@@ -4,14 +4,13 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 import jsonschema_rs
 import pytest
 from pydantic import AnyUrl, BaseModel, Field, ValidationError
 
-import schemathesis
 from schemathesis.core.error_feedback import (
     MAX_ENTRIES_PER_BUCKET,
     BoundDirection,
@@ -129,14 +128,25 @@ def _assert_valid_schema_object(input_schema: object, out: object, *, draft: str
 
 @pytest.fixture
 def make_operation(ctx):
-    """Build a real `APIOperation` with the given method/path. Returns a callable."""
-
     def factory(method: str = "post", path: str = "/api/users"):
-        schema_dict = ctx.openapi.build_schema({path: {method: {"responses": {"200": {"description": "OK"}}}}})
-        sthesis_schema = schemathesis.openapi.from_dict(schema_dict)
+        sthesis_schema = ctx.openapi.load_schema({path: {method: {"responses": {"200": {"description": "OK"}}}}})
         return sthesis_schema[path][method.upper()]
 
     return factory
+
+
+def parse_observations(
+    parser,
+    body,
+    make_operation,
+    case_factory,
+    *,
+    method: str = "post",
+    path: str = "/api/users",
+    case_kwargs: dict[str, Any] | None = None,
+):
+    operation = make_operation(method=method, path=path)
+    return parser.parse(operation=operation, body=body, case=case_factory(**(case_kwargs or {})))
 
 
 def _obs(field: str, *, op: str = "POST /api/users") -> Observation:
@@ -348,11 +358,7 @@ SPRING_FIELDERRORS_SHALL_NOT_BE_EMPTY = (
     ],
 )
 def test_spring_parser_extracts_observations(body, expected_paths, make_operation, case_factory):
-    obs = SpringParser().parse(
-        operation=make_operation(),
-        body=json.loads(body),
-        case=case_factory(),
-    )
+    obs = parse_observations(SpringParser(), json.loads(body), make_operation, case_factory)
     assert [o.parameter_path for o in obs] == expected_paths
     assert all(o.kind is ObservationKind.MUST_NOT_BE_BLANK for o in obs)
     assert all(o.location is ParameterLocation.BODY for o in obs)
@@ -463,7 +469,7 @@ def test_spring_parser_can_parse_rejects_non_spring_bodies(body):
 )
 def test_spring_parser_recognizes_non_blank_message_variants(message, make_operation, case_factory):
     body = {"subErrors": [{"field": "x", "message": message}]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind) for o in obs] == [(("x",), ObservationKind.MUST_NOT_BE_BLANK)]
 
 
@@ -479,7 +485,7 @@ def test_spring_parser_recognizes_non_blank_message_variants(message, make_opera
 )
 def test_spring_parser_skips_unrecognized_messages(message, make_operation, case_factory):
     body = {"subErrors": [{"field": "x", "message": message}]}
-    assert SpringParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(SpringParser(), body, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -496,7 +502,7 @@ def test_spring_parser_recognizes_size_bound_message_variants(
     message, expected_min, expected_max, make_operation, case_factory
 ):
     body = {"subErrors": [{"field": "username", "message": message}]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=expected_min, max=expected_max)),
     ]
@@ -533,7 +539,7 @@ def test_spring_parser_recognizes_size_bound_message_variants(
 )
 def test_spring_parser_recognizes_format_message_variants(message, expected_name, make_operation, case_factory):
     body = {"subErrors": [{"field": "contact", "message": message}]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("contact",), ObservationKind.FORMAT, FormatPayload(name=expected_name)),
     ]
@@ -544,7 +550,7 @@ def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match(make_opera
     # the URI and UUID regexes. The classifier checks UUID first so the more
     # specific format wins.
     body = {"subErrors": [{"field": "x", "message": "must be a valid UUID"}]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert obs[0].payload == FormatPayload(name="uuid")
 
 
@@ -580,7 +586,7 @@ def test_spring_parser_recognizes_numeric_bound_message_variants(
     message, expected_bound, expected_direction, expected_exclusive, make_operation, case_factory
 ):
     body = {"subErrors": [{"field": "score", "message": message}]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("score",),
@@ -615,7 +621,7 @@ def test_spring_parser_recognizes_positive_negative_keyword_variants(
     message, expected_bound, expected_direction, expected_exclusive, make_operation, case_factory
 ):
     body = {"subErrors": [{"field": "score", "message": message}]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("score",),
@@ -656,7 +662,7 @@ def test_spring_parser_recognizes_positive_negative_keyword_variants(
     ],
 )
 def test_spring_parser_extracts_unrecognized_field(body, expected, make_operation, case_factory):
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     actual = [(o.parameter_path, o.location) for o in obs if o.kind == ObservationKind.UNEXPECTED_PROPERTY]
     assert actual == expected
     for observation in obs:
@@ -685,7 +691,7 @@ def test_spring_parser_extracts_unrecognized_field(body, expected, make_operatio
     ],
 )
 def test_spring_parser_extracts_unexpected_query_parameter(body, expected_name, make_operation, case_factory):
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     actual = [(o.parameter_path, o.location, o.kind) for o in obs if o.kind == ObservationKind.UNEXPECTED_PROPERTY]
     assert actual == [((expected_name,), ParameterLocation.QUERY, ObservationKind.UNEXPECTED_PROPERTY)]
 
@@ -714,7 +720,7 @@ def test_spring_parser_extracts_unexpected_query_parameter(body, expected_name, 
     ],
 )
 def test_spring_parser_extracts_missing_request_body(body, make_operation, case_factory):
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     blank_body_obs = [
         (o.parameter_path, o.location, o.kind)
         for o in obs
@@ -737,7 +743,7 @@ def test_spring_parser_extracts_pagination_type_hint(type_name, expected_bound, 
         "messages": [f"Parameter 'page' must be '{type_name}'"],
         "timestamp": "2026-05-02T21:47:10.769780Z",
     }
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.location, o.kind, o.payload) for o in obs] == [
         (
             ("page",),
@@ -791,7 +797,7 @@ def test_jackson_parser_extracts_type_mismatch_for_object_or_array_source(source
             f'(through reference chain: AirportRequest["cityName"])'
         ),
     }
-    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.location, o.kind, o.payload) for o in obs] == [
         (
             ("cityName",),
@@ -878,7 +884,7 @@ def test_spring_parser_extracts_positive_gate_from_market_cart_body(make_operati
             {"field": "productId", "message": "Value shall be a positive number"},
         ],
     }
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("quantity",),
@@ -905,7 +911,7 @@ def test_spring_parser_extracts_positive_gate_from_market_cart_body(make_operati
 )
 def test_spring_parser_recognizes_pattern_message_variants(message, expected_regex, make_operation, case_factory):
     body = {"subErrors": [{"field": "code", "message": message}]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("code",), ObservationKind.PATTERN, PatternPayload(regex=expected_regex)),
     ]
@@ -1328,7 +1334,7 @@ def _drf_obs(
 
 def test_drf_parser_parse_flat_field(make_operation, case_factory):
     body = {"name": ["This field is required."]}
-    assert DRFParser().parse(operation=make_operation(), body=body, case=case_factory()) == (
+    assert parse_observations(DRFParser(), body, make_operation, case_factory) == (
         _drf_obs(
             op="POST /api/users",
             location=ParameterLocation.BODY,
@@ -1341,7 +1347,7 @@ def test_drf_parser_parse_flat_field(make_operation, case_factory):
 
 def test_drf_parser_parse_nested_with_size_bound(make_operation, case_factory):
     body = {"address": {"zipcode": ["Ensure this field has at least 5 characters."]}}
-    assert DRFParser().parse(operation=make_operation(), body=body, case=case_factory()) == (
+    assert parse_observations(DRFParser(), body, make_operation, case_factory) == (
         _drf_obs(
             op="POST /api/users",
             location=ParameterLocation.BODY,
@@ -1371,17 +1377,17 @@ def test_drf_parser_parse_get_request_yields_query_location(make_operation, case
 
 def test_drf_parser_parse_skips_unrecognised_messages(make_operation, case_factory):
     body = {"name": ["Custom validate_name message."]}
-    assert DRFParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(DRFParser(), body, make_operation, case_factory) == ()
 
 
 def test_drf_parser_parse_non_field_errors_only_yields_empty(make_operation, case_factory):
     body = {"non_field_errors": ["Passwords do not match."]}
-    assert DRFParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(DRFParser(), body, make_operation, case_factory) == ()
 
 
 def test_drf_parser_parse_list_with_failing_index(make_operation, case_factory):
     body = {"emails": [{}, {}, {"value": ["Enter a valid email address."]}]}
-    assert DRFParser().parse(operation=make_operation(), body=body, case=case_factory()) == (
+    assert parse_observations(DRFParser(), body, make_operation, case_factory) == (
         _drf_obs(
             op="POST /api/users",
             location=ParameterLocation.BODY,
@@ -1410,7 +1416,7 @@ _DRF_INTEGER_BODY = {"age": ["Ensure this value is greater than or equal to 0."]
 
 
 def test_drf_parser_end_to_end_multi_error_per_field(make_operation, case_factory):
-    obs = DRFParser().parse(operation=make_operation(), body=_DRF_MULTI_ERROR_BODY, case=case_factory())
+    obs = parse_observations(DRFParser(), _DRF_MULTI_ERROR_BODY, make_operation, case_factory)
     assert obs == (
         _drf_obs(
             op="POST /api/users",
@@ -1431,7 +1437,7 @@ def test_drf_parser_end_to_end_multi_error_per_field(make_operation, case_factor
 
 
 def test_drf_parser_end_to_end_django_bridge_max_length(make_operation, case_factory):
-    obs = DRFParser().parse(operation=make_operation(), body=_DRF_DJANGO_BRIDGE_BODY, case=case_factory())
+    obs = parse_observations(DRFParser(), _DRF_DJANGO_BRIDGE_BODY, make_operation, case_factory)
     assert obs == (
         _drf_obs(
             op="POST /api/users",
@@ -1445,7 +1451,7 @@ def test_drf_parser_end_to_end_django_bridge_max_length(make_operation, case_fac
 
 
 def test_drf_parser_end_to_end_list_index_attribution(make_operation, case_factory):
-    obs = DRFParser().parse(operation=make_operation(), body=_DRF_LIST_INDEX_BODY, case=case_factory())
+    obs = parse_observations(DRFParser(), _DRF_LIST_INDEX_BODY, make_operation, case_factory)
     assert obs == (
         _drf_obs(
             op="POST /api/users",
@@ -1459,7 +1465,7 @@ def test_drf_parser_end_to_end_list_index_attribution(make_operation, case_facto
 
 
 def test_drf_parser_end_to_end_nested_serializer(make_operation, case_factory):
-    obs = DRFParser().parse(operation=make_operation(), body=_DRF_NESTED_BODY, case=case_factory())
+    obs = parse_observations(DRFParser(), _DRF_NESTED_BODY, make_operation, case_factory)
     # Only the recognised "This field is required." emits — "Enter a valid value." is unmapped.
     assert obs == (
         _drf_obs(
@@ -1473,7 +1479,7 @@ def test_drf_parser_end_to_end_nested_serializer(make_operation, case_factory):
 
 
 def test_drf_parser_end_to_end_integer_min_value(make_operation, case_factory):
-    obs = DRFParser().parse(operation=make_operation(), body=_DRF_INTEGER_BODY, case=case_factory())
+    obs = parse_observations(DRFParser(), _DRF_INTEGER_BODY, make_operation, case_factory)
     assert obs == (
         _drf_obs(
             op="POST /api/users",
@@ -2362,7 +2368,7 @@ def test_laravel_parser_parse_multi_field_drops_unactionable(make_operation, cas
 
 
 def test_laravel_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert LaravelParser().parse(operation=make_operation(), body={"detail": "nope"}, case=case_factory()) == ()
+    assert parse_observations(LaravelParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -2752,7 +2758,7 @@ def test_aspnet_parser_parse(make_operation, method, path, body, expected, case_
 
 
 def test_aspnet_parser_parse_multi_field(make_operation, case_factory):
-    observations = AspNetParser().parse(operation=make_operation(), body=_ASPNET_MULTI_FIELD, case=case_factory())
+    observations = parse_observations(AspNetParser(), _ASPNET_MULTI_FIELD, make_operation, case_factory)
     assert _aspnet_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.MUST_NOT_BE_BLANK, None),
@@ -2763,7 +2769,7 @@ def test_aspnet_parser_parse_multi_field(make_operation, case_factory):
 
 
 def test_aspnet_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert AspNetParser().parse(operation=make_operation(), body={"detail": "nope"}, case=case_factory()) == ()
+    assert parse_observations(AspNetParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -3435,7 +3441,7 @@ def test_zod_parser_parse(make_operation, method, path, body, expected, case_fac
 
 
 def test_zod_parser_parse_multi_field(make_operation, case_factory):
-    observations = ZodParser().parse(operation=make_operation(), body=_ZOD_MULTI_FIELD, case=case_factory())
+    observations = parse_observations(ZodParser(), _ZOD_MULTI_FIELD, make_operation, case_factory)
     assert _zod_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
@@ -3450,7 +3456,7 @@ def test_zod_parser_parse_multi_field(make_operation, case_factory):
 
 
 def test_zod_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert ZodParser().parse(operation=make_operation(), body={"detail": "nope"}, case=case_factory()) == ()
+    assert parse_observations(ZodParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -3490,7 +3496,7 @@ def test_zod_parser_parse_returns_empty_for_non_envelope(make_operation, case_fa
 )
 def test_zod_parser_parse_drops_malformed_issue(make_operation, issue, case_factory):
     body = {"errors": [issue, {"code": "invalid_string", "validation": "email", "path": ["seed"]}]}
-    actual = ZodParser().parse(operation=make_operation(), body=body, case=case_factory())
+    actual = parse_observations(ZodParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
 
@@ -4085,7 +4091,7 @@ def test_ajv_parser_parse(make_operation, body, expected, case_factory):
 
 
 def test_ajv_parser_parse_multi_field(make_operation, case_factory):
-    observations = AjvParser().parse(operation=make_operation(), body=_AJV_MULTI_FIELD, case=case_factory())
+    observations = parse_observations(AjvParser(), _AJV_MULTI_FIELD, make_operation, case_factory)
     assert _ajv_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
@@ -4100,7 +4106,7 @@ def test_ajv_parser_parse_multi_field(make_operation, case_factory):
 
 
 def test_ajv_parser_fastify_parse_multi_field_clauses(make_operation, case_factory):
-    observations = AjvParser().parse(operation=make_operation(), body=_FASTIFY_MULTI_FIELD, case=case_factory())
+    observations = parse_observations(AjvParser(), _FASTIFY_MULTI_FIELD, make_operation, case_factory)
     assert _ajv_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
@@ -4116,7 +4122,7 @@ def test_ajv_parser_fastify_parse_multi_field_clauses(make_operation, case_facto
 
 
 def test_ajv_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert AjvParser().parse(operation=make_operation(), body={"detail": "nope"}, case=case_factory()) == ()
+    assert parse_observations(AjvParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -4140,7 +4146,7 @@ def test_ajv_parser_legacy_datapath_segments(make_operation, raw_path, expected_
             }
         ]
     }
-    obs = AjvParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(AjvParser(), body, make_operation, case_factory)
     if expected_path:
         assert obs and obs[0].parameter_path == expected_path
     else:
@@ -4150,7 +4156,7 @@ def test_ajv_parser_legacy_datapath_segments(make_operation, raw_path, expected_
 def test_ajv_parser_fastify_drops_message_without_clauses(make_operation, case_factory):
     body = _fastify_envelope("malformed")
     assert AjvParser().can_parse(body=body) is False
-    assert AjvParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(AjvParser(), body, make_operation, case_factory) == ()
 
 
 def test_ajv_parser_get_routes_to_query_location(make_operation, case_factory):
@@ -4231,7 +4237,7 @@ def test_ajv_parser_array_form_drops_malformed_issues(make_operation, issue, cas
             },
         ]
     }
-    actual = AjvParser().parse(operation=make_operation(), body=body, case=case_factory())
+    actual = parse_observations(AjvParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
 
@@ -4870,7 +4876,7 @@ def test_go_validator_parser_structured_multi_field(make_operation, case_factory
 
 
 def test_go_validator_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert GoValidatorParser().parse(operation=make_operation(), body={"detail": "nope"}, case=case_factory()) == ()
+    assert parse_observations(GoValidatorParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
 
 def test_go_validator_parser_get_routes_to_query_location(make_operation, case_factory):
@@ -4932,7 +4938,7 @@ def test_go_validator_parser_structured_drops_malformed(make_operation, issue, c
             },
         ]
     }
-    actual = GoValidatorParser().parse(operation=make_operation(), body=body, case=case_factory())
+    actual = parse_observations(GoValidatorParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
 
@@ -5340,7 +5346,7 @@ def test_symfony_parser_default_multi_field(make_operation, case_factory):
 
 
 def test_symfony_parser_api_platform_multi_field(make_operation, case_factory):
-    observations = SymfonyParser().parse(operation=make_operation(), body=_SYMFONY_API_MULTI_FIELD, case=case_factory())
+    observations = parse_observations(SymfonyParser(), _SYMFONY_API_MULTI_FIELD, make_operation, case_factory)
     assert _symfony_signatures(observations) == sorted(
         [
             (("email",), ObservationKind.FORMAT, FormatPayload(name="email")),
@@ -5352,7 +5358,7 @@ def test_symfony_parser_api_platform_multi_field(make_operation, case_factory):
 
 
 def test_symfony_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert SymfonyParser().parse(operation=make_operation(), body={"detail": "nope"}, case=case_factory()) == ()
+    assert parse_observations(SymfonyParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
 
 def test_symfony_parser_get_routes_to_query_location(make_operation, case_factory):
@@ -5401,7 +5407,7 @@ def test_symfony_parser_get_routes_to_query_location(make_operation, case_factor
 )
 def test_symfony_parser_drops_malformed_violation(make_operation, violation, case_factory):
     body = [violation, _violation("seed", _SYMFONY_EMAIL_CODE)]
-    actual = SymfonyParser().parse(operation=make_operation(), body=body, case=case_factory())
+    actual = parse_observations(SymfonyParser(), body, make_operation, case_factory)
     actual_paths = tuple(o.parameter_path for o in actual)
     assert actual_paths == (("seed",),)
 
@@ -5639,7 +5645,7 @@ def test_confluent_parser_p4_drops_when_no_empty_string_in_body(make_operation, 
 
 
 def test_confluent_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
-    assert ConfluentParser().parse(operation=make_operation(), body={"detail": "nope"}, case=case_factory()) == ()
+    assert parse_observations(ConfluentParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
 
 def test_confluent_parser_get_routes_to_query_location(make_operation, case_factory):
@@ -5770,7 +5776,7 @@ def test_jackson_parser_extracts_observations(
     carrier_key, message, expected_path, expected_type, make_operation, case_factory
 ):
     body = {carrier_key: message}
-    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (expected_path, ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=expected_type)),
     ]
@@ -5778,7 +5784,7 @@ def test_jackson_parser_extracts_observations(
 
 def test_jackson_parser_emits_both_type_and_enum_for_enum_message(make_operation, case_factory):
     body = {"msg": _JACKSON_ENUM_USERTYPE}
-    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [(o.kind, o.payload) for o in obs] == [
         (
             ObservationKind.TYPE_MISMATCH,
@@ -5791,7 +5797,7 @@ def test_jackson_parser_emits_both_type_and_enum_for_enum_message(make_operation
 
 def test_jackson_parser_emits_enum_only_when_type_clause_is_absent(make_operation, case_factory):
     body = {"msg": _JACKSON_ENUM_BARE}
-    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("status",),
@@ -5818,7 +5824,7 @@ def test_jackson_parser_enum_value_list_variants(values_blob, expected, make_ope
         f"not one of the values accepted for Enum class: [{values_blob}] "
         f'through reference chain: Order["status"]'
     )
-    obs = JacksonParser().parse(operation=make_operation(), body={"msg": message}, case=case_factory())
+    obs = parse_observations(JacksonParser(), {"msg": message}, make_operation, case_factory)
     enum_payloads = [o.payload for o in obs if o.kind is ObservationKind.ENUM]
     assert enum_payloads == [EnumPayload(values=expected)]
 
@@ -5850,7 +5856,7 @@ def test_jackson_parser_skips_message_without_reference_chain(make_operation, ca
     # Without request context, no field can be attributed; message is dropped.
     body = {"msg": 'Cannot deserialize value of type `java.time.LocalDate` from String "x"'}
     assert JacksonParser().can_parse(body=body) is True
-    assert JacksonParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(JacksonParser(), body, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -5864,7 +5870,7 @@ def test_jackson_parser_skips_message_without_reference_chain(make_operation, ca
     ids=["none", "string", "list", "no-jackson-text"],
 )
 def test_jackson_parser_parse_returns_empty_for_unparsable_bodies(body, make_operation, case_factory):
-    assert JacksonParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(JacksonParser(), body, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -5886,13 +5892,13 @@ def test_jackson_parser_walks_into_array_shape_envelopes(array_key, item_key, ma
     # Custom `@ControllerAdvice` handlers sometimes funnel Jackson parse errors
     # alongside Bean-validation results into a single `errors[]` array.
     body = {array_key: [{item_key: _JACKSON_LOCAL_DATE}]}
-    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [o.payload for o in obs] == [TypeMismatchPayload(type_name="java.time.LocalDate")]
 
 
 def test_jackson_parser_skips_non_dict_array_items(make_operation, case_factory):
     body = {"errors": ["string-item", 123, None, {"message": _JACKSON_LOCAL_DATE}]}
-    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [o.payload for o in obs] == [TypeMismatchPayload(type_name="java.time.LocalDate")]
 
 
@@ -5903,7 +5909,7 @@ def test_jackson_parser_extracts_one_observation_per_carrier_key(make_operation,
         "msg": _JACKSON_LOCAL_DATE,
         "detail": _JACKSON_UUID,
     }
-    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(JacksonParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.payload) for o in obs] == [
         (("hire_date",), TypeMismatchPayload(type_name="java.time.LocalDate")),
         (("id",), TypeMismatchPayload(type_name="java.util.UUID")),
@@ -5920,7 +5926,7 @@ _JACKSON_OVERFLOW_INT = (
 
 
 def test_jackson_numeric_overflow_int(make_operation, case_factory):
-    obs = JacksonParser().parse(operation=make_operation(), body={"msg": _JACKSON_OVERFLOW_INT}, case=case_factory())
+    obs = parse_observations(JacksonParser(), {"msg": _JACKSON_OVERFLOW_INT}, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("availableBeds",),
@@ -5940,7 +5946,7 @@ def test_jackson_numeric_overflow_long(make_operation, case_factory):
         "JSON parse error: Numeric value (99999999999999999999) out of range of long "
         'through reference chain: Order["quantity"]'
     )
-    obs = JacksonParser().parse(operation=make_operation(), body={"msg": message}, case=case_factory())
+    obs = parse_observations(JacksonParser(), {"msg": message}, make_operation, case_factory)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("quantity",),
@@ -6036,7 +6042,7 @@ SPRING_FIELDERRORS_MULTI = (
     ids=["messages", "subErrors", "problemDetail", "errors", "fieldErrors"],
 )
 def test_spring_parser_extracts_multiple_entries_per_shape(body, expected_paths, make_operation, case_factory):
-    obs = SpringParser().parse(operation=make_operation(), body=json.loads(body), case=case_factory())
+    obs = parse_observations(SpringParser(), json.loads(body), make_operation, case_factory)
     assert [o.parameter_path for o in obs] == expected_paths
 
 
@@ -6063,7 +6069,7 @@ def test_spring_parser_extracts_multiple_entries_per_shape(body, expected_paths,
     ids=["subErrors-2-deep", "messages-3-deep", "errors-2-deep", "fieldErrors-3-deep"],
 )
 def test_spring_parser_splits_dotted_paths_into_tuples(body, expected_path, make_operation, case_factory):
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [o.parameter_path for o in obs] == [expected_path]
 
 
@@ -6101,7 +6107,7 @@ def test_spring_parser_splits_dotted_paths_into_tuples(body, expected_path, make
 )
 def test_spring_parser_errors_field_and_message_priority(entry, expected, make_operation, case_factory):
     body = {"errors": [entry]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [o.parameter_path for o in obs] == expected
 
 
@@ -6144,7 +6150,7 @@ def test_spring_parser_errors_field_and_message_priority(entry, expected, make_o
 )
 def test_spring_parser_field_errors_locator_and_message_priority(entry, expected, make_operation, case_factory):
     body = {"fieldErrors": [entry]}
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [o.parameter_path for o in obs] == expected
 
 
@@ -6182,7 +6188,7 @@ def test_spring_parser_field_errors_locator_and_message_priority(entry, expected
     ],
 )
 def test_spring_parser_skips_invalid_or_unrecognized_entries(body, make_operation, case_factory):
-    assert SpringParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(SpringParser(), body, make_operation, case_factory) == ()
 
 
 def test_spring_parser_mixes_valid_and_invalid_messages(make_operation, case_factory):
@@ -6195,7 +6201,7 @@ def test_spring_parser_mixes_valid_and_invalid_messages(make_operation, case_fac
             "x - just some prose",
         ]
     }
-    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
     assert [o.parameter_path for o in obs] == [("valid",), ("another",)]
 
 
@@ -6205,7 +6211,7 @@ def test_spring_parser_mixes_valid_and_invalid_messages(make_operation, case_fac
     ids=["list", "string", "none", "int", "float", "bool"],
 )
 def test_spring_parser_returns_empty_for_non_dict_body(body, make_operation, case_factory):
-    assert SpringParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(SpringParser(), body, make_operation, case_factory) == ()
 
 
 def test_pipeline_dispatches_to_spring_parser_for_spring_shape(case_factory, response_factory):
@@ -8011,7 +8017,7 @@ _PYDANTIC_FIXTURES: tuple[tuple[dict, Observation], ...] = (
     ids=[entry["type"] for entry, _ in _PYDANTIC_FIXTURES],
 )
 def test_pydantic_parser_extracts_observation(entry, expected, make_operation, case_factory):
-    obs = PydanticParser().parse(operation=make_operation(), body={"detail": [entry]}, case=case_factory())
+    obs = parse_observations(PydanticParser(), {"detail": [entry]}, make_operation, case_factory)
     assert obs == (expected,)
 
 
@@ -8028,7 +8034,7 @@ def test_pydantic_parser_coerces_decimal_numeric_bounds(make_operation, case_fac
             }
         ]
     }
-    obs = PydanticParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(PydanticParser(), body, make_operation, case_factory)
     assert obs == (
         Observation(
             operation_label="POST /api/users",
@@ -8136,7 +8142,7 @@ def test_pydantic_fixture_matches_runtime(type_code, model, invalid_kwargs, cont
 )
 def test_pydantic_parser_maps_loc_prefix_to_location(loc_prefix, expected_location, make_operation, case_factory):
     body = {"detail": [{"type": "missing", "loc": [loc_prefix, "x"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(PydanticParser(), body, make_operation, case_factory)
     assert len(obs) == 1
     assert obs[0].location == expected_location
     assert obs[0].parameter_path == ("x",)
@@ -8144,7 +8150,7 @@ def test_pydantic_parser_maps_loc_prefix_to_location(loc_prefix, expected_locati
 
 def test_pydantic_parser_defaults_to_body_when_loc_prefix_unrecognized(make_operation, case_factory):
     body = {"detail": [{"type": "missing", "loc": ["unknown", "x"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(PydanticParser(), body, make_operation, case_factory)
     assert obs[0].location == ParameterLocation.BODY
     assert obs[0].parameter_path == ("unknown", "x")
 
@@ -8152,7 +8158,7 @@ def test_pydantic_parser_defaults_to_body_when_loc_prefix_unrecognized(make_oper
 def test_pydantic_parser_handles_int_path_segments(make_operation, case_factory):
     # FastAPI emits int segments for list-element validation failures.
     body = {"detail": [{"type": "missing", "loc": ["body", "items", 0, "qty"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(PydanticParser(), body, make_operation, case_factory)
     assert obs[0].parameter_path == ("items", 0, "qty")
     assert obs[0].location == ParameterLocation.BODY
 
@@ -8214,7 +8220,7 @@ def test_pydantic_parse_expected_returns_none_for_non_string(value):
     ],
 )
 def test_pydantic_parser_parse_returns_empty_for_uninteresting_bodies(body, make_operation, case_factory):
-    assert PydanticParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(PydanticParser(), body, make_operation, case_factory) == ()
 
 
 @pytest.mark.parametrize(
@@ -8242,12 +8248,12 @@ def test_pydantic_parser_parse_returns_empty_for_uninteresting_bodies(body, make
 )
 def test_pydantic_parser_skips_handler_with_invalid_context(type_code, context, make_operation, case_factory):
     body = {"detail": [{"type": type_code, "loc": ["body", "x"], "msg": "...", "ctx": context}]}
-    assert PydanticParser().parse(operation=make_operation(), body=body, case=case_factory()) == ()
+    assert parse_observations(PydanticParser(), body, make_operation, case_factory) == ()
 
 
 def test_pydantic_parser_skips_non_dict_detail_entry(make_operation, case_factory):
     body = {"detail": [42, {"type": "missing", "loc": ["body", "x"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(PydanticParser(), body, make_operation, case_factory)
     assert obs[0].parameter_path == ("x",)
     assert len(obs) == 1
 
@@ -8259,7 +8265,7 @@ def test_pydantic_parser_emits_one_observation_per_detail_entry(make_operation, 
             {"type": "string_too_short", "loc": ["body", "code"], "msg": "...", "ctx": {"min_length": 3}},
         ]
     }
-    obs = PydanticParser().parse(operation=make_operation(), body=body, case=case_factory())
+    obs = parse_observations(PydanticParser(), body, make_operation, case_factory)
     assert [(o.parameter_path, o.kind) for o in obs] == [
         (("name",), ObservationKind.MUST_NOT_BE_BLANK),
         (("code",), ObservationKind.SIZE_BOUND),

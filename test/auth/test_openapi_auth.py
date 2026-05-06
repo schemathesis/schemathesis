@@ -141,9 +141,9 @@ def create_auth_test_app(ctx):
 
 
 @pytest.fixture
-def auth_app_port(ctx, app_runner):
+def auth_schema_url(ctx, cli, app_runner):
     app = create_auth_test_app(ctx)
-    return app_runner.run_flask_app(app)
+    return app_runner.openapi_url(app)
 
 
 @pytest.mark.parametrize(
@@ -156,10 +156,10 @@ def auth_app_port(ctx, app_runner):
         ("BearerAuth", "/bearer-auth"),
     ],
 )
-def test_openapi_auth_schemes(cli, auth_app_port, snapshot_cli, config_section, endpoint):
+def test_openapi_auth_schemes(cli, auth_schema_url, snapshot_cli, config_section, endpoint):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             f"--include-path={endpoint}",
             "--phases=fuzzing",
             "--mode=positive",
@@ -170,10 +170,10 @@ def test_openapi_auth_schemes(cli, auth_app_port, snapshot_cli, config_section, 
     )
 
 
-def test_multiple_auth_and_semantics(cli, auth_app_port, snapshot_cli):
+def test_multiple_auth_and_semantics(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             "--include-path=/multiple-auth-and",
             "--phases=fuzzing",
             "--mode=positive",
@@ -191,10 +191,10 @@ def test_multiple_auth_and_semantics(cli, auth_app_port, snapshot_cli):
     )
 
 
-def test_multiple_auth_or_semantics(cli, auth_app_port, snapshot_cli):
+def test_multiple_auth_or_semantics(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             "--include-path=/multiple-auth-or",
             "--phases=fuzzing",
             "--mode=positive",
@@ -211,10 +211,10 @@ def test_multiple_auth_or_semantics(cli, auth_app_port, snapshot_cli):
     )
 
 
-def test_optional_auth(cli, auth_app_port, snapshot_cli):
+def test_optional_auth(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             "--include-path=/optional-auth",
             "--phases=fuzzing",
             "--mode=positive",
@@ -224,10 +224,10 @@ def test_optional_auth(cli, auth_app_port, snapshot_cli):
     )
 
 
-def test_fallback_to_cli_auth(cli, auth_app_port, snapshot_cli):
+def test_fallback_to_cli_auth(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             "--auth=testuser:testpass",
             "--include-path=/basic-auth",
             "--phases=fuzzing",
@@ -239,10 +239,10 @@ def test_fallback_to_cli_auth(cli, auth_app_port, snapshot_cli):
 
 
 @pytest.mark.parametrize("invalid_scheme", ["NonExistentAuth", "ApiKeyHeadr"])
-def test_unused_openapi_auth_warnings(cli, auth_app_port, snapshot_cli, invalid_scheme):
+def test_unused_openapi_auth_warnings(cli, auth_schema_url, snapshot_cli, invalid_scheme):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             "--include-path=/api-key-header",
             "--phases=fuzzing",
             "--mode=positive",
@@ -297,11 +297,11 @@ def test_openapi_v2_swagger(ctx, cli, app_runner, snapshot_cli):
             return jsonify({"status": "authenticated"})
         return jsonify({"error": "unauthorized"}), 401
 
-    port = app_runner.run_flask_app(app)
+    schema_url = app_runner.openapi_url(app, path="/swagger.json")
 
     assert (
         cli.run(
-            f"http://127.0.0.1:{port}/swagger.json",
+            schema_url,
             "--phases=fuzzing",
             "--mode=positive",
             "-n 5",
@@ -318,10 +318,10 @@ def test_openapi_v2_swagger(ctx, cli, app_runner, snapshot_cli):
     )
 
 
-def test_cli_auth_precedence_over_openapi(cli, auth_app_port, snapshot_cli):
+def test_cli_auth_precedence_over_openapi(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             "--auth=wrong:credentials",
             "--include-path=/basic-auth",
             "--phases=fuzzing",
@@ -339,7 +339,7 @@ def test_cli_auth_precedence_over_openapi(cli, auth_app_port, snapshot_cli):
     )
 
 
-def test_global_security_overridden_by_operation(ctx, cli, app_runner, snapshot_cli):
+def test_global_security_overridden_by_operation(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/operation-override": {
@@ -366,11 +366,9 @@ def test_global_security_overridden_by_operation(ctx, cli, app_runner, snapshot_
             return jsonify({"status": "authenticated"})
         return jsonify({"error": "unauthorized"}), 401
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--mode=positive",
             "-n 5",
@@ -387,10 +385,10 @@ def test_global_security_overridden_by_operation(ctx, cli, app_runner, snapshot_
     )
 
 
-def test_partial_scheme_configuration(cli, auth_app_port, snapshot_cli):
+def test_partial_scheme_configuration(cli, auth_schema_url, snapshot_cli):
     assert (
         cli.run(
-            f"http://127.0.0.1:{auth_app_port}/openapi.json",
+            auth_schema_url,
             "--include-path=/multiple-auth-and",
             "--phases=fuzzing",
             "--mode=positive",
@@ -408,7 +406,7 @@ def test_partial_scheme_configuration(cli, auth_app_port, snapshot_cli):
     )
 
 
-def test_no_security_requirements(ctx, cli, app_runner, snapshot_cli):
+def test_no_security_requirements(ctx, cli, snapshot_cli):
     raw_schema = {
         "openapi": "3.0.0",
         "info": {"title": "No Security API", "version": "1.0.0"},
@@ -436,12 +434,10 @@ def test_no_security_requirements(ctx, cli, app_runner, snapshot_cli):
     def public_endpoint():
         return jsonify({"status": "ok"})
 
-    port = app_runner.run_flask_app(app)
-
     # Auth is configured but should not be applied since no security requirements
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--mode=positive",
             "-n 5",
@@ -457,7 +453,7 @@ def test_no_security_requirements(ctx, cli, app_runner, snapshot_cli):
     )
 
 
-def test_multiple_or_requirements_first_match(ctx, cli, app_runner, snapshot_cli):
+def test_multiple_or_requirements_first_match(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/multi-or": {
@@ -492,12 +488,10 @@ def test_multiple_or_requirements_first_match(ctx, cli, app_runner, snapshot_cli
             return jsonify({"status": "authenticated"})
         return jsonify({"error": "unauthorized"}), 401
 
-    port = app_runner.run_flask_app(app)
-
     # Only configure SecondAuth - should use it even though FirstAuth comes first in schema
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--mode=positive",
             "-n 5",
@@ -513,7 +507,7 @@ def test_multiple_or_requirements_first_match(ctx, cli, app_runner, snapshot_cli
     )
 
 
-def test_auth_with_invalid_scheme_in_schema(ctx, cli, app_runner, snapshot_cli):
+def test_auth_with_invalid_scheme_in_schema(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/protected": {
@@ -545,12 +539,10 @@ def test_auth_with_invalid_scheme_in_schema(ctx, cli, app_runner, snapshot_cli):
     def protected():
         return jsonify({"error": "unauthorized"}), 401
 
-    port = app_runner.run_flask_app(app)
-
     # OAuth2 scheme exists but isn't supported - should fall back to CLI auth if provided
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--mode=positive",
             "-n 5",
@@ -559,7 +551,7 @@ def test_auth_with_invalid_scheme_in_schema(ctx, cli, app_runner, snapshot_cli):
     )
 
 
-def test_referenced_security_scheme(ctx, cli, app_runner, snapshot_cli):
+def test_referenced_security_scheme(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/api-key": {
@@ -584,11 +576,9 @@ def test_referenced_security_scheme(ctx, cli, app_runner, snapshot_cli):
             return jsonify({"status": "authenticated"})
         return jsonify({"error": "unauthorized"}), 401
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--include-path=/api-key",
             "--phases=fuzzing",
             "--mode=positive",

@@ -6,33 +6,29 @@ import schemathesis
 
 
 @pytest.mark.hypothesis_nested
-def test_cookies():
+def test_cookies(ctx):
     app = Flask(__name__)
 
     @app.route("/cookies", methods=["GET"])
     def cookies():
         return jsonify(request.cookies)
 
-    schema = schemathesis.openapi.from_dict(
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "paths": {
-                "/cookies": {
-                    "get": {
-                        "parameters": [
-                            {
-                                "name": "token",
-                                "in": "cookie",
-                                "required": True,
-                                "schema": {"type": "string", "enum": ["test"]},
-                            }
-                        ],
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "/cookies": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "token",
+                            "in": "cookie",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["test"]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
-            },
-        },
+            }
+        }
     )
 
     strategy = schema["/cookies"]["GET"].as_strategy()
@@ -68,21 +64,17 @@ def test_form_data(ctx):
 def test_binary_body(ctx, mocker):
     # When an API operation accepts a binary input
     api = ctx.openapi.apps.upload_file()
-    schema = schemathesis.openapi.from_dict(
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "paths": {
-                "/api/upload_file": {
-                    "post": {
-                        "requestBody": {
-                            "content": {"application/octet-stream": {"schema": {"format": "binary", "type": "string"}}}
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "/api/upload_file": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/octet-stream": {"schema": {"format": "binary", "type": "string"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 }
-            },
-        },
+            }
+        }
     )
     strategy = schema["/api/upload_file"]["POST"].as_strategy()
 

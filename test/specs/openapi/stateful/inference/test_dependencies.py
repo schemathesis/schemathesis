@@ -107,6 +107,11 @@ def operation_with_body(
     return {path: {method: op}}
 
 
+def analyze_dependencies(ctx, paths, **kwargs):
+    schema = ctx.openapi.load_schema(paths, **kwargs)
+    return schema, analyze(schema)
+
+
 ORDER_REQUEST_WITH_CUSTOMER = {
     "type": "object",
     "properties": {"customer_id": {"type": "string"}, "total": {"type": "number"}},
@@ -3160,10 +3165,7 @@ def test_dependency_graph(request, ctx, paths, components, snapshot_json):
     kwargs = {}
     if components is not None:
         kwargs["components"] = components
-    raw_schema = ctx.openapi.build_schema(paths, **kwargs)
-    schema = schemathesis.openapi.from_dict(raw_schema)
-
-    graph = analyze(schema)
+    schema, graph = analyze_dependencies(ctx, paths, **kwargs)
 
     graph.assert_incorrect_field_mappings(request.node.callspec.id, KNOWN_INCORRECT_FIELD_MAPPINGS)
     assert graph.serialize() == snapshot_json
@@ -3229,12 +3231,12 @@ def test_nested_fk_inference_independent_of_path_order(ctx):
                     return slot.resource.name, slot.resource_field
         return None
 
-    producer_first = ctx.openapi.build_schema({**producer_path, **consumer_path})
-    consumer_first = ctx.openapi.build_schema({**consumer_path, **producer_path})
+    _, producer_first = analyze_dependencies(ctx, {**producer_path, **consumer_path})
+    _, consumer_first = analyze_dependencies(ctx, {**consumer_path, **producer_path})
 
     expected = ("Location", "id")
-    assert _slot_for(analyze(schemathesis.openapi.from_dict(producer_first))) == expected
-    assert _slot_for(analyze(schemathesis.openapi.from_dict(consumer_first))) == expected
+    assert _slot_for(producer_first) == expected
+    assert _slot_for(consumer_first) == expected
 
 
 def test_nested_fk_inference_array_items_consumer_first(ctx):
@@ -3284,8 +3286,7 @@ def test_nested_fk_inference_array_items_consumer_first(ctx):
             }
         }
     }
-    spec = ctx.openapi.build_schema({**consumer_path, **producer_path})
-    graph = analyze(schemathesis.openapi.from_dict(spec))
+    _, graph = analyze_dependencies(ctx, {**consumer_path, **producer_path})
 
     array_slot = next(
         (slot for op in graph.operations.values() for slot in op.inputs if slot.parameter_name == "rows/0/location_id"),
@@ -3322,8 +3323,7 @@ def test_nested_fk_inference_drops_slot_when_target_never_registered(ctx):
             }
         }
     }
-    spec = ctx.openapi.build_schema(consumer_only)
-    graph = analyze(schemathesis.openapi.from_dict(spec))
+    _, graph = analyze_dependencies(ctx, consumer_only)
 
     assert "Phantom" not in graph.resources
     for op in graph.operations.values():
@@ -3386,7 +3386,8 @@ def test_infer_fk_target_snake_case_unchanged(field, expected):
 
 
 def test_camelcase_nested_fk_produces_input_slot(ctx):
-    spec = ctx.openapi.build_schema(
+    _, graph = analyze_dependencies(
+        ctx,
         {
             "/locations": {
                 "post": {
@@ -3429,9 +3430,8 @@ def test_camelcase_nested_fk_produces_input_slot(ctx):
                     "responses": {"201": {"description": "OK"}},
                 }
             },
-        }
+        },
     )
-    graph = analyze(schemathesis.openapi.from_dict(spec))
 
     nested_slot = next(
         (
@@ -3492,11 +3492,7 @@ def test_camelcase_nested_fk_produces_input_slot(ctx):
     ],
 )
 def test_recursion(ctx, paths, kwargs, version, snapshot_json):
-    raw_schema = ctx.openapi.build_schema(paths, **kwargs, version=version)
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
-
-    graph = analyze(schema)
+    _, graph = analyze_dependencies(ctx, paths, **kwargs, version=version)
     assert graph.serialize() == snapshot_json
 
 
@@ -3575,7 +3571,7 @@ def test_resource_name_from_path_with_param(path, param_name, expected):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_cli, ctx):
+def test_schema_inference_discovers_state_corruption(cli, snapshot_cli, ctx):
     product_schema = {
         "type": "object",
         "properties": {
@@ -3723,13 +3719,11 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
 
         return "", 204
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--mode=positive",
             "--phases=stateful",
         )
@@ -3738,9 +3732,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_with_others(
-    cli, app_runner, snapshot_cli, ctx
-):
+def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_with_others(cli, snapshot_cli, ctx):
     app, schema = ctx.openapi.make_flask_app(
         {
             "/sessions": {
@@ -3832,13 +3824,11 @@ def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_
         # Always fails with 500 for valid sessions
         return jsonify({"error": "Internal error"}), 500
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c not_a_server_error",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -3847,7 +3837,7 @@ def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
-def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot_cli, ctx):
+def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
     order_response_schema = {
         "type": "object",
         "properties": {
@@ -3951,13 +3941,11 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
 
         return jsonify({"detail": "Customer does not exist"}), 404
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -3966,7 +3954,7 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
-def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cli, ctx):
+def test_stateful_discovers_invalid_resource_id_bug(cli, snapshot_cli, ctx):
     order_response_schema = {
         "type": "object",
         "properties": {
@@ -4072,13 +4060,11 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
             }
         ), 201
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=50",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -4086,7 +4072,7 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, app_runner, snapshot_cli, ctx):
+def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, snapshot_cli, ctx):
     product_schema = {
         "type": "object",
         "properties": {
@@ -4177,13 +4163,11 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
         p = products[product_id]
         return jsonify({"id": p["id"], "name": p["name"], "price": p["price"]}), 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c not_a_server_error",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--mode=positive",
             "--phases=stateful",
         )
@@ -4192,7 +4176,7 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cli, app_runner, snapshot_cli, ctx):
+def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cli, snapshot_cli, ctx):
     order_response_schema = {
         "type": "object",
         "properties": {
@@ -4295,13 +4279,11 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
 
         return jsonify({"detail": "Customer does not exist"}), 404
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c not_a_server_error",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -4309,7 +4291,7 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_schemathesis_stateful_finds_checksum_match_bug(ctx, cli, app_runner, snapshot_cli):
+def test_schemathesis_stateful_finds_checksum_match_bug(ctx, cli, snapshot_cli):
     openapi = {
         "openapi": "3.0.0",
         "info": {"title": "Minimal Blog", "version": "1.0.0"},
@@ -4414,14 +4396,12 @@ def test_schemathesis_stateful_finds_checksum_match_bug(ctx, cli, app_runner, sn
         stored["body"] = payload.get("body", stored["body"])
         return "", 204
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "--mode=positive",
             "-c not_a_server_error",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -4429,7 +4409,7 @@ def test_schemathesis_stateful_finds_checksum_match_bug(ctx, cli, app_runner, sn
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_bug_when_link_always_used(cli, app_runner, snapshot_cli, ctx):
+def test_stateful_bug_when_link_always_used(cli, snapshot_cli, ctx):
     item_schema = {
         "type": "object",
         "properties": {
@@ -4531,13 +4511,11 @@ def test_stateful_bug_when_link_always_used(cli, app_runner, snapshot_cli, ctx):
         item = items[item_id]
         return jsonify({"id": item["id"], "name": item["name"]}), 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c not_a_server_error",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -4848,8 +4826,7 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
     ],
 )
 def test_inject_links_deduplication(ctx, schema, expected):
-    raw_schema = ctx.openapi.build_schema(schema)
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = ctx.openapi.load_schema(schema)
     assert dependencies.inject_links(schema) == expected
 
 
@@ -4877,8 +4854,7 @@ def test_inject_links_invalid_link_missing_operation_ref_and_id(ctx):
         },
     }
 
-    raw_schema = ctx.openapi.build_schema(schema_dict)
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = ctx.openapi.load_schema(schema_dict)
 
     with pytest.raises(InvalidSchema, match="Link definition is missing both.*operationRef.*operationId"):
         dependencies.inject_links(schema)
@@ -4907,7 +4883,7 @@ def test_inject_links_with_reference_to_components(ctx):
         },
     }
 
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         schema_dict,
         components={
             "links": {
@@ -4917,7 +4893,6 @@ def test_inject_links_with_reference_to_components(ctx):
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
 
     assert dependencies.inject_links(schema) == 1
 
@@ -4955,7 +4930,7 @@ def test_iter_links_with_nested_refs(ctx):
         },
     }
 
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         schema_dict,
         version="3.1.0",
         components={
@@ -4968,7 +4943,6 @@ def test_iter_links_with_nested_refs(ctx):
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
 
     # Verify that recursive $refs are fully resolved when iterating links
     for result in schema.get_all_operations():
@@ -4999,7 +4973,7 @@ def test_iter_links_with_circular_refs(ctx):
         },
     }
 
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         schema_dict,
         version="3.1.0",
         components={
@@ -5009,7 +4983,6 @@ def test_iter_links_with_circular_refs(ctx):
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
 
     # Should not hang or crash - circular refs are gracefully handled
     for result in schema.get_all_operations():
@@ -5023,7 +4996,7 @@ def test_iter_links_with_circular_refs(ctx):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
-def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapshot_cli, ctx):
+def test_stateful_discovers_bug_with_custom_deserializer(cli, snapshot_cli, ctx):
     @schemathesis.deserializer("application/vnd.custom")
     def deserialize_custom(ctx, response):
         text = response.content.decode(response.encoding or "utf-8")
@@ -5126,17 +5099,14 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapsh
     )
 
     users = {}
-    next_id = 1
 
     @app.route("/users", methods=["POST"])
     def create_user():
-        nonlocal next_id
         data = request.get_json() or {}
         if not isinstance(data, dict):
             return {"error": "Invalid input"}, 400
 
-        user_id = str(next_id)
-        next_id += 1
+        user_id = "1"
         users[user_id] = {
             "id": user_id,
             "first_name": str(data.get("first_name", "")),
@@ -5189,13 +5159,11 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapsh
             {"Content-Type": "application/vnd.custom"},
         )
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--mode=positive",
             "--phases=stateful",
         )
@@ -5204,7 +5172,7 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapsh
 
 
 def test_canonicalize_with_merged_returning_none(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -5233,15 +5201,12 @@ def test_canonicalize_with_merged_returning_none(ctx):
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     analyze(schema)
 
 
 def test_merged_returning_none_with_anyof_schema(ctx):
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
+    schema = ctx.openapi.load_schema(
+        {
             "/items": {
                 "post": {
                     "responses": {
@@ -5272,7 +5237,8 @@ def test_merged_returning_none_with_anyof_schema(ctx):
                 }
             }
         },
-        "components": {
+        version="3.1.0",
+        components={
             "schemas": {
                 "Base": {
                     "type": "object",
@@ -5287,6 +5253,5 @@ def test_merged_returning_none_with_anyof_schema(ctx):
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
     analyze(schema)

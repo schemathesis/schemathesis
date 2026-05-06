@@ -3,14 +3,13 @@ from _pytest.main import ExitCode
 from flask import Response
 
 
-def _serve_schema(ctx, app_runner, schema: dict, routes):
+def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
     app = ctx.openapi.make_flask_app_from_schema(schema)
 
     for method, path, handler in routes:
         app.add_url_rule(path, f"{method}_{path}", handler, methods=[method])
 
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}/openapi.json"
+    return app_runner.openapi_url(app)
 
 
 def test_missing_auth_warning_with_fail_on_true(ctx, cli, tmp_path, monkeypatch):
@@ -191,7 +190,7 @@ def test_warnings_multiple_types_via_cli(ctx, cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_final_line_counts_all_warning_kinds_in_run(cli, app_runner, ctx, snapshot_cli):
+def test_final_line_counts_all_warning_kinds_in_run(cli, ctx, app_runner, snapshot_cli):
     # Regression test: the footer "N warnings in Xs" should count warning *kinds*, not just missing_auth operations
     schema = ctx.openapi.build_schema(
         {
@@ -218,5 +217,5 @@ def test_final_line_counts_all_warning_kinds_in_run(cli, app_runner, ctx, snapsh
     def missing():  # type: ignore[no-untyped-def]
         return Response(status=404)
 
-    schema_url = _serve_schema(ctx, app_runner, schema, [("GET", "/auth", auth), ("GET", "/missing", missing)])
+    schema_url = _serve_schema(ctx, cli, app_runner, schema, [("GET", "/auth", auth), ("GET", "/missing", missing)])
     assert cli.run(schema_url, "--checks=not_a_server_error", "--max-examples=1") == snapshot_cli

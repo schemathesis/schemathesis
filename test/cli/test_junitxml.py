@@ -161,10 +161,10 @@ def test_binary_response(ctx, cli, app_runner, tmp_path):
             status=500,
         )
 
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
-        f"--url=http://127.0.0.1:{port}/api",
+        f"{base_url}/openapi.json",
+        f"--url={base_url}/api",
         "--checks=all",
         f"--report-junit-path={xml_path}",
         "--exclude-checks=positive_data_acceptance",
@@ -177,7 +177,7 @@ def test_binary_response(ctx, cli, app_runner, tmp_path):
     assert testcases[0][0].tag == "failure"
     assert testcases[0][0].attrib["type"] == "failure"
     assert (
-        extract_message(testcases[0][0], f"127.0.0.1:{port}")
+        extract_message(testcases[0][0], base_url.removeprefix("http://"))
         == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      <BINARY>  Reproduce with:      curl -X GET http://localhost/api/binary"
     )
 
@@ -256,7 +256,7 @@ def test_permission_denied(ctx, cli, tmp_path, path):
     assert "Permission denied" in result.stdout or "Permission denied" in result.stderr
 
 
-def test_coverage_unspecified_method_in_junit(cli, ctx, app_runner, tmp_path):
+def test_coverage_unspecified_method_in_junit(cli, ctx, tmp_path):
     # See GH-3699
     # When coverage phase triggers an `unsupported_method` failure via UNSPECIFIED_HTTP_METHOD,
     # the failure must appear in JUnit XML
@@ -268,9 +268,8 @@ def test_coverage_unspecified_method_in_junit(cli, ctx, app_runner, tmp_path):
     def users():
         return jsonify([])
 
-    port = app_runner.run_flask_app(app)
-    result = cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    result = cli.run_openapi_app(
+        app,
         "--phases=coverage",
         f"--report-junit-path={xml_path}",
         "--checks=unsupported_method",

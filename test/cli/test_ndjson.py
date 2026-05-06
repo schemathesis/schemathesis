@@ -29,7 +29,7 @@ def get_event_data(event):
     return next(iter(event.values()))
 
 
-def test_ndjson_includes_case_meta(cli, ctx, app_runner, ndjson_path):
+def test_ndjson_includes_case_meta(cli, ctx, ndjson_path):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items/{itemId}": {
@@ -47,10 +47,8 @@ def test_ndjson_includes_case_meta(cli, ctx, app_runner, ndjson_path):
     def get_item(item_id):
         return jsonify({"id": item_id})
 
-    port = app_runner.run_flask_app(app)
-
-    cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    cli.run_openapi_app(
+        app,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=2",
         "--seed=1",
@@ -247,17 +245,15 @@ def test_binary_body_base64(ctx, cli, ndjson_path):
                     assert "$base64" in body
 
 
-def test_enum_serialization(cli, ctx, app_runner, ndjson_path):
+def test_enum_serialization(cli, ctx, ndjson_path):
     app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/users")
     def users():
         return jsonify([])
 
-    port = app_runner.run_flask_app(app)
-
-    cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    cli.run_openapi_app(
+        app,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=10",
         "--seed=1",
@@ -283,7 +279,7 @@ def test_enum_serialization(cli, ctx, app_runner, ndjson_path):
         assert data["status"] in ("success", "failure", "error", "interrupted", "skip")
 
 
-def test_form_data_string_body(cli, ctx, app_runner, ndjson_path):
+def test_form_data_string_body(cli, ctx, ndjson_path):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/submit": {
@@ -310,10 +306,8 @@ def test_form_data_string_body(cli, ctx, app_runner, ndjson_path):
     def submit():
         return jsonify({"received": request.form.get("name")})
 
-    port = app_runner.run_flask_app(app)
-
-    cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    cli.run_openapi_app(
+        app,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=10",
         "--seed=1",
@@ -337,17 +331,15 @@ def test_form_data_string_body(cli, ctx, app_runner, ndjson_path):
     assert found_form_request
 
 
-def test_sanitization_disabled(cli, ctx, app_runner, ndjson_path):
+def test_sanitization_disabled(cli, ctx, ndjson_path):
     app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/users")
     def users():
         return jsonify([])
 
-    port = app_runner.run_flask_app(app)
-
-    cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    cli.run_openapi_app(
+        app,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=10",
         "--seed=1",
@@ -362,7 +354,7 @@ def test_sanitization_disabled(cli, ctx, app_runner, ndjson_path):
     assert len(phase_started) >= 1
 
 
-def test_stateful_with_extraction_failure(cli, ctx, app_runner, ndjson_path):
+def test_stateful_with_extraction_failure(cli, ctx, ndjson_path):
     # Link expression references non-existent field to trigger Err serialization
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -412,10 +404,8 @@ def test_stateful_with_extraction_failure(cli, ctx, app_runner, ndjson_path):
     def get_user(user_id):
         return jsonify({"id": user_id, "name": "Test"})
 
-    port = app_runner.run_flask_app(app)
-
-    cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    cli.run_openapi_app(
+        app,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=10",
         "--seed=1",
@@ -431,7 +421,7 @@ def test_stateful_with_extraction_failure(cli, ctx, app_runner, ndjson_path):
     assert any(get_event_data(e)["phase"]["name"] == "Stateful" for e in phase_started)
 
 
-def test_unresolvable_extraction_serialized(cli, ctx, app_runner, ndjson_path):
+def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
     # Link references an array index that will be empty, triggering $unresolvable
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -478,10 +468,8 @@ def test_unresolvable_extraction_serialized(cli, ctx, app_runner, ndjson_path):
     def get_tag(tag_id):
         return jsonify({"id": tag_id, "name": "Test"})
 
-    port = app_runner.run_flask_app(app)
-
-    cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    cli.run_openapi_app(
+        app,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=10",
         "--seed=1",

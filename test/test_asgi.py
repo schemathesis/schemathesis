@@ -41,33 +41,29 @@ def test_api(case):
 
 
 @pytest.mark.hypothesis_nested
-def test_cookies():
+def test_cookies(ctx):
     app = FastAPI()
 
     @app.get("/cookies")
     def cookies(token: str = Cookie(None)):
         return {"token": token}
 
-    schema = schemathesis.openapi.from_dict(
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "paths": {
-                "/cookies": {
-                    "get": {
-                        "parameters": [
-                            {
-                                "name": "token",
-                                "in": "cookie",
-                                "required": True,
-                                "schema": {"type": "string", "enum": ["test"]},
-                            }
-                        ],
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "/cookies": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "token",
+                            "in": "cookie",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["test"]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
-            },
-        },
+            }
+        }
     )
 
     strategy = schema["/cookies"]["GET"].as_strategy()
@@ -139,15 +135,14 @@ def test_null_byte_in_headers():
     test()
 
 
-def test_base_url():
+def test_base_url(ctx):
     # See GH-1366
     # When base URL has non-empty base path
-    raw_schema = {
-        "openapi": "3.0.3",
-        "info": {"version": "0.0.1", "title": "foo"},
-        "servers": [{"url": "https://example.org/v1"}],
-        "paths": {"/foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
-    }
+    schema = ctx.openapi.load_schema(
+        {"/foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="3.0.3",
+        servers=[{"url": "https://example.org/v1"}],
+    )
 
     # And is used for an ASGI app
     app = FastAPI()
@@ -156,7 +151,6 @@ def test_base_url():
     def read_root():
         return {"Hello": "World"}
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     strategy = schema["/foo"]["GET"].as_strategy()
 
     @given(case=strategy)

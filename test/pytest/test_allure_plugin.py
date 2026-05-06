@@ -99,11 +99,7 @@ def test_api(case):
 def test_allure_report_written_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
     allure_dir = str(testdir.tmpdir.join("allure-results"))
-    schema_dict = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
-    }
+    schema_dict = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
     testdir.makepyfile(
         f"""
 import schemathesis

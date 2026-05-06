@@ -28,7 +28,7 @@ def _new_repository(resource_names: list[str]) -> ResourceRepository:
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_jwt_sub_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cli, ctx):
+def test_jwt_sub_seeds_pool_for_username_path_param(cli, snapshot_cli, ctx):
     # Without seeding, schemathesis can't generate the bearer's username, so the bug stays hidden.
     user_schema = {
         "type": "object",
@@ -83,12 +83,11 @@ def test_jwt_sub_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cl
         # Bug: required `name` is null for the bearer's user.
         return jsonify({"username": "alice", "name": None}), 200
 
-    port = app_runner.run_flask_app(app)
     token = _make_jwt({"sub": "alice"})
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             f"--header=Authorization: Bearer {token}",
             "--phases=fuzzing",
             "--max-examples=50",
@@ -100,7 +99,7 @@ def test_jwt_sub_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cl
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_basic_auth_username_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cli, ctx):
+def test_basic_auth_username_seeds_pool_for_username_path_param(cli, snapshot_cli, ctx):
     # Basic-auth username is the same identifier the API trusts; without seeding the runner
     # never generates "alice", so the bug at GET /users/alice stays hidden.
     user_schema = {
@@ -156,10 +155,9 @@ def test_basic_auth_username_seeds_pool_for_username_path_param(cli, app_runner,
         # Bug: required `name` is null for the basic-auth user.
         return jsonify({"username": "alice", "name": None}), 200
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--auth=alice:wonderland",
             "--phases=fuzzing",
             "--max-examples=50",

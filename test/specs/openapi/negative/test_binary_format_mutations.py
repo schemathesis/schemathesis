@@ -27,7 +27,7 @@ def is_type_mutation(body: Any, field: str, expected_type: type) -> bool:
         pytest.param({"file": {"contentType": "image/png"}}, id="with_encoding"),
     ],
 )
-def test_binary_format_negative_mutations(encoding):
+def test_binary_format_negative_mutations(ctx, encoding):
     if encoding:
         # Register custom media type to test that it's skipped in negative mode
         schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG\r\n\x1a\n"))
@@ -42,21 +42,17 @@ def test_binary_format_negative_mutations(encoding):
     if encoding:
         content["encoding"] = encoding
 
-    schema = schemathesis.openapi.from_dict(
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "content": {"multipart/form-data": content},
-                            "required": True,
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "content": {"multipart/form-data": content},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 }
-            },
+            }
         }
     )
 
@@ -73,7 +69,7 @@ def test_binary_format_negative_mutations(encoding):
 
 def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optional_binary(ctx):
     # `format: binary` is permissive at runtime; mutations producing valid strings aren't actually negative.
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/upload": {
                 "put": {
@@ -93,7 +89,6 @@ def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optiona
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/upload"]["PUT"]
     real_validator = make_validator(operation.body[0].optimized_schema, jsonschema_rs.Draft4Validator)
 
@@ -107,25 +102,22 @@ def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optiona
     check()
 
 
-def test_custom_media_type_raw_binary_body_in_negative_mode():
+def test_custom_media_type_raw_binary_body_in_negative_mode(ctx):
     schemathesis.openapi.media_type("application/x-tar", st.just(b""))
 
-    schema = schemathesis.openapi.from_dict(
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.3",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "content": {"application/x-tar": {"schema": {"type": "string", "format": "binary"}}},
-                            "required": True,
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/x-tar": {"schema": {"type": "string", "format": "binary"}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 }
-            },
-        }
+            }
+        },
+        version="3.0.3",
     )
 
     operation = schema["/upload"]["POST"]

@@ -26,41 +26,52 @@ def custom_part_serializer():
         transport.unregister_serializer("application/x-part-custom")
 
 
-def test_multipart_with_custom_encoding():
+def make_operation(
+    ctx,
+    content: dict,
+    *,
+    media_type: str = "multipart/form-data",
+    path: str = "/upload",
+    method: str = "post",
+    required: bool = True,
+    responses: dict | None = None,
+):
+    request_body = {"content": {media_type: content}}
+    if required:
+        request_body["required"] = True
+    schema = ctx.openapi.load_schema(
+        {
+            path: {
+                method: {
+                    "requestBody": request_body,
+                    "responses": responses if responses is not None else {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.0.0",
+    )
+    return schema[path][method.upper()]
+
+
+def test_multipart_with_custom_encoding(ctx):
     xml_strategy = st.just(b"<?xml version='1.0'?><root>test</root>")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
 
     # Given an OpenAPI schema with multipart/form-data and custom encoding
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["name", "file"],
-                                        "properties": {
-                                            "name": {"type": "string"},
-                                            "file": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {"file": {"contentType": "text/xml"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["name", "file"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "file": {"type": "string", "format": "binary"},
+                },
             },
-        }
+            "encoding": {"file": {"contentType": "text/xml"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -71,37 +82,21 @@ def test_multipart_with_custom_encoding():
     test()
 
 
-def test_multipart_without_custom_encoding_uses_default():
+def test_multipart_without_custom_encoding_uses_default(ctx):
     # Given an OpenAPI schema with multipart but NO custom encoding
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["name", "file"],
-                                        "properties": {
-                                            "name": {"type": "string"},
-                                            "file": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["name", "file"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "file": {"type": "string", "format": "binary"},
+                },
             },
-        }
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -111,37 +106,21 @@ def test_multipart_without_custom_encoding_uses_default():
     test()
 
 
-def test_multipart_encoding_without_registered_strategy_falls_back():
+def test_multipart_encoding_without_registered_strategy_falls_back(ctx):
     # Given custom encoding but NO registered strategy for that content type
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["file"],
-                                        "properties": {
-                                            "file": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {"file": {"contentType": "application/unknown"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                    "file": {"type": "string", "format": "binary"},
+                },
             },
-        }
+            "encoding": {"file": {"contentType": "application/unknown"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -151,47 +130,31 @@ def test_multipart_encoding_without_registered_strategy_falls_back():
     test()
 
 
-def test_multipart_multiple_properties_with_different_encodings():
+def test_multipart_multiple_properties_with_different_encodings(ctx):
     # Register strategies for different media types
     xml_strategy = st.just(b"<xml>data</xml>")
     csv_strategy = st.just(b"col1,col2\nval1,val2")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
     schemathesis.openapi.media_type("text/csv", csv_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["document", "spreadsheet", "description"],
-                                        "properties": {
-                                            "document": {"type": "string", "format": "binary"},
-                                            "spreadsheet": {"type": "string", "format": "binary"},
-                                            "description": {"type": "string"},
-                                        },
-                                    },
-                                    "encoding": {
-                                        "document": {"contentType": "text/xml"},
-                                        "spreadsheet": {"contentType": "text/csv"},
-                                    },
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["document", "spreadsheet", "description"],
+                "properties": {
+                    "document": {"type": "string", "format": "binary"},
+                    "spreadsheet": {"type": "string", "format": "binary"},
+                    "description": {"type": "string"},
+                },
             },
-        }
+            "encoding": {
+                "document": {"contentType": "text/xml"},
+                "spreadsheet": {"contentType": "text/csv"},
+            },
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -202,42 +165,26 @@ def test_multipart_multiple_properties_with_different_encodings():
     test()
 
 
-def test_multipart_encoding_with_multiple_content_types():
+def test_multipart_encoding_with_multiple_content_types(ctx):
     # Register strategies for both image types
     png_strategy = st.just(b"\x89PNG\r\n\x1a\n")
     jpeg_strategy = st.just(b"\xff\xd8\xff\xe0")
     schemathesis.openapi.media_type("image/png", png_strategy)
     schemathesis.openapi.media_type("image/jpeg", jpeg_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["image"],
-                                        "properties": {
-                                            "image": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {"image": {"contentType": "image/png, image/jpeg"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                    "image": {"type": "string", "format": "binary"},
+                },
             },
-        }
+            "encoding": {"image": {"contentType": "image/png, image/jpeg"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -247,39 +194,25 @@ def test_multipart_encoding_with_multiple_content_types():
     test()
 
 
-def test_urlencoded_form_with_encoding():
+def test_urlencoded_form_with_encoding(ctx):
     xml_strategy = st.just(b"<data>test</data>")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/submit": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "application/x-www-form-urlencoded": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["data"],
-                                        "properties": {
-                                            "data": {"type": "string"},
-                                        },
-                                    },
-                                    "encoding": {"data": {"contentType": "text/xml"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {"type": "string"},
+                },
             },
-        }
+            "encoding": {"data": {"contentType": "text/xml"}},
+        },
+        media_type="application/x-www-form-urlencoded",
+        path="/submit",
     )
-    operation = schema["/submit"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -288,40 +221,24 @@ def test_urlencoded_form_with_encoding():
     test()
 
 
-def test_multipart_optional_properties():
+def test_multipart_optional_properties(ctx):
     xml_strategy = st.just(b"<optional/>")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["name"],
-                                        "properties": {
-                                            "name": {"type": "string"},
-                                            "file": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {"file": {"contentType": "text/xml"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "file": {"type": "string", "format": "binary"},
+                },
             },
-        }
+            "encoding": {"file": {"contentType": "text/xml"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -332,44 +249,28 @@ def test_multipart_optional_properties():
     test()
 
 
-def test_multipart_wildcard_matching_specific_to_wildcard():
+def test_multipart_wildcard_matching_specific_to_wildcard(ctx):
     image_strategy = st.just(b"\x89PNG\r\n\x1a\n")
     schemathesis.openapi.media_type("image/*", image_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["avatar"],
-                                        "properties": {
-                                            "avatar": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {
-                                        "avatar": {
-                                            # Specific type should match wildcard
-                                            "contentType": "image/png"
-                                        }
-                                    },
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "schema": {
+                "type": "object",
+                "required": ["avatar"],
+                "properties": {
+                    "avatar": {"type": "string", "format": "binary"},
+                },
+            },
+            "encoding": {
+                "avatar": {
+                    # Specific type should match wildcard
+                    "contentType": "image/png"
                 }
             },
-        }
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -378,46 +279,30 @@ def test_multipart_wildcard_matching_specific_to_wildcard():
     test()
 
 
-def test_multipart_wildcard_matching_wildcard_to_specific():
+def test_multipart_wildcard_matching_wildcard_to_specific(ctx):
     png_strategy = st.just(b"\x89PNG")
     jpeg_strategy = st.just(b"\xff\xd8\xff")
     schemathesis.openapi.media_type("image/png", png_strategy)
     schemathesis.openapi.media_type("image/jpeg", jpeg_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["photo"],
-                                        "properties": {
-                                            "photo": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {
-                                        "photo": {
-                                            # Wildcard should match registered specific types
-                                            "contentType": "image/*"
-                                        }
-                                    },
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "schema": {
+                "type": "object",
+                "required": ["photo"],
+                "properties": {
+                    "photo": {"type": "string", "format": "binary"},
+                },
+            },
+            "encoding": {
+                "photo": {
+                    # Wildcard should match registered specific types
+                    "contentType": "image/*"
                 }
             },
-        }
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -426,41 +311,25 @@ def test_multipart_wildcard_matching_wildcard_to_specific():
     test()
 
 
-def test_multipart_exact_match_preferred_over_wildcard():
+def test_multipart_exact_match_preferred_over_wildcard(ctx):
     wildcard_strategy = st.just(b"WILDCARD")
     exact_strategy = st.just(b"EXACT")
     schemathesis.openapi.media_type("image/*", wildcard_strategy)
     schemathesis.openapi.media_type("image/png", exact_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["icon"],
-                                        "properties": {
-                                            "icon": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {"icon": {"contentType": "image/png"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["icon"],
+                "properties": {
+                    "icon": {"type": "string", "format": "binary"},
+                },
             },
-        }
+            "encoding": {"icon": {"contentType": "image/png"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -469,37 +338,21 @@ def test_multipart_exact_match_preferred_over_wildcard():
     test()
 
 
-def test_multipart_defensive_non_string_content_type():
-    schema = schemathesis.openapi.from_dict(
+def test_multipart_defensive_non_string_content_type(ctx):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["data"],
-                                        "properties": {
-                                            "data": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    # Malformed encoding (contentType is not a string)
-                                    "encoding": {"data": {"contentType": 123}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {"type": "string", "format": "binary"},
+                },
             },
-        }
+            # Malformed encoding (contentType is not a string)
+            "encoding": {"data": {"contentType": 123}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -509,47 +362,31 @@ def test_multipart_defensive_non_string_content_type():
     test()
 
 
-def test_nested_object_with_encoding():
+def test_nested_object_with_encoding(ctx):
     xml_strategy = st.just(b"<xml/>")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "metadata": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "file": {"type": "string", "format": "binary"},
-                                                },
-                                            },
-                                        },
-                                        "required": ["metadata"],
-                                    },
-                                    "encoding": {
-                                        # This refers to top-level "file", but there isn't one
-                                        "file": {"contentType": "text/xml"}
-                                    },
-                                }
-                            },
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "metadata": {
+                        "type": "object",
+                        "properties": {
+                            "file": {"type": "string", "format": "binary"},
                         },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+                    },
+                },
+                "required": ["metadata"],
             },
-        }
+            "encoding": {
+                # This refers to top-level "file", but there isn't one
+                "file": {"contentType": "text/xml"}
+            },
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -560,40 +397,24 @@ def test_nested_object_with_encoding():
     test()
 
 
-def test_additional_properties_with_encoding():
+def test_additional_properties_with_encoding(ctx):
     xml_strategy = st.just(b"<xml/>")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "file": {"type": "string", "format": "binary"},
-                                        },
-                                        "required": ["file"],
-                                        "additionalProperties": {"type": "string"},
-                                    },
-                                    "encoding": {"file": {"contentType": "text/xml"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string", "format": "binary"},
+                },
+                "required": ["file"],
+                "additionalProperties": {"type": "string"},
             },
-        }
+            "encoding": {"file": {"contentType": "text/xml"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -605,36 +426,20 @@ def test_additional_properties_with_encoding():
     test()
 
 
-def test_empty_encoding_object():
-    schema = schemathesis.openapi.from_dict(
+def test_empty_encoding_object(ctx):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "file": {"type": "string", "format": "binary"},
-                                        },
-                                        "required": ["file"],
-                                    },
-                                    "encoding": {},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string", "format": "binary"},
+                },
+                "required": ["file"],
             },
-        }
+            "encoding": {},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -643,36 +448,20 @@ def test_empty_encoding_object():
     test()
 
 
-def test_encoding_with_invalid_content_type_format():
-    schema = schemathesis.openapi.from_dict(
+def test_encoding_with_invalid_content_type_format(ctx):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "file": {"type": "string", "format": "binary"},
-                                        },
-                                        "required": ["file"],
-                                    },
-                                    "encoding": {"file": {"contentType": ""}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "file": {"type": "string", "format": "binary"},
+                },
+                "required": ["file"],
             },
-        }
+            "encoding": {"file": {"contentType": ""}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -682,37 +471,21 @@ def test_encoding_with_invalid_content_type_format():
     test()
 
 
-def test_multipart_comma_separated_without_custom_strategy():
+def test_multipart_comma_separated_without_custom_strategy(ctx):
     # Comma-separated content types should work even without custom strategies
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "image": {"type": "string", "format": "binary"},
-                                        },
-                                        "required": ["image"],
-                                    },
-                                    "encoding": {"image": {"contentType": "image/png, image/jpeg"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "image": {"type": "string", "format": "binary"},
+                },
+                "required": ["image"],
             },
-        }
+            "encoding": {"image": {"contentType": "image/png, image/jpeg"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     content_types_seen = set()
 
@@ -737,41 +510,25 @@ def test_multipart_comma_separated_without_custom_strategy():
     assert len(content_types_seen) == 2, f"Expected both content types, got: {content_types_seen}"
 
 
-def test_multipart_optional_encoding_not_always_present():
+def test_multipart_optional_encoding_not_always_present(ctx):
     # Optional fields with custom encoding should not always be present
     xml_strategy = st.just(b"<data/>")
     schemathesis.openapi.media_type("text/xml", xml_strategy)
 
-    schema = schemathesis.openapi.from_dict(
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "required_field": {"type": "string"},
-                                            "optional_file": {"type": "string", "format": "binary"},
-                                        },
-                                        "required": ["required_field"],
-                                    },
-                                    "encoding": {"optional_file": {"contentType": "text/xml"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "required_field": {"type": "string"},
+                    "optional_file": {"type": "string", "format": "binary"},
+                },
+                "required": ["required_field"],
             },
-        }
+            "encoding": {"optional_file": {"contentType": "text/xml"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -782,41 +539,25 @@ def test_multipart_optional_encoding_not_always_present():
     test()
 
 
-def test_multipart_json_encoding_serializes_object_field():
-    schema = schemathesis.openapi.from_dict(
+def test_multipart_json_encoding_serializes_object_field(ctx):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["data"],
-                                        "properties": {
-                                            "data": {
-                                                "type": "object",
-                                                "properties": {"foo": {"type": "string"}},
-                                                "required": ["foo"],
-                                            },
-                                            "new_cert_path": {"type": "string", "format": "binary"},
-                                        },
-                                    },
-                                    "encoding": {"data": {"contentType": "application/json"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {"foo": {"type": "string"}},
+                        "required": ["foo"],
+                    },
+                    "new_cert_path": {"type": "string", "format": "binary"},
+                },
             },
-        }
+            "encoding": {"data": {"contentType": "application/json"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -836,40 +577,24 @@ def test_multipart_json_encoding_serializes_object_field():
     test()
 
 
-def test_multipart_yaml_encoding_serializes_object_field():
-    schema = schemathesis.openapi.from_dict(
+def test_multipart_yaml_encoding_serializes_object_field(ctx):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["meta"],
-                                        "properties": {
-                                            "meta": {
-                                                "type": "object",
-                                                "properties": {"tag": {"type": "string"}},
-                                                "required": ["tag"],
-                                            },
-                                        },
-                                    },
-                                    "encoding": {"meta": {"contentType": "application/yaml"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["meta"],
+                "properties": {
+                    "meta": {
+                        "type": "object",
+                        "properties": {"tag": {"type": "string"}},
+                        "required": ["tag"],
+                    },
+                },
             },
-        }
+            "encoding": {"meta": {"contentType": "application/yaml"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -887,40 +612,24 @@ def test_multipart_yaml_encoding_serializes_object_field():
     test()
 
 
-def test_multipart_custom_serializer_encoding(custom_part_serializer):
-    schema = schemathesis.openapi.from_dict(
+def test_multipart_custom_serializer_encoding(ctx, custom_part_serializer):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["payload"],
-                                        "properties": {
-                                            "payload": {
-                                                "type": "object",
-                                                "properties": {"k": {"type": "string"}},
-                                                "required": ["k"],
-                                            },
-                                        },
-                                    },
-                                    "encoding": {"payload": {"contentType": "application/x-part-custom"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["payload"],
+                "properties": {
+                    "payload": {
+                        "type": "object",
+                        "properties": {"k": {"type": "string"}},
+                        "required": ["k"],
+                    },
+                },
             },
-        }
+            "encoding": {"payload": {"contentType": "application/x-part-custom"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -936,40 +645,24 @@ def test_multipart_custom_serializer_encoding(custom_part_serializer):
     test()
 
 
-def test_multipart_encoding_with_unknown_content_type_fails():
-    schema = schemathesis.openapi.from_dict(
+def test_multipart_encoding_with_unknown_content_type_fails(ctx):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["meta"],
-                                        "properties": {
-                                            "meta": {
-                                                "type": "object",
-                                                "properties": {"tag": {"type": "string"}},
-                                                "required": ["tag"],
-                                            },
-                                        },
-                                    },
-                                    "encoding": {"meta": {"contentType": "application/x-unknown-foo"}},
-                                }
-                            },
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
+            "schema": {
+                "type": "object",
+                "required": ["meta"],
+                "properties": {
+                    "meta": {
+                        "type": "object",
+                        "properties": {"tag": {"type": "string"}},
+                        "required": ["tag"],
+                    },
+                },
             },
-        }
+            "encoding": {"meta": {"contentType": "application/x-unknown-foo"}},
+        },
     )
-    operation = schema["/upload"]["POST"]
 
     @given(case=operation.as_strategy())
     def test(case):
@@ -979,29 +672,18 @@ def test_multipart_encoding_with_unknown_content_type_fails():
     test()
 
 
-def test_multipart_encoding_with_negative_mode():
-    schema = schemathesis.openapi.from_dict(
+def test_multipart_encoding_with_negative_mode(ctx):
+    operation = make_operation(
+        ctx,
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/test": {
-                    "put": {
-                        "requestBody": {
-                            "content": {
-                                "multipart/form-data": {
-                                    "encoding": {"captionfile": {"contentType": "text/vtt, application/x-subrip"}},
-                                    "schema": {"properties": {"captionfile": {"format": "binary"}}},
-                                }
-                            }
-                        },
-                        "responses": {"default": {}},
-                    }
-                }
-            },
-        }
+            "encoding": {"captionfile": {"contentType": "text/vtt, application/x-subrip"}},
+            "schema": {"properties": {"captionfile": {"format": "binary"}}},
+        },
+        path="/test",
+        method="put",
+        required=False,
+        responses={"default": {}},
     )
-    operation = schema["/test"]["PUT"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
     def test(case):

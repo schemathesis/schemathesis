@@ -131,6 +131,7 @@ def test_stateful_only(ctx, cli, snapshot_cli):
         cli.run(
             api.schema_url,
             "--phases=stateful",
+            "--mode=positive",
             "--max-examples=200",
             "-c not_a_server_error",
         )
@@ -243,7 +244,7 @@ def test_missing_body_parameter(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=3, min_passes=1)
-def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, app_runner, snapshot_cli):
+def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, snapshot_cli):
     openapi = {
         "openapi": "3.0.0",
         "info": {"title": "Minimal API", "version": "1.0.0"},
@@ -379,13 +380,11 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, ap
         next_order_id += 1
         return jsonify({"id": order_id}), 201
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=5",
             "-c not_a_server_error",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -445,7 +444,7 @@ def test_unique_inputs(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_stateful_statistic=False)
-def test_stateful_link_coverage_with_no_parameters_or_body(cli, app_runner, snapshot_cli, ctx):
+def test_stateful_link_coverage_with_no_parameters_or_body(cli, snapshot_cli, ctx):
     session_schema = {
         "type": "object",
         "properties": {"id": {"type": "string"}},
@@ -508,20 +507,18 @@ def test_stateful_link_coverage_with_no_parameters_or_body(cli, app_runner, snap
     def get_sessions():
         return jsonify({"sessions": list(sessions.values())}), 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "-c not_a_server_error",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli
     )
 
 
-def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
+def test_nested_link_refs(cli, snapshot_cli, ctx):
     # GH-3394: Links with nested $refs should be fully resolved
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -579,11 +576,9 @@ def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
     def get_foo_by_id(id):
         return jsonify({"id": id}), 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=stateful",
             "--max-examples=5",
             "-c not_a_server_error",
@@ -594,7 +589,7 @@ def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("phase", ["stateful", "fuzzing"])
-def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot_cli, phase):
+def test_nested_path_shared_parameter_propagation(cli, ctx, snapshot_cli, phase):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
@@ -721,11 +716,9 @@ def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot
             return jsonify({"error": "Internal server error"}), 500
         return jsonify(post), 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             f"--phases={phase}",
             "--max-examples=50",
             "-c not_a_server_error",

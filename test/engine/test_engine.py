@@ -539,7 +539,7 @@ def test_payload_explicit_example(ctx):
 
 def test_explicit_examples_from_response(ctx):
     api = ctx.openapi.apps.success()
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items/{itemId}/": {
                 "get": {
@@ -563,7 +563,6 @@ def test_explicit_examples_from_response(ctx):
         },
         components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
     )
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1, phases=[PhaseName.EXAMPLES]).execute()
     assert [case.value.path_parameters for case in stream.find(events.ScenarioFinished).recorder.cases.values()] == [
@@ -647,9 +646,9 @@ def test_max_failures(ctx):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
-def test_skip_operations_with_recursive_references(schema_with_recursive_references):
+def test_skip_operations_with_recursive_references(ctx, schema_with_recursive_references):
     # When the test schema contains recursive references
-    schema = schemathesis.openapi.from_dict(schema_with_recursive_references)
+    schema = ctx.openapi.from_full_schema(schema_with_recursive_references)
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     stream = EventStream(schema).execute()
     # Then it causes an error with a proper error message
@@ -669,7 +668,7 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
 def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     # See GH-904
     # When filling missing properties during examples generation leads to unsatisfiable schemas
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/success": {
                 "post": {
@@ -700,7 +699,6 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     stream = EventStream(schema, max_examples=1, phases=phases).execute()
     # And the tests are failing because of the unsatisfiable schema
@@ -728,7 +726,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
 )
 def test_non_serializable_example(ctx, phases, expected):
     # When filling missing request body during examples generation leads to serialization error
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/success": {
                 "post": {
@@ -748,7 +746,6 @@ def test_non_serializable_example(ctx, phases, expected):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = schemathesis.openapi.from_dict(schema)
     stream = EventStream(schema, phases=phases, max_examples=1).execute()
     # And the tests are failing because of the serialization error
     stream.assert_errors()
@@ -759,7 +756,7 @@ def test_non_serializable_example(ctx, phases, expected):
 
 def test_unsupported_regex_removed_with_warning(ctx):
     # When a schema contains an unsupported regex pattern
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/success": {
                 "post": {
@@ -790,7 +787,6 @@ def test_unsupported_regex_removed_with_warning(ctx):
         }
     )
     # Then the pattern is removed and a warning is emitted
-    schema = schemathesis.openapi.from_dict(schema)
     warnings = list(schema.analysis.iter_warnings())
     assert len(warnings) > 0
     assert any("^[\\w\\s\\-\\/\\p{Greek},.#;:()']+$" in w.message for w in warnings)
@@ -798,7 +794,7 @@ def test_unsupported_regex_removed_with_warning(ctx):
 
 def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
     # When a parameter schema contains an unsupported regex pattern
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users/{id}": {
                 "get": {
@@ -816,7 +812,6 @@ def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
         }
     )
     # Then the pattern is removed and a warning is emitted
-    schema = schemathesis.openapi.from_dict(schema)
     warnings = list(schema.analysis.iter_warnings())
     assert len(warnings) > 0
     assert any("\\p{Greek}+" in w.message for w in warnings)
@@ -824,7 +819,7 @@ def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
 
 def test_invalid_header_in_example(ctx):
     api = ctx.openapi.apps.success()
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/success": {
                 "post": {
@@ -843,7 +838,6 @@ def test_invalid_header_in_example(ctx):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
     # And the tests are failing
@@ -857,8 +851,7 @@ def test_invalid_header_in_example(ctx):
 
 
 def test_connection_error(ctx):
-    schema = ctx.openapi.build_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
-    schema = schemathesis.openapi.from_dict(schema)
+    schema = ctx.openapi.load_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
     schema.config.update(base_url="http://127.0.0.1:1")
     stream = EventStream(schema, max_examples=1).execute()
     # And the tests are failing
@@ -889,7 +882,7 @@ def test_hypothesis_errors_propagation(ctx):
     # When the operation contains a media type, that Schemathesis can't serialize
     # And there is still a supported media type
     api = ctx.openapi.apps.success()
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -917,7 +910,6 @@ def test_hypothesis_errors_propagation(ctx):
     )
 
     max_examples = 10
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(
         schema,
@@ -938,7 +930,7 @@ def test_encoding_octet_stream(ctx):
     # When the operation contains the `application/octet-stream` media type
     # And has no `format: binary` in its schema
     api = ctx.openapi.apps.success()
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -957,7 +949,6 @@ def test_encoding_octet_stream(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(
         schema,
@@ -1108,8 +1099,7 @@ else:
 )
 def test_malformed_path_template(ctx, path, expected):
     # When schema contains a malformed path template
-    schema = ctx.openapi.build_schema({path: {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema = schemathesis.openapi.from_dict(schema)
+    schema = ctx.openapi.load_schema({path: {"get": {"responses": {"200": {"description": "OK"}}}}})
     # Then it should not cause a fatal error
     stream = EventStream(schema).execute()
     stream.assert_after_execution_status(Status.ERROR)
@@ -1126,7 +1116,7 @@ def test_malformed_path_template(ctx, path, expected):
 )
 def test_explicit_header_negative(ctx, parameters, expected):
     api = ctx.openapi.apps.success()
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "get": {
@@ -1138,7 +1128,6 @@ def test_explicit_header_negative(ctx, parameters, expected):
         },
         components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
     )
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, headers={"Authorization": "TEST"}, max_examples=1).execute()
@@ -1149,7 +1138,7 @@ def test_explicit_header_negative(ctx, parameters, expected):
 
 
 def test_skip_non_negated_headers(ctx):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "get": {
@@ -1159,7 +1148,6 @@ def test_skip_non_negated_headers(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     stream = EventStream(schema, max_examples=1).execute()
     # There should not be unsatisfiable
@@ -1245,7 +1233,7 @@ def test_stateful_override(ctx):
 
 def test_generation_config_in_explicit_examples(ctx):
     api = ctx.openapi.apps.success()
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/what": {
                 "post": {
@@ -1277,7 +1265,6 @@ def test_generation_config_in_explicit_examples(ctx):
         },
         version="2.0",
     )
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url=f"{api.base_url}/api")
     schema.config.generation.update(
         with_security_parameters=False,
@@ -1295,7 +1282,7 @@ def test_generation_config_in_explicit_examples(ctx):
 
 def test_missing_deserializer_warnings_collected(ctx):
     api = ctx.openapi.apps.success()
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -1313,7 +1300,6 @@ def test_missing_deserializer_warnings_collected(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
 
@@ -1329,7 +1315,7 @@ def test_missing_deserializer_warnings_collected(ctx):
 
 def test_no_warnings_for_json(ctx):
     api = ctx.openapi.apps.success()
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -1347,7 +1333,6 @@ def test_no_warnings_for_json(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
 
@@ -1357,7 +1342,7 @@ def test_no_warnings_for_json(ctx):
 
 def test_stateful_phase_missing_deserializer_warnings(ctx):
     api = ctx.openapi.apps.success()
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {
@@ -1408,7 +1393,6 @@ def test_stateful_phase_missing_deserializer_warnings(ctx):
         }
     )
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     schema.config.update(base_url=f"{api.base_url}/api")
 
     # Run only stateful phase

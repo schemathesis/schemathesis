@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import graphql
 import hypothesis
 import pytest
 from hypothesis import strategies as st
@@ -11,7 +10,6 @@ from schemathesis.core.errors import NoProducers
 from schemathesis.core.failures import FailureGroup
 from schemathesis.graphql import nodes
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
-from schemathesis.specs.graphql.schemas import GraphQLSchema
 from schemathesis.specs.graphql.stateful import GraphQLStateMachine, create_state_machine
 
 
@@ -20,11 +18,6 @@ def _register_book_id_scalar():
     schemathesis.graphql.scalar("BookID", st.uuids().map(str).map(nodes.String))
     yield
     CUSTOM_SCALARS.clear()
-
-
-def _build(sdl: str) -> GraphQLSchema:
-    introspection = graphql.introspection_from_schema(graphql.build_schema(sdl))
-    return schemathesis.graphql.from_dict(introspection)
 
 
 _FULL_SCHEMA_SDL = """
@@ -40,13 +33,13 @@ _FULL_SCHEMA_SDL = """
 
 
 @pytest.fixture
-def full_state_machine() -> type[GraphQLStateMachine]:
-    return create_state_machine(_build(_FULL_SCHEMA_SDL))
+def full_state_machine(ctx) -> type[GraphQLStateMachine]:
+    return create_state_machine(ctx.graphql.load_sdl(_FULL_SCHEMA_SDL))
 
 
-def test_create_state_machine_returns_a_subclass():
+def test_create_state_machine_returns_a_subclass(ctx):
     cls = create_state_machine(
-        _build("""
+        ctx.graphql.load_sdl("""
             type Book { id: ID! }
             type Query { book(id: ID!): Book }
             type Mutation { addBook(title: String!): Book! }
@@ -95,9 +88,9 @@ def test_use_after_delete_probe_only_for_types_with_cleanup(full_state_machine):
     assert "Query_author_on_deleted" not in full_state_machine.__dict__
 
 
-def test_cleanup_with_multiple_id_args_wires_secondary_bundles():
+def test_cleanup_with_multiple_id_args_wires_secondary_bundles(ctx):
     cls = create_state_machine(
-        _build("""
+        ctx.graphql.load_sdl("""
             type Book { id: ID! }
             type Author { id: ID! }
             type Query { _: Int }
@@ -112,9 +105,9 @@ def test_cleanup_with_multiple_id_args_wires_secondary_bundles():
     assert "Mutation_removeBookFromAuthor_double" in cls.__dict__
 
 
-def test_init_raises_NoProducers_when_no_rules():
+def test_init_raises_NoProducers_when_no_rules(ctx):
     cls = create_state_machine(
-        _build("""
+        ctx.graphql.load_sdl("""
             type Book { id: ID! }
             type Query { book(id: ID!): Book }
             type Mutation { _: Boolean }
@@ -134,8 +127,8 @@ def test_routing_override_present(method_name):
     assert method_name in GraphQLStateMachine.__dict__
 
 
-def test_state_machine_has_real_transition_controller():
-    schema = _build("""
+def test_state_machine_has_real_transition_controller(ctx):
+    schema = ctx.graphql.load_sdl("""
         type Book { id: ID! }
         type Query { book(id: ID!): Book }
         type Mutation { addBook(title: String!): Book! }

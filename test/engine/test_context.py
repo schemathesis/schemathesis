@@ -4,15 +4,13 @@ import threading
 
 import pytest
 
-import schemathesis
 from schemathesis.core.result import Ok
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.health import TIGHTENED_TIMEOUT_SECONDS
 
 
 def _build_schema_and_operation(ctx):
-    raw = ctx.openapi.build_schema({"/a": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema = schemathesis.openapi.from_dict(raw)
+    schema = ctx.openapi.load_schema({"/a": {"get": {"responses": {"200": {"description": "OK"}}}}})
     operation = next(result.ok() for result in schema.get_all_operations() if isinstance(result, Ok))
     return schema, operation
 

@@ -144,20 +144,18 @@ def test_filter_combo(ctx, hook):
 
 
 def test_filter_body_works_in_negative_mode(ctx):
-    schema = schemathesis.openapi.from_dict(
-        ctx.openapi.build_schema(
-            {
-                "/test": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {"application/json": {"schema": {"type": "object"}}},
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
-        )
+        }
     )
 
     @schema.hook("before_generate_body")
@@ -182,7 +180,7 @@ def test_filter_body_works_in_negative_mode(ctx):
 
 def _build_operation(ctx, operation_id, path):
     op = {"operationId": operation_id, "responses": {"200": {"description": "OK"}}}
-    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema({path: {"post": op}}))
+    schema = ctx.openapi.load_schema({path: {"post": op}})
     return schema[path]["POST"]
 
 

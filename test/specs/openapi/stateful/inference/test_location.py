@@ -1,7 +1,6 @@
 import pytest
 from flask import jsonify, request
 
-import schemathesis
 from schemathesis.engine.observations import LocationHeaderEntry
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi import expressions
@@ -236,10 +235,8 @@ def _link_by(key: str, value: str, **parameters):
         ),
     ],
 )
-def test_build_location_link(paths, location, expected, response_factory):
-    schema = schemathesis.openapi.from_dict(
-        {"openapi": "3.1.0", "info": {"title": "Test API", "version": "0.0.1"}, "paths": paths}
-    )
+def test_build_location_link(ctx, paths, location, expected, response_factory):
+    schema = ctx.openapi.load_schema(paths, version="3.1.0")
     inferencer = LinkInferencer.from_schema(schema)
     results = build_links(inferencer, location)
     assert results == expected
@@ -247,9 +244,10 @@ def test_build_location_link(paths, location, expected, response_factory):
         assert_links_work(response_factory, location, results, schema)
 
 
-def test_build_location_link_empty_path():
-    schema = schemathesis.openapi.from_dict(
-        {"openapi": "3.1.0", "paths": {"/users/{userId}": {"get": {"operationId": "getUserById"}}}}
+def test_build_location_link_empty_path(ctx):
+    schema = ctx.openapi.load_schema(
+        {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+        version="3.1.0",
     )
     inferencer = LinkInferencer.from_schema(schema)
 
@@ -387,8 +385,8 @@ def test_build_location_link_empty_path():
         ),
     ],
 )
-def test_build_links_with_base_url(base_url, paths, location, expected, response_factory):
-    schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
+def test_build_links_with_base_url(ctx, base_url, paths, location, expected, response_factory):
+    schema = ctx.openapi.load_schema(paths, version="3.1.0")
     schema.config.base_url = base_url
 
     inferencer = LinkInferencer.from_schema(schema)
@@ -450,8 +448,8 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
         ),
     ],
 )
-def test_build_links_all_methods(paths, location, expected, response_factory):
-    schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
+def test_build_links_all_methods(ctx, paths, location, expected, response_factory):
+    schema = ctx.openapi.load_schema(paths, version="3.1.0")
     inferencer = LinkInferencer.from_schema(schema)
     results = build_links(inferencer, location)
     assert results == expected
@@ -460,23 +458,22 @@ def test_build_links_all_methods(paths, location, expected, response_factory):
         assert_links_work(response_factory, location, results, schema)
 
 
-def test_build_links_no_paths_in_schema():
+def test_build_links_no_paths_in_schema(ctx):
     # OpenAPI 3.1.0 allows schemas without paths
-    schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "info": {"title": "Test", "version": "1.0"}})
+    schema = ctx.openapi.load_schema(None, version="3.1.0")
     inferencer = LinkInferencer.from_schema(schema)
     assert build_links(inferencer, "/users/123") == []
 
 
-def test_build_links_path_item_with_ref():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
+def test_build_links_path_item_with_ref(ctx):
+    schema = ctx.openapi.load_schema(
+        {
             "/users/{userId}": {
                 "$ref": "#/components/pathItems/UserPathItem",
             }
         },
-        "components": {
+        version="3.1.0",
+        components={
             "pathItems": {
                 "UserPathItem": {
                     "get": {"operationId": "getUserById"},
@@ -485,9 +482,7 @@ def test_build_links_path_item_with_ref():
                 }
             }
         },
-    }
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
 
     inferencer = LinkInferencer.from_schema(schema)
     assert build_links(inferencer, "/users/123") == [
@@ -497,17 +492,14 @@ def test_build_links_path_item_with_ref():
     ]
 
 
-def test_build_links_path_item_broken_ref():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
+def test_build_links_path_item_broken_ref(ctx):
+    schema = ctx.openapi.load_schema(
+        {
             "/users/{userId}": {"$ref": "#/components/pathItems/NonExistentPathItem"},
             "/orders/{orderId}": {"get": {"operationId": "getOrder"}},
         },
-    }
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
+        version="3.1.0",
+    )
     inferencer = LinkInferencer.from_schema(schema)
 
     # Broken ref should not cause crashes, should just skip that path
@@ -517,23 +509,20 @@ def test_build_links_path_item_broken_ref():
     assert build_links(inferencer, "/users/123") == []
 
 
-def test_build_links_mixed_ref_and_inline_paths():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "version": "1.0"},
-        "paths": {
+def test_build_links_mixed_ref_and_inline_paths(ctx):
+    schema = ctx.openapi.load_schema(
+        {
             "/users/{userId}": {"$ref": "#/components/pathItems/UserPathItem"},
             "/users/{userId}/posts": {
                 "get": {"operationId": "getUserPosts"},
                 "post": {"operationId": "createUserPost"},
             },
         },
-        "components": {
+        version="3.1.0",
+        components={
             "pathItems": {"UserPathItem": {"get": {"operationId": "getUser"}, "put": {"operationId": "updateUser"}}}
         },
-    }
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
 
     inferencer = LinkInferencer.from_schema(schema)
     assert build_links(inferencer, "/users/123") == [
@@ -544,12 +533,10 @@ def test_build_links_mixed_ref_and_inline_paths():
     ]
 
 
-def test_build_links_no_base_url_configured():
-    schema = schemathesis.openapi.from_dict(
-        {
-            "openapi": "3.1.0",
-            "paths": {"/users/{userId}": {"get": {"operationId": "getUserById"}, "put": {"operationId": "updateUser"}}},
-        }
+def test_build_links_no_base_url_configured(ctx):
+    schema = ctx.openapi.load_schema(
+        {"/users/{userId}": {"get": {"operationId": "getUserById"}, "put": {"operationId": "updateUser"}}},
+        version="3.1.0",
     )
     assert schema.config.base_url is None
 
@@ -702,13 +689,12 @@ def user_api_app(ctx, user_api_schema):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_link_inference_discovers_corruption_bug(cli, app_runner, snapshot_cli, user_api_app):
-    port = app_runner.run_flask_app(user_api_app)
+def test_link_inference_discovers_corruption_bug(cli, snapshot_cli, user_api_app):
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            user_api_app,
             "--max-examples=10",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing,stateful",
             config={"phases": {"stateful": {"inference": {"algorithms": ["location-headers"]}}}},
         )
@@ -717,13 +703,12 @@ def test_link_inference_discovers_corruption_bug(cli, app_runner, snapshot_cli, 
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_link_inference_accounts_for_filters(cli, app_runner, snapshot_cli, user_api_app):
-    port = app_runner.run_flask_app(user_api_app)
+def test_link_inference_accounts_for_filters(cli, snapshot_cli, user_api_app):
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            user_api_app,
             "--max-examples=10",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing,stateful",
             "--include-method=POST",
         )
@@ -731,13 +716,12 @@ def test_link_inference_accounts_for_filters(cli, app_runner, snapshot_cli, user
     )
 
 
-def test_stateful_disabled_skips_link_inference(cli, app_runner, snapshot_cli, user_api_app):
-    port = app_runner.run_flask_app(user_api_app)
+def test_stateful_disabled_skips_link_inference(cli, snapshot_cli, user_api_app):
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            user_api_app,
             "--max-examples=10",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing",
             config={"warnings": False},
         )
@@ -745,13 +729,12 @@ def test_stateful_disabled_skips_link_inference(cli, app_runner, snapshot_cli, u
     )
 
 
-def test_inference_disabled_via_config(cli, app_runner, snapshot_cli, user_api_app):
-    port = app_runner.run_flask_app(user_api_app)
+def test_inference_disabled_via_config(cli, snapshot_cli, user_api_app):
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            user_api_app,
             "--max-examples=10",
             "-c response_schema_conformance",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing,stateful",
             config={"phases": {"stateful": {"inference": {"algorithms": []}}}, "warnings": False},
         )
@@ -759,7 +742,7 @@ def test_inference_disabled_via_config(cli, app_runner, snapshot_cli, user_api_a
     )
 
 
-def test_location_points_to_nonexistent_endpoint(cli, app_runner, snapshot_cli, ctx):
+def test_location_points_to_nonexistent_endpoint(cli, snapshot_cli, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -777,32 +760,29 @@ def test_location_points_to_nonexistent_endpoint(cli, app_runner, snapshot_cli, 
         # Returns Location pointing to endpoint not defined in schema
         return jsonify({"message": "created"}), 201, {"Location": "/items/123"}
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
+        cli.run_openapi_app(
+            app,
             "--max-examples=5",
-            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing,stateful",
         )
         == snapshot_cli
     )
 
 
-def test_inject_links_location_normalization_returns_none():
-    schema = schemathesis.openapi.from_dict(
+def test_inject_links_location_normalization_returns_none(ctx):
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.1.0",
-            "paths": {
-                "/users": {
-                    "post": {
-                        "operationId": "createUser",
-                        "responses": {
-                            "201": {},
-                        },
-                    }
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "responses": {
+                        "201": {},
+                    },
                 }
-            },
-        }
+            }
+        },
+        version="3.1.0",
     )
     inferencer = LinkInferencer.from_schema(schema)
     operation = schema["/users"]["post"]
@@ -815,21 +795,19 @@ def test_inject_links_location_normalization_returns_none():
     assert "links" not in response.definition
 
 
-def test_inject_links_no_matches():
-    schema = schemathesis.openapi.from_dict(
+def test_inject_links_no_matches(ctx):
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.1.0",
-            "paths": {
-                "/users": {
-                    "post": {
-                        "operationId": "createUser",
-                        "responses": {
-                            "201": {},
-                        },
-                    }
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "responses": {
+                        "201": {},
+                    },
                 }
-            },
-        }
+            }
+        },
+        version="3.1.0",
     )
     inferencer = LinkInferencer.from_schema(schema)
     operation = schema["/users"]["post"]
@@ -842,15 +820,13 @@ def test_inject_links_no_matches():
     assert "links" not in response.definition
 
 
-def test_inject_links_creates_response_definition():
-    schema = schemathesis.openapi.from_dict(
+def test_inject_links_creates_response_definition(ctx):
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.1.0",
-            "paths": {
-                "/users": {"post": {"operationId": "createUser"}},
-                "/users/{userId}": {"get": {"operationId": "getUser"}},
-            },
-        }
+            "/users": {"post": {"operationId": "createUser"}},
+            "/users/{userId}": {"get": {"operationId": "getUser"}},
+        },
+        version="3.1.0",
     )
     inferencer = LinkInferencer.from_schema(schema)
     # No 201 response defined

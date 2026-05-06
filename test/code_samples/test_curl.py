@@ -52,7 +52,7 @@ schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 @pytest.fixture
 def loose_schema(ctx):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test/{key}": {
                 "post": {
@@ -63,7 +63,6 @@ def loose_schema(ctx):
         },
         version="2.0",
     )
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url="http://127.0.0.1:1")
     return schema
 

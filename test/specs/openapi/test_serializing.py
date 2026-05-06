@@ -7,7 +7,6 @@ import requests
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-import schemathesis
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.serialization import (
@@ -118,8 +117,8 @@ def make_openapi_schema(*parameters):
     }
 
 
-def assert_generates(testdir, raw_schema, expected, parameter):
-    schema = schemathesis.openapi.from_dict(raw_schema)
+def assert_generates(ctx, testdir, raw_schema, expected, parameter):
+    schema = ctx.openapi.from_full_schema(raw_schema)
 
     attribute = "path_parameters" if parameter == "path" else parameter
 
@@ -205,11 +204,11 @@ def test_(request, case):
         (ARRAY_SCHEMA, True, "form", {"color": ["blue", "black", "brown"]}),
     ],
 )
-def test_query_serialization_styles_openapi3(testdir, schema, explode, style, expected):
+def test_query_serialization_styles_openapi3(ctx, testdir, schema, explode, style, expected):
     raw_schema = make_openapi_schema(
         {"name": "color", "in": "query", "required": True, "schema": schema, "explode": explode, "style": style}
     )
-    assert_generates(testdir, raw_schema, (expected,), "query")
+    assert_generates(ctx, testdir, raw_schema, (expected,), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -220,9 +219,9 @@ def test_query_serialization_styles_openapi3(testdir, schema, explode, style, ex
         (ARRAY_SCHEMA, {"color": ["blue", "black", "brown"]}),
     ],
 )
-def test_query_serialization_default_style_explode(testdir, schema, expected):
+def test_query_serialization_default_style_explode(ctx, testdir, schema, expected):
     raw_schema = make_openapi_schema({"name": "color", "in": "query", "required": True, "schema": schema})
-    assert_generates(testdir, raw_schema, (expected,), "query")
+    assert_generates(ctx, testdir, raw_schema, (expected,), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -252,7 +251,7 @@ def test_query_serialization_default_style_explode_via_ref(ctx, testdir, schema,
         },
         components={"schemas": {"Color": schema}},
     )
-    assert_generates(testdir, raw_schema, (expected,), "query")
+    assert_generates(ctx, testdir, raw_schema, (expected,), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -265,11 +264,11 @@ def test_query_serialization_default_style_explode_via_ref(ctx, testdir, schema,
         (OBJECT_SCHEMA, False, {"X-Api-Key": CommaDelimitedObject("r,100,g,200,b,150")}),
     ],
 )
-def test_header_serialization_styles_openapi3(testdir, schema, explode, expected):
+def test_header_serialization_styles_openapi3(ctx, testdir, schema, explode, expected):
     raw_schema = make_openapi_schema(
         {"name": "X-Api-Key", "in": "header", "required": True, "schema": schema, "explode": explode}
     )
-    assert_generates(testdir, raw_schema, (expected,), "headers")
+    assert_generates(ctx, testdir, raw_schema, (expected,), "headers")
 
 
 @pytest.mark.hypothesis_nested
@@ -282,11 +281,11 @@ def test_header_serialization_styles_openapi3(testdir, schema, explode, expected
         (OBJECT_SCHEMA, False, {"SessionID": CommaDelimitedObject("r,100,g,200,b,150")}),
     ],
 )
-def test_cookie_serialization_styles_openapi3(testdir, schema, explode, expected):
+def test_cookie_serialization_styles_openapi3(ctx, testdir, schema, explode, expected):
     raw_schema = make_openapi_schema(
         {"name": "SessionID", "in": "cookie", "required": True, "schema": schema, "explode": explode}
     )
-    assert_generates(testdir, raw_schema, (expected,), "cookies")
+    assert_generates(ctx, testdir, raw_schema, (expected,), "cookies")
 
 
 @pytest.mark.hypothesis_nested
@@ -337,11 +336,9 @@ def test_cookie_serialization_styles_openapi3(testdir, schema, explode, expected
         ),
     ],
 )
-def test_path_serialization_styles_openapi3(schema, style, explode, expected):
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+def test_path_serialization_styles_openapi3(ctx, schema, style, explode, expected):
+    schema = ctx.openapi.load_schema(
+        {
             "/teapot/{color}": {
                 "get": {
                     "summary": "Test",
@@ -359,8 +356,7 @@ def test_path_serialization_styles_openapi3(schema, style, explode, expected):
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
 
     @given(case=schema["/teapot/{color}"]["GET"].as_strategy())
     def test(case):
@@ -370,7 +366,7 @@ def test_path_serialization_styles_openapi3(schema, style, explode, expected):
 
 
 @pytest.mark.hypothesis_nested
-def test_query_serialization_styles_openapi_multiple_params(testdir):
+def test_query_serialization_styles_openapi_multiple_params(ctx, testdir):
     raw_schema = make_openapi_schema(
         {
             "name": "color1",
@@ -389,7 +385,7 @@ def test_query_serialization_styles_openapi_multiple_params(testdir):
             "style": "spaceDelimited",
         },
     )
-    assert_generates(testdir, raw_schema, ({"color1": "blue|black|brown", "color2": "blue black brown"},), "query")
+    assert_generates(ctx, testdir, raw_schema, ({"color1": "blue|black|brown", "color2": "blue black brown"},), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -403,7 +399,7 @@ def test_query_serialization_styles_openapi_multiple_params(testdir):
         ("multi", {"color": ["blue", "black", "brown"]}),
     ],
 )
-def test_query_serialization_styles_swagger2(testdir, collection_format, expected):
+def test_query_serialization_styles_swagger2(ctx, testdir, collection_format, expected):
     raw_schema = {
         "swagger": "2.0",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -430,7 +426,7 @@ def test_query_serialization_styles_swagger2(testdir, collection_format, expecte
             }
         },
     }
-    assert_generates(testdir, raw_schema, (expected,), "query")
+    assert_generates(ctx, testdir, raw_schema, (expected,), "query")
 
 
 @pytest.mark.parametrize(("item", "expected"), [({}, {}), ({"key": 1}, {"key": "TEST"})])
@@ -453,11 +449,13 @@ class JSONString(Prefixed):
         return json.loads(unquote(value))
 
 
-def test_content_serialization(testdir):
+def test_content_serialization(ctx, testdir):
     raw_schema = make_openapi_schema(
         {"in": "query", "name": "filter", "required": True, "content": {"application/json": {"schema": OBJECT_SCHEMA}}}
     )
-    assert_generates(testdir, raw_schema, ({"filter": JSONString('{"r": "100", "g": "200", "b": "150"}')},), "query")
+    assert_generates(
+        ctx, testdir, raw_schema, ({"filter": JSONString('{"r": "100", "g": "200", "b": "150"}')},), "query"
+    )
 
 
 @pytest.mark.hypothesis_nested
@@ -465,7 +463,7 @@ def test_content_serialization(testdir):
 @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_querystring_urlencoded_default_serialization(ctx, data):
     # Example from OAS 3.2: {"foo": "a + b", "bar": true} -> foo=a+%2B+b&bar=true
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/teapot": {
                 "get": {
@@ -495,7 +493,6 @@ def test_querystring_urlencoded_default_serialization(ctx, data):
         },
         version="3.2.0",
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     case = data.draw(schema["/teapot"]["GET"].as_strategy())
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
     prepared = requests.Request("GET", "http://127.0.0.1:1/teapot", params=kwargs["params"]).prepare()
@@ -507,7 +504,7 @@ def test_querystring_urlencoded_default_serialization(ctx, data):
 @given(st.data())
 @settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/teapot": {
                 "get": {
@@ -542,7 +539,6 @@ def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
         },
         version="3.2.0",
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     case = data.draw(schema["/teapot"]["GET"].as_strategy())
     assert case.query == {"bbox": "1.1|1.1|1.1|1.1"}
 
@@ -553,7 +549,7 @@ def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
 def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
     # Example from OAS 3.2: {"numbers":[1,2],"flag":null}
     # -> %7B%22numbers%22%3A%5B1%2C2%5D%2C%22flag%22%3Anull%7D
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/teapot": {
                 "get": {
@@ -583,7 +579,6 @@ def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
         },
         version="3.2.0",
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     case = data.draw(schema["/teapot"]["GET"].as_strategy())
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
     decoded = json.loads(unquote(kwargs["params"]))
@@ -635,10 +630,10 @@ def make_array_schema(location, style):
         ),
     ],
 )
-def test_non_string_serialization(testdir, parameter, expected):
+def test_non_string_serialization(ctx, testdir, parameter, expected):
     # GH: #651
     raw_schema = make_openapi_schema(parameter)
-    assert_generates(testdir, raw_schema, expected, parameter["in"])
+    assert_generates(ctx, testdir, raw_schema, expected, parameter["in"])
 
 
 @pytest.mark.parametrize(
@@ -718,7 +713,7 @@ def test_unusual_form_schema(ctx, type_name):
     # See GH-1152
     # When API schema defines multipart media type
     # And its schema is not an object or bytes (string + format=byte)
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/multipart": {
                 "post": {
@@ -731,7 +726,6 @@ def test_unusual_form_schema(ctx, type_name):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/multipart"]["POST"].as_strategy())
     @settings(max_examples=5, deadline=None)

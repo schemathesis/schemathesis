@@ -3,7 +3,7 @@ from flask import jsonify
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_bundled_ref_schema_path_display(ctx, app_runner, cli, snapshot_cli):
+def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
     # When response validation fails inside a $ref-ed component, the "Schema at" path
     # should show the original component path (e.g. /components/schemas/Host/properties/host)
     # not the internal bundled form (e.g. /x-bundled/schema1/properties/host).
@@ -44,10 +44,8 @@ def test_bundled_ref_schema_path_display(ctx, app_runner, cli, snapshot_cli):
         # Return an integer for host instead of a string — always a type error
         return jsonify({"host": 42}), 200
 
-    port = app_runner.run_flask_app(app)
-
-    result = cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    result = cli.run_openapi_app(
+        app,
         "--checks=response_schema_conformance",
         "--max-examples=1",
     )
@@ -56,7 +54,7 @@ def test_bundled_ref_schema_path_display(ctx, app_runner, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_bundled_ref_in_error_message(ctx, app_runner, cli, snapshot_cli):
+def test_bundled_ref_in_error_message(ctx, cli, snapshot_cli):
     # When a response schema has array items with $ref, the bundled ref path like `#/x-bundled/schema1`
     # should not appear in error messages - it should show the original reference path instead
     app, _ = ctx.openapi.make_flask_app(
@@ -100,11 +98,9 @@ def test_bundled_ref_in_error_message(ctx, app_runner, cli, snapshot_cli):
         # The error message should show `#/components/schemas/Item` instead of `#/x-bundled/schema1`
         return jsonify("not an array"), 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--checks=response_schema_conformance",
             "--max-examples=1",
         )
@@ -113,7 +109,7 @@ def test_bundled_ref_in_error_message(ctx, app_runner, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_nested_ref_in_response_definition(ctx, app_runner, cli, snapshot_cli):
+def test_nested_ref_in_response_definition(ctx, cli, snapshot_cli):
     # Response 200 -> #/definitions/UserResponse -> actual response with schema
     # Without fix: nested $ref won't be resolved, schema validation won't work
     app, _ = ctx.openapi.make_flask_app(
@@ -137,12 +133,10 @@ def test_nested_ref_in_response_definition(ctx, app_runner, cli, snapshot_cli):
         # Violates schema: missing "name", wrong type for "id"
         return jsonify({"id": "not-an-integer", "email": "test@example.com", "name": "test"}), 200
 
-    port = app_runner.run_flask_app(app)
-
     # Should detect schema violations via response_schema_conformance
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--checks=response_schema_conformance",
             "--max-examples=1",
         )
@@ -151,7 +145,7 @@ def test_nested_ref_in_response_definition(ctx, app_runner, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_bundled_ref_in_negative_testing_description(ctx, app_runner, cli, snapshot_cli):
+def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
     # When a request body schema has $ref with multiple definitions, the negative testing (fuzzing)
     # phase may negate the $ref constraint. The error description should show the original reference
     # path (e.g., `#/components/schemas/Item`) instead of the internal bundled path (e.g., `#/x-bundled/schema1`).
@@ -202,10 +196,8 @@ def test_bundled_ref_in_negative_testing_description(ctx, app_runner, cli, snaps
         # Accept all requests to trigger negative_data_rejection failures
         return jsonify({"id": 1}), 201
 
-    port = app_runner.run_flask_app(app)
-
-    result = cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    result = cli.run_openapi_app(
+        app,
         "--checks=negative_data_rejection",
         "--phases=fuzzing",
         "--mode=negative",

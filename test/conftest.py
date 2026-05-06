@@ -19,7 +19,6 @@ from werkzeug import Request
 from werkzeug.datastructures import Headers
 from werkzeug.test import TestResponse
 
-import schemathesis.cli
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core.transport import Response
 
@@ -93,7 +92,7 @@ def open_api_3_schema_with_recoverable_errors(ctx):
 
 @pytest.fixture
 def open_api_3_schema_with_yaml_payload(ctx):
-    return ctx.openapi.build_schema(
+    return ctx.openapi.load_schema(
         {
             "/yaml": {
                 "post": {
@@ -213,7 +212,7 @@ def openapi_3_schema_with_xml(ctx):
         items=id_schema, xml={"namespace": "http://example.com/schema", "prefix": "smp", "wrapped": True}
     )
 
-    return ctx.openapi.build_schema(
+    return ctx.openapi.load_schema(
         {
             "/root-name": operation(make_object()),
             "/auto-name": operation({"$ref": "#/components/schemas/AutoName"}),
@@ -398,21 +397,20 @@ def schema_with_recursive_references():
 
 
 @pytest.fixture
-def swagger_20(simple_schema):
-    return schemathesis.openapi.from_dict(simple_schema)
+def swagger_20(ctx, simple_schema):
+    return ctx.openapi.from_full_schema(simple_schema)
 
 
 @pytest.fixture
-def openapi_30():
-    raw = make_schema("simple_openapi.yaml")
-    return schemathesis.openapi.from_dict(raw)
+def openapi_30(ctx):
+    return ctx.openapi.from_full_schema(make_schema("simple_openapi.yaml"))
 
 
 @pytest.fixture
-def openapi_31():
+def openapi_31(ctx):
     raw = make_schema("simple_openapi.yaml")
     raw["openapi"] = "3.1.0"
-    return schemathesis.openapi.from_dict(raw)
+    return ctx.openapi.from_full_schema(raw)
 
 
 @pytest.fixture

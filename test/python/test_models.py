@@ -23,7 +23,7 @@ from schemathesis.transport.prepare import get_default_headers
 
 @pytest.fixture
 def schema_with_payload(ctx):
-    schema = ctx.openapi.build_schema(
+    return ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -53,7 +53,6 @@ def schema_with_payload(ctx):
             }
         },
     )
-    return schemathesis.openapi.from_dict(schema)
 
 
 def test_make_case_explicit_media_type(schema_with_payload):
@@ -76,7 +75,7 @@ def test_make_case_automatic_media_type(schema_with_payload):
 
 def test_make_case_missing_media_type(ctx):
     # When there are multiple available media types
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -92,7 +91,6 @@ def test_make_case_missing_media_type(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
     # And the `media_type` argument is not passed to `make_case`
     # Then there should be a usage error
     with pytest.raises(IncorrectUsage):
@@ -219,7 +217,7 @@ def test_as_transport_kwargs_override_user_agent(ctx, swagger_20, headers, expec
 
 @pytest.mark.parametrize("header", ["content-Type", "Content-Type"])
 def test_as_transport_kwargs_override_content_type(ctx, header):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -232,7 +230,6 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
     case = schema["/data"]["post"].Case(body="<html></html>", media_type="text/plain")
     # When the `Content-Type` header is explicitly passed
     data = case.as_transport_kwargs(headers={header: "text/html"})
@@ -416,7 +413,7 @@ def test_validate_response_schema_path(
     instance,
     instance_path,
 ):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "post": {
@@ -431,7 +428,6 @@ def test_validate_response_schema_path(
         },
         components={"schemas": {"Foo": {"type": "object"}}},
     )
-    schema = schemathesis.openapi.from_dict(schema)
     response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
     with pytest.raises(Failure) as exc:
         schema["/test"]["POST"].validate_response(response)
@@ -493,7 +489,7 @@ def test_method_suggestion_without_parameters(swagger_20):
 @pytest.mark.hypothesis_nested
 def test_generation_mode_is_available(ctx, mode):
     # When a new case is generated
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -507,9 +503,7 @@ def test_generation_mode_is_available(ctx, mode):
         }
     )
 
-    api_schema = schemathesis.openapi.from_dict(schema)
-
-    @given(case=api_schema["/data"]["POST"].as_strategy(generation_mode=mode))
+    @given(case=schema["/data"]["POST"].as_strategy(generation_mode=mode))
     @settings(max_examples=1)
     def test(case):
         # Then its generator mode should be available
@@ -520,7 +514,7 @@ def test_generation_mode_is_available(ctx, mode):
 
 @pytest.mark.hypothesis_nested
 def test_case_insensitive_headers(ctx):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -531,7 +525,6 @@ def test_case_insensitive_headers(ctx):
         }
     )
     # When headers are generated
-    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/data"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -546,7 +539,7 @@ def test_case_insensitive_headers(ctx):
 
 
 def test_iter_parameters(ctx):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -559,7 +552,6 @@ def test_iter_parameters(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
     params = list(schema["/data"]["POST"].iter_parameters())
     assert len(params) == 2
     assert params[0].name == "X-id"
@@ -569,7 +561,7 @@ def test_iter_parameters(ctx):
 @pytest.mark.parametrize("factory_type", ["httpx", "requests", "wsgi"])
 def test_checks_errors_deduplication(ctx, response_factory, factory_type):
     # See GH-1394
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "get": {
@@ -580,7 +572,6 @@ def test_checks_errors_deduplication(ctx, response_factory, factory_type):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
     case = schema["/data"]["GET"].Case()
     response = getattr(response_factory, factory_type)(content=b"42", content_type=None)
     # When there are two checks that raise the same failure
@@ -678,7 +669,7 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     ],
 )
 def test_get_parameter(ctx, name, location, exists):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data/": {
                 "get": {
@@ -704,7 +695,6 @@ def test_get_parameter(ctx, name, location, exists):
         },
         security=[{"ApiKeyAuth": []}],
     )
-    schema = schemathesis.openapi.from_dict(schema)
 
     parameter = schema["/data/"]["GET"].get_parameter(name, location)
     assert (parameter is not None) is exists

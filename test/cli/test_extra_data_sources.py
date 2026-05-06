@@ -5,7 +5,7 @@ from flask import abort, jsonify, request
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, app_runner, snapshot_cli, ctx):
+def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, snapshot_cli, ctx):
     item_schema = {
         "type": "object",
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
@@ -77,8 +77,6 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, ap
         # Bug: missing required 'name' field - only discoverable with valid ID
         return jsonify({"id": items[item_id]["id"]}), 200
 
-    port = app_runner.run_flask_app(app)
-
     config = {
         "phases": {
             "fuzzing": {"extra-data-sources": {"responses": True}},
@@ -86,8 +84,8 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, ap
     }
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--max-examples=50",
             "-c not_a_server_error",
@@ -101,7 +99,7 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, ap
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("config_enabled", [False, True])
-def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli, ctx, config_enabled):
+def test_extra_data_sources_enables_bug_discovery(cli, snapshot_cli, ctx, config_enabled):
     item_schema = {
         "type": "object",
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
@@ -167,8 +165,6 @@ def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli,
         # Bug: response violates schema - missing required 'name' field
         return jsonify({"id": items[item_id]["id"]}), 200
 
-    port = app_runner.run_flask_app(app)
-
     if config_enabled:
         config = {
             "phases": {
@@ -186,8 +182,8 @@ def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli,
         }
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "-c response_schema_conformance",
             "--mode=positive",
@@ -198,7 +194,7 @@ def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli,
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, ctx):
+def test_extra_data_sources_with_body_parameters(cli, snapshot_cli, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/projects": {
@@ -306,8 +302,6 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
         # Bug: the response violates the schema - missing the required "title" field
         return jsonify({"id": task_id, "project_id": project_id}), 201
 
-    port = app_runner.run_flask_app(app)
-
     config = {
         "phases": {
             "fuzzing": {"extra-data-sources": {"responses": True}},
@@ -315,8 +309,8 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
     }
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "-c response_schema_conformance",
             "--mode=positive",
@@ -328,9 +322,7 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("extra_data_enabled", [True, False])
-def test_extra_data_sources_with_response_examples_prepopulation(
-    cli, app_runner, snapshot_cli, ctx, extra_data_enabled
-):
+def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_cli, ctx, extra_data_enabled):
     known_user_id = "seeded-user-abc-123"
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -411,8 +403,6 @@ def test_extra_data_sources_with_response_examples_prepopulation(
         # Bug: response violates schema - missing required 'name' field
         return jsonify({"id": seeded_users[user_id]["id"]}), 200
 
-    port = app_runner.run_flask_app(app)
-
     config = {
         "phases": {
             "fuzzing": {
@@ -425,8 +415,8 @@ def test_extra_data_sources_with_response_examples_prepopulation(
     # With extra_data_enabled=True, response examples are pre-populated and
     # the bug in GET /users/{user_id} is discovered. With False, only 404s occur.
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--max-examples=50",
             "-c response_schema_conformance",
@@ -475,7 +465,7 @@ _POST_ITEMS_SCHEMA = {
 }
 
 
-def _run_items_app(ctx, app_runner, get_params):
+def _make_items_app(ctx, get_params):
     """GET /items/{id} triggers a 500 only when called with a real UUID from POST."""
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -504,22 +494,21 @@ def _run_items_app(ctx, app_runner, get_params):
             return "", 404
         abort(500)  # reachable only with a real UUID from POST
 
-    return app_runner.run_flask_app(app)
+    return app
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_examples_phase_merges_pool_with_schema_examples(cli, app_runner, snapshot_cli, ctx):
+def test_examples_phase_merges_pool_with_schema_examples(cli, snapshot_cli, ctx):
     # `filter` has a schema example (keeps the phase active), `id` has none.
     # Pool supplies the real `id` from POST, exposing the bug.
     get_params = [
         {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
         {"name": "filter", "in": "query", "schema": {"type": "string", "example": "active"}},
     ]
-    port = _run_items_app(ctx, app_runner, get_params)
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            _make_items_app(ctx, get_params),
             "--phases=examples",
             "-c not_a_server_error",
             "--mode=positive",
@@ -529,17 +518,16 @@ def test_examples_phase_merges_pool_with_schema_examples(cli, app_runner, snapsh
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_examples_phase_uses_pool_as_fill_missing_source(cli, app_runner, snapshot_cli, ctx):
+def test_examples_phase_uses_pool_as_fill_missing_source(cli, snapshot_cli, ctx):
     # No schema examples - GET would be skipped without fill-missing.
     # With fill-missing=true, pool supplies the real `id` and exposes the bug.
     get_params = [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}]
-    port = _run_items_app(ctx, app_runner, get_params)
 
     config = {"phases": {"examples": {"fill-missing": True}}}
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            _make_items_app(ctx, get_params),
             "--phases=examples",
             "-c not_a_server_error",
             "--mode=positive",
@@ -550,7 +538,7 @@ def test_examples_phase_uses_pool_as_fill_missing_source(cli, app_runner, snapsh
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, snapshot_cli, ctx):
+def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, snapshot_cli, ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
@@ -631,8 +619,6 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, sn
         # Bug: response violates schema - missing the required "email" field
         return jsonify({"id": users[user_id]["id"]}), 200
 
-    port = app_runner.run_flask_app(app)
-
     config = {
         "phases": {
             "fuzzing": {"extra-data-sources": {"responses": True}},
@@ -640,8 +626,8 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, sn
     }
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=examples,fuzzing",
             "--max-examples=50",
             "-c response_schema_conformance",
@@ -653,7 +639,7 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, sn
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_examples_phase_uses_pool_for_body_fields(cli, app_runner, snapshot_cli, ctx):
+def test_examples_phase_uses_pool_for_body_fields(cli, snapshot_cli, ctx):
     # Without body-side pool consumption, fill-missing has nothing to fill the body-only consumer with.
     session_schema = {
         "type": "object",
@@ -717,12 +703,11 @@ def test_examples_phase_uses_pool_for_body_fields(cli, app_runner, snapshot_cli,
             return "", 404
         abort(500)  # reachable only when body sessionId came from the pool
 
-    port = app_runner.run_flask_app(app)
     config = {"phases": {"examples": {"fill-missing": True}}}
 
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=examples",
             "-c not_a_server_error",
             "--mode=positive",
@@ -751,7 +736,7 @@ def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, app_runner, snapshot_cli, ctx):
+def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, snapshot_cli, ctx):
     # Docker Engine /volumes shape: `{Volumes: [...], Warnings: [...]}`. Server-seeded names;
     # no POST creator. UUIDs make blind generation practically incapable of guessing.
     seeded_names = [
@@ -824,10 +809,9 @@ def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, app_runn
             return "", 404
         return jsonify({"Name": name, "Driver": "local"})
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--max-examples=30",
             "--mode=positive",
@@ -837,7 +821,7 @@ def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, app_runn
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_parent_aware_pool_correlates_path_params(cli, app_runner, snapshot_cli, ctx):
+def test_parent_aware_pool_correlates_path_params(cli, snapshot_cli, ctx):
     # Deep path planted bug fires only when (productName, itemName) co-refer.
     # Without parent-aware draws, pool feeds independent values and the bug stays unreached.
     products: set[str] = set()
@@ -930,10 +914,9 @@ def test_parent_aware_pool_correlates_path_params(cli, app_runner, snapshot_cli,
         # Planted bug fires only when (productName, itemName) form a real parent-child pair.
         raise RuntimeError("planted bug")
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--mode=positive",
         )
@@ -941,7 +924,7 @@ def test_parent_aware_pool_correlates_path_params(cli, app_runner, snapshot_cli,
     )
 
 
-def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, app_runner, ctx):
+def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
     # After a successful DELETE, the pool no longer feeds the deleted id to GET/PUT/PATCH
     # consumers. Verified by counting per-id calls server-side, not by snapshotting CLI output.
     items: dict[str, dict] = {}
@@ -1022,9 +1005,8 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, app_runner, ctx):
         del items[item_id]
         return "", 204
 
-    port = app_runner.run_flask_app(app)
-    cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    cli.run_openapi_app(
+        app,
         "--phases=fuzzing",
         "--mode=positive",
     )
@@ -1042,9 +1024,7 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, app_runner, ctx):
     ],
     ids=["top-level-array", "wrapped-array"],
 )
-def test_stateful_reaches_every_list_producer_element(
-    cli, app_runner, snapshot_cli, ctx, producer_shape, wrap_response
-):
+def test_stateful_reaches_every_list_producer_element(cli, snapshot_cli, ctx, producer_shape, wrap_response):
     # The planted bug at the last seeded id is only reachable if the inferred link
     # samples across every element of the producer's list, not just the first one.
     seeded = [
@@ -1114,10 +1094,9 @@ def test_stateful_reaches_every_list_producer_element(
                 return jsonify(w)
         return "", 404
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=stateful",
             "--mode=positive",
         )
@@ -1156,7 +1135,6 @@ def test_stateful_reaches_every_list_producer_element(
 )
 def test_pool_captures_subresources_from_every_parent(
     cli,
-    app_runner,
     snapshot_cli,
     ctx,
     sub_cardinality,
@@ -1250,10 +1228,9 @@ def test_pool_captures_subresources_from_every_parent(
             return "", 404
         return jsonify({"id": target, "text": "ok"} if sub_cardinality == "many" else {"id": target, "name": "ok"})
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--max-examples=30",
             "--mode=positive",
@@ -1263,7 +1240,7 @@ def test_pool_captures_subresources_from_every_parent(
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_extra_data_sources_overlays_nested_body_foreign_key(cli, app_runner, snapshot_cli, ctx):
+def test_extra_data_sources_overlays_nested_body_foreign_key(cli, snapshot_cli, ctx):
     # Server returns 500 only when shipping.location_id matches a real Location id;
     # without the nested overlay random ints never hit a real id and the bug stays hidden.
     app, _ = ctx.openapi.make_flask_app(
@@ -1336,15 +1313,14 @@ def test_extra_data_sources_overlays_nested_body_foreign_key(cli, app_runner, sn
             abort(500)
         return jsonify({"id": 1}), 201
 
-    port = app_runner.run_flask_app(app)
     config = {
         "phases": {
             "fuzzing": {"extra-data-sources": {"responses": True}},
         },
     }
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=coverage,fuzzing",
             "--max-examples=30",
             "--mode=positive",
@@ -1356,7 +1332,7 @@ def test_extra_data_sources_overlays_nested_body_foreign_key(cli, app_runner, sn
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_extra_data_sources_handles_boolean_body_schema(cli, app_runner, snapshot_cli, ctx):
+def test_extra_data_sources_handles_boolean_body_schema(cli, snapshot_cli, ctx):
     # A `schema: true` body alongside pool-using operations must not derail generation.
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1411,10 +1387,9 @@ def test_extra_data_sources_handles_boolean_body_schema(cli, app_runner, snapsho
     def post_anything():
         return jsonify({"ok": True}), 200
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--max-examples=5",
             "--mode=positive",
         )

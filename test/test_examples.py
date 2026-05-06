@@ -1,35 +1,27 @@
 import pytest
 from hypothesis import given, settings
 
-import schemathesis
 from schemathesis.specs.openapi.examples import get_strategies_from_examples
 
 
-@pytest.fixture(scope="module")
-def schema():
-    return schemathesis.openapi.from_dict(
+@pytest.mark.hypothesis_nested
+def test_examples_validity(ctx):
+    api = ctx.openapi.apps.success()
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
-            "paths": {
-                "/success": {
-                    "get": {
-                        "parameters": [
-                            {"name": "anyKey", "in": "header", "schema": {"type": "string"}},
-                            {"name": "id", "in": "query", "schema": {"type": "string", "example": "1"}},
-                        ],
-                        "responses": {"200": {"description": "OK"}},
-                    }
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {"name": "anyKey", "in": "header", "schema": {"type": "string"}},
+                        {"name": "id", "in": "query", "schema": {"type": "string", "example": "1"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
-            },
-        }
+            }
+        },
+        servers=[{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
     )
 
-
-@pytest.mark.hypothesis_nested
-def test_examples_validity(ctx, schema):
-    api = ctx.openapi.apps.success()
     operation = next(schema.get_all_operations()).ok()
     strategy = get_strategies_from_examples(operation)[0]
 

@@ -15,7 +15,7 @@ def test_missing_deserializer_warning_properties():
 
 
 def test_detect_missing_deserializers_with_custom_media_type(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -33,8 +33,6 @@ def test_detect_missing_deserializers_with_custom_media_type(ctx):
             }
         }
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
@@ -46,7 +44,7 @@ def test_detect_missing_deserializers_with_custom_media_type(ctx):
 
 
 def test_detect_missing_deserializers_with_json(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -64,8 +62,6 @@ def test_detect_missing_deserializers_with_json(ctx):
             }
         }
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
@@ -74,7 +70,7 @@ def test_detect_missing_deserializers_with_json(ctx):
 
 
 def test_detect_missing_deserializers_no_schema(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -87,8 +83,6 @@ def test_detect_missing_deserializers_no_schema(ctx):
             }
         }
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
@@ -97,7 +91,7 @@ def test_detect_missing_deserializers_no_schema(ctx):
 
 
 def test_detect_missing_deserializers_primitive_type(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -113,8 +107,6 @@ def test_detect_missing_deserializers_primitive_type(ctx):
             }
         }
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
@@ -123,7 +115,7 @@ def test_detect_missing_deserializers_primitive_type(ctx):
 
 
 def test_detect_missing_deserializers_with_registered_deserializer(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -146,7 +138,6 @@ def test_detect_missing_deserializers_with_registered_deserializer(ctx):
     def msgpack_deserializer(ctx, response):
         return {}
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
@@ -155,7 +146,7 @@ def test_detect_missing_deserializers_with_registered_deserializer(ctx):
 
 
 def test_detect_missing_deserializers_array_type(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -176,8 +167,6 @@ def test_detect_missing_deserializers_array_type(ctx):
             }
         }
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
     warnings = detect_missing_deserializers(operation)
@@ -187,7 +176,7 @@ def test_detect_missing_deserializers_array_type(ctx):
 
 
 def test_detect_missing_deserializers_with_malformed_media_type(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -210,8 +199,6 @@ def test_detect_missing_deserializers_with_malformed_media_type(ctx):
             }
         }
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
     # Should not raise exception and should only warn about the valid media type

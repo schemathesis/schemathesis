@@ -10,7 +10,7 @@ from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 
 
 @pytest.fixture
-def cli(tmp_path):
+def cli(tmp_path, app_runner):
     """CLI runner helper.
 
     Provides in-process execution via `click.CliRunner`.
@@ -18,6 +18,10 @@ def cli(tmp_path):
     cli_runner = CliRunner()
 
     class Runner:
+        @staticmethod
+        def run_openapi_app(app, *args, path: str = "/openapi.json", **kwargs):
+            return Runner.run(app_runner.openapi_url(app, path=path), *args, **kwargs)
+
         @staticmethod
         def run(*args, **kwargs):
             return Runner.main("run", *args, **kwargs)

@@ -22,14 +22,14 @@ def test_cli_displays_config_path(ctx, cli, app_runner, snapshot_cli):
     }
     schema = ctx.openapi.build_schema(paths)
     app = ctx.openapi.make_permissive_flask_app(schema)
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths)
 
     # Run with config parameter - cli fixture will write config file
     assert (
         cli.run(
             str(schema_path),
-            f"--url=http://127.0.0.1:{port}/api",
+            f"--url={base_url}/api",
             "-c",
             "not_a_server_error",
             "--max-examples=1",
@@ -49,14 +49,14 @@ def test_cli_no_config_display_without_file(ctx, cli, app_runner, snapshot_cli):
     }
     schema = ctx.openapi.build_schema(paths)
     app = ctx.openapi.make_permissive_flask_app(schema)
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths)
 
     # Run without config parameter - no config file used
     assert (
         cli.run(
             str(schema_path),
-            f"--url=http://127.0.0.1:{port}/api",
+            f"--url={base_url}/api",
             "-c",
             "not_a_server_error",
             "--max-examples=1",
