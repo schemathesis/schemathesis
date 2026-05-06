@@ -3811,6 +3811,80 @@ def test_body_fk_picks_same_module_resource_variant(ctx):
     assert bindings.get(("body", "group_id")) == "Group1", bindings
 
 
+def test_path_consumer_picks_same_module_suffix_match(ctx):
+    # `/bookings/resources/{id}` infers `Resource`; both `KeyDateResource` (addressbook)
+    # and `ResourceItem` (bookings) are suffix-affine, so the same-module one wins.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/addressbook/key_date_resources": {
+                "get": {
+                    "operationId": "listAddressbookKeyDateResources",
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/KeyDateResource"},
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/bookings/resources": {
+                "get": {
+                    "operationId": "listBookingsResources",
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/ResourceItem"},
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/bookings/resources/{id}": {
+                "get": {
+                    "operationId": "getBookingsResource",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ResourceItem"}}}
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "KeyDateResource": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "ResourceItem": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "title": {"type": "string"}},
+                    "required": ["id"],
+                },
+            }
+        },
+    )
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): slot.resource.name
+        for slot in graph.operations["GET /bookings/resources/{id}"].inputs
+    }
+    assert bindings.get(("path", "id")) == "ResourceItem", bindings
+
+
 def test_body_fk_inside_all_of_with_one_of_branches(ctx):
     # FK fields hidden behind allOf siblings or oneOf branches must still be discovered.
     _, graph = analyze_dependencies(

@@ -484,7 +484,7 @@ def _merge_operations(*ops):
                     },
                 },
             },
-            [{"GET /users"}, {"GET /users/{id}", "PUT /users/{id}"}],
+            [{"GET /users", "GET /users/{id}", "PUT /users/{id}"}],
             id="multi-operation-cycle",
         ),
         pytest.param(
