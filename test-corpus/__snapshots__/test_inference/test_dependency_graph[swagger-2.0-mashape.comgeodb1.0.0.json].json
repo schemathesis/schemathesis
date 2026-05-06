@@ -1,7 +1,29 @@
 {
   "operations": {
     "GET /geo/adminDivisions": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "countryIds",
+          "resource": "Country",
+          "resource_field": "countryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "excludedCountryIds",
+          "resource": "ExcludedCountry",
+          "resource_field": "excludedCountryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -42,6 +64,27 @@
           "parameter_name": "divisionId",
           "resource": "Division",
           "resource_field": "divisionId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "countryIds",
+          "resource": "Country",
+          "resource_field": "countryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "excludedCountryIds",
+          "resource": "ExcludedCountry",
+          "resource_field": "excludedCountryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
         }
       ],
       "outputs": [
@@ -63,6 +106,27 @@
           "parameter_name": "divisionId",
           "resource": "Division",
           "resource_field": "divisionId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "countryIds",
+          "resource": "Country",
+          "resource_field": "countryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "excludedCountryIds",
+          "resource": "ExcludedCountry",
+          "resource_field": "excludedCountryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
         }
       ],
       "outputs": [
@@ -77,7 +141,29 @@
       ]
     },
     "GET /geo/cities": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "countryIds",
+          "resource": "Country",
+          "resource_field": "countryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "excludedCountryIds",
+          "resource": "ExcludedCountry",
+          "resource_field": "excludedCountryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -188,6 +274,27 @@
           "parameter_name": "cityId",
           "resource": "City",
           "resource_field": "cityId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "countryIds",
+          "resource": "Country",
+          "resource_field": "countryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "excludedCountryIds",
+          "resource": "ExcludedCountry",
+          "resource_field": "excludedCountryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
         }
       ],
       "outputs": [
@@ -306,6 +413,13 @@
           "parameter_name": "countryId",
           "resource": "Country",
           "resource_field": "countryId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
         }
       ],
       "outputs": [
@@ -327,6 +441,13 @@
           "parameter_name": "countryId",
           "resource": "Country",
           "resource_field": "countryId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
         }
       ],
       "outputs": [
@@ -348,6 +469,27 @@
           "parameter_name": "locationId",
           "resource": "Location",
           "resource_field": "locationId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "countryIds",
+          "resource": "Country",
+          "resource_field": "countryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "excludedCountryIds",
+          "resource": "ExcludedCountry",
+          "resource_field": "excludedCountryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
         }
       ],
       "outputs": [
@@ -369,6 +511,27 @@
           "parameter_name": "locationId",
           "resource": "Location",
           "resource_field": "locationId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "countryIds",
+          "resource": "Country",
+          "resource_field": "countryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "excludedCountryIds",
+          "resource": "ExcludedCountry",
+          "resource_field": "excludedCountryIds"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "query",
+          "parameter_name": "timeZoneIds",
+          "resource": "TimeZone",
+          "resource_field": "timeZoneIds"
         }
       ],
       "outputs": [
@@ -624,6 +787,12 @@
       ],
       "types": {}
     },
+    "ExcludedCountry": {
+      "fields": [
+        "excludedCountryIds"
+      ],
+      "types": {}
+    },
     "LanguageDescriptor": {
       "fields": [
         "code",
@@ -819,6 +988,12 @@
           "array"
         ]
       }
+    },
+    "TimeZone": {
+      "fields": [
+        "timeZoneIds"
+      ],
+      "types": {}
     },
     "TimeZoneDescriptor": {
       "fields": [

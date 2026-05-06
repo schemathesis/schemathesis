@@ -3658,6 +3658,61 @@ def test_nested_body_fk_inside_composition_branch(ctx):
     assert (nested_slot.resource.name, nested_slot.resource_field) == ("Warehouse", "id")
 
 
+def test_body_plural_id_array_field_produces_input_slot(ctx):
+    # Plural FK array fields like `site_ids` are FKs to Site.id; the analyzer used
+    # to recognize only singular `_id` body fields.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/sites": {
+                "post": {
+                    "operationId": "createSite",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/events": {
+                "post": {
+                    "operationId": "createEvent",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "site_ids": {"type": "array", "items": {"type": "integer"}},
+                                    },
+                                    "required": ["name", "site_ids"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+    )
+
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): (slot.resource.name, slot.resource_field)
+        for slot in graph.operations["POST /events"].inputs
+    }
+    assert bindings.get(("body", "site_ids")) == ("Site", "id"), bindings
+
+
 @pytest.mark.parametrize(
     ["paths", "kwargs", "version"],
     [

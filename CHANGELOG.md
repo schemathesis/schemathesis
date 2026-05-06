@@ -43,6 +43,7 @@
 - Remove direct dependency on `jsonschema`.
 - Recognize more path parameters as resource identifiers.
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
+- Recognize plural foreign-key array fields (`site_ids`, `userUuids`, `session_guids`).
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 - Group consecutive same-title failures (e.g. multiple schema violations on one response) under a single header with a violation count.
 
