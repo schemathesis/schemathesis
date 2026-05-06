@@ -15,6 +15,7 @@
 - GraphQL stateful phase: chained operation scenarios.
 - Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
 - `extra-data-sources` config for the examples and coverage phases. [#3972](https://github.com/schemathesis/schemathesis/issues/3972)
+- Document the JSON Schema for `schemathesis.toml` for editor autocompletion. [#3971](https://github.com/schemathesis/schemathesis/issues/3971)
 
 ### :bug: Fixed
 
