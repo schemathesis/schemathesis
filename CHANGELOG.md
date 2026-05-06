@@ -54,6 +54,7 @@
 - Up to 2x faster schema processing on large specs (Stripe, VMware, OSIsoft) and ~40% faster CLI startup.
 - ~75% lower peak memory for large scenarios when writing NDJSON reports.
 - Cap shell-escaped values in reproduce-curl commands at 64 KB with an inline truncation marker.
+- Avoid unnecessary function digest calculations when Hypothesis database is disabled.
 
 ## [4.17.0](https://github.com/schemathesis/schemathesis/compare/v4.16.1...v4.17.0) - 2026-04-30
 

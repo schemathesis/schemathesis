@@ -8,6 +8,33 @@ from click.testing import CliRunner
 import schemathesis.cli
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 
+_DEFAULT_GENERATION_DATABASE_ARGUMENT = "--generation-database=none"
+
+
+def _with_default_generation_database(args, config=None):
+    if not args or args[0] != "run":
+        return args
+    if _has_cli_option(args, "--generation-database") or _has_cli_option(args, "--generation-deterministic"):
+        return args
+    if _has_generation_config_option(config, "database") or _has_generation_config_option(config, "deterministic"):
+        return args
+    return (*args, _DEFAULT_GENERATION_DATABASE_ARGUMENT)
+
+
+def _has_cli_option(args, name: str) -> bool:
+    return any(isinstance(arg, str) and (arg == name or arg.startswith(f"{name}=")) for arg in args)
+
+
+def _has_generation_config_option(config, name: str) -> bool:
+    if isinstance(config, dict):
+        generation = config.get("generation")
+        if isinstance(generation, dict) and name in generation:
+            return True
+        return any(_has_generation_config_option(value, name) for value in config.values())
+    if isinstance(config, list):
+        return any(_has_generation_config_option(value, name) for value in config)
+    return False
+
 
 @pytest.fixture
 def cli(tmp_path, app_runner):
@@ -28,6 +55,7 @@ def cli(tmp_path, app_runner):
 
         @staticmethod
         def main(*args, config=None, hooks=None, **kwargs):
+            args = _with_default_generation_database(args, config)
             if config is not None:
                 path = tmp_path / "config.toml"
                 path.write_text(tomli_w.dumps(config), encoding="utf-8")

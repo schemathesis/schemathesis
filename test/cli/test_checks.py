@@ -430,7 +430,6 @@ def test_negative_data_rejection_query_integer_param_accepts_numeric_string_no_f
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=fuzzing",
-        "--generation-database=none",
         exit_code=ExitCode.OK,
     )
 

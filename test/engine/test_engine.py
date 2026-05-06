@@ -1223,7 +1223,6 @@ def test_stateful_all_generation_modes(ctx):
 def test_stateful_seed(ctx):
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    schema.config.generation.update(database="none")
     requests = []
     for _ in range(3):
         stream = EventStream(
