@@ -5101,6 +5101,27 @@ def test_coverage_positive_object_with_min_properties_no_required(ctx):
     collect_coverage_cases(ctx, body_schema, positive=True)
 
 
+def test_coverage_positive_oneof_branch_with_conflicting_root_type(ctx):
+    # The root schema declares type:array but oneOf[0] declares type:object.
+    # Positive coverage must never yield an object body — it can't satisfy both constraints.
+    body_schema = {
+        "type": "array",
+        "items": {"type": "string"},
+        "oneOf": [
+            {
+                "type": "object",
+                "properties": {"items": {"type": "array", "items": {"type": "string"}}},
+                "required": ["items"],
+            },
+            {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+        ],
+    }
+    collect_coverage_cases(ctx, body_schema, positive=True)
+
+
 def test_coverage_positive_body_anyof_const_null_excluded_by_sibling_type(ctx):
     # When anyOf has a {const: null} branch but the sibling `type` constraint forbids null,
     # POSITIVE coverage must not yield null as a valid value for that property.
