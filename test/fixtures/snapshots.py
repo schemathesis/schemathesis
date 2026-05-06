@@ -263,7 +263,9 @@ class CliSnapshotConfig:
             lines = collapsed
         lines = clean_unit_tests(lines)
         lines = clean_stateful_tests(lines)
-        return "\n".join(lines).strip() + "\n"
+        data = "\n".join(lines)
+        data = re.sub(r"\n{4,}", "\n\n\n", data)
+        return data.strip() + "\n"
 
 
 def clean_unit_tests(lines):

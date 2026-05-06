@@ -56,13 +56,13 @@ ________________________________ Stateful tests ________________________________
     Value:
 
         {
-            "id": "0",
+            "id": "order-1",
             "total": 0
         }
 
 [201] Created:
 
-    `{"id":"0","total":0}`
+    `{"id":"order-1","total":0}`
 
 Reproduce with:
 

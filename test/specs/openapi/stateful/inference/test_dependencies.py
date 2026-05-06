@@ -4107,50 +4107,26 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, snapshot_cli, ctx):
         }
     )
 
-    customers = {}
-    next_customer_id = 1
-    next_order_id = 1
+    customers: set[str] = set()
 
     @app.route("/customers", methods=["POST"])
     def create_customer():
-        nonlocal next_customer_id
-        data = request.get_json() or {}
-
-        if not isinstance(data, dict):
+        if not isinstance(request.get_json() or {}, dict):
             return {"error": "Invalid input"}
-
-        customer_id = str(next_customer_id)
-        next_customer_id += 1
-
-        customers[customer_id] = {"id": customer_id, "name": data.get("name", "Unknown")}
-
-        return jsonify({"id": customer_id}), 201
+        customers.add("customer-1")
+        return jsonify({"id": "customer-1"}), 201
 
     @app.route("/orders", methods=["POST"])
     def create_order():
-        nonlocal next_order_id
         data = request.get_json() or {}
-
         if not isinstance(data, dict):
             return {"error": "Invalid input"}
-
         customer_id = data.get("customer_id")
-        order_id = str(next_order_id)
-        next_order_id += 1
-
         if not isinstance(customer_id, (str, int)):
             return jsonify({"detail": "Invalid customer_id"}), 400
-
-        # Bug: When customer_id is exists, we return total as string instead of number
         if customer_id in customers:
-            return jsonify(
-                {
-                    "id": order_id,
-                    "customer_id": customer_id,
-                    "total": str(data.get("total", 0)),
-                }
-            ), 201
-
+            # Bug: server returns `total` as a string while the response schema declares it a number.
+            return jsonify({"id": "order-1", "customer_id": customer_id, "total": "0"}), 201
         return jsonify({"detail": "Customer does not exist"}), 404
 
     assert (
@@ -4224,53 +4200,25 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, snapshot_cli, ctx):
         }
     )
 
-    customers = {}
-    next_customer_id = 1
-    next_order_id = 1
+    customers: set[str] = set()
 
     @app.route("/customers", methods=["POST"])
     def create_customer():
-        nonlocal next_customer_id
-        data = request.get_json() or {}
-
-        if not isinstance(data, dict):
+        if not isinstance(request.get_json() or {}, dict):
             return {"error": "Invalid input"}
-
-        customer_id = str(next_customer_id)
-        next_customer_id += 1
-
-        customers[customer_id] = {"id": customer_id, "name": data.get("name", "Unknown")}
-
-        return jsonify({"id": customer_id}), 201
+        customers.add("customer-1")
+        return jsonify({"id": "customer-1"}), 201
 
     @app.route("/orders", methods=["POST"])
     def create_order():
-        nonlocal next_order_id
         data = request.get_json() or {}
-
         if not isinstance(data, dict):
             return {"error": "Invalid input"}
-
         customer_id = data.get("customer_id")
-        next_order_id += 1
-
-        # Bug: When customer_id doesn't exist, missing required field
         if customer_id not in customers:
-            return jsonify(
-                {
-                    "id": "0",
-                    "total": 0,
-                }
-            ), 201
-
-        # Valid customers get correct response
-        return jsonify(
-            {
-                "id": "0",
-                "customer_id": customer_id,
-                "total": 0,
-            }
-        ), 201
+            # Bug: response missing required `customer_id` field.
+            return jsonify({"id": "order-1", "total": 0}), 201
+        return jsonify({"id": "order-1", "customer_id": customer_id, "total": 0}), 201
 
     assert (
         cli.run_openapi_app(
@@ -4446,49 +4394,25 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
         }
     )
 
-    customers = {}
-    next_customer_id = 1
-    next_order_id = 1
+    customers: set[str] = set()
 
     @app.route("/customers", methods=["POST"])
     def create_customer():
-        nonlocal next_customer_id
-        data = request.get_json() or {}
-
-        if not isinstance(data, dict):
+        if not isinstance(request.get_json() or {}, dict):
             return {"error": "Invalid input"}
-
-        customer_id = str(next_customer_id)
-        next_customer_id += 1
-
-        customers[customer_id] = {"id": customer_id, "name": data.get("name", "Unknown")}
-
+        customers.add("customer-1")
         return jsonify({}), 201
 
     @app.route("/orders", methods=["POST"])
     def create_order():
-        nonlocal next_order_id
         data = request.get_json() or {}
-
         if not isinstance(data, dict):
             return {"error": "Invalid input"}
-
         customer_id = data.get("customer_id")
         if not isinstance(customer_id, str):
             return {"error": "Invalid input"}
-
-        order_id = str(next_order_id)
-        next_order_id += 1
-
         if customer_id in customers:
-            return jsonify(
-                {
-                    "id": order_id,
-                    "customer_id": customer_id,
-                    "total": str(data.get("total", 0)),
-                }
-            ), 201
-
+            return jsonify({"id": "order-1", "customer_id": customer_id, "total": "0"}), 201
         return jsonify({"detail": "Customer does not exist"}), 404
 
     assert (

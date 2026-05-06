@@ -4,50 +4,83 @@ import pytest
 from flask import abort, jsonify, request
 
 
+def _object_schema(properties, *, required=None, **extra):
+    schema = {"type": "object", "properties": properties, **extra}
+    if required is not None:
+        schema["required"] = list(required)
+    return schema
+
+
+def _json_content(schema, **extra):
+    return {"application/json": {"schema": schema, **extra}}
+
+
+def _json_response(schema=None, *, description="OK", **extra):
+    response = {}
+    if description is not None:
+        response["description"] = description
+    if schema is not None:
+        response["content"] = _json_content(schema)
+    response.update(extra)
+    return response
+
+
+def _json_request_body(schema, *, required=True, **extra):
+    return {"content": _json_content(schema, **extra), "required": required}
+
+
+def _path_param(name, schema=None, **extra):
+    return {"name": name, "in": "path", "required": True, "schema": schema or {"type": "string"}, **extra}
+
+
+def _uuid_path_param(name, **extra):
+    return _path_param(name, {"type": "string", "format": "uuid"}, **extra)
+
+
+def _response_pool_config(*, enabled=True, operation_ordering=None):
+    fuzzing = {"extra-data-sources": {"responses": enabled}}
+    if operation_ordering is not None:
+        fuzzing["operation-ordering"] = operation_ordering
+    return {"phases": {"fuzzing": fuzzing}}
+
+
+def _examples_fill_missing_config():
+    return {"phases": {"examples": {"fill-missing": True}}}
+
+
+def _examples_response_pool_config(*, enabled):
+    return {"phases": {"examples": {"extra-data-sources": {"responses": enabled}}}}
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, snapshot_cli, ctx):
-    item_schema = {
-        "type": "object",
-        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
-        "required": ["id", "name"],
-    }
+    item_schema = _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"])
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
                     "operationId": "createItem",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
+                    "requestBody": _json_request_body(_object_schema({"name": {"type": "string"}}, required=["name"])),
                     "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {"application/json": {"schema": item_schema}},
-                            "links": {
+                        "201": _json_response(
+                            item_schema,
+                            description="Created",
+                            links={
                                 "GetItemById": {
                                     "operationId": "getItem",
                                     "parameters": {"id": "$response.body#/id"},
                                 }
                             },
-                        }
+                        )
                     },
                 }
             },
             "/items/{id}": {
                 "get": {
                     "operationId": "getItem",
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [_path_param("id")],
                     "responses": {
-                        "200": {"description": "Success", "content": {"application/json": {"schema": item_schema}}},
+                        "200": _json_response(item_schema, description="Success"),
                         "404": {"description": "Not found"},
                     },
                 }
@@ -77,12 +110,6 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
         # Bug: missing required 'name' field - only discoverable with valid ID
         return jsonify({"id": items[item_id]["id"]}), 200
 
-    config = {
-        "phases": {
-            "fuzzing": {"extra-data-sources": {"responses": True}},
-        },
-    }
-
     assert (
         cli.run_openapi_app(
             app,
@@ -91,7 +118,7 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
             "-c not_a_server_error",
             "-c response_schema_conformance",
             "--mode=positive",
-            config=config,
+            config=_response_pool_config(),
         )
         == snapshot_cli
     )
@@ -100,48 +127,33 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, sn
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("config_enabled", [False, True])
 def test_extra_data_sources_enables_bug_discovery(cli, snapshot_cli, ctx, config_enabled):
-    item_schema = {
-        "type": "object",
-        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
-        "required": ["id", "name"],
-    }
+    item_schema = _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"])
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
                     "operationId": "createItem",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
+                    "requestBody": _json_request_body(_object_schema({"name": {"type": "string"}}, required=["name"])),
                     "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {"application/json": {"schema": item_schema}},
-                            "links": {
+                        "201": _json_response(
+                            item_schema,
+                            description="Created",
+                            links={
                                 "GetItemById": {
                                     "operationId": "getItem",
                                     "parameters": {"id": "$response.body#/id"},
                                 }
                             },
-                        }
+                        )
                     },
                 }
             },
             "/items/{id}": {
                 "get": {
                     "operationId": "getItem",
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [_path_param("id")],
                     "responses": {
-                        "200": {"description": "Success", "content": {"application/json": {"schema": item_schema}}},
+                        "200": _json_response(item_schema, description="Success"),
                         "404": {"description": "Not found"},
                     },
                 }
@@ -165,21 +177,9 @@ def test_extra_data_sources_enables_bug_discovery(cli, snapshot_cli, ctx, config
         # Bug: response violates schema - missing required 'name' field
         return jsonify({"id": items[item_id]["id"]}), 200
 
-    if config_enabled:
-        config = {
-            "phases": {
-                "fuzzing": {"extra-data-sources": {"responses": True}},
-            },
-        }
-    else:
-        config = {
-            "phases": {
-                "fuzzing": {
-                    "operation-ordering": "none",
-                    "extra-data-sources": {"responses": False},
-                },
-            },
-        }
+    config = (
+        _response_pool_config() if config_enabled else _response_pool_config(enabled=False, operation_ordering="none")
+    )
 
     assert (
         cli.run_openapi_app(
@@ -195,80 +195,40 @@ def test_extra_data_sources_enables_bug_discovery(cli, snapshot_cli, ctx, config
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_body_parameters(cli, snapshot_cli, ctx):
+    project_schema = _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"])
+    task_request_schema = _object_schema(
+        {"project_id": {"type": "string"}, "title": {"type": "string"}}, required=["project_id", "title"]
+    )
+    task_response_schema = _object_schema(
+        {"id": {"type": "string"}, "project_id": {"type": "string"}, "title": {"type": "string"}},
+        required=["id", "project_id", "title"],
+    )
     app, _ = ctx.openapi.make_flask_app(
         {
             "/projects": {
                 "post": {
                     "operationId": "createProject",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
+                    "requestBody": _json_request_body(_object_schema({"name": {"type": "string"}}, required=["name"])),
                     "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
-                                        "required": ["id", "name"],
-                                    }
-                                }
-                            },
-                            "links": {
+                        "201": _json_response(
+                            project_schema,
+                            description="Created",
+                            links={
                                 "AddTask": {
                                     "operationId": "createTask",
                                     "parameters": {"project_id": "$response.body#/id"},
                                 }
                             },
-                        }
+                        )
                     },
                 }
             },
             "/tasks": {
                 "post": {
                     "operationId": "createTask",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "project_id": {"type": "string"},
-                                        "title": {"type": "string"},
-                                    },
-                                    "required": ["project_id", "title"],
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
+                    "requestBody": _json_request_body(task_request_schema),
                     "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": {"type": "string"},
-                                            "project_id": {"type": "string"},
-                                            "title": {"type": "string"},
-                                        },
-                                        "required": ["id", "project_id", "title"],
-                                    }
-                                }
-                            },
-                        },
+                        "201": _json_response(task_response_schema, description="Created"),
                         "404": {"description": "Project not found"},
                     },
                 }
@@ -302,19 +262,13 @@ def test_extra_data_sources_with_body_parameters(cli, snapshot_cli, ctx):
         # Bug: the response violates the schema - missing the required "title" field
         return jsonify({"id": task_id, "project_id": project_id}), 201
 
-    config = {
-        "phases": {
-            "fuzzing": {"extra-data-sources": {"responses": True}},
-        },
-    }
-
     assert (
         cli.run_openapi_app(
             app,
             "--phases=fuzzing",
             "-c response_schema_conformance",
             "--mode=positive",
-            config=config,
+            config=_response_pool_config(),
         )
         == snapshot_cli
     )
@@ -324,33 +278,19 @@ def test_extra_data_sources_with_body_parameters(cli, snapshot_cli, ctx):
 @pytest.mark.parametrize("extra_data_enabled", [True, False])
 def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_cli, ctx, extra_data_enabled):
     known_user_id = "seeded-user-abc-123"
+    user_schema = _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"])
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
                     "operationId": "createUser",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        },
-                        "required": True,
-                    },
+                    "requestBody": _json_request_body(_object_schema({"name": {"type": "string"}}, required=["name"])),
                     "responses": {
                         "201": {
                             "description": "Created",
                             "content": {
                                 "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
-                                        "required": ["id", "name"],
-                                    },
+                                    "schema": user_schema,
                                     # Response example with a known static ID that matches pre-seeded data
                                     "example": {"id": known_user_id, "name": "Seeded User"},
                                 }
@@ -368,20 +308,9 @@ def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_c
             "/users/{user_id}": {
                 "get": {
                     "operationId": "getUser",
-                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [_path_param("user_id")],
                     "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
-                                        "required": ["id", "name"],
-                                    }
-                                }
-                            },
-                        },
+                        "200": _json_response(user_schema, description="Success"),
                         "404": {"description": "Not found"},
                     },
                 }
@@ -403,15 +332,6 @@ def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_c
         # Bug: response violates schema - missing required 'name' field
         return jsonify({"id": seeded_users[user_id]["id"]}), 200
 
-    config = {
-        "phases": {
-            "fuzzing": {
-                "operation-ordering": "none",
-                "extra-data-sources": {"responses": extra_data_enabled},
-            },
-        },
-    }
-
     # With extra_data_enabled=True, response examples are pre-populated and
     # the bug in GET /users/{user_id} is discovered. With False, only 404s occur.
     assert (
@@ -421,7 +341,7 @@ def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_c
             "--max-examples=50",
             "-c response_schema_conformance",
             "--mode=positive",
-            config=config,
+            config=_response_pool_config(enabled=extra_data_enabled, operation_ordering="none"),
         )
         == snapshot_cli
     )
@@ -429,38 +349,21 @@ def test_extra_data_sources_with_response_examples_prepopulation(cli, snapshot_c
 
 _POST_ITEMS_SCHEMA = {
     "operationId": "createItem",
-    "requestBody": {
-        "content": {
-            "application/json": {
-                "schema": {
-                    "type": "object",
-                    "properties": {"name": {"type": "string"}},
-                    "required": ["name"],
-                },
-                "examples": {"valid": {"value": {"name": "test-item"}}},
-            }
-        },
-        "required": True,
-    },
+    "requestBody": _json_request_body(
+        _object_schema({"name": {"type": "string"}}, required=["name"]),
+        examples={"valid": {"value": {"name": "test-item"}}},
+    ),
     "responses": {
-        "201": {
-            "description": "Created",
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
-                        "required": ["id", "name"],
-                    }
-                }
-            },
-            "links": {
+        "201": _json_response(
+            _object_schema({"id": {"type": "string"}, "name": {"type": "string"}}, required=["id", "name"]),
+            description="Created",
+            links={
                 "GetItemById": {
                     "operationId": "getItem",
                     "parameters": {"id": "$response.body#/id"},
                 }
             },
-        }
+        )
     },
 }
 
@@ -502,7 +405,7 @@ def test_examples_phase_merges_pool_with_schema_examples(cli, snapshot_cli, ctx)
     # `filter` has a schema example (keeps the phase active), `id` has none.
     # Pool supplies the real `id` from POST, exposing the bug.
     get_params = [
-        {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+        _path_param("id"),
         {"name": "filter", "in": "query", "schema": {"type": "string", "example": "active"}},
     ]
 
@@ -521,9 +424,7 @@ def test_examples_phase_merges_pool_with_schema_examples(cli, snapshot_cli, ctx)
 def test_examples_phase_uses_pool_as_fill_missing_source(cli, snapshot_cli, ctx):
     # No schema examples - GET would be skipped without fill-missing.
     # With fill-missing=true, pool supplies the real `id` and exposes the bug.
-    get_params = [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}]
-
-    config = {"phases": {"examples": {"fill-missing": True}}}
+    get_params = [_path_param("id")]
 
     assert (
         cli.run_openapi_app(
@@ -531,7 +432,7 @@ def test_examples_phase_uses_pool_as_fill_missing_source(cli, snapshot_cli, ctx)
             "--phases=examples",
             "-c not_a_server_error",
             "--mode=positive",
-            config=config,
+            config=_examples_fill_missing_config(),
         )
         == snapshot_cli
     )
@@ -539,63 +440,36 @@ def test_examples_phase_uses_pool_as_fill_missing_source(cli, snapshot_cli, ctx)
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, snapshot_cli, ctx):
+    user_schema = _object_schema({"id": {"type": "string"}, "email": {"type": "string"}}, required=["id", "email"])
     app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
                     "operationId": "createUser",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"email": {"type": "string"}},
-                                    "required": ["email"],
-                                },
-                                "examples": {"valid": {"value": {"email": "test@example.com"}}},
-                            }
-                        },
-                        "required": True,
-                    },
+                    "requestBody": _json_request_body(
+                        _object_schema({"email": {"type": "string"}}, required=["email"]),
+                        examples={"valid": {"value": {"email": "test@example.com"}}},
+                    ),
                     "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string"}, "email": {"type": "string"}},
-                                        "required": ["id", "email"],
-                                    }
-                                }
-                            },
-                            "links": {
+                        "201": _json_response(
+                            user_schema,
+                            description="Created",
+                            links={
                                 "GetUser": {
                                     "operationId": "getUser",
                                     "parameters": {"user_id": "$response.body#/id"},
                                 }
                             },
-                        }
+                        )
                     },
                 }
             },
             "/users/{user_id}": {
                 "get": {
                     "operationId": "getUser",
-                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [_path_param("user_id")],
                     "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string"}, "email": {"type": "string"}},
-                                        "required": ["id", "email"],
-                                    }
-                                }
-                            },
-                        },
+                        "200": _json_response(user_schema, description="Success"),
                         "404": {"description": "Not found"},
                     },
                 }
@@ -619,12 +493,6 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, snapshot_cli, 
         # Bug: response violates schema - missing the required "email" field
         return jsonify({"id": users[user_id]["id"]}), 200
 
-    config = {
-        "phases": {
-            "fuzzing": {"extra-data-sources": {"responses": True}},
-        },
-    }
-
     assert (
         cli.run_openapi_app(
             app,
@@ -632,7 +500,7 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, snapshot_cli, 
             "--max-examples=50",
             "-c response_schema_conformance",
             "--mode=positive",
-            config=config,
+            config=_response_pool_config(),
         )
         == snapshot_cli
     )
@@ -641,40 +509,23 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, snapshot_cli, 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_examples_phase_uses_pool_for_body_fields(cli, snapshot_cli, ctx):
     # Without body-side pool consumption, fill-missing has nothing to fill the body-only consumer with.
-    session_schema = {
-        "type": "object",
-        "required": ["sessionId"],
-        "properties": {"sessionId": {"type": "string", "format": "uuid"}},
-    }
+    session_schema = _object_schema({"sessionId": {"type": "string", "format": "uuid"}}, required=["sessionId"])
     app, _ = ctx.openapi.make_flask_app(
         {
             "/sessions": {
                 "post": {
                     "operationId": "createSession",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": session_schema,
-                                "examples": {"valid": {"value": {"sessionId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"}}},
-                            }
-                        },
-                    },
-                    "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {"application/json": {"schema": session_schema}},
-                        }
-                    },
+                    "requestBody": _json_request_body(
+                        session_schema,
+                        examples={"valid": {"value": {"sessionId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"}}},
+                    ),
+                    "responses": {"201": _json_response(session_schema, description="Created")},
                 }
             },
             "/events/log": {
                 "post": {
                     "operationId": "logEvent",
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": session_schema}},
-                    },
+                    "requestBody": _json_request_body(session_schema),
                     "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
                 }
             },
@@ -703,15 +554,13 @@ def test_examples_phase_uses_pool_for_body_fields(cli, snapshot_cli, ctx):
             return "", 404
         abort(500)  # reachable only when body sessionId came from the pool
 
-    config = {"phases": {"examples": {"fill-missing": True}}}
-
     assert (
         cli.run_openapi_app(
             app,
             "--phases=examples",
             "-c not_a_server_error",
             "--mode=positive",
-            config=config,
+            config=_examples_fill_missing_config(),
         )
         == snapshot_cli
     )
@@ -721,7 +570,6 @@ def test_examples_phase_uses_pool_for_body_fields(cli, snapshot_cli, ctx):
 def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_cli, ctx):
     # Pool-seeded body with only a subset of required fields must not trigger positive_data_acceptance.
     api = ctx.openapi.apps.sessions_and_log_event()
-    config = {"phases": {"examples": {"fill-missing": True}}}
 
     assert (
         cli.run(
@@ -729,7 +577,7 @@ def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_
             "--phases=examples",
             "-c positive_data_acceptance",
             "--mode=positive",
-            config=config,
+            config=_examples_fill_missing_config(),
         )
         == snapshot_cli
     )
@@ -756,40 +604,24 @@ def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, snapshot
                 "get": {
                     "operationId": "listVolumes",
                     "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "Volumes": {"type": "array", "items": volume_schema},
-                                            "Warnings": {"type": "array", "items": {"type": "string"}},
-                                        },
-                                        "required": ["Volumes"],
-                                    }
-                                }
-                            },
-                        }
+                        "200": _json_response(
+                            _object_schema(
+                                {
+                                    "Volumes": {"type": "array", "items": volume_schema},
+                                    "Warnings": {"type": "array", "items": {"type": "string"}},
+                                },
+                                required=["Volumes"],
+                            )
+                        )
                     },
                 }
             },
             "/volumes/{Name}": {
                 "get": {
                     "operationId": "getVolume",
-                    "parameters": [
-                        {
-                            "name": "Name",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "format": "uuid"},
-                        }
-                    ],
+                    "parameters": [_uuid_path_param("Name")],
                     "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": volume_schema}},
-                        },
+                        "200": _json_response(volume_schema),
                         "404": {"description": "Not found"},
                     },
                 }
@@ -830,14 +662,7 @@ def test_parent_aware_pool_correlates_path_params(cli, snapshot_cli, ctx):
         "/products/{productName}": {
             "post": {
                 "operationId": "createProduct",
-                "parameters": [
-                    {
-                        "name": "productName",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "format": "uuid"},
-                    }
-                ],
+                "parameters": [_uuid_path_param("productName")],
                 "responses": {"201": {"description": "Created"}, "409": {"description": "Already exists"}},
             }
         },
@@ -845,18 +670,8 @@ def test_parent_aware_pool_correlates_path_params(cli, snapshot_cli, ctx):
             "post": {
                 "operationId": "createItem",
                 "parameters": [
-                    {
-                        "name": "productName",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "format": "uuid"},
-                    },
-                    {
-                        "name": "itemName",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "format": "uuid"},
-                    },
+                    _uuid_path_param("productName"),
+                    _uuid_path_param("itemName"),
                 ],
                 "responses": {
                     "201": {"description": "Created"},
@@ -869,18 +684,8 @@ def test_parent_aware_pool_correlates_path_params(cli, snapshot_cli, ctx):
             "post": {
                 "operationId": "syncItem",
                 "parameters": [
-                    {
-                        "name": "productName",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "format": "uuid"},
-                    },
-                    {
-                        "name": "itemName",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "format": "uuid"},
-                    },
+                    _uuid_path_param("productName"),
+                    _uuid_path_param("itemName"),
                 ],
                 "responses": {
                     "200": {"description": "Synced"},
@@ -937,44 +742,22 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
                 "post": {
                     "operationId": "createItem",
                     "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string", "format": "uuid"}},
-                                        "required": ["id"],
-                                    }
-                                }
-                            },
-                        }
+                        "201": _json_response(
+                            _object_schema({"id": {"type": "string", "format": "uuid"}}, required=["id"]),
+                            description="Created",
+                        )
                     },
                 }
             },
             "/items/{itemId}": {
                 "get": {
                     "operationId": "getItem",
-                    "parameters": [
-                        {
-                            "name": "itemId",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "format": "uuid"},
-                        }
-                    ],
+                    "parameters": [_uuid_path_param("itemId")],
                     "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
                 },
                 "delete": {
                     "operationId": "deleteItem",
-                    "parameters": [
-                        {
-                            "name": "itemId",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "format": "uuid"},
-                        }
-                    ],
+                    "parameters": [_uuid_path_param("itemId")],
                     "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
                 },
             },
@@ -1036,11 +819,7 @@ def test_stateful_reaches_every_list_producer_element(cli, snapshot_cli, ctx, pr
     widget_ref = "#/components/schemas/Widget"
     components = {
         "schemas": {
-            "Widget": {
-                "type": "object",
-                "properties": {"id": {"type": "string"}, "label": {"type": "string"}},
-                "required": ["id", "label"],
-            }
+            "Widget": _object_schema({"id": {"type": "string"}, "label": {"type": "string"}}, required=["id", "label"])
         }
     }
     if producer_shape == "top-level-array":
@@ -1056,23 +835,15 @@ def test_stateful_reaches_every_list_producer_element(cli, snapshot_cli, ctx, pr
             "/widgets": {
                 "get": {
                     "operationId": "listWidgets",
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": list_schema}},
-                        }
-                    },
+                    "responses": {"200": _json_response(list_schema)},
                 }
             },
             "/widgets/{widgetId}": {
                 "get": {
                     "operationId": "getWidget",
-                    "parameters": [{"name": "widgetId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [_path_param("widgetId")],
                     "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": {"$ref": widget_ref}}},
-                        },
+                        "200": _json_response({"$ref": widget_ref}),
                         "404": {"description": "Not found"},
                     },
                 }
@@ -1157,16 +928,8 @@ def test_pool_captures_subresources_from_every_parent(
     sub_param = "commentId" if sub_cardinality == "many" else "authorId"
     components = {
         "schemas": {
-            sub_resource: {
-                "type": "object",
-                "properties": sub_props,
-                "required": list(sub_props),
-            },
-            "Post": {
-                "type": "object",
-                "properties": {"id": {"type": "string"}, sub_field: sub_property},
-                "required": ["id", sub_field],
-            },
+            sub_resource: _object_schema(sub_props, required=list(sub_props)),
+            "Post": _object_schema({"id": {"type": "string"}, sub_field: sub_property}, required=["id", sub_field]),
         }
     }
     app, _ = ctx.openapi.make_flask_app(
@@ -1175,35 +938,21 @@ def test_pool_captures_subresources_from_every_parent(
                 "get": {
                     "operationId": "listPosts",
                     "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "data": {
-                                                "type": "array",
-                                                "items": {"$ref": "#/components/schemas/Post"},
-                                            }
-                                        },
-                                        "required": ["data"],
-                                    }
-                                }
-                            },
-                        }
+                        "200": _json_response(
+                            _object_schema(
+                                {"data": {"type": "array", "items": {"$ref": "#/components/schemas/Post"}}},
+                                required=["data"],
+                            )
+                        )
                     },
                 }
             },
             consumer_path: {
                 "get": {
                     "operationId": consumer_op,
-                    "parameters": [{"name": sub_param, "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [_path_param(sub_param)],
                     "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": {"$ref": sub_schema_ref}}},
-                        },
+                        "200": _json_response({"$ref": sub_schema_ref}),
                         "404": {"description": "Not found"},
                     },
                 }
@@ -1243,51 +992,29 @@ def test_pool_captures_subresources_from_every_parent(
 def test_extra_data_sources_overlays_nested_body_foreign_key(cli, snapshot_cli, ctx):
     # Server returns 500 only when shipping.location_id matches a real Location id;
     # without the nested overlay random ints never hit a real id and the bug stays hidden.
+    location_schema = _object_schema({"id": {"type": "integer"}}, required=["id"], example={"id": 11})
     app, _ = ctx.openapi.make_flask_app(
         {
             "/a/locations": {
                 "post": {
                     "operationId": "createLocation",
-                    "responses": {
-                        "201": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "integer"}},
-                                        "required": ["id"],
-                                        "example": {"id": 11},
-                                    }
-                                }
-                            }
-                        }
-                    },
+                    "responses": {"201": _json_response(location_schema, description=None)},
                 }
             },
             "/b/departments": {
                 "post": {
                     "operationId": "createDepartment",
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "shipping": {
-                                            "type": "object",
-                                            "properties": {
-                                                "location_id": {"type": "integer"},
-                                                "note": {"type": "string"},
-                                            },
-                                        },
-                                    },
-                                    "required": ["shipping"],
-                                }
-                            }
-                        },
-                    },
+                    "requestBody": _json_request_body(
+                        _object_schema(
+                            {
+                                "name": {"type": "string"},
+                                "shipping": _object_schema(
+                                    {"location_id": {"type": "integer"}, "note": {"type": "string"}}
+                                ),
+                            },
+                            required=["shipping"],
+                        )
+                    ),
                     "responses": {
                         "201": {"description": "OK"},
                         "500": {"description": "Server error"},
@@ -1313,11 +1040,6 @@ def test_extra_data_sources_overlays_nested_body_foreign_key(cli, snapshot_cli, 
             abort(500)
         return jsonify({"id": 1}), 201
 
-    config = {
-        "phases": {
-            "fuzzing": {"extra-data-sources": {"responses": True}},
-        },
-    }
     assert (
         cli.run_openapi_app(
             app,
@@ -1325,7 +1047,7 @@ def test_extra_data_sources_overlays_nested_body_foreign_key(cli, snapshot_cli, 
             "--max-examples=30",
             "--mode=positive",
             "-c not_a_server_error",
-            config=config,
+            config=_response_pool_config(),
         )
         == snapshot_cli
     )
@@ -1340,34 +1062,24 @@ def test_extra_data_sources_handles_boolean_body_schema(cli, snapshot_cli, ctx):
                 "post": {
                     "operationId": "createWidget",
                     "responses": {
-                        "201": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string"}},
-                                        "required": ["id"],
-                                    }
-                                }
-                            }
-                        }
+                        "201": _json_response(
+                            _object_schema({"id": {"type": "string"}}, required=["id"]),
+                            description=None,
+                        )
                     },
                 }
             },
             "/widgets/{id}": {
                 "get": {
                     "operationId": "getWidget",
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [_path_param("id")],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
             "/anything": {
                 "post": {
                     "operationId": "postAnything",
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": True}},
-                    },
+                    "requestBody": _json_request_body(True),
                     "responses": {"200": {"description": "OK"}},
                 }
             },
@@ -1405,57 +1117,25 @@ def test_extra_data_sources_examples_phase_disabled(cli, snapshot_cli, ctx):
                 "post": {
                     "operationId": "create-item",
                     "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"name": {"type": "string"}},
-                                    "required": ["name"],
-                                }
-                            }
-                        }
+                        "content": _json_content(_object_schema({"name": {"type": "string"}}, required=["name"]))
                     },
                     "responses": {
-                        "201": {
-                            "description": "Created",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"id": {"type": "string", "format": "uuid"}},
-                                        "required": ["id"],
-                                    }
-                                }
-                            },
-                        }
+                        "201": _json_response(
+                            _object_schema({"id": {"type": "string", "format": "uuid"}}, required=["id"]),
+                            description="Created",
+                        )
                     },
                 }
             },
             "/items/{item_id}": {
                 "get": {
                     "operationId": "get-item",
-                    "parameters": [
-                        {
-                            "in": "path",
-                            "name": "item_id",
-                            "required": True,
-                            "schema": {"type": "string", "format": "uuid"},
-                            "example": "00000000-0000-0000-0000-000000000001",
-                        }
-                    ],
+                    "parameters": [_uuid_path_param("item_id", example="00000000-0000-0000-0000-000000000001")],
                     "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
                 },
                 "delete": {
                     "operationId": "delete-item",
-                    "parameters": [
-                        {
-                            "in": "path",
-                            "name": "item_id",
-                            "required": True,
-                            "schema": {"type": "string", "format": "uuid"},
-                            "example": "00000000-0000-0000-0000-000000000002",
-                        }
-                    ],
+                    "parameters": [_uuid_path_param("item_id", example="00000000-0000-0000-0000-000000000002")],
                     "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
                 },
             },
@@ -1466,11 +1146,7 @@ def test_extra_data_sources_examples_phase_disabled(cli, snapshot_cli, ctx):
         cli.run_openapi_app(
             app,
             "--phases=examples",
-            config={
-                "phases": {
-                    "examples": {"extra-data-sources": {"responses": False}},
-                }
-            },
+            config=_examples_response_pool_config(enabled=False),
         )
         == snapshot_cli
     )

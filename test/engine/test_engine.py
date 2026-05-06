@@ -57,6 +57,10 @@ def _scenario_cases(stream, **attrs):
     return list(_scenario(stream, **attrs).recorder.cases.values())
 
 
+def _all_scenario_cases(stream):
+    return [case for scenario in stream.find_all(events.ScenarioFinished) for case in scenario.recorder.cases.values()]
+
+
 def _scenario_checks(scenario):
     return [check for checks in scenario.recorder.checks.values() for check in checks]
 
@@ -1198,7 +1202,7 @@ def test_stateful_auth(ctx):
         auth=("admin", "password"),
         **STATEFUL_KWARGS,
     ).execute()
-    interactions = _scenario_interactions(stream)
+    interactions = stream.find_all_interactions()
     assert len(interactions) > 0
     for interaction in interactions:
         assert interaction.request.headers["Authorization"] == ["Basic YWRtaW46cGFzc3dvcmQ="]
@@ -1210,7 +1214,7 @@ def test_stateful_all_generation_modes(ctx):
     mode = GenerationMode.NEGATIVE
     schema.config.generation.update(modes=[mode])
     stream = EventStream(schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
-    cases = _scenario_cases(stream)
+    cases = _all_scenario_cases(stream)
     assert len(cases) > 0
     for case in cases:
         assert case.value.meta.generation.mode == mode
@@ -1219,6 +1223,7 @@ def test_stateful_all_generation_modes(ctx):
 def test_stateful_seed(ctx):
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.generation.update(database="none")
     requests = []
     for _ in range(3):
         stream = EventStream(
@@ -1229,10 +1234,13 @@ def test_stateful_seed(ctx):
             **STATEFUL_KWARGS,
         ).execute()
         current = []
-        for interaction in _scenario_interactions(stream):
+        for interaction in stream.find_all_interactions():
+            if interaction.request.method != "POST":
+                continue
             data = {key: getattr(interaction.request, key) for key in Request.__slots__}
             del data["headers"][SCHEMATHESIS_TEST_CASE_HEADER]
             current.append(data)
+            break
         requests.append(current)
     assert requests[0][0] == requests[1][0] == requests[2][0]
 

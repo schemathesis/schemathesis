@@ -43,7 +43,7 @@ ________________________________ Stateful tests ________________________________
 
 [201] Created:
 
-    `{"customer_id":"1","id":"1","total":"0"}`
+    `{"customer_id":"customer-1","id":"order-1","total":"0"}`
 
 Reproduce with:
 
