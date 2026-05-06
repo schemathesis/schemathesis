@@ -41,8 +41,9 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
     if lower in ("id", "ids"):
         return from_path(path, parameter_name=parameter)
 
-    # Capital-sensitive
-    capital_suffixes = ("Id", "Uuid", "Guid", "Arn", "Address")
+    # Capital-sensitive — plurals first so array-shaped FK fields (`siteIds`) resolve
+    # before the singular check would otherwise apply.
+    capital_suffixes = ("Ids", "Uuids", "Guids", "Id", "Uuid", "Guid", "Arn", "Address")
     for suffix in capital_suffixes:
         if parameter.endswith(suffix):
             prefix = parameter[: -len(suffix)]
@@ -58,6 +59,12 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
     snake_suffixes = (
         "_id_or_slug",
         "-id-or-slug",
+        "_uuids",
+        "_guids",
+        "_ids",
+        "-uuids",
+        "-guids",
+        "-ids",
         "_guid",
         "_uuid",
         "_id",
