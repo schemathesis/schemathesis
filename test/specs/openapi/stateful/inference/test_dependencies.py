@@ -3635,6 +3635,182 @@ def test_body_self_fk_rebinds_to_path_parent_when_parent_has_field(ctx):
     assert bindings.get(("body", "spouse_id")) == ("Contact", "spouse_id"), bindings
 
 
+def test_query_self_fk_rebinds_to_path_parent_when_parent_has_field(ctx):
+    # `?sequence_id=` filters events by another event's sequence_id (a self-FK), not a Sequence resource.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/events": {
+                "get": {
+                    "operationId": "listEvents",
+                    "parameters": [
+                        {"name": "sequence_id", "in": "query", "schema": {"type": "integer"}},
+                    ],
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {"type": "integer"},
+                                                "sequence_id": {"type": "integer"},
+                                            },
+                                            "required": ["id"],
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        },
+    )
+
+    assert "Sequence" not in graph.resources, sorted(graph.resources)
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): (slot.resource.name, slot.resource_field)
+        for slot in graph.operations["GET /events"].inputs
+    }
+    assert bindings.get(("query", "sequence_id")) == ("Event", "sequence_id"), bindings
+
+
+def _module_disambiguation_paths():
+    # Two modules with same-shaped resource (Group / Group1 in different schemas).
+    children_group_response = {
+        "200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Group"}}}}
+    }
+    smallgroups_group_response = {
+        "200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Group1"}}}}
+    }
+    return {
+        "/children/groups": {
+            "get": {
+                "operationId": "listChildrenGroups",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/components/schemas/Group"},
+                                }
+                            }
+                        }
+                    }
+                },
+            },
+        },
+        "/children/groups/{id}": {
+            "get": {
+                "operationId": "getChildrenGroup",
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": children_group_response,
+            },
+        },
+        "/smallgroups/groups": {
+            "get": {
+                "operationId": "listSmallgroupsGroups",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/components/schemas/Group1"},
+                                }
+                            }
+                        }
+                    }
+                },
+            },
+        },
+        "/smallgroups/groups/{id}": {
+            "get": {
+                "operationId": "getSmallgroupsGroup",
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": smallgroups_group_response,
+            },
+        },
+    }
+
+
+def test_path_consumer_picks_same_module_resource_variant(ctx):
+    # Path-id consumers route to their own module's variant when the spec has Group / Group1.
+    _, graph = analyze_dependencies(
+        ctx,
+        _module_disambiguation_paths(),
+        components={
+            "schemas": {
+                "Group": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "Group1": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "title": {"type": "string"}},
+                    "required": ["id"],
+                },
+            }
+        },
+    )
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): slot.resource.name
+        for slot in graph.operations["GET /smallgroups/groups/{id}"].inputs
+    }
+    assert bindings.get(("path", "id")) == "Group1", bindings
+
+
+def test_body_fk_picks_same_module_resource_variant(ctx):
+    # Body FK fields prefer the same-module variant — `group_id` here picks Group1, not Group.
+    paths = _module_disambiguation_paths()
+    paths["/smallgroups/members"] = {
+        "post": {
+            "operationId": "createSmallgroupMember",
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"group_id": {"type": "string"}},
+                            "required": ["group_id"],
+                        }
+                    }
+                },
+            },
+            "responses": {"201": {"description": "OK"}},
+        }
+    }
+    _, graph = analyze_dependencies(
+        ctx,
+        paths,
+        components={
+            "schemas": {
+                "Group": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "Group1": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "title": {"type": "string"}},
+                    "required": ["id"],
+                },
+            }
+        },
+    )
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): slot.resource.name
+        for slot in graph.operations["POST /smallgroups/members"].inputs
+    }
+    assert bindings.get(("body", "group_id")) == "Group1", bindings
+
+
 def test_body_fk_inside_all_of_with_one_of_branches(ctx):
     # FK fields hidden behind allOf siblings or oneOf branches must still be discovered.
     _, graph = analyze_dependencies(

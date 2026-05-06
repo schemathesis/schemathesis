@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
+    disambiguate_module_variants,
     extract_inputs,
     merge_related_resources,
     rebind_orphan_synthetics,
@@ -137,6 +138,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Rebind orphan synthetics (e.g. `Spouse` from `spouse_id`) to the path-derived parent.
     rebind_orphan_synthetics(operations, resources)
+
+    # Prefer same-module variants for spec-suffixed duplicates (`Group` / `Group1`).
+    disambiguate_module_variants(operations, resources)
 
     # Clean up orphaned resources
     remove_unused_resources(operations, resources)
