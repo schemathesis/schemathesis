@@ -36,6 +36,7 @@ def test_planted_bug_findability(ctx, cli, snapshot_cli, filter_arg, config):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "-m",
             "positive",
@@ -63,6 +64,7 @@ def test_generic_id_planted_bug_findability(ctx, cli, snapshot_cli, filter_args,
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "-m",
             "positive",
@@ -86,6 +88,7 @@ def test_input_object_planted_bug_findability(ctx, cli, snapshot_cli, config):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "-m",
             "positive",
@@ -108,6 +111,7 @@ def test_list_argument_planted_bug_findability(ctx, cli, snapshot_cli, config):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "-m",
             "positive",
@@ -131,6 +135,7 @@ def test_tombstone_planted_bug_findability(ctx, cli, snapshot_cli, config):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=200",
             "-m",
             "positive",

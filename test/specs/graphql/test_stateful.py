@@ -30,6 +30,7 @@ def test_stateful_finds_chained_planted_bug(ctx, cli, snapshot_cli, filter_arg):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=20",
             "--phases=stateful",
             "-m",
@@ -63,6 +64,7 @@ def test_stateful_finds_tombstone_bugs(ctx, cli, snapshot_cli, make_api):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=75",
             "--phases=stateful",
             "-m",
