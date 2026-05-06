@@ -30,6 +30,7 @@ def test_feedback_toggles_planted_bug_visibility(ctx, cli, snapshot_cli, extra_k
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -46,6 +47,7 @@ def test_feedback_unmasks_planted_bug_via_dotted_path(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -61,6 +63,7 @@ def test_feedback_unmasks_planted_bug_via_size_bound(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -76,6 +79,7 @@ def test_feedback_unmasks_planted_bug_via_format(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -91,6 +95,7 @@ def test_feedback_unmasks_planted_bug_via_numeric_bound(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -106,6 +111,7 @@ def test_feedback_unmasks_planted_bug_via_positive_numeric_gate(ctx, cli, snapsh
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -121,6 +127,7 @@ def test_feedback_unmasks_planted_bug_via_unrecognized_property(ctx, cli, snapsh
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -136,6 +143,7 @@ def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapsho
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=80",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -153,6 +161,7 @@ def test_feedback_unmasks_planted_bug_via_pattern(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -168,6 +177,7 @@ def test_feedback_unmasks_planted_bug_via_type_mismatch(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -184,6 +194,7 @@ def test_feedback_unmasks_planted_bug_via_type_mismatch_ref_bundled(ctx, cli, sn
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -199,6 +210,7 @@ def test_feedback_unmasks_planted_bug_via_jackson_numeric_overflow(ctx, cli, sna
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -214,6 +226,7 @@ def test_feedback_unmasks_planted_bug_via_enum(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -229,6 +242,7 @@ def test_feedback_unmasks_planted_bug_via_missing_query_parameter(ctx, cli, snap
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -244,6 +258,7 @@ def test_feedback_recovers_constraints_dropped_from_pydantic_schema(ctx, cli, sn
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -350,6 +365,7 @@ def test_feedback_unmasks_planted_bug_via_rails_envelope(ctx, cli, envelope, sna
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -365,6 +381,7 @@ def test_feedback_unmasks_planted_bug_via_laravel_envelope(ctx, cli, snapshot_cl
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -380,6 +397,7 @@ def test_feedback_unmasks_planted_bug_via_aspnet_envelope(ctx, cli, snapshot_cli
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -395,6 +413,7 @@ def test_feedback_unmasks_planted_bug_via_zod_envelope(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -410,6 +429,7 @@ def test_feedback_unmasks_planted_bug_via_ajv_envelope(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -425,6 +445,7 @@ def test_feedback_unmasks_planted_bug_via_go_validator_envelope(ctx, cli, snapsh
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -440,6 +461,7 @@ def test_feedback_unmasks_planted_bug_via_symfony_envelope(ctx, cli, snapshot_cl
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -455,6 +477,7 @@ def test_feedback_unmasks_planted_bug_via_confluent_envelope(ctx, cli, snapshot_
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",

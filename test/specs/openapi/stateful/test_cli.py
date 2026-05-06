@@ -54,6 +54,7 @@ def test_max_failures(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
+            "--no-shrink",
             "--max-examples=80",
             "--max-failures=2",
             "--generation-database=none",
@@ -104,6 +105,7 @@ def test_junit(ctx, tmp_path, cli):
     cli.run_and_assert(
         api.schema_url,
         "--phases=stateful",
+        "--no-shrink",
         "--max-examples=80",
         "--max-failures=1",
         "-c not_a_server_error",
@@ -132,6 +134,7 @@ def test_stateful_only(ctx, cli, snapshot_cli):
             api.schema_url,
             "--phases=stateful",
             "--mode=positive",
+            "--no-shrink",
             "--max-examples=200",
             "-c not_a_server_error",
         )
