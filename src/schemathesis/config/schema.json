@@ -439,6 +439,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "extra-data-sources": {
+          "$ref": "#/$defs/ExtraDataSourcesConfig"
+        },
         "fill-missing": {
           "type": "boolean"
         },
@@ -496,6 +499,9 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "extra-data-sources": {
+          "$ref": "#/$defs/ExtraDataSourcesConfig"
         },
         "generate-duplicate-query-parameters": {
           "type": "boolean"
