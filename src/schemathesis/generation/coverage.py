@@ -25,7 +25,6 @@ from json.encoder import JSONEncoder, encode_basestring_ascii
 from typing import Any, TypeVar, cast
 from urllib.parse import quote_plus
 
-import jsonschema.exceptions
 import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
@@ -810,14 +809,11 @@ def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] 
 @contextmanager
 def _ignore_unfixable(
     *,
-    # Cache exception types here as `jsonschema` uses a custom `__getattr__` on the module level
-    # and it may cause errors during the interpreter shutdown
     ref_error: type[Exception] = RefResolutionError,
-    schema_error: type[Exception] = jsonschema.exceptions.SchemaError,
 ) -> Generator:
     try:
         yield
-    except (Unsatisfiable, ref_error, jsonschema_rs.ValidationError, schema_error):
+    except (Unsatisfiable, ref_error, jsonschema_rs.ValidationError):
         pass
     except InvalidArgument as exc:
         message = str(exc)

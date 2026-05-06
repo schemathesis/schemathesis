@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 import pytest
 import requests
-from jsonschema.exceptions import SchemaError
 
 import schemathesis
 import schemathesis.graphql as _graphql
@@ -483,7 +482,7 @@ def combined_check(ctx, response, case):
             continue
         try:
             check(ctx, response, case)
-        except (Failure, FailureGroup, SchemaError):
+        except (Failure, FailureGroup):
             pass
 
 

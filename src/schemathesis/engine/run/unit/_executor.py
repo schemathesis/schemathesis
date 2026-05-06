@@ -9,7 +9,6 @@ from warnings import WarningMessage, catch_warnings
 
 import requests
 from hypothesis.errors import InvalidArgument
-from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema_rs import ValidationError
 from requests.exceptions import ChunkedEncodingError
 from requests.structures import CaseInsensitiveDict
@@ -253,9 +252,6 @@ def run_test(
     except hypothesis.errors.DeadlineExceeded as exc:
         status = Status.ERROR
         yield non_fatal_error(DeadlineExceeded.from_exc(exc))
-    except JsonSchemaError as exc:
-        status = Status.ERROR
-        yield non_fatal_error(InvalidRegexPattern.from_schema_error(exc, from_examples=False))
     except ValidationError as exc:
         status = Status.ERROR
         if is_regex_validation_error(exc):
@@ -307,10 +303,7 @@ def run_test(
     invalid_regex = InvalidRegexMark.get(test_function)
     if invalid_regex is not None and status != Status.ERROR:
         status = Status.ERROR
-        if isinstance(invalid_regex, ValidationError):
-            yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(invalid_regex))
-        else:
-            yield non_fatal_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
+        yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(invalid_regex))
 
     invalid_headers = InvalidHeadersExampleMark.get(test_function)
     if invalid_headers:

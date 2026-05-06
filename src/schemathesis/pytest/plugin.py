@@ -13,7 +13,6 @@ from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from _pytest.subtests import SubtestReport
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
-from jsonschema.exceptions import SchemaError
 from pluggy import Result as PluggyResult
 
 from schemathesis.core.compat import BaseExceptionGroup
@@ -455,7 +454,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
                 ) from None
             invalid_regex = InvalidRegexMark.get(pyfuncitem.obj)
             if invalid_regex is not None:
-                raise InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True) from None
+                raise InvalidRegexPattern.from_jsonschema_rs_error(invalid_regex) from None
             invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
             if invalid_headers is not None:
                 raise InvalidHeadersExample.from_headers(invalid_headers) from None
@@ -472,8 +471,6 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
             raise build_unsatisfiable_error(
                 operation, with_tip=True, filter_tracker=operation.filter_case_tracker
             ) from None
-        except SchemaError as exc:
-            raise InvalidRegexPattern.from_schema_error(exc, from_examples=False) from exc
 
         invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
         if invalid_headers is not None:

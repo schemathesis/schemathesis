@@ -17,7 +17,6 @@ from jsonschema_rs import ValidationError
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
-    from jsonschema import SchemaError as JsonSchemaError
     from requests import RequestException
 
     from schemathesis.config import OutputConfig
@@ -347,20 +346,6 @@ class InvalidRegexPattern(InvalidSchema):
         match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
         if match:
             message = f"Invalid regular expression. Pattern `{match.group(1)}` is not recognized - `{match.group(2)}`"
-        return cls(message)
-
-    @classmethod
-    def from_schema_error(cls, error: JsonSchemaError, *, from_examples: bool) -> InvalidRegexPattern:
-        if from_examples:
-            message = (
-                "Failed to generate test cases from examples for this API operation because of "
-                f"unsupported regular expression `{error.instance}`"
-            )
-        else:
-            message = (
-                "Failed to generate test cases for this API operation because of "
-                f"unsupported regular expression `{error.instance}`"
-            )
         return cls(message)
 
     @classmethod
