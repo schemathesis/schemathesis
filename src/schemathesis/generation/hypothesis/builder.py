@@ -614,6 +614,15 @@ def _is_pool_eligible(schema: Any) -> bool:
     return isinstance(schema, dict) and not (_GATING_KEYS & schema.keys())
 
 
+class _NestedOverlay:
+    """Sentinel distinguishing per-leaf sub-field overlays from raw pool object values."""
+
+    __slots__ = ("fields",)
+
+    def __init__(self, fields: dict[str, Any]) -> None:
+        self.fields = fields
+
+
 def _body_pool_overlays(
     *,
     correlated: dict[tuple[ParameterLocation, str], Any],
@@ -644,7 +653,7 @@ def _body_pool_overlays(
                 correlated=correlated, outer_name=prop_name, inner_schema=prop_schema, validator_cls=validator_cls
             )
             if nested:
-                overlays[prop_name] = nested
+                overlays[prop_name] = _NestedOverlay(nested)
     return overlays
 
 
@@ -961,10 +970,10 @@ def _iter_coverage_cases(
                 for prop_name, value in body_overlays.items():
                     prop_schema = schema_properties[prop_name]
                     assert isinstance(prop_schema, dict), "_body_pool_overlays only emits dict-schema keys"
-                    if isinstance(value, dict):
+                    if isinstance(value, _NestedOverlay):
                         # Splice per leaf so the coverage generator still fills sibling fields.
                         sub_props = dict(prop_schema.get("properties") or {})
-                        for sub_name, sub_value in value.items():
+                        for sub_name, sub_value in value.fields.items():
                             sub_schema = sub_props[sub_name]
                             assert isinstance(sub_schema, dict), "_nested_body_pool_overlay only emits dict-schema keys"
                             sub_props[sub_name] = {**sub_schema, "examples": [sub_value]}

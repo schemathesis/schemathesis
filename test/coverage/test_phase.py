@@ -6040,6 +6040,48 @@ def test_coverage_pool_overlay_respects_destination_format(cli, snapshot_cli, ct
     )
 
 
+def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
+    # Pool object value for "address" contains "country", absent from the property schema.
+    loaded = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "address": {
+                                "type": "object",
+                                "properties": {"city": {"type": "string"}},
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    )
+    operation = loaded["/foo"]["post"]
+
+    class _FakeDataSource:
+        def pick_correlated_values(self, *, operation):
+            return {(ParameterLocation.BODY, "address"): {"city": "London", "country": "UK"}}
+
+        def pick_captured_value(self, *, operation, location, name, context_constraints):
+            return None
+
+    list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+            extra_data_source=_FakeDataSource(),
+        )
+    )
+
+
 def test_undeclared_method_probes_dedup_across_operations(ctx):
     # Each (path, unexpected_method) pair is emitted once across all declared operations on the path.
     schema = ctx.openapi.load_schema(
