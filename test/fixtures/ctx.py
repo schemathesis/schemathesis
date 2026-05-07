@@ -22,6 +22,7 @@ from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
 from test.apps.catalog.openapi import flask_rest as openapi_flask_rest
 from test.apps.catalog.openapi import go_validator as openapi_go_validator
 from test.apps.catalog.openapi import laravel as openapi_laravel
+from test.apps.catalog.openapi import litestar as openapi_litestar
 from test.apps.catalog.openapi import marshmallow as openapi_marshmallow
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
@@ -316,6 +317,9 @@ class OpenAPIApps:
 
     def flask_rest_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_flask_rest.planted_bug())
+
+    def litestar_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_litestar.planted_bug())
 
     def swagger_v2_baseline(self) -> OpenAPIServer:
         return _start(self.parent, openapi_swagger_v2.baseline())
