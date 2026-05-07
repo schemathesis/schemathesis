@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache, partial
 from itertools import combinations
+from math import inf, nextafter
 
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
@@ -1589,30 +1590,40 @@ def _is_numeric_bound(value: Any) -> TypeGuard[int | float]:
     return isinstance(value, int | float) and not isinstance(value, bool)
 
 
+def _adjust_numeric_bound(value: int | float, *, is_integer: bool, direction: int) -> int | float:
+    if is_integer:
+        return value + direction
+    return nextafter(float(value), inf if direction > 0 else -inf)
+
+
 def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive integer values."""
     # Boundary and near boundary values
     schema = {"type": "number", **schema}
+    is_integer = schema.get("type") == "integer"
     minimum = schema.get("minimum")
     maximum = schema.get("maximum")
     exclusive_minimum = schema.get("exclusiveMinimum")
     exclusive_maximum = schema.get("exclusiveMaximum")
     if isinstance(exclusive_minimum, bool):
         if exclusive_minimum and _is_numeric_bound(minimum):
-            minimum += 1
-    elif exclusive_minimum is not None:
-        minimum = exclusive_minimum + 1
+            minimum = _adjust_numeric_bound(minimum, is_integer=is_integer, direction=1)
+    elif _is_numeric_bound(exclusive_minimum):
+        minimum = _adjust_numeric_bound(exclusive_minimum, is_integer=is_integer, direction=1)
     if isinstance(exclusive_maximum, bool):
         if exclusive_maximum and _is_numeric_bound(maximum):
-            maximum -= 1
-    elif exclusive_maximum is not None:
-        maximum = exclusive_maximum - 1
+            maximum = _adjust_numeric_bound(maximum, is_integer=is_integer, direction=-1)
+    elif _is_numeric_bound(exclusive_maximum):
+        maximum = _adjust_numeric_bound(exclusive_maximum, is_integer=is_integer, direction=-1)
     multiple_of = schema.get("multipleOf")
     example = schema.get("example")
     examples = schema.get("examples")
     default = schema.get("default")
 
     seen = HashSet()
+
+    def _within_adjusted_bounds(value: int | float) -> bool:
+        return (minimum is None or value >= minimum) and (maximum is None or value <= maximum)
 
     if example or examples or default:
         if example and _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
@@ -1640,7 +1651,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             smallest = closest_multiple_greater_than(minimum, multiple_of)
         else:
             smallest = minimum
-        if seen.insert(smallest):
+        if _within_adjusted_bounds(smallest) and seen.insert(smallest):
             yield PositiveValue(smallest, scenario=CoverageScenario.MINIMUM_VALUE, description="Minimum value")
 
         # One more than minimum if possible
@@ -1659,7 +1670,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             largest = _largest_multiple_within(maximum, multiple_of)
         else:
             largest = maximum
-        if seen.insert(largest):
+        if _within_adjusted_bounds(largest) and seen.insert(largest):
             yield PositiveValue(largest, scenario=CoverageScenario.MAXIMUM_VALUE, description="Maximum value")
 
         # One less than maximum if possible

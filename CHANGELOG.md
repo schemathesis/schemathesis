@@ -46,6 +46,7 @@
 - Positive-mode coverage skipped object schemas with annotations next to unsatisfiable optional properties.
 - Skip parameter-mutation coverage cases when no positive body can be generated.
 - Coverage near-boundary numbers drift from `multipleOf` due to IEEE-754 subtraction (e.g. `99999.99 - 0.01`).
+- Coverage boundary numbers fail validation when both bounds are exclusive (e.g. `exclusiveMinimum: 0` + `exclusiveMaximum: 1`).
 
 ### :wrench: Changed
 

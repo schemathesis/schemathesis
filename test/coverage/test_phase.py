@@ -3241,6 +3241,51 @@ def test_positive_number_near_boundary_respects_multiple_of(ctx):
     assert invalid == []
 
 
+def test_positive_number_boundary_respects_exclusive_bounds(ctx):
+    # Boolean `exclusiveMinimum: true` + `exclusiveMaximum: true` combined with `minimum: 0`
+    # / `maximum: 1` (legacy OpenAPI 3.0 form). The boundary generator's `+= 1` / `-= 1`
+    # adjustments overshoot the other exclusive boundary; emitted values must validate.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "decayFactor": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 1,
+                                        "exclusiveMinimum": True,
+                                        "exclusiveMaximum": True,
+                                    }
+                                },
+                            },
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/foo"]["POST"]
+    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+
+    invalid = [
+        case.body
+        for case in _iter_cases(operation, GenerationMode.POSITIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY and not validator.is_valid(case.body)
+    ]
+    assert invalid == []
+
+
 def test_additional_properties_anyof_positive(ctx):
     loaded = load_schema(
         ctx,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from math import inf, nextafter
 from unittest.mock import ANY
 
 import jsonschema_rs
@@ -317,6 +318,11 @@ def test_negative_string_with_pattern(nctx):
             {"type": "integer", "minimum": 0, "exclusiveMinimum": True, "maximum": 30, "exclusiveMaximum": True},
             [1, 2, 29, 28],
             [2, 4, 28, 26],
+        ),
+        (
+            {"type": "number", "minimum": 0, "exclusiveMinimum": True, "maximum": 1, "exclusiveMaximum": True},
+            [nextafter(0.0, inf), nextafter(1.0, -inf)],
+            [],
         ),
         ({"type": "integer", "exclusiveMinimum": 5}, [6, 7], [6, 8]),
         ({"type": "integer", "exclusiveMaximum": 10}, [9, 8], [8, 6]),
