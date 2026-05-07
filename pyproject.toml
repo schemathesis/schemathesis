@@ -53,7 +53,6 @@ dependencies = [
 ]
 [project.optional-dependencies]
 tests = [
-  "aiohttp>=3.9.1,<4.0",
   "coverage>=6",
   "fastapi>=0.86.0",
   "Flask>=2.1.1,<4.0",
@@ -110,13 +109,13 @@ testpaths = "tests"
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
 filterwarnings = [
     "error::pytest.PytestUnraisableExceptionWarning",
-    # anyio streams not closed during aiohttp test server teardown (flaky on Python 3.13+)
+    # anyio streams not closed during async test teardown (flaky on Python 3.13+)
     "ignore:Unclosed <MemoryObject.*:ResourceWarning",
     "ignore:.*Unclosed <MemoryObject.*:pytest.PytestUnraisableExceptionWarning",
     # urllib3/http.client response finalizer raises ValueError on Python 3.14t free-threading GC
     "ignore:Exception ignored while finalizing file <urllib3.response.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:Exception ignored while finalizing file <http.client.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
-    # aiohttp event loop / anyio stream deallocators raise on Python 3.14t free-threading GC
+    # asyncio event loop / anyio stream deallocators raise on Python 3.14t free-threading GC
     "ignore:Exception ignored while calling deallocator <function BaseEventLoop.__del__.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:Exception ignored while calling deallocator <function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:Exception ignored in.*<function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
@@ -186,7 +185,6 @@ ignore = [
 known-first-party = ["schemathesis"]
 known-third-party = [
   "_pytest",
-  "aiohttp",
   "click",
   "fastapi",
   "flask",
