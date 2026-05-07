@@ -44,6 +44,7 @@
 - Pick up in-place mutations of bundled `$ref` targets when generating from cached schemas.
 - False positive `negative_data_rejection` for body schemas combining `$ref` with sibling keywords.
 - Positive-mode coverage skipped object schemas with annotations next to unsatisfiable optional properties.
+- Skip parameter-mutation coverage cases when no positive body can be generated.
 
 ### :wrench: Changed
 

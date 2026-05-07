@@ -3161,6 +3161,48 @@ def test_positive_body_generated_for_object_with_metadata_and_unsatisfiable_opti
     )
 
 
+def test_parameter_mutation_cases_do_not_inherit_negative_body(ctx):
+    # When positive body coverage yields nothing (the body schema combines `allOf` with
+    # readOnly properties, so template inflation requires fields rewritten to `{"not": {}}`),
+    # the engine previously fell back to a negative body as the template substrate.
+    # Subsequent parameter-mutation cases (missing required header etc.) inherited that
+    # negative body and emitted cases that mix two negatives. Verify no such case is emitted.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {"in": "header", "name": "X-Token", "required": True, "type": "string"},
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "allOf": [{"type": "object"}],
+                                "properties": {"id": {"readOnly": True, "type": "string"}},
+                            },
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/foo"]["POST"]
+
+    bad = []
+    for case in _iter_cases(operation, GenerationMode.NEGATIVE):
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY:
+            continue
+        body_component = case.meta.components.get(ParameterLocation.BODY)
+        if body_component is not None and body_component.mode == GenerationMode.NEGATIVE:
+            bad.append((case.meta.phase.data.description, case.body))
+    assert bad == []
+
+
 def test_additional_properties_anyof_positive(ctx):
     loaded = load_schema(
         ctx,
