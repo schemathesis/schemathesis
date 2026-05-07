@@ -21,6 +21,7 @@ from test.apps.catalog.openapi import confluent as openapi_confluent
 from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
 from test.apps.catalog.openapi import go_validator as openapi_go_validator
 from test.apps.catalog.openapi import laravel as openapi_laravel
+from test.apps.catalog.openapi import marshmallow as openapi_marshmallow
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
@@ -305,6 +306,9 @@ class OpenAPIApps:
 
     def symfony_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_symfony.planted_bug())
+
+    def marshmallow_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_marshmallow.planted_bug())
 
     def confluent_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_confluent.planted_bug())

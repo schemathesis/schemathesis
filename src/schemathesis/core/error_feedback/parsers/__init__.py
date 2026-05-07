@@ -42,6 +42,7 @@ from schemathesis.core.error_feedback.parsers import (  # noqa: F401, E402
     go_validator,
     jackson,
     laravel,
+    marshmallow,
     pydantic,
     rails,
     spring,
