@@ -886,6 +886,12 @@ def _iter_coverage_cases(
     template_time = instant.elapsed
     has_required_body = operation.body and any(b.is_required for b in operation.body)
     has_generated_required_body = False
+    # Set when the body template substrate had to fall back to a negative value because
+    # positive coverage yielded nothing (e.g. readOnly + allOf composition makes every
+    # template option unsatisfiable). In that case the rest of this iterator must skip
+    # parameter-mutation cases — they would otherwise emit a negative body labeled with
+    # a non-body target, mixing two negatives in one case.
+    template_body_is_fallback_negative = False
     if operation.body:
         for body in operation.body:
             instant = Instant()
@@ -1034,10 +1040,11 @@ def _iter_coverage_cases(
                         schema,
                     )
                     first_positive = next(pos_gen, NOT_SET)
-                    template.set_body(
-                        value if isinstance(first_positive, NotSet) else first_positive,
-                        body.media_type,
-                    )
+                    if isinstance(first_positive, NotSet):
+                        template_body_is_fallback_negative = True
+                        template.set_body(value, body.media_type)
+                    else:
+                        template.set_body(first_positive, body.media_type)
             data = template.with_body(value=value, media_type=body.media_type)
             yield operation.Case(
                 **data.kwargs,
@@ -1100,6 +1107,9 @@ def _iter_coverage_cases(
                 ),
             ),
         )
+
+    if template_body_is_fallback_negative:
+        return
 
     for (location, name), gen in generators.items():
         iterator = iter(gen)
