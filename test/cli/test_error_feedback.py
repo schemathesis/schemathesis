@@ -517,3 +517,19 @@ def test_feedback_unmasks_planted_bug_via_flask_rest_envelope(ctx, cli, snapshot
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_litestar_envelope(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.litestar_planted_bug()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--no-shrink",
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )

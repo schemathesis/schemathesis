@@ -8,7 +8,7 @@
 - Capture identifiers from `{<id>: <object>, ...}` map-by-id GET responses (e.g. team / pod / cluster status maps).
 - Capture every element of list-shaped responses into the pool, not just the first.
 - Capture pool entries from custom wrappers, nested envelopes, and multi-array-root GET responses.
-- Refine generation from 4xx errors (Spring, Pydantic, DRF, Rails, Laravel, ASP.NET, Symfony, Zod, AJV, go-validator, Confluent, marshmallow, Flask-RESTful, Flask-RESTX).
+- Refine generation from 4xx errors (Spring, Pydantic, DRF, Rails, Laravel, ASP.NET, Symfony, Zod, AJV, go-validator, Confluent, marshmallow, Flask-RESTful, Flask-RESTX, Litestar).
 - Apply pool overlay to foreign-key fields nested inside request body objects.
 - Track deleted resources and stop re-feeding their identifiers to subsequent operations.
 - GraphQL fuzzing: dispatch producer mutations first and reuse captured identifiers across test cases.
