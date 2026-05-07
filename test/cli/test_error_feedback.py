@@ -501,3 +501,19 @@ def test_feedback_unmasks_planted_bug_via_marshmallow_envelope(ctx, cli, snapsho
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_flask_rest_envelope(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.flask_rest_planted_bug()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--no-shrink",
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
