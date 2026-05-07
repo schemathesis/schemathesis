@@ -42,6 +42,7 @@
 - Honor `minimum: 0` / `maximum: 0` and Draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` in coverage-phase number generation.
 - Pick up in-place mutations of bundled `$ref` targets when generating from cached schemas.
 - False positive `negative_data_rejection` for body schemas combining `$ref` with sibling keywords.
+- Positive-mode coverage skipped object schemas with annotations next to unsatisfiable optional properties.
 
 ### :wrench: Changed
 

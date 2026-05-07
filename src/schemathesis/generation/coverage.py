@@ -1377,7 +1377,6 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
 
 
 _FAST_PATH_KEYS = frozenset({"properties", "required", "type"})
-_GENERATE_EXCLUDED_KEYS = frozenset({"description", "example", "examples"})
 
 
 def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext) -> JsonSchemaObject:
@@ -1397,7 +1396,9 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
             # keep it at the schema's original required to avoid aborting on optional
             # properties with unsatisfiable schemas.  Otherwise inflate to all_properties
             # so every defined property appears in the generated template.
-            schema_keys = {k for k in schema if not k.startswith("x-") and k not in _GENERATE_EXCLUDED_KEYS}
+            # Ignore non-structural keys (annotations like `title`, OpenAPI `nullable`,
+            # `readOnly`, `x-*` extensions); only JSON Schema keywords gate the choice.
+            schema_keys = {k for k in schema if k in ALL_KEYWORDS}
             if schema_keys <= _FAST_PATH_KEYS:
                 required_for_template = [k for k in required if k in all_properties]
             else:
