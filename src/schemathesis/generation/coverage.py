@@ -8,7 +8,7 @@ from functools import lru_cache, partial
 from itertools import combinations
 from math import inf, nextafter
 
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, is_valid, make_validator_for
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, is_valid, make_validator, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 
@@ -80,9 +80,7 @@ def _get_format_validator(format: str, validator_cls: type[jsonschema_rs.Validat
     """Get or create a cached validator for checking a specific format."""
     key = (format, validator_cls)
     if key not in _FORMAT_VALIDATORS:
-        _FORMAT_VALIDATORS[key] = validator_cls(
-            {"type": "string", "format": format}, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
-        )
+        _FORMAT_VALIDATORS[key] = make_validator({"type": "string", "format": format}, validator_cls)
     return _FORMAT_VALIDATORS[key]
 
 
@@ -1933,7 +1931,7 @@ def _negative_properties(
             # Include bundled definitions so $ref references in sub_schema resolve
             validator_schema = sub_schema if bundle is None else {**sub_schema, BUNDLE_STORAGE_KEY: bundle}
             try:
-                validator = ctx.validator_cls(validator_schema, pattern_options=FANCY_REGEX_OPTIONS)
+                validator = make_validator(validator_schema, ctx.validator_cls)
             except Exception:
                 pass
         with nctx.at(key):

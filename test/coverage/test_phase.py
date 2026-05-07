@@ -5593,6 +5593,44 @@ def test_revalidation_preserves_negative_mode_for_format_violating_body(ctx):
     assert target.meta.components[ParameterLocation.BODY].mode == GenerationMode.NEGATIVE
 
 
+def test_negative_coverage_emits_invalid_format_for_uuid_body_property(ctx):
+    loaded = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["orderId"],
+                                    "properties": {"orderId": {"type": "string", "format": "uuid"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = loaded["/items"]["post"]
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE)
+    format_violators = [
+        case
+        for case in cases
+        if case.meta is not None
+        and case.meta.phase.data.scenario == CoverageScenario.INVALID_FORMAT
+        and isinstance(case.body, dict)
+        and "orderId" in case.body
+    ]
+    assert format_violators, "no INVALID_FORMAT case emitted for body property with format: uuid"
+    value = format_violators[0].body["orderId"]
+    with pytest.raises(ValueError):
+        uuid.UUID(value)
+
+
 def test_coverage_form_urlencoded_filters_primitives_with_bundled_ref(ctx):
     # Every NEGATIVE form-urlencoded body must remain schema-invalid after string coercion.
     loaded = ctx.openapi.load_schema(
