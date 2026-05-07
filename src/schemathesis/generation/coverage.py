@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
+from decimal import Decimal
 from functools import lru_cache, partial
 from itertools import combinations
 
@@ -1568,6 +1569,22 @@ def closest_multiple_greater_than(y: int, x: int) -> int:
     return x * (quotient + 1)
 
 
+def _shift_by_multiple(value: int | float, step: int | float, *, direction: int) -> int | float:
+    # IEEE-754 subtraction (e.g. `99999.99 - 0.01`) drifts by `~1e-12`, making the result
+    # fail `multipleOf`. Decimal arithmetic via the canonical `repr` keeps the value exact
+    # for fractions whose decimal form is short.
+    if isinstance(value, int) and isinstance(step, int):
+        return value + direction * step
+    return float(Decimal(str(value)) + direction * Decimal(str(step)))
+
+
+def _largest_multiple_within(value: int | float, step: int | float) -> int | float:
+    if isinstance(value, int) and isinstance(step, int):
+        return value - (value % step)
+    decimal_step = Decimal(str(step))
+    return float(Decimal(str(value)) - (Decimal(str(value)) % decimal_step))
+
+
 def _is_numeric_bound(value: Any) -> TypeGuard[int | float]:
     return isinstance(value, int | float) and not isinstance(value, bool)
 
@@ -1628,7 +1645,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
         # One more than minimum if possible
         if multiple_of is not None:
-            larger = smallest + multiple_of
+            larger = _shift_by_multiple(smallest, multiple_of, direction=1)
         else:
             larger = minimum + 1
         if (maximum is None or larger <= maximum) and seen.insert(larger):
@@ -1639,7 +1656,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if maximum is not None:
         # Exactly the maximum
         if multiple_of is not None:
-            largest = maximum - (maximum % multiple_of)
+            largest = _largest_multiple_within(maximum, multiple_of)
         else:
             largest = maximum
         if seen.insert(largest):
@@ -1647,7 +1664,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
         # One less than maximum if possible
         if multiple_of is not None:
-            smaller = largest - multiple_of
+            smaller = _shift_by_multiple(largest, multiple_of, direction=-1)
         else:
             smaller = maximum - 1
         if (minimum is None or smaller >= minimum) and seen.insert(smaller):

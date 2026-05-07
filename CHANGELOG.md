@@ -45,6 +45,7 @@
 - False positive `negative_data_rejection` for body schemas combining `$ref` with sibling keywords.
 - Positive-mode coverage skipped object schemas with annotations next to unsatisfiable optional properties.
 - Skip parameter-mutation coverage cases when no positive body can be generated.
+- Coverage near-boundary numbers drift from `multipleOf` due to IEEE-754 subtraction (e.g. `99999.99 - 0.01`).
 
 ### :wrench: Changed
 

@@ -3203,6 +3203,44 @@ def test_parameter_mutation_cases_do_not_inherit_negative_body(ctx):
     assert bad == []
 
 
+def test_positive_number_near_boundary_respects_multiple_of(ctx):
+    # IEEE-754 subtraction `maximum - multipleOf` drifts (e.g. `99999.99 - 0.01 = 99999.98000000001`).
+    # The validator rejects the drifted value as not a multiple. Decimal-based arithmetic stays exact.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "amount": {"type": "number", "minimum": 0, "maximum": 99999.99, "multipleOf": 0.01}
+                                },
+                            },
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/foo"]["POST"]
+    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+
+    invalid = [
+        case.body
+        for case in _iter_cases(operation, GenerationMode.POSITIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY and not validator.is_valid(case.body)
+    ]
+    assert invalid == []
+
+
 def test_additional_properties_anyof_positive(ctx):
     loaded = load_schema(
         ctx,
