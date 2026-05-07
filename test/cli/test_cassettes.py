@@ -2,6 +2,8 @@ import base64
 import io
 import json
 import platform
+import sys
+from pathlib import Path
 from unittest.mock import ANY
 
 import harfile
@@ -193,10 +195,11 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
-def test_run_subprocess(ctx, testdir, cassette_path, hypothesis_max_examples, snapshot_cli):
+def test_run_subprocess(ctx, testdir, hypothesis_max_examples, snapshot_cli):
     api = ctx.openapi.apps.success()
+    cassette_path = Path(str(testdir.tmpdir)) / "output.yaml"
     result = testdir.run(
-        "schemathesis",
+        str(Path(sys.executable).with_name("schemathesis")),
         "run",
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 2}",

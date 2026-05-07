@@ -44,7 +44,7 @@ Test cases:
   N generated, N passed
 
 Reports:
-  - VCR: /tmp/test_run_subprocess1/output.yaml
+  - VCR: /tmp/output.yaml
 
 Seed: 42
 

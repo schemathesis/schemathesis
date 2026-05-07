@@ -36,13 +36,13 @@ def test_commands_help(cli, snapshot_cli):
 
 def test_run_subprocess(testdir):
     # To verify that CLI entry point is installed properly
-    result = testdir.run("schemathesis")
+    result = testdir.run(str(pathlib.Path(sys.executable).with_name("schemathesis")))
     assert result.ret == ExitCode.INTERRUPTED
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
 def test_run_as_module(testdir):
-    result = testdir.run("python", "-m", "schemathesis.cli")
+    result = testdir.run(sys.executable, "-m", "schemathesis.cli")
     assert result.ret == ExitCode.INTERRUPTED
 
 
@@ -2360,7 +2360,7 @@ class EventCounter(cli.EventHandler):
 
     def handle_event(self, ctx, event) -> None:
         self.counter += 1
-        if isinstance(event, engine.events.EngineStarted):
+        if isinstance(event, cli.LoadingFinished):
             ctx.add_initialization_line("Counter initialized!")
             ctx.add_initialization_line(gen())
         elif isinstance(event, engine.events.EngineFinished):

@@ -800,18 +800,8 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                     table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
 
                 message = Padding(table, BLOCK_PADDING)
-            else:
-                assert event.status == Status.SKIP
-                assert isinstance(event.payload, Ok)
-                message = Padding(
-                    Text.assemble(
-                        ("⏭   ", ""),
-                        ("API probing skipped", Style(color="yellow")),
-                    ),
-                    BLOCK_PADDING,
-                )
-            self.console.print(message)
-            self.console.print()
+                self.console.print(message)
+                self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             self.stateful_tests_manager.stop()
             if event.status == Status.ERROR:

@@ -1,5 +1,7 @@
 import json
 import platform
+import sys
+from pathlib import Path
 
 import pytest
 from _pytest.main import ExitCode
@@ -156,7 +158,7 @@ def test_interaction_with_failure(ctx, cli, hypothesis_max_examples, ndjson_path
 def test_run_subprocess(ctx, testdir, ndjson_path, hypothesis_max_examples):
     api = ctx.openapi.apps.success()
     testdir.run(
-        "schemathesis",
+        str(Path(sys.executable).with_name("schemathesis")),
         "run",
         f"--report-ndjson-path={ndjson_path}",
         f"--max-examples={hypothesis_max_examples or 2}",
