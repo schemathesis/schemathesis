@@ -986,9 +986,11 @@ def _distribute_length_range(
     greedy = _greedy_distribute_range(bounds, repetition_lengths, max_repetition_lengths, min_length, max_length)
     # Greedy may either succeed with a starved sibling (`{0}`) or fail outright
     # because it gave the leading slot too much. Both are signals that the budget
-    # is contested across siblings — fall back to a balanced split.
-    needs_balance = greedy is None or any(
-        new_max == 0 and bounds[idx][1] > 0 for idx, (_, new_max) in enumerate(greedy)
+    # is contested across siblings — fall back to a balanced split. Balanced needs
+    # a finite upper budget to redistribute; without one (pinned unbounded inner
+    # dropped `max_length`) there is nothing it can do and greedy's result stands.
+    needs_balance = max_length is not None and (
+        greedy is None or any(new_max == 0 and bounds[idx][1] > 0 for idx, (_, new_max) in enumerate(greedy))
     )
     if needs_balance:
         balanced = _balanced_distribute_range(

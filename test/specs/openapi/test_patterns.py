@@ -241,6 +241,10 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         # greedy and balanced distributors recognize the slot as silent and refuse
         # to use it for the length budget.
         (r"^a+()+$", 2, 5, r"^a+()+$"),
+        # Pinned slot with unbounded inner alongside a finite sibling whose max can't
+        # absorb the remaining min-length budget — both distributors must bail rather
+        # than crash, and the original pattern is kept.
+        (r"^(.|a+){1,3}\d{1,3}$", 100, 100, r"^(.|a+){1,3}\d{1,3}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
