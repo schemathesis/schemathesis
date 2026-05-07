@@ -114,18 +114,23 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^abcd[a-zA-Z0-9]{2,4}$", None, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd[a-zA-Z0-9]{2,4}$"),
-        (r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$", 5, 64, r"^[a-zA-Z0-9]{5,64}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0}$"),
+        # Variable-length inner in a multi-part outer repeat — outer count alone cannot
+        # encode the length bound, and collapsing the suffix to `{0}` would reject values
+        # like "abc-def" that match the original schema.
+        (r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$", 5, 64, r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$"),
         (r"^\+[0-9]{5,}$", 6, 6, r"^\+[0-9]{5}$"),
         (r"^abcd$", 50, 50, r"^abcd$"),
         # Edge cases
-        ("^[a-z]*-[0-9]*$", 3, 3, "^[a-z]{0}-[0-9]{2}$"),
+        # `[a-z]*` collapsing to `{0}` would reject valid values like "a-1" or "ab-".
+        ("^[a-z]*-[0-9]*$", 3, 3, "^[a-z]*-[0-9]*$"),
         (r"^[+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
         (r"^[\+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
         # Multiple fixed parts
         ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc[0-9]{1}def[a-z]{2}ghi$"),
         # Others
         ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, r"^(((?:DB|BR)[\-a-zA-Z0-9_]{1,}),{0,1}){1,2000}$"),
-        (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{1,196}\*{0}$"),
+        # Optional `\*?` cannot collapse to `{0}` — that would reject values like "geo:abc*".
+        (r"^geo:\w*\*?$", 5, 200, r"^geo:\w*\*?$"),
         (r"^[\w\W]$", 1, 3, r"^.{1}$"),
         (r"^[\w\W]+$", 1, 3, r"^.{1,3}$"),
         (r"^[\w\W]*$", 1, 3, r"^.{1,3}$"),
@@ -136,10 +141,13 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^[\W\w]*$", 1, 3, r"^.{1,3}$"),
         (r"^[\W\w]?$", 1, 3, r"^.{1}$"),
         (r"^[\W\w]{2,}$", 1, 3, r"^.{2,3}$"),
-        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{2}(?:,prefix\|{1,}){499}$"),
-        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1}(?:,bar\.spam\.[^,]{1,}){0}$"),
-        (r"^\008+()?$", None, 2, r"^\x008{1}(){0}$"),
-        (r"^\008+()?$", 2, None, r"^\x008{1,}(){0}$"),
+        # Variable-length inner inside multi-part outer repeats — the rewritten count
+        # neither enforces maxLength (extra inner chars exceed it) nor preserves the
+        # original valid set (collapsing `*` to `{0}` rejects matches with the suffix).
+        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix[|]+(?:,prefix[|]+)*$"),
+        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$"),
+        (r"^\008+()?$", None, 2, r"^\008+()?$"),
+        (r"^\008+()?$", 2, None, r"^\008+()?$"),
         (r"^000(000)?$", 4, 5, r"^000(000)?$"),
         ("(abc)+", 1, 10, "^(abc){1,3}$"),
         ("(hello){2,5}", None, 12, "^(hello){2}$"),
@@ -193,14 +201,19 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^([a-z]+(?!\s))+$", 1, 5, r"^([a-z]{1,}(?!\s)){1,5}$"),
         (r"^([a-z]+(?<=\s))+$", 1, 5, r"^([a-z]{1,}(?<=\s)){1,5}$"),
         (r"^([a-z]+(?=\s))+$", 1, 5, r"^([a-z]{1,}(?=\s)){1,5}$"),
-        # Alternation inside a quantified group
-        (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,99}$"),
+        # Alternation inside a quantified group: rewriting the outer count to a finite
+        # range cannot enforce maxLength because each branch contributes variable length.
+        (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$"),
         (r"^(foo|bar)+$", 3, 12, r"^(foo|bar){1,4}$"),
         # Outer bound already finite and unchanged; inner content is variable-length
         # — maxLength cannot be encoded through the outer repetition count alone.
         (r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", 1, 63, r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"),
         # Optional group with variable inner: minLength absorbed but maxLength unrepresentable.
         (r"^([a-z][a-z]*)?$", 1, 5, r"^([a-z][a-z]*)?$"),
+        # Multi-part anchored pattern with an optional variable-length suffix `(...){0,2}\.?`
+        # — collapsing the suffix to `{0}` would reject names like "Doe-Smith" that match
+        # the original schema.
+        (r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$", 1, 30, r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):

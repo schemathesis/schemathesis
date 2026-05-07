@@ -779,6 +779,22 @@ def _transform_anchored_multi(
     if not distribution:
         return None
 
+    for dist_idx, (new_min, new_max) in enumerate(distribution):
+        part_idx = quantified_indices[dist_idx]
+        _, (orig_min, orig_max, inner_subpattern) = parts[part_idx]
+        if (new_min, new_max) == (orig_min, orig_max):
+            continue
+        # Do not optimize optional suffixes away. Rewriting `...?` or `...{0,2}`
+        # to `{0}` creates a strict subset of the original schema and makes
+        # optimized schemas reject otherwise valid values.
+        if orig_max != 0 and new_max == 0:
+            return None
+        # Changing an outer repeat whose contents are variable-length does not
+        # encode the overall length bound; it either remains too loose or
+        # overconstrains valid values that fit the original min/maxLength.
+        if _has_variable_length(list(inner_subpattern)):
+            return None
+
     # An unchanged finite outer bound with variable-length inner content cannot
     # enforce maxLength — each outer tick may exceed rep_len chars.
     if adj_max is not None:
