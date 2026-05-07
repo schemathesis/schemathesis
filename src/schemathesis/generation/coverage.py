@@ -1879,7 +1879,10 @@ def _negative_properties(
     bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
     for key, sub_schema in properties.items():
         validator: jsonschema_rs.Validator | None = None
-        if (is_form or is_xml) and isinstance(sub_schema, dict):
+        # Draft 4 ignores siblings of `$ref`, so generation against `{$ref, sibling}` may yield
+        # values the body validator silently accepts; filter those out below.
+        sub_has_ref = isinstance(sub_schema, dict) and "$ref" in sub_schema
+        if isinstance(sub_schema, dict):
             # Include bundled definitions so $ref references in sub_schema resolve
             validator_schema = sub_schema if bundle is None else {**sub_schema, BUNDLE_STORAGE_KEY: bundle}
             try:
@@ -1899,6 +1902,10 @@ def _negative_properties(
                         continue
                     # Empty dict/None both serialize to empty string in XML
                     if is_xml and (v == {} or v is None) and validator.is_valid(""):
+                        continue
+                    # `{$ref, sibling}` only honors the ref target on Draft 4 — drop mutations
+                    # against the silenced siblings that the bare target accepts vacuously.
+                    if sub_has_ref and not is_form and not is_xml and validator.is_valid(v):
                         continue
                 inner = value.description or ""
                 # Build path notation: "a -> b: leaf" for nested, "a: leaf" for direct
