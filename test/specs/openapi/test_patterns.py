@@ -114,18 +114,29 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^abcd[a-zA-Z0-9]{2,4}$", None, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd[a-zA-Z0-9]{2,4}$"),
-        (r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$", 5, 64, r"^[a-zA-Z0-9]{5,64}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0}$"),
+        # When greedy would collapse the variable-inner suffix to `{0}`, the
+        # distributor falls back to a balanced split that gives both slots room.
+        (
+            r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$",
+            5,
+            64,
+            r"^[a-zA-Z0-9]{5,32}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0,16}$",
+        ),
         (r"^\+[0-9]{5,}$", 6, 6, r"^\+[0-9]{5}$"),
         (r"^abcd$", 50, 50, r"^abcd$"),
         # Edge cases
-        ("^[a-z]*-[0-9]*$", 3, 3, "^[a-z]{0}-[0-9]{2}$"),
+        # Exact-length DP picks a non-zero shape when one fits, avoiding an
+        # unnecessary `{0}` collapse on either optional slot.
+        ("^[a-z]*-[0-9]*$", 3, 3, "^[a-z]{1}-[0-9]{1}$"),
         (r"^[+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
         (r"^[\+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
         # Multiple fixed parts
         ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc[0-9]{1}def[a-z]{2}ghi$"),
         # Others
         ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, r"^(((?:DB|BR)[\-a-zA-Z0-9_]{1,}),{0,1}){1,2000}$"),
-        (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{1,196}\*{0}$"),
+        # Optional `\*?` is preserved (collapsing it to `{0}` would reject "geo:abc*"),
+        # while `\w*` still tightens to use the remaining length budget.
+        (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{1,195}\*{0,1}$"),
         (r"^[\w\W]$", 1, 3, r"^.{1}$"),
         (r"^[\w\W]+$", 1, 3, r"^.{1,3}$"),
         (r"^[\w\W]*$", 1, 3, r"^.{1,3}$"),
@@ -136,10 +147,14 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^[\W\w]*$", 1, 3, r"^.{1,3}$"),
         (r"^[\W\w]?$", 1, 3, r"^.{1}$"),
         (r"^[\W\w]{2,}$", 1, 3, r"^.{2,3}$"),
-        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{2}(?:,prefix\|{1,}){499}$"),
-        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1}(?:,bar\.spam\.[^,]{1,}){0}$"),
-        (r"^\008+()?$", None, 2, r"^\x008{1}(){0}$"),
-        (r"^\008+()?$", 2, None, r"^\x008{1,}(){0}$"),
+        # Variable-length inner: outer count alone cannot encode maxLength (each
+        # tick may be arbitrarily long), so we pin the variable slot and tighten
+        # the leading slot for minLength only.
+        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{3994,}(?:,prefix\|{1,}){0,}$"),
+        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1,}(?:,bar\.spam\.[^,]{1,}){0,}$"),
+        # Optional finite group `()?` is preserved while `8+` tightens to use the budget.
+        (r"^\008+()?$", None, 2, r"^\x008{1}(){0,1}$"),
+        (r"^\008+()?$", 2, None, r"^\x008{1,}(){0,1}$"),
         (r"^000(000)?$", 4, 5, r"^000(000)?$"),
         ("(abc)+", 1, 10, "^(abc){1,3}$"),
         ("(hello){2,5}", None, 12, "^(hello){2}$"),
@@ -193,14 +208,39 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^([a-z]+(?!\s))+$", 1, 5, r"^([a-z]{1,}(?!\s)){1,5}$"),
         (r"^([a-z]+(?<=\s))+$", 1, 5, r"^([a-z]{1,}(?<=\s)){1,5}$"),
         (r"^([a-z]+(?=\s))+$", 1, 5, r"^([a-z]{1,}(?=\s)){1,5}$"),
-        # Alternation inside a quantified group
-        (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,99}$"),
+        # Branch alternation with finite per-tick max (1 or 2 chars) — outer count
+        # tightens to keep total length within bounds.
+        (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,49}$"),
         (r"^(foo|bar)+$", 3, 12, r"^(foo|bar){1,4}$"),
         # Outer bound already finite and unchanged; inner content is variable-length
         # — maxLength cannot be encoded through the outer repetition count alone.
         (r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", 1, 63, r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"),
         # Optional group with variable inner: minLength absorbed but maxLength unrepresentable.
         (r"^([a-z][a-z]*)?$", 1, 5, r"^([a-z][a-z]*)?$"),
+        # Multi-part anchored pattern with an optional variable-length middle group:
+        # the variable-inner middle pin keeps `(...){0,2}` (collapsing it to `{0}`
+        # would reject "Doe-Smith"), while the trailing `\.?` is also pinned.
+        # maxLength cannot be enforced (middle slot can grow unboundedly), but the
+        # leading slot still tightens for minLength.
+        (
+            r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$",
+            1,
+            30,
+            r"^[a-zA-Z]{1,}([ '\-][a-zA-Z]{1,}){0,2}\.{0,1}$",
+        ),
+        # Required-only siblings whose combined max can't reach the target minLength —
+        # both greedy and balanced bail and the original schema is kept.
+        (r"^[a-z]{1,3}_[a-z]{1,3}$", 10, 12, r"^[a-z]{1,3}_[a-z]{1,3}$"),
+        # Nested unbounded inner (`([a-z]+)+`) — the per-tick max is unbounded so
+        # the slot is pinned and only the outer count is preserved.
+        (r"^([a-z]+)+$", 1, 100, r"^([a-z]{1,}){1,100}$"),
+        # Bounded outer with unbounded nested inner — the outer count cannot bound
+        # the slot, the slot is pinned, and the rewrite stays at the original.
+        (r"^([a-z]+){2,5}$", 1, 50, r"^([a-z]+){2,5}$"),
+        # Multi-quantifier with one zero-contributing slot (empty group). Both the
+        # greedy and balanced distributors recognize the slot as silent and refuse
+        # to use it for the length budget.
+        (r"^a+()+$", 2, 5, r"^a+()+$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
