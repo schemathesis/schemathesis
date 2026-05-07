@@ -80,10 +80,10 @@ def _load_schema(schema_path: str, base_url: str | None) -> Any:
         return schemathesis.openapi.from_dict(schema_dict, **kwargs)
     if schema_path.lower().startswith(("http://", "https://")):
         return schemathesis.openapi.from_url(schema_path)
-    kwargs = {}
+    schema = schemathesis.openapi.from_path(schema_path)
     if base_url:
-        kwargs["base_url"] = base_url
-    return schemathesis.openapi.from_path(schema_path, **kwargs)
+        schema.config.update(base_url=base_url)
+    return schema
 
 
 _MOCK_BASE_URL = "http://localhost"
