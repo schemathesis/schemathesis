@@ -49,6 +49,7 @@
 - Coverage boundary numbers fail validation when both bounds are exclusive (e.g. `exclusiveMinimum: 0` + `exclusiveMaximum: 1`).
 - Preserve `minLength` / `maxLength` when the `pattern` rewrite cannot encode them.
 - Emit `format: uuid` negative cases in coverage on OpenAPI 3.0 / Swagger 2.0 schemas.
+- Emit `minProperties` / `maxProperties` violations for object schemas alongside `additionalProperties`.
 
 ### :wrench: Changed
 

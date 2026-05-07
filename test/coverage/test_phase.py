@@ -3400,6 +3400,22 @@ def test_min_properties_one(ctx):
     )
 
 
+def test_min_properties_one_with_additional_properties(ctx):
+    cases = collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "additionalProperties": {"type": "array", "items": {"type": "string"}},
+            "minProperties": 1,
+            "maxProperties": 2,
+        },
+    )
+    empty = [c for c in cases if c.meta.phase.data.scenario == CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES]
+    assert any(c.body == {} for c in empty), (
+        f"Should generate empty object for minProperties: 1 alongside additionalProperties. Got: {[c.body for c in cases]}"
+    )
+
+
 def test_min_properties_fewer_than_required(ctx):
     cases = collect_coverage_cases(
         ctx,
