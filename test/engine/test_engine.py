@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import platform
 from dataclasses import asdict
-from typing import TYPE_CHECKING
 from unittest.mock import ANY
 
 import pytest
-from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
 from py import sys
 
@@ -26,9 +24,6 @@ from schemathesis.specs.openapi.checks import (
     status_code_conformance,
 )
 from test.utils import EventStream
-
-if TYPE_CHECKING:
-    from aiohttp import web
 
 IS_PYPY = platform.python_implementation() == "PyPy"
 
@@ -67,35 +62,6 @@ def _scenario_checks(scenario):
 
 def _last_scenario_checks(stream):
     return _scenario_checks(_last_scenario(stream))
-
-
-def assert_request(
-    app: web.Application, idx: int, method: str, path: str, headers: dict[str, str] | None = None
-) -> None:
-    request = app["incoming_requests"][idx]
-    assert request.method == method
-    if request.method == "GET":
-        # Ref: #200
-        # GET requests should not contain bodies
-        if not isinstance(request.content, EmptyStreamReader):
-            assert request.content._read_nowait(-1) != b"{}"
-    assert request.path == path
-    if headers:
-        for key, value in headers.items():
-            assert request.headers.get(key) == value
-
-
-def assert_not_request(app: web.Application, method: str, path: str) -> None:
-    for request in app["incoming_requests"]:
-        assert not (request.path == path and request.method == method)
-
-
-def assert_incoming_requests_num(app, number):
-    assert len(app["incoming_requests"]) == number
-
-
-def assert_schema_requests_num(app, number):
-    assert len(app["schema_requests"]) == number
 
 
 def test_execute_base_url_not_found(ctx):

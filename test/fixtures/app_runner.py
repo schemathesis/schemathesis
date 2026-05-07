@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import os
 import socket
 import subprocess
@@ -15,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import requests
 import uvicorn
-from aiohttp import web
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -29,7 +27,7 @@ def unused_port() -> int:
 
 
 def run(target: Callable, port: int | None = None, timeout: float = 0.05, **kwargs: Any) -> int:
-    """Start a thread with the given aiohttp application."""
+    """Start a daemon thread running the given server target on a free port."""
     if port is None:
         port = unused_port()
     server_thread = threading.Thread(target=target, kwargs={"port": port, **kwargs})
@@ -37,22 +35,6 @@ def run(target: Callable, port: int | None = None, timeout: float = 0.05, **kwar
     server_thread.start()
     sleep(timeout)
     return port
-
-
-def _run_server(app: web.Application, port: int) -> None:
-    """Run the given app on the given port.
-
-    Intended to be called as a target for a separate thread.
-    NOTE. `aiohttp.web.run_app` works only in the main thread and can't be used here (or maybe can we some tuning)
-    """
-    # Set a loop for a new thread (there is no by default for non-main threads)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    runner = web.AppRunner(app)
-    loop.run_until_complete(runner.setup())
-    site = web.TCPSite(runner, "127.0.0.1", port)
-    loop.run_until_complete(site.start())
-    loop.run_forever()
 
 
 class SubprocessRunner:
@@ -135,13 +117,8 @@ def subprocess_runner(tmp_path):
     runner.cleanup()
 
 
-def run_aiohttp_app(app: web.Application, port: int | None = None, timeout: float = 0.05) -> int:
-    """Start a thread with the given aiohttp application."""
-    return run(_run_server, app=app, port=port, timeout=timeout)
-
-
 def run_flask_app(app: Flask, port: int | None = None, timeout: float = 0.05) -> int:
-    """Start a thread with the given aiohttp application."""
+    """Start a thread with the given Flask application."""
     return run(app.run, port=port, timeout=timeout)
 
 
@@ -173,7 +150,6 @@ def run_asgi_app(app: FastAPI, port: int | None = None, timeout: float = 0.05) -
 def app_runner():
     return SimpleNamespace(
         run_flask_app=run_flask_app,
-        run_aiohttp_app=run_aiohttp_app,
         run_asgi_app=run_asgi_app,
         unused_port=unused_port,
         openapi_url=openapi_url,
