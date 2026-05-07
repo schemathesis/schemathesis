@@ -6,7 +6,12 @@ from typing import Any, TypeGuard, overload
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transforms import deepclone
-from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex, update_quantifier
+from schemathesis.specs.openapi.patterns import (
+    is_valid_python_regex,
+    normalize_regex,
+    pattern_length_bounds,
+    update_quantifier,
+)
 
 
 @overload
@@ -361,9 +366,13 @@ def update_pattern_in_schema(schema: dict[str, Any]) -> None:
     if pattern and (min_length or max_length):
         new_pattern = update_quantifier(pattern, min_length, max_length)
         if new_pattern != pattern:
-            schema.pop("minLength", None)
-            schema.pop("maxLength", None)
+            # Pop a bound only if the rewrite encodes it; rewrites with unbounded slots can't absorb `maxLength`.
+            new_min, new_max = pattern_length_bounds(new_pattern)
             schema["pattern"] = new_pattern
+            if min_length is not None and new_min >= min_length:
+                schema.pop("minLength", None)
+            if max_length is not None and new_max is not None and new_max <= max_length:
+                schema.pop("maxLength", None)
 
 
 def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, Any]], bool]) -> None:
