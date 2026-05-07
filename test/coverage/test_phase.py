@@ -40,9 +40,12 @@ from test.utils import assert_requests_call
 @dataclass
 class Pattern:
     _pattern: str
+    _max_length: int | None = None
 
     def __eq__(self, value: object, /) -> bool:
-        return bool(isinstance(value, str) and re.match(self._pattern, value))
+        if not (isinstance(value, str) and re.match(self._pattern, value)):
+            return False
+        return self._max_length is None or len(value) <= self._max_length
 
 
 POSITIVE_CASES = [
@@ -1875,24 +1878,13 @@ def test_query_parameters_dont_exceed_max_length(ctx):
             },
         ],
     )
+    matcher = Pattern(r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 60)
     assert_positive_coverage(
         schema,
         [
-            {
-                "query": {
-                    "foo": "bar.spam.000000,bar.spam.0,bar.spam.0,bar.spam.0,bar.spam.0",
-                },
-            },
-            {
-                "query": {
-                    "foo": "bar.spam.0000000,bar.spam.0,bar.spam.0,bar.spam.0,bar.spam.0",
-                },
-            },
-            {
-                "query": {
-                    "foo": "bar.spam.0",
-                },
-            },
+            {"query": {"foo": matcher}},
+            {"query": {"foo": matcher}},
+            {"query": {"foo": matcher}},
         ],
     )
 
@@ -4862,6 +4854,46 @@ def test_coverage_positive_pattern_with_branch_group_not_corrupted(ctx):
             f"POSITIVE value {case.query['name']!r} failed optimized_schema validation — "
             f"pattern was likely corrupted by update_quantifier"
         )
+
+
+def test_coverage_positive_pattern_with_variable_suffix_not_overconstrained(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/owners": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["lastName"],
+                                    "properties": {
+                                        "lastName": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 30,
+                                            "pattern": r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$",
+                                            "example": "Franklin",
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/owners"]["POST"]
+    validator = _body_validator(operation, validate_formats=False)
+
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
+    assert len(cases) > 0
+    for case in cases:
+        if case.media_type == "application/json" and case.body is not None:
+            assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
 
 
 def test_coverage_positive_property_names_enum_respected(ctx):

@@ -19,6 +19,7 @@
 
 ### :bug: Fixed
 
+- Skip `pattern` rewrites that collapse optional variable-length sub-groups to `{0}`.
 - Skip `{}` as positive coverage body for schemas with `minProperties` but no `required` fields.
 - Coverage positive cases from `oneOf`/`anyOf` branches violating a root-level constraint (e.g. `type: object` branch under `type: array` root) were yielded as valid.
 - Panic during response validation for schemas with very large `{0,N}` regex quantifiers (e.g. `{0,404600}`).
