@@ -1169,7 +1169,7 @@ def cover_schema_iter(
                             continue
                         nctx = ctx.with_negative()
                         with nctx.at(additional_key):
-                            for invalid in cover_schema_iter(nctx, value, seen):
+                            for invalid in cover_schema_iter(nctx, value):
                                 yield NegativeValue(
                                     {**template, additional_key: invalid.value},
                                     scenario=invalid.scenario,
