@@ -3086,6 +3086,50 @@ def test_negative_required_drops_false_negatives_at_body_root_with_ref_sibling(c
     assert false_negatives == []
 
 
+def test_positive_body_generated_for_object_with_metadata_and_unsatisfiable_optionals(ctx):
+    # Object schema with metadata keyword (`title`) plus optional properties that are
+    # unsatisfiable (`{"not": {}}` from readOnly). Empty `{}` is a valid positive body;
+    # the generator must produce at least one rather than falling back on a negative body.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "title": "Resource",
+                                "type": "object",
+                                "properties": {
+                                    "id": {"not": {}},
+                                    "created_at": {"not": {}},
+                                    "name": {"type": "string"},
+                                },
+                            },
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/foo"]["POST"]
+
+    positive_bodies = [
+        case.body
+        for case in _iter_cases(operation, GenerationMode.POSITIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY
+    ]
+    assert positive_bodies, "Expected at least one positive body case"
+    assert all(isinstance(body, dict) for body in positive_bodies), (
+        f"Positive bodies must be objects per `type: object`; got: {positive_bodies}"
+    )
+
+
 def test_additional_properties_anyof_positive(ctx):
     loaded = load_schema(
         ctx,
