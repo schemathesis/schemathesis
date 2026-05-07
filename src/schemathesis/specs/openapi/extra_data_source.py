@@ -184,19 +184,6 @@ def build_inputs_by_label(graph: DependencyGraph) -> dict[str, list[InputSlot]]:
     return inputs_by_label
 
 
-def _variant_satisfies(variant: dict[str, Any], validators: dict[str, jsonschema_rs.Validator | None]) -> bool:
-    for name, value in variant.items():
-        validator = validators.get(name)
-        if validator is None:
-            continue
-        try:
-            if not validator.is_valid(value):
-                return False
-        except Exception:
-            continue
-    return True
-
-
 def _build_property_validator(
     prop_schema: Any, container_schema: Any, validator_cls: type
 ) -> jsonschema_rs.Validator | None:

@@ -483,6 +483,10 @@ def testdir(testdir):
             )
             config.addinivalue_line(
                 "filterwarnings",
+                "ignore:Exception ignored while finalizing socket <socket.socket.*:pytest.PytestUnraisableExceptionWarning",
+            )
+            config.addinivalue_line(
+                "filterwarnings",
                 "ignore:unclosed <socket.socket.*:ResourceWarning",
             )
         def pytest_unconfigure(config):

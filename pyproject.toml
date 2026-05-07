@@ -121,6 +121,7 @@ filterwarnings = [
     "ignore:Exception ignored in.*<function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
     # unclosed socket from test server teardown (flaky on Python 3.12+)
     "ignore:Exception ignored in.*<socket.socket.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored while finalizing socket <socket.socket.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:unclosed <socket.socket.*:ResourceWarning",
 ]
 

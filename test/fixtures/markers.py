@@ -8,8 +8,14 @@ IGNORED_WARNING_STRICT_FILTERS = (
     # Keep globally ignored teardown noise ignored when a test opts into `filterwarnings("error")`.
     "ignore:Unclosed <MemoryObject.*:ResourceWarning",
     "ignore:.*Unclosed <MemoryObject.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored while finalizing file <urllib3.response.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored while finalizing file <http.client.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored while calling deallocator <function BaseEventLoop.__del__.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:Exception ignored while calling deallocator <function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:Exception ignored in.*<function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored in.*<socket.socket.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored while finalizing socket <socket.socket.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:unclosed <socket.socket.*:ResourceWarning",
 )
 
 

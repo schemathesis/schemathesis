@@ -26,14 +26,26 @@ def unused_port() -> int:
         return s.getsockname()[1]
 
 
-def run(target: Callable, port: int | None = None, timeout: float = 0.05, **kwargs: Any) -> int:
+def wait_for_port(port: int, *, timeout: float = 5.0, interval: float = 0.01) -> None:
+    deadline = monotonic() + timeout
+    while monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=interval):
+                return
+        except OSError:
+            sleep(interval)
+    raise RuntimeError(f"Server on port {port} failed to start within {timeout}s")
+
+
+def run(target: Callable, port: int | None = None, timeout: float = 5.0, wait: bool = True, **kwargs: Any) -> int:
     """Start a daemon thread running the given server target on a free port."""
     if port is None:
         port = unused_port()
     server_thread = threading.Thread(target=target, kwargs={"port": port, **kwargs})
     server_thread.daemon = True
     server_thread.start()
-    sleep(timeout)
+    if wait:
+        wait_for_port(port, timeout=timeout)
     return port
 
 
@@ -117,18 +129,18 @@ def subprocess_runner(tmp_path):
     runner.cleanup()
 
 
-def run_flask_app(app: Flask, port: int | None = None, timeout: float = 0.05) -> int:
+def run_flask_app(app: Flask, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int:
     """Start a thread with the given Flask application."""
-    return run(app.run, port=port, timeout=timeout)
+    return run(app.run, port=port, timeout=timeout, wait=wait)
 
 
-def openapi_url(app: Flask, *, path: str = "/openapi.json") -> str:
+def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -> str:
     """Start `app` on a free port and return the URL where the OpenAPI schema is served."""
-    port = run_flask_app(app)
+    port = run_flask_app(app, wait=wait)
     return f"http://127.0.0.1:{port}{path}"
 
 
-def run_asgi_app(app: FastAPI, port: int | None = None, timeout: float = 0.05) -> int:
+def run_asgi_app(app: FastAPI, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int:
     """Start a daemon thread running uvicorn against the given ASGI application."""
     if port is None:
         port = unused_port()
@@ -136,14 +148,9 @@ def run_asgi_app(app: FastAPI, port: int | None = None, timeout: float = 0.05) -
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
-    deadline = monotonic() + 5.0
-    while monotonic() < deadline:
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=timeout):
-                return port
-        except OSError:
-            sleep(timeout)
-    raise RuntimeError(f"uvicorn did not bind to 127.0.0.1:{port}")
+    if wait:
+        wait_for_port(port, timeout=timeout)
+    return port
 
 
 @pytest.fixture(scope="session")
