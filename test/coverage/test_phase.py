@@ -3074,6 +3074,49 @@ def test_negative_required_drops_false_negatives_at_body_root_with_ref_sibling(c
     assert false_negatives == []
 
 
+def test_negative_ref_sibling_with_binary_format_does_not_crash_validator(ctx):
+    # `$ref` + sibling triggers the unmerged-validator path; the merged target produces
+    # values containing Binary, which jsonschema_rs cannot validate and raises ValueError.
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Upload",
+                                    "required": ["file"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Upload": {
+                    "type": "object",
+                    "properties": {
+                        "file": {"type": "string", "format": "binary"},
+                        "sku": {"$ref": "#/components/schemas/Sku"},
+                    },
+                },
+                # Second component forces bundling so the `$ref` + sibling shape survives
+                # into `cover_schema_iter` instead of being inlined.
+                "Sku": {"type": "object", "properties": {"name": {"type": "string"}}},
+            }
+        },
+    )
+    operation = schema["/upload"]["POST"]
+
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE)
+    assert len(cases) > 0
+
+
 def test_positive_body_generated_for_object_with_metadata_and_unsatisfiable_optionals(ctx):
     # Object schema with metadata keyword (`title`) plus optional properties that are
     # unsatisfiable (`{"not": {}}` from readOnly). Empty `{}` is a valid positive body;
