@@ -346,6 +346,18 @@ _BranchValue: TypeAlias = tuple[None, list[list[_Node]]]
 
 
 @lru_cache
+def pattern_length_bounds(pattern: str) -> tuple[int, int | None]:
+    """Return min and max string length the pattern matches; `max` is `None` when unbounded."""
+    try:
+        parsed = list(sre_parse.parse(pattern))
+    except (re.error, InternalError):
+        return (0, None)
+    min_length = _calculate_min_repetition_length(parsed)
+    max_length = _calculate_max_repetition_length(parsed)
+    return (min_length, None if max_length == MAXREPEAT else max_length)
+
+
+@lru_cache
 def update_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
     """Update the quantifier of a regular expression based on given min and max lengths."""
     if not pattern or (min_length in (None, 0) and max_length is None):

@@ -14,6 +14,7 @@ except ImportError:
     import sre_parse  # type: ignore[no-redef]
 
 from schemathesis.core.errors import InternalError
+from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import _serialize, normalize_regex, update_quantifier
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
@@ -254,6 +255,33 @@ def test_update_quantifier(pattern, min_length, max_length, expected):
 
 def test_update_quantifier_invalid_pattern():
     assert update_quantifier("*", 1, 3) == "*"
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"type": "string", "pattern": r"^[a-z]+$", "minLength": 1, "maxLength": 10},
+            {"type": "string", "pattern": r"^[a-z]{1,10}$"},
+        ),
+        # Unbounded `{1,}` survives the rewrite; `maxLength` must stay so length is still enforced.
+        (
+            {"type": "string", "pattern": r"^([a-z]+-){2,3}\d+$", "minLength": 1, "maxLength": 32},
+            {"type": "string", "pattern": r"^([a-z]{1,}-){2,3}\d{1,}$", "maxLength": 32},
+        ),
+        (
+            {"type": "string", "pattern": r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$", "minLength": 1, "maxLength": 30},
+            {
+                "type": "string",
+                "pattern": r"^[a-zA-Z]{1,}([ '\-][a-zA-Z]{1,}){0,2}\.{0,1}$",
+                "maxLength": 30,
+            },
+        ),
+    ],
+)
+def test_update_pattern_in_schema_keeps_unenforced_bounds(schema, expected):
+    update_pattern_in_schema(schema)
+    assert schema == expected
 
 
 @pytest.mark.parametrize(
