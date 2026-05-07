@@ -755,6 +755,7 @@ def _transform_anchored_multi(
     fixed_length = 0
     quantifier_bounds = []
     repetition_lengths = []
+    repetition_max_lengths = []
     quantified_indices = []
 
     for idx, (op, value) in enumerate(parts):
@@ -764,6 +765,7 @@ def _transform_anchored_multi(
             min_repeat, max_repeat, subpattern = value
             quantifier_bounds.append((min_repeat, max_repeat))
             repetition_lengths.append(_calculate_min_repetition_length(subpattern))
+            repetition_max_lengths.append(_calculate_max_repetition_length(list(subpattern)))
             quantified_indices.append(idx)
 
     adj_min = None if min_l is None else min_l - fixed_length
@@ -775,19 +777,106 @@ def _transform_anchored_multi(
     if not quantifier_bounds:
         return None
 
-    distribution = _distribute_length_constraints(quantifier_bounds, repetition_lengths, adj_min, adj_max)
-    if not distribution:
-        return None
+    # Pin slots whose bounds the distributor must not change:
+    #   - Slots whose inner per-tick max is truly unbounded (e.g. `[|]+` inside,
+    #     branches with unbounded alternatives): outer count cannot enforce length.
+    #     Pinning them keeps the rewrite a superset of the original; siblings can
+    #     still tighten for minLength.
+    #   - Variable-inner slots in exact-length cases: the exact-length DP can't
+    #     distribute a per-tick range, so we keep them and accept that the
+    #     resulting pattern won't enforce exact length.
+    #   - Optional finite slots with fixed-length inner (range cases only):
+    #     collapse-to-zero would produce a strict subset (e.g. `\*?` in
+    #     `^geo:\w*\*?$` becoming `\*{0}` rejects "geo:abc*"). For exact-length
+    #     the DP picks one concrete shape and collapses are acceptable.
+    # Variable-inner slots with finite per-tick max (e.g. `(aa|bbb)`) are NOT
+    # pinned — the distributor uses `repetition_max_lengths` to compute outer
+    # bounds that actually enforce maxLength.
+    exact_length = adj_min == adj_max
+    pinned: set[int] = set()
+    has_unbounded_pinned = False
+    for dist_idx in range(len(quantifier_bounds)):
+        part_idx = quantified_indices[dist_idx]
+        _, (orig_min, orig_max, inner_subpattern) = parts[part_idx]
+        rep_len_max = repetition_max_lengths[dist_idx]
+        rep_len_min = repetition_lengths[dist_idx]
+        inner_variable = rep_len_min != rep_len_max
+        if inner_variable and rep_len_max == MAXREPEAT:
+            pinned.add(dist_idx)
+            has_unbounded_pinned = True
+        elif inner_variable and exact_length:
+            pinned.add(dist_idx)
+            # Bounded inner length, but exact-length DP can't use the range.
+            # Treat contribution as bounded for budget; the resulting rewrite
+            # is a superset that no longer enforces exact length.
+            has_unbounded_pinned = True
+        elif not exact_length and orig_min == 0 and 0 < orig_max < MAXREPEAT and not inner_variable:
+            pinned.add(dist_idx)
 
-    # An unchanged finite outer bound with variable-length inner content cannot
-    # enforce maxLength — each outer tick may exceed rep_len chars.
-    if adj_max is not None:
-        for dist_idx, (_, new_max) in enumerate(distribution):
-            if new_max != MAXREPEAT:
-                part_idx = quantified_indices[dist_idx]
-                _, (_, orig_max, inner_subpattern) = parts[part_idx]
-                if orig_max != MAXREPEAT and new_max == orig_max and _has_variable_length(list(inner_subpattern)):
-                    return None
+    if pinned:
+        sum_pinned_min = 0
+        sum_pinned_max = 0
+        for dist_idx in pinned:
+            min_r, max_r = quantifier_bounds[dist_idx]
+            rep_len = repetition_lengths[dist_idx]
+            sum_pinned_min += min_r * rep_len
+            sum_pinned_max += max_r * rep_len
+
+        np_adj_min = None if adj_min is None else max(0, adj_min - sum_pinned_min)
+        # Pinned slots with unbounded contribution mean we cannot enforce maxLength
+        # via the rewrite. Drop the upper budget; minLength still holds because
+        # each pinned slot's minimum contribution is finite.
+        if has_unbounded_pinned:
+            np_adj_max = None
+        else:
+            np_adj_max = None if adj_max is None else adj_max - sum_pinned_max
+        if np_adj_max is not None and np_adj_max < 0:
+            return None
+
+        np_indices = [i for i in range(len(quantifier_bounds)) if i not in pinned]
+        if not np_indices:
+            # All slots pinned — the rewrite would just re-emit the original bounds.
+            return None
+        np_bounds = [quantifier_bounds[i] for i in np_indices]
+        np_rep_lens = [repetition_lengths[i] for i in np_indices]
+        np_rep_max_lens = [repetition_max_lengths[i] for i in np_indices]
+        np_distribution = _distribute_length_constraints(
+            np_bounds, np_rep_lens, np_adj_min, np_adj_max, max_repetition_lengths=np_rep_max_lens
+        )
+        if not np_distribution:
+            return None
+
+        distribution: list[tuple[int, int]] = []
+        np_iter = iter(np_distribution)
+        for dist_idx in range(len(quantifier_bounds)):
+            if dist_idx in pinned:
+                distribution.append(quantifier_bounds[dist_idx])
+            else:
+                distribution.append(next(np_iter))
+    else:
+        full_distribution = _distribute_length_constraints(
+            quantifier_bounds,
+            repetition_lengths,
+            adj_min,
+            adj_max,
+            max_repetition_lengths=repetition_max_lengths,
+        )
+        if not full_distribution:
+            return None
+        distribution = full_distribution
+
+    for dist_idx, (new_min, new_max) in enumerate(distribution):
+        if dist_idx in pinned:
+            continue
+        part_idx = quantified_indices[dist_idx]
+        _, (orig_min, orig_max, inner_subpattern) = parts[part_idx]
+        if (new_min, new_max) == (orig_min, orig_max):
+            continue
+        # For exact-length cases the rewrite picks one concrete shape. Collapsing
+        # an optional sibling to `{0}` is fine — the chosen shape still satisfies
+        # the original pattern and the requested length.
+        if not exact_length and orig_max != 0 and new_max == 0:
+            return None
 
     # Apply distribution directly to AST nodes
     new_parts = list(parts)
@@ -813,13 +902,19 @@ def _matches_anything(value: list[_Node]) -> bool:
 
 
 def _distribute_length_constraints(
-    bounds: list[tuple[int, int]], repetition_lengths: list[int], min_length: int | None, max_length: int | None
+    bounds: list[tuple[int, int]],
+    repetition_lengths: list[int],
+    min_length: int | None,
+    max_length: int | None,
+    *,
+    max_repetition_lengths: list[int],
 ) -> list[tuple[int, int]] | None:
     """Distribute length constraints among quantified pattern parts."""
-    if min_length == max_length:
-        assert min_length is not None
+    if min_length is not None and min_length == max_length:
         return _distribute_exact_length(bounds, repetition_lengths, min_length)
-    return _distribute_length_range(bounds, repetition_lengths, min_length, max_length)
+    return _distribute_length_range(
+        bounds, repetition_lengths, min_length, max_length, max_repetition_lengths=max_repetition_lengths
+    )
 
 
 def _distribute_exact_length(
@@ -842,10 +937,19 @@ def _distribute_exact_length(
         if max_repeat == MAXREPEAT:
             max_repeat = remaining // repeat_length + 1 if repeat_length > 0 else remaining + 1
 
-        for repeat_count in range(min_repeat, max_repeat + 1):
+        # For optional slots that contribute chars, try non-zero counts first so
+        # the chosen distribution avoids unnecessary `{0}` collapses (e.g. picks
+        # `[a-z]{1}-[0-9]{1}` for `^[a-z]*-[0-9]*$` length 3 instead of leaving
+        # one slot at zero). Falls back to zero if no non-zero combination fits.
+        if min_repeat == 0 and max_repeat > 0 and repeat_length > 0:
+            counts: range | tuple[int, ...] = (*range(1, max_repeat + 1), 0)
+        else:
+            counts = range(min_repeat, max_repeat + 1)
+
+        for repeat_count in counts:
             used_length = repeat_count * repeat_length
             if used_length > remaining:
-                break
+                continue
 
             rest = find_valid_combination(pos + 1, remaining - used_length)
             if rest is not None:
@@ -862,25 +966,65 @@ def _distribute_exact_length(
 
 
 def _distribute_length_range(
-    bounds: list[tuple[int, int]], repetition_lengths: list[int], min_length: int | None, max_length: int | None
+    bounds: list[tuple[int, int]],
+    repetition_lengths: list[int],
+    min_length: int | None,
+    max_length: int | None,
+    *,
+    max_repetition_lengths: list[int],
 ) -> list[tuple[int, int]] | None:
-    """Greedy single-pass distribution of min/max length budget across quantifiers."""
+    """Distribute min/max length budget across quantifiers.
+
+    When `max_repetition_lengths` differs from `repetition_lengths` (variable inner
+    with finite per-tick max), the upper-budget calculation uses the per-tick max
+    so the resulting outer count actually bounds the slot's contribution.
+
+    A first pass is greedy: each slot consumes as much of the budget as it can.
+    If that collapses an optional sibling to `{0}` (the leading slot ate everything),
+    a balanced second pass splits the max budget across slots so each gets headroom.
+    """
+    greedy = _greedy_distribute_range(bounds, repetition_lengths, max_repetition_lengths, min_length, max_length)
+    # Greedy may either succeed with a starved sibling (`{0}`) or fail outright
+    # because it gave the leading slot too much. Both are signals that the budget
+    # is contested across siblings — fall back to a balanced split.
+    needs_balance = greedy is None or any(
+        new_max == 0 and bounds[idx][1] > 0 for idx, (_, new_max) in enumerate(greedy)
+    )
+    if needs_balance:
+        balanced = _balanced_distribute_range(
+            bounds, repetition_lengths, max_repetition_lengths, min_length, max_length
+        )
+        if balanced is not None:
+            return balanced
+    return greedy
+
+
+def _greedy_distribute_range(
+    bounds: list[tuple[int, int]],
+    repetition_lengths: list[int],
+    max_repetition_lengths: list[int],
+    min_length: int | None,
+    max_length: int | None,
+) -> list[tuple[int, int]] | None:
+    """Single-pass greedy: each slot maxes out before moving on."""
     result = []
     remaining_min = min_length or 0
     remaining_max = MAXREPEAT if max_length is None else max_length
 
-    for (min_repeat, max_repeat), rep_len in zip(bounds, repetition_lengths, strict=True):
-        if rep_len == 0:
+    for (min_repeat, max_repeat), rep_len_min, rep_len_max in zip(
+        bounds, repetition_lengths, max_repetition_lengths, strict=True
+    ):
+        if rep_len_min == 0 and rep_len_max == 0:
             result.append((0, 0))
             continue
 
-        if remaining_min > 0:
-            part_min = min(max_repeat, max(min_repeat, -(-remaining_min // rep_len)))
+        if remaining_min > 0 and rep_len_min > 0:
+            part_min = min(max_repeat, max(min_repeat, -(-remaining_min // rep_len_min)))
         else:
             part_min = min_repeat
 
-        if remaining_max < MAXREPEAT:
-            part_max = min(max_repeat, remaining_max // rep_len) if rep_len > 0 else max_repeat
+        if remaining_max < MAXREPEAT and rep_len_max != MAXREPEAT and rep_len_max > 0:
+            part_max = min(max_repeat, remaining_max // rep_len_max)
         else:
             part_max = max_repeat
 
@@ -889,10 +1033,79 @@ def _distribute_length_range(
 
         result.append((part_min, part_max))
 
-        remaining_min = max(0, remaining_min - part_min * rep_len)
-        remaining_max -= part_max * rep_len if part_max != MAXREPEAT else 0
+        remaining_min = max(0, remaining_min - part_min * rep_len_min)
+        if part_max != MAXREPEAT and rep_len_max != MAXREPEAT:
+            remaining_max -= part_max * rep_len_max
 
     if remaining_min > 0 or remaining_max < 0:
+        return None
+
+    return result
+
+
+def _balanced_distribute_range(
+    bounds: list[tuple[int, int]],
+    repetition_lengths: list[int],
+    max_repetition_lengths: list[int],
+    min_length: int | None,
+    max_length: int | None,
+) -> list[tuple[int, int]] | None:
+    """Split both min and max budgets across slots so every sibling gets headroom.
+
+    The max budget is divided as `max_length // n` chars per slot (leftover to the
+    last slot). The min budget is also distributed by fair share so optional siblings
+    aren't pushed into a stricter shape than necessary — keeps the rewrite from
+    rejecting valid lengths the original allowed.
+    """
+    n = len(bounds)
+    # Balanced is only invoked when greedy starved a sibling — that requires both
+    # a finite max budget and at least one slot. The caller (`_transform_anchored_multi`)
+    # already guarantees `bounds` is non-empty.
+    assert n > 0 and max_length is not None and max_length < MAXREPEAT
+    share = max_length // n
+    slot_max_chars = [share] * n
+    slot_max_chars[-1] += max_length - share * n
+
+    # Min budget is distributed only across required slots (orig_min > 0). Optional
+    # slots keep `part_min = 0` so they stay optional in the rewrite — forcing them
+    # to a non-zero count would reject strings the original schema accepts.
+    required_slots_left = sum(1 for (mn, _), rl in zip(bounds, repetition_lengths, strict=True) if mn > 0 and rl > 0)
+
+    result = []
+    remaining_min = min_length or 0
+
+    for (min_repeat, max_repeat), rep_len_min, rep_len_max, max_chars in zip(
+        bounds, repetition_lengths, max_repetition_lengths, slot_max_chars, strict=True
+    ):
+        if rep_len_min == 0 and rep_len_max == 0:
+            result.append((0, 0))
+            continue
+
+        # Slots with unbounded `rep_len_max` are pinned upstream, and `slot_max_chars`
+        # are all finite by construction (the caller only invokes balanced when
+        # `max_length` is finite).
+        part_max = min(max_repeat, max_chars // rep_len_max)
+
+        if min_repeat == 0:
+            # Optional slot — keep it optional; min budget is the required slots' job.
+            part_min = 0
+        elif remaining_min > 0 and rep_len_min > 0 and required_slots_left > 0:
+            share_chars = -(-remaining_min // required_slots_left)
+            needed_ticks = -(-share_chars // rep_len_min)
+            part_min = min(part_max, max(min_repeat, needed_ticks))
+            required_slots_left -= 1
+        else:
+            part_min = min_repeat
+            if min_repeat > 0:
+                required_slots_left -= 1
+
+        if part_min > part_max:
+            return None
+
+        result.append((part_min, part_max))
+        remaining_min = max(0, remaining_min - part_min * rep_len_min)
+
+    if remaining_min > 0:
         return None
 
     return result
@@ -915,6 +1128,35 @@ def _calculate_min_repetition_length(subpattern: list[_Node]) -> int:
             _, alternatives = value
             branch_min = min(_calculate_min_repetition_length(list(alt)) for alt in alternatives)
             total += branch_min
+    return total
+
+
+def _calculate_max_repetition_length(subpattern: list[_Node]) -> int:
+    """Calculate maximum length contribution per repetition. Returns MAXREPEAT if unbounded."""
+    total = 0
+    for op, value in subpattern:
+        if op in [LITERAL, NOT_LITERAL, IN, sre.ANY]:
+            total += 1
+        elif op == sre.SUBPATTERN:
+            _, _, _, inner_pattern = value
+            inner_max = _calculate_max_repetition_length(list(inner_pattern))
+            if inner_max == MAXREPEAT:
+                return MAXREPEAT
+            total += inner_max
+        elif op in REPEATS:
+            _, max_repeat, inner_pattern = value
+            if max_repeat == MAXREPEAT:
+                return MAXREPEAT
+            inner_max = _calculate_max_repetition_length(list(inner_pattern))
+            if inner_max == MAXREPEAT:
+                return MAXREPEAT
+            total += max_repeat * inner_max
+        elif op == sre.BRANCH:
+            _, alternatives = value
+            alt_maxes = [_calculate_max_repetition_length(list(alt)) for alt in alternatives]
+            if MAXREPEAT in alt_maxes:
+                return MAXREPEAT
+            total += max(alt_maxes)
     return total
 
 
