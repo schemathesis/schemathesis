@@ -153,6 +153,17 @@ def test_set_applies_token(auth_operation, applier, token, expected_header, expe
     assert case.headers[expected_header] == expected_value
 
 
+def test_api_key_auth_unknown_location_is_noop(auth_operation):
+    case = auth_operation.Case()
+    provider = ApiKeyAuthProvider(value="", name="X-API-Key", location="unknown")
+
+    provider.set(case, "secret", None)
+
+    assert "X-API-Key" not in case.headers
+    assert "X-API-Key" not in case.query
+    assert "X-API-Key" not in case.cookies
+
+
 @pytest.mark.parametrize(
     "kwargs,match",
     [

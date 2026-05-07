@@ -2612,7 +2612,6 @@ def test_stateful_crash(subprocess_runner, cli, snapshot_cli):
     app = """
 import os
 from flask import Flask, jsonify, request
-import ctypes
 
 app = Flask(__name__)
 
@@ -2700,7 +2699,7 @@ def create_user():
 @app.route("/users/<int:user_id>", methods=["GET"])
 def get_user(user_id):
     # Crash during stateful testing when following the link
-    ctypes.string_at(0)  # Segfault
+    os._exit(1)
 
 if __name__ == "__main__":
     port = int(os.environ["PORT"])

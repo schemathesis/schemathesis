@@ -44,6 +44,24 @@ settings.register_profile("CI", max_examples=2000)
 output.SCHEMATHESIS_VERSION = "dev"
 
 
+def _get_current_coverage() -> Any | None:
+    try:
+        from coverage import Coverage
+    except Exception:
+        return None
+    try:
+        return Coverage.current()
+    except Exception:
+        return None
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    coverage = _get_current_coverage()
+    if coverage is not None:
+        # Some xdist workers don't reliably persist coverage data during interpreter shutdown.
+        coverage.save()
+
+
 @pytest.fixture(scope="session")
 def hypothesis_max_examples():
     # Returns max_examples when overridden via `--hypothesis-profile`, else None so each test can pick its own.

@@ -78,6 +78,9 @@ jobs:
         uses: codecov/codecov-action@v6.0.0
         with:
           files: coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+          verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # On windows redirecting output to a file could lead to an error due to the default IO encoding being CP-1252
