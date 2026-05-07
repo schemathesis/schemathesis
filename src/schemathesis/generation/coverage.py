@@ -893,6 +893,7 @@ def cover_schema_iter(
                     if (
                         unmerged_validator is not None
                         and generated.generation_mode == GenerationMode.NEGATIVE
+                        and not contains_binary(generated.value)
                         and unmerged_validator.is_valid(generated.value)
                     ):
                         continue
