@@ -11,6 +11,9 @@ Schemathesis dev
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
+Counter initialized!
+first
+second
 
  ✅  API capabilities:
 

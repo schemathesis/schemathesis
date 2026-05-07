@@ -119,6 +119,9 @@ def make_console(**kwargs: Any) -> Console:
 
     if "PYTEST_VERSION" in os.environ:
         kwargs.setdefault("width", 240)
+        # Snapshots assume non-terminal rendering; force it even when CI sets FORCE_COLOR=1.
+        kwargs.setdefault("force_terminal", False)
+        kwargs.setdefault("color_system", None)
     return Console(**kwargs)
 
 

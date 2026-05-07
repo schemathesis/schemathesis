@@ -352,7 +352,9 @@ def test_fuzz_custom_handler_error(cli, app_runner, ctx, snapshot_cli):
 def test_fuzz_custom_handler(cli, app_runner, ctx, snapshot_cli):
     class SummaryHandler(EventHandler):
         def handle_event(self, run_ctx, event):
-            if isinstance(event, EngineFinished):
+            if isinstance(event, schemathesis.cli.LoadingFinished):
+                run_ctx.add_initialization_line("custom: fuzzing initialized")
+            elif isinstance(event, EngineFinished):
                 run_ctx.add_summary_line("custom: fuzzing done")
 
     schemathesis.cli.handler()(SummaryHandler)
