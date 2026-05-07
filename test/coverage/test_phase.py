@@ -3001,6 +3001,45 @@ def test_additional_properties_with_schema_negative(ctx):
     )
 
 
+def test_negative_type_drops_false_negatives_against_loose_ref_target(ctx):
+    # Property's schema is `$ref` + sibling `type: object`. Draft 4 ignores siblings of `$ref`,
+    # so the validator only enforces the bare ref target — which has no `type`. Type-mutations
+    # against the silenced sibling pass the target vacuously and must not be emitted.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "required": ["thing"],
+                                "properties": {"thing": {"$ref": "#/definitions/Loose", "type": "object"}},
+                            },
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+        definitions={"Loose": {"properties": {"x": {"type": "string"}}, "required": ["x"]}},
+    )
+    operation = schema["/foo"]["POST"]
+    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+
+    false_negatives = [
+        case.body
+        for case in _iter_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY and validator.is_valid(case.body)
+    ]
+    assert false_negatives == []
+
+
 def test_additional_properties_anyof_positive(ctx):
     loaded = load_schema(
         ctx,
