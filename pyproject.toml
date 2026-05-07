@@ -131,7 +131,15 @@ branch = true
 source_pkgs = ["schemathesis"]
 
 [tool.coverage.paths]
-source = ["src", ".tox/*/site-packages"]
+source = [
+  "src",
+  ".tox/*/site-packages",
+  ".tox/*/Lib/site-packages",
+  ".tox/*/lib/*/site-packages",
+  "*/.tox/*/site-packages",
+  "*/.tox/*/Lib/site-packages",
+  "*/.tox/*/lib/*/site-packages",
+]
 
 [tool.coverage.report]
 show_missing = true

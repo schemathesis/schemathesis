@@ -20,6 +20,9 @@ if TYPE_CHECKING:
     from flask import Flask
 
 
+COVERAGE_ENV_VARS = ("COVERAGE_PROCESS_START", "COVERAGE_FILE")
+
+
 def unused_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
@@ -69,7 +72,7 @@ class SubprocessRunner:
         filepath = self.tmp_path / filename
         filepath.write_text(content)
 
-        process_env = os.environ.copy()
+        process_env = {key: value for key, value in os.environ.items() if key not in COVERAGE_ENV_VARS}
         process_env["PORT"] = str(port)
         if env:
             process_env.update(env)
