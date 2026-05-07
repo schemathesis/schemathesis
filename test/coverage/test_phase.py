@@ -3040,6 +3040,52 @@ def test_negative_type_drops_false_negatives_against_loose_ref_target(ctx):
     assert false_negatives == []
 
 
+def test_negative_required_drops_false_negatives_at_body_root_with_ref_sibling(ctx):
+    # Body root is `$ref` + sibling `required: [...]`. Draft 4 ignores siblings of `$ref`,
+    # so the validator only enforces the bare ref target — which has no matching `required`.
+    # Removing the listed required field passes the target vacuously and must not be emitted.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {"$ref": "#/definitions/Wrapper", "required": ["location"]},
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+        # Second definition forces bundling — single-def schemas get inlined and lose
+        # the `$ref` + sibling shape that triggers the bug.
+        definitions={
+            "Wrapper": {
+                "type": "object",
+                "properties": {
+                    "location": {"type": "string"},
+                    "sku": {"$ref": "#/definitions/Sku"},
+                },
+            },
+            "Sku": {"type": "object", "properties": {"name": {"type": "string"}}},
+        },
+    )
+    operation = schema["/foo"]["POST"]
+    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+
+    false_negatives = [
+        case.body
+        for case in _iter_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY and validator.is_valid(case.body)
+    ]
+    assert false_negatives == []
+
+
 def test_additional_properties_anyof_positive(ctx):
     loaded = load_schema(
         ctx,
