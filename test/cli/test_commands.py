@@ -1683,7 +1683,7 @@ def test_wait_for_schema(cli, app_runner, schema_path, make_app):
         return original_run(*args, **kwargs)
 
     app.run = run_with_delay
-    schema_url = app_runner.openapi_url(app, path=f"/{schema_path}")
+    schema_url = app_runner.openapi_url(app, path=f"/{schema_path}", wait=False)
     cli.run_and_assert(schema_url, "--wait-for-schema=1", "--max-examples=1", "--mode=positive")
 
 
@@ -1697,7 +1697,7 @@ def test_wait_for_schema_not_enough(cli, app_runner, snapshot_cli):
         return original_run(*args, **kwargs)
 
     app.run = run_with_delay
-    assert cli.run(app_runner.openapi_url(app), "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
+    assert cli.run(app_runner.openapi_url(app, wait=False), "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
 
 
 def test_wait_for_schema_retries_503(cli, app_runner, ctx):
