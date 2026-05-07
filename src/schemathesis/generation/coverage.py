@@ -878,8 +878,25 @@ def cover_schema_iter(
                         merged["required"] = list(dict.fromkeys(merged["required"] + v))
                     else:
                         merged[k] = v
-                schema = merged
-                yield from cover_schema_iter(ctx, schema, seen)
+                # Draft 4 silently drops `$ref` siblings; the merged form is what generation
+                # walks but the body validator only honors the bare ref target. Build a view
+                # validator from the un-merged schema and skip negative values it accepts.
+                unmerged_validator: jsonschema_rs.Validator | None = None
+                if any(k != "$ref" and k in ALL_KEYWORDS for k in schema):
+                    bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
+                    check_schema = schema if bundle is None else {**schema, BUNDLE_STORAGE_KEY: bundle}
+                    try:
+                        unmerged_validator = ctx.validator_cls(check_schema, pattern_options=FANCY_REGEX_OPTIONS)
+                    except Exception:
+                        pass
+                for generated in cover_schema_iter(ctx, merged, seen):
+                    if (
+                        unmerged_validator is not None
+                        and generated.generation_mode == GenerationMode.NEGATIVE
+                        and unmerged_validator.is_valid(generated.value)
+                    ):
+                        continue
+                    yield generated
             else:
                 yield from cover_schema_iter(ctx, resolved, seen)
             return
