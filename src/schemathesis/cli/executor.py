@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 class ExecutionContext(Protocol):
     exit_code: int
 
-    def on_event(self, event: EngineEvent) -> None: ...
+    def on_event(self, event: EngineEvent) -> None: ...  # pragma: no cover
 
 
 try:

@@ -13,6 +13,7 @@ from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 
 import schemathesis
 from schemathesis.config import GenerationConfig
+from schemathesis.core.jsonschema import _is_valid_uuid
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
@@ -656,14 +657,6 @@ def test_bundled_references(ctx, cli, snapshot_cli):
     )
 
 
-def is_valid_uuid(value: str) -> bool:
-    try:
-        uuid.UUID(value)
-        return True
-    except ValueError:
-        return False
-
-
 @pytest.mark.hypothesis_nested
 def test_negative_format_generates_invalid_values(ctx):
     # When a path parameter has `format: uuid`
@@ -687,7 +680,7 @@ def test_negative_format_generates_invalid_values(ctx):
         nonlocal invalid_uuid_found
         id_value = case.path_parameters["id"]
         # Negative mode should generate values that DON'T match UUID format
-        if not is_valid_uuid(id_value):
+        if not _is_valid_uuid(id_value):
             invalid_uuid_found = True
 
     test()

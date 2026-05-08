@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import uuid
 
 import pytest
 
 import schemathesis
+from schemathesis.core.jsonschema import _is_valid_uuid
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.generation.meta import FuzzingPhaseData
 
@@ -86,14 +86,6 @@ def test_operator_swarm_yields_homogeneous_and_heterogeneous_cases(ctx):
 
     assert any(len(s) == 1 for s in operator_sets), "expected at least one homogeneous case"
     assert any(len(s) > 1 for s in operator_sets), "expected at least one heterogeneous case"
-
-
-def _is_valid_uuid(value: str) -> bool:
-    try:
-        uuid.UUID(value)
-        return True
-    except ValueError:
-        return False
 
 
 def test_value_channel_produces_format_uuid_near_miss(ctx):
