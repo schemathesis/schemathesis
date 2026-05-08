@@ -87,8 +87,6 @@ class BaseSchema(Mapping):
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
-        # Path-level dedup of undeclared-method coverage probes; cleared per coverage phase.
-        self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
         # Runtime auth-inference overlays keyed by operation label. Populated when the server enforces
         # auth on an operation the spec declares public; subsequent generations consult it instead of
         # mutating the parsed spec. Empty for schemas whose adapter doesn't run inference.
@@ -455,6 +453,20 @@ class BaseSchema(Mapping):
     def get_coverage_capabilities(self) -> CoverageCapabilities:
         """Return spec-specific data the coverage phase asks of a schema."""
         return CoverageCapabilities(format_strategies={}, update_pattern=None, validator_cls=None)
+
+    def reset_coverage_state(self) -> None:
+        """Reset spec-specific runtime state held across coverage runs; default is a no-op."""
+
+    def iter_coverage_cases(
+        self,
+        operation: APIOperation,
+        *,
+        generation_modes: list[GenerationMode],
+        generation_config: GenerationConfig,
+        extra_data_source: ExtraDataSource | None = None,
+        error_feedback: ErrorFeedbackStore | None = None,
+    ) -> Iterator[Case]:
+        raise NotImplementedError
 
     def revalidate_case_metadata(self, case: Case) -> None:
         """Refresh case metadata after a container was modified; default just clears the dirty markers."""

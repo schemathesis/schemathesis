@@ -30,15 +30,12 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
+from schemathesis.engine.run.unit._direct_executor import run_driver
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
-from schemathesis.engine.run.unit._progressive_executor import (
-    build_coverage_generator,
-    build_examples_generator,
-    run_progressive,
-)
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import overrides
+from schemathesis.generation.drivers import CoverageGenerator, ExamplesGenerator
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
@@ -48,6 +45,30 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 WORKER_TIMEOUT = 0.1
+
+
+def _build_coverage_generator(
+    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any]
+) -> CoverageGenerator:
+    generation = ctx.config.generation_for(operation=operation)
+    return CoverageGenerator(
+        operation=operation,
+        generation_modes=generation.modes,
+        generation_config=generation,
+        auth_storage=as_strategy_kwargs.get("auth_storage"),
+        as_strategy_kwargs=as_strategy_kwargs,
+    )
+
+
+def _build_examples_generator(
+    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any]
+) -> ExamplesGenerator:
+    phases_config = ctx.config.phases_for(operation=operation)
+    return ExamplesGenerator(
+        operation=operation,
+        as_strategy_kwargs=as_strategy_kwargs,
+        fill_missing=phases_config.examples.fill_missing,
+    )
 
 
 def _create_scheduler(engine: EngineContext, phase: Phase) -> DefaultScheduler | LayeredScheduler:
@@ -66,7 +87,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         mode = HypothesisTestMode.EXAMPLES
     elif phase.name == PhaseName.COVERAGE:
         mode = HypothesisTestMode.COVERAGE
-        engine.schema.coverage_unexpected_methods_seen.clear()
+        engine.schema.reset_coverage_state()
     else:
         mode = HypothesisTestMode.FUZZING
 
@@ -156,7 +177,7 @@ def worker_task(
     from hypothesis.errors import HypothesisWarning
 
     from schemathesis.engine.run.unit._case import run_one_case
-    from schemathesis.engine.run.unit._executor import run_test
+    from schemathesis.engine.run.unit._hypothesis_executor import run_test
     from schemathesis.generation.hypothesis.builder import create_test
 
     def on_error(error: Exception, *, method: str | None = None, path: str | None = None) -> None:
@@ -232,9 +253,9 @@ def worker_task(
                     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
 
                     if phase == PhaseName.COVERAGE:
-                        generator = build_coverage_generator(operation, ctx, as_strategy_kwargs)
+                        generator = _build_coverage_generator(operation, ctx, as_strategy_kwargs)
                         events_queue.put(scenario_started)
-                        for event in run_progressive(
+                        for event in run_driver(
                             generator=generator,
                             ctx=ctx,
                             phase=phase,
@@ -243,9 +264,9 @@ def worker_task(
                         ):
                             events_queue.put(event)
                     elif phase == PhaseName.EXAMPLES:
-                        examples_generator = build_examples_generator(operation, ctx, as_strategy_kwargs)
+                        examples_generator = _build_examples_generator(operation, ctx, as_strategy_kwargs)
                         events_queue.put(scenario_started)
-                        for event in run_progressive(
+                        for event in run_driver(
                             generator=examples_generator,
                             ctx=ctx,
                             phase=phase,
@@ -264,7 +285,6 @@ def worker_task(
                                     seed=ctx.config.seed,
                                     project=ctx.config,
                                     as_strategy_kwargs=as_strategy_kwargs,
-                                    unexpected_methods_seen=None,
                                 ),
                             )
                         except (InvalidSchema, InvalidArgument, AuthenticationError, ValidationError) as exc:

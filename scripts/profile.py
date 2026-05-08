@@ -413,7 +413,6 @@ def coverage(
         method = operation.method.upper()
         path = operation.path
         config = operation.schema.config
-        phases_cfg = config.phases_for(operation=operation)
 
         for gen_mode in modes:
             profiler = _get_profiler()
@@ -425,8 +424,6 @@ def coverage(
                         generation_modes=[gen_mode],
                         auth_storage=None,
                         as_strategy_kwargs={},
-                        generate_duplicate_query_parameters=phases_cfg.coverage.generate_duplicate_query_parameters,
-                        unexpected_methods=phases_cfg.coverage.unexpected_methods,
                         generation_config=config.generation,
                     )
                 )

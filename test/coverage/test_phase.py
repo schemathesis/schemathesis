@@ -24,13 +24,13 @@ from schemathesis.core.failures import AcceptedNegativeData
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.drivers import CoverageGenerator
 from schemathesis.generation.hypothesis.builder import (
     HypothesisTestConfig,
     HypothesisTestMode,
     create_test,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
-from schemathesis.generation.progressive import CoverageGenerator
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._schema import CoverageContext, _negative_format
@@ -203,7 +203,9 @@ ALL_MODES = list(GenerationMode)
 
 
 def run_test(operation, test, modes=ALL_MODES, generate_duplicate_query_parameters=None, unexpected_methods=None):
-    config = ProjectConfig()
+    # Mutate the operation's schema config directly: `iter_coverage_cases` reads phase
+    # settings off `self.config`, so a separate `ProjectConfig` would never reach it.
+    config = operation.schema.config
     config.generation.update(modes=modes)
     if generate_duplicate_query_parameters is not None:
         config.phases.coverage.generate_duplicate_query_parameters = generate_duplicate_query_parameters
@@ -297,13 +299,16 @@ def _iter_cases(operation, generation_mode, *, generation_config=None):
 
 
 def _generate_cases(operation, generation_mode, *, project_config=None, generation_config=None):
+    coverage_config = operation.schema.config.phases.coverage
     if project_config is not None:
-        generate_duplicate_query_parameters = project_config.phases.coverage.generate_duplicate_query_parameters
-        unexpected_methods = project_config.phases.coverage.unexpected_methods
+        coverage_config.generate_duplicate_query_parameters = (
+            project_config.phases.coverage.generate_duplicate_query_parameters
+        )
+        coverage_config.unexpected_methods = project_config.phases.coverage.unexpected_methods
         generation_config = generation_config or project_config.generation
     else:
-        generate_duplicate_query_parameters = False
-        unexpected_methods = set()
+        coverage_config.generate_duplicate_query_parameters = False
+        coverage_config.unexpected_methods = set()
         generation_config = generation_config or operation.schema.config.generation
     return list(
         CoverageGenerator(
@@ -311,8 +316,6 @@ def _generate_cases(operation, generation_mode, *, project_config=None, generati
             generation_modes=[generation_mode],
             auth_storage=None,
             as_strategy_kwargs={},
-            generate_duplicate_query_parameters=generate_duplicate_query_parameters,
-            unexpected_methods=unexpected_methods,
             generation_config=generation_config,
         )
     )

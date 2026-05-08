@@ -32,7 +32,7 @@ from schemathesis.generation.hypothesis.builder import (
 from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error
 
 if TYPE_CHECKING:
-    from schemathesis.generation.progressive import Controller
+    from schemathesis.generation.drivers import Controller
     from schemathesis.schemas import APIOperation
 
 

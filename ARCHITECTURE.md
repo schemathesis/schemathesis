@@ -39,7 +39,10 @@ data types. Depends only on stdlib and third-party packages.
 by every spec.
 
 `specs/openapi/` and `specs/graphql/` are the concrete schema implementations:
-parsing, spec-flavored generation, spec-specific checks.
+parsing, spec-flavored generation, spec-specific checks. Phase-level case
+enumeration that walks spec-specific constructs (e.g., the coverage phase's
+JSON Schema constraint walker) also lives here; the engine reaches it through
+methods on the abstract schema interface, never by importing `specs/` directly.
 
 `generation/` and `hooks.py` produce cases and dispatch hooks.
 

@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
@@ -195,6 +196,19 @@ class GraphQLSchema(BaseSchema):
         if isinstance(body, NotSet | bytes):
             return body
         return {"query": body}
+
+    @override
+    def iter_coverage_cases(
+        self,
+        operation: APIOperation,
+        *,
+        generation_modes: list[GenerationMode],
+        generation_config: GenerationConfig,
+        extra_data_source: ExtraDataSource | None = None,
+        error_feedback: ErrorFeedbackStore | None = None,
+    ) -> Iterator[Case]:
+        # GraphQL has no coverage phase yet; the schema-level case enumerator is empty.
+        return iter(())
 
     @override
     def get_unit_scheduler(

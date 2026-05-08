@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Callable, Generator, Iterator
 
     import jsonschema_rs
     from hypothesis.strategies import SearchStrategy
@@ -100,6 +100,18 @@ class ApiSchema(Protocol):
     ) -> bool | None: ...  # pragma: no cover
 
     def get_coverage_capabilities(self) -> CoverageCapabilities: ...  # pragma: no cover
+
+    def reset_coverage_state(self) -> None: ...  # pragma: no cover
+
+    def iter_coverage_cases(
+        self,
+        operation: APIOperation,
+        *,
+        generation_modes: list[GenerationMode],
+        generation_config: GenerationConfig,
+        extra_data_source: ExtraDataSource | None = ...,
+        error_feedback: ErrorFeedbackStore | None = ...,
+    ) -> Iterator[Case]: ...  # pragma: no cover
 
     def get_custom_format_strategies(
         self, generation_config: GenerationConfig, mode: GenerationMode
