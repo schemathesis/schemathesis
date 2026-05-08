@@ -3419,6 +3419,58 @@ def test_min_properties_one_with_additional_properties(ctx):
     )
 
 
+def test_ref_with_type_sibling_dropped_in_openapi_3_0(ctx):
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "components": {
+                "schemas": {
+                    "Inner": {
+                        "type": "object",
+                        "properties": {"foo": {"type": "string"}},
+                        "required": ["foo"],
+                    },
+                }
+            },
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "Field": {
+                                                "$ref": "#/components/schemas/Inner",
+                                                "type": "string",
+                                            },
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    cases: list = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    field_strings = [c.body for c in cases if isinstance(c.body, dict) and isinstance(c.body.get("Field"), str)]
+    assert not field_strings, f"Field generated as string despite $ref to object. Got: {field_strings}"
+
+
 def test_additional_property_respects_max_properties(ctx):
     cases = collect_coverage_cases(
         ctx,

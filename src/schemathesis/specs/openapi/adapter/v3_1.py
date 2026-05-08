@@ -45,18 +45,18 @@ ref_siblings = True
 extract_parameter_schema: ExtractParameterSchema = parameters.extract_parameter_schema_v3
 extract_raw_response_schema: ExtractRawResponseSchema = responses.extract_raw_response_schema_v3
 extract_response_schema: ExtractResponseSchema = partial(
-    responses.extract_response_schema_v3, upgrade_legacy_exclusive_bounds=True
+    responses.extract_response_schema_v3, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
 )
 prepare_response_media_type_schema: PrepareResponseMediaTypeSchema = partial(
-    responses.prepare_response_media_type_schema, upgrade_legacy_exclusive_bounds=True
+    responses.prepare_response_media_type_schema, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
 )
 get_default_response_media_type: GetDefaultResponseMediaType = responses.get_default_response_media_type_v3
 resolve_response_media_type: ResolveResponseMediaType = responses.resolve_response_media_type_v3
 extract_schema_for_media_type: ExtractSchemaForMediaType = partial(
-    responses.extract_schema_for_media_type_v3, upgrade_legacy_exclusive_bounds=True
+    responses.extract_schema_for_media_type_v3, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
 )
 extract_header_schema: ExtractHeaderSchema = partial(
-    responses.extract_header_schema_v3, upgrade_legacy_exclusive_bounds=True
+    responses.extract_header_schema_v3, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
 )
 iter_parameters: IterParameters = parameters.iter_parameters_v3
 build_path_parameter: BuildPathParameter = parameters.build_path_parameter_v3_1
