@@ -287,7 +287,7 @@ def extract_response_schema_v2(
     """Extract and prepare response schema for Swagger 2.0."""
     schema = extract_raw_response_schema_v2(response)
     if schema is not None:
-        return _prepare_schema(schema, resolver, scope, nullable_keyword)
+        return _prepare_schema(schema, resolver, scope, nullable_keyword, merge_ref_siblings=False)
     return None
 
 
@@ -303,6 +303,7 @@ def extract_response_schema_v3(
     nullable_keyword: str,
     *,
     upgrade_legacy_exclusive_bounds: bool = False,
+    merge_ref_siblings: bool = False,
 ) -> Bundle | None:
     schema = extract_raw_response_schema_v3(response)
     if schema is not None:
@@ -312,6 +313,7 @@ def extract_response_schema_v3(
             scope,
             nullable_keyword,
             upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+            merge_ref_siblings=merge_ref_siblings,
         )
     return None
 
@@ -335,6 +337,7 @@ def _prepare_schema(
     nullable_keyword: str,
     *,
     upgrade_legacy_exclusive_bounds: bool = False,
+    merge_ref_siblings: bool = False,
 ) -> Bundle:
     try:
         bundled = bundle_for_validation(schema, resolver)
@@ -348,6 +351,7 @@ def _prepare_schema(
         update_quantifiers=False,
         clone=False,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        merge_ref_siblings=merge_ref_siblings,
     )
     return Bundle(schema=converted, name_to_uri=bundled.name_to_uri)
 
@@ -359,6 +363,7 @@ def prepare_response_media_type_schema(
     nullable_keyword: str,
     *,
     upgrade_legacy_exclusive_bounds: bool = False,
+    merge_ref_siblings: bool = False,
 ) -> Bundle:
     """Prepare schema for a specific media type entry."""
     return _prepare_schema(
@@ -367,6 +372,7 @@ def prepare_response_media_type_schema(
         scope,
         nullable_keyword,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        merge_ref_siblings=merge_ref_siblings,
     )
 
 
@@ -449,6 +455,7 @@ def extract_schema_for_media_type_v3(
     nullable_keyword: str,
     *,
     upgrade_legacy_exclusive_bounds: bool = False,
+    merge_ref_siblings: bool = False,
 ) -> Bundle | None:
     """Extract schema for specific media type from OpenAPI 3.x response."""
     content = response.get("content")
@@ -460,6 +467,7 @@ def extract_schema_for_media_type_v3(
             scope,
             nullable_keyword,
             upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+            merge_ref_siblings=merge_ref_siblings,
         )
 
     media_type_object = content.get(media_type)
@@ -480,6 +488,7 @@ def extract_schema_for_media_type_v3(
         scope,
         nullable_keyword,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        merge_ref_siblings=merge_ref_siblings,
     )
 
 
@@ -576,7 +585,7 @@ def _iter_resolved_headers(
 def extract_header_schema_v2(
     header: Mapping[str, Any], resolver: Resolver, scope: str, nullable_keyword: str
 ) -> Bundle:
-    return _prepare_schema(cast(dict, header), resolver, scope, nullable_keyword)
+    return _prepare_schema(cast(dict, header), resolver, scope, nullable_keyword, merge_ref_siblings=False)
 
 
 def extract_header_schema_v3(
@@ -586,6 +595,7 @@ def extract_header_schema_v3(
     nullable_keyword: str,
     *,
     upgrade_legacy_exclusive_bounds: bool = False,
+    merge_ref_siblings: bool = False,
 ) -> Bundle:
     schema = header.get("schema", {})
     return _prepare_schema(
@@ -594,6 +604,7 @@ def extract_header_schema_v3(
         scope,
         nullable_keyword,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        merge_ref_siblings=merge_ref_siblings,
     )
 
 

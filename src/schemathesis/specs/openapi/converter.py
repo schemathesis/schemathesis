@@ -24,6 +24,7 @@ def to_json_schema(
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
+    merge_ref_siblings: bool = True,
 ) -> dict[str, Any]: ...  # pragma: no cover
 
 
@@ -37,6 +38,7 @@ def to_json_schema(
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
+    merge_ref_siblings: bool = True,
 ) -> bool: ...  # pragma: no cover
 
 
@@ -49,6 +51,7 @@ def to_json_schema(
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
+    merge_ref_siblings: bool = True,
 ) -> dict[str, Any] | bool:
     if isinstance(schema, bool):
         return schema
@@ -62,6 +65,7 @@ def to_json_schema(
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
         convert_prefix_items=convert_prefix_items,
         name_to_uri=name_to_uri,
+        merge_ref_siblings=merge_ref_siblings,
     )
 
 
@@ -74,9 +78,21 @@ def _to_json_schema(
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
+    merge_ref_siblings: bool = True,
 ) -> JsonSchema:
     if not isinstance(schema, dict):
         return schema if isinstance(schema, bool) else {}
+
+    # OpenAPI 3.0 / Swagger 2.0: keys alongside `$ref` are ignored. Drop them so generation and
+    # validation observe the same shape; otherwise a sibling like `type: string` next to a `$ref`
+    # to an object schema produces strings the validator rejects.
+    if not merge_ref_siblings and "$ref" in schema:
+        nullable = schema.get(nullable_keyword)
+        for key in list(schema):
+            if key != "$ref" and key != BUNDLE_STORAGE_KEY:
+                del schema[key]
+        if nullable:
+            schema[nullable_keyword] = nullable
 
     if upgrade_legacy_exclusive_bounds:
         _upgrade_legacy_exclusive_bounds(schema)
@@ -161,6 +177,7 @@ def _to_json_schema(
                 upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                 convert_prefix_items=convert_prefix_items,
                 name_to_uri=name_to_uri,
+                merge_ref_siblings=merge_ref_siblings,
             )
         elif keyword in IN_ITEM and isinstance(value, list):
             for idx, subschema in enumerate(value):
@@ -172,6 +189,7 @@ def _to_json_schema(
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                     convert_prefix_items=convert_prefix_items,
                     name_to_uri=name_to_uri,
+                    merge_ref_siblings=merge_ref_siblings,
                 )
         elif keyword in IN_CHILD and isinstance(value, dict):
             for name, subschema in value.items():
@@ -183,6 +201,7 @@ def _to_json_schema(
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                     convert_prefix_items=convert_prefix_items,
                     name_to_uri=name_to_uri,
+                    merge_ref_siblings=merge_ref_siblings,
                 )
 
     # A property forbidden inside an `allOf` branch (read/write-only rewrite produces `{"not": {}}`)

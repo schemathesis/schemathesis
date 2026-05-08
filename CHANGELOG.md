@@ -8,8 +8,7 @@
 
 ### :bug: Fixed
 
-#### Coverage phase
-
+- Drop sibling keys alongside `$ref` in OpenAPI 3.0 / Swagger 2.0 schemas.
 - Respect `maxProperties` in positive coverage cases for `additionalProperties` schemas.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
