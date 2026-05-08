@@ -11,7 +11,7 @@ class SchemaWarning(Protocol):
     operation_label: str | None
 
     @property
-    def kind(self) -> SchemathesisWarning: ...
+    def kind(self) -> SchemathesisWarning: ...  # pragma: no cover
 
     @property
-    def message(self) -> str: ...
+    def message(self) -> str: ...  # pragma: no cover

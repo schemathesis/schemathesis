@@ -83,6 +83,7 @@ class AuthProvider(Generic[Auth], Protocol):
             Authentication data (e.g., token, credentials) or `None`.
 
         """
+        ...  # pragma: no cover
 
     def set(self, case: Case, data: Auth, ctx: AuthContext) -> None:
         """Apply authentication data to the test case.
@@ -93,6 +94,7 @@ class AuthProvider(Generic[Auth], Protocol):
             ctx: Authentication state and configuration.
 
         """
+        ...  # pragma: no cover
 
 
 @dataclass
@@ -183,7 +185,7 @@ class KeyedCachingAuthProvider(CachingAuthProvider[Auth]):
 class FilterableRegisterAuth(Protocol):
     """Protocol that adds filters to the return value of `register`."""
 
-    def __call__(self, provider_class: type[AuthProvider]) -> type[AuthProvider]: ...
+    def __call__(self, provider_class: type[AuthProvider]) -> type[AuthProvider]: ...  # pragma: no cover
 
     def apply_to(
         self,
@@ -195,7 +197,7 @@ class FilterableRegisterAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRegisterAuth: ...
+    ) -> FilterableRegisterAuth: ...  # pragma: no cover
 
     def skip_for(
         self,
@@ -207,13 +209,13 @@ class FilterableRegisterAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRegisterAuth: ...
+    ) -> FilterableRegisterAuth: ...  # pragma: no cover
 
 
 class FilterableApplyAuth(Protocol):
     """Protocol that adds filters to the return value of `apply`."""
 
-    def __call__(self, test: Callable) -> Callable: ...
+    def __call__(self, test: Callable) -> Callable: ...  # pragma: no cover
 
     def apply_to(
         self,
@@ -225,7 +227,7 @@ class FilterableApplyAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableApplyAuth: ...
+    ) -> FilterableApplyAuth: ...  # pragma: no cover
 
     def skip_for(
         self,
@@ -237,7 +239,7 @@ class FilterableApplyAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableApplyAuth: ...
+    ) -> FilterableApplyAuth: ...  # pragma: no cover
 
 
 class FilterableRequestsAuth(Protocol):
@@ -253,7 +255,7 @@ class FilterableRequestsAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRequestsAuth: ...
+    ) -> FilterableRequestsAuth: ...  # pragma: no cover
 
     def skip_for(
         self,
@@ -265,7 +267,7 @@ class FilterableRequestsAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRequestsAuth: ...
+    ) -> FilterableRequestsAuth: ...  # pragma: no cover
 
 
 @dataclass
