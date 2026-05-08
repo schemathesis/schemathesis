@@ -7,7 +7,7 @@ from typing import Any
 from schemathesis.core.mutations import Mutation
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.resources import PoolDraw
+from schemathesis.resources import PoolDraw, SemanticDraw
 
 
 class TestPhase(str, Enum):
@@ -200,6 +200,8 @@ class CaseMetadata:
     # Resource-bound (location, parameter_name) slots the engine wanted to fill from the pool
     # but couldn't (no captured instance). Lets the analyzer compute chain rate.
     pool_misses: tuple[tuple[str, str], ...]
+    # Semantic value index substitutions applied by the overlay (one entry per leaf substituted).
+    semantic_draws: tuple[SemanticDraw, ...]
     # Typed (pre-serialization) container snapshots captured at generation time.
     # Coverage stringifies query/path values for the wire; this preserves the
     # original typed form so revalidation matches the schema's abstraction level.
@@ -219,6 +221,7 @@ class CaseMetadata:
         "phase",
         "pool_draws",
         "pool_misses",
+        "semantic_draws",
         "raw_containers",
         "_dirty",
         "_last_validated_hashes",
@@ -232,6 +235,7 @@ class CaseMetadata:
         phase: PhaseInfo,
         pool_draws: tuple[PoolDraw, ...] = (),
         pool_misses: tuple[tuple[str, str], ...] = (),
+        semantic_draws: tuple[SemanticDraw, ...] = (),
         raw_containers: dict[ParameterLocation, Any] | None = None,
     ) -> None:
         self.generation = generation
@@ -239,6 +243,7 @@ class CaseMetadata:
         self.phase = phase
         self.pool_draws = pool_draws
         self.pool_misses = pool_misses
+        self.semantic_draws = semantic_draws
         self.raw_containers = raw_containers if raw_containers is not None else {}
         # Initialize dirty tracking
         self._dirty = set()
@@ -299,6 +304,17 @@ class CaseMetadata:
                 for draw in self.pool_draws
             ],
             "pool_misses": [list(miss) for miss in self.pool_misses],
+            "semantic_draws": [
+                {
+                    "path": list(draw.path),
+                    "type_token": draw.type_token,
+                    "format_token": draw.format_token,
+                    "pattern_hash": draw.pattern_hash,
+                    "normalized_name": draw.normalized_name,
+                    "value": draw.value,
+                }
+                for draw in self.semantic_draws
+            ],
             "raw_containers": {loc.name: value for loc, value in self.raw_containers.items()},
         }
 
@@ -325,6 +341,17 @@ class CaseMetadata:
             for draw in data.get("pool_draws", [])
         )
         pool_misses = tuple((miss[0], miss[1]) for miss in data.get("pool_misses", []))
+        semantic_draws = tuple(
+            SemanticDraw(
+                path=tuple(draw["path"]),
+                type_token=draw["type_token"],
+                format_token=draw["format_token"],
+                pattern_hash=draw["pattern_hash"],
+                normalized_name=draw["normalized_name"],
+                value=draw["value"],
+            )
+            for draw in data.get("semantic_draws", [])
+        )
         phase_data_raw = data["phase"]["data"]
         param_loc_name = phase_data_raw["parameter_location"]
         param_loc = ParameterLocation[param_loc_name] if param_loc_name is not None else None
@@ -372,6 +399,7 @@ class CaseMetadata:
             phase=phase,
             pool_draws=pool_draws,
             pool_misses=pool_misses,
+            semantic_draws=semantic_draws,
             raw_containers=raw_containers,
         )
 

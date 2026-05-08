@@ -40,7 +40,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
-from schemathesis.resources import ExtraDataSource, PoolDraw
+from schemathesis.resources import ExtraDataSource, PoolDraw, SemanticDraw
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.formats import (
@@ -245,7 +245,7 @@ def openapi_cases(
                 # transforming/filtering and rewrap to keep `pool_draws` flowing.
                 strategy = strategy.map(
                     lambda x: (
-                        GeneratedValue(prepare_urlencoded_form(x.value), x.meta, x.pool_draws)
+                        GeneratedValue(prepare_urlencoded_form(x.value), x.meta, x.pool_draws, x.semantic_draws)
                         if isinstance(x, GeneratedValue)
                         else prepare_urlencoded_form(x)
                     )
@@ -253,10 +253,12 @@ def openapi_cases(
             body_result = _draw(draw, strategy, operation)
             body_metadata = None
             body_pool_draws: tuple[PoolDraw, ...] = ()
+            body_semantic_draws: tuple[SemanticDraw, ...] = ()
             # Negative strategy returns GeneratedValue, positive returns just value
             if isinstance(body_result, GeneratedValue):
                 body_metadata = body_result.meta
                 body_pool_draws = body_result.pool_draws
+                body_semantic_draws = body_result.semantic_draws
                 body_result = body_result.value
             body_ = ValueContainer(
                 value=body_result,
@@ -264,6 +266,7 @@ def openapi_cases(
                 generator=body_generator,
                 meta=body_metadata,
                 pool_draws=body_pool_draws,
+                semantic_draws=body_semantic_draws,
             )
         else:
             body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
@@ -388,6 +391,9 @@ def openapi_cases(
     pool_draws = tuple(
         draw for container in (query_, path_parameters_, headers_, cookies_, body_) for draw in container.pool_draws
     )
+    semantic_draws = tuple(
+        draw for container in (query_, path_parameters_, headers_, cookies_, body_) for draw in container.semantic_draws
+    )
     instance = operation.Case(
         media_type=media_type,
         path_parameters=path_parameters_.value or {},
@@ -414,6 +420,7 @@ def openapi_cases(
                 if value.generator is not None
             },
             pool_draws=pool_draws,
+            semantic_draws=semantic_draws,
         ),
     )
     auth_context = auths.AuthContext(
@@ -644,7 +651,7 @@ def get_parameters_value(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
-) -> tuple[dict[str, Any] | None, Any, tuple[PoolDraw, ...]]:
+) -> GeneratedValue:
     """Get the final value for the specified location.
 
     If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
@@ -664,8 +671,8 @@ def get_parameters_value(
         result = _draw(draw, strategy, operation)
         # Negative strategy returns GeneratedValue, positive returns just value
         if isinstance(result, GeneratedValue):
-            return result.value, result.meta, result.pool_draws
-        return result, None, ()
+            return result
+        return GeneratedValue(value=result, meta=None)
     strategy = get_parameters_strategy(
         operation,
         generation_mode,
@@ -678,16 +685,20 @@ def get_parameters_value(
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = _draw(draw, strategy, operation)
-    metadata = None
-    pool_draws: tuple[PoolDraw, ...] = ()
-    # Negative strategy returns GeneratedValue, positive returns just value
     if isinstance(new, GeneratedValue):
-        new, metadata, pool_draws = new.value, new.meta, new.pool_draws
+        meta = new.meta
+        pool_draws = new.pool_draws
+        semantic_draws = new.semantic_draws
+        new = new.value
+    else:
+        meta = None
+        pool_draws = ()
+        semantic_draws = ()
     if new is not None:
         copied = dict(value)
         copied.update(new)
-        return copied, metadata, pool_draws
-    return value, metadata, pool_draws
+        return GeneratedValue(value=copied, meta=meta, pool_draws=pool_draws, semantic_draws=semantic_draws)
+    return GeneratedValue(value=value, meta=meta, pool_draws=pool_draws, semantic_draws=semantic_draws)
 
 
 @dataclass(slots=True)
@@ -699,6 +710,7 @@ class ValueContainer:
     generator: GenerationMode | None
     meta: MutationMetadata | None
     pool_draws: tuple[PoolDraw, ...] = ()
+    semantic_draws: tuple[SemanticDraw, ...] = ()
 
     @property
     def is_generated(self) -> bool:
@@ -748,7 +760,7 @@ def generate_parameter(
         # If we can't negate any parameter, generate positive ones
         # If nothing else will be negated, then skip the test completely
         generator = GenerationMode.POSITIVE
-    value, metadata, pool_draws = get_parameters_value(
+    generated = get_parameters_value(
         explicit,
         location,
         draw,
@@ -761,6 +773,7 @@ def generate_parameter(
         error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
+    value = generated.value
     if value is not None and location == ParameterLocation.PATH:
         value = quote_all(value)
         if operation.schema._path_decoder_strict:
@@ -772,7 +785,12 @@ def generate_parameter(
         # If the final value is the same, then other parameters were generated at all
         used_generator = None
     return ValueContainer(
-        value=value, location=location, generator=used_generator, meta=metadata, pool_draws=pool_draws
+        value=value,
+        location=location,
+        generator=used_generator,
+        meta=generated.meta,
+        pool_draws=generated.pool_draws,
+        semantic_draws=generated.semantic_draws,
     )
 
 

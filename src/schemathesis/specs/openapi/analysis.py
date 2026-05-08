@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.extra_data_source import (
     build_parameter_requirements,
 )
 from schemathesis.specs.openapi.resources import build_descriptors
+from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
@@ -28,6 +29,19 @@ from schemathesis.specs.openapi.warnings import (
 if TYPE_CHECKING:
     from schemathesis.resources import ResourceDescriptor
     from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+
+def _collect_semantic_eligible_operations(schema: OpenApiSchema) -> frozenset[str]:
+    """Labels of operations that declare at least one successful response."""
+    eligible: set[str] = set()
+    for result in schema.get_all_operations():
+        if not isinstance(result, Ok):
+            continue
+        operation = result.ok()
+        for _ in operation.responses.iter_successful_responses():
+            eligible.add(operation.label)
+            break
+    return frozenset(eligible)
 
 
 class OpenAPIAnalysis:
@@ -96,14 +110,15 @@ class OpenAPIAnalysis:
     def extra_data_source(self) -> ExtraDataSource | None:
         """Extra data source for augmenting test generation with captured API data.
 
-        Returns None when neither response-extractable descriptors nor request-side
-        input slots exist — there is nothing to capture in either case.
+        Returns None when the spec has neither response-extractable descriptors, request-side
+        input slots, nor any operation with a declared successful response.
         """
         if self._extra_data_source is NOT_SET:
             descriptors = self.resource_descriptors
             requirements = build_parameter_requirements(self.dependency_graph)
             inputs_by_label = build_inputs_by_label(self.dependency_graph)
-            if not descriptors and not inputs_by_label:
+            semantic_eligible = _collect_semantic_eligible_operations(self.schema)
+            if not descriptors and not inputs_by_label and not semantic_eligible:
                 self._extra_data_source = None
             else:
                 repository = ResourceRepository(descriptors)
@@ -118,6 +133,8 @@ class OpenAPIAnalysis:
                     repository=repository,
                     requirements=requirements,
                     inputs_by_label=inputs_by_label,
+                    semantic_index=SemanticValueIndex() if semantic_eligible else None,
+                    semantic_eligible_operations=semantic_eligible,
                 )
         assert not isinstance(self._extra_data_source, NotSet)
         return self._extra_data_source

@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Stateful tests damp reuse of extracted values from unreliable API links.
+- Reuse response field values across operations without an inferred producer-consumer link.
 
 ### :bug: Fixed
 

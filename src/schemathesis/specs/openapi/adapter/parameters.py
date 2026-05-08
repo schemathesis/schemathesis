@@ -24,7 +24,7 @@ from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.resources import ExtraDataSource
+from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.specs.openapi.extra_data_source import CapturedVariant, VariantUsageTracker
     from schemathesis.specs.openapi.negative.mutations import MutationTargetDescriptor
+    from schemathesis.specs.openapi.semantic_pool import LeafDescriptor, SemanticValueIndex
 
 
 MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
@@ -87,6 +88,179 @@ EXAMPLE_USAGE_PROBABILITY = 0.20
 def _variant_key(variant: dict[str, Any]) -> str:
     """Create a stable string key for a variant dict."""
     return jsonschema_rs.canonical.json.to_string(variant)
+
+
+def build_semantic_overlay(
+    inner_strategy: st.SearchStrategy,
+    leaf_descriptors: list[LeafDescriptor],
+    semantic_index: SemanticValueIndex,
+    validator_cls: type[jsonschema_rs.Validator],
+    container_schema: JsonSchema | None = None,
+) -> st.SearchStrategy:
+    """Replace generated leaf values with semantic-pool draws that pass leaf and container validation.
+
+    ``container_schema`` is the consumer object schema (body or parameter set). Container-level
+    constraints (``not``, ``if`` / ``then``, ``dependentSchemas``, top-level ``oneOf``) can fail
+    after a leaf is substituted even when the leaf itself validates; the overlay re-checks the
+    full container after every substitution and reverts when the result is invalid.
+    """
+    from hypothesis import strategies as st
+
+    from schemathesis.specs.openapi.examples import _example_is_valid
+    from schemathesis.specs.openapi.negative import GeneratedValue
+    from schemathesis.specs.openapi.semantic_pool import SEMANTIC_OVERLAY_PROBABILITY
+
+    paired: list[tuple[LeafDescriptor, jsonschema_rs.Validator | None]] = []
+    for descriptor in leaf_descriptors:
+        try:
+            validator = make_validator(descriptor.schema, validator_cls)
+        except jsonschema_rs.ValidationError:
+            # Malformed leaf schema (e.g. invalid regex); fall through with no leaf gate.
+            validator = None
+        paired.append((descriptor, validator))
+
+    container_validator: jsonschema_rs.Validator | None = None
+    if container_schema is not None:
+        try:
+            container_validator = make_validator(container_schema, validator_cls)
+        except jsonschema_rs.ValidationError:
+            # Malformed container schema; substitutions skip the container-level revalidation.
+            container_validator = None
+
+    @st.composite  # type: ignore[untyped-decorator]
+    def overlaid(draw: st.DrawFn) -> JsonValue | GeneratedValue:
+        base = draw(inner_strategy)
+        # Inner may already be a GeneratedValue carrying pool_draws / meta; unwrap once and re-wrap
+        # at the end so we propagate that provenance alongside any new semantic draws.
+        if isinstance(base, GeneratedValue):
+            inner_meta = base.meta
+            inner_pool_draws = base.pool_draws
+            inner_semantic_draws = base.semantic_draws
+            body = base.value
+        else:
+            inner_meta = None
+            inner_pool_draws = ()
+            inner_semantic_draws = ()
+            body = base
+        if not isinstance(body, dict):
+            return base
+        # `st.floats` shrinks toward 0, biasing substitution well above the configured probability.
+        random = draw(st.randoms())
+        # `inner_strategy` may be `build_example_aware_strategy`, which returns a shared
+        # example dict by reference. Defer the deepclone until a substitution actually fires
+        # so non-substituting draws keep the zero-copy fast path.
+        copied = False
+        new_draws: list[SemanticDraw] | None = None
+        for descriptor, validator in paired:
+            if random.random() >= SEMANTIC_OVERLAY_PROBABILITY:
+                continue
+            candidates = semantic_index.lookup(
+                type_token=descriptor.type,
+                format_token=descriptor.format,
+                pattern_hash=descriptor.pattern_hash,
+                normalized_name=descriptor.normalized_name,
+            )
+            if not candidates:
+                continue
+            value = draw(st.sampled_from(candidates))
+            if validator is not None and not _example_is_valid(value, validator):
+                continue
+            if not copied:
+                body = deepclone(body)
+                copied = True
+            original = _get_at_path(body, descriptor.path)
+            if original is _MISSING:
+                continue
+            _set_at_path(body, descriptor.path, value)
+            if container_validator is not None and not _example_is_valid(body, container_validator):
+                _set_at_path(body, descriptor.path, original)
+                continue
+            semantic_index.record_draw(
+                type_token=descriptor.type,
+                format_token=descriptor.format,
+                pattern_hash=descriptor.pattern_hash,
+                normalized_name=descriptor.normalized_name,
+                value=value,
+            )
+            if new_draws is None:
+                new_draws = []
+            new_draws.append(
+                SemanticDraw(
+                    path=descriptor.path,
+                    type_token=descriptor.type,
+                    format_token=descriptor.format,
+                    pattern_hash=descriptor.pattern_hash,
+                    normalized_name=descriptor.normalized_name,
+                    value=value,
+                )
+            )
+        if new_draws is None and not isinstance(base, GeneratedValue):
+            return body
+        combined_semantic = inner_semantic_draws + tuple(new_draws) if new_draws else inner_semantic_draws
+        return GeneratedValue(body, inner_meta, inner_pool_draws, combined_semantic)
+
+    return overlaid()
+
+
+def _captured_variants_active(extra_data_source: ExtraDataSource | None, operation: APIOperation) -> bool:
+    """True when the captured-variant overlay would bind stale resource values for this operation.
+
+    Resource-bound variants are baked into the strategy at build time, so caching freezes them
+    against later updates. Semantic-only data sources read the live index per draw, so caching
+    them is safe.
+    """
+    if extra_data_source is None:
+        return False
+    from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
+
+    if not isinstance(extra_data_source, OpenApiExtraDataSource):
+        return True
+    return operation.label in extra_data_source.consumer_labels
+
+
+def _semantic_cache_key(extra_data_source: ExtraDataSource | None) -> int | None:
+    """Identity of the semantic index that the overlay would close over, or None when no overlay applies.
+
+    The overlay binds at build time, so a strategy cached for one source must not be reused for
+    a different one (or for a call where the overlay is absent entirely).
+    """
+    if extra_data_source is None:
+        return None
+    from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
+
+    if not isinstance(extra_data_source, OpenApiExtraDataSource):
+        return None
+    if extra_data_source.semantic_index is None:
+        return None
+    return id(extra_data_source.semantic_index)
+
+
+_MISSING: object = object()
+
+
+def _get_at_path(target: dict[str, Any], path: tuple[str, ...]) -> object:
+    """Read the value at path. Returns the ``_MISSING`` sentinel when any segment is absent."""
+    cursor: object = target
+    for segment in path:
+        if not isinstance(cursor, dict) or segment not in cursor:
+            return _MISSING
+        cursor = cursor[segment]
+    return cursor
+
+
+def _set_at_path(target: dict[str, Any], path: tuple[str, ...], value: object) -> bool:
+    """Set value at path in target. Returns False when the path is missing from target."""
+    if not path:
+        return False
+    cursor: object = target
+    for segment in path[:-1]:
+        if not isinstance(cursor, dict) or segment not in cursor:
+            return False
+        cursor = cursor[segment]
+    if not isinstance(cursor, dict) or path[-1] not in cursor:
+        return False
+    cursor[path[-1]] = value
+    return True
 
 
 def build_hybrid_strategy(
@@ -610,8 +784,8 @@ class OpenApiBody(OpenApiComponent):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._positive_strategy_cache: tuple[st.SearchStrategy, int | None] | NotSet = NOT_SET
-        self._negative_strategy_cache: tuple[st.SearchStrategy, int | None] | NotSet = NOT_SET
+        self._positive_strategy_cache: tuple[st.SearchStrategy, int | None, int | None] | NotSet = NOT_SET
+        self._negative_strategy_cache: tuple[st.SearchStrategy, int | None, int | None] | NotSet = NOT_SET
         self._is_negatable: bool | NotSet = NOT_SET
 
     @property
@@ -669,24 +843,26 @@ class OpenApiBody(OpenApiComponent):
         error_feedback: ErrorFeedbackStore | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
-        # Don't cache when mix_examples is False since we need different strategies
-        # for EXAMPLES phase vs fuzzing/stateful phases
-        use_cache = extra_data_source is None and mix_examples
+        # The captured-variant overlay binds resource values at build time, so caching it
+        # would freeze stale variants. The semantic overlay closes over the live index and
+        # remains correct under caching, so semantic-only data sources stay cache-eligible.
+        use_cache = mix_examples and not _captured_variants_active(extra_data_source, operation)
         feedback_generation = error_feedback.generation if error_feedback is not None else None
+        semantic_id = _semantic_cache_key(extra_data_source)
 
         # Check cache based on generation mode (only when extra data sources are not used)
         if use_cache:
             if generation_mode == GenerationMode.POSITIVE:
                 cached = self._positive_strategy_cache
                 if cached is not NOT_SET and not isinstance(cached, NotSet):
-                    cached_strategy, cached_generation = cached
-                    if cached_generation == feedback_generation:
+                    cached_strategy, cached_generation, cached_semantic = cached
+                    if cached_generation == feedback_generation and cached_semantic == semantic_id:
                         return cached_strategy
             else:
                 cached = self._negative_strategy_cache
                 if cached is not NOT_SET and not isinstance(cached, NotSet):
-                    cached_strategy, cached_generation = cached
-                    if cached_generation == feedback_generation:
+                    cached_strategy, cached_generation, cached_semantic = cached
+                    if cached_generation == feedback_generation and cached_semantic == semantic_id:
                         return cached_strategy
 
         # Import here to avoid circular dependency
@@ -758,6 +934,25 @@ class OpenApiBody(OpenApiComponent):
             if strategy_examples:
                 strategy = build_example_aware_strategy(strategy, strategy_examples)
 
+        if (
+            extra_data_source is not None
+            and generation_mode == GenerationMode.POSITIVE
+            and isinstance(extra_data_source, OpenApiExtraDataSource)
+            and extra_data_source.semantic_index is not None
+            and isinstance(schema, dict)
+        ):
+            from schemathesis.specs.openapi.semantic_pool import iter_consumer_leaves
+
+            leaf_descriptors = iter_consumer_leaves(schema)
+            if leaf_descriptors:
+                strategy = build_semantic_overlay(
+                    strategy,
+                    leaf_descriptors,
+                    extra_data_source.semantic_index,
+                    operation.schema.adapter.jsonschema_validator_cls,
+                    container_schema=schema,
+                )
+
         # Apply hybrid approach when captured variants are available
         if captured_variants and usage_tracker is not None:
             if generation_mode.is_negative:
@@ -767,9 +962,9 @@ class OpenApiBody(OpenApiComponent):
             else:
                 strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
 
-        # Cache the strategy keyed by feedback generation
+        # Cache the strategy keyed by feedback generation and semantic-index identity
         if use_cache:
-            slot = (strategy, feedback_generation)
+            slot = (strategy, feedback_generation, semantic_id)
             if generation_mode == GenerationMode.POSITIVE:
                 self._positive_strategy_cache = slot
             else:
@@ -1156,7 +1351,9 @@ class OpenApiParameterSet(ParameterSet):
         self._schema: dict | NotSet = NOT_SET
         self._validation_schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
-        self._strategy_cache: dict[tuple[frozenset[str], GenerationMode, int | None], st.SearchStrategy] = {}
+        self._strategy_cache: dict[
+            tuple[frozenset[str], GenerationMode, int | None, int | None], st.SearchStrategy
+        ] = {}
         self._strict_validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
     def get_strict_validator(self) -> jsonschema_rs.Validator:
@@ -1246,9 +1443,10 @@ class OpenApiParameterSet(ParameterSet):
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
         feedback_generation = error_feedback.generation if error_feedback is not None else None
-        cache_key = (exclude_key, generation_mode, feedback_generation)
+        semantic_id = _semantic_cache_key(extra_data_source)
+        cache_key = (exclude_key, generation_mode, feedback_generation, semantic_id)
 
-        use_cache = extra_data_source is None and mix_examples
+        use_cache = mix_examples and not _captured_variants_active(extra_data_source, operation)
 
         if use_cache and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
@@ -1354,6 +1552,28 @@ class OpenApiParameterSet(ParameterSet):
                 if parameter_examples:
                     strategy = build_parameter_example_aware_strategy(strategy, parameter_examples)
 
+            # Path parameters are always identity values; semantic substitution does not apply.
+            # Runs before serialization and location-specific filters so substituted values pass through
+            # the same `_quote_all_safe` / `is_valid_query` / `is_valid_header` paths as generated ones.
+            if (
+                extra_data_source is not None
+                and self.location != ParameterLocation.PATH
+                and not is_negative
+                and isinstance(extra_data_source, OpenApiExtraDataSource)
+                and extra_data_source.semantic_index is not None
+            ):
+                from schemathesis.specs.openapi.semantic_pool import iter_consumer_leaves
+
+                leaf_descriptors = iter_consumer_leaves(schema_obj)
+                if leaf_descriptors:
+                    strategy = build_semantic_overlay(
+                        strategy,
+                        leaf_descriptors,
+                        extra_data_source.semantic_index,
+                        operation.schema.adapter.jsonschema_validator_cls,
+                        container_schema=schema_obj,
+                    )
+
             # Bias path parameter integers toward positive values in positive mode
             if (
                 self.location == ParameterLocation.PATH
@@ -1370,7 +1590,9 @@ class OpenApiParameterSet(ParameterSet):
             if serialize is not None:
                 if is_negative:
                     # Apply serialize only to the value part of GeneratedValue
-                    strategy = strategy.map(lambda x: GeneratedValue(serialize(x.value), x.meta, x.pool_draws))
+                    strategy = strategy.map(
+                        lambda x: GeneratedValue(serialize(x.value), x.meta, x.pool_draws, x.semantic_draws)
+                    )
                 else:
                     strategy = strategy.map(serialize)
 
@@ -1382,7 +1604,10 @@ class OpenApiParameterSet(ParameterSet):
                 if is_negative:
                     strategy = strategy.map(
                         lambda x: GeneratedValue(
-                            _quote_all_safe(jsonify_python_specific_types(x.value)), x.meta, x.pool_draws
+                            _quote_all_safe(jsonify_python_specific_types(x.value)),
+                            x.meta,
+                            x.pool_draws,
+                            x.semantic_draws,
                         )
                     )
                     # Keep strict anti-misrouting defaults for negative generation.
@@ -1401,7 +1626,9 @@ class OpenApiParameterSet(ParameterSet):
                     strategy = strategy.filter(query_filter)
                 if is_negative:
                     strategy = strategy.map(
-                        lambda x: GeneratedValue(jsonify_python_specific_types(x.value), x.meta, x.pool_draws)
+                        lambda x: GeneratedValue(
+                            jsonify_python_specific_types(x.value), x.meta, x.pool_draws, x.semantic_draws
+                        )
                     )
                 else:
                     strategy = strategy.map(jsonify_python_specific_types)
