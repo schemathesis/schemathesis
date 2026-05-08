@@ -11,6 +11,7 @@ import jsonschema_rs
 import pytest
 from pydantic import AnyUrl, BaseModel, Field, ValidationError
 
+from schemathesis.core import NOT_SET
 from schemathesis.core.error_feedback import (
     MAX_ENTRIES_PER_BUCKET,
     BoundDirection,
@@ -2938,6 +2939,15 @@ _ZOD_INVALID_TYPE_REQUIRED = _zod_envelope(
         "message": "Required",
     }
 )
+_ZOD_ROOT_BODY_REQUIRED = _zod_envelope(
+    {
+        "code": "invalid_type",
+        "expected": "object",
+        "received": "undefined",
+        "path": [],
+        "message": "Required",
+    }
+)
 _ZOD_INVALID_ENUM_VALUE = _zod_envelope(
     {
         "received": "superuser",
@@ -3013,6 +3023,7 @@ _ZOD_ACCEPTED_BODIES = [
     pytest.param(_ZOD_INVALID_TYPE_NUMBER, id="invalid-type-number"),
     pytest.param(_ZOD_INVALID_TYPE_BOOLEAN, id="invalid-type-boolean"),
     pytest.param(_ZOD_INVALID_TYPE_REQUIRED, id="invalid-type-required"),
+    pytest.param(_ZOD_ROOT_BODY_REQUIRED, id="root-body-required"),
     pytest.param(_ZOD_INVALID_ENUM_VALUE, id="invalid-enum-value"),
     pytest.param(_ZOD_INVALID_DATE, id="invalid-date"),
     pytest.param(_ZOD_NESTED_PATH, id="nested-path"),
@@ -3312,6 +3323,20 @@ def _zod_signatures(observations: tuple[Observation, ...]) -> list[tuple]:
             _ZOD_INVALID_TYPE_REQUIRED,
             (("POST /api/users", ParameterLocation.BODY, ("name",), ObservationKind.MUST_NOT_BE_BLANK, None),),
             id="invalid-type-required",
+        ),
+        pytest.param(
+            "post",
+            "/api/users",
+            _ZOD_ROOT_BODY_REQUIRED,
+            (("POST /api/users", ParameterLocation.BODY, (), ObservationKind.MUST_NOT_BE_BLANK, None),),
+            id="root-body-required",
+        ),
+        pytest.param(
+            "get",
+            "/api/users",
+            _ZOD_ROOT_BODY_REQUIRED,
+            (),
+            id="root-body-required-get-dropped",
         ),
         pytest.param(
             "post",
@@ -3676,6 +3701,15 @@ _AJV_TYPE = _ajv_array_envelope(
         "message": "must be string",
     }
 )
+_AJV_ROOT_TYPE_OBJECT = _ajv_array_envelope(
+    {
+        "instancePath": "",
+        "schemaPath": "#/type",
+        "keyword": "type",
+        "params": {"type": "object"},
+        "message": "must be object",
+    }
+)
 _AJV_ADDITIONAL_PROPERTIES = _ajv_array_envelope(
     {
         "instancePath": "",
@@ -3795,6 +3829,7 @@ _AJV_ACCEPTED_BODIES = [
     pytest.param(_AJV_PATTERN, id="ajv-pattern"),
     pytest.param(_AJV_ENUM, id="ajv-enum"),
     pytest.param(_AJV_TYPE, id="ajv-type"),
+    pytest.param(_AJV_ROOT_TYPE_OBJECT, id="ajv-root-type-object"),
     pytest.param(_AJV_ADDITIONAL_PROPERTIES, id="ajv-additional-properties"),
     pytest.param(_AJV_REQUIRED_ROOT, id="ajv-required-root"),
     pytest.param(_AJV_REQUIRED_NESTED, id="ajv-required-nested"),
@@ -4091,6 +4126,29 @@ def test_ajv_parser_parse(make_operation, body, expected, case_factory):
     actual = AjvParser().parse(operation=operation, body=body, case=case_factory())
     actual_signatures = tuple((o.parameter_path, o.kind, o.payload) for o in actual)
     assert actual_signatures == expected
+
+
+@pytest.mark.parametrize("case_body", [NOT_SET, None], ids=["omitted", "null"])
+def test_ajv_parser_emits_body_required_for_root_type_error(make_operation, case_factory, case_body):
+    operation = make_operation(method="post", path="/api/users")
+    actual = AjvParser().parse(
+        operation=operation,
+        body=_AJV_ROOT_TYPE_OBJECT,
+        case=case_factory(body=case_body),
+    )
+    assert tuple((o.parameter_path, o.kind, o.payload) for o in actual) == (
+        ((), ObservationKind.MUST_NOT_BE_BLANK, None),
+    )
+
+
+def test_ajv_parser_drops_root_type_error_when_body_was_present(make_operation, case_factory):
+    operation = make_operation(method="post", path="/api/users")
+    actual = AjvParser().parse(
+        operation=operation,
+        body=_AJV_ROOT_TYPE_OBJECT,
+        case=case_factory(body=[]),
+    )
+    assert actual == ()
 
 
 def test_ajv_parser_parse_multi_field(make_operation, case_factory):
@@ -9108,14 +9166,187 @@ _PYDANTIC_FIXTURES: tuple[tuple[dict, Observation], ...] = (
 )
 
 
+_PYDANTIC_V1_FIXTURES: tuple[tuple[dict, Observation], ...] = (
+    (
+        {"type": "value_error.missing", "loc": ["body", "name"], "msg": "field required"},
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("name",),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="field required",
+        ),
+    ),
+    (
+        {"type": "type_error.integer", "loc": ["body", "age"], "msg": "value is not a valid integer"},
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("age",),
+            kind=ObservationKind.TYPE_MISMATCH,
+            raw_message="value is not a valid integer",
+            payload=TypeMismatchPayload(type_name="integer"),
+        ),
+    ),
+    (
+        {
+            "type": "value_error.any_str.min_length",
+            "loc": ["body", "name"],
+            "msg": "ensure this value has at least 3 characters",
+            "ctx": {"limit_value": 3},
+        },
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("name",),
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message="ensure this value has at least 3 characters",
+            payload=SizeBoundPayload(min=3, max=None),
+        ),
+    ),
+    (
+        {
+            "type": "value_error.any_str.max_length",
+            "loc": ["body", "name"],
+            "msg": "ensure this value has at most 20 characters",
+            "ctx": {"limit_value": 20},
+        },
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("name",),
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message="ensure this value has at most 20 characters",
+            payload=SizeBoundPayload(min=None, max=20),
+        ),
+    ),
+    (
+        {
+            "type": "value_error.number.not_gt",
+            "loc": ["body", "qty"],
+            "msg": "ensure this value is greater than 0",
+            "ctx": {"limit_value": 0},
+        },
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("qty",),
+            kind=ObservationKind.NUMERIC_BOUND,
+            raw_message="ensure this value is greater than 0",
+            payload=NumericBoundPayload(bound=0.0, direction=BoundDirection.MIN, exclusive=True),
+        ),
+    ),
+    (
+        {
+            "type": "value_error.number.not_ge",
+            "loc": ["body", "qty"],
+            "msg": "ensure this value is greater than or equal to 1",
+            "ctx": {"limit_value": 1},
+        },
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("qty",),
+            kind=ObservationKind.NUMERIC_BOUND,
+            raw_message="ensure this value is greater than or equal to 1",
+            payload=NumericBoundPayload(bound=1.0, direction=BoundDirection.MIN, exclusive=False),
+        ),
+    ),
+    (
+        {
+            "type": "value_error.number.not_lt",
+            "loc": ["body", "qty"],
+            "msg": "ensure this value is less than 100",
+            "ctx": {"limit_value": 100},
+        },
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("qty",),
+            kind=ObservationKind.NUMERIC_BOUND,
+            raw_message="ensure this value is less than 100",
+            payload=NumericBoundPayload(bound=100.0, direction=BoundDirection.MAX, exclusive=True),
+        ),
+    ),
+    (
+        {
+            "type": "value_error.number.not_le",
+            "loc": ["body", "qty"],
+            "msg": "ensure this value is less than or equal to 100",
+            "ctx": {"limit_value": 100},
+        },
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("qty",),
+            kind=ObservationKind.NUMERIC_BOUND,
+            raw_message="ensure this value is less than or equal to 100",
+            payload=NumericBoundPayload(bound=100.0, direction=BoundDirection.MAX, exclusive=False),
+        ),
+    ),
+    (
+        {
+            "type": "value_error.str.regex",
+            "loc": ["body", "code"],
+            "msg": 'string does not match regex "^[A-Z]+$"',
+            "ctx": {"pattern": "^[A-Z]+$"},
+        },
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("code",),
+            kind=ObservationKind.PATTERN,
+            raw_message='string does not match regex "^[A-Z]+$"',
+            payload=PatternPayload(regex="^[A-Z]+$"),
+        ),
+    ),
+    (
+        {"type": "value_error.email", "loc": ["body", "email"], "msg": "value is not a valid email address"},
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=("email",),
+            kind=ObservationKind.FORMAT,
+            raw_message="value is not a valid email address",
+            payload=FormatPayload(name="email"),
+        ),
+    ),
+)
+
+
 @pytest.mark.parametrize(
     "entry, expected",
     _PYDANTIC_FIXTURES,
     ids=[entry["type"] for entry, _ in _PYDANTIC_FIXTURES],
 )
-def test_pydantic_parser_extracts_observation(entry, expected, make_operation, case_factory):
+def test_pydantic_parser_extracts_v2_observation(entry, expected, make_operation, case_factory):
     obs = parse_observations(PydanticParser(), {"detail": [entry]}, make_operation, case_factory)
     assert obs == (expected,)
+
+
+@pytest.mark.parametrize(
+    "entry, expected",
+    _PYDANTIC_V1_FIXTURES,
+    ids=[entry["type"] for entry, _ in _PYDANTIC_V1_FIXTURES],
+)
+def test_pydantic_parser_extracts_v1_observation(entry, expected, make_operation, case_factory):
+    obs = parse_observations(PydanticParser(), {"detail": [entry]}, make_operation, case_factory)
+    assert obs == (expected,)
+
+
+@pytest.mark.parametrize("type_code", ["missing", "value_error.missing"], ids=["v2", "v1"])
+def test_pydantic_parser_emits_body_required_for_root_missing(type_code, make_operation, case_factory):
+    entry = {"type": type_code, "loc": ["body"], "msg": "Field required"}
+    obs = parse_observations(PydanticParser(), {"detail": [entry]}, make_operation, case_factory)
+    assert obs == (
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=(),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="Field required",
+        ),
+    )
 
 
 def test_pydantic_parser_coerces_decimal_numeric_bounds(make_operation, case_factory):
@@ -9303,7 +9534,6 @@ def test_pydantic_parse_expected_returns_none_for_non_string(value):
         {"detail": [{"type": "missing"}]},  # missing loc
         {"detail": [{"type": "unknown_code", "loc": ["body", "x"], "msg": "..."}]},
         {"detail": [{"type": "missing", "loc": [], "msg": "..."}]},  # empty loc - no path
-        {"detail": [{"type": "missing", "loc": ["body"], "msg": "..."}]},  # only the location prefix
     ],
     ids=[
         "none",
@@ -9313,7 +9543,6 @@ def test_pydantic_parse_expected_returns_none_for_non_string(value):
         "missing-loc",
         "unknown-type-code",
         "empty-loc",
-        "loc-prefix-only",
     ],
 )
 def test_pydantic_parser_parse_returns_empty_for_uninteresting_bodies(body, make_operation, case_factory):
@@ -9324,21 +9553,31 @@ def test_pydantic_parser_parse_returns_empty_for_uninteresting_bodies(body, make
     "type_code, context",
     [
         ("string_too_short", {}),
+        ("value_error.any_str.min_length", {}),
+        ("value_error.any_str.max_length", {}),
         ("string_too_long", {}),
         ("greater_than", {}),
         ("greater_than", {"gt": True}),
+        ("value_error.number.not_ge", {}),
+        ("value_error.number.not_le", {"limit_value": "100"}),
         ("less_than_equal", {"le": "100"}),
         ("string_pattern_mismatch", {}),
+        ("value_error.str.regex", {}),
         ("enum", {"expected": "no quoted values here"}),
         ("literal_error", {}),
     ],
     ids=[
         "size-min-missing",
+        "v1-size-min-missing",
+        "v1-size-max-missing",
         "size-max-missing",
         "numeric-missing",
         "numeric-bool",
+        "v1-numeric-missing",
+        "v1-numeric-string",
         "numeric-string",
         "pattern-missing",
+        "v1-pattern-missing",
         "enum-no-tokens",
         "literal-no-context",
     ],

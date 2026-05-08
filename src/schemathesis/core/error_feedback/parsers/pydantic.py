@@ -16,6 +16,7 @@ from schemathesis.core.error_feedback.store import (
     ObservationPayload,
     PatternPayload,
     SizeBoundPayload,
+    TypeMismatchPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
 
@@ -76,6 +77,18 @@ def _string_too_long(context: dict) -> HandlerResult:
     return ObservationKind.SIZE_BOUND, SizeBoundPayload(min=None, max=max_length)
 
 
+def _limit_value_size_bound(direction: BoundDirection) -> Handler:
+    def handler(context: dict) -> HandlerResult:
+        limit = context.get("limit_value")
+        if not isinstance(limit, int) or isinstance(limit, bool):
+            return None, None
+        if direction is BoundDirection.MIN:
+            return ObservationKind.SIZE_BOUND, SizeBoundPayload(min=limit, max=None)
+        return ObservationKind.SIZE_BOUND, SizeBoundPayload(min=None, max=limit)
+
+    return handler
+
+
 def _numeric_bound(direction: BoundDirection, exclusive: bool, context_key: str) -> Handler:
     def handler(context: dict) -> HandlerResult:
         bound = context.get(context_key)
@@ -86,6 +99,13 @@ def _numeric_bound(direction: BoundDirection, exclusive: bool, context_key: str)
         return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
             bound=float(bound), direction=direction, exclusive=exclusive
         )
+
+    return handler
+
+
+def _type_mismatch(type_name: str) -> Handler:
+    def handler(_context: dict) -> HandlerResult:
+        return ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=type_name)
 
     return handler
 
@@ -113,13 +133,27 @@ def _format_handler(format_name: str) -> Handler:
 
 _TYPE_CODE_HANDLERS: dict[str, Handler] = {
     "missing": _missing,
+    "value_error.missing": _missing,
     "string_too_short": _string_too_short,
     "string_too_long": _string_too_long,
+    "value_error.any_str.min_length": _limit_value_size_bound(BoundDirection.MIN),
+    "value_error.any_str.max_length": _limit_value_size_bound(BoundDirection.MAX),
     "greater_than": _numeric_bound(BoundDirection.MIN, exclusive=True, context_key="gt"),
     "greater_than_equal": _numeric_bound(BoundDirection.MIN, exclusive=False, context_key="ge"),
     "less_than": _numeric_bound(BoundDirection.MAX, exclusive=True, context_key="lt"),
     "less_than_equal": _numeric_bound(BoundDirection.MAX, exclusive=False, context_key="le"),
+    "value_error.number.not_gt": _numeric_bound(BoundDirection.MIN, exclusive=True, context_key="limit_value"),
+    "value_error.number.not_ge": _numeric_bound(BoundDirection.MIN, exclusive=False, context_key="limit_value"),
+    "value_error.number.not_lt": _numeric_bound(BoundDirection.MAX, exclusive=True, context_key="limit_value"),
+    "value_error.number.not_le": _numeric_bound(BoundDirection.MAX, exclusive=False, context_key="limit_value"),
+    "type_error.str": _type_mismatch("string"),
+    "type_error.integer": _type_mismatch("integer"),
+    "type_error.float": _type_mismatch("number"),
+    "type_error.bool": _type_mismatch("boolean"),
+    "type_error.list": _type_mismatch("array"),
+    "type_error.dict": _type_mismatch("object"),
     "string_pattern_mismatch": _string_pattern_mismatch,
+    "value_error.str.regex": _string_pattern_mismatch,
     "enum": _enum_handler,
     "literal_error": _enum_handler,
     # Date/datetime failures surface under several codes depending on the input
@@ -132,12 +166,18 @@ _TYPE_CODE_HANDLERS: dict[str, Handler] = {
     "time_parsing": _format_handler("time"),
     "uuid_parsing": _format_handler("uuid"),
     "url_parsing": _format_handler("uri"),
+    "value_error.email": _format_handler("email"),
+    "value_error.url": _format_handler("uri"),
+    "type_error.uuid": _format_handler("uuid"),
+    "value_error.date": _format_handler("date"),
+    "value_error.datetime": _format_handler("date-time"),
+    "value_error.time": _format_handler("time"),
 }
 
 
 @PARSERS.register
 class PydanticParser:
-    """Parser for Pydantic v2 `ValidationError` envelopes — `{"detail": [{type, loc, ctx}, ...]}`."""
+    """Parser for Pydantic `ValidationError` envelopes — `{"detail": [{type, loc, ctx}, ...]}`."""
 
     priority = 7
 
@@ -174,12 +214,12 @@ class PydanticParser:
             if handler is None:
                 continue
             location, path = _split_loc(loc)
-            if not path:
-                continue
             raw_context = entry.get("ctx")
             context = raw_context if isinstance(raw_context, dict) else {}
             kind, payload = handler(context)
             if kind is None:
+                continue
+            if not path and not (loc == ["body"] and kind is ObservationKind.MUST_NOT_BE_BLANK):
                 continue
             raw_message = entry.get("msg")
             observations.append(

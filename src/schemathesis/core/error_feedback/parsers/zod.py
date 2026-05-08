@@ -15,6 +15,7 @@ from schemathesis.core.error_feedback.store import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
+from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -58,12 +59,12 @@ def _has_zod_signature(issues: list[dict]) -> bool:
     return any(isinstance(issue.get("code"), str) and isinstance(issue.get("path"), list) for issue in issues)
 
 
-def _extract_path(issue: dict) -> tuple[str | int, ...]:
+def _extract_path(issue: dict) -> tuple[str | int, ...] | None:
     raw = issue.get("path")
-    if not isinstance(raw, list) or not raw:
-        return ()
+    if not isinstance(raw, list):
+        return None
     if any(isinstance(p, bool) or not isinstance(p, (str, int)) for p in raw):
-        return ()
+        return None
     return tuple(raw)
 
 
@@ -159,11 +160,15 @@ class ZodParser:
         observations: list[Observation] = []
         for issue in issues:
             path = _extract_path(issue)
-            if not path:
+            if path is None:
                 continue
             message = issue.get("message")
             raw_message = message if isinstance(message, str) else ""
             for kind, payload in _classify(issue):
+                if not path and (
+                    location is not ParameterLocation.BODY or kind is not ObservationKind.MUST_NOT_BE_BLANK
+                ):
+                    continue
                 observations.append(
                     Observation(
                         operation_label=operation.label,
