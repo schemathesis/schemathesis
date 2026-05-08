@@ -30,9 +30,9 @@ except ImportError:
         return json.dumps(obj, separators=(",", ":")).encode("utf-8")
 
 
-CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-CATALOG_DIR = CURRENT_DIR / "../test-corpus/openapi-directory/APIs/"
-DATA_DIR = CURRENT_DIR / "data"
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+DATA_DIR = REPO_ROOT / "corpus" / "data"
+CATALOG_DIR = REPO_ROOT / "test-corpus" / "openapi-directory" / "APIs"
 
 Loader = type("YAMLLoader", (SafeLoader,), {})
 Loader.yaml_implicit_resolvers = {  # type: ignore[attr-defined]
@@ -135,25 +135,29 @@ def load_from_corpus(file_name: str, corpus: tarfile.TarFile | str) -> dict[str,
     raise FileNotFoundError(file_name)
 
 
-def read_corpus_file(name: str) -> tarfile.TarFile:
-    return tarfile.open(DATA_DIR / f"{name}.tar.gz", "r:gz")
+def read_corpus_file(name: str, *, data_dir: pathlib.Path = DATA_DIR) -> tarfile.TarFile:
+    return tarfile.open(data_dir / f"{name}.tar.gz", "r:gz")
 
 
-def iter_corpus_file(name: str) -> Generator[tuple[str, dict[str, Any]], None, None]:
+def iter_corpus_file(
+    name: str, *, data_dir: pathlib.Path = DATA_DIR
+) -> Generator[tuple[str, dict[str, Any]], None, None]:
     """Iterate over the corpus file."""
-    with read_corpus_file(name) as tar:
-        for member in tar.getmembers():
-            extracted = tar.extractfile(member)
+    with read_corpus_file(name, data_dir=data_dir) as archive:
+        for member in archive.getmembers():
+            extracted = archive.extractfile(member)
             if extracted is not None:
                 yield member.name, json_loads(extracted.read())
 
 
-def iter_all_corpus_files() -> Generator[tuple[str, str, dict[str, Any]], None, None]:
-    """Iterate over all corpus files."""
-    for corpus_name in os.listdir(DATA_DIR):
-        if corpus_name.endswith(".tar.gz"):
-            for file_name, schema in iter_corpus_file(corpus_name):
-                yield corpus_name, file_name, schema
+def iter_all_corpus_files(
+    *, data_dir: pathlib.Path = DATA_DIR
+) -> Generator[tuple[str, str, dict[str, Any]], None, None]:
+    """Iterate over all corpus files (sorted by archive name for determinism)."""
+    for corpus_path in sorted(data_dir.glob("*.tar.gz")):
+        corpus_name = corpus_path.name.removesuffix(".tar.gz")
+        for file_name, schema in iter_corpus_file(corpus_name, data_dir=data_dir):
+            yield corpus_name, file_name, schema
 
 
 if __name__ == "__main__":

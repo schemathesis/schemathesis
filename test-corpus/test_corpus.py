@@ -36,7 +36,7 @@ from schemathesis.specs.openapi.stateful import dependencies
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
-from corpus.tools import json_loads, read_corpus_file  # noqa: E402
+from tools.corpus.io import json_loads, read_corpus_file  # noqa: E402
 
 CORPUS_FILE_NAMES = (
     "swagger-2.0",

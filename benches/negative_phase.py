@@ -11,7 +11,7 @@ from schemathesis.generation.hypothesis import setup
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
-from corpus.tools import load_from_corpus, read_corpus_file  # noqa: E402
+from tools.corpus.io import load_from_corpus, read_corpus_file  # noqa: E402
 
 setup()
 

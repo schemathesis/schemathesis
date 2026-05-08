@@ -15,8 +15,6 @@ import click
 
 DEFAULT_CLI_PROFILE_FILENAME = "profiles/profile_cli.html"
 
-# Corpus tooling lives one level up from scripts/
-_CORPUS_TOOLS_DIR = Path(__file__).parent.parent / "corpus"
 _CORPUS_SCHEME = "corpus://"
 
 
@@ -59,10 +57,9 @@ def _parse_corpus_path(schema_path: str) -> tuple[str, str]:
 
 def _load_corpus_dict(schema_path: str) -> dict[str, Any]:
     """Load a schema dict from a corpus:// path."""
-    import sys
-
-    sys.path.insert(0, str(_CORPUS_TOOLS_DIR))
-    from tools import load_from_corpus, read_corpus_file
+    # Reach the repo-root `tools/` package; scripts/ does not have it on sys.path by default.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from tools.corpus.io import load_from_corpus, read_corpus_file
 
     corpus_name, schema_name = _parse_corpus_path(schema_path)
     with read_corpus_file(corpus_name) as tar:
