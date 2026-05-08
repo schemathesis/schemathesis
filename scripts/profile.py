@@ -15,7 +15,11 @@ import click
 
 DEFAULT_CLI_PROFILE_FILENAME = "profiles/profile_cli.html"
 
-_CORPUS_SCHEME = "corpus://"
+# Reach the repo-root `tools/` package; scripts/ does not have it on sys.path by default.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from schemathesis.generation import GenerationMode  # noqa: E402
+from tools.corpus.locator import CORPUS_SCHEME, load_schema_dict, parse_corpus_path  # noqa: E402
 
 
 @dataclass
@@ -40,36 +44,19 @@ def _get_profiler() -> Any:
     return Profiler()
 
 
-def _parse_corpus_path(schema_path: str) -> tuple[str, str]:
-    """Parse 'corpus://CORPUS_NAME/SCHEMA_NAME' into (corpus_name, schema_name).
-
-    Example: 'corpus://openapi-3.0/vercel.com/0.0.1.json'
-      -> corpus_name='openapi-3.0', schema_name='vercel.com/0.0.1.json'
-    """
-    remainder = schema_path[len(_CORPUS_SCHEME) :]
-    corpus_name, _, schema_name = remainder.partition("/")
-    if not corpus_name or not schema_name:
-        raise click.BadParameter(
-            f"corpus:// path must be 'corpus://CORPUS_NAME/SCHEMA_NAME', got: {schema_path!r}",
-        )
-    return corpus_name, schema_name
-
-
 def _load_corpus_dict(schema_path: str) -> dict[str, Any]:
-    """Load a schema dict from a corpus:// path."""
-    # Reach the repo-root `tools/` package; scripts/ does not have it on sys.path by default.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from tools.corpus.io import load_from_corpus, read_corpus_file
-
-    corpus_name, schema_name = _parse_corpus_path(schema_path)
-    with read_corpus_file(corpus_name) as tar:
-        return load_from_corpus(schema_name, tar)
+    """Load a schema dict from a ``corpus://`` path."""
+    try:
+        parse_corpus_path(schema_path)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from exc
+    return load_schema_dict(schema_path).schema
 
 
 def _load_schema(schema_path: str, base_url: str | None) -> Any:
     import schemathesis
 
-    if schema_path.startswith(_CORPUS_SCHEME):
+    if schema_path.startswith(CORPUS_SCHEME):
         schema_dict = _load_corpus_dict(schema_path)
         kwargs: dict[str, Any] = {}
         if base_url:
@@ -116,7 +103,7 @@ def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:
     updated = []
     tmp_paths = []
     for arg in args:
-        if arg.startswith(_CORPUS_SCHEME):
+        if arg.startswith(CORPUS_SCHEME):
             schema_dict = _load_corpus_dict(arg)
             tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
             json.dump(schema_dict, tmp)
@@ -128,16 +115,6 @@ def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:
         else:
             updated.append(arg)
     return updated, tmp_paths
-
-
-def _parse_modes(mode: str) -> list[Any]:
-    from schemathesis.generation.modes import GenerationMode
-
-    if mode == "all":
-        return list(GenerationMode)
-    if mode == "positive":
-        return [GenerationMode.POSITIVE]
-    return [GenerationMode.NEGATIVE]
 
 
 def _build_operation_filter(include_name: tuple[str, ...]) -> set[str]:
@@ -300,7 +277,7 @@ def fuzzing(
     click.echo()
 
     schema = _load_schema(schema_path, base_url)
-    modes = _parse_modes(mode)
+    modes = GenerationMode.from_choice(mode)
     operation_filter = _build_operation_filter(include_name)
 
     out_dir = Path(output_dir)
@@ -423,7 +400,7 @@ def coverage(
     click.echo()
 
     schema = _load_schema(schema_path, base_url)
-    modes = _parse_modes(mode)
+    modes = GenerationMode.from_choice(mode)
     operation_filter = _build_operation_filter(include_name)
 
     out_dir = Path(output_dir)
