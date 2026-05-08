@@ -17,11 +17,9 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis.builder import (
-    _iter_coverage_cases,
-    generate_example_cases,
-)
+from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.transport.prepare import prepare_request
 
 DEFAULT_FUZZING_MAX_EXAMPLES = 100
@@ -86,7 +84,7 @@ def _coverage_cases(
     generation_config: GenerationConfig,
     generation_modes: list[GenerationMode],
 ) -> Generator[Case]:
-    yield from _iter_coverage_cases(
+    yield from iter_coverage_cases(
         operation=operation,
         generation_modes=generation_modes,
         generate_duplicate_query_parameters=False,

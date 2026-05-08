@@ -1,7 +1,7 @@
 import jsonschema_rs
 
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
+from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 
 # Malformed regex - bad character range `\\-.`
 MALFORMED_REGEX = "^[A-Za-z0-9 \\\\-.'À-ÿ]+$"
@@ -29,7 +29,7 @@ def _load_json_body_operation(
 
 def _collect_coverage_cases(operation, generation_mode):
     return list(
-        _iter_coverage_cases(
+        iter_coverage_cases(
             operation=operation,
             generation_modes=[generation_mode],
             generate_duplicate_query_parameters=False,

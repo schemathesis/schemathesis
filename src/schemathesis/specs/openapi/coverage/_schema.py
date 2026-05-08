@@ -1,3 +1,9 @@
+"""JSON Schema constraint walking.
+
+Produces positive and negative coverage values for individual schema constructs
+(`type`, `enum`, `pattern`, `minimum`, `oneOf`, ...).
+"""
+
 from __future__ import annotations
 
 import re
