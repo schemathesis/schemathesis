@@ -4,8 +4,8 @@ import pytest
 from jsonschema_rs import Draft202012Validator
 
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.coverage import CoverageContext, cover_schema_iter
 from schemathesis.generation.hypothesis import setup
+from schemathesis.specs.openapi.coverage._schema import CoverageContext, cover_schema_iter
 from schemathesis.specs.openapi.patterns import update_quantifier
 
 setup()

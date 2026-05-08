@@ -10,7 +10,7 @@ import pytest
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.coverage import (
+from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
     CoverageScenario,
     GeneratedValue,

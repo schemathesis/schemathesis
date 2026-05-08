@@ -24,16 +24,16 @@ from schemathesis.core.failures import AcceptedNegativeData
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
-from schemathesis.generation import coverage as coverage_generation
 from schemathesis.generation.hypothesis.builder import (
     HypothesisTestConfig,
     HypothesisTestMode,
-    _iter_coverage_cases,
     create_test,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
 from schemathesis.generation.progressive import CoverageGenerator
 from schemathesis.specs.openapi.checks import negative_data_rejection
+from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
+from schemathesis.specs.openapi.coverage._schema import CoverageContext, _negative_format
 from test.utils import assert_requests_call
 
 
@@ -286,7 +286,7 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
 
 def _iter_cases(operation, generation_mode, *, generation_config=None):
     return list(
-        _iter_coverage_cases(
+        iter_coverage_cases(
             operation=operation,
             generation_modes=[generation_mode],
             generate_duplicate_query_parameters=False,
@@ -2555,7 +2555,7 @@ def test_references(ctx, operation, components):
     schema = ctx.openapi.load_schema({"/test": {"post": operation}}, components=components)
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
-            for _ in _iter_coverage_cases(
+            for _ in iter_coverage_cases(
                 operation=operation.ok(),
                 generation_modes=list(GenerationMode),
                 generate_duplicate_query_parameters=False,
@@ -3682,8 +3682,10 @@ def test_duration_format_generates_required_query_positive_cases(ctx, version):
 )
 def test_hostname_negative_format_respects_validator_draft(monkeypatch, validator_cls, should_generate):
     # `XN--9krT00a` is valid in Draft 4 but invalid in Draft 2020-12.
-    monkeypatch.setattr(coverage_generation, "from_schema", lambda *_args, **_kwargs: st.just("XN--9krT00a"))
-    ctx = coverage_generation.CoverageContext(
+    monkeypatch.setattr(
+        "schemathesis.specs.openapi.coverage._schema.from_schema", lambda *_args, **_kwargs: st.just("XN--9krT00a")
+    )
+    ctx = CoverageContext(
         root_schema={"type": "string", "format": "hostname"},
         location=ParameterLocation.QUERY,
         media_type=None,
@@ -3693,7 +3695,7 @@ def test_hostname_negative_format_respects_validator_draft(monkeypatch, validato
         validator_cls=validator_cls,
     )
 
-    generator = coverage_generation._negative_format(ctx, {"type": "string", "format": "hostname"}, "hostname")
+    generator = _negative_format(ctx, {"type": "string", "format": "hostname"}, "hostname")
 
     if should_generate:
         value = next(generator)
@@ -6484,7 +6486,7 @@ def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
             return None
 
     list(
-        _iter_coverage_cases(
+        iter_coverage_cases(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             generate_duplicate_query_parameters=False,
@@ -6509,7 +6511,7 @@ def test_undeclared_method_probes_dedup_across_operations(ctx):
     seen: list[tuple[str, str]] = []
     seen_dedup: set[tuple[str, str]] = set()
     for declared in ("GET", "POST", "PUT", "DELETE"):
-        for case in _iter_coverage_cases(
+        for case in iter_coverage_cases(
             operation=schema["/items"][declared],
             generation_modes=[GenerationMode.NEGATIVE],
             generate_duplicate_query_parameters=False,

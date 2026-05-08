@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.generation.coverage import push_examples_to_properties
+from schemathesis.specs.openapi.coverage._schema import push_examples_to_properties
 
 
 @pytest.mark.parametrize(

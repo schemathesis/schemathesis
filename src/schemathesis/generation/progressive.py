@@ -23,13 +23,10 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis.builder import (
-    _iter_coverage_cases,
-    adjust_urlencoded_payload,
-    find_invalid_headers,
-)
+from schemathesis.generation.hypothesis.builder import adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, _should_skip_hook
+from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 
 if TYPE_CHECKING:
     from schemathesis.auths import AuthStorage
@@ -118,7 +115,7 @@ class CoverageGenerator:
             # Per-test hooks are a pytest-plugin feature; the engine has none.
             dispatchers = [GLOBAL_HOOK_DISPATCHER, operation.schema.hooks]
 
-            for case in _iter_coverage_cases(
+            for case in iter_coverage_cases(
                 operation=operation,
                 generation_modes=self._generation_modes,
                 generate_duplicate_query_parameters=self._generate_duplicate_query_parameters,
