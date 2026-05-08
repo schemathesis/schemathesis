@@ -11,15 +11,15 @@ alias tch := test-cov-html
 
 # Run all tests
 test *ARGS:
-    python -m pytest test/ {{ARGS}}
+    python -m pytest test/ --ignore=test/tooling {{ARGS}}
 
 test-dist *ARGS:
-    python -m pytest test/ -n auto --dist=worksteal {{ARGS}}
+    python -m pytest test/ --ignore=test/tooling -n auto --dist=worksteal {{ARGS}}
 
 # Run tests with coverage
 test-cov *ARGS:
     @rm -f .coverage*
-    COVERAGE_PROCESS_START="$(pwd)/pyproject.toml" COVERAGE_FILE="$(pwd)/.coverage" uv run python -m coverage run -m pytest test/ -n auto --dist=worksteal {{ARGS}} || true
+    COVERAGE_PROCESS_START="$(pwd)/pyproject.toml" COVERAGE_FILE="$(pwd)/.coverage" uv run python -m coverage run -m pytest test/ --ignore=test/tooling -n auto --dist=worksteal {{ARGS}} || true
     uv run python -m coverage combine
     uv run python -m coverage report
 
@@ -31,15 +31,25 @@ test-cov-html *ARGS:
 
 # Run tests matching pattern
 test-k PATTERN *ARGS:
-    python -m pytest test/ -k "{{PATTERN}}" {{ARGS}}
+    python -m pytest test/ --ignore=test/tooling -k "{{PATTERN}}" {{ARGS}}
 
 # Update test snapshots
 snapshot-update *ARGS:
-    python -m pytest test/ --snapshot-update -n auto --dist=worksteal {{ARGS}}
+    python -m pytest test/ --ignore=test/tooling --snapshot-update -n auto --dist=worksteal {{ARGS}}
 
 # Run corpus tests
 test-corpus:
     python -m pytest test-corpus/ -n auto --dist=worksteal
+
+# Run corpus tooling tests
+test-corpus-tooling *ARGS:
+    python -m pytest test/tooling/corpus -n auto {{ARGS}}
+
+check-corpus-tooling:
+    uvx ruff check tools/corpus test/tooling/corpus
+    uvx ruff format --check tools/corpus test/tooling/corpus
+    uvx --with=".[tests]" --with=mypy --with=types-PyYAML mypy tools/corpus
+    uv run --extra=tests pytest test/tooling/corpus -n auto -q
 
 # Launch a catalog test app on PORT (default factory: kitchen_sink). `just serve --list` to see all factories.
 serve PORT="8081" FACTORY="kitchen_sink" *ARGS:

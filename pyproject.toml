@@ -96,6 +96,7 @@ exclude = [
   "/corpus",
   "/test-corpus",
   "/scripts",
+  "/tools",
   "/img",
   "/benches",
 ]
@@ -191,7 +192,7 @@ ignore = [
 "test/apps/__main__.py" = ["T201"]  # CLI launcher prints to stdout
 
 [tool.ruff.lint.isort]
-known-first-party = ["schemathesis"]
+known-first-party = ["schemathesis", "tools"]
 known-third-party = [
   "_pytest",
   "click",

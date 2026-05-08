@@ -24,7 +24,7 @@ CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 CATALOG_DIR = CURRENT_DIR / "data"
 
-from corpus.tools import load_from_corpus, read_corpus_file  # noqa: E402
+from tools.corpus.io import load_from_corpus, read_corpus_file  # noqa: E402
 
 setup()
 CONFIG = SchemathesisConfig()

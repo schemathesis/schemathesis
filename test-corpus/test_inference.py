@@ -12,7 +12,11 @@ from schemathesis.specs.openapi.stateful import dependencies
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
-from corpus.tools import json_loads, read_corpus_file  # noqa: E402
+from tools.corpus.io import json_loads, read_corpus_file  # noqa: E402
+from tools.corpus.metrics import (  # noqa: E402
+    add_dependency_metrics,
+    collect_dependency_metrics,
+)
 
 CORPUS_FILE_NAMES = (
     "swagger-2.0",
@@ -147,22 +151,7 @@ def test_dependency_graph(corpus, filename, snapshot_json):
 
 
 def _process_member(raw_content):
-    raw_schema = json_loads(raw_content)
-    schema = schemathesis.openapi.from_dict(raw_schema)
-    graph = dependencies.analyze(schema)
-
-    resources = len(graph.resources)
-    inputs = 0
-    outputs = 0
-    links = 0
-
-    for operation in graph.operations.values():
-        inputs += len(operation.inputs)
-        outputs += len(operation.outputs)
-    for response_links in graph.iter_links():
-        links += len(response_links.links)
-
-    return resources, inputs, outputs, links
+    return collect_dependency_metrics(json_loads(raw_content))
 
 
 def test_overall_metrics(snapshot_json):
@@ -175,17 +164,12 @@ def test_overall_metrics(snapshot_json):
             work_items.append(raw_content)
 
     max_workers = multiprocessing.cpu_count()
-    total_resources = total_inputs = total_outputs = total_links = 0
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as exe:
-        for resources, inputs, outputs, links in exe.map(_process_member, work_items, chunksize=16):
-            total_resources += resources
-            total_inputs += inputs
-            total_outputs += outputs
-            total_links += links
+        metrics = add_dependency_metrics(exe.map(_process_member, work_items, chunksize=16))
 
     assert {
-        "total_resources": total_resources,
-        "total_inputs": total_inputs,
-        "total_outputs": total_outputs,
-        "total_links": total_links,
+        "total_resources": metrics.resources,
+        "total_inputs": metrics.inputs,
+        "total_outputs": metrics.outputs,
+        "total_links": metrics.links,
     } == snapshot_json

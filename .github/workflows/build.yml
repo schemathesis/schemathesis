@@ -42,6 +42,34 @@ jobs:
 
       - run: uvx prek run --all-files
 
+  corpus-tooling:
+    name: Corpus tooling
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          cache-dependency-glob: |
+            **/pyproject.toml
+            **/uv.lock
+          cache-suffix: corpus-tooling-3.14-v1
+
+      - run: uvx ruff check tools/corpus test/tooling/corpus
+
+      - run: uvx ruff format --check tools/corpus test/tooling/corpus
+
+      - run: uvx --with=".[tests]" --with=mypy --with=types-PyYAML mypy tools/corpus
+
+      - run: uv run --extra=tests pytest test/tooling/corpus -n auto -q
+
   tests:
     strategy:
       matrix:
