@@ -35,8 +35,8 @@ Hook Error
 Error in `before_init_operation` hook: AttributeError: test hook error
 
     Traceback (most recent call last):
-      File "/package-root/hooks.py", line XXX, in dispatch
-        hook(context, *args, **kwargs)
+      File "/package-root/hooks.py", line XXX, in _dispatch_to_all
+        hook(context, *args)
       File "/tmp/module.py", line XXX, in before_init_operation
         raise AttributeError("test hook error")
     AttributeError: test hook error

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.generation.meta import CaseMetadata
     from schemathesis.generation.stateful.state_machine import APIStateMachine
-    from schemathesis.hooks import HookContext, HookDispatcher
+    from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ExtraDataSource
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.graphql.schemas import GraphQLSchema
@@ -112,8 +112,6 @@ class ApiSchema(Protocol):
     ) -> type[APIStateMachine]: ...  # pragma: no cover
 
     def create_extra_data_source(self) -> ExtraDataSource | None: ...  # pragma: no cover
-
-    def dispatch_hook(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None: ...  # pragma: no cover
 
     def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]: ...  # pragma: no cover
 

@@ -41,6 +41,7 @@ from schemathesis.hooks import (
     HookContext,
     HookDispatcher,
     HookDispatcherMark,
+    dispatch_before_add_examples,
 )
 from schemathesis.schemas import APIOperation
 
@@ -344,10 +345,10 @@ def generate_example_cases(
         add_single_example(strategy, result)
 
     context = HookContext(operation=operation)  # context should be passed here instead
-    GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, result)
-    operation.schema.hooks.dispatch("before_add_examples", context, result)
+    dispatchers: tuple[HookDispatcher, ...] = (GLOBAL_HOOK_DISPATCHER, operation.schema.hooks)
     if hook_dispatcher:
-        hook_dispatcher.dispatch("before_add_examples", context, result)
+        dispatchers = (*dispatchers, hook_dispatcher)
+    dispatch_before_add_examples(*dispatchers, context=context, examples=result)
     original_test = test
     for example in result:
         if example.headers is not None:

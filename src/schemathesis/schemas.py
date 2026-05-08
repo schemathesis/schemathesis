@@ -41,7 +41,13 @@ from .filters import (
     RegexValue,
     is_deprecated,
 )
-from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope, defines, dispatch, to_filterable_hook
+from .hooks import (
+    GLOBAL_HOOK_DISPATCHER,
+    HookContext,
+    HookDispatcher,
+    HookScope,
+    to_filterable_hook,
+)
 
 if TYPE_CHECKING:
     import httpx
@@ -380,16 +386,6 @@ class BaseSchema(Mapping):
             # Might be missing it in case of `LazySchema` usage
             return HookDispatcherMark.get(self.test_function)
         return None
-
-    def dispatch_hook(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
-        # Fast path: skip the per-dispatcher loop overhead when nothing is registered.
-        if defines(name):
-            dispatch(name, context, *args, **kwargs)
-        if self.hooks.defines(name):
-            self.hooks.dispatch(name, context, *args, **kwargs)
-        local_dispatcher = self.get_local_hook_dispatcher()
-        if local_dispatcher is not None and local_dispatcher.defines(name):
-            local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None

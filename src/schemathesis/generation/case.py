@@ -18,7 +18,14 @@ from schemathesis.engine import Status
 from schemathesis.generation import generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, store_components
-from schemathesis.hooks import HookContext, dispatch
+from schemathesis.hooks import (
+    GLOBAL_HOOK_DISPATCHER,
+    HookContext,
+    dispatch_after_call,
+    dispatch_after_network_error,
+    dispatch_after_validate,
+    dispatch_before_call,
+)
 from schemathesis.transport.prepare import prepare_path, prepare_request
 from schemathesis.transport.serialization import Binary
 
@@ -334,7 +341,7 @@ class Case:
 
         """
         hook_context = HookContext(operation=self.operation)
-        dispatch("before_call", hook_context, self, _with_dual_style_kwargs=True, **kwargs)
+        dispatch_before_call(GLOBAL_HOOK_DISPATCHER, context=hook_context, case=self, kwargs=kwargs)
 
         # Revalidate metadata if dirty before freezing (captures user modifications)
         if self._meta and self._meta.is_dirty():
@@ -381,11 +388,17 @@ class Case:
 
             request = getattr(exc, "request", None)
             if isinstance(request, requests.PreparedRequest):
-                dispatch("after_network_error", hook_context, self, request)
-                self.operation.schema.hooks.dispatch("after_network_error", hook_context, self, request)
+                dispatch_after_network_error(
+                    GLOBAL_HOOK_DISPATCHER,
+                    self.operation.schema.hooks,
+                    context=hook_context,
+                    case=self,
+                    request=request,
+                )
             raise
-        dispatch("after_call", hook_context, self, response)
-        self.operation.schema.hooks.dispatch("after_call", hook_context, self, response)
+        dispatch_after_call(
+            GLOBAL_HOOK_DISPATCHER, self.operation.schema.hooks, context=hook_context, case=self, response=response
+        )
         return response
 
     def validate_response(
@@ -473,8 +486,14 @@ class Case:
         )
         if has_after_validate:
             hook_context = HookContext(operation=self.operation)
-            dispatch("after_validate", hook_context, self, response, check_results)
-            self.operation.schema.hooks.dispatch("after_validate", hook_context, self, response, check_results)
+            dispatch_after_validate(
+                GLOBAL_HOOK_DISPATCHER,
+                self.operation.schema.hooks,
+                context=hook_context,
+                case=self,
+                response=response,
+                results=check_results,
+            )
         if failures:
             _failures = list(failures)
             message = failure_report_title(_failures) + "\n"

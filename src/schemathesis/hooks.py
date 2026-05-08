@@ -261,22 +261,6 @@ class HookDispatcher:
             strategy = strategy.flatmap(hook)
         return strategy
 
-    def dispatch(
-        self, name: str, context: HookContext, *args: Any, _with_dual_style_kwargs: bool = False, **kwargs: Any
-    ) -> None:
-        """Run all hooks for the given name."""
-        for hook in self.get_all_by_name(name):
-            if _should_skip_hook(hook, context):
-                continue
-            try:
-                # NOTE: It is a backward-compat shim to support calling `before_call` with `**kwargs` OR with `kwargs`.
-                if _with_dual_style_kwargs and not has_var_keyword(hook):
-                    hook(context, *args, kwargs)
-                else:
-                    hook(context, *args, **kwargs)
-            except Exception as exc:
-                raise HookExecutionError(name, exc) from exc
-
     def unregister(self, hook: Callable) -> None:
         """Unregister a specific hook."""
         # It removes this function from all places
@@ -300,6 +284,22 @@ def has_var_keyword(hook: Callable) -> bool:
 def _should_skip_hook(hook: Callable, ctx: HookContext) -> bool:
     filter_set = getattr(hook, "filter_set", None)
     return filter_set is not None and ctx.operation is not None and not filter_set.match(ctx)
+
+
+def _dispatch_to_all(
+    name: str,
+    dispatchers: tuple[HookDispatcher, ...],
+    context: HookContext,
+    *args: Any,
+) -> None:
+    for dispatcher in dispatchers:
+        for hook in dispatcher.get_all_by_name(name):
+            if _should_skip_hook(hook, context):
+                continue
+            try:
+                hook(context, *args)
+            except Exception as exc:
+                raise HookExecutionError(name, exc) from exc
 
 
 def apply_to_all_dispatchers(
@@ -535,11 +535,76 @@ def after_validate(context: HookContext, case: Case, response: Response, results
 
 
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
-dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
 defines = GLOBAL_HOOK_DISPATCHER.defines
 unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
+
+
+def _dispatch_schema_cascade(schema: BaseSchema, name: str, context: HookContext, *args: Any) -> None:
+    dispatchers: tuple[HookDispatcher, ...] = (GLOBAL_HOOK_DISPATCHER, schema.hooks)
+    local = schema.get_local_hook_dispatcher()
+    if local is not None:
+        dispatchers = (*dispatchers, local)
+    _dispatch_to_all(name, dispatchers, context, *args)
+
+
+def dispatch_before_process_path(schema: BaseSchema, context: HookContext, path: str, methods: dict[str, Any]) -> None:
+    _dispatch_schema_cascade(schema, "before_process_path", context, path, methods)
+
+
+def dispatch_before_init_operation(schema: BaseSchema, context: HookContext, operation: APIOperation) -> None:
+    _dispatch_schema_cascade(schema, "before_init_operation", context, operation)
+
+
+def dispatch_before_load_schema(*dispatchers: HookDispatcher, context: HookContext, raw_schema: dict[str, Any]) -> None:
+    _dispatch_to_all("before_load_schema", dispatchers, context, raw_schema)
+
+
+def dispatch_after_load_schema(*dispatchers: HookDispatcher, context: HookContext, schema: BaseSchema) -> None:
+    _dispatch_to_all("after_load_schema", dispatchers, context, schema)
+
+
+def dispatch_before_add_examples(*dispatchers: HookDispatcher, context: HookContext, examples: list[Case]) -> None:
+    _dispatch_to_all("before_add_examples", dispatchers, context, examples)
+
+
+def dispatch_before_call(
+    *dispatchers: HookDispatcher, context: HookContext, case: Case, kwargs: dict[str, Any]
+) -> None:
+    name = "before_call"
+    for dispatcher in dispatchers:
+        for hook in dispatcher.get_all_by_name(name):
+            if _should_skip_hook(hook, context):
+                continue
+            try:
+                # Support both `def before_call(ctx, case, kwargs)` and `def before_call(ctx, case, **kwargs)`.
+                if has_var_keyword(hook):
+                    hook(context, case, **kwargs)
+                else:
+                    hook(context, case, kwargs)
+            except Exception as exc:
+                raise HookExecutionError(name, exc) from exc
+
+
+def dispatch_after_call(*dispatchers: HookDispatcher, context: HookContext, case: Case, response: Response) -> None:
+    _dispatch_to_all("after_call", dispatchers, context, case, response)
+
+
+def dispatch_after_network_error(
+    *dispatchers: HookDispatcher, context: HookContext, case: Case, request: requests.PreparedRequest
+) -> None:
+    _dispatch_to_all("after_network_error", dispatchers, context, case, request)
+
+
+def dispatch_after_validate(
+    *dispatchers: HookDispatcher,
+    context: HookContext,
+    case: Case,
+    response: Response,
+    results: list[CheckResult],
+) -> None:
+    _dispatch_to_all("after_validate", dispatchers, context, case, response, results)
 
 
 def hook(hook: str | Callable) -> Callable:

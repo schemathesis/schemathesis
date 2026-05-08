@@ -9,7 +9,14 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.hooks import HookDispatcher, HookDispatcherMark, HookScope
+from schemathesis.hooks import (
+    HookContext,
+    HookDispatcher,
+    HookDispatcherMark,
+    HookScope,
+    dispatch_before_add_examples,
+    dispatch_before_call,
+)
 from schemathesis.pytest.plugin import SchemaHandleMark
 from schemathesis.transport.prepare import get_default_headers
 from test.utils import assert_requests_call, flaky
@@ -54,6 +61,61 @@ def global_hook(request):
 @pytest.fixture
 def dispatcher():
     return HookDispatcher(scope=HookScope.SCHEMA)
+
+
+def test_hook_dispatch_accepts_multiple_dispatchers(dispatcher):
+    calls = []
+    context = HookContext()
+    examples = []
+    another_dispatcher = HookDispatcher(scope=HookScope.SCHEMA)
+
+    @dispatcher.hook
+    def before_add_examples(context, examples):
+        calls.append(("first", context, examples))
+
+    @another_dispatcher.hook
+    def before_add_examples(context, examples):  # noqa: F811
+        calls.append(("second", context, examples))
+
+    dispatch_before_add_examples(dispatcher, another_dispatcher, context=context, examples=examples)
+
+    assert calls == [("first", context, examples), ("second", context, examples)]
+
+
+def test_hook_dispatch_skips_filtered_hooks(ctx, dispatcher):
+    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    operation = schema["/users"]["GET"]
+    calls = []
+
+    @dispatcher.hook.apply_to(method="POST")
+    def before_add_examples(context, examples):
+        calls.append("ran")
+
+    dispatch_before_add_examples(dispatcher, context=HookContext(operation=operation), examples=[])
+
+    assert calls == []
+
+
+def test_before_call_dispatch_preserves_kwargs_styles():
+    dispatcher = HookDispatcher(scope=HookScope.GLOBAL)
+    context = HookContext()
+    case = object()
+    calls = []
+
+    @dispatcher.hook
+    def before_call(context, case, kwargs):
+        calls.append(("legacy", context, case, kwargs))
+
+    @dispatcher.hook("before_call")
+    def hook(context, case, **kwargs):
+        calls.append(("kwargs", context, case, kwargs))
+
+    dispatch_before_call(dispatcher, context=context, case=case, kwargs={"timeout": 1})
+
+    assert calls == [
+        ("legacy", context, case, {"timeout": 1}),
+        ("kwargs", context, case, {"timeout": 1}),
+    ]
 
 
 @pytest.mark.hypothesis_nested
