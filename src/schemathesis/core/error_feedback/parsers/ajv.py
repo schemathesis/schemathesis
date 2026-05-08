@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from schemathesis.core import NOT_SET
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
@@ -165,9 +166,12 @@ _KEYWORD_HANDLERS: dict[str, KeywordHandler] = {
 }
 
 
-def _array_form_path(error: dict) -> ParameterPath | None:
+def _array_base_path(error: dict) -> ParameterPath:
     raw = error.get("instancePath")
-    path = _split_instance_path(raw) if isinstance(raw, str) else _split_dotted_path(error["dataPath"])
+    return _split_instance_path(raw) if isinstance(raw, str) else _split_dotted_path(error["dataPath"])
+
+
+def _array_form_path(error: dict, base_path: ParameterPath) -> ParameterPath | None:
     if error.get("keyword") == "required":
         params = error.get("params")
         if not isinstance(params, dict):
@@ -175,10 +179,21 @@ def _array_form_path(error: dict) -> ParameterPath | None:
         missing = params.get("missingProperty")
         if not isinstance(missing, str):
             return None
-        return (*path, missing)
-    if not path:
+        return (*base_path, missing)
+    if not base_path:
         return None
-    return path
+    return base_path
+
+
+def _is_root_body_type_error(error: dict, location: ParameterLocation, case: Case) -> bool:
+    if location is not ParameterLocation.BODY:
+        return False
+    if case.body is not NOT_SET and case.body is not None:
+        return False
+    if error.get("keyword") != "type":
+        return False
+    params = error.get("params")
+    return isinstance(params, dict) and isinstance(params.get("type"), str)
 
 
 def _is_ajv_array_error(error: object) -> bool:
@@ -200,7 +215,8 @@ def _extract_array_errors(body: object) -> list[dict] | None:
 
 # Fastify form: single-message envelope. Matches `body must <phrase>` (root) or `<location>/<path> must <phrase>`.
 _FASTIFY_CLAUSE = re.compile(
-    r"(?P<location>body|query|params|headers)(?:/(?P<path>[^ ]+))? must (?P<rest>.+?)(?=, (?:body|query|params|headers)(?:/| )|$)"
+    r"(?P<location>body|query|params|headers)(?:/(?P<path>[^ ]+))? must "
+    r"(?P<rest>.+?)(?=, (?:body|query|params|headers)(?:/| )|$)"
 )
 _FASTIFY_REQUIRED = re.compile(r"have required property '(.+?)'")
 
@@ -291,18 +307,30 @@ def _fastify_observations(body: dict, operation_label: str) -> tuple[Observation
 
 
 def _array_observations(
-    errors: list[dict], operation_label: str, location: ParameterLocation
+    errors: list[dict], operation_label: str, location: ParameterLocation, case: Case
 ) -> tuple[Observation, ...]:
     observations: list[Observation] = []
     for error in errors:
         handler = _KEYWORD_HANDLERS.get(error["keyword"])
         if handler is None:
             continue
-        path = _array_form_path(error)
-        if path is None:
-            continue
         message = error.get("message")
         raw_message = message if isinstance(message, str) else ""
+        base_path = _array_base_path(error)
+        path = _array_form_path(error, base_path)
+        if path is None:
+            if not base_path and _is_root_body_type_error(error, location, case):
+                observations.append(
+                    Observation(
+                        operation_label=operation_label,
+                        location=location,
+                        parameter_path=(),
+                        kind=ObservationKind.MUST_NOT_BE_BLANK,
+                        raw_message=raw_message,
+                        payload=None,
+                    )
+                )
+            continue
         for kind, payload in handler(error):
             observations.append(
                 Observation(
@@ -319,7 +347,7 @@ def _array_observations(
 
 @PARSERS.register
 class AjvParser:
-    """Parser for AJV / Fastify validation envelopes — both AJV's structured array form and Fastify's prose envelope."""
+    """Parser for AJV / Fastify validation envelopes."""
 
     priority = 12
 
@@ -334,7 +362,7 @@ class AjvParser:
     def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         errors = _extract_array_errors(body)
         if errors is not None:
-            return _array_observations(errors, operation.label, location_for_method(operation.method))
+            return _array_observations(errors, operation.label, location_for_method(operation.method), case)
         if _is_fastify_envelope(body):
             assert isinstance(body, dict)
             return _fastify_observations(body, operation.label)
