@@ -1,0 +1,100 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ 🚫  Auth: bootstrap failed at login — Auth endpoint returned 401: '{"error":"always rejects"}\n'
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  2 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 2 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 2 failed
+
+=================================== FAILURES ===================================
+_________________________________ POST /login __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"error":"always rejects"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+________________________________ POST /register ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- API accepted schema-violating request
+
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 406, 422, 428, 5xx
+    Invalid component: in body - incorrect type
+
+[200] OK:
+
+    `{"ok":true}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== WARNINGS ===================================
+
+Authentication failed: 1 operation returned authentication errors
+
+401 Unauthorized (1 operation):
+  - POST /login
+
+💡 Ensure valid authentication credentials are set via --auth or -H
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ API accepted schema-violating request: 1
+  ❌ Undocumented HTTP status code: 1
+
+Warnings:
+  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================== 2 failures, 1 warning in 1.00s ========================

@@ -1,0 +1,96 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ 🚫  Auth: bootstrap failed at register (status 400) — {"error":"always bad"}
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  2 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 2 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 2 failed
+
+=================================== FAILURES ===================================
+_________________________________ POST /login __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Missing header not rejected
+
+    Got 404 when missing required 'Authorization' header, expected 401
+
+- Undocumented HTTP status code
+
+    Received: 404
+    Documented: 200
+
+[404] Not Found:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>404 Not Found</title>
+    <h1>Not Found</h1>
+    <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+________________________________ POST /register ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- API rejected schema-compliant request
+
+    Valid data should have been accepted
+    Expected: 2xx, 401, 403, 404, 409, 5xx
+
+[400] Bad Request:
+
+    `{"error":"always bad"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ API rejected schema-compliant request: 1
+  ❌ Missing header not rejected: 1
+  ❌ Undocumented HTTP status code: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 3 failures in 1.00s ==============================

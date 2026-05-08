@@ -626,3 +626,55 @@ class OpenApiExtraDataSource(ExtraDataSource):
             except TypeError:  # unhashable value (e.g. list); fall through, eviction still runs
                 pass
             self.repository.remove_by_value(requirement.resource_name, param_value)
+
+
+def get_credential_variants(
+    *,
+    operation: APIOperation,
+    location: ParameterLocation,
+    schema: JsonSchema,
+) -> list[dict[str, str]] | None:
+    """Return a single variant carrying bootstrapped credentials for register/login bodies.
+
+    Returns one variant dict containing the minted credential values that match the
+    operation's body schema, or None when no injection should occur (no auth flow,
+    no bootstrapped session, operation outside the flow, non-body location, or no
+    schema-valid match).
+    """
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+    if not isinstance(operation.schema, OpenApiSchema):
+        return None
+    spec = operation.schema.analysis.auth_flow
+    session = operation.schema.bootstrapped_session
+    if spec is None or session is None:
+        return None
+    if operation.label not in (spec.register_operation, spec.login_operation):
+        return None
+    if location is not ParameterLocation.BODY:
+        return None
+    if not isinstance(schema, dict):
+        return None
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return None
+
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    matched: dict[str, str] = {}
+    for field in spec.credentials:
+        if field.name not in properties:
+            continue
+        value = session.credentials.get(field.name)
+        if value is None:
+            continue
+        property_schema = properties[field.name]
+        if isinstance(property_schema, dict):
+            try:
+                validator = make_validator(schema_with_bundle(property_schema, schema), validator_cls)
+            except Exception:
+                matched[field.name] = value
+                continue
+            if not validator.is_valid(value):
+                continue
+        matched[field.name] = value
+    return [matched] if matched else None

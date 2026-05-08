@@ -60,6 +60,7 @@ class Engine:
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.SCHEMA_ANALYSIS),
                 requires_transitions=False,
             ),
+            self.get_phase_config(PhaseName.AUTH_BOOTSTRAP, is_supported=True, requires_transitions=False),
             self.get_phase_config(
                 PhaseName.EXAMPLES,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.EXAMPLES),

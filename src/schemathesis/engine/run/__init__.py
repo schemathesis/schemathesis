@@ -15,6 +15,7 @@ class PhaseName(str, enum.Enum):
 
     PROBING = "API probing"
     SCHEMA_ANALYSIS = "Schema analysis"
+    AUTH_BOOTSTRAP = "Auth bootstrap"
     EXAMPLES = "Examples"
     COVERAGE = "Coverage"
     FUZZING = "Fuzzing"
@@ -29,6 +30,7 @@ class PhaseName(str, enum.Enum):
         return {
             PhaseName.PROBING: "probing",
             PhaseName.SCHEMA_ANALYSIS: "schema analysis",
+            PhaseName.AUTH_BOOTSTRAP: "auth bootstrap",
             PhaseName.EXAMPLES: "examples",
             PhaseName.COVERAGE: "coverage",
             PhaseName.FUZZING: "fuzzing",
@@ -40,6 +42,7 @@ class PhaseName(str, enum.Enum):
         return {
             "probing": cls.PROBING,
             "schema analysis": cls.SCHEMA_ANALYSIS,
+            "auth bootstrap": cls.AUTH_BOOTSTRAP,
             "examples": cls.EXAMPLES,
             "coverage": cls.COVERAGE,
             "fuzzing": cls.FUZZING,
@@ -89,6 +92,8 @@ class Phase:
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
+    from schemathesis.engine.auth import bootstrap
+
     from . import analysis, probes, stateful, unit
 
     with warnings.catch_warnings():
@@ -98,6 +103,8 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             yield from probes.execute(ctx, phase)
         elif phase.name == PhaseName.SCHEMA_ANALYSIS:
             yield from analysis.execute(ctx, phase)
+        elif phase.name == PhaseName.AUTH_BOOTSTRAP:
+            yield from bootstrap.execute(ctx, phase)
         elif phase.name == PhaseName.EXAMPLES or phase.name == PhaseName.COVERAGE or phase.name == PhaseName.FUZZING:
             yield from unit.execute(ctx, phase)
         elif phase.name == PhaseName.STATEFUL_TESTING:

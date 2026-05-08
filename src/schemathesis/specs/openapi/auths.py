@@ -17,6 +17,14 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
+class LoginRequestError(AuthenticationError):
+    """The login HTTP/WSGI/ASGI request itself failed (transport error or non-2xx response)."""
+
+
+class TokenExtractionError(AuthenticationError):
+    """The login response was 2xx but the token could not be extracted (missing pointer / header / wrong type)."""
+
+
 @dataclass
 class ApiKeyAuthProvider:
     """Auth provider for OpenAPI API Key authentication.
@@ -118,12 +126,12 @@ class DynamicTokenAuthProvider:
         try:
             response = requests.request(self.method, url, json=self.payload, timeout=timeout)
         except requests.exceptions.RequestException as exc:
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"Connection to auth endpoint failed: {exc}",
             ) from exc
-        return self._extract_token(
+        return self.extract_token(
             status_code=response.status_code,
             text=response.text,
             get_json=response.json,
@@ -137,12 +145,12 @@ class DynamicTokenAuthProvider:
             client = get_client(app)
             response = client.open(self.path, method=self.method.upper(), json=self.payload)
         except Exception as exc:
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"WSGI auth request failed: {exc}",
             ) from exc
-        return self._extract_token(
+        return self.extract_token(
             status_code=response.status_code,
             text=response.get_data(as_text=True),
             get_json=lambda: response.get_json(force=True, silent=False),
@@ -157,19 +165,19 @@ class DynamicTokenAuthProvider:
             with get_client(app) as client:
                 response = client.request(self.method.upper(), self.path, json=self.payload, timeout=timeout)
         except Exception as exc:
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"ASGI auth request failed: {exc}",
             ) from exc
-        return self._extract_token(
+        return self.extract_token(
             status_code=response.status_code,
             text=response.text,
             get_json=response.json,
             headers=response.headers,
         )
 
-    def _extract_token(
+    def extract_token(
         self,
         status_code: int,
         text: str,
@@ -177,7 +185,7 @@ class DynamicTokenAuthProvider:
         headers: Mapping[str, str],
     ) -> str:
         if status_code >= 400:
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"Auth endpoint returned {status_code}: {text!r}",
@@ -186,20 +194,20 @@ class DynamicTokenAuthProvider:
             try:
                 body = get_json()
             except ValueError as exc:
-                raise AuthenticationError(
+                raise TokenExtractionError(
                     "DynamicTokenAuthProvider",
                     "get",
                     f"Auth endpoint returned non-JSON body: {text!r}",
                 ) from exc
             raw = resolve_pointer(body, self.extract_selector)
             if raw is UNRESOLVABLE:
-                raise AuthenticationError(
+                raise TokenExtractionError(
                     "DynamicTokenAuthProvider",
                     "get",
                     f"JSON Pointer {self.extract_selector!r} not found in auth response body: {body!r}",
                 )
             if not isinstance(raw, str):
-                raise AuthenticationError(
+                raise TokenExtractionError(
                     "DynamicTokenAuthProvider",
                     "get",
                     f"Expected a string at {self.extract_selector!r}, got {type(raw).__name__}: {raw!r}",
@@ -208,7 +216,7 @@ class DynamicTokenAuthProvider:
         result = headers.get(self.extract_selector)
         if result is None:
             present = list(headers.keys())
-            raise AuthenticationError(
+            raise TokenExtractionError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"Header {self.extract_selector!r} not found in auth response. Present headers: {present!r}",

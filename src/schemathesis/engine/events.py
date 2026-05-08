@@ -15,6 +15,7 @@ from schemathesis.engine.run import Phase, PhaseName
 
 if TYPE_CHECKING:
     from schemathesis.engine import Status, StopReason
+    from schemathesis.engine.auth.models import AuthBootstrapPayload
     from schemathesis.engine.run.probes import ProbePayload
 
 EventGenerator = Generator["EngineEvent", None, None]
@@ -78,11 +79,17 @@ class PhaseFinished(PhaseEvent):
     """End of an execution phase."""
 
     status: Status
-    payload: Result[ProbePayload, Exception] | None
+    payload: Result[ProbePayload, Exception] | AuthBootstrapPayload | None
 
     __slots__ = ("id", "timestamp", "phase", "status", "payload")
 
-    def __init__(self, *, phase: Phase, status: Status, payload: Result[ProbePayload, Exception] | None) -> None:
+    def __init__(
+        self,
+        *,
+        phase: Phase,
+        status: Status,
+        payload: Result[ProbePayload, Exception] | AuthBootstrapPayload | None,
+    ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase

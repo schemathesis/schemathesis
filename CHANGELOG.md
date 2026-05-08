@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Auto-detect register/login/use-token flows and bootstrap a session before test phases run.
+
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
 ### :rocket: Added

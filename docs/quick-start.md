@@ -41,6 +41,10 @@ Reproduce with:
 ## Test your own API
 
 === "With authentication"
+    Schemathesis auto-detects register/login flows in your schema and bootstraps a session before testing — no setup required if your schema declares one. See [Automatic Detection](guides/auth.md#automatic-detection).
+
+    For static tokens or other patterns:
+
     ```bash
     uvx schemathesis run https://your-api.com/openapi.json \
       --header 'Authorization: Bearer your-token'

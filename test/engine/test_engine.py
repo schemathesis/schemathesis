@@ -1068,6 +1068,8 @@ def test_stop_event_stream_after_second_event(event_stream):
     next(event_stream)
     next(event_stream)
     next(event_stream)
+    next(event_stream)
+    next(event_stream)
     event_stream.stop()
     next(event_stream)
     next(event_stream)

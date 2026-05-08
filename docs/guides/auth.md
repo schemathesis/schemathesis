@@ -2,6 +2,55 @@
 
 Configure authentication for APIs that require credentials, from simple static tokens to dynamic refresh patterns.
 
+## Automatic Detection
+
+If your schema declares a register/login flow that returns a bearer token (or API key), Schemathesis can bootstrap a session before testing — no configuration required.
+
+```bash
+uvx schemathesis run http://localhost:8000/openapi.json
+```
+
+When a register-shaped operation (e.g. `POST /register`, `/signup`, `/users`), a paired login operation (e.g. `POST /login`, `/auth/token`) returning a token, and a `bearer`/`apiKey` security scheme that the token applies to are all detected, the run kicks off with:
+
+```
+✅  Auth: bootstrapped via POST /login (scheme: BearerAuth)
+```
+
+Schemathesis registers a synthetic user, logs in, harvests the token, and applies it to every subsequent request that requires that scheme. Auth-walled endpoints get tested instead of returning a wall of 401s.
+
+### Coexistence With Configured Auth
+
+Auto-detection is the **lowest-priority** auth source. If any of the following is configured for the target scheme, auto-inference is suppressed:
+
+- Programmatic auth via `@schema.auth(...)` or `@schemathesis.auth(...)`
+- Static auth in `[auth.openapi.<Scheme>]`
+- Dynamic auth in `[auth.dynamic.openapi.<Scheme>]`
+
+You'll see a skip notice in CLI output:
+
+```
+⏭   Auth: detected POST /login flow but skipped — explicit auth covers scheme 'BearerAuth'
+```
+
+CLI overrides like `--header 'Authorization: ...'` and `--auth user:pass` apply on top of any auth source and don't prevent bootstrap from running, but they take precedence on the wire.
+
+### When Auto-Detection Doesn't Fire
+
+The detector is conservative — it requires a register-shaped operation, a paired login operation that returns a token, and a matching `bearer`/`apiKey` security scheme. If any signal is missing, the phase stays silent and testing proceeds without bootstrap. Falling back to one of the explicit configurations below gives you full control.
+
+### When Bootstrap Fails
+
+The register or login call may fail (server validation, network errors, missing token in response). Schemathesis reports the stage and continues without the session:
+
+```
+🚫  Auth: bootstrap failed at register (status 400) — Validation failed: email required
+🚫  Auth: bootstrap failed at login — Auth endpoint returned 401: invalid credentials
+🚫  Auth: bootstrap failed extracting token — JSON Pointer '/access_token' not found in auth response body
+🚫  Auth: could not mint credentials — could not mint a value for 'password' satisfying ...
+```
+
+Failed runs proceed without auth — public endpoints still get coverage. To fix, either correct the schema (e.g., declare `email` as required if the server enforces it) or fall back to one of the explicit auth sections below.
+
 ## Static Authentication
 
 For simple cases use CLI options directly.

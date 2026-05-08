@@ -661,12 +661,37 @@ class OpenApiBody(OpenApiComponent):
         extra_data_source: ExtraDataSource | None = None,
         mix_examples: bool = True,
         error_feedback: ErrorFeedbackStore | None = None,
+        *,
+        _inject_credentials: bool = True,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
-        # Don't cache when mix_examples is False since we need different strategies
-        # for EXAMPLES phase vs fuzzing/stateful phases
-        use_cache = extra_data_source is None and mix_examples
+        # Import here to avoid circular dependency
+        from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
+        from schemathesis.specs.openapi.extra_data_source import (
+            VariantUsageTracker,
+            get_credential_variants,
+        )
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+        # Bootstrapped credentials override any captured variants for the detected
+        # register/login operations so fuzzing produces wire-valid credentials.
+        # Suppressed on the inner negative recursion to avoid re-entering
+        # `_build_negative_aware_strategy` indefinitely; the outer call still
+        # carries credential variants and overlays them via the existing path.
+        if _inject_credentials:
+            credential_variants = get_credential_variants(
+                operation=operation,
+                location=ParameterLocation.BODY,
+                schema=self.optimized_schema,
+            )
+        else:
+            credential_variants = None
+
         feedback_generation = error_feedback.generation if error_feedback is not None else None
+        # Don't cache when mix_examples is False since EXAMPLES and fuzzing/stateful phases
+        # need different strategies. Don't cache when credential injection applies either:
+        # bootstrapped state changes per run.
+        use_cache = extra_data_source is None and mix_examples and credential_variants is None
 
         # Check cache based on generation mode (only when extra data sources are not used)
         if use_cache:
@@ -683,10 +708,6 @@ class OpenApiBody(OpenApiComponent):
                     if cached_generation == feedback_generation:
                         return cached_strategy
 
-        # Import here to avoid circular dependency
-        from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
-
         # Check for captured variants for hybrid approach
         captured_variants: list[dict[str, Any]] | None = None
         usage_tracker = None
@@ -698,6 +719,11 @@ class OpenApiBody(OpenApiComponent):
                     operation=operation, location=ParameterLocation.BODY, schema=self.optimized_schema
                 )
                 usage_tracker = extra_data_source.usage_tracker
+
+        if credential_variants is not None:
+            captured_variants = credential_variants
+            if usage_tracker is None:
+                usage_tracker = VariantUsageTracker()
 
         # Build the strategy
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
@@ -784,13 +810,21 @@ class OpenApiBody(OpenApiComponent):
         from schemathesis.specs.openapi.negative import GeneratedValue
 
         positive_strategy = self.get_strategy(
-            operation, generation_config, GenerationMode.POSITIVE, extra_data_source=None
+            operation,
+            generation_config,
+            GenerationMode.POSITIVE,
+            extra_data_source=None,
+            _inject_credentials=False,
         )
         positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
 
         negative_strategy = self.get_strategy(
-            operation, generation_config, GenerationMode.NEGATIVE, extra_data_source=None
+            operation,
+            generation_config,
+            GenerationMode.NEGATIVE,
+            extra_data_source=None,
+            _inject_credentials=False,
         )
 
         @st.composite  # type: ignore[untyped-decorator]

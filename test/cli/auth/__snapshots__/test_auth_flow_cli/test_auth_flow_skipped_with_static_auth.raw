@@ -1,0 +1,122 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       3 selected / 3 total
+     Configuration:    /tmp/config.toml
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ⏭   Auth: detected POST /login flow but skipped — explicit auth covers scheme 'BearerAuth'
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  3 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 3 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 3 failed
+
+=================================== FAILURES ===================================
+_________________________________ POST /login __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"error":"bad creds"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+________________________________ POST /register ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200
+
+[500] Internal Server Error:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>500 Internal Server Error</title>
+    <h1>Internal Server Error</h1>
+    <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+________________________________ GET /protected ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"error":"unauthorized"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== WARNINGS ===================================
+
+Authentication failed: 1 operation returned authentication errors
+
+401 Unauthorized (1 operation):
+  - POST /login
+
+💡 Ensure valid authentication credentials are set via --auth or -H
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 3
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ Server error: 1
+  ❌ Undocumented HTTP status code: 3
+
+Warnings:
+  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================== 4 failures, 1 warning in 1.00s ========================

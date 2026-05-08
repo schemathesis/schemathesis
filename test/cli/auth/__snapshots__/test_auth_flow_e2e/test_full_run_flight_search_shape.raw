@@ -1,0 +1,117 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       3 selected / 3 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ✅  Auth: bootstrapped via POST /api/v1/auth/login (scheme: BearerAuth)
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  3 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 3 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 3 failed
+
+=================================== FAILURES ===================================
+___________________________ POST /api/v1/auth/login ____________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"error":"bad creds"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+2. Test Case ID: <PLACEHOLDER>
+
+- API accepts requests without authentication
+
+    Expected 401, got `200 OK` for `POST /api/v1/auth/login`
+
+[200] OK:
+
+    `{"access_token":"valid-jwt-12345"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+__________________________ POST /api/v1/auth/register __________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 400
+    Documented: 200
+
+[400] Bad Request:
+
+    `{"error":"bad body"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+_____________________________ GET /api/v1/flights ______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"error":"unauthorized"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 3
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ API accepts requests without authentication: 1
+  ❌ Undocumented HTTP status code: 3
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 4 failures in 1.00s ==============================

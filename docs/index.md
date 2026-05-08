@@ -31,6 +31,7 @@ This command will immediately find real bugs in a demo API and show you exactly 
 
 - 🎯 Find real bugs on the first run (commonly 5–15 in production schemas).
 - 🧠 Adapts as it runs: learns from server responses, threads real values into later requests, and shifts effort away from operations that aren't producing useful signal.
+- 🔐 Auto-detects register/login flows and bootstraps a session before testing protected endpoints.
 - ⏱️ No per-endpoint tests to maintain — point it at your schema and run.
 - 🐛 Every finding ships with a minimal `curl` reproducer.
 - 🔌 Plugs into existing setups: CLI, `pytest`, GitHub Actions, plus Allure, JUnit XML, and HAR output.

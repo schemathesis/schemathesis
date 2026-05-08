@@ -9,6 +9,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.resources import ExtraDataSource, ResourceRepository
+from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
 from schemathesis.specs.openapi.auth_jwt import seed_pool_from_basic_auth, seed_pool_from_headers
 from schemathesis.specs.openapi.extra_data_source import (
     OpenApiExtraDataSource,
@@ -47,6 +48,8 @@ class OpenAPIAnalysis:
         "_inferencer",
         "_warnings_cache",
         "_schema_warnings_cache",
+        "_auth_flow",
+        "_auth_flow_cached",
     )
 
     def __init__(self, schema: OpenApiSchema) -> None:
@@ -59,6 +62,8 @@ class OpenAPIAnalysis:
         self._inferencer: LinkInferencer | None = None
         self._warnings_cache: Mapping[str, Sequence[SchemaWarning]] | None = None
         self._schema_warnings_cache: Sequence[SchemaWarning] | None = None
+        self._auth_flow: AuthFlowSpec | None = None
+        self._auth_flow_cached = False
 
     @property
     def dependency_graph(self) -> dependencies.DependencyGraph:
@@ -141,6 +146,16 @@ class OpenAPIAnalysis:
                         status_code=status_code,
                         payload=example_value,
                     )
+
+    @property
+    def auth_flow(self) -> AuthFlowSpec | None:
+        """Detected register/login/use-token flow, or `None` when no flow matches."""
+        if not self._auth_flow_cached:
+            from schemathesis.specs.openapi.auth_flow.detection import detect_auth_flow
+
+            self._auth_flow = detect_auth_flow(self.schema)
+            self._auth_flow_cached = True
+        return self._auth_flow
 
     @property
     def inferencer(self) -> LinkInferencer:

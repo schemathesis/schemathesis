@@ -1,0 +1,177 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ 🚫  Auth: could not mint credentials — could not mint a value for 'password' satisfying {'maxLength': 0, 'minLength': 1000, 'type': 'string'}
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  2 skipped
+
+ 🚫  Coverage (in 0.00s)
+
+     ❌ 1 failed  🚫 1 error
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 2 failed
+
+==================================== ERRORS ====================================
+________________________________ POST /register ________________________________
+Runtime Error
+
+Cannot have max_size=0 < min_size=1000
+
+    Traceback (most recent call last):
+      File "/package-root/engine/run/unit/__init__.py", line XXX, in worker_task
+        test_function = create_test(
+            operation=operation,
+        ...<10 lines>...
+            ),
+        )
+      File "/package-root/generation/hypothesis/builder.py", line XXX, in create_test
+        hypothesis_test = add_coverage(
+            hypothesis_test,
+        ...<7 lines>...
+            unexpected_methods_seen=config.unexpected_methods_seen,
+        )
+      File "/package-root/generation/hypothesis/builder.py", line XXX, in add_coverage
+        for case in generate_coverage_cases(
+            operation=operation,
+        ...<6 lines>...
+            unexpected_methods_seen=unexpected_methods_seen,
+        ):
+      File "/package-root/generation/hypothesis/builder.py", line XXX, in generate_coverage_cases
+        for case in _iter_coverage_cases(
+            operation=operation,
+        ...<5 lines>...
+            unexpected_methods_seen=unexpected_methods_seen,
+        ):
+      File "/package-root/generation/hypothesis/builder.py", line XXX, in _iter_coverage_cases
+        value = next(gen, NOT_SET)
+      File "/package-root/generation/coverage.py", line XXX, in cover_schema_iter
+        yield from _cover_positive_for_type(ctx, schema, ty)
+      File "/package-root/generation/coverage.py", line XXX, in _cover_positive_for_type
+        template = ctx.generate_from_schema(template_schema)
+      File "/package-root/generation/coverage.py", line XXX, in generate_from_schema
+        obj[key] = self.generate_from_schema(sub_schema)
+      File "/package-root/generation/coverage.py", line XXX, in generate_from_schema
+        return cached_draw(st.text(min_size=schema.get("minLength", 0), max_size=schema["maxLength"]))
+      File "/package-root/generation/coverage.py", line XXX, in cached_draw
+        return examples.generate_one(strategy)
+      File "/package-root/generation/hypothesis/examples.py", line XXX, in generate_one
+        add_single_example(strategy, examples, suppress_health_check)
+      File "/package-root/generation/hypothesis/examples.py", line XXX, in add_single_example
+        example_generating_inner_function()
+      File "/package-root/generation/hypothesis/examples.py", line XXX, in example_generating_inner_function
+        @applied_settings  # type: ignore[untyped-decorator]
+      File "/site-packages/hypothesis/core.py", line XXX, in wrapped_test
+        arguments, kwargs, stuff = process_arguments_to_given(
+            wrapped_test,
+        ...<3 lines>...
+            new_signature.parameters,
+        )
+      File "/site-packages/hypothesis/core.py", line XXX, in process_arguments_to_given
+        s.validate()
+      File "/site-packages/hypothesis/strategies/_internal/strategies.py", line XXX, in validate
+        self.do_validate()
+      File "/site-packages/hypothesis/strategies/_internal/lazy.py", line XXX, in do_validate
+        w = self.wrapped_strategy
+      File "/site-packages/hypothesis/strategies/_internal/lazy.py", line XXX, in wrapped_strategy
+        base = self.function(*self.__args, **self.__kwargs)
+      File "/site-packages/hypothesis/strategies/_internal/core.py", line XXX, in text
+        check_valid_sizes(min_size, max_size)
+      File "/site-packages/hypothesis/internal/validation.py", line XXX, in check_valid_sizes
+        check_valid_interval(min_size, max_size, "min_size", "max_size")
+      File "/site-packages/hypothesis/internal/validation.py", line XXX, in check_valid_interval
+        raise InvalidArgument(
+            f"Cannot have {upper_name}={upper_bound!r} < {lower_name}={lower_bound!r}"
+        )
+    hypothesis.errors.InvalidArgument: Cannot have max_size=0 < min_size=1000
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== FAILURES ===================================
+_________________________________ POST /login __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Missing header not rejected
+
+    Got 404 when missing required 'Authorization' header, expected 401
+
+- Undocumented HTTP status code
+
+    Received: 404
+    Documented: 200
+
+[404] Not Found:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>404 Not Found</title>
+    <h1>Not Found</h1>
+    <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+________________________________ POST /register ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 404
+    Documented: 200
+
+[404] Not Found:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>404 Not Found</title>
+    <h1>Not Found</h1>
+    <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples
+  🚫 Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ Missing header not rejected: 1
+  ❌ Undocumented HTTP status code: 2
+
+Errors:
+  🚫 Runtime Error: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+========================= 3 failures, 1 error in 1.00s =========================
