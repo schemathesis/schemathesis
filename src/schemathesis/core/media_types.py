@@ -16,6 +16,7 @@ YAML_MEDIA_TYPES: tuple[str, ...] = (
     "text/vnd.yaml",
     "application/yaml",
 )
+JSON_MEDIA_TYPES: frozenset[tuple[str, str]] = frozenset({("application", "jose+jwe")})
 
 FORM_MEDIA_TYPES: frozenset[str] = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])
 
@@ -93,8 +94,7 @@ def is_json(value: str) -> bool:
 
     For example - ``application/problem+json`` matches.
     """
-    main, sub = parse(value)
-    return main == "application" and (sub == "json" or sub.endswith("+json"))
+    return is_json_parts(parse(value))
 
 
 def is_yaml(value: str) -> bool:
@@ -120,6 +120,12 @@ def is_form_urlencoded(value: str | None) -> bool:
         return parse(value) == ("application", "x-www-form-urlencoded")
     except MalformedMediaType:
         return False
+
+
+def is_json_parts(media_type: tuple[str, str]) -> bool:
+    """Detect variations of the ``application/json`` media type from a parsed tuple."""
+    main, sub = media_type
+    return main == "application" and (sub == "json" or sub.endswith("+json") or media_type in JSON_MEDIA_TYPES)
 
 
 def is_xml(value: str) -> bool:
