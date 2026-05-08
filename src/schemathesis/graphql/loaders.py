@@ -10,7 +10,12 @@ from typing import IO, TYPE_CHECKING, Any, NoReturn, TypeVar, cast
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
-from schemathesis.hooks import HookContext, dispatch
+from schemathesis.hooks import (
+    GLOBAL_HOOK_DISPATCHER,
+    HookContext,
+    dispatch_after_load_schema,
+    dispatch_before_load_schema,
+)
 from schemathesis.python import asgi, wsgi
 
 if TYPE_CHECKING:
@@ -238,14 +243,14 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
     if "data" in schema:
         schema = schema["data"]
     hook_context = HookContext()
-    dispatch("before_load_schema", hook_context, schema)
+    dispatch_before_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, raw_schema=schema)
 
     if config is None:
         config = SchemathesisConfig.discover()
     project_config = config.projects.get(schema)
     instance = GraphQLSchema(schema, config=project_config)
     instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
-    dispatch("after_load_schema", hook_context, instance)
+    dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, schema=instance)
     return instance
 
 

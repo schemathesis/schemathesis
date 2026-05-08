@@ -25,7 +25,7 @@ from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
-from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, _should_skip_hook
+from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, _should_skip_hook, dispatch_before_add_examples
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 
 if TYPE_CHECKING:
@@ -229,8 +229,7 @@ class ExamplesGenerator:
 
         context = HookContext(operation=operation)
         # Per-test hooks are a pytest-plugin feature; the engine has none.
-        GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, cases)
-        operation.schema.hooks.dispatch("before_add_examples", context, cases)
+        dispatch_before_add_examples(GLOBAL_HOOK_DISPATCHER, operation.schema.hooks, context=context, examples=cases)
 
         for case in cases:
             if case.headers is not None:

@@ -56,7 +56,12 @@ from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
 from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
 
 from ...generation import GenerationMode
-from ...hooks import HookContext, HookDispatcher
+from ...hooks import (
+    HookContext,
+    HookDispatcher,
+    dispatch_before_init_operation,
+    dispatch_before_process_path,
+)
 from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
 from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
@@ -336,7 +341,7 @@ class OpenApiSchema(BaseSchema):
         else:
             path_resolver = self.root_resolver
             scope = path_resolver.base_uri
-        self.dispatch_hook("before_process_path", HookContext(), path, path_item)
+        dispatch_before_process_path(self, HookContext(), path, path_item)
         map = APIOperationMap(self, {})
         map._data = MethodMap(map, path_resolver, scope, path, CaseInsensitiveDict(path_item))
         return map
@@ -503,7 +508,6 @@ class OpenApiSchema(BaseSchema):
 
         context = HookContext()
         # Optimization: local variables are faster than attribute access
-        dispatch_hook = self.dispatch_hook
         filters_active = not self.filter_set.is_empty()
         should_skip = self._should_skip
         iter_parameters = self._iter_parameters
@@ -512,7 +516,7 @@ class OpenApiSchema(BaseSchema):
         for path, path_item in paths.items():
             method = None
             try:
-                dispatch_hook("before_process_path", context, path, path_item)
+                dispatch_before_process_path(self, context, path, path_item)
                 if "$ref" in path_item:
                     path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
                     scope = path_resolver.base_uri
@@ -669,7 +673,7 @@ class OpenApiSchema(BaseSchema):
                 operation.add_parameter(
                     OpenApiParameter.from_definition(definition=param, name_to_uri={}, adapter=self.adapter)
                 )
-        self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
+        dispatch_before_init_operation(self, HookContext(operation=operation), operation)
         return operation
 
     @property
