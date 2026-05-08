@@ -1883,6 +1883,9 @@ def _positive_object(
     # Handle additionalProperties with schema
     additional_properties = schema.get("additionalProperties")
     if isinstance(additional_properties, dict):
+        max_properties = schema.get("maxProperties")
+        if isinstance(max_properties, int) and len(template) + 1 > max_properties:
+            return
         existing_keys = set(properties.keys()) | set(template.keys())
         additional_key = _pick_property_name(schema, existing_keys, ctx)
         if additional_key is None:
