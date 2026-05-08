@@ -478,43 +478,43 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
         return parameter
 
     # Normalize for fuzzy matching
-    parameter_normalized = _normalize_for_matching(parameter)
-    resource_normalized = _normalize_for_matching(resource)
+    parameter_normalized = normalize_for_matching(parameter)
+    resource_normalized = normalize_for_matching(resource)
 
     # Normalized exact match
     # `brandId` -> `Brand.BrandId`
     for field in fields:
-        if _normalize_for_matching(field) == parameter_normalized:
+        if normalize_for_matching(field) == parameter_normalized:
             return field
 
     # Extract parameter components
     parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
-    parameter_prefix_normalized = _normalize_for_matching(parameter_prefix)
+    parameter_prefix_normalized = normalize_for_matching(parameter_prefix)
 
     # Parameter has resource prefix, field might not
     # Example: `channelId` - `Channel.id`
     if parameter_prefix and parameter_prefix_normalized == resource_normalized:
-        suffix_normalized = _normalize_for_matching(parameter_suffix)
+        suffix_normalized = normalize_for_matching(parameter_suffix)
 
         for field in fields:
-            field_normalized = _normalize_for_matching(field)
+            field_normalized = normalize_for_matching(field)
             if field_normalized == suffix_normalized:
                 return field
 
     # Parameter has no prefix, field might have resource prefix
     # Example: `id` - `Channel.channelId`
     if not parameter_prefix and parameter_suffix:
-        expected_field_normalized = resource_normalized + _normalize_for_matching(parameter_suffix)
+        expected_field_normalized = resource_normalized + normalize_for_matching(parameter_suffix)
 
         for field in fields:
-            field_normalized = _normalize_for_matching(field)
+            field_normalized = normalize_for_matching(field)
             if field_normalized == expected_field_normalized:
                 return field
 
     # ID field synonym matching (for identifier parameters)
     # Match parameter like 'conversation_id' or 'id' with fields like 'uuid', 'guid', 'uid'
     parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
-    suffix_normalized = _normalize_for_matching(parameter_suffix)
+    suffix_normalized = normalize_for_matching(parameter_suffix)
 
     # Common identifier field names in priority order
     ID_FIELD_NAMES = ["id", "uuid", "guid", "uid"]
@@ -524,13 +524,13 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
     if suffix_normalized == "idorslug":
         for id_name in ID_FIELD_NAMES + SLUG_FIELD_NAMES:
             for field in fields:
-                if _normalize_for_matching(field) == id_name:
+                if normalize_for_matching(field) == id_name:
                     return field
     elif suffix_normalized in ID_FIELD_NAMES or suffix_normalized == "ids":
         # Try to match with any identifier field, preferring exact match first
         for id_name in ID_FIELD_NAMES:
             for field in fields:
-                if _normalize_for_matching(field) == id_name:
+                if normalize_for_matching(field) == id_name:
                     return field
 
     # Resource-hint matching for underscore-separated parameters
@@ -545,21 +545,21 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
 
             # Conservative: require minimum prefix length (3 chars) to avoid spurious matches
             if len(param_prefix) >= 3 and param_suffix:
-                prefix_normalized = _normalize_for_matching(param_prefix)
-                suffix_normalized = _normalize_for_matching(param_suffix)
+                prefix_normalized = normalize_for_matching(param_prefix)
+                suffix_normalized = normalize_for_matching(param_suffix)
 
                 # Check if resource name ends with OR starts with the prefix
                 # Suffix: "BackupFile" ends with "file" for parameter "file_name"
                 # Prefix: "GroupSummary" starts with "group" for parameter "group_slug"
                 if resource_normalized.endswith(prefix_normalized) or resource_normalized.startswith(prefix_normalized):
                     for field in fields:
-                        if _normalize_for_matching(field) == suffix_normalized:
+                        if normalize_for_matching(field) == suffix_normalized:
                             return field
 
     return None
 
 
-def _normalize_for_matching(text: str) -> str:
+def normalize_for_matching(text: str) -> str:
     """Normalize text for case-insensitive, separator-insensitive matching.
 
     Examples:

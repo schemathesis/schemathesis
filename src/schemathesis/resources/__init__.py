@@ -26,6 +26,18 @@ class PoolDraw:
 
 
 @dataclass(slots=True, frozen=True)
+class SemanticDraw:
+    """Provenance for a single semantic value index draw consumed by a generated case."""
+
+    path: tuple[str, ...]
+    type_token: str
+    format_token: str | None
+    pattern_hash: str | None
+    normalized_name: str
+    value: str | int | float
+
+
+@dataclass(slots=True, frozen=True)
 class PoolPick:
     """Bundle of correlated values + their provenance returned from `pick_correlated_values`.
 
@@ -106,4 +118,5 @@ __all__ = [
     "ResourceDescriptor",
     "ResourceInstance",
     "ResourceRepository",
+    "SemanticDraw",
 ]

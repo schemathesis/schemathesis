@@ -194,7 +194,7 @@ def record_extra_data_from_recorder(ctx: EngineContext, operation: APIOperation,
         if response is None:
             continue
         case = recorder.cases[case_id].value
-        if extra_data_source.should_record(operation=operation.label):
+        if extra_data_source.should_record(operation=operation.label) and _targets_declared_method(case):
             extra_data_source.record_response(operation=operation, response=response, case=case)
         if extra_data_source.should_record_request(operation=operation.label) and _targets_declared_method(case):
             extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)

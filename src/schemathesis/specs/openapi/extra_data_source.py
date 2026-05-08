@@ -8,13 +8,17 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 import jsonschema_rs
 
 from schemathesis.core import NOT_SET, deserialization
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import make_validator, schema_with_bundle
+from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
+from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex, iter_ingestion_leaves
 from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
+from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching
 
 if TYPE_CHECKING:
     from random import Random
@@ -236,7 +240,8 @@ def _build_property_validator(
         return None
     try:
         return make_validator(schema_with_bundle(prop_schema, container_schema), validator_cls)
-    except Exception:
+    except jsonschema_rs.ValidationError:
+        # Malformed property schema (e.g. invalid regex, unsupported keyword combination).
         return None
 
 
@@ -293,11 +298,8 @@ def _variant_satisfies_paths(
             cursor = cursor[key]
         if cursor is None:
             continue
-        try:
-            if not validator.is_valid(cursor):
-                return False
-        except Exception:
-            continue
+        if not validator.is_valid(cursor):
+            return False
     return True
 
 
@@ -309,6 +311,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
     requirements: dict[RequirementKey, ParameterRequirement]
     inputs_by_label: dict[str, list[InputSlot]]
     usage_tracker: VariantUsageTracker
+    semantic_index: SemanticValueIndex | None
+    semantic_eligible_operations: frozenset[str]
+    consumer_labels: frozenset[str]
 
     def __init__(
         self,
@@ -316,11 +321,17 @@ class OpenApiExtraDataSource(ExtraDataSource):
         requirements: dict[RequirementKey, ParameterRequirement],
         inputs_by_label: dict[str, list[InputSlot]] | None = None,
         usage_tracker: VariantUsageTracker | None = None,
+        semantic_index: SemanticValueIndex | None = None,
+        semantic_eligible_operations: frozenset[str] = frozenset(),
     ) -> None:
         self.repository = repository
         self.requirements = requirements
         self.inputs_by_label = inputs_by_label if inputs_by_label is not None else {}
         self.usage_tracker = usage_tracker if usage_tracker is not None else VariantUsageTracker()
+        self.semantic_index = semantic_index
+        self.semantic_eligible_operations = semantic_eligible_operations
+        # Operations whose strategies bind captured variants at build time (consumer side).
+        self.consumer_labels: frozenset[str] = frozenset(key[0] for key in requirements)
         # Values that have been successfully DELETEd; pool draws skip them.
         self._tombstoned: set[tuple[str, Any]] = set()
 
@@ -638,7 +649,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
     def should_record(self, *, operation: str) -> bool:
         """Check if responses should be recorded for this operation."""
-        return bool(self.repository.descriptors_for_operation(operation))
+        if self.repository.descriptors_for_operation(operation):
+            return True
+        if self.semantic_index is not None and operation in self.semantic_eligible_operations:
+            return True
+        return False
 
     def should_record_request(self, *, operation: str) -> bool:
         """Check if request inputs should be captured for this operation."""
@@ -683,6 +698,17 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
         Handles deserialization and extraction of response data internally.
         """
+        # Decide eligibility before deserializing so semantic-only operations don't pay the
+        # deserialization cost (or risk a custom-deserializer exception) for non-2xx responses
+        # that the pool would discard anyway.
+        has_descriptors = bool(self.repository.descriptors_for_operation(operation.label))
+        semantic_active = (
+            self.semantic_index is not None
+            and operation.label in self.semantic_eligible_operations
+            and 200 <= response.status_code < 300
+        )
+        if not has_descriptors and not semantic_active:
+            return
         content_types = response.headers.get("content-type")
         if not content_types:
             return
@@ -692,12 +718,41 @@ class OpenApiExtraDataSource(ExtraDataSource):
             payload = deserialization.deserialize_response(response, content_type, context=context)
         except (TypeError, ValueError, json.JSONDecodeError, NotImplementedError):
             return
-        self.repository.record_response(
-            operation=operation.label,
-            status_code=response.status_code,
-            payload=payload,
-            context=case.path_parameters or {},
-        )
+        if has_descriptors:
+            self.repository.record_response(
+                operation=operation.label,
+                status_code=response.status_code,
+                payload=payload,
+                context=case.path_parameters or {},
+            )
+        if semantic_active:
+            response_def = operation.responses.find_by_status_code(response.status_code)
+            response_schema: dict[str, Any] | None = None
+            if response_def is not None:
+                # Recording runs outside the response-schema check path; an unresolvable
+                # `$ref` or other malformed response schema must not fail the operation
+                # when only non-schema checks are enabled. Fall back to a schemaless walk.
+                try:
+                    resolved_schema = response_def.get_schema(content_type).schema
+                except (BundleError, InvalidSchema, MalformedMediaType):
+                    resolved_schema = None
+                # A boolean JSON Schema (true/false) carries no leaf info; treat as schemaless.
+                if isinstance(resolved_schema, dict):
+                    response_schema = resolved_schema
+            # Normalize so a response echoing `user_id` is excluded when the path declares `userId`.
+            excluded = (
+                frozenset(normalize_for_matching(name) for name in case.path_parameters)
+                if case.path_parameters
+                else frozenset()
+            )
+            for leaf in iter_ingestion_leaves(response_schema, payload, excluded_names=excluded):
+                self.semantic_index.add(  # type: ignore[union-attr]
+                    type_token=leaf.type_token,
+                    format_token=leaf.format_token,
+                    pattern_hash=leaf.pattern_hash,
+                    normalized_name=leaf.normalized_name,
+                    value=leaf.value,
+                )
 
     def record_successful_delete(
         self,
