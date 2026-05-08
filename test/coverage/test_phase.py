@@ -3419,6 +3419,78 @@ def test_min_properties_one_with_additional_properties(ctx):
     )
 
 
+def test_required_outside_allof_propagated_into_canonicalised_branches(ctx):
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "components": {
+                "schemas": {
+                    "Interval": {"type": "string", "enum": ["WEEKLY", "MONTHLY"]},
+                    "Base": {
+                        "type": "object",
+                        "additionalProperties": True,
+                        "nullable": True,
+                        "properties": {
+                            "adjusted_start_date": {"type": "string", "format": "date", "nullable": True},
+                            "end_date": {"type": "string", "format": "date", "nullable": True},
+                            "start_date": {"type": "string", "format": "date"},
+                            "interval": {"$ref": "#/components/schemas/Interval"},
+                            "interval_execution_day": {"type": "integer"},
+                        },
+                    },
+                    "Wrapper": {
+                        "additionalProperties": True,
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Base"},
+                            {"type": "object"},
+                        ],
+                        "required": ["start_date", "interval", "interval_execution_day"],
+                    },
+                }
+            },
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "schedule": {"$ref": "#/components/schemas/Wrapper"},
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    cases: list = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    required = ("start_date", "interval", "interval_execution_day")
+    bad = []
+    for c in cases:
+        if not isinstance(c.body, dict):
+            continue
+        sched = c.body.get("schedule")
+        if isinstance(sched, dict) and not all(k in sched for k in required):
+            bad.append(sched)
+    assert not bad, f"Generated nested object missing outer-required properties. Got: {bad}"
+
+
 def test_ref_with_type_sibling_dropped_in_openapi_3_0(ctx):
     schema = ctx.openapi.from_full_schema(
         {

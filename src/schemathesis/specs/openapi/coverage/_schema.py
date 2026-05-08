@@ -709,28 +709,36 @@ def _cover_positive_for_type(
                         # See GH-3584
                         # Sub-schema defines its own properties — treat as a complete type, do not inject parent properties.
                         # Exception: required fields absent from the branch but defined in the parent must be injected
-                        # so they are generated with the correct constraints.
+                        # (or referenced from the branch's own properties) so they are still honoured.
                         parent_props = schema.get("properties", {}) if isinstance(schema, dict) else {}
-                        if parent_props:
-                            branch_props = effective.get("properties", {})
-                            branch_required: list = effective.get("required", [])
-                            parent_required: list = schema.get("required", []) if isinstance(schema, dict) else []
-                            to_inject = {
-                                f: parent_props[f]
-                                for f in set(branch_required) | set(parent_required)
-                                if f not in branch_props and f in parent_props
+                        parent_required_raw = schema.get("required", []) if isinstance(schema, dict) else []
+                        parent_required: list = parent_required_raw if isinstance(parent_required_raw, list) else []
+                        branch_props = effective.get("properties", {})
+                        branch_required_raw = effective.get("required", [])
+                        branch_required: list = branch_required_raw if isinstance(branch_required_raw, list) else []
+                        to_inject = {
+                            f: parent_props[f]
+                            for f in set(branch_required) | set(parent_required)
+                            if f not in branch_props and f in parent_props
+                        }
+                        # Required keys the branch should honour: its own plus parent-required keys
+                        # that the branch can already satisfy (or that we inject above).
+                        merged_required = list(
+                            dict.fromkeys(
+                                list(branch_required)
+                                + [
+                                    f
+                                    for f in parent_required
+                                    if f not in branch_required and (f in branch_props or f in to_inject)
+                                ]
+                            )
+                        )
+                        if to_inject or merged_required != branch_required:
+                            effective = {
+                                **effective,
+                                "properties": {**branch_props, **to_inject} if to_inject else branch_props,
+                                "required": merged_required,
                             }
-                            if to_inject:
-                                all_required = list(
-                                    dict.fromkeys(
-                                        list(branch_required) + [f for f in parent_required if f not in branch_required]
-                                    )
-                                )
-                                effective = {
-                                    **effective,
-                                    "properties": {**branch_props, **to_inject},
-                                    "required": all_required,
-                                }
                         gen = cover_schema_iter(ctx, effective)
                     else:
                         # See GH-3520
