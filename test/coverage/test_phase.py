@@ -3416,6 +3416,29 @@ def test_min_properties_one_with_additional_properties(ctx):
     )
 
 
+def test_additional_property_respects_max_properties(ctx):
+    cases = collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 1,
+            "additionalProperties": {"type": "integer"},
+        },
+        positive=True,
+    )
+    exceeding = [
+        c
+        for c in cases
+        if c.meta.phase.data.scenario == CoverageScenario.OBJECT_ADDITIONAL_PROPERTY
+        and isinstance(c.body, dict)
+        and len(c.body) > 1
+    ]
+    assert not exceeding, (
+        f"OBJECT_ADDITIONAL_PROPERTY positive case must respect maxProperties. Got: {[c.body for c in exceeding]}"
+    )
+
+
 def test_min_properties_fewer_than_required(ctx):
     cases = collect_coverage_cases(
         ctx,
