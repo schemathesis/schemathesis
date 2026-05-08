@@ -20,7 +20,7 @@ from schemathesis.engine.run.unit._errors import (
 )
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-from schemathesis.generation.progressive import CoverageGenerator
+from schemathesis.generation.progressive import CoverageGenerator, ExamplesGenerator
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -47,9 +47,23 @@ def build_coverage_generator(
     )
 
 
+def build_examples_generator(
+    operation: APIOperation,
+    ctx: EngineContext,
+    as_strategy_kwargs: dict[str, Any],
+) -> ExamplesGenerator:
+    """Construct the Examples-phase case generator."""
+    phases_config = ctx.config.phases_for(operation=operation)
+    return ExamplesGenerator(
+        operation=operation,
+        as_strategy_kwargs=as_strategy_kwargs,
+        fill_missing=phases_config.examples.fill_missing,
+    )
+
+
 def run_progressive(
     *,
-    generator: CoverageGenerator,
+    generator: CoverageGenerator | ExamplesGenerator,
     ctx: EngineContext,
     phase: PhaseName,
     suite_id: uuid.UUID,
@@ -102,6 +116,7 @@ def run_progressive(
 
     status = Status.SUCCESS
     any_case_ran = False
+    any_case_errored = False
     try:
         # Silence Hypothesis stderr chatter so it doesn't leak into the engine's event stream.
         with ignore_hypothesis_output():
@@ -111,24 +126,30 @@ def run_progressive(
                     # Promote the stop signal so `KeyboardInterrupt` handler reports INTERRUPTED.
                     raise KeyboardInterrupt
                 any_case_ran = True
-                run_one_case(
-                    case=case,
-                    ctx=ctx,
-                    check_ctx=check_ctx,
-                    recorder=recorder,
-                    generation=generation,
-                    transport_kwargs=transport_kwargs,
-                    continue_on_failure=continue_on_failure,
-                    state=state,
-                    errors=errors,
-                )
+                try:
+                    run_one_case(
+                        case=case,
+                        ctx=ctx,
+                        check_ctx=check_ctx,
+                        recorder=recorder,
+                        generation=generation,
+                        transport_kwargs=transport_kwargs,
+                        continue_on_failure=continue_on_failure,
+                        state=state,
+                        errors=errors,
+                    )
+                except UnexpectedError:
+                    # Per-case runtime error — already appended to `errors`. Continue iterating so
+                    # subsequent cases still run; their errors are accumulated and surfaced together.
+                    any_case_errored = True
+                    continue
             if not any_case_ran:
                 status = Status.SKIP
                 skip_reason = "No examples in schema"
+            elif any_case_errored:
+                status = Status.ERROR
     except (FailureGroup, Failure):
         status = Status.FAILURE
-    except UnexpectedError:
-        status = Status.ERROR
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)

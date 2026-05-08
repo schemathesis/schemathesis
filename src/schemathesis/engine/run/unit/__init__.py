@@ -34,6 +34,7 @@ from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
 from schemathesis.engine.run.unit._progressive_executor import (
     build_coverage_generator,
+    build_examples_generator,
     run_progressive,
 )
 from schemathesis.engine.supervisor import SchedulingDirective
@@ -235,6 +236,17 @@ def worker_task(
                         events_queue.put(scenario_started)
                         for event in run_progressive(
                             generator=generator,
+                            ctx=ctx,
+                            phase=phase,
+                            suite_id=suite_id,
+                            scenario_id=scenario_started.id,
+                        ):
+                            events_queue.put(event)
+                    elif phase == PhaseName.EXAMPLES:
+                        examples_generator = build_examples_generator(operation, ctx, as_strategy_kwargs)
+                        events_queue.put(scenario_started)
+                        for event in run_progressive(
+                            generator=examples_generator,
                             ctx=ctx,
                             phase=phase,
                             suite_id=suite_id,
