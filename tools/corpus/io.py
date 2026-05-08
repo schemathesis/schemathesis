@@ -6,6 +6,7 @@ import pathlib
 import re
 import tarfile
 from collections.abc import Generator
+from dataclasses import dataclass
 from typing import Any
 
 import yaml
@@ -158,6 +159,54 @@ def iter_all_corpus_files(
         corpus_name = corpus_path.name.removesuffix(".tar.gz")
         for file_name, schema in iter_corpus_file(corpus_name, data_dir=data_dir):
             yield corpus_name, file_name, schema
+
+
+CORPUS_NAMES = ("openapi-3.0", "openapi-3.1", "swagger-2.0")
+
+
+@dataclass(slots=True, frozen=True)
+class CorpusEntry:
+    """A single resolved schema, whether it came from a corpus tarball or elsewhere."""
+
+    corpus: str
+    name: str
+    schema: dict[str, Any]
+
+    @property
+    def api(self) -> str:
+        return self.name.removesuffix(".json")
+
+
+def iter_corpus_streaming(
+    corpus: str | None = None,
+    *,
+    only: str | None = None,
+    limit: int | None = None,
+    data_dir: pathlib.Path = DATA_DIR,
+) -> Generator[CorpusEntry, None, None]:
+    """Stream entries from one corpus tarball (or all of them when `corpus` is None).
+
+    Filters by member-name substring before decoding JSON, so skipped entries
+    cost only a tar header read instead of a full json.loads.
+    """
+    corpora = [corpus] if corpus else list(CORPUS_NAMES)
+    for corpus_name in corpora:
+        yielded = 0
+        with read_corpus_file(corpus_name, data_dir=data_dir) as archive:
+            for member in archive:
+                if only is not None and only not in member.name:
+                    continue
+                if limit is not None and yielded >= limit:
+                    break
+                extracted = archive.extractfile(member)
+                if extracted is None:
+                    continue
+                yield CorpusEntry(
+                    corpus=corpus_name,
+                    name=member.name,
+                    schema=json_loads(extracted.read()),
+                )
+                yielded += 1
 
 
 if __name__ == "__main__":

@@ -18,3 +18,10 @@ class GenerationMode(str, Enum):
     @property
     def is_negative(self) -> bool:
         return self == GenerationMode.NEGATIVE
+
+    @classmethod
+    def from_choice(cls, value: str) -> list[GenerationMode]:
+        """Translate an "all"/"positive"/"negative" CLI choice into a list of modes."""
+        if value == "all":
+            return list(cls)
+        return [cls(value)]
