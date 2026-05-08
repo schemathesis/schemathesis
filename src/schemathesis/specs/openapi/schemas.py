@@ -69,11 +69,18 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext, AuthProvider, AuthStorage
     from schemathesis.config import GenerationConfig
+    from schemathesis.config._auth import (
+        ApiKeyAuthConfig,
+        DynamicTokenAuthConfig,
+        HttpBasicAuthConfig,
+        HttpBearerAuthConfig,
+    )
     from schemathesis.core.adapter import ParsedParameters
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema, Scheduler
+    from schemathesis.engine.auth.models import BootstrappedSession
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
@@ -115,6 +122,7 @@ class OpenApiSchema(BaseSchema):
         # never enforces auth on a declared-public operation; otherwise generations consult this
         # instead of mutating the parsed spec.
         self._inferred_security: dict[str, SecurityRequirements] = {}
+        self.bootstrapped_session: BootstrappedSession | None = None
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
@@ -160,10 +168,32 @@ class OpenApiSchema(BaseSchema):
 
         Returns True if authentication was applied, False otherwise.
         """
-        all_schemes = self.config.auth.all_openapi_schemes
+        all_schemes = {**self.config.auth.all_openapi_schemes, **self._bootstrapped_schemes()}
         if not all_schemes:
             return False
         return self.security.apply_auth(case, context, all_schemes)
+
+    def _bootstrapped_schemes(
+        self,
+    ) -> dict[str, ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig | DynamicTokenAuthConfig]:
+        """Return the bootstrapped scheme as a single-entry config dict, or empty when absent."""
+        session = self.bootstrapped_session
+        if session is None:
+            return {}
+        spec = self.analysis.auth_flow
+        if spec is None:
+            return {}
+        definition = self.security.security_definitions.get(spec.target_scheme, {})
+        scheme_type = definition.get("type")
+        if scheme_type == "http" and str(definition.get("scheme", "")).lower() == "bearer":
+            from schemathesis.config._auth import HttpBearerAuthConfig
+
+            return {spec.target_scheme: HttpBearerAuthConfig(bearer=session.token)}
+        if scheme_type == "apiKey":
+            from schemathesis.config._auth import ApiKeyAuthConfig
+
+            return {spec.target_scheme: ApiKeyAuthConfig(api_key=session.token)}
+        return {}
 
     @override
     def create_extra_data_source(self) -> ExtraDataSource | None:

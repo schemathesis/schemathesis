@@ -1425,12 +1425,36 @@ class OpenApiBody(OpenApiComponent):
         mix_examples: bool = True,
         error_feedback: ErrorFeedbackStore | None = None,
         constants_value_source: ConstantsPool | None = None,
+        *,
+        _inject_credentials: bool = True,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
+        from schemathesis.specs.openapi.extra_data_source import (
+            VariantUsageTracker,
+            get_credential_variants,
+        )
+
+        # Bootstrapped credentials override any captured variants for the detected
+        # register/login operations so fuzzing produces wire-valid credentials.
+        # Suppressed on the inner negative recursion to avoid re-entering
+        # `_build_negative_aware_strategy` indefinitely; the outer call still
+        # carries credential variants and overlays them via the existing path.
+        if _inject_credentials:
+            credential_variants = get_credential_variants(
+                operation=operation,
+                location=ParameterLocation.BODY,
+                schema=self.optimized_schema,
+            )
+        else:
+            credential_variants = None
+
         # The captured-variant overlay binds resource values at build time, so caching it
         # would freeze stale variants. The semantic overlay closes over the live index and
         # remains correct under caching, so semantic-only data sources stay cache-eligible.
-        use_cache = mix_examples and not _captured_variants_active(extra_data_source, operation)
+        # Bootstrapped credentials change per run, so they are never cached either.
+        use_cache = (
+            mix_examples and not _captured_variants_active(extra_data_source, operation) and credential_variants is None
+        )
         feedback_generation = error_feedback.generation if error_feedback is not None else None
         semantic_id = _semantic_cache_key(extra_data_source)
         constants_id = id(constants_value_source) if constants_value_source is not None else None
@@ -1472,6 +1496,11 @@ class OpenApiBody(OpenApiComponent):
                     operation=operation, location=ParameterLocation.BODY, schema=self.optimized_schema
                 )
                 usage_tracker = extra_data_source.usage_tracker
+
+        if credential_variants is not None:
+            captured_variants = credential_variants
+            if usage_tracker is None:
+                usage_tracker = VariantUsageTracker()
 
         # Build the strategy
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
@@ -1650,6 +1679,7 @@ class OpenApiBody(OpenApiComponent):
             mix_examples=mix_examples,
             error_feedback=error_feedback,
             constants_value_source=constants_value_source,
+            _inject_credentials=False,
         )
         positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
@@ -1665,6 +1695,7 @@ class OpenApiBody(OpenApiComponent):
             extra_data_source=None,
             mix_examples=mix_examples,
             error_feedback=error_feedback,
+            _inject_credentials=False,
         )
 
         @st.composite  # type: ignore[untyped-decorator]

@@ -340,7 +340,15 @@ def test_enum_serialization(cli, ctx, ndjson_path):
         data = get_event_data(event)
         phase = data["phase"]
         assert isinstance(phase["name"], str)
-        assert phase["name"] in ("probing", "schema_analysis", "examples", "coverage", "fuzzing", "stateful")
+        assert phase["name"] in (
+            "probing",
+            "schema_analysis",
+            "auth_bootstrap",
+            "examples",
+            "coverage",
+            "fuzzing",
+            "stateful",
+        )
 
     # Status enum should be serialized as string value
     phase_finished = [e for e in events if get_event_type(e) == "PhaseFinished"]

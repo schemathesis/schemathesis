@@ -39,6 +39,14 @@ def _response_block(status_code: int, text: str, config: OutputConfig) -> str:
     return f"\n[{status_code}] {reason}:\n" + textwrap.indent(f"\n`{payload}`", "    ")
 
 
+class LoginRequestError(AuthenticationError):
+    """The login HTTP/WSGI/ASGI request itself failed (transport error or non-2xx response)."""
+
+
+class TokenExtractionError(AuthenticationError):
+    """The login response was 2xx but the token could not be extracted (missing pointer / header / wrong type)."""
+
+
 @dataclass(slots=True)
 class ApiKeyAuthProvider:
     """Auth provider for OpenAPI API Key authentication.
@@ -169,12 +177,12 @@ class DynamicTokenAuthProvider:
             response = requests.request(self.method, url, data=body, headers=headers, timeout=timeout, **kwargs)
         except (requests.exceptions.RequestException, OSError) as exc:
             # OSError: requests surfaces TLS setup failures (e.g. a missing client certificate file) as raw OSError.
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"Connection to auth endpoint failed: {exc}",
             ) from exc
-        return self._extract_token(
+        return self.extract_token(
             status_code=response.status_code,
             text=decode_lossy(response.content, response.encoding),
             get_json=lambda: load_json_lossy(response.content, response.encoding),
@@ -196,12 +204,12 @@ class DynamicTokenAuthProvider:
                 content_type=headers.get("Content-Type"),
             )
         except Exception as exc:
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"WSGI auth request failed: {exc}",
             ) from exc
-        return self._extract_token(
+        return self.extract_token(
             status_code=response.status_code,
             text=response.get_data(as_text=True),
             get_json=lambda: response.get_json(force=True, silent=False),
@@ -225,12 +233,12 @@ class DynamicTokenAuthProvider:
                     timeout=timeout,
                 )
         except Exception as exc:
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"ASGI auth request failed: {exc}",
             ) from exc
-        return self._extract_token(
+        return self.extract_token(
             status_code=response.status_code,
             text=decode_lossy(response.content, response.encoding),
             get_json=lambda: load_json_lossy(response.content, response.encoding),
@@ -239,7 +247,7 @@ class DynamicTokenAuthProvider:
             output_config=ctx.operation.schema.config.output,
         )
 
-    def _extract_token(
+    def extract_token(
         self,
         status_code: int,
         text: str,
@@ -249,7 +257,7 @@ class DynamicTokenAuthProvider:
         output_config: OutputConfig,
     ) -> str:
         if status_code in (401, 403):
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 "Auth endpoint rejected the credentials. Check the configured auth credentials.\n"
@@ -257,7 +265,7 @@ class DynamicTokenAuthProvider:
                 include_common_causes=False,
             )
         if status_code >= 400:
-            raise AuthenticationError(
+            raise LoginRequestError(
                 "DynamicTokenAuthProvider",
                 "get",
                 "Auth endpoint returned an error response.\n" + _response_block(status_code, text, output_config),
@@ -266,20 +274,20 @@ class DynamicTokenAuthProvider:
             try:
                 body = get_json()
             except ValueError as exc:
-                raise AuthenticationError(
+                raise TokenExtractionError(
                     "DynamicTokenAuthProvider",
                     "get",
                     f"Auth endpoint returned non-JSON body: {text!r}",
                 ) from exc
             raw = resolve_pointer(body, self.extract_selector)
             if raw is UNRESOLVABLE:
-                raise AuthenticationError(
+                raise TokenExtractionError(
                     "DynamicTokenAuthProvider",
                     "get",
                     f"JSON Pointer {self.extract_selector!r} not found in auth response body: {body!r}",
                 )
             if not isinstance(raw, str):
-                raise AuthenticationError(
+                raise TokenExtractionError(
                     "DynamicTokenAuthProvider",
                     "get",
                     f"Expected a string at {self.extract_selector!r}, got {type(raw).__name__}: {raw!r}",
@@ -288,7 +296,7 @@ class DynamicTokenAuthProvider:
         if self.extract_from == "cookie":
             value = cookies.get(self.extract_selector)
             if value is None:
-                raise AuthenticationError(
+                raise TokenExtractionError(
                     "DynamicTokenAuthProvider",
                     "get",
                     f"Cookie {self.extract_selector!r} not found in auth response. Present cookies: {list(cookies)!r}",
@@ -297,7 +305,7 @@ class DynamicTokenAuthProvider:
         result = headers.get(self.extract_selector)
         if result is None:
             present = list(headers.keys())
-            raise AuthenticationError(
+            raise TokenExtractionError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"Header {self.extract_selector!r} not found in auth response. Present headers: {present!r}",

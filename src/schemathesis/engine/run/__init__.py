@@ -15,6 +15,7 @@ class PhaseName(str, enum.Enum):
 
     PROBING = "probing"
     SCHEMA_ANALYSIS = "schema_analysis"
+    AUTH_BOOTSTRAP = "auth_bootstrap"
     EXAMPLES = "examples"
     COVERAGE = "coverage"
     FUZZING = "fuzzing"
@@ -81,6 +82,8 @@ class Phase:
 def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
+    from schemathesis.engine.auth import bootstrap
+
     from . import analysis, probes, stateful, unit
 
     with warnings.catch_warnings():
@@ -90,6 +93,8 @@ def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = N
             yield from probes.execute(ctx, phase)
         elif phase.name == PhaseName.SCHEMA_ANALYSIS:
             yield from analysis.execute(ctx, phase)
+        elif phase.name == PhaseName.AUTH_BOOTSTRAP:
+            yield from bootstrap.execute(ctx, phase)
         elif phase.name == PhaseName.EXAMPLES or phase.name == PhaseName.COVERAGE or phase.name == PhaseName.FUZZING:
             yield from unit.execute(ctx, phase, only=only)
         elif phase.name == PhaseName.STATEFUL_TESTING:

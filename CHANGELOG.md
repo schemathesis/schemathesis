@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.29.4...HEAD) - TBD
 
+### :rocket: Added
+
+- Detect register/login flows and bootstrap an auth session before testing protected operations.
+
 ### :bug: Fixed
 
 - Stateful testing aborting when a few operations hang instead of skipping them.

@@ -1324,7 +1324,7 @@ def test_engine_finished_stop_reason_completed(ctx):
 
 
 def test_stop_event_stream_after_second_event(event_stream):
-    for _ in range(8):
+    for _ in range(10):
         next(event_stream)
     event_stream.stop()
     remaining = list(event_stream)

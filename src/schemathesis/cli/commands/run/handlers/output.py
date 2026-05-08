@@ -41,6 +41,7 @@ from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
+from schemathesis.engine.auth.models import AuthBootstrapPayload
 from schemathesis.engine.run import ELASTIC_PHASES, PhaseName
 from schemathesis.engine.run.probes import ProbeOutcome
 
@@ -181,6 +182,56 @@ def _missing_test_data_advice(
 
 
 TRUNCATION_PLACEHOLDER = "[...]"
+
+
+def _render_auth_bootstrap(payload: AuthBootstrapPayload) -> Text | None:
+    """Render the AuthBootstrapPayload as a one-line section.
+
+    Returns ``None`` when no flow was detected — the phase stays silent in that case.
+    """
+    from rich.style import Style
+    from rich.text import Text
+
+    spec = payload.spec
+    if payload.status == Status.SUCCESS:
+        if spec is None:
+            return None
+        return Text.assemble(
+            ("✅  ", Style(color="green")),
+            ("Auth: ", Style(color="bright_white", bold=True)),
+            (
+                f"bootstrapped via {spec.login_operation} (scheme: {spec.target_scheme})",
+                Style(color="white"),
+            ),
+        )
+    if payload.status == Status.SKIP:
+        assert spec is not None
+        return Text.assemble(
+            ("⏭   ", Style(color="yellow")),
+            ("Auth: ", Style(color="bright_white", bold=True)),
+            (
+                f"detected {spec.login_operation} flow but skipped — {payload.message}",
+                Style(color="yellow"),
+            ),
+        )
+    if payload.status == Status.ERROR:
+        message = payload.message or ""
+        if payload.failure_stage == "mint":
+            detail = f"could not mint credentials — {message}"
+        elif payload.failure_stage == "register":
+            detail = f"bootstrap failed at register (status {payload.status_code}) — {message[:100]}"
+        elif payload.failure_stage == "login":
+            detail = f"bootstrap failed at login — {message}"
+        elif payload.failure_stage == "extract":
+            detail = f"bootstrap failed extracting token — {message}"
+        else:
+            detail = f"bootstrap failed — {message}"
+        return Text.assemble(
+            ("🚫  ", Style(color="red")),
+            ("Auth: ", Style(color="bright_white", bold=True)),
+            (detail, Style(color="red")),
+        )
+    return None
 
 
 @dataclass(slots=True)
@@ -989,6 +1040,11 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
                 self.console.print(Padding(table, BLOCK_PADDING))
                 self.console.print()
+        elif phase.name == PhaseName.AUTH_BOOTSTRAP and isinstance(event.payload, AuthBootstrapPayload):
+            rendered = _render_auth_bootstrap(event.payload)
+            if rendered is not None:
+                self.console.print(Padding(rendered, BLOCK_PADDING))
+                self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             manager = self.stateful_tests_manager
             self.stateful_tests_manager = None
@@ -1493,7 +1549,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         click.echo(_style("Test Phases:", bold=True))
 
         for phase in PhaseName:
-            if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS):
+            if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS, PhaseName.AUTH_BOOTSTRAP):
                 # Internal phases are not part of the test phase summary
                 continue
             status, skip_reason = ctx.phases[phase]
