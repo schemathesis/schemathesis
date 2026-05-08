@@ -4,45 +4,41 @@
 
 ### :rocket: Added
 
-- Detect runtime auth requirements from 401/403 responses on operations the spec declares public.
+#### Resource pool & captured IDs
+
 - Capture identifiers from `{<id>: <object>, ...}` map-by-id GET responses (e.g. team / pod / cluster status maps).
 - Capture every element of list-shaped responses into the pool, not just the first.
 - Capture pool entries from custom wrappers, nested envelopes, and multi-array-root GET responses.
-- Refine generation from 4xx errors (Spring, Pydantic, DRF, Rails, Laravel, ASP.NET, Symfony, Zod, AJV, go-validator, Confluent, marshmallow, Flask-RESTful, Flask-RESTX, Litestar).
 - Apply pool overlay to foreign-key fields nested inside request body objects.
-- Track deleted resources and stop re-feeding their identifiers to subsequent operations.
+
+#### Error feedback (4xx parsers)
+
+- Refine generation from 4xx errors (Spring, Pydantic, DRF, Rails, Laravel, ASP.NET, Symfony, Zod, AJV, go-validator, Confluent, marshmallow, Flask-RESTful, Flask-RESTX, Litestar).
+
+#### Adaptive operation handling
+
+- Detect runtime auth requirements from 401/403 responses on operations the spec declares public.
+- Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
+
+#### GraphQL
+
 - GraphQL fuzzing: dispatch producer mutations first and reuse captured identifiers across test cases.
 - GraphQL stateful phase: chained operation scenarios.
-- Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
+
+#### Configuration
+
 - `extra-data-sources` config for the examples and coverage phases. [#3972](https://github.com/schemathesis/schemathesis/issues/3972)
 - Document the JSON Schema for `schemathesis.toml` for editor autocompletion. [#3971](https://github.com/schemathesis/schemathesis/issues/3971)
 
 ### :bug: Fixed
 
+#### Coverage phase
+
 - Skip `pattern` rewrites that collapse optional variable-length sub-groups to `{0}`.
 - Skip `{}` as positive coverage body for schemas with `minProperties` but no `required` fields.
 - Coverage positive cases from `oneOf`/`anyOf` branches violating a root-level constraint (e.g. `type: object` branch under `type: array` root) were yielded as valid.
-- Panic during response validation for schemas with very large `{0,N}` regex quantifiers (e.g. `{0,404600}`).
 - Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
-- Mismatched parent/child path parameters in pool draws for hierarchical operations.
-- Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
-- Recognize body foreign-key fields nested behind `allOf` / `oneOf` / `anyOf` composition.
-- Drop spec examples invalidated by inferred constraints from the example mixer.
-- False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
-- JUnit and Allure reports marked all test cases as skipped when a schema had no inline examples, even though Coverage or Fuzzing phases ran successfully afterwards. [#3738](https://github.com/schemathesis/schemathesis/issues/3738)
-- False positive `negative_data_rejection` on 405 responses from routing-level rejection.
-- `Runtime Error` from invalid Schema Object when every required parameter of a set is excluded from generation.
-- False positive `response_headers_conformance` for Swagger 2.0 array headers serialised via `collectionFormat`.
-- False positive `use_after_free` on a second DELETE - DELETE is idempotent (RFC 7231 §4.3.5).
-- False positive `use_after_free` after a DELETE on a collection path with no path parameters.
-- Include the prior DELETE in `use_after_free` reproduce when it is a sibling step.
-- False positive `positive_data_acceptance` when a runtime pool body variant was missing required fields. [#3949](https://github.com/schemathesis/schemathesis/issues/3949)
-- Set `filename` on binary `multipart/form-data` parts; use `encoding.headers.Content-Disposition` if present, field name otherwise. [#3951](https://github.com/schemathesis/schemathesis/issues/3951)
-- Reject `.` and `..` path-parameter values; URL normalisation routes the request to a different operation.
-- Preserve trailing test events when producer threads exit at a phase boundary.
 - Honor `minimum: 0` / `maximum: 0` and Draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` in coverage-phase number generation.
-- Pick up in-place mutations of bundled `$ref` targets when generating from cached schemas.
-- False positive `negative_data_rejection` for body schemas combining `$ref` with sibling keywords.
 - Positive-mode coverage skipped object schemas with annotations next to unsatisfiable optional properties.
 - Skip parameter-mutation coverage cases when no positive body can be generated.
 - Coverage near-boundary numbers drift from `multipleOf` due to IEEE-754 subtraction (e.g. `99999.99 - 0.01`).
@@ -51,9 +47,46 @@
 - Emit `format: uuid` negative cases in coverage on OpenAPI 3.0 / Swagger 2.0 schemas.
 - Emit `minProperties` / `maxProperties` violations for object schemas alongside `additionalProperties`.
 
+#### Resource pool & captured IDs
+
+- Mismatched parent/child path parameters in pool draws for hierarchical operations.
+- Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
+- Recognize body foreign-key fields nested behind `allOf` / `oneOf` / `anyOf` composition.
+- Drop spec examples invalidated by inferred constraints from the example mixer.
+- Pick up in-place mutations of bundled `$ref` targets when generating from cached schemas.
+- Pool overlay corrupting nested object siblings during coverage generation.
+- Stop re-feeding deleted resource identifiers to subsequent operations.
+- False positive `positive_data_acceptance` when a runtime pool body variant was missing required fields. [#3949](https://github.com/schemathesis/schemathesis/issues/3949)
+
+#### `use_after_free` check
+
+- False positive `use_after_free` on a second DELETE - DELETE is idempotent (RFC 7231 §4.3.5).
+- False positive `use_after_free` after a DELETE on a collection path with no path parameters.
+- Include the prior DELETE in `use_after_free` reproduce when it is a sibling step.
+
+#### Validation false positives
+
+- False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
+- False positive `negative_data_rejection` on 405 responses from routing-level rejection.
+- False positive `negative_data_rejection` for body schemas combining `$ref` with sibling keywords.
+- False positive `response_headers_conformance` for Swagger 2.0 array headers serialised via `collectionFormat`.
+
+#### Reports & output
+
+- JUnit and Allure reports marked all test cases as skipped when a schema had no inline examples, even though Coverage or Fuzzing phases ran successfully afterwards. [#3738](https://github.com/schemathesis/schemathesis/issues/3738)
+- Preserve trailing test events when producer threads exit at a phase boundary.
+
+#### Other
+
+- Panic during response validation for schemas with very large `{0,N}` regex quantifiers (e.g. `{0,404600}`).
+- `Runtime Error` from invalid Schema Object when every required parameter of a set is excluded from generation.
+- Set `filename` on binary `multipart/form-data` parts; use `encoding.headers.Content-Disposition` if present, field name otherwise. [#3951](https://github.com/schemathesis/schemathesis/issues/3951)
+- Reject `.` and `..` path-parameter values; URL normalisation routes the request to a different operation.
+
 ### :wrench: Changed
 
-- Remove direct dependency on `jsonschema`.
+#### Resource & foreign-key recognition
+
 - Recognize more path parameters as resource identifiers.
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 - Recognize plural foreign-key array fields (`site_ids`, `userUuids`, `session_guids`).
@@ -61,9 +94,19 @@
 - Rebind body and query self-FK slots to the path-derived parent when the parent has the same field.
 - Prefer same-module variants for spec-suffixed duplicates (`Group` / `Group1`, `Member` / `Member1`).
 - Steer path slots to the same-module resource the operation actually returns when the suffix matcher would pick a cross-module candidate.
+
+#### Stateful & output
+
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 - Group consecutive same-title failures (e.g. multiple schema violations on one response) under a single header with a violation count.
+
+#### Generation
+
 - Negative-mode fuzzing distributes mutations across all schema depths.
+
+#### Schema & dependencies
+
+- Remove direct dependency on `jsonschema`.
 - Recognize `application/jose+jwe` as JSON media type.
 
 ### :racing_car: Performance
