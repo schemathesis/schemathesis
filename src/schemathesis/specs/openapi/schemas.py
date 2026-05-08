@@ -101,6 +101,9 @@ class OpenApiSchema(BaseSchema):
         self._bundler = Bundler()
         self._bundle_cache: BundleCache = {}
         self._operation_lookup = OperationLookup(self, HTTP_METHODS)
+        # Path-level dedup of undeclared-method coverage probes; cleared per coverage phase via
+        # `reset_coverage_state`.
+        self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
@@ -162,6 +165,34 @@ class OpenApiSchema(BaseSchema):
             format_strategies={**get_default_format_strategies(), **STRING_FORMATS},
             update_pattern=update_quantifier,
             validator_cls=self.adapter.jsonschema_validator_cls,
+        )
+
+    @override
+    def reset_coverage_state(self) -> None:
+        self.coverage_unexpected_methods_seen.clear()
+
+    @override
+    def iter_coverage_cases(
+        self,
+        operation: APIOperation,
+        *,
+        generation_modes: list[GenerationMode],
+        generation_config: GenerationConfig,
+        extra_data_source: ExtraDataSource | None = None,
+        error_feedback: ErrorFeedbackStore | None = None,
+    ) -> Iterator[Case]:
+        from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
+
+        phases_config = self.config.phases_for(operation=operation)
+        return iter_coverage_cases(
+            operation=operation,
+            generation_modes=generation_modes,
+            generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
+            unexpected_methods=phases_config.coverage.unexpected_methods,
+            generation_config=generation_config,
+            extra_data_source=extra_data_source,
+            unexpected_methods_seen=self.coverage_unexpected_methods_seen,
+            error_feedback=error_feedback,
         )
 
     @override

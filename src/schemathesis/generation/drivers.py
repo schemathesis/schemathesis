@@ -23,10 +23,15 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis.builder import adjust_urlencoded_payload, find_invalid_headers
+from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
-from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, _should_skip_hook, dispatch_before_add_examples
-from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
+from schemathesis.hooks import (
+    GLOBAL_HOOK_DISPATCHER,
+    HookContext,
+    HookDispatcher,
+    _should_skip_hook,
+    dispatch_before_add_examples,
+)
 
 if TYPE_CHECKING:
     from schemathesis.auths import AuthStorage
@@ -43,6 +48,24 @@ class Controller:
     """
 
     deferred_errors: list[Exception] = field(default_factory=list)
+
+
+def _apply_filter_and_map_hooks(
+    case: Case, dispatchers: list[HookDispatcher], hook_context: HookContext
+) -> Case | None:
+    """Run `filter_case` then `map_case` across all dispatchers; return `None` when filtered out."""
+    for dispatcher in dispatchers:
+        for hook in dispatcher.get_all_by_name("filter_case"):
+            if _should_skip_hook(hook, hook_context):
+                continue
+            if not hook(hook_context, case):
+                return None
+    for dispatcher in dispatchers:
+        for hook in dispatcher.get_all_by_name("map_case"):
+            if _should_skip_hook(hook, hook_context):
+                continue
+            case = hook(hook_context, case)
+    return case
 
 
 def _capture_missing_path_parameters(operation: APIOperation, controller: Controller) -> None:
@@ -68,21 +91,15 @@ class CoverageGenerator:
         *,
         operation: APIOperation,
         generation_modes: list[GenerationMode],
-        generate_duplicate_query_parameters: bool,
-        unexpected_methods: set[str],
         generation_config: GenerationConfig,
         auth_storage: AuthStorage | None,
         as_strategy_kwargs: dict[str, Any],
-        unexpected_methods_seen: set[tuple[str, str]] | None = None,
     ) -> None:
         self._operation = operation
         self._generation_modes = generation_modes
-        self._generate_duplicate_query_parameters = generate_duplicate_query_parameters
-        self._unexpected_methods = unexpected_methods
         self._generation_config = generation_config
         self._auth_storage = auth_storage
         self._as_strategy_kwargs = as_strategy_kwargs
-        self._unexpected_methods_seen = unexpected_methods_seen
         self._controller = Controller()
         _capture_missing_path_parameters(operation, self._controller)
 
@@ -115,14 +132,11 @@ class CoverageGenerator:
             # Per-test hooks are a pytest-plugin feature; the engine has none.
             dispatchers = [GLOBAL_HOOK_DISPATCHER, operation.schema.hooks]
 
-            for case in iter_coverage_cases(
-                operation=operation,
+            for case in operation.schema.iter_coverage_cases(
+                operation,
                 generation_modes=self._generation_modes,
-                generate_duplicate_query_parameters=self._generate_duplicate_query_parameters,
-                unexpected_methods=self._unexpected_methods,
                 generation_config=self._generation_config,
                 extra_data_source=extra_data_source,
-                unexpected_methods_seen=self._unexpected_methods_seen,
                 error_feedback=error_feedback,
             ):
                 if (
@@ -138,24 +152,10 @@ class CoverageGenerator:
                         setattr(case, container_name, value)
                     else:
                         container.update(value)
-                skip = False
-                for dispatcher in dispatchers:
-                    for hook in dispatcher.get_all_by_name("filter_case"):
-                        if _should_skip_hook(hook, hook_context):
-                            continue
-                        if not hook(hook_context, case):
-                            skip = True
-                            break
-                    if skip:
-                        break
-                if skip:
+                processed = _apply_filter_and_map_hooks(case, dispatchers, hook_context)
+                if processed is None:
                     continue
-                for dispatcher in dispatchers:
-                    for hook in dispatcher.get_all_by_name("map_case"):
-                        if _should_skip_hook(hook, hook_context):
-                            continue
-                        case = hook(hook_context, case)
-                yield case
+                yield processed
 
 
 class ExamplesGenerator:

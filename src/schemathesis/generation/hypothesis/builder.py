@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable, Generator, Mapping
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
@@ -18,7 +18,7 @@ from requests.models import CaseInsensitiveDict
 
 from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import GenerationConfig, ProjectConfig
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, SpecificationFeature, media_types
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, SpecificationFeature
 from schemathesis.core.errors import (
     IncorrectUsage,
     InfiniteRecursiveReference,
@@ -29,10 +29,8 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
-from schemathesis.core.transport import prepare_urlencoded
-from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.case import Case
+from schemathesis.generation.case import Case, adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
@@ -64,7 +62,6 @@ class HypothesisTestConfig:
     as_strategy_kwargs: dict[str, Any]
     given_args: tuple[GivenInput, ...]
     given_kwargs: dict[str, GivenInput]
-    unexpected_methods_seen: set[tuple[str, str]] | None
 
     __slots__ = (
         "project",
@@ -75,7 +72,6 @@ class HypothesisTestConfig:
         "as_strategy_kwargs",
         "given_args",
         "given_kwargs",
-        "unexpected_methods_seen",
     )
 
     def __init__(
@@ -88,7 +84,6 @@ class HypothesisTestConfig:
         as_strategy_kwargs: dict[str, Any] | None = None,
         given_args: tuple[GivenInput, ...] = (),
         given_kwargs: dict[str, GivenInput] | None = None,
-        unexpected_methods_seen: set[tuple[str, str]] | None = None,
     ) -> None:
         self.project = project
         self.modes = modes
@@ -98,7 +93,6 @@ class HypothesisTestConfig:
         self.as_strategy_kwargs = as_strategy_kwargs or {}
         self.given_args = given_args
         self.given_kwargs = given_kwargs or {}
-        self.unexpected_methods_seen = unexpected_methods_seen
 
 
 def create_test(
@@ -221,17 +215,13 @@ def create_test(
         and not config.given_args
         and not config.given_kwargs
     ):
-        phases_config = config.project.phases_for(operation=operation)
         hypothesis_test = add_coverage(
             hypothesis_test,
             operation,
             generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
-            generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
-            unexpected_methods=phases_config.coverage.unexpected_methods,
             generation_config=generation,
-            unexpected_methods_seen=config.unexpected_methods_seen,
         )
 
     injected_path_parameter_names = [
@@ -360,33 +350,22 @@ def generate_example_cases(
         yield example
 
 
-def adjust_urlencoded_payload(case: Case) -> None:
-    if media_types.is_form_urlencoded(case.media_type):
-        case.body = prepare_urlencoded(case.body)
-
-
 def add_coverage(
     test: Callable,
     operation: APIOperation,
     generation_modes: list[GenerationMode],
     auth_storage: AuthStorage | None,
     as_strategy_kwargs: dict[str, Any],
-    generate_duplicate_query_parameters: bool,
-    unexpected_methods: set[str],
     generation_config: GenerationConfig,
-    unexpected_methods_seen: set[tuple[str, str]] | None = None,
 ) -> Callable:
-    from schemathesis.generation.progressive import CoverageGenerator
+    from schemathesis.generation.drivers import CoverageGenerator
 
     generator = CoverageGenerator(
         operation=operation,
         generation_modes=generation_modes,
-        generate_duplicate_query_parameters=generate_duplicate_query_parameters,
-        unexpected_methods=unexpected_methods,
         generation_config=generation_config,
         auth_storage=auth_storage,
         as_strategy_kwargs=as_strategy_kwargs,
-        unexpected_methods_seen=unexpected_methods_seen,
     )
     for case in generator:
         test = hypothesis.example(case=case)(test)
@@ -402,12 +381,6 @@ def _case_to_kwargs(case: Case) -> dict:
         elif value and value is not NOT_SET:
             kwargs[container_name] = value
     return kwargs
-
-
-def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, None]:
-    for name, value in headers.items():
-        if not is_latin_1_encodable(value) or has_invalid_characters(name, value):
-            yield name, value
 
 
 UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")

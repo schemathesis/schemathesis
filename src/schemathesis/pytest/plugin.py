@@ -198,11 +198,6 @@ class SchemathesisCase(PyCollector):
                         project=self.schema.config,
                         as_strategy_kwargs=as_strategy_kwargs,
                         seed=self.schema.config.seed,
-                        unexpected_methods_seen=(
-                            self.schema.coverage_unexpected_methods_seen
-                            if HypothesisTestMode.COVERAGE in modes
-                            else None
-                        ),
                     ),
                 )
                 if inspect.iscoroutinefunction(self.test_function):

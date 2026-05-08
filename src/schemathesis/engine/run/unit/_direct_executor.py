@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from requests.structures import CaseInsensitiveDict
 
@@ -19,49 +19,14 @@ from schemathesis.engine.run.unit._errors import (
     translate_iteration_exception,
 )
 from schemathesis.generation import overrides
+from schemathesis.generation.drivers import CoverageGenerator, ExamplesGenerator
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-from schemathesis.generation.progressive import CoverageGenerator, ExamplesGenerator
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
-    from schemathesis.schemas import APIOperation
 
 
-def build_coverage_generator(
-    operation: APIOperation,
-    ctx: EngineContext,
-    as_strategy_kwargs: dict[str, Any],
-) -> CoverageGenerator:
-    """Construct the Coverage-phase case generator."""
-    phases_config = ctx.config.phases_for(operation=operation)
-    generation = ctx.config.generation_for(operation=operation)
-    return CoverageGenerator(
-        operation=operation,
-        generation_modes=generation.modes,
-        generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
-        unexpected_methods=phases_config.coverage.unexpected_methods,
-        generation_config=generation,
-        auth_storage=as_strategy_kwargs.get("auth_storage"),
-        as_strategy_kwargs=as_strategy_kwargs,
-        unexpected_methods_seen=ctx.schema.coverage_unexpected_methods_seen,
-    )
-
-
-def build_examples_generator(
-    operation: APIOperation,
-    ctx: EngineContext,
-    as_strategy_kwargs: dict[str, Any],
-) -> ExamplesGenerator:
-    """Construct the Examples-phase case generator."""
-    phases_config = ctx.config.phases_for(operation=operation)
-    return ExamplesGenerator(
-        operation=operation,
-        as_strategy_kwargs=as_strategy_kwargs,
-        fill_missing=phases_config.examples.fill_missing,
-    )
-
-
-def run_progressive(
+def run_driver(
     *,
     generator: CoverageGenerator | ExamplesGenerator,
     ctx: EngineContext,

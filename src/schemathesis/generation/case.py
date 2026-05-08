@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -8,12 +8,13 @@ from jsonschema_rs import Validator
 
 from schemathesis import hooks, transport
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, CheckResult, load_all_checks, run_checks
-from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl, media_types
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Response, prepare_urlencoded
+from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.engine import Status
 from schemathesis.generation import generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata
@@ -550,3 +551,14 @@ class Case:
             transport_kwargs=transport_kwargs,
         )
         return response
+
+
+def adjust_urlencoded_payload(case: Case) -> None:
+    if media_types.is_form_urlencoded(case.media_type):
+        case.body = prepare_urlencoded(case.body)
+
+
+def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, None]:
+    for name, value in headers.items():
+        if not is_latin_1_encodable(value) or has_invalid_characters(name, value):
+            yield name, value

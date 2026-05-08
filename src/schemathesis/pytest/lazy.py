@@ -79,9 +79,6 @@ def get_all_tests(
                     project=schema.config,
                     as_strategy_kwargs=_as_strategy_kwargs,
                     given_kwargs=given_kwargs or {},
-                    unexpected_methods_seen=(
-                        schema.coverage_unexpected_methods_seen if HypothesisTestMode.COVERAGE in modes else None
-                    ),
                 ),
             )
             yield Ok((operation, test))
