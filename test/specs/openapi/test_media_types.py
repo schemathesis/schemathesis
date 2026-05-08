@@ -108,6 +108,41 @@ def test_malformed_registered_media_type_is_skipped(ctx):
     test()
 
 
+def test_jose_jwe_generation(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/jwe": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/jose+jwe": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"payload": {"type": "integer", "enum": [42]}},
+                                    "required": ["payload"],
+                                    "additionalProperties": False,
+                                }
+                            },
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    strategy = schema["/jwe"]["post"].as_strategy()
+
+    @given(strategy)
+    def test(case):
+        assert case.media_type == "application/jose+jwe"
+        assert case.body == {"payload": 42}
+        assert REQUESTS_TRANSPORT.serialize_case(case)["json"] == {"payload": 42}
+
+    test()
+
+
 def test_coverage_phase(ctx, testdir):
     api = ctx.openapi.apps.success()
     testdir.make_test(
