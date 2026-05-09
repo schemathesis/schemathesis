@@ -182,7 +182,7 @@ class SerializerRegistry:
 
             # Register multiple aliases at once
             schemathesis.serializer.alias(
-                ["application/x-json", "text/json"],
+                ["application/jsonrequest", "application/json-rpc"],
                 "application/json"
             )
             ```
