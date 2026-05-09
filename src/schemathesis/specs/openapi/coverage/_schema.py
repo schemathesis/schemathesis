@@ -693,12 +693,14 @@ def _cover_positive_for_type(
                 else:
                     one_of_validators = None
                 # A branch may generate values that satisfy the branch schema but violate
-                # a root-level `type` constraint (e.g. type:array root while branch type:object).
-                # Only gate body schemas: header/query/cookie/path adapters inject type:string
-                # for serialization, which would incorrectly filter null values from nullable
-                # anyOf branches.
+                # parent-level constraints (e.g. parent `properties.discriminator: const value`,
+                # or parent `type` excluding the branch's type). Only gate body schemas:
+                # header/query/cookie/path adapters inject type:string for serialization, which
+                # would incorrectly filter null values from nullable anyOf branches.
                 parent_validator: jsonschema_rs.Validator | None = None
-                if "type" in schema and ctx.location == ParameterLocation.BODY:
+                if ctx.location == ParameterLocation.BODY and (
+                    "type" in schema or "properties" in schema or "required" in schema
+                ):
                     try:
                         parent_validator = make_validator_for(schema)
                     except Exception:
@@ -801,9 +803,15 @@ def _cover_positive_for_type(
                 elif ty == "array":
                     yield from _positive_array(ctx, schema, cast(list, template))
                 elif ty == "object":
-                    yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
+                    yield from _filter_against_combinators(
+                        _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
+                        schema,
+                    )
             elif "properties" in schema or "required" in schema:
-                yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
+                yield from _filter_against_combinators(
+                    _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
+                    schema,
+                )
         if "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
             # These violations are positive for the outer schema, so flip the mode
@@ -1332,6 +1340,31 @@ def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema_rs.Va
                 return True
     # No matching at all - we successfully generated invalid value
     return valid_count == 0
+
+
+def _filter_against_combinators(
+    cases: Generator[GeneratedValue, None, None], schema: JsonSchema
+) -> Generator[GeneratedValue, None, None]:
+    """Drop outer-only object values that violate `anyOf`/`oneOf` on the same schema.
+
+    `_positive_object` generates from outer `properties` without consulting sibling `anyOf`/`oneOf`
+    constraints (e.g. a branch tightening a property's enum). When such a combinator is present,
+    validate each generated value against the full schema and drop the ones no branch accepts.
+    """
+    if not isinstance(schema, dict) or ("anyOf" not in schema and "oneOf" not in schema):
+        yield from cases
+        return
+    try:
+        validator = make_validator_for(schema)
+    except Exception:
+        yield from cases
+        return
+    for case in cases:
+        try:
+            if validator.is_valid(case.value):
+                yield case
+        except Exception:
+            yield case
 
 
 def _is_valid_with_formats(value: Any, schema: JsonSchema, ctx: CoverageContext) -> bool:
