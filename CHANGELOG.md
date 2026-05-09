@@ -13,6 +13,7 @@
 
 ### :bug: Fixed
 
+- Skip type-violation negatives for `multipart/form-data` string properties — stringification makes them wire-indistinguishable from enum violations.
 - Generate type-violation negatives for properties combining `type` and `enum` when canonicalization drops the explicit `type`.
 - Drop sibling keys alongside `$ref` in OpenAPI 3.0 / Swagger 2.0 schemas.
 - Respect `maxProperties` in positive coverage cases for `additionalProperties` schemas.
