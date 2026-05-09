@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
 import sys
 from collections.abc import Iterator
 from dataclasses import asdict
@@ -84,6 +86,22 @@ def main(argv: list[str] | None = None) -> int:
     results: list[SchemaResult] = []
     interrupted = False
 
+    def _write_summary_and_exit(signum: int, frame: object) -> None:
+        print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
+        summary = aggregate(results)
+        summary_json = args.out / "summary.json"
+        summary_md = args.out / "summary.md"
+        with summary_json.open("w") as fd:
+            json.dump(summary, fd, indent=2)
+        with summary_md.open("w") as fd:
+            fd.write(render_markdown(summary))
+        print(f"audited={len(results)} -> {args.out}", file=sys.stderr)
+        print(f"summary -> {summary_json}", file=sys.stderr)
+        print(f"report  -> {summary_md}", file=sys.stderr)
+        os._exit(130)
+
+    signal.signal(signal.SIGINT, _write_summary_and_exit)
+
     try:
         for entry in _iter_inputs(args):
             api_label = entry.api
@@ -125,6 +143,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"kw={keywords.get('full', 0)}/{keywords.get('total', 0)}{flag}",
                 file=sys.stderr,
             )
+            for error in result.errors:
+                print(f"     error: {error}", file=sys.stderr)
             if html_link is not None:
                 print(f"     report: {html_link}", file=sys.stderr)
     except KeyboardInterrupt:
