@@ -5832,6 +5832,43 @@ def test_coverage_positive_object_with_min_properties_no_required(ctx):
     collect_coverage_cases(ctx, body_schema, positive=True)
 
 
+def test_coverage_positive_object_no_required_collapsed_template_emits_empty_once(ctx):
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "xml": {"name": "User"},
+                                        "properties": {
+                                            "a": {"type": "string"},
+                                            "b": {"type": "string"},
+                                            "c": {"type": "string"},
+                                            "d": {"type": "string"},
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
+    empty_bodies = [c.body for c in cases if c.body == {}]
+    assert len(empty_bodies) == 1, f"Expected one empty-body case, got {len(empty_bodies)}: {[c.body for c in cases]}"
+
+
 def test_coverage_positive_oneof_branch_with_conflicting_root_type(ctx):
     # The root schema declares type:array but oneOf[0] declares type:object.
     # Positive coverage must never yield an object body — it can't satisfy both constraints.

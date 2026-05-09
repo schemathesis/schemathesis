@@ -44,7 +44,7 @@ from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
-from schemathesis.core.media_types import is_xml_parts
+from schemathesis.core.media_types import is_form_parts, is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
@@ -345,7 +345,7 @@ class CoverageContext:
         if self.location in ("query", "path", "header", "cookie"):
             return True
         if self.location == "body" and self.media_type is not None:
-            if self.media_type in frozenset([("multipart", "form-data"), ("application", "x-www-form-urlencoded")]):
+            if is_form_parts(self.media_type):
                 return True
             if is_xml_parts(self.media_type):
                 return True
@@ -1276,10 +1276,7 @@ def cover_schema_iter(
                     # Query/path/header parameters are also stringified, but servers parse them
                     # back to their declared type before validation, so str() doesn't make them
                     # valid for explicitly string-typed branches in that case.
-                    stringify_body_fields = ctx.location == ParameterLocation.BODY and ctx.media_type in {
-                        ("multipart", "form-data"),
-                        ("application", "x-www-form-urlencoded"),
-                    }
+                    stringify_body_fields = ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type)
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -1878,6 +1875,9 @@ def _positive_object(
 
     # A required property absent from the template makes every derived combination schema-invalid.
     template_complete = not (required - set(template))
+    # Whole-object dedup. Empty/partial templates make several scenarios
+    # (Valid object, subset-of-optional, only-required) collapse to the same value.
+    outer_seen = HashSet()
 
     if example or examples or default:
         if example and _is_valid_with_formats(example, schema, ctx):
@@ -1893,12 +1893,8 @@ def _positive_object(
             and _is_valid_with_formats(default, schema, ctx)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    elif template_complete and (
-        template
-        or not (
-            ctx.is_required and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
-        )
-    ):
+    elif template_complete and (template or not (ctx.is_required and is_form_parts(ctx.media_type))):
+        outer_seen.insert(template)
         yield PositiveValue(template, scenario=CoverageScenario.VALID_OBJECT, description="Valid object")
 
     if not template_complete:
@@ -1907,7 +1903,7 @@ def _positive_object(
     # Generate combinations with required properties and one optional property
     for name in optional:
         combo = {k: v for k, v in template.items() if k in required or k == name}
-        if combo != template and (min_props is None or len(combo) >= min_props):
+        if combo != template and (min_props is None or len(combo) >= min_props) and outer_seen.insert(combo):
             yield PositiveValue(
                 combo,
                 scenario=CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
@@ -1916,7 +1912,7 @@ def _positive_object(
     # Generate one combination for each size from 2 to N-1
     for selection in select_combinations(optional):
         combo = {k: v for k, v in template.items() if k in required or k in selection}
-        if min_props is None or len(combo) >= min_props:
+        if (min_props is None or len(combo) >= min_props) and outer_seen.insert(combo):
             yield PositiveValue(
                 combo,
                 scenario=CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
@@ -1927,12 +1923,10 @@ def _positive_object(
         only_required = {k: v for k, v in template.items() if k in required}
         # Skip empty object for required form bodies - {} serializes to no content
         # which violates requestBody.required
-        if (min_props is None or len(only_required) >= min_props) and (
-            only_required
-            or not (
-                ctx.is_required
-                and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
-            )
+        if (
+            (min_props is None or len(only_required) >= min_props)
+            and (only_required or not (ctx.is_required and is_form_parts(ctx.media_type)))
+            and outer_seen.insert(only_required)
         ):
             yield PositiveValue(
                 only_required,
@@ -1998,7 +1992,7 @@ def _negative_properties(
     ctx: CoverageContext, template: dict, properties: dict
 ) -> Generator[GeneratedValue, None, None]:
     nctx = ctx.with_negative()
-    is_form = ctx.location == ParameterLocation.BODY and ctx.media_type == ("application", "x-www-form-urlencoded")
+    is_form = ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type)
     is_xml = ctx.location == ParameterLocation.BODY and ctx.media_type is not None and is_xml_parts(ctx.media_type)
     bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
     for key, sub_schema in properties.items():
@@ -2017,8 +2011,9 @@ def _negative_properties(
             for value in cover_schema_iter(nctx, sub_schema):
                 if validator is not None:
                     v = value.value
-                    # Form-urlencoded values are all stringified on the wire; any non-string
-                    # whose repr satisfies the property schema is a no-op mutation.
+                    # Form bodies (urlencoded and multipart) stringify scalar property values
+                    # on the wire; any non-string whose `str(v)` satisfies the property schema
+                    # is a no-op mutation.
                     if is_form and not isinstance(v, str) and validator.is_valid(str(v)):
                         continue
                     # XML text content stringifies primitives; objects/arrays keep structure.
@@ -2291,15 +2286,7 @@ def _negative_type(
     # Form/multipart body-level type mutations don't yield reliable wire violations:
     # form-urlencoded serializes to empty body; multipart renders as boundaries around
     # str(value), which permissive servers accept as zero-part multipart.
-    if (
-        "object" in types
-        and ctx.location == ParameterLocation.BODY
-        and ctx.media_type
-        in (
-            ("application", "x-www-form-urlencoded"),
-            ("multipart", "form-data"),
-        )
-    ):
+    if "object" in types and ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type):
         return
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
 
