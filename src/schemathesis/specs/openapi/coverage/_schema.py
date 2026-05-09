@@ -114,6 +114,25 @@ def _replace_zero_with_nonzero(x: float) -> float:
     return x or 0.0
 
 
+def _accept_spec_value(value: Any, schema: dict[str, Any]) -> Any:
+    # Spec examples reflecting the response shape may carry `readOnly` keys that
+    # request-side schemas forbid; dropping those keys recovers the curated value.
+    if is_valid(value, schema):
+        return value
+    if not isinstance(value, dict):
+        return NOT_SET
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return NOT_SET
+    forbidden = {k for k, sub in properties.items() if isinstance(sub, dict) and sub.get("not") == {}}
+    if not forbidden or forbidden.isdisjoint(value):
+        return NOT_SET
+    cleaned = {k: v for k, v in value.items() if k not in forbidden}
+    if is_valid(cleaned, schema):
+        return cleaned
+    return NOT_SET
+
+
 def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
     return st.lists(strategy, max_size=2) | st.dictionaries(st.text(), strategy, max_size=2)
 
@@ -380,16 +399,21 @@ class CoverageContext:
         # properties whose schemas declare `example`/`default` get synthetic Hypothesis values.
         if isinstance(schema, dict):
             example = schema.get("example", NOT_SET)
-            if example is not NOT_SET and is_valid(example, schema):
-                return example
+            if example is not NOT_SET:
+                accepted = _accept_spec_value(example, schema)
+                if accepted is not NOT_SET:
+                    return accepted
             examples = schema.get("examples")
             if isinstance(examples, list):
                 for candidate in examples:
-                    if is_valid(candidate, schema):
-                        return candidate
+                    accepted = _accept_spec_value(candidate, schema)
+                    if accepted is not NOT_SET:
+                        return accepted
             default = schema.get("default", NOT_SET)
-            if default is not NOT_SET and is_valid(default, schema):
-                return default
+            if default is not NOT_SET:
+                accepted = _accept_spec_value(default, schema)
+                if accepted is not NOT_SET:
+                    return accepted
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
         if keys == ["type"]:
             return cached_draw(get_strategy_for_type(schema["type"]))
@@ -470,6 +494,10 @@ class CoverageContext:
             min_items = schema.get("minItems", 0)
             if "enum" in items:
                 return cached_draw(st.lists(st.sampled_from(items["enum"]), min_size=min_items))
+            # Recurse so `items`-level `example`/`examples`/`default` reach generation.
+            if any(k in items for k in ("example", "examples", "default")):
+                size = max(min_items, 1)
+                return [self.generate_from_schema(items) for _ in range(size)]
             sub_keys = sorted([k for k in items if not k.startswith("x-") and k not in ["description", "example"]])
             if sub_keys == ["type"] and items["type"] == "string":
                 return cached_draw(st.lists(st.text(), min_size=min_items))

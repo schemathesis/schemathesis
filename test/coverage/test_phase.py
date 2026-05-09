@@ -4866,6 +4866,50 @@ def test_coverage_positive_object_type_with_items(ctx):
         assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid per optimized_schema: {case.body!r}"
 
 
+def _positive_body_context():
+    return CoverageContext(
+        root_schema={},
+        location=ParameterLocation.BODY,
+        media_type=("application", "json"),
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats={},
+        validator_cls=jsonschema_rs.validator_for({}).__class__,
+    )
+
+
+@pytest.mark.parametrize(
+    "items_hint",
+    [{"example": {"id": "X"}}, {"examples": [{"id": "X"}]}, {"default": {"id": "X"}}],
+    ids=["example", "examples", "default"],
+)
+def test_array_items_spec_hint_seeds_generated_array(items_hint):
+    # Array elements draw from `items`-level spec hints.
+    items = {"type": "object", "properties": {"id": {"type": "string"}}, **items_hint}
+    assert _positive_body_context().generate_from_schema({"type": "array", "items": items, "minItems": 1}) == [
+        {"id": "X"}
+    ]
+
+
+@pytest.mark.parametrize(
+    "hint_extra",
+    [
+        {"example": {"id": "X", "ro": "v"}},
+        {"examples": [{"id": "X", "ro": "v"}]},
+        {"default": {"id": "X", "ro": "v"}},
+    ],
+    ids=["example", "examples", "default"],
+)
+def test_spec_hint_recovers_after_dropping_readonly_stripped_keys(hint_extra):
+    # Examples carrying `readOnly` keys (forbidden in request schemas) must still seed generation after dropping them.
+    schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "ro": {"not": {}}},
+        **hint_extra,
+    }
+    assert _positive_body_context().generate_from_schema(schema) == {"id": "X"}
+
+
 def test_coverage_negative_string_length_with_enum(ctx):
     loaded = ctx.openapi.load_schema(
         {
