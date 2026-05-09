@@ -23,6 +23,7 @@
 - Cover each `items` branch in positive coverage when the array has size constraints.
 - Drop duplicate object bodies in positive coverage when scenarios collapse to the same value.
 - Skip `multipart/form-data` property mutations whose stringified value still satisfies the schema.
+- Cover falsy `default` and `example` spec hints (`0`, `""`, `false`, `[]`, `{}`) in positive coverage.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
