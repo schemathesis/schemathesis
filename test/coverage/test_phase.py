@@ -935,6 +935,38 @@ def test_negative_type_violations_for_enum_property_under_allof(ctx):
     )
 
 
+def test_no_redundant_type_violations_for_enum_string_property_in_multipart(ctx):
+    # Multipart stringifies every value, so non-strings for a string-typed property
+    # collapse into the enum negation already emitted.
+    schema = build_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["color"],
+                        "properties": {
+                            "color": {"type": "string", "enum": ["red", "blue"]},
+                        },
+                    },
+                },
+            },
+        },
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
+        [
+            {"body": {"color": "AAA"}},
+            {"body": {}},
+            {"body": {"color": "blue"}},
+            {"body": {"color": "red"}},
+        ],
+    )
+
+
 def test_negative_patterns(ctx):
     schema = build_schema(
         ctx,

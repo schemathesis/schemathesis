@@ -2330,6 +2330,10 @@ def _negative_type(
     # str(value), which permissive servers accept as zero-part multipart.
     if "object" in types and ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type):
         return
+    # Form-parts stringify every value; non-strings sent for a string-typed property
+    # read as valid strings server-side, collapsing into the enum/format/range negation.
+    if "string" in types and ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type):
+        return
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
 
     filter_func = {
