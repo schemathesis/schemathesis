@@ -1338,11 +1338,17 @@ def _is_valid_with_formats(value: Any, schema: JsonSchema, ctx: CoverageContext)
     """Return True if value satisfies schema including format constraints at all nesting levels."""
     if not isinstance(schema, dict):
         return True
+    full_schema: JsonSchema = schema
+    if BUNDLE_STORAGE_KEY in ctx.root_schema:
+        full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
+    # Auto-detection picks the latest draft (wider format coverage); fall back to the spec's
+    # draft so Draft-4-only constructs still validate instead of silently passing.
     try:
-        full_schema: JsonSchema = schema
-        if BUNDLE_STORAGE_KEY in ctx.root_schema:
-            full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
         return make_validator_for(full_schema).is_valid(value)
+    except Exception:
+        pass
+    try:
+        return make_validator(full_schema, ctx.validator_cls).is_valid(value)
     except Exception:
         return True
 

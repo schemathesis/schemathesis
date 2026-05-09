@@ -3419,6 +3419,66 @@ def test_min_properties_one_with_additional_properties(ctx):
     )
 
 
+def test_request_body_example_invalid_against_schema_not_yielded(ctx):
+    # Boolean `exclusiveMinimum` (Draft 4) defeats Draft-2020-12 auto-detection; the example
+    # missing `riskFreeRate` must still be filtered out as a positive case.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "portfolios": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "values": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "number",
+                                                                "minimum": 0,
+                                                                "exclusiveMinimum": True,
+                                                            },
+                                                            "minItems": 2,
+                                                        },
+                                                    },
+                                                    "required": ["values"],
+                                                },
+                                                "minItems": 1,
+                                            },
+                                            "riskFreeRate": {"type": "number"},
+                                        },
+                                        "required": ["portfolios", "riskFreeRate"],
+                                    },
+                                    "examples": {
+                                        "missing-required": {
+                                            "value": {"portfolios": [{"values": [100, 95]}]},
+                                        },
+                                    },
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
+    bad = [c.body for c in cases if isinstance(c.body, dict) and "riskFreeRate" not in c.body]
+    assert not bad, f"Spec example invalid against schema must not be yielded. Got: {bad}"
+
+
 def test_required_outside_allof_propagated_into_canonicalised_branches(ctx):
     schema = ctx.openapi.from_full_schema(
         {
