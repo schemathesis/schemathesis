@@ -10,6 +10,7 @@
 
 - Seed strategy draws in `add_single_example` unconditionally so example generation is deterministic.
 - Recognize `application/jwt`, `text/json`, `application/x-json` as JSON media types.
+- Sort failures alphabetically by operation label for stable output ordering.
 
 ### :bug: Fixed
 
