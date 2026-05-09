@@ -239,13 +239,19 @@ def test_body_unexpected_parameters_control(ctx_factory, allow_extra_parameters)
         ({"type": "string", "minLength": 5, "maxLength": 6}, {5, 6}),
         ({"type": "string", "minLength": 5, "maxLength": 5}, {5}),
         ({"type": "string", "minLength": 0, "maxLength": 512, "pattern": r"^[\w\W]+$"}, {1}),
+        # Nullable string: union type must not leak into boundary generation,
+        # otherwise hypothesis-jsonschema may pick null and skip both length variants.
+        ({"type": ["string", "null"], "maxLength": 10}, {9, 10}),
+        ({"type": ["string", "null"], "minLength": 5, "maxLength": 10}, {5, 6, 9, 10}),
     ],
 )
 def test_positive_string(ctx, schema, lengths):
     covered = list(_positive_string(ctx, schema))
     assert_unique(covered)
     for length in lengths:
-        assert len([x for x in covered if len(x.value) == length]) == 1
+        assert len([x for x in covered if isinstance(x.value, str) and len(x.value) == length]) == 1
+    for value in covered:
+        assert isinstance(value.value, str), f"non-string from _positive_string: {value.value!r}"
     assert_conform(covered, schema)
 
 
@@ -1192,8 +1198,11 @@ def test_negative_multiple_types(nctx):
 
 
 def test_positive_multiple_types(pctx):
+    # Nullable date-time: string branch must honour `format` (null branch yields `None`).
     schema = {"type": ["string", "null"], "format": "date-time"}
-    assert cover_schema(pctx, schema) == ["", None]
+    covered = cover_schema(pctx, schema)
+    assert covered == [AnyString(), None]
+    assert_conform(covered, schema)
 
 
 @pytest.mark.parametrize(

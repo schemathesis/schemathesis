@@ -13,6 +13,7 @@
 - Preserve `required` for `allOf` schemas combined with nullable `$ref`.
 - Filter spec-provided examples and defaults when the schema uses Draft-4-only constructs.
 - Drop positive coverage bodies that violate sibling `anyOf`/`oneOf` constraints.
+- Cover `maxLength`/`minLength` boundary strings for nullable string schemas (`type: ["string", "null"]`).
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
