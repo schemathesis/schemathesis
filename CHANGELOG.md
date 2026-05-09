@@ -5,7 +5,7 @@
 ### :wrench: Changed
 
 - Seed strategy draws in `add_single_example` unconditionally so example generation is deterministic.
-- Recognize `application/jwt` as JSON media type.
+- Recognize `application/jwt`, `text/json` as JSON media types.
 
 ### :bug: Fixed
 
