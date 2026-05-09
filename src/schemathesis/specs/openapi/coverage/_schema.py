@@ -677,9 +677,22 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
         return sub
     try:
         resolved = ctx.resolve_ref(sub["$ref"])
-        if isinstance(resolved, dict):
-            return {**resolved, **{k: v for k, v in sub.items() if k != "$ref"}}
-        return resolved
+        if not isinstance(resolved, dict):
+            return resolved
+        # Deep-merge so sibling `properties`/`required` augment the resolved schema
+        # rather than wiping it; the discriminator-pinning rewrite produces exactly
+        # this shape (sibling pins the discriminator key, resolved carries the rest).
+        merged = {**resolved}
+        for key, value in sub.items():
+            if key == "$ref":
+                continue
+            if key == "properties" and isinstance(value, dict) and isinstance(merged.get("properties"), dict):
+                merged["properties"] = {**merged["properties"], **value}
+            elif key == "required" and isinstance(value, list) and isinstance(merged.get("required"), list):
+                merged["required"] = list(dict.fromkeys(merged["required"] + value))
+            else:
+                merged[key] = value
+        return merged
     except RefResolutionError:
         # Schemas are bundled, so this should not happen in practice
         return sub

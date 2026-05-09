@@ -4910,6 +4910,123 @@ def test_spec_hint_recovers_after_dropping_readonly_stripped_keys(hint_extra):
     assert _positive_body_context().generate_from_schema(schema) == {"id": "X"}
 
 
+def test_oneof_ref_branches_with_discriminator_each_get_distinct_positive_coverage(ctx):
+    # A nested discriminator `oneOf` under an outer `oneOf`-discriminated body must
+    # yield at least one value uniquely satisfying each inner branch.
+    raw = ctx.openapi.build_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Rule"}}},
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+        components={
+            "schemas": {
+                "Rule": {
+                    "discriminator": {
+                        "propertyName": "ruleType",
+                        "mapping": {
+                            "http": "#/components/schemas/HttpRule",
+                            "kinesis": "#/components/schemas/KinesisRule",
+                        },
+                    },
+                    "oneOf": [
+                        {"$ref": "#/components/schemas/HttpRule"},
+                        {"$ref": "#/components/schemas/KinesisRule"},
+                    ],
+                },
+                "HttpRule": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["ruleType", "url"],
+                    "properties": {
+                        "ruleType": {"type": "string", "enum": ["http"]},
+                        "url": {"type": "string"},
+                    },
+                },
+                "KinesisRule": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["ruleType", "target"],
+                    "properties": {
+                        "ruleType": {"type": "string", "enum": ["kinesis"]},
+                        "target": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["auth"],
+                            "properties": {
+                                "auth": {
+                                    "discriminator": {
+                                        "propertyName": "mode",
+                                        "mapping": {
+                                            "credentials": "#/components/schemas/Credentials",
+                                            "assumeRole": "#/components/schemas/AssumeRole",
+                                        },
+                                    },
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Credentials"},
+                                        {"$ref": "#/components/schemas/AssumeRole"},
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+                "Credentials": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["accessKey", "secretKey"],
+                    "properties": {
+                        "mode": {"type": "string", "enum": ["credentials"]},
+                        "accessKey": {"type": "string"},
+                        "secretKey": {"type": "string"},
+                    },
+                },
+                "AssumeRole": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["roleArn"],
+                    "properties": {
+                        "mode": {"type": "string", "enum": ["assumeRole"]},
+                        "roleArn": {"type": "string"},
+                    },
+                },
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(raw)
+    operation = loaded["/r"]["POST"]
+    creds_validator = jsonschema_rs.validator_for(raw["components"]["schemas"]["Credentials"])
+    assume_validator = jsonschema_rs.validator_for(raw["components"]["schemas"]["AssumeRole"])
+    creds_only = 0
+    assume_only = 0
+    for case in iter_coverage_cases(
+        operation=operation,
+        generation_modes=[GenerationMode.POSITIVE],
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=operation.schema.config.generation,
+    ):
+        body = case.body
+        if not isinstance(body, dict) or not isinstance(body.get("target"), dict):
+            continue
+        auth = body["target"].get("auth")
+        if not isinstance(auth, dict):
+            continue
+        ok_c = creds_validator.is_valid(auth)
+        ok_a = assume_validator.is_valid(auth)
+        if ok_c and not ok_a:
+            creds_only += 1
+        elif ok_a and not ok_c:
+            assume_only += 1
+    assert creds_only > 0 and assume_only > 0, f"creds_only={creds_only}, assume_only={assume_only}"
+
+
 def test_coverage_negative_string_length_with_enum(ctx):
     loaded = ctx.openapi.load_schema(
         {
