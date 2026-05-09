@@ -11,6 +11,7 @@
 - Drop sibling keys alongside `$ref` in OpenAPI 3.0 / Swagger 2.0 schemas.
 - Respect `maxProperties` in positive coverage cases for `additionalProperties` schemas.
 - Preserve `required` for `allOf` schemas combined with nullable `$ref`.
+- Filter spec-provided examples and defaults when the schema uses Draft-4-only constructs.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
