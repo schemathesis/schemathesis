@@ -20,6 +20,7 @@
 - Preserve `required` for `allOf` schemas combined with nullable `$ref`.
 - Filter spec-provided examples and defaults when the schema uses Draft-4-only constructs.
 - Drop positive coverage bodies that violate sibling `anyOf`/`oneOf` constraints.
+- Emit empty-array `minItems` negatives for array schemas that also declare `examples`/`example`/`default`.
 - Cover `maxLength`/`minLength` boundary strings for nullable string schemas (`type: ["string", "null"]`).
 - Cover each `items` branch in positive coverage when the array has size constraints.
 - Drop duplicate object bodies in positive coverage when scenarios collapse to the same value.

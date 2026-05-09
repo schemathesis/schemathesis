@@ -967,6 +967,60 @@ def test_no_redundant_type_violations_for_enum_string_property_in_multipart(ctx)
     )
 
 
+def test_below_min_items_negative_emitted_when_array_schema_carries_examples(ctx):
+    # Array schemas with `minItems > 0` and a sibling `examples` (or `example`/`default`)
+    # must still emit an empty-array negative — generation used to short-circuit on the
+    # spec-declared example and skip the constraint-violating shape.
+    raw = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/Item"},
+                                            "minItems": 1,
+                                            "maxItems": 50,
+                                            "examples": [[{"id": "a"}]],
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+        components={
+            "schemas": {
+                "Item": {"type": "object", "properties": {"id": {"type": "string"}}},
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(raw)
+    operation = loaded["/foo"]["POST"]
+    cases = list(
+        iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+    )
+    empty_array = [c for c in cases if isinstance(c.body, dict) and c.body.get("items") == []]
+    assert empty_array and all(
+        c.meta.phase.data.scenario == CoverageScenario.ARRAY_BELOW_MIN_ITEMS for c in empty_array
+    ), [c.body for c in cases]
+
+
 def test_negative_patterns(ctx):
     schema = build_schema(
         ctx,

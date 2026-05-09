@@ -1186,8 +1186,11 @@ def cover_schema_iter(
                             pass
                 elif key == "minItems" and isinstance(value, int) and value > 0:
                     try:
-                        # Force the array to have one less item than the minimum
-                        new_schema = {**schema, "minItems": value - 1, "maxItems": value - 1, "type": "array"}
+                        # Drop spec hints: they describe valid shapes, so `generate_from_schema`
+                        # would short-circuit to the example (vacuously accepted when a sibling
+                        # `$ref` blocks validator construction) and skip the bound we install.
+                        new_schema = {k: v for k, v in schema.items() if k not in ("example", "examples", "default")}
+                        new_schema.update({"minItems": value - 1, "maxItems": value - 1, "type": "array"})
                         array_value = ctx.generate_from_schema(new_schema)
                         if seen.insert(array_value):
                             yield NegativeValue(
