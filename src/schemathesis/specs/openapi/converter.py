@@ -23,6 +23,7 @@ def to_json_schema(
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
+    convert_if_then_else: bool = True,
     name_to_uri: dict[str, str] | None = None,
     merge_ref_siblings: bool = True,
 ) -> dict[str, Any]: ...  # pragma: no cover
@@ -37,6 +38,7 @@ def to_json_schema(
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
+    convert_if_then_else: bool = True,
     name_to_uri: dict[str, str] | None = None,
     merge_ref_siblings: bool = True,
 ) -> bool: ...  # pragma: no cover
@@ -50,6 +52,7 @@ def to_json_schema(
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
+    convert_if_then_else: bool = True,
     name_to_uri: dict[str, str] | None = None,
     merge_ref_siblings: bool = True,
 ) -> dict[str, Any] | bool:
@@ -64,6 +67,7 @@ def to_json_schema(
         update_quantifiers=update_quantifiers,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
         convert_prefix_items=convert_prefix_items,
+        convert_if_then_else=convert_if_then_else,
         name_to_uri=name_to_uri,
         merge_ref_siblings=merge_ref_siblings,
     )
@@ -77,6 +81,7 @@ def _to_json_schema(
     update_quantifiers: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
     convert_prefix_items: bool = True,
+    convert_if_then_else: bool = True,
     name_to_uri: dict[str, str] | None = None,
     merge_ref_siblings: bool = True,
 ) -> JsonSchema:
@@ -161,6 +166,11 @@ def _to_json_schema(
             schema["additionalItems"] = schema.pop("items")
         schema["items"] = prefix_items
 
+    # Convert `if`/`then`/`else` to anyOf so coverage's anyOf machinery handles the conditional.
+    # Skipped when the consumer needs the originals to stay intact (e.g. for Draft 2020-12 validators).
+    if convert_if_then_else:
+        _rewrite_if_then_else(schema)
+
     if schema_type == "array":
         _rewrite_allof_of_contains_consts(schema)
 
@@ -176,6 +186,7 @@ def _to_json_schema(
                 update_quantifiers=update_quantifiers,
                 upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                 convert_prefix_items=convert_prefix_items,
+                convert_if_then_else=convert_if_then_else,
                 name_to_uri=name_to_uri,
                 merge_ref_siblings=merge_ref_siblings,
             )
@@ -188,6 +199,7 @@ def _to_json_schema(
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                     convert_prefix_items=convert_prefix_items,
+                    convert_if_then_else=convert_if_then_else,
                     name_to_uri=name_to_uri,
                     merge_ref_siblings=merge_ref_siblings,
                 )
@@ -200,6 +212,7 @@ def _to_json_schema(
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                     convert_prefix_items=convert_prefix_items,
+                    convert_if_then_else=convert_if_then_else,
                     name_to_uri=name_to_uri,
                     merge_ref_siblings=merge_ref_siblings,
                 )
@@ -307,6 +320,42 @@ def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
     min_items = schema.get("minItems")
     if not isinstance(min_items, int) or min_items < len(consts):
         schema["minItems"] = len(consts)
+
+
+def _rewrite_if_then_else(schema: dict[str, Any]) -> None:
+    # Flatten `if`/`then`/`else` into `anyOf` branches so coverage's anyOf machinery exercises both paths.
+    if "if" not in schema:
+        return
+    if_sub = schema.pop("if")
+    then_sub = schema.pop("then", None)
+    else_sub = schema.pop("else", None)
+
+    # Bare `if` with no `then`/`else` is a JSON Schema tautology; drop without adding constraints.
+    if then_sub is None and else_sub is None:
+        return
+
+    if then_sub is not None:
+        then_branch: Any = {"allOf": [if_sub, then_sub]}
+    else:
+        then_branch = if_sub
+
+    if else_sub is not None:
+        else_branch: Any = {"allOf": [{"not": if_sub}, else_sub]}
+    else:
+        else_branch = {"not": if_sub}
+
+    new_anyof = [then_branch, else_branch]
+
+    # Compose with existing `anyOf`/`allOf` so author-declared constraints are preserved.
+    if "anyOf" in schema:
+        existing_anyof = schema.pop("anyOf")
+        existing_allof = schema.setdefault("allOf", [])
+        existing_allof.append({"anyOf": existing_anyof})
+        existing_allof.append({"anyOf": new_anyof})
+    elif "allOf" in schema:
+        schema["allOf"].append({"anyOf": new_anyof})
+    else:
+        schema["anyOf"] = new_anyof
 
 
 def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
