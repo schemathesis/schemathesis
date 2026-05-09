@@ -9,6 +9,7 @@
 
 ### :bug: Fixed
 
+- Generate type-violation negatives for properties combining `type` and `enum` when canonicalization drops the explicit `type`.
 - Drop sibling keys alongside `$ref` in OpenAPI 3.0 / Swagger 2.0 schemas.
 - Respect `maxProperties` in positive coverage cases for `additionalProperties` schemas.
 - Preserve `required` for `allOf` schemas combined with nullable `$ref`.

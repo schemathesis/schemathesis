@@ -888,6 +888,53 @@ def test_mixed_type_keyword(ctx):
     )
 
 
+def test_negative_type_violations_for_enum_property_under_allof(ctx):
+    # `allOf` canonicalisation drops `type` from `{type, enum}` properties; the engine must
+    # still emit type-violation negatives for those properties in mixed-mode coverage.
+    schema = build_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "allOf": [
+                            {"type": "object"},
+                            {
+                                "type": "object",
+                                "required": ["color"],
+                                "properties": {
+                                    "color": {"type": "string", "enum": ["red", "blue"]},
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
+        [
+            {"body": [None, None]},
+            {"body": ""},
+            {},
+            {"body": False},
+            {"body": 0},
+            {"body": {}},
+            {"body": {"color": {}}},
+            {"body": {"color": [None, None]}},
+            {"body": {"color": None}},
+            {"body": {"color": False}},
+            {"body": {"color": 0}},
+            {"body": {"color": "AAA"}},
+            {"body": {"color": "blue"}},
+            {"body": {"color": "red"}},
+        ],
+    )
+
+
 def test_negative_patterns(ctx):
     schema = build_schema(
         ctx,
