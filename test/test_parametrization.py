@@ -166,7 +166,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.body == {"name": "John"}
+    assert case.body in ({"name": "John"}, {"name": ""})
 """,
         paths={
             "/users": {
@@ -197,7 +197,8 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    # 3 calls = 1 explicit example + 2 coverage cases (example value + per-property variant).
+    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
 
 
 @pytest.mark.parametrize(
