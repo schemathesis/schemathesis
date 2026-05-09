@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.core.spec import ApiSchema
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
@@ -591,3 +592,10 @@ def _generate_parameter(
 
 def _noop(node: graphql.Node) -> graphql.Node:
     return node
+
+
+if TYPE_CHECKING:
+    # Verify structural conformance to the spec-agnostic protocol; mypy fails here
+    # if a method is renamed or its signature drifts from `ApiSchema`.
+    def _verify_api_schema_protocol(schema: GraphQLSchema) -> ApiSchema:
+        return schema

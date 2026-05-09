@@ -88,6 +88,14 @@ class Failure(AssertionError):
     def _unique_key(self) -> Any:
         return self.message
 
+    def related_case_ids(self) -> tuple[str, ...]:
+        """Other case IDs whose request/response history is needed to reproduce this failure.
+
+        Default: none. Subclasses override when reproduction depends on a sibling case
+        (e.g. `UseAfterFree` references the prior DELETE).
+        """
+        return ()
+
 
 def get_origin(exception: BaseException, seen: tuple[BaseException, ...] = ()) -> tuple:
     filename, lineno = None, None

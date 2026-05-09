@@ -18,21 +18,14 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.media_types import is_xml
-from schemathesis.core.mutations import OperatorKind
+from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import JsonValue, deepclone
+from schemathesis.core.transforms import deepclone
 
 from .types import Draw, Schema
 from .utils import can_negate, is_binary_format
 
 T = TypeVar("T")
-
-
-class MutationChannel(str, enum.Enum):
-    """Where a mutation lives in the per-case pipeline."""
-
-    SCHEMA = "schema"
-    VALUE = "value"
 
 
 PathKeyword: TypeAlias = Literal[
@@ -44,49 +37,6 @@ PathSelector: TypeAlias = str | int | None
 MAX_WALK_DEPTH = 32
 # Cap on extra mutation targets per case beyond the always-chosen primary.
 MAX_SECONDARY_TARGETS = 2
-
-
-@dataclass(slots=True)
-class Mutation:
-    """One mutation applied during a negative-fuzzing case.
-
-    Records the schema/value alteration so callers can attribute the case to a
-    specific path, operator, and keyword set.
-    """
-
-    path: tuple[str | int, ...]
-    schema_pointer: str
-    channel: MutationChannel
-    operator: OperatorKind
-    keywords: tuple[str, ...]
-    parameter: str | None
-    original_value: JsonValue | None
-    new_value: JsonValue | None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "path": list(self.path),
-            "schema_pointer": self.schema_pointer,
-            "channel": self.channel.value,
-            "operator": self.operator.value,
-            "keywords": list(self.keywords),
-            "parameter": self.parameter,
-            "original_value": self.original_value,
-            "new_value": self.new_value,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Mutation:
-        return cls(
-            path=tuple(data["path"]),
-            schema_pointer=data["schema_pointer"],
-            channel=MutationChannel(data["channel"]),
-            operator=OperatorKind(data["operator"]),
-            keywords=tuple(data["keywords"]),
-            parameter=data["parameter"],
-            original_value=data["original_value"],
-            new_value=data["new_value"],
-        )
 
 
 class MutationMetadata:

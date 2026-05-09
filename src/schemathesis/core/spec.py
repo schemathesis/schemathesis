@@ -25,8 +25,6 @@ if TYPE_CHECKING:
     from schemathesis.hooks import HookDispatcher
     from schemathesis.resources import ExtraDataSource
     from schemathesis.schemas import APIOperation
-    from schemathesis.specs.graphql.schemas import GraphQLSchema
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
 @dataclass
@@ -161,11 +159,3 @@ class ApiSchema(Protocol):
     ) -> tuple[list | None, dict[str, Any] | None]: ...  # pragma: no cover
 
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]: ...  # pragma: no cover
-
-
-if TYPE_CHECKING:
-    # Force the type checker to verify that concrete schema classes structurally satisfy
-    # `Specification`. If the Protocol changes (or a method is renamed/removed on a schema
-    # class) without updating both sides, mypy fails here.
-    def _check_protocol_conformance(openapi: OpenApiSchema, graphql: GraphQLSchema) -> tuple[ApiSchema, ApiSchema]:
-        return openapi, graphql

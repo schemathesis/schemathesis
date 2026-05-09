@@ -66,7 +66,6 @@ def test_record_auth_inference_records_observation_and_mutates_operation(ctx):
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -104,7 +103,6 @@ def test_record_auth_inference_skips_non_auth_status_codes(ctx, response_factory
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_200,
         transport_kwargs={},
@@ -136,7 +134,6 @@ def test_record_auth_inference_skips_when_operation_declares_security(ctx):
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -168,7 +165,6 @@ def test_record_auth_inference_idempotent_per_operation(ctx):
         record_auth_inference(
             store=store,
             recorder=recorder,
-            operation=operation,
             case=operation.Case(method="GET"),
             response=response_401,
             transport_kwargs={},
@@ -207,7 +203,6 @@ def test_record_auth_inference_no_configured_schemes_skips(ctx):
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -237,7 +232,6 @@ def test_record_auth_inference_retry_still_401_does_not_record(ctx):
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -290,7 +284,6 @@ def test_record_auth_inference_skips_when_retry_returns_5xx(ctx):
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -343,7 +336,6 @@ def test_send_with_scheme_forwards_wsgi_app_to_retry(ctx):
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -364,7 +356,6 @@ def test_record_auth_inference_skips_for_non_openapi_schema(ctx, response_factor
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -393,7 +384,6 @@ def test_record_auth_inference_skips_on_retry_network_error(ctx, app_runner, res
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -425,7 +415,6 @@ def test_record_auth_inference_skips_when_provider_raises(ctx, response_factory)
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -455,7 +444,6 @@ def test_record_auth_inference_skips_when_retry_returns_undocumented_status(ctx)
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},
@@ -488,7 +476,6 @@ def test_record_auth_inference_records_documented_4xx_as_auth_success(ctx):
     record_auth_inference(
         store=store,
         recorder=recorder,
-        operation=operation,
         case=case,
         response=response_401,
         transport_kwargs={},

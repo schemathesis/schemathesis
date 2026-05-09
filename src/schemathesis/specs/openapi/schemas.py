@@ -75,7 +75,9 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
+    from schemathesis.core.spec import ApiSchema
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
@@ -170,6 +172,26 @@ class OpenApiSchema(BaseSchema):
     @override
     def reset_coverage_state(self) -> None:
         self.coverage_unexpected_methods_seen.clear()
+
+    @override
+    def record_runtime_observations(
+        self,
+        *,
+        store: ErrorFeedbackStore,
+        recorder: ScenarioRecorder,
+        case: Case,
+        response: Response,
+        transport_kwargs: dict[str, Any],
+    ) -> None:
+        from schemathesis.specs.openapi.auth_inference import record_auth_inference
+
+        record_auth_inference(
+            store=store,
+            recorder=recorder,
+            case=case,
+            response=response,
+            transport_kwargs=transport_kwargs,
+        )
 
     @override
     def iter_coverage_cases(
@@ -1128,3 +1150,10 @@ class MethodMap(Mapping):
             if available_methods:
                 message += f" Available methods: {available_methods}"
             raise LookupError(message) from exc
+
+
+if TYPE_CHECKING:
+    # Verify structural conformance to the spec-agnostic protocol; mypy fails here
+    # if a method is renamed or its signature drifts from `ApiSchema`.
+    def _verify_api_schema_protocol(schema: OpenApiSchema) -> ApiSchema:
+        return schema

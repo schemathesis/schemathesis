@@ -99,7 +99,6 @@ def record_auth_inference(
     *,
     store: ErrorFeedbackStore,
     recorder: ScenarioRecorder,
-    operation: APIOperation,
     case: Case,
     response: Response,
     transport_kwargs: dict[str, Any],
@@ -115,6 +114,7 @@ def record_auth_inference(
     """
     if response.status_code not in (401, 403):
         return
+    operation = case.operation
     if not isinstance(operation.schema, OpenApiSchema):
         return
     if _has_declared_security(operation):
