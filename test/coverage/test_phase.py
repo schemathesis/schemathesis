@@ -935,6 +935,34 @@ def test_negative_type_violations_for_enum_property_under_allof(ctx):
     )
 
 
+def test_positive_oneof_number_branch_covered_when_example_pins_string(ctx):
+    # Spec example "5xx" satisfies the string branch but not the number branch; without a
+    # baseline fallback the number branch yields no positive case and `/oneOf/0/type` ends
+    # up as `needs_valid` even though the schema is satisfiable.
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "statusCode",
+                "in": "query",
+                "required": False,
+                "schema": {
+                    "examples": ["5xx"],
+                    "oneOf": [{"type": "number"}, {"type": "string"}],
+                },
+            },
+        ],
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE],
+        [
+            {"query": {"statusCode": "5xx"}},
+            {"query": {"statusCode": "0"}},
+        ],
+    )
+
+
 def test_no_redundant_type_violations_for_enum_string_property_in_multipart(ctx):
     # Multipart stringifies every value, so non-strings for a string-typed property
     # collapse into the enum negation already emitted.
