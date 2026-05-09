@@ -1,0 +1,390 @@
+# serializer version: 1
+# name: test_render_markdown_baseline_snapshot
+  '''
+  # Schemathesis run report
+  
+  v4.16.1 · seed 1 · duration 4.5s · 25 calls
+  
+  **Schema-quality finding:** server accepted 2 supposedly-invalid payloads (8.0%) — schema may be too narrow.
+  
+  ## Budget utilisation
+  
+  | Bucket                                 | Count | Share  |
+  |----------------------------------------|-------|--------|
+  | Positive accepted (P+2xx)              |     8 |  32.0% |
+  | Negative rejected (N+4xx)              |     4 |  16.0% |
+  | Server error (5xx)                     |     1 |   4.0% |
+  | Drift: handler rejects valid (P+4xx)   |     5 |  20.0% |
+  | Drift: handler accepts invalid (N+2xx) |     2 |   8.0% |
+  | Route-rejected                         |     1 |   4.0% |
+  | Auth-rejected                          |     2 |   8.0% |
+  | Other (3xx, transport, unknown mode)   |     2 |   8.0% |
+  
+  **Handler-reached: 80.0%**  ·  **Drift: 7** (P+4xx 5, N+2xx 2)
+  
+  ### Drift by location  (P+4xx, locations participating)
+  
+  | Location | Calls |
+  |----------|-------|
+  | body     |     4 |
+  
+  ## Top wasted operations
+  
+  | Operation | Total | Drift+ (P+4xx) | Drift- (N+2xx) | Auth | Route | 5xx | Top location |
+  |-----------|-------|----------------|----------------|------|-------|-----|--------------|
+  | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
+  
+  ## Phases
+  
+  | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
+  |-------|------|-------|-----------|----------|-----------|----------|-------------|--------------|
+  | Coverage | 3.0s | 12 | 0.0s | 0.0ms | 0.0s | 0.0ms | 3.0s | 100.0% |
+  | Fuzzing | 1.5s* | 13 | 0.0s | 0.0ms | 0.0s | 0.0ms | 1.5s | 100.0% |
+  
+  ## Status codes (run-wide)
+  
+  2xx: 8  3xx: 2  4xx: 12  5xx: 1  transport: 0
+  
+  ## Failures
+  
+  1 unique failures, 1 total occurrences:
+  - `status_code_conformance` — 1 unique, 1 occurrences across 1 operation: POST /echo-validate
+  
+  '''
+# ---
+# name: test_render_markdown_drift_dominant_headline_snapshot
+  '''
+  # Schemathesis run report
+  
+  v4.16.1 · seed 1 · duration 4.5s · 100 calls
+  
+  **Dominant signal:** schema/data drift (P+4xx) (100.0%) — random values miss real resources or schema is overly strict
+  
+  ## Budget utilisation
+  
+  | Bucket                                 | Count | Share  |
+  |----------------------------------------|-------|--------|
+  | Positive accepted (P+2xx)              |     0 |   0.0% |
+  | Negative rejected (N+4xx)              |     0 |   0.0% |
+  | Server error (5xx)                     |     0 |   0.0% |
+  | Drift: handler rejects valid (P+4xx)   |   100 | 100.0% |
+  | Drift: handler accepts invalid (N+2xx) |     0 |   0.0% |
+  | Route-rejected                         |     0 |   0.0% |
+  | Auth-rejected                          |     0 |   0.0% |
+  | Other (3xx, transport, unknown mode)   |     0 |   0.0% |
+  
+  **Handler-reached: 100.0%**  ·  **Drift: 100** (P+4xx 100, N+2xx 0)
+  
+  ### Drift by location  (P+4xx, locations participating)
+  
+  | Location | Calls |
+  |----------|-------|
+  | body     |     4 |
+  
+  ## Top wasted operations
+  
+  | Operation | Total | Drift+ (P+4xx) | Drift- (N+2xx) | Auth | Route | 5xx | Top location |
+  |-----------|-------|----------------|----------------|------|-------|-----|--------------|
+  | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
+  
+  ## Phases
+  
+  | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
+  |-------|------|-------|-----------|----------|-----------|----------|-------------|--------------|
+  | Coverage | 3.0s | 12 | 0.0s | 0.0ms | 0.0s | 0.0ms | 3.0s | 100.0% |
+  | Fuzzing | 1.5s* | 13 | 0.0s | 0.0ms | 0.0s | 0.0ms | 1.5s | 100.0% |
+  
+  ## Status codes (run-wide)
+  
+  2xx: 8  3xx: 2  4xx: 12  5xx: 1  transport: 0
+  
+  ## Failures
+  
+  1 unique failures, 1 total occurrences:
+  - `status_code_conformance` — 1 unique, 1 occurrences across 1 operation: POST /echo-validate
+  
+  '''
+# ---
+# name: test_render_markdown_failure_summary_with_two_fingerprints_snapshot
+  '''
+  # Schemathesis run report
+  
+  v4.16.1 · seed 1 · duration 4.5s · 25 calls
+  
+  **Schema-quality finding:** server accepted 2 supposedly-invalid payloads (8.0%) — schema may be too narrow.
+  
+  ## Budget utilisation
+  
+  | Bucket                                 | Count | Share  |
+  |----------------------------------------|-------|--------|
+  | Positive accepted (P+2xx)              |     8 |  32.0% |
+  | Negative rejected (N+4xx)              |     4 |  16.0% |
+  | Server error (5xx)                     |     1 |   4.0% |
+  | Drift: handler rejects valid (P+4xx)   |     5 |  20.0% |
+  | Drift: handler accepts invalid (N+2xx) |     2 |   8.0% |
+  | Route-rejected                         |     1 |   4.0% |
+  | Auth-rejected                          |     2 |   8.0% |
+  | Other (3xx, transport, unknown mode)   |     2 |   8.0% |
+  
+  **Handler-reached: 80.0%**  ·  **Drift: 7** (P+4xx 5, N+2xx 2)
+  
+  ### Drift by location  (P+4xx, locations participating)
+  
+  | Location | Calls |
+  |----------|-------|
+  | body     |     4 |
+  
+  ## Top wasted operations
+  
+  | Operation | Total | Drift+ (P+4xx) | Drift- (N+2xx) | Auth | Route | 5xx | Top location |
+  |-----------|-------|----------------|----------------|------|-------|-----|--------------|
+  | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
+  
+  ## Phases
+  
+  | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
+  |-------|------|-------|-----------|----------|-----------|----------|-------------|--------------|
+  | Coverage | 3.0s | 12 | 0.0s | 0.0ms | 0.0s | 0.0ms | 3.0s | 100.0% |
+  | Fuzzing | 1.5s* | 13 | 0.0s | 0.0ms | 0.0s | 0.0ms | 1.5s | 100.0% |
+  
+  ## Status codes (run-wide)
+  
+  2xx: 8  3xx: 2  4xx: 12  5xx: 1  transport: 0
+  
+  ## Failures
+  
+  2 unique failures, 2 total occurrences:
+  - `negative_data_rejection` — 2 unique, 2 occurrences across 1 operation: POST /a
+  
+  '''
+# ---
+# name: test_render_markdown_schema_quality_callout_snapshot
+  '''
+  # Schemathesis run report
+  
+  v4.16.1 · seed 1 · duration 4.5s · 623 calls
+  
+  **Dominant signal:** schema-quality (N+2xx) (96.3%) — server accepts data the schema marks invalid
+  
+  **Schema-quality finding:** server accepted 600 supposedly-invalid payloads (96.3%) — schema may be too narrow.
+  
+  ## Budget utilisation
+  
+  | Bucket                                 | Count | Share  |
+  |----------------------------------------|-------|--------|
+  | Positive accepted (P+2xx)              |     8 |   1.3% |
+  | Negative rejected (N+4xx)              |     4 |   0.6% |
+  | Server error (5xx)                     |     1 |   0.2% |
+  | Drift: handler rejects valid (P+4xx)   |     5 |   0.8% |
+  | Drift: handler accepts invalid (N+2xx) |   600 |  96.3% |
+  | Route-rejected                         |     1 |   0.2% |
+  | Auth-rejected                          |     2 |   0.3% |
+  | Other (3xx, transport, unknown mode)   |     2 |   0.3% |
+  
+  **Handler-reached: 99.2%**  ·  **Drift: 605** (P+4xx 5, N+2xx 600)
+  
+  ### Drift by location  (P+4xx, locations participating)
+  
+  | Location | Calls |
+  |----------|-------|
+  | body     |     4 |
+  
+  ## Top wasted operations
+  
+  | Operation | Total | Drift+ (P+4xx) | Drift- (N+2xx) | Auth | Route | 5xx | Top location |
+  |-----------|-------|----------------|----------------|------|-------|-----|--------------|
+  | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
+  
+  ## Phases
+  
+  | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
+  |-------|------|-------|-----------|----------|-----------|----------|-------------|--------------|
+  | Coverage | 3.0s | 12 | 0.0s | 0.0ms | 0.0s | 0.0ms | 3.0s | 100.0% |
+  | Fuzzing | 1.5s* | 13 | 0.0s | 0.0ms | 0.0s | 0.0ms | 1.5s | 100.0% |
+  
+  ## Status codes (run-wide)
+  
+  2xx: 8  3xx: 2  4xx: 12  5xx: 1  transport: 0
+  
+  ## Failures
+  
+  1 unique failures, 1 total occurrences:
+  - `status_code_conformance` — 1 unique, 1 occurrences across 1 operation: POST /echo-validate
+  
+  '''
+# ---
+# name: test_render_markdown_with_5xx_operation_snapshot
+  '''
+  # Schemathesis run report
+  
+  v4.16.1 · seed 1 · duration 4.5s · 25 calls
+  
+  **Schema-quality finding:** server accepted 2 supposedly-invalid payloads (8.0%) — schema may be too narrow.
+  
+  ## Budget utilisation
+  
+  | Bucket                                 | Count | Share  |
+  |----------------------------------------|-------|--------|
+  | Positive accepted (P+2xx)              |     8 |  32.0% |
+  | Negative rejected (N+4xx)              |     4 |  16.0% |
+  | Server error (5xx)                     |     1 |   4.0% |
+  | Drift: handler rejects valid (P+4xx)   |     5 |  20.0% |
+  | Drift: handler accepts invalid (N+2xx) |     2 |   8.0% |
+  | Route-rejected                         |     1 |   4.0% |
+  | Auth-rejected                          |     2 |   8.0% |
+  | Other (3xx, transport, unknown mode)   |     2 |   8.0% |
+  
+  **Handler-reached: 80.0%**  ·  **Drift: 7** (P+4xx 5, N+2xx 2)
+  
+  ### Drift by location  (P+4xx, locations participating)
+  
+  | Location | Calls |
+  |----------|-------|
+  | body     |     4 |
+  
+  ## Top wasted operations
+  
+  | Operation | Total | Drift+ (P+4xx) | Drift- (N+2xx) | Auth | Route | 5xx | Top location |
+  |-----------|-------|----------------|----------------|------|-------|-----|--------------|
+  | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
+  
+  ## Top server-error operations
+  
+  | Operation | Total | 5xx | Ratio |
+  |-----------|-------|-----|-------|
+  | GET /flaky | 10 | 8 | 80.0% |
+  
+  ## Phases
+  
+  | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
+  |-------|------|-------|-----------|----------|-----------|----------|-------------|--------------|
+  | Coverage | 3.0s | 12 | 0.0s | 0.0ms | 0.0s | 0.0ms | 3.0s | 100.0% |
+  | Fuzzing | 1.5s* | 13 | 0.0s | 0.0ms | 0.0s | 0.0ms | 1.5s | 100.0% |
+  
+  ## Status codes (run-wide)
+  
+  2xx: 8  3xx: 2  4xx: 12  5xx: 1  transport: 0
+  
+  ## Failures
+  
+  1 unique failures, 1 total occurrences:
+  - `status_code_conformance` — 1 unique, 1 occurrences across 1 operation: POST /echo-validate
+  
+  '''
+# ---
+# name: test_render_markdown_with_stateful_snapshot
+  '''
+  # Schemathesis run report
+  
+  v4.16.1 · seed 1 · duration 4.5s · 25 calls
+  
+  **Schema-quality finding:** server accepted 2 supposedly-invalid payloads (8.0%) — schema may be too narrow.
+  
+  ## Budget utilisation
+  
+  | Bucket                                 | Count | Share  |
+  |----------------------------------------|-------|--------|
+  | Positive accepted (P+2xx)              |     8 |  32.0% |
+  | Negative rejected (N+4xx)              |     4 |  16.0% |
+  | Server error (5xx)                     |     1 |   4.0% |
+  | Drift: handler rejects valid (P+4xx)   |     5 |  20.0% |
+  | Drift: handler accepts invalid (N+2xx) |     2 |   8.0% |
+  | Route-rejected                         |     1 |   4.0% |
+  | Auth-rejected                          |     2 |   8.0% |
+  | Other (3xx, transport, unknown mode)   |     2 |   8.0% |
+  
+  **Handler-reached: 80.0%**  ·  **Drift: 7** (P+4xx 5, N+2xx 2)
+  
+  ### Drift by location  (P+4xx, locations participating)
+  
+  | Location | Calls |
+  |----------|-------|
+  | body     |     4 |
+  
+  ## Top wasted operations
+  
+  | Operation | Total | Drift+ (P+4xx) | Drift- (N+2xx) | Auth | Route | 5xx | Top location |
+  |-----------|-------|----------------|----------------|------|-------|-----|--------------|
+  | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
+  
+  ## Stateful summary
+  
+  `Stateful tests` — 35 calls, handler-reached 100.0%, drift 20 (P+4xx 20, N+2xx 0), 5xx 5
+  Drift by location: body 12, path 8
+  
+  ## Phases
+  
+  | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
+  |-------|------|-------|-----------|----------|-----------|----------|-------------|--------------|
+  | Coverage | 3.0s | 12 | 0.0s | 0.0ms | 0.0s | 0.0ms | 3.0s | 100.0% |
+  | Fuzzing | 1.5s* | 13 | 0.0s | 0.0ms | 0.0s | 0.0ms | 1.5s | 100.0% |
+  
+  ## Status codes (run-wide)
+  
+  2xx: 8  3xx: 2  4xx: 12  5xx: 1  transport: 0
+  
+  ## Failures
+  
+  1 unique failures, 1 total occurrences:
+  - `status_code_conformance` — 1 unique, 1 occurrences across 1 operation: POST /echo-validate
+  
+  '''
+# ---
+# name: test_render_markdown_with_time_consuming_operations_snapshot
+  '''
+  # Schemathesis run report
+  
+  v4.16.1 · seed 1 · duration 4.5s · 25 calls
+  
+  **Schema-quality finding:** server accepted 2 supposedly-invalid payloads (8.0%) — schema may be too narrow.
+  
+  ## Budget utilisation
+  
+  | Bucket                                 | Count | Share  |
+  |----------------------------------------|-------|--------|
+  | Positive accepted (P+2xx)              |     8 |  32.0% |
+  | Negative rejected (N+4xx)              |     4 |  16.0% |
+  | Server error (5xx)                     |     1 |   4.0% |
+  | Drift: handler rejects valid (P+4xx)   |     5 |  20.0% |
+  | Drift: handler accepts invalid (N+2xx) |     2 |   8.0% |
+  | Route-rejected                         |     1 |   4.0% |
+  | Auth-rejected                          |     2 |   8.0% |
+  | Other (3xx, transport, unknown mode)   |     2 |   8.0% |
+  
+  **Handler-reached: 80.0%**  ·  **Drift: 7** (P+4xx 5, N+2xx 2)
+  
+  ### Drift by location  (P+4xx, locations participating)
+  
+  _no positive-drift calls_
+  
+  ## Top wasted operations
+  
+  _no wasted calls_
+  
+  ## Top time-consuming operations
+  
+  Sort key: generation + response (measured per call).
+  
+  | Operation | Calls | Gen | Net | Total |
+  |-----------|-------|-----|-----|-------|
+  | POST /slow | 30 | 15.0s | 10.0s | 25.0s |
+  | GET /fast | 30 | 5.0s | 20.0s | 25.0s |
+  
+  ## Phases
+  
+  | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
+  |-------|------|-------|-----------|----------|-----------|----------|-------------|--------------|
+  | Coverage | 3.0s | 12 | 0.0s | 0.0ms | 0.0s | 0.0ms | 3.0s | 100.0% |
+  | Fuzzing | 1.5s* | 13 | 0.0s | 0.0ms | 0.0s | 0.0ms | 1.5s | 100.0% |
+  
+  ## Status codes (run-wide)
+  
+  2xx: 8  3xx: 2  4xx: 12  5xx: 1  transport: 0
+  
+  ## Failures
+  
+  1 unique failures, 1 total occurrences:
+  - `status_code_conformance` — 1 unique, 1 occurrences across 1 operation: POST /echo-validate
+  
+  '''
+# ---

@@ -75,7 +75,7 @@ cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3"]
 bench = ["pytest-codspeed==4.5.0", "pytest-test-groups==1.2.1"]
 docs = ["mkdocs-material", "mkdocstrings[python]"]
 profiling = ["pyinstrument>=5.1"]
-scripts = ["tracecov>=0.20"]
+scripts = ["tracecov>=0.20", "seaborn>=0.13"]
 dev = ["schemathesis[tests,cov,bench,docs,scripts]"]
 
 [project.urls]
