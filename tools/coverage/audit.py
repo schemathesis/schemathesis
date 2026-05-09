@@ -88,14 +88,21 @@ def _coverage_cases(
     generation_config: GenerationConfig,
     generation_modes: list[GenerationMode],
 ) -> Generator[Case]:
-    yield from iter_coverage_cases(
+    transport = operation.schema.transport
+    for case in iter_coverage_cases(
         operation=operation,
         generation_modes=generation_modes,
         generate_duplicate_query_parameters=False,
         unexpected_methods=set(),
         generation_config=generation_config,
         unexpected_methods_seen=None,
-    )
+    ):
+        # Mirror the runner: drop cases for media types with no registered serializer
+        # so a single unsupported alternative (e.g. `application/x-msgpack`) doesn't
+        # crash the operation and forfeit coverage of its serializable siblings.
+        if case.media_type and transport.get_first_matching_media_type(case.media_type) is None:
+            continue
+        yield case
 
 
 def _example_cases(operation: APIOperation) -> Generator[Case]:

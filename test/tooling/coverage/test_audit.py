@@ -118,6 +118,31 @@ def test_audit_schema_records_required_invalid_for_form_urlencoded_body(ctx):
     assert form_required == [], outcome.result.uncovered_keywords
 
 
+def test_audit_schema_skips_unserializable_media_types_without_aborting_operation(ctx):
+    # An unserializable body alternative (no built-in serializer for `application/x-msgpack`)
+    # must not abort coverage for sibling media types that *are* serializable.
+    raw = ctx.openapi.build_schema(
+        {
+            "/messages": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "object"}},
+                            "application/x-msgpack": {"schema": {"type": "object"}},
+                            "application/x-www-form-urlencoded": {"schema": {"type": "object"}},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    assert outcome.result.errors == []
+    assert outcome.result.cases_generated > 0
+
+
 def test_audit_schema_fuzzing_uses_only_requested_generation_modes(ctx):
     raw = ctx.openapi.build_schema(_PATHS)
     outcome = audit_schema(
