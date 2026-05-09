@@ -78,6 +78,7 @@ class CoverageScenario(str, Enum):
     # Negative scenarios - Constraint violations
     OBJECT_UNEXPECTED_PROPERTIES = "object_unexpected_properties"
     OBJECT_MISSING_REQUIRED_PROPERTY = "object_missing_required_property"
+    OBJECT_INVALID_PROPERTY_NAME = "object_invalid_property_name"
     INCORRECT_TYPE = "incorrect_type"
     INVALID_ENUM_VALUE = "invalid_enum_value"
     INVALID_FORMAT = "invalid_format"

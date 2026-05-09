@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Negative coverage for `propertyNames`: emit objects with keys violating the sub-schema constraints.
+
 ### :wrench: Changed
 
 - Seed strategy draws in `add_single_example` unconditionally so example generation is deterministic.
