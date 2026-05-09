@@ -136,11 +136,13 @@ def main(argv: list[str] | None = None) -> int:
             results.append(result)
 
             keywords = (result.statistic or {}).get("keywords") or {}
+            examples = (result.statistic or {}).get("examples") or {}
             # `full` only — matches the tracecov HTML headline; `partial` doesn't count as covered.
             flag = f" [errors={len(result.errors)}]" if result.errors else ""
             print(
                 f"  -> {target.name} | ops={result.operations} cases={result.cases_generated} "
-                f"kw={keywords.get('full', 0)}/{keywords.get('total', 0)}{flag}",
+                f"kw={keywords.get('full', 0)}/{keywords.get('total', 0)} "
+                f"ex={examples.get('seen', 0)}/{examples.get('total', 0)}{flag}",
                 file=sys.stderr,
             )
             for error in result.errors:
