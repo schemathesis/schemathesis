@@ -1831,15 +1831,23 @@ def _positive_array(
                         scenario=CoverageScenario.ENUM_VALUE_ITEMS_ARRAY,
                         description="Enum value from available for items array",
                     )
-    elif min_items is None and max_items is None and "items" in schema and isinstance(schema["items"], dict):
-        # Otherwise only an empty array is generated
+    elif (
+        "items" in schema
+        and isinstance(schema["items"], dict)
+        and (min_items is None or min_items <= 1)
+        and (max_items is None or max_items >= 1)
+    ):
+        # Single-item arrays exercise each items-schema branch individually.
+        # `maxItems`-sized boundary arrays (above) repeat one shape and miss multi-branch coverage.
         sub_schema = schema["items"]
         for item in cover_schema_iter(ctx, sub_schema):
-            yield PositiveValue(
-                [item.value],
-                scenario=CoverageScenario.VALID_ARRAY,
-                description=f"Single-item array: {item.description}",
-            )
+            candidate = [item.value]
+            if seen.insert(candidate):
+                yield PositiveValue(
+                    candidate,
+                    scenario=CoverageScenario.VALID_ARRAY,
+                    description=f"Single-item array: {item.description}",
+                )
 
 
 def _positive_object(

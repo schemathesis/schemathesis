@@ -667,6 +667,38 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 [],
                 [0, 0, 0, 0, 0],
                 [0, 0, 0, 0],
+                [0],
+            ],
+        ),
+        # Multi-branch items must be exercised individually; boundary-size arrays
+        # repeat one branch and miss the other.
+        (
+            {
+                "type": "array",
+                "maxItems": 3,
+                "items": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["a"],
+                            "properties": {"a": {"type": "string"}},
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["b"],
+                            "properties": {"b": {"type": "string"}},
+                        },
+                    ],
+                },
+            },
+            [
+                [],
+                [{"a": ""}, {"a": ""}, {"a": ""}],
+                [{"a": ""}, {"a": ""}],
+                [{"a": ""}],
+                [{"b": ""}],
             ],
         ),
         (
@@ -747,6 +779,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             [
                 [{"foo": 5}],
                 [{"foo": 5}, {"foo": 5}],
+                [{"foo": 6}],
             ],
         ),
         (

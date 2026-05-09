@@ -14,6 +14,7 @@
 - Filter spec-provided examples and defaults when the schema uses Draft-4-only constructs.
 - Drop positive coverage bodies that violate sibling `anyOf`/`oneOf` constraints.
 - Cover `maxLength`/`minLength` boundary strings for nullable string schemas (`type: ["string", "null"]`).
+- Cover each `items` branch in positive coverage when the array has size constraints.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
