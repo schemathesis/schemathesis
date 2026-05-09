@@ -528,6 +528,7 @@ def foo(ctx, value):
     [
         ("application/json", {"application/json"}),
         ("application/problem+json", {"application/problem+json"}),
+        ("application/jwt", {"application/jwt"}),
         (
             "application/*",
             {
