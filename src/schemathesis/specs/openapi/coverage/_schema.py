@@ -979,6 +979,10 @@ def cover_schema_iter(
                 elif key == "patternProperties":
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                     yield from _negative_pattern_properties(ctx, template, value)
+                elif key == "propertyNames" and isinstance(value, dict):
+                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                    if isinstance(template, dict):
+                        yield from _negative_property_names(ctx, template, value)
                 elif key == "items" and isinstance(value, dict):
                     yield from _negative_items(ctx, value)
                 elif key == "items" and isinstance(value, list):
@@ -2036,6 +2040,27 @@ def _negative_properties(
                     location=nctx.current_path,
                     parameter=key,
                 )
+
+
+def _negative_property_names(
+    ctx: CoverageContext, template: dict, property_names_schema: dict
+) -> Generator[GeneratedValue, None, None]:
+    """Objects with an extra key violating the `propertyNames` sub-schema."""
+    nctx = ctx.with_negative()
+    for value in cover_schema_iter(nctx, property_names_schema):
+        bad_key = value.value
+        # JSON object keys are always strings; non-string negatives can't be carried on the wire.
+        if not isinstance(bad_key, str) or bad_key in template:
+            continue
+        candidate = {**template, bad_key: ""}
+        if not ctx.leads_to_negative_test_case(candidate):
+            continue
+        yield NegativeValue(
+            candidate,
+            scenario=CoverageScenario.OBJECT_INVALID_PROPERTY_NAME,
+            description=f"Object with property name violating propertyNames: {value.description}",
+            location=nctx.current_path,
+        )
 
 
 def _negative_pattern_properties(

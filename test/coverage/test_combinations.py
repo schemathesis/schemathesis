@@ -1182,6 +1182,30 @@ def test_negative_pattern(nctx, schema, expected):
     covered = cover_schema(nctx, schema)
     assert covered == expected
     assert_unique(covered)
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"type": "object", "propertyNames": {"maxLength": 3}},
+            [0, "false", "null", "", ["null", "null"], {"0000": ""}],
+        ),
+        (
+            {"type": "object", "propertyNames": {"pattern": "^[a-z]+$"}},
+            [0, "false", "null", "", ["null", "null"], {"": ""}],
+        ),
+        (
+            {"type": "object", "propertyNames": {"minLength": 3}},
+            [0, "false", "null", "", ["null", "null"], {"00": ""}],
+        ),
+    ],
+)
+def test_negative_property_names(nctx, schema, expected):
+    covered = cover_schema(nctx, schema)
+    assert covered == expected
+    assert_unique(covered)
+    assert_not_conform(covered, schema)
     assert_not_conform(covered, schema)
 
 
