@@ -3419,6 +3419,137 @@ def test_min_properties_one_with_additional_properties(ctx):
     )
 
 
+def test_anyof_with_outer_properties_yields_branch_constrained_bodies(ctx):
+    # Outer property `status: string` is tightened by each anyOf branch via enum;
+    # positive bodies must satisfy at least one branch's enum.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "properties": {"status": {"type": "string"}},
+                                        "anyOf": [
+                                            {"properties": {"status": {"enum": ["succeeded"]}}},
+                                            {"properties": {"status": {"enum": ["failed", "rejected"]}}},
+                                        ],
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
+    bad = [
+        c.body
+        for c in cases
+        if isinstance(c.body, dict)
+        and "status" in c.body
+        and c.body["status"] not in ("succeeded", "failed", "rejected")
+    ]
+    assert not bad, f"Positive body must satisfy at least one anyOf branch's enum. Got: {bad}"
+
+
+def test_oneof_no_required_disambiguator_does_not_yield_ambiguous_empty(ctx):
+    # Both oneOf branches accept `{}` (no required, only optional properties).
+    # `{}` matches both, violating oneOf's "exactly one" — must not be yielded as a positive case.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "oneOf": [
+                                            {"properties": {"a": {"type": "integer"}}},
+                                            {"properties": {"b": {"type": "integer"}}},
+                                        ],
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
+    assert not any(c.body == {} for c in cases), (
+        f"Empty `{{}}` matches both oneOf branches and must not be yielded. Got: {[c.body for c in cases]}"
+    )
+
+
+def test_anyof_discriminator_branch_required_propagated(ctx):
+    # anyOf branches discriminated by a `type` enum. The branch with type=A also requires
+    # `priority`. A positive body claiming type=A must include priority.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "anyOf": [
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "type": {"enum": ["A"]},
+                                                    "value": {"type": "string"},
+                                                    "priority": {"type": "integer"},
+                                                },
+                                                "required": ["type", "value", "priority"],
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "type": {"enum": ["B"]},
+                                                    "value": {"type": "string"},
+                                                },
+                                                "required": ["type", "value"],
+                                            },
+                                        ],
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
+    bad = [c.body for c in cases if isinstance(c.body, dict) and c.body.get("type") == "A" and "priority" not in c.body]
+    assert not bad, f"Positive body for branch type=A must include branch-required `priority`. Got: {bad}"
+
+
 def test_request_body_example_invalid_against_schema_not_yielded(ctx):
     # Boolean `exclusiveMinimum` (Draft 4) defeats Draft-2020-12 auto-detection; the example
     # missing `riskFreeRate` must still be filtered out as a positive case.
