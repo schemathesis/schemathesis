@@ -375,6 +375,21 @@ class CoverageContext:
             if not schema:
                 raise Unsatisfiable
             return 0
+        # Prefer spec-declared concrete values when valid: example > examples[0] > default.
+        # Surfaces author intent into recursively-generated templates; without this, nested
+        # properties whose schemas declare `example`/`default` get synthetic Hypothesis values.
+        if isinstance(schema, dict):
+            example = schema.get("example", NOT_SET)
+            if example is not NOT_SET and is_valid(example, schema):
+                return example
+            examples = schema.get("examples")
+            if isinstance(examples, list):
+                for candidate in examples:
+                    if is_valid(candidate, schema):
+                        return candidate
+            default = schema.get("default", NOT_SET)
+            if default is not NOT_SET and is_valid(default, schema):
+                return default
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
         if keys == ["type"]:
             return cached_draw(get_strategy_for_type(schema["type"]))

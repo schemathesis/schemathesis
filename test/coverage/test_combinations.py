@@ -435,6 +435,22 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 {"foo": 42},
             ],
         ),
+        # Nested object declared with just `properties` (no `type: object`):
+        # per-property example must lift into the template, not just appear in per-property variants.
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "settings": {"properties": {"active": {"type": "boolean", "example": True}}},
+                },
+                "required": ["settings"],
+            },
+            [
+                {"settings": {"active": True}},
+                {"settings": {}},
+                {"settings": {"active": False}},
+            ],
+        ),
         (
             {
                 "type": "object",
