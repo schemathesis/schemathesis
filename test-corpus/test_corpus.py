@@ -475,19 +475,24 @@ KNOWN_ISSUES = {
     ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /configuredTables"),
 }
 # Coverage-phase JSON body conformance failures expected until each is fixed. Drive to zero.
+# All entries here are Python-vs-Rust regex semantic differences — the Rust-backed generator
+# emits strings the Python `re`-based validator rejects (Unicode whitespace/digits matched
+# against ASCII char classes, nested-set `[[…]]` parsed differently, etc.) — or Rust regex
+# engine limits (e.g. `^.{0,262144}$` panics in regex-automata as `HaystackTooLong`).
 KNOWN_BODY_VIOLATIONS: set[tuple[str, str]] = {
-    # jsonschema_rs surfaces a "Regex engine failed to evaluate pattern" validation error
-    # for patterns with very large bounds (e.g. `^.{0,262144}$`).
     ("adyen.com/TerminalAPI-v1/1.json", "POST /display"),
     ("adyen.com/TerminalAPI-v1/1.json", "POST /enableservice"),
-    ("amazonaws.com/sagemaker-featurestore-runtime/2020-07-01.json", "POST /BatchGetRecord"),
-    # Strict format/pattern (ARN partition, email, phone, version, timezone, path, ARN role)
-    # that the Hypothesis-driven generator can't satisfy — string regex is too restrictive.
+    ("adyen.com/TerminalAPI-v1/1.json", "POST /input"),
     ("amazonaws.com/account/2021-02-01.json", "POST /putAlternateContact"),
+    ("amazonaws.com/appconfig/2019-10-09.json", "POST /extensions"),
     ("amazonaws.com/appstream/2016-12-01.json", "POST /#X-Amz-Target=PhotonAdminProxyService.CreateFleet"),
+    ("amazonaws.com/appstream/2016-12-01.json", "POST /#X-Amz-Target=PhotonAdminProxyService.UpdateFleet"),
     ("amazonaws.com/auditmanager/2017-07-25.json", "POST /assessments"),
+    ("amazonaws.com/auditmanager/2017-07-25.json", "PUT /assessments/{assessmentId}"),
     ("amazonaws.com/databrew/2017-07-25.json", "POST /datasets"),
+    ("amazonaws.com/databrew/2017-07-25.json", "PUT /datasets/{name}"),
     ("amazonaws.com/devops-guru/2020-12-01.json", "POST /events"),
+    ("amazonaws.com/devops-guru/2020-12-01.json", "POST /insights/search"),
     (
         "amazonaws.com/emr-containers/2020-10-01.json",
         "POST /virtualclusters/{virtualClusterId}/endpoints/{endpointId}/credentials",
@@ -496,11 +501,14 @@ KNOWN_BODY_VIOLATIONS: set[tuple[str, str]] = {
     ("amazonaws.com/kms/2014-11-01.json", "POST /#X-Amz-Target=TrentService.CreateCustomKeyStore"),
     ("amazonaws.com/lookoutmetrics/2017-07-25.json", "POST /DescribeAnomalyDetectionExecutions"),
     ("amazonaws.com/redshift-data/2019-12-20.json", "POST /#X-Amz-Target=RedshiftData.BatchExecuteStatement"),
+    ("amazonaws.com/redshift-data/2019-12-20.json", "POST /#X-Amz-Target=RedshiftData.DescribeTable"),
+    ("amazonaws.com/sagemaker-featurestore-runtime/2020-07-01.json", "POST /BatchGetRecord"),
     (
         "amazonaws.com/translate/2017-07-01.json",
         "POST /#X-Amz-Target=AWSShineFrontendService_20170701.StartTextTranslationJob",
     ),
     ("restleague/market.json", "POST /register"),
+    ("restleague/market.json", "PUT /customer/contacts"),
 }
 
 
