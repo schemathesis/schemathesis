@@ -67,6 +67,10 @@ def _is_response_keyword(entry: dict[str, Any]) -> bool:
 def _case_to_interaction(case: Case) -> tracecov.HttpInteraction:
     prepared = prepare_request(case, headers=None, config=_NO_SANITIZATION)
     body = prepared.body.encode("utf-8") if isinstance(prepared.body, str) else prepared.body
+    # `requests` collapses an empty form body to None even though the wire still carries
+    # zero bytes — pass b"" so the recorder parses it as `{}` and `/required` flips invalid.
+    if body is None and prepared.headers.get("Content-Length") == "0":
+        body = b""
     return tracecov.HttpInteraction(
         request=tracecov.HttpRequest(
             method=case.method,
