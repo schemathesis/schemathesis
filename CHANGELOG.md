@@ -14,6 +14,7 @@
 
 ### :bug: Fixed
 
+- Cover each discriminator-pinned `oneOf` branch when the branch is a `$ref` with sibling pin keywords.
 - Honour `example`/`examples`/`default` on array items so curated values reach populated arrays instead of synthetic empty fills.
 - Recover spec-declared `example`/`examples`/`default` values that carry readOnly-stripped properties by dropping those keys before validating.
 - Cover numeric `oneOf`/`anyOf` branches when spec examples only match a sibling branch.
