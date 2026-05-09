@@ -1493,8 +1493,9 @@ def _ensure_valid_headers_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
 
 def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
-    # Boundary and near boundary values
-    schema = {"type": "string", **schema}
+    # Pin type to "string"; for unions like ["string","null"] the dispatcher yields null separately,
+    # without this override generation here may pick null and drop the boundary-length variants.
+    schema = {**schema, "type": "string"}
     min_length = schema.get("minLength")
     if min_length == 0:
         min_length = None
