@@ -2,10 +2,6 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.0...HEAD) - TBD
 
-### :rocket: Added
-
-- Negative coverage for `propertyNames`: emit objects with keys violating the sub-schema constraints.
-
 ### :wrench: Changed
 
 - Seed strategy draws in `add_single_example` unconditionally so example generation is deterministic.
@@ -35,6 +31,7 @@
 - Surface per-property `example`/`default` into recursively-generated object templates instead of synthesising values that ignore them.
 - Cover the numeric branch of `type: ["string", "number", ...]` schemas in positive coverage.
 - Cover positive parameter values (e.g. enum query params) when the body is unsatisfiable.
+- Negative coverage for `propertyNames`: emit objects with keys violating the sub-schema constraints.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
