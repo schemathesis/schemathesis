@@ -26,6 +26,7 @@
 - Skip `multipart/form-data` property mutations whose stringified value still satisfies the schema.
 - Cover falsy `default` and `example` spec hints (`0`, `""`, `false`, `[]`, `{}`) in positive coverage.
 - Surface per-property `example`/`default` into recursively-generated object templates instead of synthesising values that ignore them.
+- Cover the numeric branch of `type: ["string", "number", ...]` schemas in positive coverage.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
