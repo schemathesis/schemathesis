@@ -3325,6 +3325,52 @@ def test_positive_body_generated_for_object_with_metadata_and_unsatisfiable_opti
     )
 
 
+def test_parameter_positive_coverage_when_body_fallback_negative(ctx):
+    # An unsatisfiable body must not suppress positive coverage of unrelated parameters.
+    schema = ctx.openapi.load_schema(
+        {
+            "/push": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "format",
+                            "schema": {"type": "string", "enum": ["json", "jsonp", "msgpack", "html"]},
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"type": "object", "properties": {"channel": {"type": "string"}}},
+                                        {"type": "object", "properties": {"channel": {"type": "string"}}},
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/push"]["POST"]
+    assert {
+        case.query.get("format")
+        for case in iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+        if case.query
+        and (query_component := case.meta.components.get(ParameterLocation.QUERY)) is not None
+        and query_component.mode == GenerationMode.POSITIVE
+    } == {"json", "jsonp", "msgpack", "html"}
+
+
 def test_parameter_mutation_cases_do_not_inherit_negative_body(ctx):
     # When positive body coverage yields nothing (the body schema combines `allOf` with
     # readOnly properties, so template inflation requires fields rewritten to `{"not": {}}`),

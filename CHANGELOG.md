@@ -31,6 +31,7 @@
 - Cover falsy `default` and `example` spec hints (`0`, `""`, `false`, `[]`, `{}`) in positive coverage.
 - Surface per-property `example`/`default` into recursively-generated object templates instead of synthesising values that ignore them.
 - Cover the numeric branch of `type: ["string", "number", ...]` schemas in positive coverage.
+- Cover positive parameter values (e.g. enum query params) when the body is unsatisfiable.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 

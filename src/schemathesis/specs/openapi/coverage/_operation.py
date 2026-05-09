@@ -439,11 +439,13 @@ def iter_coverage_cases(
     template_time = instant.elapsed
     has_required_body = operation.body and any(b.is_required for b in operation.body)
     has_generated_required_body = False
-    # Set when the body template substrate had to fall back to a negative value because
-    # positive coverage yielded nothing (e.g. readOnly + allOf composition makes every
-    # template option unsatisfiable). In that case the rest of this iterator must skip
-    # parameter-mutation cases — they would otherwise emit a negative body labeled with
-    # a non-body target, mixing two negatives in one case.
+    # Set when the body template substrate had to fall back to a negative value because positive
+    # coverage yielded nothing (e.g. readOnly + allOf composition makes every template option
+    # unsatisfiable, or every `oneOf` branch overlaps). When set, parameter-mutation cases must
+    # skip NEGATIVE param values — those would mix two negatives in one case (the existing body
+    # plus the param mutation). POSITIVE param values still flow through: the case is overall
+    # negative because of the body, but the parameter's positive value still reaches the wire,
+    # which is what coverage tracking needs.
     template_body_is_fallback_negative = False
     if operation.body:
         for body in operation.body:
@@ -659,9 +661,6 @@ def iter_coverage_cases(
             ),
         )
 
-    if template_body_is_fallback_negative:
-        return
-
     for (location, name), gen in generators.items():
         iterator = iter(gen)
         while True:
@@ -673,6 +672,9 @@ def iter_coverage_cases(
                 break
 
             if value.generation_mode == GenerationMode.NEGATIVE:
+                if template_body_is_fallback_negative:
+                    # Skip: would emit a case with NEGATIVE body + NEGATIVE param.
+                    continue
                 seen_negative.insert(data.kwargs)
             elif value.generation_mode == GenerationMode.POSITIVE:
                 if has_required_body and not has_generated_required_body:
@@ -694,6 +696,11 @@ def iter_coverage_cases(
                     ),
                 ),
             )
+    if template_body_is_fallback_negative:
+        # The remaining blocks emit NEGATIVE param-mutation cases (missing/duplicate/etc.)
+        # built off the template body. Combined with a fallback-negative body they would
+        # mix two negatives in one case.
+        return
     if GenerationMode.NEGATIVE in generation_modes:
         # Path-level: each `(path, method)` pair runs once across declared operations.
         methods = sorted(unexpected_methods - set(operation.schema[operation.path]))
