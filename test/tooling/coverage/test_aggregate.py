@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from tools.coverage.aggregate import aggregate, render_markdown
 from tools.coverage.audit import SchemaResult
 
@@ -58,15 +60,40 @@ def test_aggregate_counts_gap_kinds_and_marks_errored_apis():
     assert summary["gap_kinds"] == [("operation_unseen", 2), ("response_uncovered", 1)]
 
 
-def test_aggregate_picks_worst_apis_by_keyword_percent():
-    summary = aggregate(
-        [
-            _result(api="strong", statistic={"keywords": {"full": 9, "total": 10}}),
-            _result(api="weak", statistic={"keywords": {"full": 1, "total": 10}}),
-            _result(api="medium", statistic={"keywords": {"full": 5, "total": 10}}),
-        ]
-    )
-    assert [entry["api"] for entry in summary["worst_apis"]] == ["weak", "medium", "strong"]
+@pytest.mark.parametrize(
+    ("apis", "expected"),
+    [
+        (
+            [
+                ("strong", {"full": 9, "total": 10}),
+                ("weak", {"full": 1, "total": 10}),
+                ("medium", {"full": 5, "total": 10}),
+            ],
+            ["weak", "medium", "strong"],
+        ),
+        # 100% `full` APIs have nothing to surface; listing them as "worst" is misleading.
+        (
+            [
+                ("full", {"full": 10, "total": 10}),
+                ("weak", {"full": 1, "total": 10}),
+            ],
+            ["weak"],
+        ),
+        # Both APIs are at 100% partial+full; ranking must use `full` only so the
+        # mostly-partial one (with real `needs_valid`/`needs_invalid` gaps) ranks worse.
+        (
+            [
+                ("mostly_partial", {"full": 4, "partial": 6, "total": 10}),
+                ("mostly_full", {"full": 9, "partial": 1, "total": 10}),
+            ],
+            ["mostly_partial", "mostly_full"],
+        ),
+    ],
+    ids=["ranks_by_full_ratio", "excludes_fully_covered", "ranks_by_full_not_partial"],
+)
+def test_aggregate_worst_apis(apis, expected):
+    summary = aggregate([_result(api=api, statistic={"keywords": kw}) for api, kw in apis])
+    assert [entry["api"] for entry in summary["worst_apis"]] == expected
 
 
 def test_render_markdown_includes_phase_and_metrics():
