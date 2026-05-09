@@ -50,6 +50,201 @@ def test_prefix_items_to_items_array(schema, expected):
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
+        pytest.param(
+            {
+                "type": "object",
+                "properties": {"kind": {"type": "string"}},
+                "if": {"properties": {"kind": {"const": "number"}}},
+                "then": {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+                "else": {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+            },
+            {
+                "type": "object",
+                "properties": {"kind": {"type": "string"}},
+                "anyOf": [
+                    {
+                        "allOf": [
+                            {"properties": {"kind": {"const": "number"}}},
+                            {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+                        ]
+                    },
+                    {
+                        "allOf": [
+                            {"not": {"properties": {"kind": {"const": "number"}}}},
+                            {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+                        ]
+                    },
+                ],
+            },
+            id="if_then_else_full",
+        ),
+        pytest.param(
+            {
+                "type": "object",
+                "if": {"properties": {"kind": {"const": "number"}}},
+                "then": {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+            },
+            {
+                "type": "object",
+                "anyOf": [
+                    {
+                        "allOf": [
+                            {"properties": {"kind": {"const": "number"}}},
+                            {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+                        ]
+                    },
+                    {"not": {"properties": {"kind": {"const": "number"}}}},
+                ],
+            },
+            id="if_then_only",
+        ),
+        pytest.param(
+            {
+                "type": "object",
+                "if": {"properties": {"kind": {"const": "number"}}},
+                "else": {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+            },
+            {
+                "type": "object",
+                "anyOf": [
+                    {"properties": {"kind": {"const": "number"}}},
+                    {
+                        "allOf": [
+                            {"not": {"properties": {"kind": {"const": "number"}}}},
+                            {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+                        ]
+                    },
+                ],
+            },
+            id="if_else_only",
+        ),
+        pytest.param(
+            # `if` alone is a tautology — drop it.
+            {"type": "object", "if": {"properties": {"kind": {"const": "number"}}}},
+            {"type": "object"},
+            id="if_alone",
+        ),
+        pytest.param(
+            # Existing `anyOf` is preserved by composing through `allOf`.
+            {
+                "type": "object",
+                "anyOf": [{"required": ["a"]}, {"required": ["b"]}],
+                "if": {"properties": {"kind": {"const": "number"}}},
+                "then": {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+                "else": {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+            },
+            {
+                "type": "object",
+                "allOf": [
+                    {"anyOf": [{"required": ["a"]}, {"required": ["b"]}]},
+                    {
+                        "anyOf": [
+                            {
+                                "allOf": [
+                                    {"properties": {"kind": {"const": "number"}}},
+                                    {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+                                ]
+                            },
+                            {
+                                "allOf": [
+                                    {"not": {"properties": {"kind": {"const": "number"}}}},
+                                    {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+                                ]
+                            },
+                        ]
+                    },
+                ],
+            },
+            id="if_then_else_with_existing_anyof",
+        ),
+        pytest.param(
+            # Existing `allOf` is extended with the new conditional anyOf.
+            {
+                "type": "object",
+                "allOf": [{"required": ["a"]}],
+                "if": {"properties": {"kind": {"const": "number"}}},
+                "then": {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+            },
+            {
+                "type": "object",
+                "allOf": [
+                    {"required": ["a"]},
+                    {
+                        "anyOf": [
+                            {
+                                "allOf": [
+                                    {"properties": {"kind": {"const": "number"}}},
+                                    {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+                                ]
+                            },
+                            {"not": {"properties": {"kind": {"const": "number"}}}},
+                        ]
+                    },
+                ],
+            },
+            id="if_then_with_existing_allof",
+        ),
+        pytest.param(
+            # Nested if/then/else inside `properties` is also rewritten via the recursive walker.
+            {
+                "type": "object",
+                "properties": {
+                    "inner": {
+                        "type": "object",
+                        "if": {"properties": {"k": {"const": "x"}}},
+                        "then": {"required": ["v"]},
+                    }
+                },
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "inner": {
+                        "type": "object",
+                        "anyOf": [
+                            {
+                                "allOf": [
+                                    {"properties": {"k": {"const": "x"}}},
+                                    {"required": ["v"]},
+                                ]
+                            },
+                            {"not": {"properties": {"k": {"const": "x"}}}},
+                        ],
+                    }
+                },
+            },
+            id="if_then_nested_in_properties",
+        ),
+    ],
+)
+def test_if_then_else_rewrite(schema, expected):
+    result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
+    assert result == expected
+
+
+def test_validation_schema_preserves_if_then_else():
+    # Validation paths keep the originals so JSON Schema validators evaluate the conditional natively.
+    raw = {
+        "type": "object",
+        "if": {"properties": {"kind": {"const": "number"}}},
+        "then": {"required": ["value"]},
+    }
+    result = transform(
+        raw,
+        converter.to_json_schema,
+        nullable_keyword="x-nullable",
+        convert_if_then_else=False,
+    )
+    assert result == {
+        "type": "object",
+        "if": {"properties": {"kind": {"const": "number"}}},
+        "then": {"required": ["value"]},
+    }
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
         (
             {
                 "type": "object",

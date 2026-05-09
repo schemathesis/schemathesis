@@ -9,7 +9,9 @@ import pytest
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import transform
 from schemathesis.generation import GenerationMode
+from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
     CoverageScenario,
@@ -2515,3 +2517,40 @@ def test_array_with_unique_items_enum_not_violated(pctx):
     # so every variant gets coverage
     first_elements = {arr[0] for arr in covered if arr}
     assert first_elements == {"A", "B", "C"}
+
+
+def test_positive_if_then_else_emits_only_conforming_cases(ctx_factory):
+    # Body context applies the parent-validator gate; query context skips it.
+    pctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    original = {
+        "type": "object",
+        "properties": {"kind": {"type": "string"}, "value": {}},
+        "required": ["kind"],
+        "if": {"properties": {"kind": {"const": "number"}}},
+        "then": {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+        "else": {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+    }
+    rewritten = transform(original, to_json_schema, nullable_keyword="x-nullable")
+    validator = jsonschema_rs.Draft202012Validator(original)
+    cases = [v.value for v in cover_schema_iter(pctx, rewritten)]
+    invalid = [c for c in cases if not validator.is_valid(c)]
+    assert not invalid, f"positive cases violate if/then/else: {invalid}"
+    assert any(isinstance(c, dict) and c.get("kind") == "number" for c in cases), "then-branch case missing"
+    assert any(isinstance(c, dict) and c.get("kind") != "number" for c in cases), "else-branch case missing"
+
+
+def test_negative_if_then_else_violates_branches(ctx_factory):
+    nctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    original = {
+        "type": "object",
+        "properties": {"kind": {"type": "string"}, "value": {}},
+        "required": ["kind"],
+        "if": {"properties": {"kind": {"const": "number"}}},
+        "then": {"properties": {"value": {"type": "integer"}}, "required": ["value"]},
+        "else": {"properties": {"value": {"type": "string"}}, "required": ["value"]},
+    }
+    rewritten = transform(original, to_json_schema, nullable_keyword="x-nullable")
+    validator = jsonschema_rs.Draft202012Validator(original)
+    cases = [v.value for v in cover_schema_iter(nctx, rewritten)]
+    invalid = [c for c in cases if isinstance(c, dict) and not validator.is_valid(c)]
+    assert invalid, "no negative cases violate the conditional"

@@ -367,6 +367,7 @@ class OpenApiComponent(ABC):
                     self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
                 ),
                 convert_prefix_items=False,
+                convert_if_then_else=False,
                 name_to_uri=self.name_to_uri,
                 merge_ref_siblings=self.adapter.ref_siblings,
             )
