@@ -261,8 +261,8 @@ def display_failures(statistic: Statistic, config: OutputConfig) -> None:
     if not statistic.failures:
         return
     display_section_name("FAILURES")
-    for label, failures in statistic.failures.items():
-        display_failures_for_single_test(config, label, failures.values())
+    for label in sorted(statistic.failures):
+        display_failures_for_single_test(config, label, statistic.failures[label].values())
 
 
 def display_api_operations(
