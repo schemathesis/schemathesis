@@ -189,6 +189,20 @@ def test_negative_primitive_schemas(nctx, schema, expected):
     assert_not_conform(covered, schema)
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        # `default: null` — Python `None` after JSON load. Must round-trip through the `null`
+        # type branch and not be skipped as "absent". Sentinel-based read ensures that.
+        {"type": ["string", "null"], "default": None},
+        {"type": ["integer", "null"], "example": None},
+    ],
+)
+def test_positive_null_default_or_example_round_trips(pctx, schema):
+    covered = [v.value for v in cover_schema_iter(pctx, schema)]
+    assert None in covered, f"`null` default/example was dropped: {covered!r}"
+
+
 @pytest.mark.parametrize("allow_extra_parameters", [True, False])
 def test_query_unexpected_parameters_control(ctx_factory, allow_extra_parameters):
     schema = {
@@ -246,6 +260,11 @@ def test_body_unexpected_parameters_control(ctx_factory, allow_extra_parameters)
         # otherwise hypothesis-jsonschema may pick null and skip both length variants.
         ({"type": ["string", "null"], "maxLength": 10}, {9, 10}),
         ({"type": ["string", "null"], "minLength": 5, "maxLength": 10}, {5, 6, 9, 10}),
+        # Falsy `default`/`example` are still set: empty string must be exercised.
+        ({"type": "string", "default": ""}, {0}),
+        ({"type": "string", "example": ""}, {0}),
+        # Falsy `default` alongside truthy `examples`: both must be emitted.
+        ({"type": "string", "default": "", "examples": ["a"]}, {0, 1}),
     ],
 )
 def test_positive_string(ctx, schema, lengths):
@@ -309,6 +328,11 @@ def test_negative_string_with_pattern(nctx):
         ({"type": "integer", "example": 2, "default": 2}, [2], [2]),
         ({"type": "integer", "example": 2, "default": 4}, [2, 4], [2, 4]),
         ({"type": "integer", "default": 2}, [2], [2]),
+        # `default: 0` / `example: 0` are valid spec hints; falsy must not skip them.
+        ({"type": "integer", "default": 0}, [0], [0]),
+        ({"type": "integer", "example": 0}, [0], [0]),
+        # Falsy `default` alongside truthy `examples`: both must be emitted.
+        ({"type": "integer", "default": 0, "examples": [1]}, [1, 0], [0]),
         ({"type": "integer", "examples": [42, 44]}, [42, 44], [42, 44]),
         ({"type": "number"}, [0], [0]),
         ({"type": "integer", "minimum": 5}, [5, 6], [6, 8]),
