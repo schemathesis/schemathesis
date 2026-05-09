@@ -1710,11 +1710,14 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         return (minimum is None or value >= minimum) and (maximum is None or value <= maximum)
 
     if example is not NOT_SET or examples or default is not NOT_SET:
+        has_valid_example = False
         if example is not NOT_SET and _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
+            has_valid_example = True
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
                 if _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
+                    has_valid_example = True
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default is not NOT_SET
@@ -1723,7 +1726,12 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             and _is_valid_with_formats(default, schema, ctx)
             and seen.insert(default)
         ):
+            has_valid_example = True
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
+        if not has_valid_example and minimum is None and maximum is None:
+            value = ctx.generate_from_schema(schema)
+            if seen.insert(value):
+                yield PositiveValue(value, scenario=CoverageScenario.VALID_NUMBER, description="Valid number")
     elif minimum is None and maximum is None:
         value = ctx.generate_from_schema(schema)
         seen.insert(value)
