@@ -17,7 +17,7 @@ YAML_MEDIA_TYPES: tuple[str, ...] = (
     "application/yaml",
 )
 JSON_MEDIA_TYPES: frozenset[tuple[str, str]] = frozenset(
-    {("application", "jose+jwe"), ("application", "jwt"), ("text", "json")}
+    {("application", "jose+jwe"), ("application", "jwt"), ("application", "x-json"), ("text", "json")}
 )
 
 FORM_MEDIA_TYPES: frozenset[str] = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])

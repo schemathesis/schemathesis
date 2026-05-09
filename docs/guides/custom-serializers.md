@@ -112,7 +112,7 @@ schemathesis.serializer.alias(
 )
 ```
 
-**Note:** Media types with `+json` or `+xml` suffixes (like `application/vnd.api+json`) are automatically handled and don't need aliases.
+**Note:** Media types with `+json` or `+xml` suffixes (like `application/vnd.api+json`) are automatically handled. The following JSON variants are also recognized without aliases: `text/json`, `application/x-json`, `application/jwt`, `application/jose+jwe`.
 
 ### Multiple aliases for the same format
 
