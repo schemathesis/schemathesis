@@ -21,7 +21,6 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import metrics
 from schemathesis.generation.case import Case
-from schemathesis.specs.openapi.auth_inference import record_auth_inference
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -144,10 +143,9 @@ def _do_call_and_validate(
             case=case,
             response=response,
         )
-        record_auth_inference(
+        case.operation.schema.record_runtime_observations(
             store=ctx.error_feedback,
             recorder=recorder,
-            operation=case.operation,
             case=case,
             response=response,
             transport_kwargs=transport_kwargs,

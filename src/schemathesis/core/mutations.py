@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from schemathesis.core.transforms import JsonValue
 
 
 class OperatorKind(str, Enum):
@@ -15,3 +20,53 @@ class OperatorKind(str, Enum):
     VALUE_VIOLATOR = "value_violator"
     # Replaces the body with random bytes that aren't valid JSON.
     SYNTAX_FUZZING = "syntax_fuzzing"
+
+
+class MutationChannel(str, Enum):
+    """Where a mutation lives in the per-case pipeline."""
+
+    SCHEMA = "schema"
+    VALUE = "value"
+
+
+@dataclass(slots=True)
+class Mutation:
+    """One mutation applied during a negative-fuzzing case.
+
+    Records the schema/value alteration so callers can attribute the case to a
+    specific path, operator, and keyword set.
+    """
+
+    path: tuple[str | int, ...]
+    schema_pointer: str
+    channel: MutationChannel
+    operator: OperatorKind
+    keywords: tuple[str, ...]
+    parameter: str | None
+    original_value: JsonValue | None
+    new_value: JsonValue | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "path": list(self.path),
+            "schema_pointer": self.schema_pointer,
+            "channel": self.channel.value,
+            "operator": self.operator.value,
+            "keywords": list(self.keywords),
+            "parameter": self.parameter,
+            "original_value": self.original_value,
+            "new_value": self.new_value,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Mutation:
+        return cls(
+            path=tuple(data["path"]),
+            schema_pointer=data["schema_pointer"],
+            channel=MutationChannel(data["channel"]),
+            operator=OperatorKind(data["operator"]),
+            keywords=tuple(data["keywords"]),
+            parameter=data["parameter"],
+            original_value=data["original_value"],
+            new_value=data["new_value"],
+        )

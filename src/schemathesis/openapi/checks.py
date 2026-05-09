@@ -291,6 +291,11 @@ class UseAfterFree(Failure):
     def _unique_key(self) -> str:
         return ""
 
+    def related_case_ids(self) -> tuple[str, ...]:
+        if self.deleted_case_id is None:
+            return ()
+        return (self.deleted_case_id,)
+
 
 class EnsureResourceAvailability(Failure):
     """Resource is not available immediately after creation."""

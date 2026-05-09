@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
@@ -456,6 +457,17 @@ class BaseSchema(Mapping):
 
     def reset_coverage_state(self) -> None:
         """Reset spec-specific runtime state held across coverage runs; default is a no-op."""
+
+    def record_runtime_observations(
+        self,
+        *,
+        store: ErrorFeedbackStore,
+        recorder: ScenarioRecorder,
+        case: Case,
+        response: Response,
+        transport_kwargs: dict[str, Any],
+    ) -> None:
+        """Spec-specific runtime observations from a response (e.g. auth inference). Default: no-op."""
 
     def iter_coverage_cases(
         self,
