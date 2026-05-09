@@ -155,8 +155,11 @@ class AnyNumber:
         ({"type": "null"}, [0, "false", "", ["null", "null"]]),
         ({"type": "boolean"}, [0, "null", "", ["null", "null"]]),
         ({"type": ["boolean", "null"]}, [0, "", ["null", "null"]]),
-        ({"enum": [1, 2]}, ["AAA"]),
-        ({"enum": [1, 2, {}]}, ["AAA"]),
+        # canonicalish drops `type` when `enum` is present; infer it from the values so type
+        # violations still appear alongside the enum violation.
+        ({"enum": [1, 2]}, ["AAA", "false", "null", "", ["null", "null"]]),
+        ({"enum": [1, 2, {}]}, ["AAA", "false", "null", "", ["null", "null"]]),
+        ({"enum": ["a", "b"]}, ["AAA", 0, "false", "null", ["null", "null"]]),
         ({"const": 42}, ["AAA"]),
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
         ({"format": "date-time"}, [AnyString()]),

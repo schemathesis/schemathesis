@@ -43,7 +43,7 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
 from schemathesis.core.media_types import is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -950,13 +950,27 @@ def cover_schema_iter(
         template = None
         if not ctx.can_be_negated(schema):
             return
+        # `enum`/`const` without a sibling `type` (e.g. `canonicalish` strips `type` from
+        # `{type: string, enum: [...]}` because the enum values already pin the type) would
+        # otherwise miss type-violation negatives. Infer the type from the values once so the
+        # `enum`/`const` branches below can dispatch `_negative_type` alongside `_negative_enum`.
+        inferred_types: list[str] | None = None
+        if "type" not in schema:
+            if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
+                inferred_types = sorted({to_json_type_name(v) for v in schema["enum"]})
+            elif "const" in schema:
+                inferred_types = [to_json_type_name(schema["const"])]
         for key, value in schema.items():
             with _ignore_unfixable(), ctx.at(key):
                 if key == "enum":
                     yield from _negative_enum(ctx, value, seen)
+                    if inferred_types:
+                        yield from _negative_type(ctx, inferred_types, seen, schema)
                 elif key == "const":
                     for value_ in _negative_enum(ctx, [value], seen):
                         yield value_
+                    if inferred_types:
+                        yield from _negative_type(ctx, inferred_types, seen, schema)
                 elif key == "type":
                     yield from _negative_type(ctx, value, seen, schema)
                 elif key == "properties":
