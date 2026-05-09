@@ -31,11 +31,13 @@ from schemathesis.core.jsonschema import BundleError
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.stateful import dependencies
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
+from tools.corpus.conformance import check_body_conformance  # noqa: E402
 from tools.corpus.io import json_loads, read_corpus_file  # noqa: E402
 
 CORPUS_FILE_NAMES = (
@@ -472,6 +474,34 @@ KNOWN_ISSUES = {
     ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /collaborations"),
     ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /configuredTables"),
 }
+# Coverage-phase JSON body conformance failures expected until each is fixed. Drive to zero.
+KNOWN_BODY_VIOLATIONS: set[tuple[str, str]] = {
+    # jsonschema_rs surfaces a "Regex engine failed to evaluate pattern" validation error
+    # for patterns with very large bounds (e.g. `^.{0,262144}$`).
+    ("adyen.com/TerminalAPI-v1/1.json", "POST /display"),
+    ("adyen.com/TerminalAPI-v1/1.json", "POST /enableservice"),
+    ("amazonaws.com/sagemaker-featurestore-runtime/2020-07-01.json", "POST /BatchGetRecord"),
+    # Strict format/pattern (ARN partition, email, phone, version, timezone, path, ARN role)
+    # that the Hypothesis-driven generator can't satisfy — string regex is too restrictive.
+    ("amazonaws.com/account/2021-02-01.json", "POST /putAlternateContact"),
+    ("amazonaws.com/appstream/2016-12-01.json", "POST /#X-Amz-Target=PhotonAdminProxyService.CreateFleet"),
+    ("amazonaws.com/auditmanager/2017-07-25.json", "POST /assessments"),
+    ("amazonaws.com/databrew/2017-07-25.json", "POST /datasets"),
+    ("amazonaws.com/devops-guru/2020-12-01.json", "POST /events"),
+    (
+        "amazonaws.com/emr-containers/2020-10-01.json",
+        "POST /virtualclusters/{virtualClusterId}/endpoints/{endpointId}/credentials",
+    ),
+    ("amazonaws.com/gamesparks/2021-08-17.json", "POST /game/{GameName}/snapshot/{SnapshotId}/generated-sdk-code-job"),
+    ("amazonaws.com/kms/2014-11-01.json", "POST /#X-Amz-Target=TrentService.CreateCustomKeyStore"),
+    ("amazonaws.com/lookoutmetrics/2017-07-25.json", "POST /DescribeAnomalyDetectionExecutions"),
+    ("amazonaws.com/redshift-data/2019-12-20.json", "POST /#X-Amz-Target=RedshiftData.BatchExecuteStatement"),
+    (
+        "amazonaws.com/translate/2017-07-01.json",
+        "POST /#X-Amz-Target=AWSShineFrontendService_20170701.StartTextTranslationJob",
+    ),
+    ("restleague/market.json", "POST /register"),
+}
 
 
 @schemathesis.check
@@ -484,6 +514,24 @@ def combined_check(ctx, response, case):
             check(ctx, response, case)
         except (Failure, FailureGroup):
             pass
+    if case.meta is None or case.meta.phase.name != TestPhase.COVERAGE:
+        return
+    violation = check_body_conformance(case)
+    if violation is None:
+        return
+    if violation.expected_valid:
+        raise AssertionError(
+            f"Positive coverage case produced an invalid body.\n"
+            f"Media type: {violation.media_type}\n"
+            f"Body: {violation.body!r}\n"
+            f"Errors: {list(violation.errors)}"
+        )
+    raise AssertionError(
+        f"Negative coverage case produced a valid body (mutation had no effect).\n"
+        f"Media type: {violation.media_type}\n"
+        f"Body: {violation.body!r}\n"
+        f"Scenario: {case.meta.phase.data.scenario}"
+    )
 
 
 def test_default(corpus, filename):
@@ -580,13 +628,37 @@ def assert_invalid_schema(exc: LoaderError) -> NoReturn:
     raise exc
 
 
+_BODY_CONFORMANCE_FAILURE_PREFIXES = (
+    "Positive coverage case produced an invalid body.",
+    "Negative coverage case produced a valid body",
+)
+# Drained as entries fire; whatever remains at session end is now-passing rot.
+_PENDING_BODY_VIOLATIONS: set[tuple[str, str]] = set(KNOWN_BODY_VIOLATIONS)
+
+
+def _is_known_body_conformance_failure(schema_id: str, label: str, check) -> bool:
+    if check.failure_info is None:
+        return False
+    failure_text = str(check.failure_info.failure)
+    if not any(prefix in failure_text for prefix in _BODY_CONFORMANCE_FAILURE_PREFIXES):
+        return False
+    key = (schema_id, label)
+    if key in KNOWN_BODY_VIOLATIONS:
+        _PENDING_BODY_VIOLATIONS.discard(key)
+        return True
+    return False
+
+
 def assert_event(schema_id: str, event: events.EngineEvent) -> None:
     if isinstance(event, events.NonFatalError):
         if not should_ignore_error(schema_id, event):
             raise AssertionError(f"{event.label}: {event.info.format()}")
     if isinstance(event, events.ScenarioFinished):
-        failures = [
+        all_failures = [
             check for checks in event.recorder.checks.values() for check in checks if check.status == Status.FAILURE
+        ]
+        failures = [
+            check for check in all_failures if not _is_known_body_conformance_failure(schema_id, event.label, check)
         ]
         if failures:
             details = "\n\n".join(
@@ -595,7 +667,9 @@ def assert_event(schema_id: str, event: events.EngineEvent) -> None:
                 if check.failure_info is not None
             )
             raise AssertionError(f"{event.label}: {len(failures)} check failure(s)\n\n{details}")
-        # Errors are checked above and unknown ones cause a test failure earlier
+        # Suppressed body-conformance failures leave `event.status == FAILURE`; that's expected.
+        if all_failures:
+            return
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
     if isinstance(event, events.FatalError):
         raise AssertionError(f"Internal Error: {format_exception(event.exception, with_traceback=True)}")
