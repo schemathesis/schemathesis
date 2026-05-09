@@ -1682,9 +1682,14 @@ def _adjust_numeric_bound(value: int | float, *, is_integer: bool, direction: in
 
 def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive integer values."""
-    # Boundary and near boundary values
-    schema = {"type": "number", **schema}
-    is_integer = schema.get("type") == "integer"
+    # Pin type to "integer" or "number"; for unions like ["string","number","null"] the
+    # dispatcher yields the other branches separately, and without this override generation
+    # here would draw from the union and miss the numeric variant entirely.
+    declared = schema.get("type")
+    declared_types = declared if isinstance(declared, list) else [declared]
+    pinned = "integer" if "integer" in declared_types else "number"
+    schema = {**schema, "type": pinned}
+    is_integer = pinned == "integer"
     minimum = schema.get("minimum")
     maximum = schema.get("maximum")
     exclusive_minimum = schema.get("exclusiveMinimum")

@@ -33,7 +33,7 @@ from schemathesis.generation.hypothesis.builder import (
 from schemathesis.generation.meta import CoverageScenario, TestPhase
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
-from schemathesis.specs.openapi.coverage._schema import CoverageContext, _negative_format
+from schemathesis.specs.openapi.coverage._schema import CoverageContext, _negative_format, cover_schema_iter
 from test.utils import assert_requests_call
 
 
@@ -4151,6 +4151,26 @@ def test_hostname_negative_format_respects_validator_draft(monkeypatch, validato
     else:
         with pytest.raises(Unsatisfiable):
             next(generator)
+
+
+@pytest.mark.parametrize(
+    ("types", "expected_kind"),
+    [(["string", "number", "null"], (int, float)), (["string", "integer", "null"], int)],
+    ids=["number", "integer"],
+)
+def test_multi_type_union_yields_numeric_branch(types, expected_kind):
+    # Numeric branch of a multi-type union must produce a numeric value, not a string drawn from a sibling branch.
+    ctx = CoverageContext(
+        root_schema={},
+        location=ParameterLocation.QUERY,
+        media_type=None,
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=False,
+        custom_formats={},
+        validator_cls=jsonschema_rs.validator_for({}).__class__,
+    )
+    values = [v.value for v in cover_schema_iter(ctx, {"type": types})]
+    assert any(isinstance(v, expected_kind) and not isinstance(v, bool) for v in values), values
 
 
 def test_missing_required_header_case_uses_invalid_template_body(ctx):
