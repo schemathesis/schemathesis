@@ -55,12 +55,16 @@ def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
         operations_total += total
 
         bucket = statistic.get("keywords") or {}
-        keywords_full += int(bucket.get("full", 0))
+        full = int(bucket.get("full", 0))
+        keywords_full += full
         covered, total = _bucket_full_partial(statistic, "keywords")
         keywords_full_partial += covered
         keywords_total += total
+        # Rank by `full` coverage (matches the "keywords (full only)" headline). Using
+        # `partial+full` hides APIs whose keywords are all "partially seen" but never fully
+        # exercised — they look maxed out at 100% even with real `needs_valid`/`needs_invalid` gaps.
         if total:
-            keyword_pcts.append((covered / total * 100, result.corpus, result.api))
+            keyword_pcts.append((full / total * 100, result.corpus, result.api))
 
         covered, total = _bucket_full_partial(statistic, "parameters")
         parameters_covered += covered
@@ -125,6 +129,7 @@ def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
         "worst_apis": [
             {"corpus": corpus, "api": api, "keyword_pct": round(pct, 2)}
             for pct, corpus, api in keyword_pcts[:WORST_APIS]
+            if pct < 100
         ],
     }
 
