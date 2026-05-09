@@ -17,6 +17,8 @@
 - Drop positive coverage bodies that violate sibling `anyOf`/`oneOf` constraints.
 - Cover `maxLength`/`minLength` boundary strings for nullable string schemas (`type: ["string", "null"]`).
 - Cover each `items` branch in positive coverage when the array has size constraints.
+- Drop duplicate object bodies in positive coverage when scenarios collapse to the same value.
+- Skip `multipart/form-data` property mutations whose stringified value still satisfies the schema.
 
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 

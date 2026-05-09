@@ -144,6 +144,11 @@ def is_xml_parts(media_type: tuple[str, str]) -> bool:
     return sub == "xml" or sub.endswith("+xml")
 
 
+def is_form_parts(media_type: tuple[str, str] | None) -> bool:
+    """Detect ``application/x-www-form-urlencoded`` or ``multipart/form-data`` from a parsed tuple."""
+    return media_type == ("application", "x-www-form-urlencoded") or media_type == ("multipart", "form-data")
+
+
 def matches_parts(expected: tuple[str, str], actual: tuple[str, str]) -> bool:
     """Check if two parsed media types match with wildcard support."""
     expected_main, expected_sub = expected
