@@ -9,6 +9,9 @@ permissions:
   pull-requests: write
   issues: write
 
+env:
+  PYTHONHASHSEED: "0"
+
 jobs:
   memory-benchmark:
     runs-on: ubuntu-22.04
