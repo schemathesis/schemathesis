@@ -20,6 +20,7 @@ from schemathesis.core import NOT_SET, Body, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
@@ -77,7 +78,7 @@ def get_full_path(base_path: str, path: str) -> str:
 
 @dataclass(eq=False)
 class BaseSchema(Mapping):
-    raw_schema: dict[str, Any]
+    raw_schema: JsonSchemaObject
     config: ProjectConfig
     location: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)

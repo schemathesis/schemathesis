@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from schemathesis.core import NotSet
+from schemathesis.core import Body, NotSet
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
@@ -154,39 +154,39 @@ WSGI_TRANSPORT = WSGITransport()
 
 
 @WSGI_TRANSPORT.serializer("application/json", "text/json")
-def json_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def json_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_json(value)
 
 
 @WSGI_TRANSPORT.serializer(
     "text/yaml", "text/x-yaml", "text/vnd.yaml", "text/yml", "application/yaml", "application/x-yaml"
 )
-def yaml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def yaml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_yaml(value)
 
 
 @WSGI_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
-def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return {"data": value}
 
 
 @WSGI_TRANSPORT.serializer("application/xml", "text/xml")
-def xml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def xml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_xml(ctx.case, value)
 
 
 @WSGI_TRANSPORT.serializer("application/x-www-form-urlencoded")
-def urlencoded_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def urlencoded_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return {"data": value}
 
 
 @WSGI_TRANSPORT.serializer("text/plain")
-def text_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def text_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     return {"data": str(value)}
 
 
 @WSGI_TRANSPORT.serializer("application/octet-stream")
-def binary_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def binary_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return {"data": serialize_binary(value)}

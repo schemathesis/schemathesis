@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
-
 import jsonschema_rs
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema.types import JsonValue
 
 
-def schema_cache_key(schema: Any) -> tuple[Any, ...]:
+def schema_cache_key(schema: JsonValue) -> tuple[str, ...]:
     if isinstance(schema, dict):
         bundle = schema.get(BUNDLE_STORAGE_KEY)
         if bundle is not None:

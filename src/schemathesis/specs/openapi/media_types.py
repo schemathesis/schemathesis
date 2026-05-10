@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core import Body
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.transport import SerializationContext
 from schemathesis.transport.asgi import ASGI_TRANSPORT
@@ -62,7 +63,7 @@ def register_media_type(name: str, strategy: st.SearchStrategy[bytes], *, aliase
     @REQUESTS_TRANSPORT.serializer(name, *aliases)
     @ASGI_TRANSPORT.serializer(name, *aliases)
     @WSGI_TRANSPORT.serializer(name, *aliases)
-    def serialize(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+    def serialize(ctx: SerializationContext, value: Body) -> dict[str, Any]:
         return {"data": value}
 
     MEDIA_TYPE_STRATEGIES[name] = strategy

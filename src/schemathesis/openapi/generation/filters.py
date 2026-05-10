@@ -1,5 +1,4 @@
 from collections.abc import Collection, Mapping
-from typing import Any
 from urllib.parse import unquote
 
 from schemathesis.core import NOT_SET
@@ -32,7 +31,7 @@ def is_valid_path(parameters: dict[str, object], allow_encoded_slash_for: Collec
     )
 
 
-def is_invalid_path_parameter(value: Any, *, allow_encoded_slash: bool = False) -> bool:
+def is_invalid_path_parameter(value: object, *, allow_encoded_slash: bool = False) -> bool:
     # `.` and `..` collapse during URL normalization the same way `/` does,
     # routing the request to a different operation than the one declared.
     if value in ("/", "", ".", ".."):

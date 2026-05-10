@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
@@ -159,7 +159,7 @@ _TAG_HANDLERS: dict[str, DictHandler] = {
 }
 
 
-def _is_structured_issue(issue: object) -> bool:
+def _is_structured_issue(issue: object) -> TypeGuard[dict]:
     return isinstance(issue, dict) and isinstance(issue.get("tag"), str) and isinstance(issue.get("namespace"), str)
 
 

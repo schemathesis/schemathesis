@@ -50,7 +50,7 @@ def _default_headers() -> CaseInsensitiveDict:
 _NOTSET_HASH = 0x7F3A9B2C
 
 
-def _contains_bytes(value: Any) -> bool:
+def _contains_bytes(value: Body) -> bool:
     """Check if value contains bytes or Binary wrappers anywhere in nested structure."""
     if isinstance(value, bytes | Binary):
         return True
@@ -260,7 +260,7 @@ class Case:
             value = dict(value)
         return make_validator(container.schema, validator_cls).is_valid(value)
 
-    def _hash_container(self, value: Any) -> int:
+    def _hash_container(self, value: object) -> int:
         """Create a hash representing the current state of a container.
 
         Recursively hashes nested dicts/lists/tuples and primitives to detect modifications.

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 if TYPE_CHECKING:
     from schemathesis.config import SanitizationConfig
 
 
-def sanitize_value(item: Any, *, config: SanitizationConfig) -> None:
+def sanitize_value(item: object, *, config: SanitizationConfig) -> None:
     """Sanitize sensitive values within a given item.
 
     This function is recursive and will sanitize sensitive data within nested

@@ -18,7 +18,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, BundleError, Bundler, make_validator
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -223,7 +223,7 @@ def build_positive_biased_path_strategy(strategy: st.SearchStrategy) -> st.Searc
     return biased()
 
 
-def filter_schema_valid_examples(examples: list[Any], schema: Any, validator_cls: type) -> list[Any]:
+def filter_schema_valid_examples(examples: list[JsonValue], schema: JsonSchema, validator_cls: type) -> list[JsonValue]:
     """Drop examples that don't conform to the given schema; real-world specs often disagree."""
     if not examples:
         return examples
@@ -238,7 +238,7 @@ def filter_schema_valid_examples(examples: list[Any], schema: Any, validator_cls
 
 def build_example_aware_strategy(
     original_strategy: st.SearchStrategy,
-    examples: list[Any],
+    examples: list[JsonValue],
 ) -> st.SearchStrategy:
     """Combine original strategy with schema examples.
 
@@ -266,7 +266,7 @@ def build_example_aware_strategy(
 
 def build_parameter_example_aware_strategy(
     original_strategy: st.SearchStrategy,
-    parameter_examples: dict[str, list[Any]],
+    parameter_examples: dict[str, list[JsonValue]],
 ) -> st.SearchStrategy:
     """Combine original parameter strategy with per-parameter schema examples.
 
@@ -470,7 +470,7 @@ class OpenApiComponent(ABC):
 
         return examples
 
-    def _get_strategy_examples(self, operation: APIOperation) -> list[object]:
+    def _get_strategy_examples(self, operation: APIOperation) -> list[JsonValue]:
         """Extract examples using proper OAS3 Example Object unpacking for the definition container.
 
         Unlike `_extract_examples`, uses `extract_inner_examples` which correctly handles
@@ -481,7 +481,7 @@ class OpenApiComponent(ABC):
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         assert isinstance(operation.schema, OpenApiSchema)
-        examples: list[object] = []
+        examples: list[JsonValue] = []
 
         container = self.definition.get(self.adapter.examples_container_keyword)
         if container is not None:

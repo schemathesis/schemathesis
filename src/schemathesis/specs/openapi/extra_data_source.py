@@ -185,7 +185,7 @@ def build_inputs_by_label(graph: DependencyGraph) -> dict[str, list[InputSlot]]:
 
 
 def _build_property_validator(
-    prop_schema: Any, container_schema: Any, validator_cls: type
+    prop_schema: object, container_schema: JsonSchema, validator_cls: type
 ) -> jsonschema_rs.Validator | None:
     """Validator for a single property, splicing the container's `x-bundled` for `$ref` resolution."""
     if not isinstance(prop_schema, dict):

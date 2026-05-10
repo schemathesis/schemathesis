@@ -90,7 +90,7 @@ def _get_format_validator(format: str, validator_cls: type[jsonschema_rs.Validat
     return _FORMAT_VALIDATORS[key]
 
 
-def conforms_to_format(value: Any, format: str, validator_cls: type[jsonschema_rs.Validator]) -> bool:
+def conforms_to_format(value: object, format: str, validator_cls: type[jsonschema_rs.Validator]) -> bool:
     """Check if a value conforms to a JSON Schema format."""
     return _get_format_validator(format, validator_cls).is_valid(value)
 
@@ -247,7 +247,7 @@ class CoverageContext:
     validator_cls: type[jsonschema_rs.Validator]
     update_pattern: Callable[[str, int | None, int | None], str] | None
     _resolver: Resolver | None
-    _schema_generation_cache: dict[tuple[Any, ...], Any]
+    _schema_generation_cache: dict[tuple[str, ...], Any]
     allow_extra_parameters: bool
 
     __slots__ = (
@@ -278,7 +278,7 @@ class CoverageContext:
         validator_cls: type[jsonschema_rs.Validator],
         update_pattern: Callable[[str, int | None, int | None], str] | None = None,
         _resolver: Resolver | None = None,
-        _schema_generation_cache: dict[tuple[Any, ...], Any] | None = None,
+        _schema_generation_cache: dict[tuple[str, ...], Any] | None = None,
         allow_extra_parameters: bool = True,
     ) -> None:
         self.root_schema = root_schema
@@ -589,7 +589,9 @@ def _update_schema_pattern(
             schema["pattern"] = new_pattern
 
 
-def _apply_pattern_optimizations(obj: Any, update_pattern: Callable[[str, int | None, int | None], str] | None) -> None:
+def _apply_pattern_optimizations(
+    obj: object, update_pattern: Callable[[str, int | None, int | None], str] | None
+) -> None:
     if update_pattern is None:
         return
     if isinstance(obj, dict):
@@ -1404,7 +1406,7 @@ def is_valid_for_others(
     return False
 
 
-def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
+def is_invalid_for_oneOf(value: object, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
     if contains_binary(value):
         # Binary values cannot be validated by jsonschema_rs; treat as not matching any other sub-schema
         return True
@@ -1447,7 +1449,7 @@ def _filter_against_combinators(
             yield case
 
 
-def _is_valid_with_formats(value: Any, schema: JsonSchema, ctx: CoverageContext) -> bool:
+def _is_valid_with_formats(value: object, schema: JsonSchema, ctx: CoverageContext) -> bool:
     """Return True if value satisfies schema including format constraints at all nesting levels."""
     if not isinstance(schema, dict):
         return True
@@ -2318,7 +2320,7 @@ def _is_not_numeric_string(x: str) -> bool:
         return True
 
 
-def is_valid_header_value(value: Any) -> bool:
+def is_valid_header_value(value: object) -> bool:
     value = str(value)
     if not is_latin_1_encodable(value):
         return False

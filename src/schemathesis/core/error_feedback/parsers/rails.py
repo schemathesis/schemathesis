@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 WalkPair = tuple[tuple[str | int, ...], str]
-ModernShape = Mapping[str, Sequence[object]]
+ModernShape = Mapping[str, Sequence[str]]
 LegacyShape = Sequence[str]
 
 # Object-level (cross-field) errors have no attribute to adjust against, so skip them.

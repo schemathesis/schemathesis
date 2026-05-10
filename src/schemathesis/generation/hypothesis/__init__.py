@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections import OrderedDict
+from collections.abc import Callable
 from typing import Any, Literal
 
 
@@ -26,7 +27,7 @@ def setup() -> None:
         make_validator,
         make_validator_for,
     )
-    from schemathesis.core.jsonschema.types import _get_type
+    from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, _get_type
     from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer
     from schemathesis.generation._cache import schema_cache_key
 
@@ -44,7 +45,7 @@ def setup() -> None:
     _from_schema.encode_canonical_json = jsonschema_rs.canonical.json.to_string
 
     # This one is used a lot, and under the hood it re-parses the AST of the same function
-    def _is_first_param_referenced_in_function(f: Any) -> bool:
+    def _is_first_param_referenced_in_function(f: Callable) -> bool:
         if f.__name__ == "from_object_schema" and f.__module__ == "hypothesis_jsonschema._from_schema":
             return True
         return is_first_param_referenced_in_function(f)
@@ -66,13 +67,15 @@ def setup() -> None:
 
         __slots__ = ("schema", "encoded", "serialized", "cache_key")
 
-        def __init__(self, schema: dict[str, Any]) -> None:
+        def __init__(self, schema: JsonSchemaObject) -> None:
             self.schema = schema
             self.cache_key = schema_cache_key(schema)
             self.serialized = self.cache_key[1]
             self.encoded = hash(self.cache_key)
 
-        def __eq__(self, other: CacheableSchema) -> bool:  # type: ignore[override]
+        def __eq__(self, other: object) -> bool:
+            if not isinstance(other, CacheableSchema):
+                return NotImplemented
             return self.cache_key == other.cache_key
 
         def __hash__(self) -> int:
@@ -83,17 +86,17 @@ def setup() -> None:
 
     # Cache for fully-resolved schema output, keyed by canonical schema content.
     # Avoids re-traversing schemas with the same JSON content.
-    _resolve_result_cache: dict[tuple[Any, ...], dict[str, Any]] = {}
-    _merged_result_cache: OrderedDict[tuple[tuple[Any, ...], tuple[Any, ...]], dict[str, Any] | None] = OrderedDict()
+    _resolve_result_cache: dict[tuple[str, ...], JsonSchemaObject] = {}
+    _merged_result_cache: OrderedDict[tuple[tuple[str, ...], tuple[str, ...]], JsonSchemaObject | None] = OrderedDict()
     _merged_result_cache_maxsize = 4096
-    _canonicalish_result_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
+    _canonicalish_result_cache: OrderedDict[tuple[str, ...], JsonSchemaObject] = OrderedDict()
     _canonicalish_result_cache_maxsize = 8192
-    _from_schema_result_cache: OrderedDict[tuple[tuple[Any, ...], int, int], Any] = OrderedDict()
+    _from_schema_result_cache: OrderedDict[tuple[tuple[str, ...], int, int], Any] = OrderedDict()
     _from_schema_result_cache_maxsize = 4096
-    _merged_as_strategies_result_cache: OrderedDict[tuple[tuple[tuple[Any, ...], ...], int, int], Any] = OrderedDict()
+    _merged_as_strategies_result_cache: OrderedDict[tuple[tuple[tuple[str, ...], ...], int, int], Any] = OrderedDict()
     _merged_as_strategies_result_cache_maxsize = 2048
 
-    def _merge_cache_get(key: tuple[tuple[Any, ...], tuple[Any, ...]]) -> dict[str, Any] | None | Literal[False]:
+    def _merge_cache_get(key: tuple[tuple[str, ...], tuple[str, ...]]) -> JsonSchemaObject | None | Literal[False]:
         if key in _merged_result_cache:
             _merged_result_cache.move_to_end(key)
             cached = _merged_result_cache[key]
@@ -102,57 +105,57 @@ def setup() -> None:
             return deepclone(cached)
         return False
 
-    def _merge_cache_set(key: tuple[tuple[Any, ...], tuple[Any, ...]], value: dict[str, Any] | None) -> None:
+    def _merge_cache_set(key: tuple[tuple[str, ...], tuple[str, ...]], value: JsonSchemaObject | None) -> None:
         _merged_result_cache[key] = deepclone(value) if isinstance(value, dict) else None
         _merged_result_cache.move_to_end(key)
         if len(_merged_result_cache) > _merged_result_cache_maxsize:
             _merged_result_cache.popitem(last=False)
 
-    def _canonicalish_cache_get(key: tuple[Any, ...]) -> dict[str, Any] | None:
+    def _canonicalish_cache_get(key: tuple[str, ...]) -> JsonSchemaObject | None:
         if key in _canonicalish_result_cache:
             _canonicalish_result_cache.move_to_end(key)
             return deepclone(_canonicalish_result_cache[key])
         return None
 
-    def _canonicalish_cache_set(key: tuple[Any, ...], value: dict[str, Any]) -> None:
+    def _canonicalish_cache_set(key: tuple[str, ...], value: JsonSchemaObject) -> None:
         _canonicalish_result_cache[key] = deepclone(value)
         _canonicalish_result_cache.move_to_end(key)
         if len(_canonicalish_result_cache) > _canonicalish_result_cache_maxsize:
             _canonicalish_result_cache.popitem(last=False)
 
-    def _from_schema_cache_get(key: tuple[tuple[Any, ...], int, int]) -> Any | None:
+    def _from_schema_cache_get(key: tuple[tuple[str, ...], int, int]) -> Any | None:
         if key in _from_schema_result_cache:
             _from_schema_result_cache.move_to_end(key)
             return _from_schema_result_cache[key]
         return None
 
-    def _from_schema_cache_set(key: tuple[tuple[Any, ...], int, int], value: Any) -> None:
+    def _from_schema_cache_set(key: tuple[tuple[str, ...], int, int], value: Any) -> None:
         _from_schema_result_cache[key] = value
         _from_schema_result_cache.move_to_end(key)
         if len(_from_schema_result_cache) > _from_schema_result_cache_maxsize:
             _from_schema_result_cache.popitem(last=False)
 
-    def _merged_as_strategies_cache_get(key: tuple[tuple[tuple[Any, ...], ...], int, int]) -> Any | None:
+    def _merged_as_strategies_cache_get(key: tuple[tuple[tuple[str, ...], ...], int, int]) -> Any | None:
         if key in _merged_as_strategies_result_cache:
             _merged_as_strategies_result_cache.move_to_end(key)
             return _merged_as_strategies_result_cache[key]
         return None
 
-    def _merged_as_strategies_cache_set(key: tuple[tuple[tuple[Any, ...], ...], int, int], value: Any) -> None:
+    def _merged_as_strategies_cache_set(key: tuple[tuple[tuple[str, ...], ...], int, int], value: Any) -> None:
         _merged_as_strategies_result_cache[key] = value
         _merged_as_strategies_result_cache.move_to_end(key)
         if len(_merged_as_strategies_result_cache) > _merged_as_strategies_result_cache_maxsize:
             _merged_as_strategies_result_cache.popitem(last=False)
 
-    def _is_trivial_truthy(schema: Any) -> bool:
+    def _is_trivial_truthy(schema: object) -> bool:
         return schema is True or schema == {}
 
-    def _canonicalish_checked(schema: Any) -> dict[str, Any]:
+    def _canonicalish_checked(schema: JsonSchema) -> JsonSchemaObject:
         result = _canonicalise.canonicalish(schema)
         _canonicalise._get_validator_class(result)
         return result
 
-    def _distribute_anyof(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any] | None:
+    def _distribute_anyof(left: JsonSchemaObject, right: JsonSchemaObject) -> JsonSchemaObject | None:
         # `_original_merged` returns None for two distinct `anyOf` lists; distribute
         # the intersection over their branches and drop empty results.
         left_branches = left.get("anyOf")
@@ -175,7 +178,7 @@ def setup() -> None:
             return branches[0]
         return {"anyOf": branches}
 
-    def _merged(schemas: list[Any]) -> dict[str, Any] | None:
+    def _merged(schemas: list[JsonSchema]) -> JsonSchemaObject | None:
         if len(schemas) > 1:
             filtered = [schema for schema in schemas if not _is_trivial_truthy(schema)]
             if not filtered:
@@ -219,7 +222,7 @@ def setup() -> None:
         if _canonicalise.TRUTHY:
             _canonicalise.TRUTHY.clear()
 
-    def _resolve_ref(root_schema: dict[str, Any], ref: str) -> Any:
+    def _resolve_ref(root_schema: JsonSchemaObject, ref: str) -> object:
         if not ref:
             return root_schema
         if ref.startswith("#"):
@@ -228,7 +231,7 @@ def setup() -> None:
                 return resolved
         raise _canonicalise.HypothesisRefResolutionError(f"Could not resolve reference {ref!r}")
 
-    def _cached_from_schema(schema: Any, *, alphabet: Any, custom_formats: Any) -> Any:
+    def _cached_from_schema(schema: JsonSchema, *, alphabet: Any, custom_formats: Any) -> Any:
         _ensure_canonical_constants()
         try:
             key = (schema_cache_key(schema), id(alphabet), id(custom_formats))
@@ -254,7 +257,7 @@ def setup() -> None:
 
         return strategy
 
-    def _cached_merged_as_strategies(schemas: Any, *, alphabet: Any, custom_formats: Any) -> Any:
+    def _cached_merged_as_strategies(schemas: list[JsonSchema], *, alphabet: Any, custom_formats: Any) -> Any:
         try:
             schema_keys = tuple(schema_cache_key(schema) for schema in schemas)
             key = (schema_keys, id(alphabet), id(custom_formats))
@@ -274,10 +277,10 @@ def setup() -> None:
         return strategy
 
     def resolve_all_refs(
-        schema: Literal[True, False] | dict[str, Any],
+        schema: JsonSchema,
         *,
-        root_schema: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        root_schema: JsonSchemaObject | None = None,
+    ) -> JsonSchemaObject:
         if schema is True:
             return {}
         if schema is False:
@@ -287,7 +290,7 @@ def setup() -> None:
 
         _resolve_all_refs = resolve_all_refs
         top_level = root_schema is None
-        cache_key: tuple[Any, ...] | None = None
+        cache_key: tuple[str, ...] | None = None
 
         if top_level:
             cacheable_schema = CacheableSchema(schema)
@@ -349,7 +352,7 @@ def setup() -> None:
     # Patch canonicalish to skip x-bundled during the deep-copy serialisation.
     _original_canonicalish = _canonicalise.canonicalish
 
-    def _has_bundle_ref(obj: Any) -> bool:
+    def _has_bundle_ref(obj: object) -> bool:
         if isinstance(obj, dict):
             ref = obj.get("$ref")
             if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
@@ -359,7 +362,7 @@ def setup() -> None:
             return any(_has_bundle_ref(item) for item in obj)
         return False
 
-    def _fast_canonicalish(schema: Any) -> dict[str, Any]:
+    def _fast_canonicalish(schema: JsonSchema) -> JsonSchemaObject:
         try:
             cache_key = schema_cache_key(schema)
         except (TypeError, ValueError):
@@ -404,10 +407,10 @@ def setup() -> None:
     class _ValidatorWrapper:
         __slots__ = ("_validator",)
 
-        def __init__(self, validator: Any) -> None:
+        def __init__(self, validator: jsonschema_rs.Validator) -> None:
             self._validator = validator
 
-        def is_valid(self, value: Any) -> bool:
+        def is_valid(self, value: object) -> bool:
             if contains_binary(value):
                 return True
             return self._validator.is_valid(value)
@@ -416,7 +419,7 @@ def setup() -> None:
     # but hypothesis-jsonschema defaults to Draft 7. Schemas using Draft 4/7 features
     # (e.g. tuple `items`) are rejected by 2020-12, so we fall back through older drafts.
     # TODO: remove once hypothesis-jsonschema propagates the draft version consistently.
-    def _make_rust_validator(schema: dict[str, Any]) -> Any:
+    def _make_rust_validator(schema: JsonSchemaObject) -> jsonschema_rs.Validator:
         last_error: jsonschema_rs.ValidationError | None = None
         try:
             return make_validator_for(schema)
@@ -436,7 +439,7 @@ def setup() -> None:
         assert last_error is not None
         raise last_error
 
-    def _make_wrapped_validator(schema: dict[str, Any]) -> _ValidatorWrapper:
+    def _make_wrapped_validator(schema: JsonSchemaObject) -> _ValidatorWrapper:
         try:
             validator = _make_rust_validator(schema)
             return _ValidatorWrapper(validator)
@@ -446,7 +449,7 @@ def setup() -> None:
             cls = _original_get_validator_class(schema)
             return _ValidatorWrapper(cls(schema))
 
-    def _get_validator_class(schema: dict[str, Any]) -> Any:
+    def _get_validator_class(schema: JsonSchemaObject) -> type[jsonschema_rs.Validator]:
         classes_to_try = [
             jsonschema_rs.validator_cls_for(schema),
             jsonschema_rs.Draft7Validator,

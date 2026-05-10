@@ -24,7 +24,7 @@ BundleCache = dict[int, tuple[dict[str, Any], dict[str, str]]]
 
 
 class BundleError(Exception):
-    def __init__(self, reference: str, value: Any) -> None:
+    def __init__(self, reference: str, value: object) -> None:
         self.reference = reference
         self.value = value
 

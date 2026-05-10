@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 WalkPair = tuple[tuple[str | int, ...], str]
-AspNetShape = Mapping[str, Sequence[object]]
+AspNetShape = Mapping[str, Sequence[str]]
 
 # Vocabulary discriminator — substrings that lock detection to ASP.NET / FluentValidation.
 _ASPNET_VOCABULARY: frozenset[str] = frozenset(
@@ -61,7 +61,7 @@ def _walk(errors: AspNetShape) -> Iterator[WalkPair]:
             continue
         field = lowercase_first_letter(raw_key)
         for message in messages:
-            if isinstance(message, str) and message:
+            if message:
                 yield ((field,), message)
 
 
@@ -172,11 +172,7 @@ def _extract_errors(body: object) -> AspNetShape | None:
 
 def _has_aspnet_vocabulary(errors: AspNetShape) -> bool:
     return any(
-        phrase in message
-        for messages in errors.values()
-        for message in messages
-        if isinstance(message, str)
-        for phrase in _ASPNET_VOCABULARY
+        phrase in message for messages in errors.values() for message in messages for phrase in _ASPNET_VOCABULARY
     )
 
 

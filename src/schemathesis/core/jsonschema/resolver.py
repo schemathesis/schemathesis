@@ -15,6 +15,7 @@ import requests
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import RemoteDocumentError
+from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
@@ -33,7 +34,7 @@ class Resolver:
 
     __slots__ = ("base_uri", "inner", "schema", "fragment_cache")
 
-    def __init__(self, inner: jsonschema_rs.Resolver, schema: Any) -> None:
+    def __init__(self, inner: jsonschema_rs.Resolver, schema: JsonSchema) -> None:
         self.inner = inner
         self.schema = schema
         # Frozen on the wrapper so hot-path callers don't pay a property+attribute hop.

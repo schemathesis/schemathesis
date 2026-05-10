@@ -10,6 +10,7 @@ from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from schemathesis.core.errors import HookExecutionError
+from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response
 from schemathesis.filters import FilterSet, attach_filter_chain
@@ -464,7 +465,7 @@ def before_process_path(context: HookContext, path: str, methods: dict[str, Any]
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def before_load_schema(context: HookContext, raw_schema: dict[str, Any]) -> None:
+def before_load_schema(context: HookContext, raw_schema: JsonSchemaObject) -> None:
     """Called before schema instance is created."""
 
 
@@ -557,7 +558,9 @@ def dispatch_before_init_operation(schema: BaseSchema, context: HookContext, ope
     _dispatch_schema_cascade(schema, "before_init_operation", context, operation)
 
 
-def dispatch_before_load_schema(*dispatchers: HookDispatcher, context: HookContext, raw_schema: dict[str, Any]) -> None:
+def dispatch_before_load_schema(
+    *dispatchers: HookDispatcher, context: HookContext, raw_schema: JsonSchemaObject
+) -> None:
     _dispatch_to_all("before_load_schema", dispatchers, context, raw_schema)
 
 

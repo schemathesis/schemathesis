@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 
@@ -119,7 +118,7 @@ def _sanitize_combinators(schema: JsonSchemaObject, is_recursive_ref: Callable[[
             schema.pop("allOf", None)
 
 
-def _is_self_ref(entry: Any, is_recursive_ref: Callable[[str], bool]) -> bool:
+def _is_self_ref(entry: object, is_recursive_ref: Callable[[str], bool]) -> bool:
     """A bare `{"$ref": X}` whose target is currently being inlined."""
     if not isinstance(entry, dict) or list(entry) != ["$ref"]:
         return False
@@ -258,7 +257,7 @@ def _sanitize_additional_items(schema: JsonSchemaObject) -> None:
         schema["additionalItems"] = False
 
 
-def _has_ref(schema: Any) -> bool:
+def _has_ref(schema: object) -> bool:
     """Check if schema contains $ref at any level."""
     if not isinstance(schema, dict):
         return False
