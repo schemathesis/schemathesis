@@ -114,10 +114,15 @@ def _replace_zero_with_nonzero(x: float) -> float:
     return x or 0.0
 
 
-def _accept_spec_value(value: Any, schema: dict[str, Any]) -> Any:
+def _accept_spec_value(value: Any, schema: dict[str, Any], bundle: dict[str, Any] | None = None) -> Any:
     # Spec examples reflecting the response shape may carry `readOnly` keys that
     # request-side schemas forbid; dropping those keys recovers the curated value.
-    if is_valid(value, schema):
+    # Bundle is spliced in so `$ref`s inside `schema` resolve during validation;
+    # otherwise an unresolvable ref would silently pass and accept invalid examples.
+    schema_for_validation = (
+        schema if bundle is None or BUNDLE_STORAGE_KEY in schema else {**schema, BUNDLE_STORAGE_KEY: bundle}
+    )
+    if is_valid(value, schema_for_validation):
         return value
     if not isinstance(value, dict):
         return NOT_SET
@@ -128,7 +133,7 @@ def _accept_spec_value(value: Any, schema: dict[str, Any]) -> Any:
     if not forbidden or forbidden.isdisjoint(value):
         return NOT_SET
     cleaned = {k: v for k, v in value.items() if k not in forbidden}
-    if is_valid(cleaned, schema):
+    if is_valid(cleaned, schema_for_validation):
         return cleaned
     return NOT_SET
 
@@ -398,20 +403,21 @@ class CoverageContext:
         # Surfaces author intent into recursively-generated templates; without this, nested
         # properties whose schemas declare `example`/`default` get synthetic Hypothesis values.
         if isinstance(schema, dict):
+            bundle = self.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(self.root_schema, dict) else None
             example = schema.get("example", NOT_SET)
             if example is not NOT_SET:
-                accepted = _accept_spec_value(example, schema)
+                accepted = _accept_spec_value(example, schema, bundle)
                 if accepted is not NOT_SET:
                     return accepted
             examples = schema.get("examples")
             if isinstance(examples, list):
                 for candidate in examples:
-                    accepted = _accept_spec_value(candidate, schema)
+                    accepted = _accept_spec_value(candidate, schema, bundle)
                     if accepted is not NOT_SET:
                         return accepted
             default = schema.get("default", NOT_SET)
             if default is not NOT_SET:
-                accepted = _accept_spec_value(default, schema)
+                accepted = _accept_spec_value(default, schema, bundle)
                 if accepted is not NOT_SET:
                     return accepted
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])

@@ -4910,6 +4910,71 @@ def test_spec_hint_recovers_after_dropping_readonly_stripped_keys(hint_extra):
     assert _positive_body_context().generate_from_schema(schema) == {"id": "X"}
 
 
+def test_example_with_nested_ref_violation_is_not_used(ctx):
+    # An `example` whose nested values violate an enum reachable via `$ref` must not
+    # be emitted as a positive case. Without bundle-aware validation the ref cannot
+    # resolve, the validator silently accepts the example, and an invalid body ships.
+    raw = ctx.openapi.build_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Wrapper"}}},
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+        components={
+            "schemas": {
+                "Wrapper": {
+                    "type": "object",
+                    "required": ["item"],
+                    "properties": {"item": {"$ref": "#/components/schemas/Item"}},
+                },
+                "Item": {
+                    "type": "object",
+                    "required": ["choices"],
+                    "example": {"choices": ["bad"]},
+                    "properties": {
+                        "choices": {"type": "array", "items": {"$ref": "#/components/schemas/Choice"}},
+                    },
+                },
+                "Choice": {"type": "string", "enum": ["allowed"]},
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(raw)
+    operation = loaded["/r"]["POST"]
+    resolved_body = {
+        "type": "object",
+        "required": ["item"],
+        "properties": {
+            "item": {
+                "type": "object",
+                "required": ["choices"],
+                "properties": {
+                    "choices": {"type": "array", "items": {"type": "string", "enum": ["allowed"]}},
+                },
+            },
+        },
+    }
+    validator = jsonschema_rs.validator_for(resolved_body)
+    cases = list(
+        iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+    )
+    assert cases, "expected at least one positive coverage case"
+    for case in cases:
+        assert validator.is_valid(case.body), f"Invalid positive body emitted: {case.body!r}"
+
+
 def test_oneof_ref_branches_with_discriminator_each_get_distinct_positive_coverage(ctx):
     # A nested discriminator `oneOf` under an outer `oneOf`-discriminated body must
     # yield at least one value uniquely satisfying each inner branch.
