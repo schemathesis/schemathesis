@@ -15,6 +15,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """
     if config.getoption("keyword"):
         return
+    if not any(
+        report.nodeid.startswith("test_corpus.py::test_coverage_phase")
+        for report in terminalreporter.getreports("passed") + terminalreporter.getreports("failed")
+    ):
+        return
     try:
         from test_corpus import _PENDING_BODY_VIOLATIONS
     except ImportError:
