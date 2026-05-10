@@ -26,6 +26,7 @@ from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
     SCHEMA_ERROR_SUGGESTION,
+    HookExecutionError,
     InfiniteRecursiveReference,
     InvalidSchema,
     MalformedMediaType,
@@ -512,6 +513,36 @@ class OpenApiSchema(BaseSchema):
         for link in collected_links:
             if is_link_selected(link):
                 statistic.transitions.selected += 1
+
+        # Resource-pool inventory: counts of descriptor-producing operations, resource-bound
+        # consumer operations, and distinct resource types. Lets the analyzer compute
+        # "exercised N of M known edges" from the post-run NDJSON.
+        # Hook/schema errors raised by `analyze` re-fire during engine iteration where
+        # they're handled; defer to that path so the loader doesn't crash.
+        try:
+            descriptors = self.analysis.resource_descriptors
+            graph = self.analysis.dependency_graph
+        except (HookExecutionError, *SCHEMA_PARSING_ERRORS):
+            return statistic
+        # Intersect with the run's selected operations so coverage ratios match what the run exercised.
+        selected_labels = {f"{method.upper()} {path}" for method, path in selected_operations_by_path}
+        producer_labels: set[str] = set()
+        resource_names: set[str] = set()
+        for descriptor in descriptors:
+            if descriptor.operation in selected_labels:
+                producer_labels.add(descriptor.operation)
+                resource_names.add(descriptor.resource_name)
+        consumer_labels: set[str] = set()
+        for label, operation in graph.operations.items():
+            if label not in selected_labels:
+                continue
+            resource_bound = [slot for slot in operation.inputs if slot.resource_field is not None]
+            if resource_bound:
+                consumer_labels.add(label)
+                resource_names.update(slot.resource.name for slot in resource_bound)
+        statistic.resource_pool.producer_labels = sorted(producer_labels)
+        statistic.resource_pool.consumer_labels = sorted(consumer_labels)
+        statistic.resource_pool.resources = len(resource_names)
 
         return statistic
 

@@ -34,6 +34,8 @@
   |-----------|-------|----------------|----------------|------|-------|-----|--------------|
   | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
   
+  ## Reachability
+  **Reached:** 2/2 operations (100.0%) produced ≥1 2xx response.
   ## Phases
   
   | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
@@ -87,6 +89,8 @@
   |-----------|-------|----------------|----------------|------|-------|-----|--------------|
   | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
   
+  ## Reachability
+  **Reached:** 2/2 operations (100.0%) produced ≥1 2xx response.
   ## Phases
   
   | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
@@ -140,6 +144,8 @@
   |-----------|-------|----------------|----------------|------|-------|-----|--------------|
   | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
   
+  ## Reachability
+  **Reached:** 2/2 operations (100.0%) produced ≥1 2xx response.
   ## Phases
   
   | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
@@ -195,6 +201,8 @@
   |-----------|-------|----------------|----------------|------|-------|-----|--------------|
   | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
   
+  ## Reachability
+  **Reached:** 2/2 operations (100.0%) produced ≥1 2xx response.
   ## Phases
   
   | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
@@ -254,6 +262,8 @@
   |-----------|-------|-----|-------|
   | GET /flaky | 10 | 8 | 80.0% |
   
+  ## Reachability
+  **Reached:** 3/3 operations (100.0%) produced ≥1 2xx response.
   ## Phases
   
   | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |
@@ -307,6 +317,8 @@
   |-----------|-------|----------------|----------------|------|-------|-----|--------------|
   | POST /echo-validate | 6 | 4 | 0 | 0 | 0 | 0 | body |
   
+  ## Reachability
+  **Reached:** 2/2 operations (100.0%) produced ≥1 2xx response.
   ## Stateful summary
   
   `Stateful tests` — 35 calls, handler-reached 100.0%, drift 20 (P+4xx 20, N+2xx 0), 5xx 5
@@ -370,6 +382,8 @@
   | POST /slow | 30 | 15.0s | 10.0s | 25.0s |
   | GET /fast | 30 | 5.0s | 20.0s | 25.0s |
   
+  ## Reachability
+  **Reached:** 2/2 operations (100.0%) produced ≥1 2xx response.
   ## Phases
   
   | Phase | Wall | Calls | Gen total | Gen/case | Net total | Net/case | Unaccounted | Unaccounted% |

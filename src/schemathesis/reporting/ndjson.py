@@ -30,7 +30,11 @@ TextOutput = IO[str] | StringIO | Path
 
 # Fields to skip during serialization per type (too large or not useful for analysis)
 SKIP_FIELDS: dict[str, frozenset[str]] = {
-    "LoadingFinished": frozenset({"schema", "config", "find_operation_by_label"}),
+    # `location` and `base_url` can hold credentials or query-string tokens; the generic
+    # dataclass serializer doesn't run them through `sanitize_url`, so skip them entirely.
+    # `base_path` is dropped alongside for consistency. `find_operation_by_label` is a callable.
+    "LoadingStarted": frozenset({"location"}),
+    "LoadingFinished": frozenset({"schema", "config", "find_operation_by_label", "location", "base_url", "base_path"}),
     "Case": frozenset({"operation"}),
     "NonFatalError": frozenset({"info"}),  # Duplicate of `value`
     "CheckFailureInfo": frozenset({"code_sample"}),  # Reconstructable from case + interaction

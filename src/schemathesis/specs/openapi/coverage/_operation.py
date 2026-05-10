@@ -39,7 +39,7 @@ from schemathesis.transport.serialization import quote_all
 if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
-    from schemathesis.resources import ExtraDataSource
+    from schemathesis.resources import ExtraDataSource, PoolDraw
     from schemathesis.schemas import APIOperation, ParameterSet
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 
@@ -108,15 +108,15 @@ class Template:
         return output
 
     def unmodified(self) -> TemplateValue:
-        kwargs = deepclone(self._template)
-        kwargs = self._serialize(kwargs)
-        return TemplateValue(kwargs=kwargs, components=self._components.copy())
+        raw = deepclone(self._template)
+        kwargs = self._serialize(raw)
+        return TemplateValue(kwargs=kwargs, raw=raw, components=self._components.copy())
 
     def with_body(self, *, media_type: str, value: GeneratedValue) -> TemplateValue:
-        kwargs = {**self._template, "media_type": media_type, "body": value.value}
-        kwargs = self._serialize(kwargs)
+        raw = {**self._template, "media_type": media_type, "body": value.value}
+        kwargs = self._serialize(raw)
         components = {**self._components, ParameterLocation.BODY: ComponentInfo(mode=value.generation_mode)}
-        return TemplateValue(kwargs=kwargs, components=components)
+        return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
     def with_parameter(self, *, location: ParameterLocation, name: str, value: GeneratedValue) -> TemplateValue:
         container = self._template[location.container_name]
@@ -129,18 +129,19 @@ class Template:
     def with_location(
         self, *, location: ParameterLocation, value: Any, generation_mode: GenerationMode
     ) -> TemplateValue:
-        kwargs = {**self._template, location.container_name: value}
+        raw = {**self._template, location.container_name: value}
         components = {**self._components, location: ComponentInfo(mode=generation_mode)}
-        kwargs = self._serialize(kwargs)
-        return TemplateValue(kwargs=kwargs, components=components)
+        kwargs = self._serialize(raw)
+        return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
 
 @dataclass
 class TemplateValue:
     kwargs: dict[str, Any]
+    raw: dict[str, Any]
     components: dict[ParameterLocation, ComponentInfo]
 
-    __slots__ = ("kwargs", "components")
+    __slots__ = ("kwargs", "raw", "components")
 
 
 def _stringify_value(val: Any, container_name: str) -> Any:
@@ -290,6 +291,89 @@ def _generate_multipart_body_from_custom_strategies(body: OpenApiBody) -> dict[s
     return result if has_custom_strategy else None
 
 
+def _filter_draws_for_case(
+    raw: dict[str, Any],
+    correlated: dict[tuple[ParameterLocation, str], Any],
+    draws: tuple[PoolDraw, ...],
+) -> tuple[PoolDraw, ...]:
+    """Keep only draws whose pooled value is actually present in the yielded case.
+
+    Coverage variants can omit an optional resource-bound slot or replace it with a mutated
+    value; in either case the pool was not consumed for that slot in this specific case, so
+    the draw shouldn't carry over into the analyzer's per-case stats.
+
+    Operates on the pre-serialization `raw` view so the comparison is a plain ``==`` against
+    the original pool value — no URL-quoting or stringification reversal needed.
+    """
+    if not draws:
+        return ()
+    result: list[PoolDraw] = []
+    for draw in draws:
+        try:
+            location = ParameterLocation(draw.location)
+        except ValueError:
+            continue
+        expected = correlated.get((location, draw.parameter_name))
+        if expected is None:
+            continue
+        actual = _case_slot_value(raw, location, draw.parameter_name)
+        if actual is _SENTINEL_ABSENT:
+            continue
+        if actual == expected:
+            result.append(draw)
+    return tuple(result)
+
+
+def _filter_misses_for_case(
+    raw: dict[str, Any],
+    misses: tuple[tuple[str, str], ...],
+) -> tuple[tuple[str, str], ...]:
+    """Keep misses whose slot is present in the yielded case (synthesised value, not a pool draw).
+
+    A miss is "engine wanted to draw, pool was empty, slot still got a synthesised value".
+    Cases that omit the slot entirely (e.g. missing-parameter coverage probes) didn't actually
+    attempt the fill, so they shouldn't count as misses for this case.
+    """
+    if not misses:
+        return ()
+    result: list[tuple[str, str]] = []
+    for miss in misses:
+        try:
+            location = ParameterLocation(miss[0])
+        except ValueError:
+            continue
+        if _case_slot_value(raw, location, miss[1]) is not _SENTINEL_ABSENT:
+            result.append(miss)
+    return tuple(result)
+
+
+# Sentinel used by `_case_slot_value` to distinguish "absent" from "present with value None".
+_SENTINEL_ABSENT = object()
+
+
+def _case_slot_value(kwargs: dict[str, Any], location: ParameterLocation, parameter_name: str) -> Any:
+    """Look up the value at `(location, parameter_name)` in the yielded case kwargs.
+
+    Returns ``_SENTINEL_ABSENT`` when the slot is not present at all. For nested body fields
+    like ``"shipping/location_id"``, walks the path one segment at a time.
+    """
+    container = kwargs.get(location.container_name)
+    if container is None:
+        return _SENTINEL_ABSENT
+    if location == ParameterLocation.BODY:
+        if not isinstance(container, dict):
+            return _SENTINEL_ABSENT
+        cursor: Any = container
+        for segment in parameter_name.split("/"):
+            if not isinstance(cursor, dict) or segment not in cursor:
+                return _SENTINEL_ABSENT
+            cursor = cursor[segment]
+        return cursor
+    if not isinstance(container, dict) or parameter_name not in container:
+        return _SENTINEL_ABSENT
+    return container[parameter_name]
+
+
 def iter_coverage_cases(
     *,
     operation: APIOperation,
@@ -317,13 +401,36 @@ def iter_coverage_cases(
     assert validator_cls is not None, "Coverage phase requires a JSON schema validator class"
 
     correlated: dict[tuple[ParameterLocation, str], Any]
+    correlated_draws: tuple[PoolDraw, ...]
+    correlated_misses: tuple[tuple[str, str], ...]
     if extra_data_source is not None:
-        try:
-            correlated = extra_data_source.pick_correlated_values(operation=operation)
-        except Exception:
-            correlated = {}
+        pool_pick = extra_data_source.pick_correlated_values(operation=operation)
+        correlated = pool_pick.values
+        correlated_draws = pool_pick.draws
+        correlated_misses = pool_pick.misses
     else:
         correlated = {}
+        correlated_draws = ()
+        correlated_misses = ()
+
+    def _build_meta(
+        *,
+        generation: GenerationInfo,
+        components: dict[ParameterLocation, ComponentInfo],
+        phase: PhaseInfo,
+        raw: dict[str, Any],
+    ) -> CaseMetadata:
+        # Filter operation-level draws/misses to only those whose slot actually appears in
+        # the yielded request. Coverage variants that omit an optional resource-bound slot,
+        # or synthesised probes that drop one parameter while keeping a pooled path param,
+        # would otherwise over- or under-attribute the pool.
+        return CaseMetadata(
+            generation=generation,
+            components=components,
+            phase=phase,
+            pool_draws=_filter_draws_for_case(raw, correlated, correlated_draws),
+            pool_misses=_filter_misses_for_case(raw, correlated_misses),
+        )
 
     inferred_properties_per_location: dict[ParameterLocation, dict[str, Any] | None] = {}
 
@@ -479,7 +586,7 @@ def iter_coverage_cases(
                 data = template.with_body(value=first_custom_value, media_type=body.media_type)
                 yield operation.Case(
                     **data.kwargs,
-                    _meta=CaseMetadata(
+                    _meta=_build_meta(
                         generation=GenerationInfo(time=elapsed, mode=first_custom_value.generation_mode),
                         components=data.components,
                         phase=PhaseInfo.coverage(
@@ -489,6 +596,7 @@ def iter_coverage_cases(
                             parameter=body.media_type,
                             parameter_location=ParameterLocation.BODY,
                         ),
+                        raw=data.raw,
                     ),
                 )
                 continue
@@ -601,7 +709,7 @@ def iter_coverage_cases(
             data = template.with_body(value=value, media_type=body.media_type)
             yield operation.Case(
                 **data.kwargs,
-                _meta=CaseMetadata(
+                _meta=_build_meta(
                     generation=GenerationInfo(
                         time=elapsed,
                         mode=value.generation_mode,
@@ -614,6 +722,7 @@ def iter_coverage_cases(
                         parameter=body.media_type,
                         parameter_location=ParameterLocation.BODY,
                     ),
+                    raw=data.raw,
                 ),
             )
             iterator = iter(gen)
@@ -627,7 +736,7 @@ def iter_coverage_cases(
                     data = template.with_body(value=next_value, media_type=body.media_type)
                     yield operation.Case(
                         **data.kwargs,
-                        _meta=CaseMetadata(
+                        _meta=_build_meta(
                             generation=GenerationInfo(
                                 time=instant.elapsed,
                                 mode=next_value.generation_mode,
@@ -640,6 +749,7 @@ def iter_coverage_cases(
                                 parameter=body.media_type,
                                 parameter_location=ParameterLocation.BODY,
                             ),
+                            raw=data.raw,
                         ),
                     )
                 except StopIteration:
@@ -649,7 +759,7 @@ def iter_coverage_cases(
         seen_positive.insert(data.kwargs)
         yield operation.Case(
             **data.kwargs,
-            _meta=CaseMetadata(
+            _meta=_build_meta(
                 generation=GenerationInfo(
                     time=template_time,
                     mode=GenerationMode.POSITIVE,
@@ -658,6 +768,7 @@ def iter_coverage_cases(
                 phase=PhaseInfo.coverage(
                     scenario=CoverageScenario.DEFAULT_POSITIVE_TEST, description="Default positive test case"
                 ),
+                raw=data.raw,
             ),
         )
 
@@ -684,7 +795,7 @@ def iter_coverage_cases(
 
             yield operation.Case(
                 **data.kwargs,
-                _meta=CaseMetadata(
+                _meta=_build_meta(
                     generation=GenerationInfo(time=instant.elapsed, mode=value.generation_mode),
                     components=data.components,
                     phase=PhaseInfo.coverage(
@@ -694,6 +805,7 @@ def iter_coverage_cases(
                         parameter=name,
                         parameter_location=location,
                     ),
+                    raw=data.raw,
                 ),
             )
     if template_body_is_fallback_negative:
@@ -715,13 +827,14 @@ def iter_coverage_cases(
             yield operation.Case(
                 **data.kwargs,
                 method=method.upper(),
-                _meta=CaseMetadata(
+                _meta=_build_meta(
                     generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                     components=data.components,
                     phase=PhaseInfo.coverage(
                         scenario=CoverageScenario.UNSPECIFIED_HTTP_METHOD,
                         description=f"Unspecified HTTP method: {method.upper()}",
                     ),
+                    raw=data.raw,
                 ),
             )
         # Generate duplicate query parameters
@@ -746,7 +859,7 @@ def iter_coverage_cases(
                     )
                     yield operation.Case(
                         **data.kwargs,
-                        _meta=CaseMetadata(
+                        _meta=_build_meta(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                             components=data.components,
                             phase=PhaseInfo.coverage(
@@ -755,6 +868,7 @@ def iter_coverage_cases(
                                 parameter=parameter.name,
                                 parameter_location=ParameterLocation.QUERY,
                             ),
+                            raw=data.raw,
                         ),
                     )
         # Generate missing required parameters
@@ -770,14 +884,16 @@ def iter_coverage_cases(
                     generation_mode=GenerationMode.NEGATIVE,
                 )
                 kwargs = data.kwargs
+                raw = data.raw
                 # For missing Content-Type header test, don't send body
                 if location == ParameterLocation.HEADER and name.lower() == "content-type":
                     kwargs = {k: v for k, v in kwargs.items() if k not in ("body", "media_type")}
+                    raw = {k: v for k, v in raw.items() if k not in ("body", "media_type")}
 
                 if seen_negative.insert(kwargs):
                     yield operation.Case(
                         **kwargs,
-                        _meta=CaseMetadata(
+                        _meta=_build_meta(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                             components=data.components,
                             phase=PhaseInfo.coverage(
@@ -786,6 +902,7 @@ def iter_coverage_cases(
                                 parameter=name,
                                 parameter_location=location,
                             ),
+                            raw=raw,
                         ),
                     )
     # Generate combinations for each location
@@ -818,7 +935,7 @@ def iter_coverage_cases(
             data = template.with_location(location=_location, value=container_values, generation_mode=_generation_mode)
             return operation.Case(
                 **data.kwargs,
-                _meta=CaseMetadata(
+                _meta=_build_meta(
                     generation=GenerationInfo(
                         time=_instant.elapsed,
                         mode=_generation_mode,
@@ -830,6 +947,7 @@ def iter_coverage_cases(
                         parameter=_parameter,
                         parameter_location=_location,
                     ),
+                    raw=data.raw,
                 ),
             )
 

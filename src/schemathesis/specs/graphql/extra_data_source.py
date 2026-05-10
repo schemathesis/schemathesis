@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Final, cast
 
 import graphql
 
+from schemathesis.resources import PoolPick
 from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
 from schemathesis.specs.graphql.inference import OperationRole, classify_operation
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values
@@ -115,9 +116,9 @@ class GraphQLResourcePool:
         self,
         *,
         operation: APIOperation,
-    ) -> dict[tuple[ParameterLocation, str], Any]:
+    ) -> PoolPick:
         # Required by Protocol; GraphQL substitution calls draw() directly.
-        return {}  # pragma: no cover
+        return PoolPick()  # pragma: no cover
 
     def capture(
         self,

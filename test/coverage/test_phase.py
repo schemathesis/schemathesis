@@ -31,6 +31,7 @@ from schemathesis.generation.hypothesis.builder import (
     create_test,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
+from schemathesis.resources import PoolDraw, PoolPick
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._schema import CoverageContext, _negative_format, cover_schema_iter
@@ -7416,7 +7417,7 @@ def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
 
     class _FakeDataSource:
         def pick_correlated_values(self, *, operation):
-            return {(ParameterLocation.BODY, "address"): {"city": "London", "country": "UK"}}
+            return PoolPick(values={(ParameterLocation.BODY, "address"): {"city": "London", "country": "UK"}})
 
         def pick_captured_value(self, *, operation, location, name, context_constraints):
             return None
@@ -7459,3 +7460,262 @@ def test_undeclared_method_probes_dedup_across_operations(ctx):
                 seen.append((case.operation.path, case.method))
 
     assert sorted(seen) == sorted([("/items", method.upper()) for method in unexpected_methods])
+
+
+def test_coverage_pool_draws_multi_slot_correlated(ctx):
+    # Two resource-bound path params on one operation produce two PoolDraws on each yielded case.
+    user_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+    }
+    post_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "userId": {"type": "string"}},
+        "required": ["id", "userId"],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "responses": {"201": {"content": {"application/json": {"schema": user_schema}}}},
+                }
+            },
+            "/users/{userId}/posts": {
+                "post": {
+                    "operationId": "createPost",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"201": {"content": {"application/json": {"schema": post_schema}}}},
+                }
+            },
+            "/users/{userId}/posts/{postId}": {
+                "get": {
+                    "operationId": "getPost",
+                    "parameters": [
+                        {"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}},
+                        {"name": "postId", "in": "path", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    # The post-creation request used `userId=user-1` (path); store that on context so the
+    # consumer's (userId, postId) pair stays correlated.
+    data_source.repository.record_response(
+        operation="POST /users/{userId}/posts",
+        status_code=201,
+        payload={"id": "post-7", "userId": "user-1"},
+        context={"userId": "user-1"},
+    )
+
+    consumer = schema["/users/{userId}/posts/{postId}"]["GET"]
+    cases = list(
+        iter_coverage_cases(
+            operation=consumer,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+            extra_data_source=data_source,
+        )
+    )
+    assert cases
+    # Both slots attribute back to the post-creating operation — its `id` for `postId` and
+    # its captured `userId` context for the parent. Order across draws is incidental, so
+    # compare a name-keyed view.
+    expected_source = "POST /users/{userId}/posts"
+    assert {d.parameter_name: d for d in cases[0].meta.pool_draws} == {
+        "userId": PoolDraw(
+            location=ParameterLocation.PATH.value,
+            parameter_name="userId",
+            resource_name="User",
+            resource_field="id",
+            source_operation=expected_source,
+            source_status=201,
+        ),
+        "postId": PoolDraw(
+            location=ParameterLocation.PATH.value,
+            parameter_name="postId",
+            resource_name="Post",
+            resource_field="id",
+            source_operation=expected_source,
+            source_status=201,
+        ),
+    }
+
+
+def test_coverage_attaches_pool_draws_to_consumer_cases(ctx):
+    # Real ResourceRepository capture: POST captures `id`; coverage cases for GET /albums/{id}
+    # carry pool-draw provenance pointing back to POST.
+    user_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/albums": {
+                "post": {
+                    "operationId": "createAlbum",
+                    "responses": {
+                        "201": {"description": "Created", "content": {"application/json": {"schema": user_schema}}}
+                    },
+                }
+            },
+            "/albums/{albumId}": {
+                "get": {
+                    "operationId": "getAlbum",
+                    "parameters": [{"name": "albumId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(
+        operation="POST /albums", status_code=201, payload={"id": "alb-42", "name": "First"}
+    )
+
+    consumer = schema["/albums/{albumId}"]["GET"]
+    cases = list(
+        iter_coverage_cases(
+            operation=consumer,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+            extra_data_source=data_source,
+        )
+    )
+    assert cases, "expected at least one coverage case for the consumer operation"
+    # Every case from this generator carries the same pool-draw attribution.
+    assert cases[0].meta.pool_draws == (
+        PoolDraw(
+            location=ParameterLocation.PATH.value,
+            parameter_name="albumId",
+            resource_name="Album",
+            resource_field="id",
+            source_operation="POST /albums",
+            source_status=201,
+        ),
+    )
+
+
+def test_pool_inventory_respects_operation_filters(ctx):
+    # When the user filters operations, the inventory must intersect with the selected set —
+    # otherwise the analyzer's coverage ratios treat intentionally excluded operations as
+    # missing producers/consumers.
+    item_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {"201": {"content": {"application/json": {"schema": item_schema}}}},
+                }
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/widgets": {
+                "post": {
+                    "operationId": "createWidget",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/widgets/{widgetId}": {
+                "get": {
+                    "operationId": "getWidget",
+                    "parameters": [{"name": "widgetId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    full_inventory = schema._measure_statistic().resource_pool
+    # Sanity: without filters the inventory holds both resource families.
+    assert set(full_inventory.producer_labels) == {"POST /items", "POST /widgets"}
+    assert set(full_inventory.consumer_labels) == {"GET /items/{itemId}", "GET /widgets/{widgetId}"}
+
+    filtered = schema.include(path_regex="/items")._measure_statistic().resource_pool
+    # The widget producers/consumers are excluded by the filter; coverage denominators
+    # should follow the filter, not the full schema.
+    assert filtered.producer_labels == ["POST /items"]
+    assert filtered.consumer_labels == ["GET /items/{itemId}"]
+    assert filtered.resources == 1
+
+
+def test_coverage_pool_draws_survive_numeric_id_serialization(ctx):
+    # Pooled numeric id arrives at the case as a stringified wire value; the analyzer must
+    # see the draw attached anyway, otherwise chain-rate is under-reported for numeric APIs.
+    item_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}},
+        "required": ["id"],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {"201": {"content": {"application/json": {"schema": item_schema}}}},
+                }
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 42})
+
+    consumer = schema["/items/{itemId}"]["GET"]
+    cases = list(
+        iter_coverage_cases(
+            operation=consumer,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+            extra_data_source=data_source,
+        )
+    )
+    assert cases
+    # Wire form is `"42"` (string) but the draw still attributes back to the integer producer.
+    assert cases[0].meta.pool_draws == (
+        PoolDraw(
+            location=ParameterLocation.PATH.value,
+            parameter_name="itemId",
+            resource_name="Item",
+            resource_field="id",
+            source_operation="POST /items",
+            source_status=201,
+        ),
+    )

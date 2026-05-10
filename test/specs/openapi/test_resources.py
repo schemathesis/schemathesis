@@ -8,13 +8,16 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
+from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.resources import PoolPick
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import (
     MAX_CONTEXTS_PER_TYPE,
     PER_CONTEXT_CAPACITY,
     ResourceRepository,
 )
+from schemathesis.specs.openapi._hypothesis import openapi_cases
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
 from schemathesis.specs.openapi.negative import GeneratedValue
 
@@ -633,7 +636,10 @@ def test_captured_variants_filter_values_invalid_for_destination(ctx):
         operation=sync_op, location=ParameterLocation.PATH, schema=sync_op.path_parameters.schema
     )
 
-    assert variants == [{"itemId": 5}]
+    assert [v.overlay for v in variants] == [{"itemId": 5}]
+    # Each variant carries provenance back to the producing operation.
+    assert variants[0].draws[0].source_operation == "POST /items"
+    assert variants[0].draws[0].parameter_name == "itemId"
 
 
 def test_data_source_provides_captured_variants(user_schema_builder):
@@ -672,8 +678,9 @@ def test_data_source_provides_captured_variants(user_schema_builder):
 
     assert variants is not None
     assert len(variants) == 2
-    assert {"user_id": "1"} in variants
-    assert {"user_id": "2"} in variants
+    overlays = [v.overlay for v in variants]
+    assert {"user_id": "1"} in overlays
+    assert {"user_id": "2"} in overlays
 
 
 def test_record_successful_delete_evicts_pool_entry_and_filters_subsequent_draws(ctx):
@@ -885,7 +892,7 @@ def test_collect_values(user_data_source, payloads, expected):
         user_data_source.repository.record_response(operation=POST_USERS, status_code=CREATED, payload=payload)
 
     requirement = ParameterRequirement(USER_RESOURCE, "id")
-    values = user_data_source._collect_values(requirement)
+    values = [v for v, _ in user_data_source._collect_values(requirement)]
 
     if isinstance(expected, int):
         assert len(values) == expected
@@ -925,7 +932,7 @@ def test_collect_complex_values(user_data_source, field, payloads, expected_valu
         user_data_source.repository.record_response(operation=POST_USERS, status_code=CREATED, payload=payload)
 
     requirement = ParameterRequirement(USER_RESOURCE, field)
-    values = user_data_source._collect_values(requirement)
+    values = [v for v, _ in user_data_source._collect_values(requirement)]
 
     assert len(values) == len(expected_values)
     for expected in expected_values:
@@ -1091,7 +1098,7 @@ def test_prepopulate_from_response_examples(ctx):
     variants = data_source.get_captured_variants(
         operation=get_operation, location=ParameterLocation.PATH, schema=path_schema
     )
-    assert variants == [{"user_id": "example-user-123"}]
+    assert [v.overlay for v in variants] == [{"user_id": "example-user-123"}]
 
 
 def test_object_level_augmentation_preserves_relationships(ctx):
@@ -1150,7 +1157,7 @@ def test_object_level_augmentation_preserves_relationships(ctx):
     assert len(variants) == 1
 
     # Variant contains both userId and postId with correct values
-    variant = variants[0]
+    variant = variants[0].overlay
     assert variant["userId"] == "user-456"
     assert variant["postId"] == "post-123"
 
@@ -1406,6 +1413,10 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
     @settings(max_examples=100, database=None, deadline=None)
     def collect(value):
         nonlocal pool_hits_with_note, pool_hits
+        # Hybrid strategy wraps in `GeneratedValue` when picking from the pool so the engine
+        # can attribute provenance; tests that compose the strategy directly unwrap here.
+        if isinstance(value, GeneratedValue):
+            value = value.value
         if not isinstance(value, dict):
             return
         shipping = value.get("shipping")
@@ -1425,6 +1436,78 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
         f"{pool_hits - pool_hits_with_note} of {pool_hits} pool-overlaid bodies dropped the "
         "generated `note` sibling — nested overlay replaced the whole `shipping` object."
     )
+
+
+def test_positive_form_urlencoded_body_pool_overlay_survives_form_prep(ctx):
+    # Pool-captured form-urlencoded body values must reach the wire, not be filtered out before send.
+    consumer_body_schema = {
+        "type": "object",
+        "properties": {"user_id": {"type": "string"}, "scope": {"type": "string"}},
+        "required": ["user_id"],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/sessions": {
+                "post": {
+                    "operationId": "createSession",
+                    "requestBody": {
+                        "required": True,
+                        # Both content types share a schema. The JSON body lets descriptor
+                        # inference link `user_id` to `User.id`; the form-urlencoded body is
+                        # the path under test (must survive form prep when the hybrid picks
+                        # a captured pool variant).
+                        "content": {
+                            "application/json": {"schema": consumer_body_schema},
+                            "application/x-www-form-urlencoded": {"schema": consumer_body_schema},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+    assert data_source is not None
+    pooled_ids = {"u-1", "u-2", "u-3"}
+    for value in pooled_ids:
+        data_source.repository.record_response(operation="POST /users", status_code=201, payload={"id": value})
+
+    operation = schema["/sessions"]["POST"]
+    cases_strategy = openapi_cases(operation=operation, phase=TestPhase.FUZZING, extra_data_source=data_source)
+
+    # Counts only the form-urlencoded slice: that's the path the form-prep map/filter
+    # rewrites. With the pre-fix code, captured-variant draws were filtered out here.
+    form_pool_hits = 0
+
+    @given(cases_strategy)
+    @settings(max_examples=200, database=None, deadline=None)
+    def collect(case):
+        nonlocal form_pool_hits
+        if case.media_type != "application/x-www-form-urlencoded":
+            return
+        if isinstance(case.body, dict) and case.body.get("user_id") in pooled_ids:
+            form_pool_hits += 1
+
+    collect()
+    assert form_pool_hits > 0, "pool-derived user_id never survived the form-urlencoded prep step"
 
 
 def test_negative_aware_strategy_with_captured_values_body(ctx):
@@ -1531,7 +1614,7 @@ def test_primitive_identifier_extraction(ctx):
     variants = data_source.get_captured_variants(
         operation=get_operation, location=ParameterLocation.PATH, schema=path_schema
     )
-    assert variants == [{"slug": "my-recipe-slug"}]
+    assert [v.overlay for v in variants] == [{"slug": "my-recipe-slug"}]
 
 
 def test_primitive_identifier_adds_field_to_empty_resource(ctx):
@@ -1743,7 +1826,7 @@ def test_pick_correlated_values_empty_for_unbound_operation(user_schema_builder)
     schema = user_schema_builder()
     data_source = schema.create_extra_data_source()
     operation = schema["/users"]["POST"]
-    assert data_source.pick_correlated_values(operation=operation) == {}
+    assert data_source.pick_correlated_values(operation=operation) == PoolPick()
 
 
 def test_pick_correlated_values_single_family_correlated_pair(user_schema_builder):
@@ -1768,7 +1851,14 @@ def test_pick_correlated_values_single_family_correlated_pair(user_schema_builde
     )
     operation = schema["/users/{user_id}"]["GET"]
     result = data_source.pick_correlated_values(operation=operation)
-    assert result == {(ParameterLocation.PATH, "user_id"): "1"}
+    assert result.values == {(ParameterLocation.PATH, "user_id"): "1"}
+    # Draws record provenance back to POST /users that captured the resource.
+    assert len(result.draws) == 1
+    draw = result.draws[0]
+    assert draw.location == ParameterLocation.PATH.value
+    assert draw.parameter_name == "user_id"
+    assert draw.source_operation == "POST /users"
+    assert draw.source_status == 201
 
 
 def test_pick_correlated_values_falls_back_when_family_lacks_full_match(user_schema_builder):
@@ -1793,7 +1883,7 @@ def test_pick_correlated_values_falls_back_when_family_lacks_full_match(user_sch
     )
     operation = schema["/users/{user_id}"]["GET"]
     result = data_source.pick_correlated_values(operation=operation)
-    assert (ParameterLocation.PATH, "user_id") in result
+    assert (ParameterLocation.PATH, "user_id") in result.values
 
 
 def test_pick_correlated_values_rotates_across_consecutive_calls(user_schema_builder):
@@ -1819,7 +1909,8 @@ def test_pick_correlated_values_rotates_across_consecutive_calls(user_schema_bui
         )
     operation = schema["/users/{user_id}"]["GET"]
     picks = [
-        data_source.pick_correlated_values(operation=operation)[(ParameterLocation.PATH, "user_id")] for _ in range(4)
+        data_source.pick_correlated_values(operation=operation).values[(ParameterLocation.PATH, "user_id")]
+        for _ in range(4)
     ]
     assert set(picks) == {"a", "b", "c", "d"}
 
@@ -1848,6 +1939,6 @@ def test_correlated_and_per_slot_share_rotation_state(user_schema_builder):
         )
     operation = schema["/users/{user_id}"]["GET"]
     correlated = data_source.pick_correlated_values(operation=operation)
-    drawn_id = correlated[(ParameterLocation.PATH, "user_id")]
+    drawn_id = correlated.values[(ParameterLocation.PATH, "user_id")]
     next_pick = data_source.pick_captured_value(operation=operation, location=ParameterLocation.PATH, name="user_id")
     assert next_pick != drawn_id

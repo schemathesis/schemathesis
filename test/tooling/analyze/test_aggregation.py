@@ -367,7 +367,10 @@ def test_analyze_stateful_404_with_matching_method_not_route_rejected(tmp_path, 
     assert run.stateful.buckets.total == 1
 
 
-def test_analyze_stateful_scenario_keeps_synthetic_label(tmp_path, write_ndjson):
+def test_analyze_stateful_scenario_dual_bumps_per_op_and_phase_aggregate(tmp_path, write_ndjson):
+    # Stateful cases with a real per-case method+path must show up in BOTH
+    # `run.operations[<op>]` (so per-op drill-downs include stateful contribution) AND
+    # `run.stateful` (the phase-level aggregate stays available for stateful-only views).
     payload = {
         "ScenarioFinished": {
             "timestamp": 101.0,
@@ -393,4 +396,6 @@ def test_analyze_stateful_scenario_keeps_synthetic_label(tmp_path, write_ndjson)
     run = analyze(path)
     assert run.stateful is not None
     assert run.stateful.label == "Stateful tests"
-    assert "GET /owners" not in run.operations
+    assert run.stateful.buckets.positive_accepted == 1
+    assert "GET /owners" in run.operations
+    assert run.operations["GET /owners"].buckets.positive_accepted == 1

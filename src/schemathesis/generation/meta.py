@@ -7,6 +7,7 @@ from typing import Any
 from schemathesis.core.mutations import Mutation
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.resources import PoolDraw
 
 
 class TestPhase(str, Enum):
@@ -195,22 +196,38 @@ class CaseMetadata:
     generation: GenerationInfo
     components: dict[ParameterLocation, ComponentInfo]
     phase: PhaseInfo
+    pool_draws: tuple[PoolDraw, ...]
+    # Resource-bound (location, parameter_name) slots the engine wanted to fill from the pool
+    # but couldn't (no captured instance). Lets the analyzer compute chain rate.
+    pool_misses: tuple[tuple[str, str], ...]
 
     # Dirty tracking for revalidation
     _dirty: set[ParameterLocation]
     _last_validated_hashes: dict[ParameterLocation, int]
 
-    __slots__ = ("generation", "components", "phase", "_dirty", "_last_validated_hashes")
+    __slots__ = (
+        "generation",
+        "components",
+        "phase",
+        "pool_draws",
+        "pool_misses",
+        "_dirty",
+        "_last_validated_hashes",
+    )
 
     def __init__(
         self,
         generation: GenerationInfo,
         components: dict[ParameterLocation, ComponentInfo],
         phase: PhaseInfo,
+        pool_draws: tuple[PoolDraw, ...] = (),
+        pool_misses: tuple[tuple[str, str], ...] = (),
     ) -> None:
         self.generation = generation
         self.components = components
         self.phase = phase
+        self.pool_draws = pool_draws
+        self.pool_misses = pool_misses
         # Initialize dirty tracking
         self._dirty = set()
         self._last_validated_hashes = {}
@@ -257,6 +274,18 @@ class CaseMetadata:
                 "name": self.phase.name.value,
                 "data": phase_data_dict,
             },
+            "pool_draws": [
+                {
+                    "location": draw.location,
+                    "parameter_name": draw.parameter_name,
+                    "resource_name": draw.resource_name,
+                    "resource_field": draw.resource_field,
+                    "source_operation": draw.source_operation,
+                    "source_status": draw.source_status,
+                }
+                for draw in self.pool_draws
+            ],
+            "pool_misses": [list(miss) for miss in self.pool_misses],
         }
 
     @classmethod
@@ -270,6 +299,18 @@ class CaseMetadata:
             ParameterLocation[loc_name]: ComponentInfo(mode=GenerationMode(mode_val))
             for loc_name, mode_val in data["components"].items()
         }
+        pool_draws = tuple(
+            PoolDraw(
+                location=draw["location"],
+                parameter_name=draw["parameter_name"],
+                resource_name=draw["resource_name"],
+                resource_field=draw["resource_field"],
+                source_operation=draw["source_operation"],
+                source_status=draw["source_status"],
+            )
+            for draw in data.get("pool_draws", [])
+        )
+        pool_misses = tuple((miss[0], miss[1]) for miss in data.get("pool_misses", []))
         phase_data_raw = data["phase"]["data"]
         param_loc_name = phase_data_raw["parameter_location"]
         param_loc = ParameterLocation[param_loc_name] if param_loc_name is not None else None
@@ -308,7 +349,13 @@ class CaseMetadata:
                 mutations=_load_mutations(phase_data_raw),
             )
         phase = PhaseInfo(name=TestPhase(data["phase"]["name"]), data=phase_data)
-        return cls(generation=generation, components=components, phase=phase)
+        return cls(
+            generation=generation,
+            components=components,
+            phase=phase,
+            pool_draws=pool_draws,
+            pool_misses=pool_misses,
+        )
 
 
 def _load_mutations(raw: dict[str, Any]) -> tuple[Mutation, ...]:

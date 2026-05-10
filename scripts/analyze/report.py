@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from io import StringIO
 
-from .metrics import Bucket, OperationMetrics, RunMetrics
+from .metrics import (
+    BROKEN_OPERATION_MIN_CALLS,
+    Bucket,
+    OperationMetrics,
+    PoolDrawStats,
+    PoolEdgeStats,
+    RunMetrics,
+    TransitionRecord,
+    TransitionStats,
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -214,6 +224,50 @@ def render_markdown(run: RunMetrics) -> str:
             write(f"- `{operation.label}` ({operation.buckets.total} calls, 0% handler-reached)\n")
         write("\n")
 
+    operations_with_traffic = [operation for operation in run.operations.values() if operation.buckets.total > 0]
+    if operations_with_traffic:
+        total_operations = len(operations_with_traffic)
+        # `covered_operations` is the any-mode 2xx set produced by the analyzer pipeline;
+        # reached counts include operations that only landed N+2xx (classified as
+        # `negative_drift`, not `positive_accepted`). Fall back to bucket data when the
+        # pipeline didn't run — test fixtures and partial inputs may skip it — so the
+        # rendered counts stay consistent with the rest of the report.
+        if run.reachability.covered_operations:
+            covered = set(run.reachability.covered_operations)
+        else:
+            covered = {
+                operation.label
+                for operation in operations_with_traffic
+                if operation.buckets.positive_accepted + operation.buckets.negative_drift > 0
+            }
+        reached_operations = sum(1 for operation in operations_with_traffic if operation.label in covered)
+        broken = run.reachability.broken_operations
+        reached_pct = reached_operations * 100 / total_operations if total_operations else 0.0
+        # Compact output (no internal blank lines) to keep snapshot diffs free of
+        # trailing-whitespace warnings on indent-only lines.
+        write("## Reachability\n")
+        write(
+            f"**Reached:** {reached_operations}/{total_operations} operations "
+            f"({reached_pct:.1f}%) produced ≥1 2xx response.\n"
+        )
+        if broken:
+            write(
+                f"**Permanently broken:** {len(broken)} operations received "
+                f"≥{BROKEN_OPERATION_MIN_CALLS} calls with zero 2xx — "
+                f"surfaces the fuzzer never reached.\n"
+            )
+            for label in broken[:20]:
+                operation = run.operations[label]
+                write(
+                    f"- `{label}` ({operation.buckets.total} calls, "
+                    f"{operation.buckets.server_error} × 5xx, "
+                    f"{operation.buckets.positive_drift} × P+4xx)\n"
+                )
+            if len(broken) > 20:
+                write(f"- _...and {len(broken) - 20} more_\n")
+        # No trailing blank line — next section's `## X\n\n` header provides the gap;
+        # emitting an indent-only line here would trip `git diff --check`.
+
     if run.stateful is not None:
         stateful = run.stateful
         buckets = stateful.buckets
@@ -231,6 +285,17 @@ def render_markdown(run: RunMetrics) -> str:
             )
             write(f"Drift by location: {locations}\n")
         write("\n")
+
+    if run.transitions.by_id or run.transitions.depth.cases > 0:
+        _render_transitions_section(write, run.transitions)
+
+    # Render whenever the engine *attempted* a pool fill — even runs with 0 draws and only
+    # misses (empty pool throughout) are valuable to surface, since that's the case where
+    # the chain-rate and "misses by consumer" diagnostics are most actionable.
+    if run.pool_draws.total_draws + run.pool_draws.total_misses > 0:
+        _render_pool_draws_section(write, run.pool_draws)
+    if run.pool_draws.inventory.producer_labels:
+        _render_producer_draw_coverage(write, run)
 
     write("## Phases\n\n")
     non_empty = [phase for phase in run.phases if phase.buckets.total > 0]
@@ -257,6 +322,20 @@ def render_markdown(run: RunMetrics) -> str:
     else:
         write("_no phases recorded_\n")
     write("\n")
+
+    if run.slow_generations:
+        write("## Slow generation outliers\n")
+        write(
+            "Top single-case generation times across the run. Useful for catching "
+            "corpus / boundary-test code paths that block on long generation rather than I/O.\n"
+        )
+        write("| Phase | Operation | Mode | Gen time |\n")
+        write("|-------|-----------|------|----------|\n")
+        for entry in run.slow_generations:
+            write(
+                f"| {entry.phase} | `{entry.operation_label}` | {entry.mode} | "
+                f"{_format_seconds(entry.generation_seconds)} |\n"
+            )
 
     write("## Status codes (run-wide)\n\n")
     grouped = {"2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0, "transport": 0}
@@ -290,6 +369,21 @@ def render_markdown(run: RunMetrics) -> str:
                 f"- `{check_name}` — {unique} unique, {occurrences} occurrences "
                 f"across {operation_count} {suffix}{extra}\n"
             )
+
+        # Bug-count proxy independent of per-response variance (timestamps, ids): the
+        # response-body exception class is stable across cases that hit the same bug.
+        # Dedupe by (operation, class) so a class flagged by both `ServerError` and
+        # `UndefinedStatusCode` on the same operation counts once.
+        exception_operations: dict[str, set[str]] = {}
+        for failure in run.failures:
+            if failure.exception_signature:
+                exception_operations.setdefault(failure.exception_signature, set()).add(failure.operation_label)
+        if exception_operations:
+            write("### Server-side exception classes (5xx response bodies)\n")
+            for exception_class, operations in sorted(exception_operations.items(), key=lambda item: -len(item[1])):
+                count = len(operations)
+                suffix = "s" if count != 1 else ""
+                write(f"- `{exception_class}` — {count} distinct (operation, class) pair{suffix}\n")
     else:
         write("_no failures_\n")
     return out.getvalue()
@@ -315,3 +409,250 @@ def _format_seconds(seconds: float) -> str:
 
 def _format_per_case_ms(seconds: float) -> str:
     return f"{seconds * 1000:.1f}ms"
+
+
+# Threshold for the "broken-link candidates" callout: transitions firing at least this
+# many times AND with applied-rate at most this share. The pair flags an engine wasting
+# budget on transitions whose data extraction never threads through.
+_BROKEN_LINK_MIN_COUNT = 20
+_BROKEN_LINK_MAX_APPLIED_RATE = 0.10
+# How many top entries to surface in each pool-draw rollup table.
+_POOL_TOP_N = 10
+
+
+def _render_transitions_section(write: Callable[[str], int], stats: TransitionStats) -> None:
+    write("## Stateful transitions\n\n")
+    distinct = len(stats.by_id)
+    write(f"{distinct} distinct transitions exercised, {len(stats.distinct_targets)} target operations reached.\n")
+    cases = stats.depth.cases
+    if cases > 0:
+        avg_depth = stats.depth.sum / cases
+        write(f"Depth from root across {cases} stateful cases: avg {avg_depth:.2f}, max {stats.depth.max}.\n")
+        chained = sum(count for depth, count in stats.depth.by_depth.items() if int(depth) > 0)
+        chained_pct = chained / cases * 100
+        write(f"Chained beyond initial step: {chained}/{cases} ({chained_pct:.1f}%).\n\n")
+        write("```\n")
+        write("Depth  Cases   Share\n")
+        for depth in sorted(stats.depth.by_depth, key=int):
+            count = stats.depth.by_depth[depth]
+            share = count / cases * 100
+            bars = "█" * max(1, int(share / 5))
+            write(f"  {int(depth):>2}  {count:>6}  {share:>5.1f}%  {bars}\n")
+        write("```\n\n")
+    else:
+        write("\n")
+
+    if not stats.by_id:
+        return
+
+    broken = _broken_link_candidates(stats.by_id)
+    if broken:
+        write(
+            f"### Broken-link candidates  (≥ {_BROKEN_LINK_MIN_COUNT} cases, "
+            f"≤ {int(_BROKEN_LINK_MAX_APPLIED_RATE * 100)}% applied)\n\n"
+        )
+        write("Engine drew the transition repeatedly but data extraction never threaded ")
+        write("through — prime targets for dependency-pruning.\n\n")
+        write("| Transition | Cases | Applied% | 2xx | 4xx | 5xx |\n")
+        write("|------------|------:|---------:|----:|----:|----:|\n")
+        for record in broken:
+            applied_pct = record.applied_count / record.count * 100 if record.count else 0.0
+            write(
+                f"| {record.id} | {record.count} | {applied_pct:.1f}% | "
+                f"{record.twoxx} | {record.fourxx} | {record.fivexx} |\n"
+            )
+        write("\n")
+
+    top_count = sorted(stats.by_id.values(), key=lambda r: -r.count)[:10]
+    write("### Top transitions by case count\n\n")
+    write("| Transition | Cases | Applied% | 2xx | 4xx | 5xx | Avg depth | Inferred |\n")
+    write("|------------|------:|---------:|----:|----:|----:|----------:|----------|\n")
+    for record in top_count:
+        applied_pct = record.applied_count / record.count * 100 if record.count else 0.0
+        avg_depth = record.depth_sum / record.count if record.count else 0.0
+        write(
+            f"| {record.id} | {record.count} | {applied_pct:.1f}% | "
+            f"{record.twoxx} | {record.fourxx} | {record.fivexx} | "
+            f"{avg_depth:.1f} | {'yes' if record.is_inferred else 'no'} |\n"
+        )
+    write("\n")
+
+    fivexx_rows = [r for r in stats.by_id.values() if r.fivexx > 0]
+    fivexx_rows.sort(key=lambda r: -r.fivexx)
+    if fivexx_rows:
+        write("### Top transitions by server-error rate  (bug-discovery hot paths)\n\n")
+        write("| Transition | Cases | 5xx | 5xx% |\n")
+        write("|------------|------:|----:|-----:|\n")
+        for record in fivexx_rows[:10]:
+            rate = record.fivexx / record.count * 100 if record.count else 0.0
+            write(f"| {record.id} | {record.count} | {record.fivexx} | {rate:.1f}% |\n")
+        write("\n")
+
+
+def _broken_link_candidates(by_id: dict[str, TransitionRecord]) -> list[TransitionRecord]:
+    candidates: list[TransitionRecord] = []
+    for record in by_id.values():
+        if record.count < _BROKEN_LINK_MIN_COUNT:
+            continue
+        applied_rate = record.applied_count / record.count if record.count else 0.0
+        if applied_rate <= _BROKEN_LINK_MAX_APPLIED_RATE:
+            candidates.append(record)
+    candidates.sort(key=lambda r: -r.count)
+    return candidates[:10]
+
+
+def _render_pool_draws_section(write: Callable[[str], int], stats: PoolDrawStats) -> None:
+    write("## Resource pool draws\n\n")
+    edges = list(stats.by_edge.values())
+    inv = stats.inventory
+    if inv.producer_labels or inv.consumer_labels:
+        write(
+            f"Schema inventory: {len(inv.producer_labels)} producer operations, "
+            f"{len(inv.consumer_labels)} consumer operations, {inv.resources} distinct resource types.\n"
+        )
+        producer_set = set(inv.producer_labels)
+        consumer_set = set(inv.consumer_labels)
+        producers_hit = {edge.source_operation for edge in edges if edge.source_operation in producer_set}
+        consumers_hit = {edge.consumer_operation for edge in edges if edge.consumer_operation in consumer_set}
+        if producer_set:
+            write(
+                f"Producer coverage: {len(producers_hit)}/{len(producer_set)} declared producers supplied "
+                "at least one draw.\n"
+            )
+        if consumer_set:
+            write(
+                f"Consumer coverage: {len(consumers_hit)}/{len(consumer_set)} declared consumers made "
+                "at least one draw.\n"
+            )
+        write("\n")
+    write(
+        f"{stats.cases_with_draws} cases consumed pool data ({stats.total_draws} draws total) "
+        f"across {len(edges)} unique consumer-producer edges.\n"
+    )
+    attempted = stats.total_draws + stats.total_misses
+    if attempted > 0:
+        chain_rate = stats.total_draws / attempted * 100
+        write(
+            f"Chain rate: {chain_rate:.1f}% — {stats.total_draws} of {attempted} resource-bound slot "
+            f"fills found a pool entry; {stats.total_misses} hit an empty pool.\n"
+        )
+    write("\n")
+
+    if stats.misses_by_consumer:
+        write("### Empty-pool misses by consumer\n\n")
+        write(
+            "Operations the engine wanted to chain into but found no captured value for. High counts "
+            "early in the run typically resolve as more producers fire; persistent counts flag "
+            "broken or unreachable producers.\n\n"
+        )
+        write("| Consumer | Misses |\n")
+        write("|----------|-------:|\n")
+        for label, count in _top_pairs(stats.misses_by_consumer, _POOL_TOP_N):
+            write(f"| {label} | {count} |\n")
+        write("\n")
+
+    if stats.total_draws == 0:
+        # Inventory + chain rate + misses tables above are the full diagnostic for empty runs.
+        return
+
+    write("### Top consumers by draw count\n\n")
+    write("| Consumer | Draws |\n")
+    write("|----------|------:|\n")
+    for label, count in _top_pairs(stats.by_consumer, _POOL_TOP_N):
+        write(f"| {label} | {count} |\n")
+    write("\n")
+
+    write("### Top producers by draw count\n\n")
+    write("| Producer | Draws |\n")
+    write("|----------|------:|\n")
+    for label, count in _top_pairs(stats.by_source, _POOL_TOP_N):
+        write(f"| {label} | {count} |\n")
+    write("\n")
+
+    write("### Top edges by draw count\n\n")
+    write("Edges read producer -> consumer (data-flow direction).\n")
+    write("Pos/Neg splits how many draws were on positive vs negative-mode cases — the latter\n")
+    write("are real ids torture-tested with mutated bodies/params and tend to land 4xx by design.\n\n")
+    write("| Producer | Consumer | Resource | Draws | Pos | Neg | 2xx% | 4xx% | 5xx% |\n")
+    write("|----------|----------|----------|------:|----:|----:|-----:|-----:|-----:|\n")
+    edges.sort(key=lambda edge: -edge.count)
+    for edge in edges[:_POOL_TOP_N]:
+        write(_format_edge_row(edge))
+    write("\n")
+
+    fivexx_edges = [edge for edge in edges if edge.fivexx > 0]
+    if fivexx_edges:
+        write("### Edges with the highest 5xx counts  (server-error hot paths)\n\n")
+        write("| Producer | Consumer | Resource | Draws | 5xx | 5xx% |\n")
+        write("|----------|----------|----------|------:|----:|-----:|\n")
+        fivexx_edges.sort(key=lambda edge: -edge.fivexx)
+        for edge in fivexx_edges[:_POOL_TOP_N]:
+            rate = edge.fivexx / edge.count * 100 if edge.count else 0.0
+            write(
+                f"| {edge.source_operation} | {edge.consumer_operation} | {edge.resource_name} "
+                f"| {edge.count} | {edge.fivexx} | {rate:.1f}% |\n"
+            )
+        write("\n")
+
+
+def _top_pairs(counts: dict[str, int], n: int) -> list[tuple[str, int]]:
+    return sorted(counts.items(), key=lambda kv: -kv[1])[:n]
+
+
+def _format_edge_row(edge: PoolEdgeStats) -> str:
+    twoxx_rate = edge.twoxx / edge.count * 100 if edge.count else 0.0
+    fourxx_rate = edge.fourxx / edge.count * 100 if edge.count else 0.0
+    fivexx_rate = edge.fivexx / edge.count * 100 if edge.count else 0.0
+    return (
+        f"| {edge.source_operation} | {edge.consumer_operation} | {edge.resource_name} "
+        f"| {edge.count} | {edge.positive} | {edge.negative} "
+        f"| {twoxx_rate:.1f}% | {fourxx_rate:.1f}% | {fivexx_rate:.1f}% |\n"
+    )
+
+
+def _render_producer_draw_coverage(write: Callable[[str], int], run: RunMetrics) -> None:
+    """Surface declared producers that supplied no pool draws across the run.
+
+    `by_source` counts draws made by *consumers*, so "0 draws" can mean either the
+    extractor never recognised the producer's response OR no selected consumer needed
+    that producer's resource. Without an explicit per-producer capture count we can't
+    separate the two, so the section is framed as "draw coverage" rather than a verdict.
+    """
+    producer_labels = run.pool_draws.inventory.producer_labels
+    by_source = run.pool_draws.by_source
+    twoxx_by_operation = run.pool_draws.twoxx_by_operation
+    not_drawn_with_traffic: list[tuple[str, int]] = []
+    not_drawn_without_traffic: list[str] = []
+    for label in producer_labels:
+        if by_source.get(label, 0) > 0:
+            continue
+        twoxx_count = twoxx_by_operation.get(label, 0)
+        if twoxx_count > 0:
+            not_drawn_with_traffic.append((label, twoxx_count))
+        else:
+            not_drawn_without_traffic.append(label)
+    if not not_drawn_with_traffic and not not_drawn_without_traffic:
+        return
+    write("## Producer draw coverage\n\n")
+    write(
+        "Declared producers that supplied zero pool draws this run. Possible causes: the "
+        "response-shape extractor doesn't recognise this producer, no selected consumer "
+        "references the resource it captures, or — for the no-2xx group — the producer never "
+        "succeeded.\n\n"
+    )
+    if not_drawn_with_traffic:
+        write("Reached the SUT (>= 1 2xx) but no draw was made from its output:\n\n")
+        write("| Producer | 2xx calls | Draws supplied |\n")
+        write("|----------|----------:|---------------:|\n")
+        not_drawn_with_traffic.sort(key=lambda row: -row[1])
+        for label, twoxx_count in not_drawn_with_traffic:
+            write(f"| {label} | {twoxx_count} | 0 |\n")
+        write("\n")
+    if not_drawn_without_traffic:
+        write(
+            f"{len(not_drawn_without_traffic)} declared producer(s) had no 2xx call this run — "
+            "auth / setup / dependency-ordering issue first, not a draw-coverage question:\n\n"
+        )
+        for label in sorted(not_drawn_without_traffic):
+            write(f"- `{label}`\n")
+        write("\n")
