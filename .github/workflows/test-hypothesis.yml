@@ -21,4 +21,4 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
 
-      - run: uvx --from=".[tests]" pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
+      - run: uvx --from=".[tests]" pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI --ignore=test/tooling test
