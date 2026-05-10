@@ -7,6 +7,8 @@ from typing import Any, overload
 
 import jsonschema_rs
 
+from schemathesis.core.jsonschema.types import JsonValue
+
 deepclone = jsonschema_rs.canonical.schema.clone
 
 
@@ -41,9 +43,6 @@ def merge_at(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> None:
     data[data_key] = original
 
 
-JsonValue = dict[str, Any] | list | str | float | int
-
-
 @overload
 def transform(schema: dict[str, Any], callback: Callable, *args: Any, **kwargs: Any) -> dict[str, Any]: ...
 
@@ -58,6 +57,10 @@ def transform(schema: str, callback: Callable, *args: Any, **kwargs: Any) -> str
 
 @overload
 def transform(schema: float, callback: Callable, *args: Any, **kwargs: Any) -> float: ...
+
+
+@overload
+def transform(schema: JsonValue, callback: Callable, *args: Any, **kwargs: Any) -> JsonValue: ...
 
 
 def transform(schema: JsonValue, callback: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -> JsonValue:
@@ -89,7 +92,7 @@ def iter_decoded_pointer_segments(pointer: str) -> Iterator[str]:
     return map(decode_pointer, pointer.split("/")[1:])
 
 
-def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None | Unresolvable:
+def resolve_pointer(document: object, pointer: str) -> object | Unresolvable:
     """Implementation is adapted from Rust's `serde-json` crate.
 
     Ref: https://github.com/serde-rs/json/blob/master/src/value/mod.rs#L751
@@ -102,8 +105,8 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     return resolve_path(document, iter_decoded_pointer_segments(pointer))
 
 
-def resolve_path(document: Any, path: Iterable[str | int]) -> dict | list | str | int | float | None | Unresolvable:
-    target = document
+def resolve_path(document: object, path: Iterable[str | int]) -> object | Unresolvable:
+    target: object = document
     for token in path:
         if isinstance(target, dict):
             target = target.get(token, UNRESOLVABLE)
@@ -119,7 +122,7 @@ def resolve_path(document: Any, path: Iterable[str | int]) -> dict | list | str 
     return target
 
 
-def resolve_pointer_all(document: Any, pointer: str) -> list[Any] | Unresolvable:
+def resolve_pointer_all(document: object, pointer: str) -> list[object] | Unresolvable:
     """Resolve a JSON Pointer that may contain `*` wildcard segments, fanning out at each `*`.
 
     Returns a flat list of every match. Returns UNRESOLVABLE only if the
@@ -133,14 +136,14 @@ def resolve_pointer_all(document: Any, pointer: str) -> list[Any] | Unresolvable
     return _resolve_all(document, list(iter_decoded_pointer_segments(pointer)))
 
 
-def _resolve_all(target: Any, segments: list[str]) -> list[Any] | Unresolvable:
+def _resolve_all(target: object, segments: list[str]) -> list[object] | Unresolvable:
     if not segments:
         return [target]
     head, *rest = segments
     if head == "*":
         if not isinstance(target, list):
             return []
-        results: list[Any] = []
+        results: list[object] = []
         for item in target:
             sub = _resolve_all(item, rest)
             if isinstance(sub, list):

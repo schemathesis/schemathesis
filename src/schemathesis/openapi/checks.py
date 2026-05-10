@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.jsonschema.bundler import unbundle, unbundle_path
+from schemathesis.core.jsonschema.types import JsonValue
 from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import resolve_path
 
@@ -98,7 +99,7 @@ class JsonSchemaError(Failure):
         schema_path: list[str | int],
         schema: dict[str, Any] | bool,
         instance_path: list[str | int],
-        instance: None | bool | float | str | list | dict[str, Any],
+        instance: JsonValue,
         message: str,
         title: str = "Response violates schema",
         case_id: str | None = None,

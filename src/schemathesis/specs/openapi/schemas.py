@@ -21,7 +21,7 @@ from schemathesis.config import (
     FuzzingPhaseConfig,
     OperationOrdering,
 )
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, Body, Specification, deserialization
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
@@ -836,7 +836,7 @@ class OpenApiSchema(BaseSchema):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: Body = NOT_SET,
         media_type: str | None = None,
         multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,

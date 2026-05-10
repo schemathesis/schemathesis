@@ -8,6 +8,7 @@ from urllib.parse import quote_plus, unquote
 
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.types import JsonValue
 from schemathesis.core.transforms import transform
 
 
@@ -118,7 +119,6 @@ def serialize_yaml(value: Any) -> dict[str, Any]:
 
 
 Primitive = str | int | float | bool | None
-JSON = Primitive | list | dict[str, Any]
 DEFAULT_TAG_NAME = "data"
 NAMESPACE_URL = "http://example.com/schema"
 
@@ -172,7 +172,7 @@ def _get_xml_tag(schema: dict[str, Any] | None, resource_name: str | None) -> st
 
 def _write_xml(
     buffer: StringIO,
-    value: JSON,
+    value: JsonValue,
     tag: str,
     schema: dict[str, Any] | None,
     namespace_stack: list[str],
@@ -207,7 +207,7 @@ def pop_namespace_if_any(namespace_stack: list[str], options: dict[str, Any]) ->
 
 def _write_object(
     buffer: StringIO,
-    obj: dict[str, JSON],
+    obj: dict[str, JsonValue],
     tag: str,
     schema: dict[str, Any] | None,
     stack: list[str],
@@ -271,7 +271,7 @@ def _write_object(
 
 def _write_array(
     buffer: StringIO,
-    obj: list[JSON],
+    obj: list[JsonValue],
     tag: str,
     schema: dict[str, Any] | None,
     stack: list[str],
@@ -332,7 +332,7 @@ def _write_namespace(buffer: StringIO, options: dict[str, Any]) -> None:
     buffer.write(f'="{options["namespace"]}"')
 
 
-def _escape_xml(value: JSON) -> str:
+def _escape_xml(value: JsonValue) -> str:
     """Escape special characters in XML content."""
     if isinstance(value, (int | float | bool)):
         return str(value)

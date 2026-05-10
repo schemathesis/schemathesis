@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig, ProjectConfig
-    from schemathesis.core import NotSet, Specification
+    from schemathesis.core import Body, Specification
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.errors import InvalidSchema
     from schemathesis.core.result import Result
@@ -79,7 +79,7 @@ class ApiSchema(Protocol):
         headers: dict[str, Any] | CaseInsensitiveDict | None = ...,
         cookies: dict[str, Any] | None = ...,
         query: dict[str, Any] | None = ...,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = ...,
+        body: Body = ...,
         media_type: str | None = ...,
         multipart_content_types: dict[str, str] | None = ...,
         meta: CaseMetadata | None = ...,
@@ -139,9 +139,7 @@ class ApiSchema(Protocol):
 
     def build_request_url(self, case: Case, base_url: str) -> str: ...  # pragma: no cover
 
-    def prepare_request_body(
-        self, body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
-    ) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet: ...  # pragma: no cover
+    def prepare_request_body(self, body: Body) -> Body: ...  # pragma: no cover
 
     def adapt_to_null_byte_in_header_failure(self) -> None: ...  # pragma: no cover
 

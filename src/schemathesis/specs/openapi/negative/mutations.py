@@ -16,7 +16,7 @@ from hypothesis.strategies._internal.featureflags import FeatureFlags, FeatureSt
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
-from schemathesis.core.jsonschema.types import JsonSchemaObject
+from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_xml
 from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
@@ -910,7 +910,7 @@ def negate_constraints(
             schema[key] = value
     if is_negated:
         parameter = None
-        original_required: list[str] | None = None
+        original_required: list[JsonValue] | None = None
         for key in negated_keys:
             value = copied[key]
             if key == "required":

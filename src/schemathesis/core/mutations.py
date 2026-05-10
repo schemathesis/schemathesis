@@ -5,7 +5,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from schemathesis.core.transforms import JsonValue
+    from schemathesis.core.jsonschema.types import JsonValue
 
 
 class OperatorKind(str, Enum):
