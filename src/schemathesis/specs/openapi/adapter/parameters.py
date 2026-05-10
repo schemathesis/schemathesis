@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.core.error_feedback import ErrorFeedbackStore
-    from schemathesis.specs.openapi.extra_data_source import VariantUsageTracker
+    from schemathesis.specs.openapi.extra_data_source import CapturedVariant, VariantUsageTracker
     from schemathesis.specs.openapi.negative.mutations import MutationTargetDescriptor
 
 
@@ -91,7 +91,7 @@ def _variant_key(variant: dict[str, Any]) -> str:
 
 def build_hybrid_strategy(
     original_strategy: st.SearchStrategy,
-    captured_variants: list[dict[str, Any]],
+    captured_variants: list[CapturedVariant],
     usage_tracker: VariantUsageTracker,
 ) -> st.SearchStrategy:
     """Combine original strategy with captured variants using weighted sampling.
@@ -101,16 +101,20 @@ def build_hybrid_strategy(
 
     Captured variants may be partial (only containing parameters with resource
     requirements). We merge them with generated values to ensure all required
-    parameters are present.
+    parameters are present. When a variant is selected, the strategy returns a
+    `GeneratedValue` carrying the pool-draw provenance; otherwise it returns the
+    raw generated value (a dict or scalar).
     """
     from hypothesis import strategies as st
 
+    from schemathesis.specs.openapi.negative import GeneratedValue
+
     # Pre-compute keys for all variants
-    variant_keys = [_variant_key(v) for v in captured_variants]
+    variant_keys = [_variant_key(v.overlay) for v in captured_variants]
     n_variants = len(captured_variants)
 
     @st.composite  # type: ignore[untyped-decorator]
-    def hybrid(draw: st.DrawFn) -> dict[str, Any]:
+    def hybrid(draw: st.DrawFn) -> Any:
         random = draw(st.randoms())
 
         # Decide: use captured variant or generate fresh?
@@ -130,17 +134,16 @@ def build_hybrid_strategy(
         # Single variant: no selection needed
         if n_variants == 1:
             usage_tracker.record_draw(variant_keys[0])
-            _deep_merge_overlay(base, captured_variants[0])
-            return base
+            chosen = captured_variants[0]
+        else:
+            # Shuffle indices before weighted selection to avoid Hypothesis's bias
+            # toward early indices when using cumulative probability selection.
+            idx = usage_tracker.weighted_select(variant_keys, random)
+            usage_tracker.record_draw(variant_keys[idx])
+            chosen = captured_variants[idx]
 
-        # Shuffle indices before weighted selection to avoid Hypothesis's bias
-        # toward early indices when using cumulative probability selection.
-        idx = usage_tracker.weighted_select(variant_keys, random)
-
-        # Record this draw for future weighting
-        usage_tracker.record_draw(variant_keys[idx])
-        _deep_merge_overlay(base, captured_variants[idx])
-        return base
+        _deep_merge_overlay(base, chosen.overlay)
+        return GeneratedValue(value=base, meta=None, pool_draws=chosen.draws)
 
     return hybrid()
 
@@ -691,7 +694,7 @@ class OpenApiBody(OpenApiComponent):
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         # Check for captured variants for hybrid approach
-        captured_variants: list[dict[str, Any]] | None = None
+        captured_variants: list[CapturedVariant] | None = None
         usage_tracker = None
         if extra_data_source is not None:
             from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
@@ -778,7 +781,7 @@ class OpenApiBody(OpenApiComponent):
         self,
         operation: APIOperation,
         generation_config: GenerationConfig,
-        captured_variants: list[dict[str, Any]],
+        captured_variants: list[CapturedVariant],
         usage_tracker: VariantUsageTracker,
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available."""
@@ -790,7 +793,11 @@ class OpenApiBody(OpenApiComponent):
             operation, generation_config, GenerationMode.POSITIVE, extra_data_source=None
         )
         positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
-        positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
+        # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
+        # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.
+        positive_strategy = positive_strategy.map(
+            lambda x: x if isinstance(x, GeneratedValue) else GeneratedValue(x, None)
+        )
 
         negative_strategy = self.get_strategy(
             operation, generation_config, GenerationMode.NEGATIVE, extra_data_source=None
@@ -1252,7 +1259,7 @@ class OpenApiParameterSet(ParameterSet):
             )
 
         # Check for captured variants for hybrid approach
-        captured_variants: list[dict[str, Any]] | None = None
+        captured_variants: list[CapturedVariant] | None = None
         usage_tracker = None
         if extra_data_source is not None:
             from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
@@ -1335,7 +1342,7 @@ class OpenApiParameterSet(ParameterSet):
             if serialize is not None:
                 if is_negative:
                     # Apply serialize only to the value part of GeneratedValue
-                    strategy = strategy.map(lambda x: GeneratedValue(serialize(x.value), x.meta))
+                    strategy = strategy.map(lambda x: GeneratedValue(serialize(x.value), x.meta, x.pool_draws))
                 else:
                     strategy = strategy.map(serialize)
 
@@ -1346,7 +1353,9 @@ class OpenApiParameterSet(ParameterSet):
             if self.location == ParameterLocation.PATH:
                 if is_negative:
                     strategy = strategy.map(
-                        lambda x: GeneratedValue(_quote_all_safe(jsonify_python_specific_types(x.value)), x.meta)
+                        lambda x: GeneratedValue(
+                            _quote_all_safe(jsonify_python_specific_types(x.value)), x.meta, x.pool_draws
+                        )
                     )
                     # Keep strict anti-misrouting defaults for negative generation.
                     # Explicit %2F allowances apply only to positive data.
@@ -1363,7 +1372,9 @@ class OpenApiParameterSet(ParameterSet):
                 else:
                     strategy = strategy.filter(query_filter)
                 if is_negative:
-                    strategy = strategy.map(lambda x: GeneratedValue(jsonify_python_specific_types(x.value), x.meta))
+                    strategy = strategy.map(
+                        lambda x: GeneratedValue(jsonify_python_specific_types(x.value), x.meta, x.pool_draws)
+                    )
                 else:
                     strategy = strategy.map(jsonify_python_specific_types)
             else:
@@ -1395,7 +1406,7 @@ class OpenApiParameterSet(ParameterSet):
         operation: APIOperation,
         generation_config: GenerationConfig,
         exclude: Iterable[str],
-        captured_variants: list[dict[str, Any]],
+        captured_variants: list[CapturedVariant],
         usage_tracker: VariantUsageTracker,
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available.
@@ -1413,7 +1424,11 @@ class OpenApiParameterSet(ParameterSet):
         )
         positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         # Wrap in GeneratedValue for consistent return type with negative strategy
-        positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
+        # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
+        # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.
+        positive_strategy = positive_strategy.map(
+            lambda x: x if isinstance(x, GeneratedValue) else GeneratedValue(x, None)
+        )
 
         # Get negative strategy without extra_data_source to avoid recursion
         negative_strategy = self.get_strategy(

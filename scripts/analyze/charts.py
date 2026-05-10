@@ -111,12 +111,67 @@ def _new_operation_timeline_chart(run: RunMetrics, charts_dir: Path) -> None:
     _save(fig, charts_dir / "new_operation_timeline")
 
 
+def _pool_edges_chart(run: RunMetrics, charts_dir: Path) -> None:
+    edges = list(run.pool_draws.by_edge.values())
+    if not edges:
+        return
+    edges.sort(key=lambda edge: -edge.count)
+    top = edges[:10]
+    labels = [f"{edge.source_operation} -> {edge.consumer_operation}" for edge in top]
+    counts = [edge.count for edge in top]
+    twoxx_rate = [edge.twoxx / edge.count if edge.count else 0.0 for edge in top]
+    fig, ax = pyplot.subplots(figsize=(max(8, len(top) * 0.6), 5))
+    cmap = pyplot.get_cmap("Greens")
+    bar_colors = [cmap(0.2 + 0.7 * rate) for rate in twoxx_rate]
+    bars = ax.barh(labels, counts, color=bar_colors)
+    ax.invert_yaxis()
+    ax.set_title("Top resource-pool edges  (bar = draws, fill = 2xx rate)")
+    ax.set_xlabel("Draws")
+    ax.set_ylabel("Edge (producer -> consumer)")
+    # Annotate each bar with its 2xx rate — black on light fills, white on dark fills.
+    max_count = max(counts)
+    for bar, count, rate in zip(bars, counts, twoxx_rate, strict=True):
+        text_color = "white" if rate > 0.55 else "black"
+        ax.text(
+            count - max_count * 0.01,
+            bar.get_y() + bar.get_height() / 2,
+            f"{rate * 100:.1f}% 2xx",
+            ha="right",
+            va="center",
+            color=text_color,
+            fontsize=9,
+            fontweight="bold",
+        )
+    norm = pyplot.matplotlib.colors.Normalize(vmin=0.0, vmax=1.0)
+    scalar_mappable = pyplot.matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
+    scalar_mappable.set_array([])
+    colorbar = fig.colorbar(scalar_mappable, ax=ax, fraction=0.04, pad=0.02)
+    colorbar.set_label("2xx response rate")
+    _save(fig, charts_dir / "pool_edges")
+
+
+def _transition_depth_chart(run: RunMetrics, charts_dir: Path) -> None:
+    by_depth = run.transitions.depth.by_depth
+    if not by_depth:
+        return
+    depths = sorted(by_depth, key=int)
+    counts = [by_depth[depth] for depth in depths]
+    fig, ax = pyplot.subplots(figsize=(max(6, len(depths) * 0.8), 4))
+    seaborn.barplot(x=[str(int(d)) for d in depths], y=counts, ax=ax, color="#06b6d4")
+    ax.set_title("Stateful chain depth distribution")
+    ax.set_xlabel("Depth from root")
+    ax.set_ylabel("Cases")
+    _save(fig, charts_dir / "transition_depth")
+
+
 _PRODUCERS = (
     _bucket_chart,
     _phases_chart,
     _mutation_grid_chart,
     _coverage_scenarios_chart,
     _new_operation_timeline_chart,
+    _pool_edges_chart,
+    _transition_depth_chart,
 )
 
 

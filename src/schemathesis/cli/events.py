@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from schemathesis.config import ProjectConfig
 from schemathesis.core import Specification
@@ -11,7 +12,10 @@ from schemathesis.engine import events
 from schemathesis.schemas import APIOperation
 
 
+@dataclass(init=False)
 class LoadingStarted(events.EngineEvent):
+    location: str
+
     __slots__ = ("id", "timestamp", "location")
 
     def __init__(self, *, location: str) -> None:
@@ -20,7 +24,19 @@ class LoadingStarted(events.EngineEvent):
         self.location = location
 
 
+@dataclass(init=False)
 class LoadingFinished(events.EngineEvent):
+    # Annotations match `__slots__` so the NDJSON dataclass-fields walk picks them up.
+    location: str
+    duration: float
+    base_url: str
+    base_path: str
+    specification: Specification
+    statistic: ApiStatistic
+    schema: dict
+    config: ProjectConfig
+    find_operation_by_label: Callable[[str], APIOperation | None]
+
     __slots__ = (
         "id",
         "timestamp",

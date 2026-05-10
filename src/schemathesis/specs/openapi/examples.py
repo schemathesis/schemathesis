@@ -108,7 +108,8 @@ def _get_pool_combos(
         )
         if variants:
             container = location.container_name
-            per_location.append([{container: variant} for variant in variants])
+            # Examples-phase combos don't carry pool_draws; that threading is a follow-up.
+            per_location.append([{container: variant.overlay} for variant in variants])
 
     for body in operation.body:
         body_schema = body.definition.get("schema")
@@ -121,9 +122,11 @@ def _get_pool_combos(
         )
         if variants:
             required_fields = set(body_schema.get("required", []))
-            complete_variants = [v for v in variants if all(f in v for f in required_fields)]
+            complete_variants = [v for v in variants if all(f in v.overlay for f in required_fields)]
             if complete_variants:
-                per_location.append([{"body": variant, "media_type": body.media_type} for variant in complete_variants])
+                per_location.append(
+                    [{"body": variant.overlay, "media_type": body.media_type} for variant in complete_variants]
+                )
 
     if not per_location:
         return []

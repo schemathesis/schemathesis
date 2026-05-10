@@ -12,7 +12,7 @@ from schemathesis.core.jsonschema import make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.resources import ExtraDataSource
+from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
 
@@ -156,6 +156,50 @@ class ParameterRequirement:
     resource_field: str
 
 
+@dataclass(slots=True, frozen=True)
+class CapturedVariant:
+    """A captured pool overlay together with the provenance of every slot it fills.
+
+    `overlay` is the dict that gets deep-merged into the generated case body; `draws`
+    records which captured `ResourceInstance` supplied each slot value, so the analyzer
+    can attribute the case to its semantic predecessor(s).
+    """
+
+    overlay: dict[str, Any]
+    draws: tuple[PoolDraw, ...]
+
+
+def _build_pool_draw(slot: InputSlot, instance: ResourceInstance) -> PoolDraw:
+    """Build a `PoolDraw` provenance record for a slot that was filled from `instance`."""
+    parameter_name = slot.parameter_name if isinstance(slot.parameter_name, str) else ""
+    return PoolDraw(
+        location=slot.parameter_location.value,
+        parameter_name=parameter_name,
+        resource_name=slot.resource.name,
+        resource_field=slot.resource_field or "",
+        source_operation=instance.source_operation,
+        source_status=instance.status_code,
+    )
+
+
+def _build_pool_draw_from_requirement(
+    *,
+    location: ParameterLocation,
+    parameter_name: str,
+    requirement: ParameterRequirement,
+    instance: ResourceInstance,
+) -> PoolDraw:
+    """Variant of `_build_pool_draw` for sites that hold a `ParameterRequirement` rather than an `InputSlot`."""
+    return PoolDraw(
+        location=location.value,
+        parameter_name=parameter_name,
+        resource_name=requirement.resource_name,
+        resource_field=requirement.resource_field,
+        source_operation=instance.source_operation,
+        source_status=instance.status_code,
+    )
+
+
 def build_parameter_requirements(graph: DependencyGraph) -> dict[RequirementKey, ParameterRequirement]:
     """Index resource inputs by operation / location / parameter name."""
     requirements: dict[RequirementKey, ParameterRequirement] = {}
@@ -292,12 +336,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
         operation: APIOperation,
         location: ParameterLocation,
         schema: JsonSchema,
-    ) -> list[dict[str, Any]] | None:
-        """Get captured variants for hybrid strategy.
+    ) -> list[CapturedVariant] | None:
+        """Get captured variants for hybrid strategy, each carrying its own provenance.
 
-        Returns list of parameter value sets from captured responses.
-        For single requirements, returns single-property dicts.
-        For multiple requirements, returns complete value sets preserving relationships.
+        For single requirements, each variant has a single-property overlay.
+        For multiple requirements, each variant has a complete value set preserving relationships.
         For BODY location, walks one level into nested objects so nested foreign-key fields get overlays.
         """
         if not isinstance(schema, dict):
@@ -326,11 +369,25 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if not slots:
             return None
 
+        variants: list[CapturedVariant]
         if len(slots) == 1:
             slot = slots[0]
-            variants = [_assemble_path(slot.path, value) for value in self._collect_values(slot.requirement)]
+            variants = [
+                CapturedVariant(
+                    overlay=_assemble_path(slot.path, value),
+                    draws=(
+                        _build_pool_draw_from_requirement(
+                            location=location,
+                            parameter_name=slot.lookup_key,
+                            requirement=slot.requirement,
+                            instance=instance,
+                        ),
+                    ),
+                )
+                for value, instance in self._collect_values(slot.requirement)
+            ]
         else:
-            variants = self._collect_object_variants(slots)
+            variants = self._collect_object_variants(slots, location)
 
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -339,19 +396,22 @@ class OpenApiExtraDataSource(ExtraDataSource):
         validators = {
             slot.lookup_key: _build_property_validator(slot.leaf_schema, schema, validator_cls) for slot in slots
         }
-        variants = [v for v in variants if _variant_satisfies_paths(v, slots, validators)]
+        variants = [v for v in variants if _variant_satisfies_paths(v.overlay, slots, validators)]
         return variants or None
 
-    def _collect_object_variants(self, slots: list[_VariantSlot]) -> list[dict[str, Any]]:
+    def _collect_object_variants(self, slots: list[_VariantSlot], location: ParameterLocation) -> list[CapturedVariant]:
         """Collect complete value sets that preserve relationships between properties."""
         resource_names = {slot.requirement.resource_name for slot in slots}
 
-        variants: list[dict[str, Any]] = []
+        variants: list[CapturedVariant] = []
         seen: set[str] = set()
 
         for resource_name in resource_names:
             for instance in self.repository.iter_instances(resource_name):
                 filled: dict[str, Any] = {}
+                # Same-resource slots get attribution to `instance`; context-only slots also do,
+                # because `instance.context` is captured when this instance was created.
+                draws: list[PoolDraw] = []
                 for slot in slots:
                     req = slot.requirement
                     if req.resource_name == resource_name:
@@ -360,12 +420,20 @@ class OpenApiExtraDataSource(ExtraDataSource):
                         value = instance.context.get(slot.lookup_key)
                     if value is not None and not self._is_tombstoned(req.resource_name, value):
                         filled[slot.lookup_key] = value
+                        draws.append(
+                            _build_pool_draw_from_requirement(
+                                location=location,
+                                parameter_name=slot.lookup_key,
+                                requirement=req,
+                                instance=instance,
+                            )
+                        )
                 if len(filled) == len(slots):
-                    variant = _assemble_variant(slots, filled)
-                    key = jsonschema_rs.canonical.json.to_string(variant)
+                    overlay = _assemble_variant(slots, filled)
+                    key = jsonschema_rs.canonical.json.to_string(overlay)
                     if key not in seen:
                         seen.add(key)
-                        variants.append(variant)
+                        variants.append(CapturedVariant(overlay=overlay, draws=tuple(draws)))
 
         if variants:
             return variants
@@ -373,9 +441,10 @@ class OpenApiExtraDataSource(ExtraDataSource):
         # No instance covered every slot; chain picks across resources, each constrained
         # by the context of slots already chosen.
         chosen: dict[str, Any] = {}
+        chained_draws: list[PoolDraw] = []
         for slot in slots:
             req = slot.requirement
-            best: Any = None
+            best: tuple[Any, ResourceInstance] | None = None
             for instance in self.repository.iter_instances(req.resource_name):
                 value = instance.data.get(req.resource_field) if req.resource_name else None
                 if value is None:
@@ -384,18 +453,26 @@ class OpenApiExtraDataSource(ExtraDataSource):
                     continue
                 if any(instance.context.get(k) not in (None, v) for k, v in chosen.items()):
                     continue
-                best = value
+                best = (value, instance)
                 break
             if best is not None:
-                chosen[slot.lookup_key] = best
+                chosen[slot.lookup_key] = best[0]
+                chained_draws.append(
+                    _build_pool_draw_from_requirement(
+                        location=location,
+                        parameter_name=slot.lookup_key,
+                        requirement=req,
+                        instance=best[1],
+                    )
+                )
         if chosen:
-            variants.append(_assemble_variant(slots, chosen))
+            variants.append(CapturedVariant(overlay=_assemble_variant(slots, chosen), draws=tuple(chained_draws)))
         return variants
 
-    def _collect_values(self, requirement: ParameterRequirement) -> list[Any]:
-        """Collect unique non-tombstoned values from captured resource instances."""
+    def _collect_values(self, requirement: ParameterRequirement) -> list[tuple[Any, ResourceInstance]]:
+        """Collect unique non-tombstoned values + their source instances from captured responses."""
         instances = self.repository.iter_instances(requirement.resource_name)
-        values: list[Any] = []
+        values: list[tuple[Any, ResourceInstance]] = []
         seen: set[DedupKey] = set()
 
         for instance in instances:
@@ -418,7 +495,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             if dedup_key in seen:
                 continue
             seen.add(dedup_key)
-            values.append(value)
+            values.append((value, instance))
 
         return values
 
@@ -430,7 +507,24 @@ class OpenApiExtraDataSource(ExtraDataSource):
         name: str,
         context_constraints: dict[str, Any] | None = None,
     ) -> Any | None:
-        """Return one weighted-selected pool value for a resource-bound parameter, or None.
+        """Return one weighted-selected pool value for a resource-bound parameter, or None."""
+        picked = self._pick_captured_with_provenance(
+            operation=operation,
+            location=location,
+            name=name,
+            context_constraints=context_constraints,
+        )
+        return picked[0] if picked is not None else None
+
+    def _pick_captured_with_provenance(
+        self,
+        *,
+        operation: APIOperation,
+        location: ParameterLocation,
+        name: str,
+        context_constraints: dict[str, Any] | None = None,
+    ) -> tuple[Any, ResourceInstance] | None:
+        """Like `pick_captured_value` but also returns the `ResourceInstance` whose draw won.
 
         `context_constraints` keeps draws on the same parent chain; missing context keys
         match anything, and the filter falls through when no constrained instance exists.
@@ -458,28 +552,37 @@ class OpenApiExtraDataSource(ExtraDataSource):
         variant_keys = [jsonschema_rs.canonical.json.to_string(instance.data) for instance, _ in candidates]
         idx = self.usage_tracker.argmax_by_weight(variant_keys)
         self.usage_tracker.record_draw(variant_keys[idx])
-        return candidates[idx][1]
+        chosen_instance, chosen_value = candidates[idx]
+        return chosen_value, chosen_instance
 
     def pick_correlated_values(
         self,
         *,
         operation: APIOperation,
-    ) -> dict[tuple[ParameterLocation, str], Any]:
-        """Return one (location, name) -> value map keeping all resource-bound slots correlated, or {}."""
+    ) -> PoolPick:
+        """Return one (location, name) -> value map keeping all resource-bound slots correlated.
+
+        The returned `PoolPick.draws` carries one `PoolDraw` per slot that was filled from the pool,
+        recording which captured `ResourceInstance` supplied the value.
+        """
         slots: list[InputSlot] = []
         for slot in self.inputs_by_label.get(operation.label, ()):
             if slot.resource_field is None or not isinstance(slot.parameter_name, str):
                 continue
             slots.append(slot)
         if not slots:
-            return {}
+            return PoolPick()
 
         resource_names = {slot.resource.name for slot in slots}
-        satisfying: list[tuple[ResourceInstance, dict[tuple[ParameterLocation, str], Any]]] = []
+        # Each "satisfying" entry records the seed instance and per-slot (instance, value) so
+        # provenance stays attached even when context-only fields come from a different parent.
+        satisfying: list[
+            tuple[ResourceInstance, dict[tuple[ParameterLocation, str], tuple[ResourceInstance, Any]]]
+        ] = []
 
         for resource_name in resource_names:
             for instance in self.repository.iter_instances(resource_name):
-                filled: dict[tuple[ParameterLocation, str], Any] = {}
+                filled: dict[tuple[ParameterLocation, str], tuple[ResourceInstance, Any]] = {}
                 for slot in slots:
                     param_name = slot.parameter_name
                     resource_field = slot.resource_field
@@ -491,7 +594,10 @@ class OpenApiExtraDataSource(ExtraDataSource):
                         value = instance.context.get(param_name)
                     if value is None:
                         break
-                    filled[(slot.parameter_location, param_name)] = value
+                    # Same-resource slots and context-only slots both attribute to `instance`:
+                    # parent ids are stored on the child's context when the instance was captured,
+                    # so a single instance accounts for the whole correlated pick.
+                    filled[(slot.parameter_location, param_name)] = (instance, value)
                 else:
                     satisfying.append((instance, filled))
 
@@ -499,24 +605,36 @@ class OpenApiExtraDataSource(ExtraDataSource):
             variant_keys = [jsonschema_rs.canonical.json.to_string(inst.data) for inst, _ in satisfying]
             idx = self.usage_tracker.argmax_by_weight(variant_keys)
             self.usage_tracker.record_draw(variant_keys[idx])
-            return satisfying[idx][1]
+            chosen = satisfying[idx][1]
+            slot_by_key = {(slot.parameter_location, slot.parameter_name): slot for slot in slots}
+            values = {key: value for key, (_, value) in chosen.items()}
+            draws = tuple(
+                _build_pool_draw(slot_by_key[key], source_instance) for key, (source_instance, _) in chosen.items()
+            )
+            return PoolPick(values=values, draws=draws)
 
         # Independent picks with chained context constraints so child resources track parent.
-        result: dict[tuple[ParameterLocation, str], Any] = {}
+        values_result: dict[tuple[ParameterLocation, str], Any] = {}
+        draws_result: list[PoolDraw] = []
+        misses_result: list[tuple[str, str]] = []
         context_constraints: dict[str, Any] = {}
         for slot in slots:
             param_name = slot.parameter_name
             assert isinstance(param_name, str)
-            value = self.pick_captured_value(
+            picked = self._pick_captured_with_provenance(
                 operation=operation,
                 location=slot.parameter_location,
                 name=param_name,
                 context_constraints=context_constraints,
             )
-            if value is not None:
-                result[(slot.parameter_location, param_name)] = value
+            if picked is not None:
+                value, source_instance = picked
+                values_result[(slot.parameter_location, param_name)] = value
+                draws_result.append(_build_pool_draw(slot, source_instance))
                 context_constraints[param_name] = value
-        return result
+            else:
+                misses_result.append((slot.parameter_location.value, param_name))
+        return PoolPick(values=values_result, draws=tuple(draws_result), misses=tuple(misses_result))
 
     def should_record(self, *, operation: str) -> bool:
         """Check if responses should be recorded for this operation."""

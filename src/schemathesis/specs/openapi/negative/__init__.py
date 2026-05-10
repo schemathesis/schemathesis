@@ -35,6 +35,8 @@ SYNTAX_FUZZING_PROBABILITY = 0.05
 VALUE_CHANNEL_PROBABILITY = 0.15
 
 if TYPE_CHECKING:
+    from schemathesis.resources import PoolDraw
+
     from .types import Draw, Schema
 
 
@@ -55,7 +57,7 @@ def _random_non_json_bytes() -> st.SearchStrategy[bytes]:
     return st.binary(min_size=1, max_size=1024).filter(_is_not_valid_json)
 
 
-@dataclass
+@dataclass(slots=True)
 class GeneratedValue:
     """Wrapper for generated values with optional mutation metadata.
 
@@ -65,8 +67,7 @@ class GeneratedValue:
 
     value: Any
     meta: MutationMetadata | None
-
-    __slots__ = ("value", "meta")
+    pool_draws: tuple[PoolDraw, ...] = ()
 
 
 def wrap_filter_hook_for_generated_value(hook: Callable) -> Callable:
@@ -90,7 +91,7 @@ def wrap_map_hook_for_generated_value(hook: Callable) -> Callable:
     def wrapper(value: Any) -> Any:
         if isinstance(value, GeneratedValue):
             result = hook(value.value)
-            return GeneratedValue(value=result, meta=value.meta)
+            return GeneratedValue(value=result, meta=value.meta, pool_draws=value.pool_draws)
         return hook(value)
 
     return wrapper
@@ -107,7 +108,8 @@ def wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
     def wrapper(value: Any) -> st.SearchStrategy:
         if isinstance(value, GeneratedValue):
             meta = value.meta
-            return hook(value.value).map(lambda v: GeneratedValue(value=v, meta=meta))
+            pool_draws = value.pool_draws
+            return hook(value.value).map(lambda v: GeneratedValue(value=v, meta=meta, pool_draws=pool_draws))
         return hook(value)
 
     return wrapper

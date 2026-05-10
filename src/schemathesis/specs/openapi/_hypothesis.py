@@ -36,7 +36,7 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
-from schemathesis.resources import ExtraDataSource
+from schemathesis.resources import ExtraDataSource, PoolDraw
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.negative.mutations import MutationMetadata
@@ -241,24 +241,31 @@ def openapi_cases(
                         return is_valid_urlencoded(x.body)
                     return is_valid_urlencoded(x)
 
-                if body_generator.is_negative:
-                    # For negative strategies, unwrap GeneratedValue, apply transformation, then rewrap
-                    strategy = strategy.map(
-                        lambda x: (
-                            GeneratedValue(prepare_urlencoded_form(x.value), x.meta)
-                            if isinstance(x, GeneratedValue)
-                            else prepare_urlencoded_form(x)
-                        )
-                    ).filter(lambda x: is_valid_urlencoded_form(x.value if isinstance(x, GeneratedValue) else x))
-                else:
-                    strategy = strategy.map(prepare_urlencoded_form).filter(is_valid_urlencoded_form)
+                # The hybrid strategy wraps in `GeneratedValue` when it picks a captured pool
+                # variant, so both positive and negative paths must unwrap before
+                # transforming/filtering and rewrap to keep `pool_draws` flowing.
+                strategy = strategy.map(
+                    lambda x: (
+                        GeneratedValue(prepare_urlencoded_form(x.value), x.meta, x.pool_draws)
+                        if isinstance(x, GeneratedValue)
+                        else prepare_urlencoded_form(x)
+                    )
+                ).filter(lambda x: is_valid_urlencoded_form(x.value if isinstance(x, GeneratedValue) else x))
             body_result = _draw(draw, strategy, operation)
             body_metadata = None
+            body_pool_draws: tuple[PoolDraw, ...] = ()
             # Negative strategy returns GeneratedValue, positive returns just value
             if isinstance(body_result, GeneratedValue):
                 body_metadata = body_result.meta
+                body_pool_draws = body_result.pool_draws
                 body_result = body_result.value
-            body_ = ValueContainer(value=body_result, location="body", generator=body_generator, meta=body_metadata)
+            body_ = ValueContainer(
+                value=body_result,
+                location="body",
+                generator=body_generator,
+                meta=body_metadata,
+                pool_draws=body_pool_draws,
+            )
         else:
             body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
     else:
@@ -379,6 +386,9 @@ def openapi_cases(
         multipart_content_types = body_value.content_types
         body_value = body_value.body
 
+    pool_draws = tuple(
+        draw for container in (query_, path_parameters_, headers_, cookies_, body_) for draw in container.pool_draws
+    )
     instance = operation.Case(
         media_type=media_type,
         path_parameters=path_parameters_.value or {},
@@ -404,6 +414,7 @@ def openapi_cases(
                 ]
                 if value.generator is not None
             },
+            pool_draws=pool_draws,
         ),
     )
     auth_context = auths.AuthContext(
@@ -634,7 +645,7 @@ def get_parameters_value(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
-) -> tuple[dict[str, Any] | None, Any]:
+) -> tuple[dict[str, Any] | None, Any, tuple[PoolDraw, ...]]:
     """Get the final value for the specified location.
 
     If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
@@ -654,8 +665,8 @@ def get_parameters_value(
         result = _draw(draw, strategy, operation)
         # Negative strategy returns GeneratedValue, positive returns just value
         if isinstance(result, GeneratedValue):
-            return result.value, result.meta
-        return result, None
+            return result.value, result.meta, result.pool_draws
+        return result, None, ()
     strategy = get_parameters_strategy(
         operation,
         generation_mode,
@@ -669,17 +680,18 @@ def get_parameters_value(
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = _draw(draw, strategy, operation)
     metadata = None
+    pool_draws: tuple[PoolDraw, ...] = ()
     # Negative strategy returns GeneratedValue, positive returns just value
     if isinstance(new, GeneratedValue):
-        new, metadata = new.value, new.meta
+        new, metadata, pool_draws = new.value, new.meta, new.pool_draws
     if new is not None:
         copied = dict(value)
         copied.update(new)
-        return copied, metadata
-    return value, metadata
+        return copied, metadata, pool_draws
+    return value, metadata, pool_draws
 
 
-@dataclass
+@dataclass(slots=True)
 class ValueContainer:
     """Container for a value generated by a data generator or explicitly provided."""
 
@@ -687,8 +699,7 @@ class ValueContainer:
     location: str
     generator: GenerationMode | None
     meta: MutationMetadata | None
-
-    __slots__ = ("value", "location", "generator", "meta")
+    pool_draws: tuple[PoolDraw, ...] = ()
 
     @property
     def is_generated(self) -> bool:
@@ -725,7 +736,7 @@ def generate_parameter(
         # If we can't negate any parameter, generate positive ones
         # If nothing else will be negated, then skip the test completely
         generator = GenerationMode.POSITIVE
-    value, metadata = get_parameters_value(
+    value, metadata, pool_draws = get_parameters_value(
         explicit,
         location,
         draw,
@@ -746,7 +757,9 @@ def generate_parameter(
         # When we pass `explicit`, then its parts are excluded from generation of the final value
         # If the final value is the same, then other parameters were generated at all
         used_generator = None
-    return ValueContainer(value=value, location=location, generator=used_generator, meta=metadata)
+    return ValueContainer(
+        value=value, location=location, generator=used_generator, meta=metadata, pool_draws=pool_draws
+    )
 
 
 def can_negate_path_parameters(operation: APIOperation) -> bool:
