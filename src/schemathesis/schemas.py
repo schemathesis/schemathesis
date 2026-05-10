@@ -16,7 +16,7 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
 from schemathesis.config import GenerationConfig, ProjectConfig
-from schemathesis.core import NOT_SET, NotSet, media_types
+from schemathesis.core import NOT_SET, Body, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import FailureGroup
@@ -404,7 +404,7 @@ class BaseSchema(Mapping):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: Body = NOT_SET,
         media_type: str | None = None,
         multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,
@@ -529,9 +529,7 @@ class BaseSchema(Mapping):
             base_url += "/"
         return unquote(urljoin(base_url, quote(path)))
 
-    def prepare_request_body(
-        self, body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
-    ) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
+    def prepare_request_body(self, body: Body) -> Body:
         """Apply spec-specific transformations to a generated body before sending."""
         return body
 
@@ -910,7 +908,7 @@ class APIOperation(Generic[P, R, S]):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: Body = NOT_SET,
         media_type: str | None = None,
         multipart_content_types: dict[str, str] | None = None,
         _meta: CaseMetadata | None = None,

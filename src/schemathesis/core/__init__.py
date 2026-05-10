@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, TypeAlias
+
+if TYPE_CHECKING:
+    from schemathesis.core.jsonschema.types import JsonValue
 
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
@@ -14,6 +18,9 @@ class NotSet: ...
 
 
 NOT_SET = NotSet()
+
+
+Body: TypeAlias = "dict[str, JsonValue] | list[JsonValue] | str | int | float | bool | bytes | NotSet"
 
 
 class SpecificationFeature(str, enum.Enum):

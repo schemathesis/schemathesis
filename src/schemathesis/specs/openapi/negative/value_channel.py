@@ -9,8 +9,7 @@ from typing import Any, Literal, TypeAlias
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
-from schemathesis.core.jsonschema.types import JsonSchemaObject
-from schemathesis.core.transforms import JsonValue
+from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 
 ValueChannelKeyword: TypeAlias = Literal[
     "format:uuid",

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, Body
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
@@ -79,7 +79,9 @@ def get_exclude_headers(case: Case) -> list[str]:
                     # Multi-required: the case may have omitted any subset of the
                     # original list; exclude exactly those names so default/session
                     # auth doesn't get re-applied for them.
-                    excluded.extend(name for name in mutation.original_value if name not in case_headers)
+                    excluded.extend(
+                        name for name in mutation.original_value if isinstance(name, str) and name not in case_headers
+                    )
         return excluded
 
     return []
@@ -92,7 +94,7 @@ def prepare_url(case: Case, base_url: str | None) -> str:
     return case.operation.schema.build_request_url(case, base_url)
 
 
-def prepare_body(case: Case) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
+def prepare_body(case: Case) -> Body:
     """Prepare body via the schema's spec-aware override."""
     return case.operation.schema.prepare_request_body(case.body)
 

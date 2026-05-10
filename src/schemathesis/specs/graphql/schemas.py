@@ -19,7 +19,7 @@ from requests.structures import CaseInsensitiveDict
 from typing_extensions import override
 
 from schemathesis import auths
-from schemathesis.core import NOT_SET, NotSet, Specification
+from schemathesis.core import NOT_SET, Body, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
@@ -191,9 +191,7 @@ class GraphQLSchema(BaseSchema):
         return urlunsplit(parts)
 
     @override
-    def prepare_request_body(
-        self, body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
-    ) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
+    def prepare_request_body(self, body: Body) -> Body:
         if isinstance(body, NotSet | bytes):
             return body
         return {"query": body}
@@ -359,7 +357,7 @@ class GraphQLSchema(BaseSchema):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: Body = NOT_SET,
         media_type: str | None = None,
         multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,

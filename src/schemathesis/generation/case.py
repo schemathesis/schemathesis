@@ -8,7 +8,7 @@ from jsonschema_rs import Validator
 
 from schemathesis import hooks, transport
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, CheckResult, load_all_checks, run_checks
-from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl, media_types
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, curl, media_types
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.jsonschema import make_validator
@@ -82,7 +82,7 @@ class Case:
     """Generated query parameters"""
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
-    body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
+    body: Body
     """Generated request body"""
     media_type: str | None
     """Media type from OpenAPI schema (e.g., "multipart/form-data")"""
@@ -126,7 +126,7 @@ class Case:
         headers: CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: Body = NOT_SET,
         media_type: str | None = None,
         multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,
