@@ -12,7 +12,7 @@ from urllib.parse import urlencode, urlparse
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import override
 
-from schemathesis.core import NotSet, media_types
+from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.core.rate_limit import ratelimit
@@ -244,18 +244,18 @@ REQUESTS_TRANSPORT = RequestsTransport()
 
 
 @REQUESTS_TRANSPORT.serializer("application/json", "text/json")
-def json_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def json_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_json(value)
 
 
 @REQUESTS_TRANSPORT.serializer(
     "text/yaml", "text/x-yaml", "text/vnd.yaml", "text/yml", "application/yaml", "application/x-yaml"
 )
-def yaml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def yaml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_yaml(value)
 
 
-def _should_coerce_to_bytes(item: Any) -> bool:
+def _should_coerce_to_bytes(item: object) -> bool:
     """Whether the item should be converted to bytes."""
     # These types are OK in forms, others should be coerced to bytes
     return isinstance(item, Binary) or not isinstance(item, (bytes | str | int))
@@ -313,7 +313,7 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
     return result
 
 
-def _is_already_serialized(value: Any) -> bool:
+def _is_already_serialized(value: object) -> bool:
     """Whether the value is already in a form that can be sent as a multipart part."""
     if isinstance(value, (bytes, str, Binary)):
         return True
@@ -339,7 +339,7 @@ def _serialize_part_value(ctx: SerializationContext, value: Any, content_type: s
 
 
 @REQUESTS_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
-def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     if isinstance(value, dict):
@@ -357,22 +357,22 @@ def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any
 
 
 @REQUESTS_TRANSPORT.serializer("application/xml", "text/xml")
-def xml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def xml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_xml(ctx.case, value)
 
 
 @REQUESTS_TRANSPORT.serializer("application/x-www-form-urlencoded")
-def urlencoded_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def urlencoded_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return {"data": value}
 
 
 @REQUESTS_TRANSPORT.serializer("text/plain")
-def text_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def text_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     return {"data": str(value).encode("utf8")}
 
 
 @REQUESTS_TRANSPORT.serializer("application/octet-stream")
-def binary_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+def binary_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return {"data": serialize_binary(value)}

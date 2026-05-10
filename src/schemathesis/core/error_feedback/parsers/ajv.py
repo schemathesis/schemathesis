@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.error_feedback.parsers import PARSERS
@@ -196,7 +196,7 @@ def _is_root_body_type_error(error: dict, location: ParameterLocation, case: Cas
     return isinstance(params, dict) and isinstance(params.get("type"), str)
 
 
-def _is_ajv_array_error(error: object) -> bool:
+def _is_ajv_array_error(error: object) -> TypeGuard[dict]:
     return (
         isinstance(error, dict)
         and isinstance(error.get("keyword"), str)

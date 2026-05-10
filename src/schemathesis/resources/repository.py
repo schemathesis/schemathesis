@@ -81,7 +81,7 @@ class ResourceRepository:
             instances.extend(bucket)
         return tuple(instances)
 
-    def remove_by_value(self, resource_name: str, value: Any) -> int:
+    def remove_by_value(self, resource_name: str, value: object) -> int:
         """Drop instances whose data carries the given value; returns the number removed.
 
         Called after a successful DELETE so subsequent draws don't re-feed a server-side gone id.
@@ -169,7 +169,7 @@ class ResourceRepository:
                 context=context or {},
             )
 
-    def _extract_payload(self, payload: Any, descriptor: ResourceDescriptor) -> Iterable[dict[str, Any]]:
+    def _extract_payload(self, payload: object, descriptor: ResourceDescriptor) -> Iterable[dict[str, Any]]:
         pointer = descriptor.pointer
         if pointer in ("", None, "/"):
             target = payload

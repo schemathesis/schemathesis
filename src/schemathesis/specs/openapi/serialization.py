@@ -281,7 +281,7 @@ def make_delimited(data: dict[str, Any] | None, delimiter: str = ",") -> str:
     return delimiter.join(f"{key}={value}" for key, value in force_dict(data or {}).items())
 
 
-def force_iterable(value: Any) -> list | tuple:
+def force_iterable(value: object) -> list | tuple:
     """Converts the value to a list or a tuple.
 
     Only relevant for negative test scenarios where the original types might be changed.
@@ -291,7 +291,7 @@ def force_iterable(value: Any) -> list | tuple:
     return [value]
 
 
-def force_dict(value: Any) -> dict:
+def force_dict(value: object) -> dict:
     """Converts the value to a dictionary.
 
     Only relevant for negative test scenarios where the original types might be changed.

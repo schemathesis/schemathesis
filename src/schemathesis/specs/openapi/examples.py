@@ -257,7 +257,7 @@ def extract_top_level(
                 # - A oneOf/anyOf branch example is validated against the branch (not the full
                 #   combined schema, which would reject strings valid for multiple branches).
                 try:
-                    validator = None if isinstance(definition, bool) else make_validator_for(definition)
+                    validator = make_validator_for(definition) if isinstance(definition, dict) else None
                 except jsonschema_rs.ValidationError:
                     validator = None
             # Open API 2 also supports `example`
@@ -608,7 +608,7 @@ def extract_from_schemas(
                     yield BodyExample(value=value, media_type=body.media_type)
 
 
-def _example_is_valid(value: Any, validator: jsonschema_rs.Validator | None) -> bool:
+def _example_is_valid(value: object, validator: jsonschema_rs.Validator | None) -> bool:
     if validator is None:
         return True
     try:

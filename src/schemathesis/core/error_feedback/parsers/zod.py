@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import ClassificationResult, location_for_method
@@ -31,7 +31,7 @@ _STRING_VALIDATION_FORMATS: dict[str, str] = {
 }
 
 
-def _is_issues_list(candidate: object) -> bool:
+def _is_issues_list(candidate: object) -> TypeGuard[list[dict]]:
     return isinstance(candidate, list) and bool(candidate) and all(isinstance(item, dict) for item in candidate)
 
 

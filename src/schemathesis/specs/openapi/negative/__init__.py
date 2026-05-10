@@ -132,7 +132,7 @@ class CacheKey:
         return hash((self.operation_name, self.location, self.custom_format_names))
 
 
-def _always_invalid(value: Any) -> bool:
+def _always_invalid(value: object) -> bool:
     """A format check that always fails."""
     return False
 

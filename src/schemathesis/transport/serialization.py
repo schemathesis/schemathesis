@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from unicodedata import normalize
 from urllib.parse import quote_plus, unquote
 
+from schemathesis.core import Body
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonValue
@@ -60,7 +61,7 @@ class Binary(str):
         return f"Binary(data={self.data!r})"
 
 
-def contains_binary(value: Any) -> bool:
+def contains_binary(value: object) -> bool:
     """Check if the value contains any Binary instances.
 
     Binary is a special wrapper type that jsonschema-rs cannot validate.
@@ -74,7 +75,7 @@ def contains_binary(value: Any) -> bool:
     return False
 
 
-def serialize_json(value: Any) -> dict[str, Any]:
+def serialize_json(value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         # Possible to get via explicit examples, e.g. `externalValue`
         return {"data": value}
@@ -92,7 +93,7 @@ def _replace_binary(value: dict) -> dict:
     return {key: value.data if isinstance(value, Binary) else value for key, value in value.items()}
 
 
-def serialize_binary(value: Any) -> bytes:
+def serialize_binary(value: Body) -> bytes:
     """Convert the input value to bytes and ignore any conversion errors."""
     if isinstance(value, bytes):
         return value
@@ -101,7 +102,7 @@ def serialize_binary(value: Any) -> bytes:
     return str(value).encode(errors="ignore")
 
 
-def serialize_yaml(value: Any) -> dict[str, Any]:
+def serialize_yaml(value: Body) -> dict[str, Any]:
     import yaml
 
     try:
@@ -123,7 +124,7 @@ DEFAULT_TAG_NAME = "data"
 NAMESPACE_URL = "http://example.com/schema"
 
 
-def serialize_xml(case: Case, value: Any) -> dict[str, Any]:
+def serialize_xml(case: Case, value: Body) -> dict[str, Any]:
     media_type = case.media_type
 
     assert media_type is not None

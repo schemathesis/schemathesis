@@ -20,7 +20,7 @@ class NotSet: ...
 NOT_SET = NotSet()
 
 
-Body: TypeAlias = "dict[str, JsonValue] | list[JsonValue] | str | int | float | bool | bytes | NotSet"
+Body: TypeAlias = "JsonValue | bytes | NotSet"
 
 
 class SpecificationFeature(str, enum.Enum):

@@ -10,7 +10,7 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from itertools import combinations
 from time import perf_counter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeGuard
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
@@ -166,7 +166,7 @@ def _stringify_value(val: Any, container_name: str) -> Any:
 _GATING_KEYS = frozenset({"example", "examples", "default", "enum", "const"})
 
 
-def _is_pool_eligible(schema: Any) -> bool:
+def _is_pool_eligible(schema: object) -> TypeGuard[dict[str, Any]]:
     return isinstance(schema, dict) and not (_GATING_KEYS & schema.keys())
 
 

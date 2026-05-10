@@ -456,13 +456,13 @@ def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, An
         schema.pop("properties", None)
 
 
-def is_write_only(schema: Any) -> TypeGuard[dict[str, Any]]:
+def is_write_only(schema: object) -> TypeGuard[dict[str, Any]]:
     if not isinstance(schema, dict):
         return False
     return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
 
 
-def is_read_only(schema: Any) -> TypeGuard[dict[str, Any]]:
+def is_read_only(schema: object) -> TypeGuard[dict[str, Any]]:
     if not isinstance(schema, dict):
         return False
     return schema.get("readOnly", False)

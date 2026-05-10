@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, TypeGuard
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import ClassificationResult, location_for_method
@@ -119,7 +119,13 @@ def _classify(message: str) -> ClassificationResult | None:
     return None
 
 
-def _is_litestar_issue(item: object) -> bool:
+class LitestarIssue(TypedDict):
+    message: str
+    key: str
+    source: str
+
+
+def _is_litestar_issue(item: object) -> TypeGuard[LitestarIssue]:
     return (
         isinstance(item, dict)
         and isinstance(item.get("message"), str)
@@ -128,7 +134,7 @@ def _is_litestar_issue(item: object) -> bool:
     )
 
 
-def _extract_issues(body: object) -> list[dict] | None:
+def _extract_issues(body: object) -> list[LitestarIssue] | None:
     if not isinstance(body, dict):
         return None
     if not isinstance(body.get("status_code"), int):

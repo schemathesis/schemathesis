@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from schemathesis.core import media_types
+from schemathesis.core import Body, media_types
 from schemathesis.core.errors import SerializationNotPossible
 
 if TYPE_CHECKING:
@@ -13,14 +13,14 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-def is_asgi_app(app: Any) -> bool:
+def is_asgi_app(app: object) -> bool:
     """Return True if the app uses ASGI (async) transport."""
     return iscoroutinefunction(app) or (
         hasattr(app, "__call__") and iscoroutinefunction(app.__call__)  # noqa: B004
     )
 
 
-def get(app: Any) -> BaseTransport:
+def get(app: object) -> BaseTransport:
     """Get transport to send the data to the application."""
     from schemathesis.transport.asgi import ASGI_TRANSPORT
     from schemathesis.transport.requests import REQUESTS_TRANSPORT
@@ -49,7 +49,7 @@ class SerializationContext:
     __slots__ = ("case",)
 
 
-Serializer = Callable[[SerializationContext, Any], Any]
+Serializer = Callable[[SerializationContext, Body], dict[str, Any]]
 
 
 class BaseTransport(Generic[S]):

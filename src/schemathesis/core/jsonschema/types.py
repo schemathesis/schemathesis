@@ -27,7 +27,7 @@ def _get_type(schema: JsonSchema) -> list[str]:
     return get_type(schema, _check_type=True)
 
 
-def to_json_type_name(v: Any) -> str:
+def to_json_type_name(v: object) -> str:
     if v is None:
         return "null"
     if isinstance(v, bool):

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 WalkPair = tuple[tuple[str | int, ...], str]
-LaravelShape = Mapping[str, Sequence[object]]
+LaravelShape = Mapping[str, Sequence[str]]
 
 # Vocabulary discriminator — substrings that, if found in any message, lock detection to Laravel.
 _LARAVEL_VOCABULARY: frozenset[str] = frozenset(
@@ -55,7 +55,7 @@ def _walk(body: LaravelShape) -> Iterator[WalkPair]:
     for raw_key, messages in body.items():
         key_path: tuple[str | int, ...] = tuple(raw_key.split(".")) if "." in raw_key else (raw_key,)
         for message in messages:
-            if isinstance(message, str) and message:
+            if message:
                 yield (key_path, message)
 
 
@@ -148,11 +148,7 @@ def _extract_errors(body: object) -> LaravelShape | None:
 
 def _has_laravel_vocabulary(errors: LaravelShape) -> bool:
     return any(
-        phrase in message
-        for messages in errors.values()
-        for message in messages
-        if isinstance(message, str)
-        for phrase in _LARAVEL_VOCABULARY
+        phrase in message for messages in errors.values() for message in messages for phrase in _LARAVEL_VOCABULARY
     )
 
 

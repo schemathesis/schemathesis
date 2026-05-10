@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import cast
 
 from schemathesis.generation.case import Case
 from schemathesis.graphql.checks import GraphQLClientError, GraphQLServerError, UnexpectedGraphQLResponse
@@ -22,7 +22,7 @@ def is_client_error(payload: dict) -> bool:
     return data is None and "path" not in errors[0]
 
 
-def validate_graphql_response(case: Case, payload: Any) -> None:
+def validate_graphql_response(case: Case, payload: object) -> None:
     """Validate GraphQL response.
 
     Semantically valid GraphQL responses are JSON objects and may contain `data` or `errors` keys.

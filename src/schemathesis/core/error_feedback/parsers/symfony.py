@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeGuard
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
@@ -189,7 +189,7 @@ _CODE_HANDLERS: dict[str, DictHandler] = {
 }
 
 
-def _is_violation(item: object) -> bool:
+def _is_violation(item: object) -> TypeGuard[dict]:
     return isinstance(item, dict) and isinstance(item.get("propertyPath"), str)
 
 
