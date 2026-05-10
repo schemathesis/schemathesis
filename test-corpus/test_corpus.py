@@ -491,8 +491,10 @@ KNOWN_BODY_VIOLATIONS: set[tuple[str, str]] = {
     ("amazonaws.com/auditmanager/2017-07-25.json", "PUT /assessments/{assessmentId}"),
     ("amazonaws.com/databrew/2017-07-25.json", "POST /datasets"),
     ("amazonaws.com/databrew/2017-07-25.json", "PUT /datasets/{name}"),
-    ("amazonaws.com/devops-guru/2020-12-01.json", "POST /events"),
-    ("amazonaws.com/devops-guru/2020-12-01.json", "POST /insights/search"),
+    # Pre-existing multi-slot pattern issue (unrelated to `update_quantifier`'s
+    # balanced-distribution rewrite) — surfaced once that rewrite unblocked the earlier
+    # ops on this schema.
+    ("amazonaws.com/devops-guru/2020-12-01.json", "PUT /channels"),
     (
         "amazonaws.com/emr-containers/2020-10-01.json",
         "POST /virtualclusters/{virtualClusterId}/endpoints/{endpointId}/credentials",

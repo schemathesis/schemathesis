@@ -116,12 +116,14 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd[a-zA-Z0-9]{2,4}$"),
         # When greedy would collapse the variable-inner suffix to `{0}`, the
-        # distributor falls back to a balanced split that gives both slots room.
+        # distributor falls back to a balanced split that gives both slots room
+        # — each slot's max gets the budget minus what other slots are required to
+        # consume, so the rewrite admits any skewed distribution the original allows.
         (
             r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$",
             5,
             64,
-            r"^[a-zA-Z0-9]{5,32}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0,16}$",
+            r"^[a-zA-Z0-9]{5,64}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0,31}$",
         ),
         (r"^\+[0-9]{5,}$", 6, 6, r"^\+[0-9]{5}$"),
         (r"^abcd$", 50, 50, r"^abcd$"),
@@ -255,6 +257,22 @@ def test_update_quantifier(pattern, min_length, max_length, expected):
 
 def test_update_quantifier_invalid_pattern():
     assert update_quantifier("*", 1, 3) == "*"
+
+
+@pytest.mark.parametrize(
+    ("min_length", "max_length", "value"),
+    [
+        # Multi-slot rewrite must accept any distribution that satisfies the original
+        # pattern within the length budget; per-slot caps from a balanced split would
+        # reject valid lengths the original pattern allowed.
+        (1, 128, "A" + "0" * 100),
+        (1, 128, "A" + "0" * 127),
+        (1, 128, "A" * 128),
+    ],
+)
+def test_update_quantifier_admits_uneven_slot_distributions(min_length, max_length, value):
+    rewritten = update_quantifier(r"^[a-zA-Z*]+[a-zA-Z0-9-]*$", min_length, max_length)
+    assert re.match(rewritten, value), (rewritten, value)
 
 
 @pytest.mark.parametrize(

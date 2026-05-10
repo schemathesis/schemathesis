@@ -1064,21 +1064,27 @@ def _balanced_distribute_range(
     min_length: int | None,
     max_length: int | None,
 ) -> list[tuple[int, int]] | None:
-    """Split both min and max budgets across slots so every sibling gets headroom.
+    """Distribute min/max budgets across slots so every sibling keeps headroom.
 
-    The max budget is divided as `max_length // n` chars per slot (leftover to the
-    last slot). The min budget is also distributed by fair share so optional siblings
-    aren't pushed into a stricter shape than necessary — keeps the rewrite from
-    rejecting valid lengths the original allowed.
+    Each slot's max gets the full budget minus what the other slots are *required*
+    to consume; an even `max_length // n` cap would reject valid skewed distributions
+    the original pattern allowed (e.g. `"A" + "0"*100` for `^[a-zA-Z*]+[a-zA-Z0-9-]*$`
+    with `maxLength=128`). The pattern's combined max may exceed `max_length`, so
+    callers must keep the schema-level `maxLength` to enforce the total.
     """
     n = len(bounds)
     # Balanced is only invoked when greedy starved a sibling — that requires both
     # a finite max budget and at least one slot. The caller (`_transform_anchored_multi`)
     # already guarantees `bounds` is non-empty.
     assert n > 0 and max_length is not None and max_length < MAXREPEAT
-    share = max_length // n
-    slot_max_chars = [share] * n
-    slot_max_chars[-1] += max_length - share * n
+    other_min_chars = []
+    for idx in range(n):
+        total = 0
+        for jdx, ((mn, _), rl) in enumerate(zip(bounds, repetition_lengths, strict=True)):
+            if jdx != idx:
+                total += mn * rl
+        other_min_chars.append(total)
+    slot_max_chars = [max(0, max_length - other) for other in other_min_chars]
 
     # Min budget is distributed only across required slots (orig_min > 0). Optional
     # slots keep `part_min = 0` so they stay optional in the rewrite — forcing them

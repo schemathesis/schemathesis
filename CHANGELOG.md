@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Accept skewed length distributions across sibling quantifiers when rewriting `pattern` against `maxLength`.
+
 ## [4.18.1](https://github.com/schemathesis/schemathesis/compare/v4.18.0...v4.18.1) - 2026-05-10
 
 ### :wrench: Changed

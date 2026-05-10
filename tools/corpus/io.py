@@ -64,8 +64,8 @@ def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> 
         if key_node.tag != "tag:yaml.org,2002:str":
             key = key_node.value
         else:
-            key = self.construct_object(key_node, deep)  # type: ignore[no-untyped-call]
-        mapping[key] = self.construct_object(value_node, deep)  # type: ignore[no-untyped-call]
+            key = self.construct_object(key_node, deep)
+        mapping[key] = self.construct_object(value_node, deep)
     return mapping
 
 
