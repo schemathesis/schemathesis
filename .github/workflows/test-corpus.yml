@@ -104,7 +104,7 @@ jobs:
         with:
           cache-dependency-glob: "**/pyproject.toml"
 
-      - run: uvx --from=".[tests]" pytest test-corpus/test_corpus.py -n auto -k "example" --durations=20 --dist=worksteal
+      - run: uvx --from=".[tests]" pytest test-corpus/test_corpus.py -n auto -k test_examples_phase --durations=20 --dist=worksteal
 
   corpus-graphql:
     name: GraphQL corpus tests
