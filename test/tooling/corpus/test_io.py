@@ -6,6 +6,7 @@ from tools.corpus.io import (
     CorpusEntry,
     get_schema_version,
     iter_all_corpus_files,
+    iter_corpus_entries_from_refs,
     iter_corpus_file,
     iter_corpus_streaming,
 )
@@ -60,6 +61,22 @@ def test_iter_corpus_streaming_respects_limit(tmp_path, make_tarball):
     entries = list(iter_corpus_streaming("openapi-3.0", limit=2, data_dir=tmp_path))
     assert len(entries) == 2
     assert [entry.api for entry in entries] == ["x0", "x1"]
+
+
+def test_iter_corpus_entries_from_refs_reads_requested_members(tmp_path, make_tarball):
+    make_tarball(
+        tmp_path / "openapi-3.0.tar.gz",
+        {
+            "alpha.json": b'{"openapi":"3.0.0","paths":{"/a":{}}}',
+            "ignored.json": b"not json",
+            "beta.json": b'{"openapi":"3.0.0","paths":{"/b":{}}}',
+        },
+    )
+
+    assert list(iter_corpus_entries_from_refs("openapi-3.0", ("beta.json", "alpha.json"), data_dir=tmp_path)) == [
+        CorpusEntry(corpus="openapi-3.0", name="beta.json", schema={"openapi": "3.0.0", "paths": {"/b": {}}}),
+        CorpusEntry(corpus="openapi-3.0", name="alpha.json", schema={"openapi": "3.0.0", "paths": {"/a": {}}}),
+    ]
 
 
 def test_corpus_entry_api_strips_json_suffix():
