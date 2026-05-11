@@ -794,3 +794,47 @@ def test_api(case):
 def test_uuid_format_is_rfc4122(data):
     value = data.draw(formats.get_default_format_strategies()["uuid"])
     assert uuid.UUID(value).variant == uuid.RFC_4122
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ({"name": "a%5Cb"}, {"name": "a_b"}),
+        ({"name": "%5C%5c%01%1F%7F%7f"}, {"name": "______"}),
+        ({"name": "ok-value-1"}, {"name": "ok-value-1"}),
+        ({"name": "literal-%25"}, {"name": "literal-%25"}),
+        ({"id": 42}, {"id": 42}),
+    ],
+    ids=["backslash", "control-and-del", "safe-string", "literal-percent", "non-string"],
+)
+def test_strip_path_decoder_unsafe(raw, expected):
+    assert _hypothesis._strip_path_decoder_unsafe(raw) == expected
+
+
+@pytest.mark.hypothesis_nested
+def test_path_string_sanitized_when_decoder_strict(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/products/{productName}": {
+                "get": {
+                    "parameters": [
+                        {"name": "productName", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.adapt_to_path_decoder_rejection()
+    operation = schema["/products/{productName}"]["GET"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=30, deadline=None, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        value = case.path_parameters["productName"]
+        upper = value.upper()
+        assert "%5C" not in upper, value
+        assert "%7F" not in upper, value
+        assert not any(f"%{i:02X}" in upper for i in range(0x20)), value
+
+    inner()

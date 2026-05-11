@@ -12,7 +12,8 @@ Schemathesis dev
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✓
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
 
      No tests were run
 

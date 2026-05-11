@@ -143,6 +143,8 @@ class ApiSchema(Protocol):
 
     def adapt_to_null_byte_in_header_failure(self) -> None: ...  # pragma: no cover
 
+    def adapt_to_path_decoder_rejection(self) -> None: ...  # pragma: no cover
+
     def apply_auth(self, case: Case, context: AuthContext) -> bool: ...  # pragma: no cover
 
     def get_parameter_serializer(

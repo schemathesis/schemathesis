@@ -42,6 +42,8 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     for result in probes:
         if isinstance(result.probe, NullByteInHeader) and result.is_failure:
             ctx.schema.adapt_to_null_byte_in_header_failure()
+        elif isinstance(result.probe, UnsafePathDecoder) and result.is_failure:
+            ctx.schema.adapt_to_path_decoder_rejection()
         payload = Ok(ProbePayload(probes=probes))
     yield events.PhaseFinished(phase=phase, status=status, payload=payload)
 
@@ -132,7 +134,37 @@ class NullByteInHeader(Probe):
         return ProbeOutcome.SUCCESS
 
 
-PROBES = (NullByteInHeader,)
+# Mix of chars that strict URL decoders (Tomcat, common WAFs) reject in the path component
+# before routing: backslash, ESC, control chars from both ranges. If any of these come back
+# as 400 with an empty body, the app never sees the request anyway.
+_UNSAFE_PATH_PROBE_SUFFIX = "schemathesis-probe%5C%1B%01"
+
+
+@dataclass
+class UnsafePathDecoder(Probe):
+    """Reject backslash and control characters in URL paths before routing."""
+
+    __slots__ = ("name",)
+
+    def __init__(self) -> None:
+        self.name = "Accepts backslash and control characters in URL paths"
+
+    def prepare_request(
+        self, session: requests.Session, request: requests.Request, schema: BaseSchema
+    ) -> requests.PreparedRequest:
+        base_url = schema.get_base_url()
+        request.method = "GET"
+        separator = "" if base_url.endswith("/") else "/"
+        request.url = f"{base_url}{separator}{_UNSAFE_PATH_PROBE_SUFFIX}"
+        return session.prepare_request(request)
+
+    def analyze_response(self, response: requests.Response) -> ProbeOutcome:
+        if response.status_code == 400 and not response.content:
+            return ProbeOutcome.FAILURE
+        return ProbeOutcome.SUCCESS
+
+
+PROBES = (NullByteInHeader, UnsafePathDecoder)
 
 
 def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
