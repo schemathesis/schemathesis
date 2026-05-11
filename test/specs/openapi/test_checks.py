@@ -10,6 +10,7 @@ from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJ
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
+from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -21,6 +22,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
+from schemathesis.openapi.checks import UseAfterFree
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _body_negation_becomes_valid_after_serialization,
@@ -30,6 +32,7 @@ from schemathesis.specs.openapi.checks import (
     negative_data_rejection,
     positive_data_acceptance,
     response_schema_conformance,
+    use_after_free,
 )
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
 
@@ -1200,3 +1203,81 @@ def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_
     with pytest.raises(Failure) as exc_info:
         response_schema_conformance(_CHECK_CTX, Response.from_requests(invalid, True), case)
     assert exc_info.value.title == "Discriminator value not in schema mapping"
+
+
+_USER_PROFILE_SCHEMA = {
+    "/users": {
+        "post": {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}}
+                },
+            },
+            "responses": {
+                "201": {"content": {"application/json": {"schema": {"type": "object"}}}},
+            },
+        },
+    },
+    "/users/{userId}": {
+        "delete": {
+            "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "string"}}],
+            "responses": {"204": {"description": "Deleted"}, "500": {"description": "Server error"}},
+        },
+    },
+    "/users/{userId}/profile": {
+        "get": {
+            "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
+        },
+    },
+}
+
+
+def _build_user_profile_chain(ctx, response_factory, *, delete_status: int):
+    schema = ctx.openapi.load_schema(_USER_PROFILE_SCHEMA)
+    post_operation = schema["/users"]["POST"]
+    delete_operation = schema["/users/{userId}"]["DELETE"]
+    get_operation = schema["/users/{userId}/profile"]["GET"]
+
+    post_case = post_operation.Case(body={"name": "alice"})
+    delete_case = delete_operation.Case(path_parameters={"userId": "alice"})
+    get_case = get_operation.Case(path_parameters={"userId": "alice"})
+
+    post_response = Response.from_requests(response_factory.requests(status_code=201), True)
+    delete_response = Response.from_requests(response_factory.requests(status_code=delete_status), True)
+    get_response = Response.from_requests(response_factory.requests(status_code=200), True)
+
+    recorder = ScenarioRecorder(label="use-after-free-test")
+    recorder.record_case(parent_id=None, case=post_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=post_case.id, response=post_response)
+    recorder.record_case(parent_id=post_case.id, case=delete_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=delete_case.id, response=delete_response)
+    recorder.record_case(parent_id=delete_case.id, case=get_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=get_case.id, response=get_response)
+
+    check_context = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+    )
+    return check_context, get_case, get_response
+
+
+@pytest.mark.parametrize("delete_status", [500, 404], ids=["server-crash", "not-found"])
+def test_use_after_free_skips_when_delete_failed(ctx, response_factory, delete_status):
+    # When DELETE returns 5xx (server crash) or 404 (nothing to free), the resource was never
+    # actually deleted, so a subsequent 2xx read is not a use-after-free.
+    check_context, get_case, get_response = _build_user_profile_chain(
+        ctx, response_factory, delete_status=delete_status
+    )
+    assert use_after_free(check_context, get_response, get_case) is None
+
+
+def test_use_after_free_fires_when_delete_succeeded(ctx, response_factory):
+    check_context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=204)
+    with pytest.raises(UseAfterFree):
+        use_after_free(check_context, get_response, get_case)

@@ -876,10 +876,15 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
 
         parent_response = ctx._find_response(case_id=parent.id)
 
+        # The DELETE itself must have succeeded for a subsequent read to be a use-after-free —
+        # a 5xx (server crash) or 404 (nothing to delete) leaves the resource intact.
+        delete_response = ctx._find_response(case_id=related_case.id)
         if (
             related_case.operation.method.lower() == "delete"
             and parent_response is not None
             and 200 <= parent_response.status_code < 300
+            and delete_response is not None
+            and 200 <= delete_response.status_code < 300
             and related_case.path_parameters
         ):
             # A DELETE without path parameters targets a collection, not a specific
