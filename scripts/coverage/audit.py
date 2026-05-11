@@ -116,13 +116,15 @@ def _process_entry(
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w") as fd:
         json.dump(asdict(result), fd, default=str, indent=2)
-    return _WorkerOutput(
+    output = _WorkerOutput(
         result=result,
         target_name=target.name,
         html_link=html_link,
         corpus=entry.corpus,
         api=api_label,
     )
+    _print_outcome(output)
+    return output
 
 
 def _process_batch(
@@ -218,7 +220,6 @@ def _run_pool(
                         _record_batch_crash(batch, f"{exc.__class__.__name__}: {exc}", results, phase=phase)
                     else:
                         for output in outputs:
-                            _print_outcome(output)
                             results.append(output.result)
                 if broken:
                     # the dead pool poisons every still-in-flight future; treat them as suspects.
@@ -364,7 +365,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.spec is not None or args.workers <= 1:
             for entry in _iter_inputs(args):
                 output = _process_entry(entry, **worker_kwargs)
-                _print_outcome(output)
                 results.append(output.result)
         else:
             # `spawn` avoids fork-after-threads deadlocks from hypothesis/tracecov import-time threads.
