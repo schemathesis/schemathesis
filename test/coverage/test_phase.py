@@ -2733,6 +2733,41 @@ def test_references(ctx, operation, components):
             assert "Unresolvable reference in the schema" in str(operation.err())
 
 
+def test_urlencoded_array_body_is_serializable(ctx):
+    # Form-urlencoded bodies declared as top-level arrays used to abort the operation when prepared.
+    schema = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/x-www-form-urlencoded": {
+                    "schema": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"id": {"type": "integer"}},
+                            "required": ["id"],
+                        },
+                    },
+                }
+            },
+        },
+    )
+    operation = schema["/foo"]["post"]
+    config = SanitizationConfig(enabled=False)
+    count = 0
+    for case in iter_coverage_cases(
+        operation=operation,
+        generation_modes=list(GenerationMode),
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=operation.schema.config.generation,
+    ):
+        prepare_request(case, headers=None, config=config)
+        count += 1
+    assert count > 0
+
+
 def test_urlencoded_payloads_are_valid(ctx):
     schema = load_schema(
         ctx,
