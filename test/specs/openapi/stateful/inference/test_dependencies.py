@@ -5885,3 +5885,37 @@ def test_merged_returning_none_with_anyof_schema(ctx):
         },
     )
     analyze(schema)
+
+
+def test_content_wrapper_unwrapped_around_single_object(ctx):
+    # Single-property `content` wrapper around a resource object should be unwrapped so the link
+    # extractor points at `/content/id`, not the unresolvable `/id`.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/albums": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "content": {
+                                                "type": "object",
+                                                "properties": {"id": {"type": "integer"}},
+                                                "required": ["id"],
+                                            }
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+        },
+    )
+    [output] = graph.operations["POST /albums"].outputs
+    assert (output.resource.name, output.pointer, output.cardinality.value) == ("Album", "/content", "ONE")
