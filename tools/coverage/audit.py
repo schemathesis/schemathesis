@@ -198,7 +198,7 @@ def audit_schema(
                 coverage_map.record_schemathesis_interactions(case.method, operation.full_path, [interaction])
                 result.cases_generated += 1
         except Exception as exc:
-            result.errors.append(f"{operation.method} {operation.full_path}: {exc.__class__.__name__}")
+            result.errors.append(f"{operation.method} {operation.full_path}: {exc.__class__.__name__}: {exc}")
         for mode in unsatisfiable:
             result.unsatisfiable.append((f"{operation.method.upper()} {operation.full_path}", mode.value))
 
