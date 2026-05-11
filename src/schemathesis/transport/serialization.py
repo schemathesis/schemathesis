@@ -62,11 +62,8 @@ class Binary(str):
 
 
 def contains_binary(value: object) -> bool:
-    """Check if the value contains any Binary instances.
-
-    Binary is a special wrapper type that jsonschema-rs cannot validate.
-    """
-    if isinstance(value, Binary):
+    """Check if the value contains any binary payload jsonschema-rs cannot validate."""
+    if isinstance(value, (Binary, bytes)):
         return True
     if isinstance(value, dict):
         return any(contains_binary(v) for v in value.values())

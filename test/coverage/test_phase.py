@@ -16,7 +16,7 @@ from requests.models import RequestEncodingMixin
 
 import schemathesis
 from schemathesis.checks import CheckContext
-from schemathesis.config import ChecksConfig
+from schemathesis.config import ChecksConfig, SanitizationConfig
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
@@ -35,6 +35,7 @@ from schemathesis.resources import PoolDraw, PoolPick
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._schema import CoverageContext, _negative_format, cover_schema_iter
+from schemathesis.transport.prepare import prepare_request
 from test.utils import assert_requests_call
 
 
@@ -7719,3 +7720,50 @@ def test_coverage_pool_draws_survive_numeric_id_serialization(ctx):
             source_status=201,
         ),
     )
+
+
+def test_multipart_body_with_binary_ref_completes_coverage(ctx):
+    # Multipart bodies whose schema referenced a nested $ref aborted with a validator error mid-iteration.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "t", "version": "1"},
+            "components": {
+                "schemas": {
+                    "Upload": {
+                        "nullable": True,
+                        "type": "object",
+                        "properties": {
+                            "file": {"type": "string"},
+                            "owner": {"$ref": "#/components/schemas/Owner"},
+                        },
+                    },
+                    "Owner": {"type": "object", "properties": {"id": {"type": "string"}}},
+                }
+            },
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {"multipart/form-data": {"schema": {"$ref": "#/components/schemas/Upload"}}},
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/upload"]["POST"]
+    config = SanitizationConfig(enabled=False)
+    count = 0
+    for case in iter_coverage_cases(
+        operation=operation,
+        generation_modes=list(GenerationMode),
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=operation.schema.config.generation,
+    ):
+        prepare_request(case, headers=None, config=config)
+        count += 1
+    assert count > 0
