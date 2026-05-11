@@ -177,6 +177,60 @@ class CorpusEntry:
         return self.name.removesuffix(".json")
 
 
+def iter_corpus_refs(
+    corpus: str | None = None,
+    *,
+    only: str | None = None,
+    limit: int | None = None,
+    data_dir: pathlib.Path = DATA_DIR,
+) -> Generator[tuple[str, str], None, None]:
+    """Stream `(corpus_name, member_name)` pairs from one or all corpus tarballs.
+
+    Same filter semantics as `iter_corpus_streaming` but skips JSON decoding —
+    useful when the consumer wants to ship work to subprocesses by reference
+    and load schemas independently.
+    """
+    corpora = [corpus] if corpus else list(CORPUS_NAMES)
+    for corpus_name in corpora:
+        yielded = 0
+        with read_corpus_file(corpus_name, data_dir=data_dir) as archive:
+            for member in archive:
+                if only is not None and only not in member.name:
+                    continue
+                if limit is not None and yielded >= limit:
+                    break
+                yield corpus_name, member.name
+                yielded += 1
+
+
+def iter_corpus_entries_from_refs(
+    corpus_name: str,
+    member_names: tuple[str, ...],
+    *,
+    data_dir: pathlib.Path = DATA_DIR,
+) -> Generator[CorpusEntry, None, None]:
+    """Load selected corpus members while scanning the archive once."""
+    requested = tuple(member_names)
+    pending = set(requested)
+    schemas: dict[str, dict[str, Any]] = {}
+    with read_corpus_file(corpus_name, data_dir=data_dir) as archive:
+        for member in archive:
+            if member.name not in pending:
+                continue
+            extracted = archive.extractfile(member)
+            if extracted is None:
+                continue
+            schemas[member.name] = json_loads(extracted.read())
+            pending.remove(member.name)
+            if not pending:
+                break
+    if pending:
+        missing = ", ".join(sorted(pending))
+        raise FileNotFoundError(f"{corpus_name}: {missing}")
+    for member_name in requested:
+        yield CorpusEntry(corpus=corpus_name, name=member_name, schema=schemas[member_name])
+
+
 def iter_corpus_streaming(
     corpus: str | None = None,
     *,
