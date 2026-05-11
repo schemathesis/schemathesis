@@ -14,6 +14,7 @@ from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema import _is_valid_uuid
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
@@ -359,6 +360,54 @@ def test_no_unsatisfiable_schemas(data):
         )
     )
     assert canonicalish(mutated_schema) != FALSEY
+
+
+@given(data=st.data())
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=200, derandomize=True)
+def test_mutated_body_with_shared_ref_does_not_crash(data):
+    schema = {
+        "type": "object",
+        "required": ["entries"],
+        "properties": {
+            "entries": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id": {"type": "string", "minLength": 1, "maxLength": 80},
+                        "key": {"$ref": "#/x-bundled/ProduceData"},
+                        "value": {"$ref": "#/x-bundled/ProduceData"},
+                    },
+                },
+            }
+        },
+        BUNDLE_STORAGE_KEY: {
+            "ProduceData": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "anyOf": [
+                            {"type": "string", "minLength": 1},
+                            {"type": "object", "minProperties": 1},
+                        ]
+                    },
+                    "type": {"type": "string", "minLength": 1},
+                },
+            }
+        },
+    }
+    data.draw(
+        mutated(
+            keywords=schema,
+            non_keywords={},
+            location=ParameterLocation.BODY,
+            media_type="application/json",
+            allow_extra_parameters=True,
+            target_descriptors=compute_mutation_targets(schema),
+        )
+    )
 
 
 def test_openapi_31_legacy_exclusive_bounds_in_response_schema(ctx):
