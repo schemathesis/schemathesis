@@ -93,6 +93,10 @@ class BaseSchema(Mapping):
         # auth on an operation the spec declares public; subsequent generations consult it instead of
         # mutating the parsed spec. Empty for schemas whose adapter doesn't run inference.
         self._inferred_security: dict[str, list[Mapping[str, list[str]]]] = {}
+        # Set by the startup probe when the server's URL decoder rejects backslash/control chars
+        # in path strings; path generation sanitizes those chars to avoid wasting budget on
+        # requests the app never sees.
+        self._path_decoder_strict: bool = False
 
     @property
     def specification(self) -> Specification:
@@ -536,6 +540,10 @@ class BaseSchema(Mapping):
 
     def adapt_to_null_byte_in_header_failure(self) -> None:
         """React to the engine probe finding that null bytes in headers crash the app under test."""
+
+    def adapt_to_path_decoder_rejection(self) -> None:
+        """React to the engine probe finding that the app rejects unsafe characters in URL paths."""
+        self._path_decoder_strict = True
 
     def get_custom_format_strategies(
         self, generation_config: GenerationConfig, mode: GenerationMode

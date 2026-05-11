@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -699,6 +700,19 @@ def any_negated_values(values: list[ValueContainer]) -> bool:
     return any(value.generator == GenerationMode.NEGATIVE for value in values if value.is_generated)
 
 
+# Percent-encoded backslash, control chars (0x00-0x1F), and DEL — what strict URL decoders
+# (Tomcat, common WAFs) reject before routing. After `quote_all`, every occurrence in the
+# encoded string represents a raw unsafe byte, so the replacement is safe regardless of source.
+_UNSAFE_PATH_PERCENT = re.compile(r"%(?:5[Cc]|[01][0-9A-Fa-f]|7[Ff])")
+
+
+def _strip_path_decoder_unsafe(value: dict[str, Any]) -> dict[str, Any]:
+    for key, raw in value.items():
+        if isinstance(raw, str):
+            value[key] = _UNSAFE_PATH_PERCENT.sub("_", raw)
+    return value
+
+
 def generate_parameter(
     location: ParameterLocation,
     explicit: dict[str, Any] | None,
@@ -738,6 +752,8 @@ def generate_parameter(
     )
     if value is not None and location == ParameterLocation.PATH:
         value = quote_all(value)
+        if operation.schema._path_decoder_strict:
+            value = _strip_path_decoder_unsafe(value)
 
     used_generator: GenerationMode | None = generator
     if value == explicit:

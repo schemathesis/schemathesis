@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.1...HEAD) - TBD
 
+### :rocket: Added
+
+- Probe for strict URL decoders (Tomcat, common WAFs) and sanitize backslash/control chars from generated path strings when the server rejects them.
+
 ### :bug: Fixed
 
 - Accept skewed length distributions across sibling quantifiers when rewriting `pattern` against `maxLength`.

@@ -33,6 +33,26 @@ def null_byte_strict_url(app_runner):
 
 
 @pytest.fixture
+def path_decoder_strict_url(app_runner):
+    # Tomcat-style strict URL decoder: 400 with empty body when path carries backslash/control chars.
+    app = Flask(__name__)
+
+    @app.before_request
+    def _reject_unsafe_path():
+        if "\\" in request.path or any(ord(c) < 0x20 for c in request.path):
+            return ("", 400)
+        return None
+
+    @app.route("/", defaults={"_path": ""})
+    @app.route("/<path:_path>")
+    def _ok(_path: str):
+        return "ok"
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/"
+
+
+@pytest.fixture
 def engine_ctx(openapi_30):
     return EngineContext(schema=openapi_30, stop_event=threading.Event())
 
@@ -62,15 +82,14 @@ def test_detect_null_byte_detected(engine_ctx, null_byte_strict_url, kwargs):
         session.auth = kwargs["auth"]
     engine_ctx.schema.config.update(**kwargs)
     results = probes.run(engine_ctx)
-    assert results == [
-        probes.ProbeRun(
-            probe=probes.NullByteInHeader(),
-            outcome=probes.ProbeOutcome.FAILURE,
-            request=ANY,
-            response=ANY,
-            error=None,
-        )
-    ]
+    null_byte_result = next(r for r in results if isinstance(r.probe, probes.NullByteInHeader))
+    assert null_byte_result == probes.ProbeRun(
+        probe=probes.NullByteInHeader(),
+        outcome=probes.ProbeOutcome.FAILURE,
+        request=ANY,
+        response=ANY,
+        error=None,
+    )
 
 
 def test_detect_null_byte_with_response(engine_ctx, null_byte_strict_url, response_factory):
@@ -82,28 +101,47 @@ def test_detect_null_byte_with_response(engine_ctx, null_byte_strict_url, respon
 def test_detect_null_byte_error(engine_ctx):
     engine_ctx.schema.config.update(base_url="http://127.0.0.1:1")
     results = probes.run(engine_ctx)
-    assert results == [
-        probes.ProbeRun(
-            probe=probes.NullByteInHeader(),
-            outcome=probes.ProbeOutcome.FAILURE,
-            request=ANY,
-            response=None,
-            error=ANY,
-        )
-    ]
+    null_byte_result = next(r for r in results if isinstance(r.probe, probes.NullByteInHeader))
+    assert null_byte_result == probes.ProbeRun(
+        probe=probes.NullByteInHeader(),
+        outcome=probes.ProbeOutcome.FAILURE,
+        request=ANY,
+        response=None,
+        error=ANY,
+    )
 
 
 def test_detect_null_byte_skipped(engine_ctx):
     results = probes.run(engine_ctx)
-    assert results == [
-        probes.ProbeRun(
-            probe=probes.NullByteInHeader(),
-            outcome=probes.ProbeOutcome.SKIP,
-            request=None,
-            response=None,
-            error=None,
-        )
-    ]
+    null_byte_result = next(r for r in results if isinstance(r.probe, probes.NullByteInHeader))
+    assert null_byte_result == probes.ProbeRun(
+        probe=probes.NullByteInHeader(),
+        outcome=probes.ProbeOutcome.SKIP,
+        request=None,
+        response=None,
+        error=None,
+    )
+
+
+def test_detect_unsafe_path_decoder_failure(engine_ctx, path_decoder_strict_url):
+    engine_ctx.schema.config.update(base_url=path_decoder_strict_url)
+    results = probes.run(engine_ctx)
+    path_result = next(r for r in results if isinstance(r.probe, probes.UnsafePathDecoder))
+    assert path_result == probes.ProbeRun(
+        probe=probes.UnsafePathDecoder(),
+        outcome=probes.ProbeOutcome.FAILURE,
+        request=ANY,
+        response=ANY,
+        error=None,
+    )
+
+
+def test_detect_unsafe_path_decoder_success(engine_ctx, null_byte_strict_url):
+    # Same fixture as the null-byte test: tolerates `\` and control chars in path; only headers strict.
+    engine_ctx.schema.config.update(base_url=null_byte_strict_url)
+    results = probes.run(engine_ctx)
+    path_result = next(r for r in results if isinstance(r.probe, probes.UnsafePathDecoder))
+    assert path_result.outcome == probes.ProbeOutcome.SUCCESS
 
 
 def test_ctrl_c(ctx, cli, mocker, snapshot_cli):
