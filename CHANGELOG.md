@@ -15,6 +15,7 @@
 - Treat field-level body `must not be blank` feedback as a body-required signal so generation stops emitting empty bodies.
 - Recognise `content` as a single-property response wrapper during dependency inference.
 - Skip `use_after_free` false positives when the DELETE itself returned a non-2xx status (server crash or 404).
+- Propagate error-feedback observations on first occurrence so coverage reacts to examples-phase 4xx evidence immediately.
 
 ### :racing_car: Performance
 

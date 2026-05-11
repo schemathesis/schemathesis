@@ -329,6 +329,19 @@ def test_stale_body_example_evicted_in_coverage_after_examples_observations(ctx)
     assert not stale, f"Stale `commitDate`: {len(stale)}/{len(coverage_commit_dates)} coverage draws"
 
 
+def test_stale_property_example_evicted_in_coverage_after_examples_observations(ctx):
+    api = ctx.openapi.apps.commit_date_with_property_example()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["examples", "coverage"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=20)
+
+    coverage_commit_dates = _collect_body_dates(schema, phase=PhaseName.COVERAGE)
+    assert coverage_commit_dates, "No coverage body draws collected"
+    stale = [v for v in coverage_commit_dates if v == "dd-MM-yyyy"]
+    assert not stale, f"Stale `commitDate`: {len(stale)}/{len(coverage_commit_dates)} coverage draws"
+
+
 def test_stale_query_example_evicted_in_coverage_after_examples_observations(ctx):
     api = ctx.openapi.apps.token_with_examples()
     schema = schemathesis.openapi.from_url(api.schema_url)

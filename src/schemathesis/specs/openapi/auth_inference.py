@@ -37,7 +37,6 @@ def _already_inferred(store: ErrorFeedbackStore, operation_label: str) -> bool:
     observations = store.observations(
         operation_label=operation_label,
         location=ParameterLocation.PATH,
-        min_count=1,
     )
     return any(observation.kind is ObservationKind.REQUIRES_AUTHENTICATION for observation in observations)
 

@@ -961,6 +961,36 @@ def commit_date_with_example() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def commit_date_with_property_example() -> OpenAPIApp:
+    """POST /events whose `commitDate` property carries a per-property `example` that fails the date format."""
+    spec = build_schema(
+        {
+            "/events": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["commitDate"],
+                                    "properties": {
+                                        "commitDate": {"type": "string", "example": "dd-MM-yyyy"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+    _register_commit_date_handler(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def commit_date_with_examples() -> OpenAPIApp:
     """POST /events with two named examples, both of which fail the server-side date format check."""
     spec = build_schema(
