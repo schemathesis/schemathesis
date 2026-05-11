@@ -323,6 +323,22 @@ def render_markdown(run: RunMetrics) -> str:
         write("_no phases recorded_\n")
     write("\n")
 
+    if run.engine_errors:
+        write("## Engine errors\n")
+        write(
+            "Non-fatal exceptions recorded mid-run: transport noise (`ReadTimeout`, `ConnectionError`) "
+            "and engine-side crashes (`KeyError`, `ValidationError`, `Unsatisfiable`).\n"
+        )
+        write("| Count | Type | Phase | Operation | Message |\n")
+        write("|------:|------|-------|-----------|---------|\n")
+        for error in run.engine_errors:
+            phase_label = error.phase or "-"
+            op_label = f"`{error.operation_label}`" if error.operation_label else "-"
+            message = error.message.replace("|", "\\|").replace("\n", " ")
+            if len(message) > 80:
+                message = message[:77] + "..."
+            write(f"| {error.count} | `{error.type}` | {phase_label} | {op_label} | {message} |\n")
+
     if run.slow_generations:
         write("## Slow generation outliers\n")
         write(
@@ -331,10 +347,10 @@ def render_markdown(run: RunMetrics) -> str:
         )
         write("| Phase | Operation | Mode | Gen time |\n")
         write("|-------|-----------|------|----------|\n")
-        for entry in run.slow_generations:
+        for slow in run.slow_generations:
             write(
-                f"| {entry.phase} | `{entry.operation_label}` | {entry.mode} | "
-                f"{_format_seconds(entry.generation_seconds)} |\n"
+                f"| {slow.phase} | `{slow.operation_label}` | {slow.mode} | "
+                f"{_format_seconds(slow.generation_seconds)} |\n"
             )
 
     write("## Status codes (run-wide)\n\n")

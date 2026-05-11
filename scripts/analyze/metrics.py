@@ -178,7 +178,7 @@ class MutationStats:
 
 @dataclass(slots=True)
 class Reachability:
-    # The harness computes covered/total because it has the spec; we surface only the numerator.
+    # Numerator only — computing the ratio needs the spec, which isn't in NDJSON.
     covered_operations: list[str] = field(default_factory=list)
     # Operations that received >= BROKEN_OPERATION_MIN_CALLS but never produced a 2xx.
     # A direct surface-area metric: each entry is a path the fuzzer never reached.
@@ -225,6 +225,18 @@ class SlowGeneration:
 
 
 SLOW_GENERATION_TOP_N = 20
+
+
+@dataclass(slots=True)
+class EngineError:
+    # `type` is the exception class name from the recorder payload (`KeyError`, `ReadTimeout`, ...).
+    # SUT-side noise (`ReadTimeout`, `ConnectionError`) and engine-side bugs (`KeyError`,
+    # `Unsatisfiable`, `ValidationError`) live in the same bucket; the reader distinguishes them.
+    type: str
+    phase: str | None
+    operation_label: str | None
+    message: str
+    count: int
 
 
 @dataclass(slots=True)
@@ -281,8 +293,8 @@ class DepthStats:
 class TransitionStats:
     by_id: dict[str, TransitionRecord] = field(default_factory=dict)
     depth: DepthStats = field(default_factory=DepthStats)
-    # Distinct target operations reached via *any* transition. Numerator for "engine
-    # explored N target ops via stateful". Harness has the spec to compute the ratio.
+    # Distinct target operations reached via any transition. Numerator for "engine
+    # explored N target ops via stateful"; the spec-aware consumer computes the ratio.
     distinct_targets: list[str] = field(default_factory=list)
 
 
@@ -381,6 +393,9 @@ class RunMetrics:
     # `generation_seconds`. Catches corpus / coverage-phase outliers that don't
     # surface in per-operation sums.
     slow_generations: list[SlowGeneration] = field(default_factory=list)
+    # `NonFatalError` / `InternalError` events deduped by `(type, phase, operation_label)`,
+    # sorted by count desc.
+    engine_errors: list[EngineError] = field(default_factory=list)
 
 
 @dataclass(slots=True, frozen=True)
@@ -893,6 +908,7 @@ def analyze(path: Path) -> RunMetrics:
     first_2xx_minute: dict[str, int] = {}
     covered_operations: set[str] = set()
     twoxx_total = 0
+    engine_error_buckets: dict[tuple[str, str | None, str | None], EngineError] = {}
     with open(path, encoding="utf-8") as fd:
         for lineno, line in enumerate(fd, start=1):
             line = line.strip()
@@ -937,6 +953,21 @@ def analyze(path: Path) -> RunMetrics:
             elif event_name == "EngineFinished" and isinstance(timestamp, (int, float)):
                 if engine_started_at is not None:
                     run.duration_seconds = max(0.0, float(timestamp) - engine_started_at)
+            elif event_name in ("NonFatalError", "InternalError"):
+                value = payload.get("value")
+                if isinstance(value, dict):
+                    kind = value.get("type") or "?"
+                    message = value.get("message") or ""
+                    phase = payload.get("phase")
+                    label = payload.get("label")
+                    key = (kind, phase, label)
+                    existing = engine_error_buckets.get(key)
+                    if existing is None:
+                        engine_error_buckets[key] = EngineError(
+                            type=kind, phase=phase, operation_label=label, message=message, count=1
+                        )
+                    else:
+                        existing.count += 1
             elif event_name == "PhaseStarted":
                 name = _phase_name(payload)
                 if name and name not in SKIP_PHASES and isinstance(timestamp, (int, float)):
@@ -1068,6 +1099,10 @@ def analyze(path: Path) -> RunMetrics:
         operation.label
         for operation in run.operations.values()
         if operation.label not in covered_operations and operation.buckets.total >= BROKEN_OPERATION_MIN_CALLS
+    )
+    run.engine_errors = sorted(
+        engine_error_buckets.values(),
+        key=lambda entry: (-entry.count, entry.type, entry.phase or "", entry.operation_label or ""),
     )
     return run
 
