@@ -143,6 +143,23 @@ def test_audit_schema_skips_unserializable_media_types_without_aborting_operatio
     assert outcome.result.cases_generated > 0
 
 
+def test_audit_schema_preserves_error_message_for_malformed_media_type(ctx):
+    # Recording only the exception class name forces re-running the audit to learn what was wrong.
+    raw = ctx.openapi.build_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"form-data": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    assert outcome.result.errors
+    assert "form-data" in outcome.result.errors[0]
+
+
 def test_audit_schema_fuzzing_uses_only_requested_generation_modes(ctx):
     raw = ctx.openapi.build_schema(_PATHS)
     outcome = audit_schema(
