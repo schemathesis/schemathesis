@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
@@ -113,17 +114,35 @@ def normalize_base_url(base_url: str | None) -> str | None:
     return base_url
 
 
+_PATH_PLACEHOLDER = re.compile(r"\{([^{}]+)\}")
+
+
 def prepare_path(path: str, parameters: dict[str, Any] | None) -> str:
+    if "{" not in path and "}" not in path:
+        return path
+    params = parameters or {}
     try:
-        return path.format(**parameters or {})
+        return path.format(**params)
     except KeyError as exc:
-        # This may happen when a path template has a placeholder for variable "X", but parameter "X" is not defined
-        # in the parameters list.
-        # When `exc` is formatted, it is the missing key name in quotes. E.g. 'id'
         raise InvalidSchema(f"Path parameter {exc} is not defined") from exc
-    except (IndexError, ValueError) as exc:
-        # A single unmatched `}` inside the path template may cause this
-        raise InvalidSchema(f"Malformed path template: `{path}`\n\n  {exc}") from exc
+    except (IndexError, ValueError):
+        # `str.format` rejects placeholders like `{.format}` (RFC 6570 label expansion).
+        pass
+    missing: list[str] = []
+
+    def _substitute(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name in params:
+            return str(params[name])
+        missing.append(name)
+        return match.group(0)
+
+    result = _PATH_PLACEHOLDER.sub(_substitute, path)
+    if missing:
+        raise InvalidSchema(f"Path parameter '{missing[0]}' is not defined")
+    if "{" in result or "}" in result:
+        raise InvalidSchema(f"Malformed path template: `{path}`")
+    return result
 
 
 def prepare_request(case: Case, headers: Mapping[str, Any] | None, *, config: SanitizationConfig) -> PreparedRequest:

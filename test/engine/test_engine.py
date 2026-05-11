@@ -1082,17 +1082,11 @@ def test_finish(event_stream):
     assert next(event_stream, None) is None
 
 
-if IS_PYPY:
-    REPLACEMENT_ERROR = "out of range: index 0 but only 0 arguments"
-else:
-    REPLACEMENT_ERROR = "Replacement index 0 out of range for positional args tuple"
-
-
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
-        ("/foo}/", "Single '}' encountered in format string"),
-        ("/{.format}/", REPLACEMENT_ERROR),
+        ("/foo}/", "Malformed path template: `/foo}/`"),
+        ("/{.format}/", "Path parameter '.format' is not defined"),
     ],
 )
 def test_malformed_path_template(ctx, path, expected):
@@ -1102,7 +1096,7 @@ def test_malformed_path_template(ctx, path, expected):
     stream = EventStream(schema).execute()
     stream.assert_after_execution_status(Status.ERROR)
     # And should produce the proper error message
-    assert str(stream.find(events.NonFatalError).value) == f"Malformed path template: `{path}`\n\n  {expected}"
+    assert str(stream.find(events.NonFatalError).value) == expected
 
 
 @pytest.mark.parametrize(
