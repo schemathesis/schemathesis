@@ -65,8 +65,6 @@ def test_error_feedback_adjustment_grows_descriptor_set(ctx):
         kind=ObservationKind.MUST_NOT_BE_BLANK,
         raw_message="y must not be blank",
     )
-    # Observations must clear MIN_OBSERVATIONS threshold to surface.
-    feedback.record(observation)
     feedback.record(observation)
 
     original_descriptors = compute_mutation_targets(body.optimized_schema)

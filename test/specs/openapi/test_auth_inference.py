@@ -45,7 +45,6 @@ def test_requires_authentication_kind_round_trips_through_store():
     stored = store.observations(
         operation_label="POST /users",
         location=ParameterLocation.PATH,
-        min_count=1,
     )
     assert stored == (observation,)
 
@@ -74,7 +73,6 @@ def test_record_auth_inference_records_observation_and_mutates_operation(ctx):
     observations = store.observations(
         operation_label=operation.label,
         location=ParameterLocation.PATH,
-        min_count=1,
     )
     assert observations == (
         Observation(
@@ -112,7 +110,6 @@ def test_record_auth_inference_skips_non_auth_status_codes(ctx, response_factory
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -143,7 +140,6 @@ def test_record_auth_inference_skips_when_operation_declares_security(ctx):
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -173,7 +169,6 @@ def test_record_auth_inference_idempotent_per_operation(ctx):
     observations = store.observations(
         operation_label=operation.label,
         location=ParameterLocation.PATH,
-        min_count=1,
     )
     assert observations == (
         Observation(
@@ -212,7 +207,6 @@ def test_record_auth_inference_no_configured_schemes_skips(ctx):
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -241,7 +235,6 @@ def test_record_auth_inference_retry_still_401_does_not_record(ctx):
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -293,7 +286,6 @@ def test_record_auth_inference_skips_when_retry_returns_5xx(ctx):
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -365,7 +357,6 @@ def test_record_auth_inference_skips_for_non_openapi_schema(ctx, response_factor
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -393,7 +384,6 @@ def test_record_auth_inference_skips_on_retry_network_error(ctx, app_runner, res
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -424,7 +414,6 @@ def test_record_auth_inference_skips_when_provider_raises(ctx, response_factory)
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )
@@ -453,7 +442,6 @@ def test_record_auth_inference_skips_when_retry_returns_undocumented_status(ctx)
         store.observations(
             operation_label=operation.label,
             location=ParameterLocation.PATH,
-            min_count=1,
         )
         == ()
     )

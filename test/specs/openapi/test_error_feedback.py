@@ -188,11 +188,11 @@ def test_store_evicts_lowest_count_entry_when_bucket_full():
     assert len(paths) == MAX_ENTRIES_PER_BUCKET
 
 
-def test_store_observations_filters_by_min_count():
+def test_store_observations_surface_on_first_record():
+    # Parsers only emit observations on a specific framework-string match, so a single
+    # occurrence is conclusive — observations propagate to the next phase immediately
+    # rather than waiting for a duplicate confirmation.
     store = ErrorFeedbackStore()
-    store.record(_obs("email"))
-    assert store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY) == ()
-
     store.record(_obs("email"))
     out = store.observations(operation_label="POST /api/users", location=ParameterLocation.BODY)
     assert len(out) == 1
@@ -7469,26 +7469,14 @@ def _drive_collector(
     return store, case
 
 
-def test_collector_records_observations_after_two_400_responses(case_factory, response_factory):
+def test_collector_records_observations_from_400(case_factory, response_factory):
     store, case = _drive_collector(
         case_factory=case_factory,
         response_factory=response_factory,
         status_code=400,
-        times=2,
     )
     out = store.observations(operation_label=case.operation.label, location=ParameterLocation.BODY)
     assert sorted(o.parameter_path for o in out) == [("city",), ("zipcode",)]
-
-
-def test_collector_observations_below_min_observations_are_filtered(case_factory, response_factory):
-    store, case = _drive_collector(
-        case_factory=case_factory,
-        response_factory=response_factory,
-        status_code=400,
-        times=1,
-    )
-    out = store.observations(operation_label=case.operation.label, location=ParameterLocation.BODY)
-    assert out == ()
 
 
 @pytest.mark.parametrize("status_code", [200, 401, 403, 500, 503])
@@ -7497,12 +7485,10 @@ def test_collector_skips_non_4xx_and_auth_failures(status_code, case_factory, re
         case_factory=case_factory,
         response_factory=response_factory,
         status_code=status_code,
-        times=2,
     )
     out = store.observations(
         operation_label=case.operation.label,
         location=ParameterLocation.BODY,
-        min_count=1,
     )
     assert out == ()
 
@@ -7512,13 +7498,11 @@ def test_collector_skips_negative_mode_cases(case_factory, response_factory):
         case_factory=case_factory,
         response_factory=response_factory,
         status_code=400,
-        times=2,
         mode=GenerationMode.NEGATIVE,
     )
     out = store.observations(
         operation_label=case.operation.label,
         location=ParameterLocation.BODY,
-        min_count=1,
     )
     assert out == ()
 

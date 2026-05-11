@@ -8,8 +8,6 @@ from schemathesis.core.parameters import ParameterLocation
 
 # Bound per (operation, location) bucket; lowest-count entry is evicted at the cap.
 MAX_ENTRIES_PER_BUCKET = 100
-# Below this, an observation is treated as a fluke and not surfaced to adjustments.
-MIN_OBSERVATIONS = 2
 
 
 class ObservationKind(str, Enum):
@@ -229,11 +227,16 @@ class ErrorFeedbackStore:
         *,
         operation_label: str,
         location: ParameterLocation,
-        min_count: int = MIN_OBSERVATIONS,
     ) -> tuple[Observation, ...]:
-        """Immutable snapshot for one (op, location), filtered by calibration threshold."""
+        """Immutable snapshot of every observation recorded for one (op, location).
+
+        Parsers only emit observations when their framework-specific regex matches
+        an error envelope, so a single occurrence is conclusive enough to act on —
+        delaying propagation until a second occurrence pushes the wrong spec
+        example through the next phase before the constraint can land.
+        """
         with self._lock:
             bucket = self._buckets.get((operation_label, location))
             if bucket is None:
                 return ()
-            return tuple(entry.canonical for entry in bucket.entries.values() if entry.count >= min_count)
+            return tuple(entry.canonical for entry in bucket.entries.values())

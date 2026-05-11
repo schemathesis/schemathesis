@@ -292,6 +292,9 @@ class OpenAPIApps:
     def commit_date_with_examples(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.commit_date_with_examples())
 
+    def commit_date_with_property_example(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.commit_date_with_property_example())
+
     def commit_date_with_link(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.commit_date_with_link())
 
