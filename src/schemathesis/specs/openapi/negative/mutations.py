@@ -265,24 +265,32 @@ def _propagate_required_path(path: tuple[PathStep, ...]) -> None:
                     parent["minItems"] = min_required
             case "oneOf" | "anyOf" as keyword:
                 assert isinstance(selector, int)
-                branches = parent[keyword]
+                branches = parent.get(keyword)
+                if not isinstance(branches, list):
+                    continue
                 # Earlier sibling propagation may already have collapsed this list to one branch.
                 if selector < len(branches):
                     parent[keyword] = [branches[selector]]
             case "allOf":
                 pass
             case "additionalProperties":
+                additional = parent.get("additionalProperties")
+                if additional is None:
+                    continue
                 synthesized = _synthesize_property_name(parent)
-                parent.setdefault("properties", {})[synthesized] = parent["additionalProperties"]
+                parent.setdefault("properties", {})[synthesized] = additional
                 required = parent.setdefault("required", [])
                 if synthesized not in required:
                     required.append(synthesized)
             case "patternProperties":
                 assert isinstance(selector, str)
+                pattern_map = parent.get("patternProperties")
+                if not isinstance(pattern_map, dict) or selector not in pattern_map:
+                    continue
                 synthesized_pattern = _synthesize_pattern_property_name(selector)
                 if synthesized_pattern is None:
                     continue
-                parent.setdefault("properties", {})[synthesized_pattern] = parent["patternProperties"][selector]
+                parent.setdefault("properties", {})[synthesized_pattern] = pattern_map[selector]
                 required = parent.setdefault("required", [])
                 if synthesized_pattern not in required:
                     required.append(synthesized_pattern)
