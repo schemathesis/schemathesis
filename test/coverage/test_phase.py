@@ -6727,6 +6727,55 @@ def test_coverage_array_above_max_items_with_complex_items_schema(ctx):
             )
 
 
+def test_coverage_array_above_max_items_with_draft_mismatch_sibling(ctx):
+    # When a sibling keyword breaks the auto-detected validator (e.g. `exclusiveMinimum: true`),
+    # the `ARRAY_ABOVE_MAX_ITEMS` mutation must still produce a body whose target array exceeds
+    # maxItems — spec-supplied examples whose arrays fit within bounds must not slip through.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "examples": {"good": {"value": {"t": [0.5, 0.9], "k": [0.1, 0.2]}}},
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["t"],
+                                    "properties": {
+                                        "t": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "maxItems": 3,
+                                            "items": {"type": "number", "minimum": 0, "maximum": 1},
+                                        },
+                                        "k": {
+                                            "type": "array",
+                                            "minItems": 2,
+                                            "items": {"type": "number", "minimum": 0, "exclusiveMinimum": True},
+                                        },
+                                    },
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    operation = loaded["/r"]["post"]
+    for case in _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation):
+        if case.meta is None:
+            continue
+        if str(getattr(case.meta.phase.data, "scenario", "")).endswith("ARRAY_ABOVE_MAX_ITEMS"):
+            body_t = case.body.get("t") if isinstance(case.body, dict) else None
+            assert body_t is not None and len(body_t) > 3, (
+                f"ARRAY_ABOVE_MAX_ITEMS mutation produced a body within bounds: {case.body!r}"
+            )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_consumes_path_keyed_pool(cli, snapshot_cli, ctx):
     paths = {
