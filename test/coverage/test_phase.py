@@ -4052,6 +4052,32 @@ def test_missing_content_type_header(ctx):
     )
 
 
+def test_path_template_with_dot_prefixed_placeholder(ctx):
+    # RFC 6570 label expansion (`{.format}`) appears in real schemas; coverage used to abort the operation.
+    loaded = load_schema(
+        ctx,
+        path="/projects/{id}{.format}",
+        method="get",
+        parameters=[
+            {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+            {"name": ".format", "in": "path", "required": True, "schema": {"type": "string", "enum": ["json"]}},
+        ],
+    )
+    operation = loaded["/projects/{id}{.format}"]["get"]
+    config = SanitizationConfig(enabled=False)
+    paths = set()
+    for case in iter_coverage_cases(
+        operation=operation,
+        generation_modes=list(GenerationMode),
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=operation.schema.config.generation,
+    ):
+        prepared = prepare_request(case, headers=None, config=config)
+        paths.add(prepared.url)
+    assert paths
+
+
 def test_path_parameter_with_slash_in_custom_format(ctx):
     # See GH-3527
     schemathesis.openapi.format("ipv4-network", st.sampled_from(["0.0.0.0/0"]))

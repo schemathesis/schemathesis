@@ -6,6 +6,7 @@
 
 - Crash in coverage phase on multipart bodies whose schemas reference each other.
 - Crash in coverage phase on `application/x-www-form-urlencoded` bodies declared as top-level arrays or scalars.
+- Substitute path templates whose placeholder names contain dots or other non-identifier characters.
 
 ## [4.18.2](https://github.com/schemathesis/schemathesis/compare/v4.18.1...v4.18.2) - 2026-05-11
 
