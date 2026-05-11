@@ -16,6 +16,10 @@
 - Recognise `content` as a single-property response wrapper during dependency inference.
 - Skip `use_after_free` false positives when the DELETE itself returned a non-2xx status (server crash or 404).
 
+### :racing_car: Performance
+
+- Faster coverage-phase generation for formats the active JSON Schema draft does not validate.
+
 ## [4.18.1](https://github.com/schemathesis/schemathesis/compare/v4.18.0...v4.18.1) - 2026-05-10
 
 ### :wrench: Changed

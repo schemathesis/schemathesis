@@ -14,7 +14,13 @@ from functools import lru_cache, partial
 from itertools import combinations
 from math import inf, nextafter
 
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, is_valid, make_validator, make_validator_for
+from schemathesis.core.jsonschema import (
+    FANCY_REGEX_OPTIONS,
+    VALIDATED_FORMATS_BY_DRAFT,
+    is_valid,
+    make_validator,
+    make_validator_for,
+)
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 
@@ -2288,6 +2294,14 @@ def _negative_required(
         )
 
 
+def _violates_format(value: object, format: str, validator_cls: type[jsonschema_rs.Validator]) -> bool:
+    return not conforms_to_format(value, format, validator_cls)
+
+
+def _violates_hostname(value: object, validator_cls: type[jsonschema_rs.Validator]) -> bool:
+    return value == "" or not conforms_to_format(value, "hostname", validator_cls)
+
+
 def _negative_format(
     ctx: CoverageContext, schema: JsonSchemaObject, format: str
 ) -> Generator[GeneratedValue, None, None]:
@@ -2297,22 +2311,25 @@ def _negative_format(
     # We can only generate truly invalid data for formats in VALIDATED_FORMATS (e.g., "email", "uri", "uuid").
     if format not in VALIDATED_FORMATS:
         return
+    # The active draft determines which formats actually validate (Draft 4 treats
+    # iri-reference / json-pointer / etc. as annotation-only). Skip when the format
+    # is not validated — the strategy below would be unsatisfiable for every property.
+    validator_cls = ctx.validator_cls
+    if format not in VALIDATED_FORMATS_BY_DRAFT.get(validator_cls, frozenset()):
+        return
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format["type"] = "string"
     if ctx.location == "path":
         # Empty path parameters are invalid
         without_format["minLength"] = 1
-    strategy = from_schema(without_format)
-    # Use the schema's actual validator class to determine format conformance, avoiding
-    # false positives from mismatched draft semantics (e.g. Draft 4 vs Draft 2020-12).
-    vc = ctx.validator_cls
     if format == "hostname":
-        strategy = strategy.filter(lambda v, vc=vc: v == "" or not conforms_to_format(v, "hostname", vc))
+        filter_fn = partial(_violates_hostname, validator_cls=validator_cls)
     else:
-        strategy = strategy.filter(lambda v, f=format, vc=vc: not conforms_to_format(v, f, vc))
+        filter_fn = partial(_violates_format, format=format, validator_cls=validator_cls)
+    strategy = from_schema(without_format).filter(filter_fn)
     yield NegativeValue(
-        ctx.generate_from(strategy),
+        examples.generate_one(strategy),
         scenario=CoverageScenario.INVALID_FORMAT,
         description=f"Value not matching the '{format}' format",
         location=ctx.current_path,
