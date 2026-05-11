@@ -429,8 +429,10 @@ def _body_required_per_feedback(operation: APIOperation, error_feedback: ErrorFe
     """Return True when the server reported the body itself as missing for this operation."""
     if error_feedback is None:
         return False
+    # Any body-location `must not be blank` — body-level or field-level — implies the body
+    # itself is required, since omitting it would have produced a different error.
     for observation in error_feedback.observations(operation_label=operation.label, location=ParameterLocation.BODY):
-        if observation.kind == ObservationKind.MUST_NOT_BE_BLANK and not observation.parameter_path:
+        if observation.kind == ObservationKind.MUST_NOT_BE_BLANK:
             return True
     return False
 
