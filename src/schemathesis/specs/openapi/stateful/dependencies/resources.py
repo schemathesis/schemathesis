@@ -141,7 +141,7 @@ def iter_resources_from_response(
     if properties and len(properties) == 1:
         wrapper_field = list(properties)[0]
         # Check if it's a known wrapper field name
-        common_wrappers = {"data", "result", "response", "payload"}
+        common_wrappers = {"data", "result", "response", "payload", "content"}
         if wrapper_field.lower() in common_wrappers:
             pointer = f"/{wrapper_field}"
             resolved = properties[wrapper_field]
