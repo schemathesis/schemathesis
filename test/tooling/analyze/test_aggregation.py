@@ -113,6 +113,54 @@ def test_analyze_failure_occurrence_count_includes_duplicates(analyzer_ndjson):
         assert run.failure_counts[check_name] >= unique
 
 
+def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path, write_ndjson):
+    path = tmp_path / "run.ndjson"
+    write_ndjson(
+        path,
+        [
+            {"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}},
+            {
+                "NonFatalError": {
+                    "id": "a",
+                    "timestamp": 1.0,
+                    "value": {"type": "KeyError", "message": "'anyOf'"},
+                    "phase": "Fuzzing",
+                    "label": "POST /records",
+                }
+            },
+            {
+                "NonFatalError": {
+                    "id": "b",
+                    "timestamp": 2.0,
+                    "value": {"type": "KeyError", "message": "'anyOf'"},
+                    "phase": "Fuzzing",
+                    "label": "POST /records",
+                }
+            },
+            {
+                "NonFatalError": {
+                    "id": "c",
+                    "timestamp": 3.0,
+                    "value": {"type": "ReadTimeout", "message": "read timed out"},
+                    "phase": "Stateful",
+                    "label": "POST /records",
+                }
+            },
+        ],
+    )
+    run = analyze(path)
+    assert [(e.type, e.phase, e.operation_label, e.count) for e in run.engine_errors] == [
+        ("KeyError", "Fuzzing", "POST /records", 2),
+        ("ReadTimeout", "Stateful", "POST /records", 1),
+    ]
+
+
+def test_analyze_engine_errors_empty_when_no_failures(tmp_path, write_ndjson):
+    path = tmp_path / "run.ndjson"
+    write_ndjson(path, [{"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}}])
+    assert analyze(path).engine_errors == []
+
+
 def test_analyze_truncated_phase(tmp_path, write_ndjson):
     path = tmp_path / "run.ndjson"
     write_ndjson(
