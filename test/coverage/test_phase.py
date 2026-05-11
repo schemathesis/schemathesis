@@ -4975,6 +4975,62 @@ def test_example_with_nested_ref_violation_is_not_used(ctx):
         assert validator.is_valid(case.body), f"Invalid positive body emitted: {case.body!r}"
 
 
+def test_content_example_invalid_under_draft4_only_schema_is_not_used(ctx):
+    # Schemas mixing draft-specific keywords with content-level examples must not ship examples
+    # whose values violate item-schemas (e.g. `null` in a `number` array) as positive coverage bodies.
+    raw = ctx.openapi.build_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "bad": {"value": {"w": [0.5, None]}},
+                                    "good": {"value": {"w": [0.5, 0.5]}},
+                                },
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "w": {
+                                            "type": "array",
+                                            "minItems": 2,
+                                            "items": {"type": "number", "minimum": 0, "maximum": 1},
+                                        },
+                                        "k": {
+                                            "type": "array",
+                                            "minItems": 2,
+                                            "items": {"type": "number", "minimum": 0, "exclusiveMinimum": True},
+                                        },
+                                    },
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(raw)
+    operation = loaded["/r"]["POST"]
+    cases = list(
+        iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+    )
+    assert cases, "expected at least one positive coverage case"
+    for case in cases:
+        body = case.body
+        if isinstance(body, dict) and isinstance(body.get("w"), list):
+            assert None not in body["w"], f"Invalid positive body emitted: {body!r}"
+
+
 def test_oneof_ref_branches_with_discriminator_each_get_distinct_positive_coverage(ctx):
     # A nested discriminator `oneOf` under an outer `oneOf`-discriminated body must
     # yield at least one value uniquely satisfying each inner branch.

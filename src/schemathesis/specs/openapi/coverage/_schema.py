@@ -114,15 +114,27 @@ def _replace_zero_with_nonzero(x: float) -> float:
     return x or 0.0
 
 
-def _accept_spec_value(value: Any, schema: dict[str, Any], bundle: dict[str, Any] | None = None) -> Any:
+def _is_strictly_valid(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> bool:
+    # Fails closed: when no validator can be built (e.g. cross-draft keyword combos rejected
+    # by both the auto-detected draft and the spec's `validator_cls`), treat the value as
+    # unchecked so callers drop it rather than ship it as a valid positive coverage body.
+    full_schema: JsonSchema = schema
+    if BUNDLE_STORAGE_KEY in ctx.root_schema:
+        full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
+    try:
+        return make_validator_for(full_schema).is_valid(value)
+    except Exception:
+        pass
+    try:
+        return make_validator(full_schema, ctx.validator_cls).is_valid(value)
+    except Exception:
+        return False
+
+
+def _accept_spec_value(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> Any:
     # Spec examples reflecting the response shape may carry `readOnly` keys that
     # request-side schemas forbid; dropping those keys recovers the curated value.
-    # Bundle is spliced in so `$ref`s inside `schema` resolve during validation;
-    # otherwise an unresolvable ref would silently pass and accept invalid examples.
-    schema_for_validation = (
-        schema if bundle is None or BUNDLE_STORAGE_KEY in schema else {**schema, BUNDLE_STORAGE_KEY: bundle}
-    )
-    if is_valid(value, schema_for_validation):
+    if _is_strictly_valid(value, schema, ctx):
         return value
     if not isinstance(value, dict):
         return NOT_SET
@@ -133,7 +145,7 @@ def _accept_spec_value(value: Any, schema: dict[str, Any], bundle: dict[str, Any
     if not forbidden or forbidden.isdisjoint(value):
         return NOT_SET
     cleaned = {k: v for k, v in value.items() if k not in forbidden}
-    if is_valid(cleaned, schema_for_validation):
+    if _is_strictly_valid(cleaned, schema, ctx):
         return cleaned
     return NOT_SET
 
@@ -403,21 +415,20 @@ class CoverageContext:
         # Surfaces author intent into recursively-generated templates; without this, nested
         # properties whose schemas declare `example`/`default` get synthetic Hypothesis values.
         if isinstance(schema, dict):
-            bundle = self.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(self.root_schema, dict) else None
             example = schema.get("example", NOT_SET)
             if example is not NOT_SET:
-                accepted = _accept_spec_value(example, schema, bundle)
+                accepted = _accept_spec_value(example, schema, self)
                 if accepted is not NOT_SET:
                     return accepted
             examples = schema.get("examples")
             if isinstance(examples, list):
                 for candidate in examples:
-                    accepted = _accept_spec_value(candidate, schema, bundle)
+                    accepted = _accept_spec_value(candidate, schema, self)
                     if accepted is not NOT_SET:
                         return accepted
             default = schema.get("default", NOT_SET)
             if default is not NOT_SET:
-                accepted = _accept_spec_value(default, schema, bundle)
+                accepted = _accept_spec_value(default, schema, self)
                 if accepted is not NOT_SET:
                     return accepted
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
