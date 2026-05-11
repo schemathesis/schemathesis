@@ -287,10 +287,10 @@ def classify_root_transitions(
 
 def is_likely_root_transition(operation: APIOperation, node: OperationNode | None) -> bool:
     """Check if operation is likely to succeed as a root transition."""
-    # Foreign-key consumers depend on producer-supplied values; firing them with random
-    # data wastes the budget on guaranteed-fail calls.
-    if node is not None and any(slot.resource_field is not None for slot in node.inputs):
-        return False
+    if node is not None:
+        produced = {slot.resource.name for slot in node.outputs}
+        if any(slot.resource_field is not None and slot.resource.name not in produced for slot in node.inputs):
+            return False
 
     # POST operations are likely to create resources
     if operation.method == "post":

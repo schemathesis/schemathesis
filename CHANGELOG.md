@@ -8,6 +8,7 @@
 - Crash in coverage phase on `application/x-www-form-urlencoded` bodies declared as top-level arrays or scalars.
 - Substitute path templates whose placeholder names contain dots or other non-identifier characters.
 - Crash in fuzzing phase when multi-target negative mutations cleared a shared `$ref` body before required-path propagation.
+- Keep producer operations as stateful roots when their request body carries a self-referential `id` field.
 
 ## [4.18.2](https://github.com/schemathesis/schemathesis/compare/v4.18.1...v4.18.2) - 2026-05-11
 
