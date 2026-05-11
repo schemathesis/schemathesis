@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Crash in coverage phase on multipart bodies whose schemas reference each other.
+
 ## [4.18.2](https://github.com/schemathesis/schemathesis/compare/v4.18.1...v4.18.2) - 2026-05-11
 
 ### :rocket: Added
