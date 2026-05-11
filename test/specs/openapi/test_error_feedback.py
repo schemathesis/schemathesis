@@ -9956,7 +9956,8 @@ def _record_body_observation(store, operation, *, kind, parameter_path):
     "kind, parameter_path, expected",
     [
         pytest.param(ObservationKind.MUST_NOT_BE_BLANK, (), True, id="empty-path-must-not-be-blank"),
-        pytest.param(ObservationKind.MUST_NOT_BE_BLANK, ("email",), False, id="field-path-must-not-be-blank"),
+        pytest.param(ObservationKind.MUST_NOT_BE_BLANK, ("email",), True, id="field-path-must-not-be-blank"),
+        pytest.param(ObservationKind.MUST_NOT_BE_BLANK, ("user", "email"), True, id="nested-path-must-not-be-blank"),
         pytest.param(ObservationKind.UNEXPECTED_PROPERTY, (), False, id="empty-path-unexpected-property"),
     ],
 )
