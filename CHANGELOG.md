@@ -6,6 +6,7 @@
 
 - Accept skewed length distributions across sibling quantifiers when rewriting `pattern` against `maxLength`.
 - Drop spec `example`/`examples`/`default` values that cannot be validated against the schema in positive coverage.
+- Honour per-operation `phases.stateful.enabled = false` in the state machine.
 
 ## [4.18.1](https://github.com/schemathesis/schemathesis/compare/v4.18.0...v4.18.1) - 2026-05-10
 

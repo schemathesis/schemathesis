@@ -198,6 +198,8 @@ def create_state_machine(
 
     for target in operations:
         if target.label in transitions.operations:
+            if not schema.config.phases_for(operation=target).stateful.enabled:
+                continue
             incoming = transitions.operations[target.label].incoming
             config = schema.config.generation_for(operation=target, phase="stateful")
             if incoming:

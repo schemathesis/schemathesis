@@ -3,6 +3,7 @@ from hypothesis import HealthCheck, Phase, settings
 from hypothesis.errors import InvalidDefinition
 
 import schemathesis
+from schemathesis.config import OperationConfig
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup
 from schemathesis.generation.modes import GenerationMode
@@ -291,3 +292,42 @@ def test_passing_transport_kwargs(ctx, mocker):
         pass
 
     assert mocked.call_args.args[0]._transport_kwargs == kwargs
+
+
+@pytest.mark.parametrize(
+    ("disabled_op", "expected_rules"),
+    [
+        (
+            "PATCH /users/{user_id}",
+            [
+                "PATCH_users_user_id___200_GetUserById__GET_users_user_id_",
+                "POST_users___201_GetUserByUserId__GET_users_user_id_",
+                "RANDOM__POST_users_",
+            ],
+        ),
+        (
+            "POST /users/",
+            [
+                "GET_users_user_id___200_UpdateUserById__PATCH_users_user_id_",
+                "PATCH_users_user_id___200_GetUserById__GET_users_user_id_",
+                "POST_users___201_GetUserByUserId__GET_users_user_id_",
+                "POST_users___201_UpdateUserById__PATCH_users_user_id_",
+            ],
+        ),
+    ],
+    ids=["transition-target", "root"],
+)
+def test_stateful_disabled_for_op_skips_rules(ctx, disabled_op, expected_rules):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_dict(api.spec)
+    schema.config.operations.operations.append(
+        OperationConfig.from_dict({"include-name": disabled_op, "phases": {"stateful": {"enabled": False}}})
+    )
+
+    # No rule should execute the disabled op — root or incoming-transition.
+    # Outgoing transitions whose source is the disabled op stay (their target is still enabled).
+    state_machine = schema.as_state_machine()
+    assert (
+        sorted(name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule"))
+        == expected_rules
+    )
