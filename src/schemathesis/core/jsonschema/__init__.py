@@ -40,6 +40,101 @@ def _is_valid_uuid(value: object) -> bool:
 DRAFT4_SUPPLEMENTAL_FORMATS: dict[str, Callable[[Any], bool]] = {"uuid": _is_valid_uuid}
 
 
+# Format names that each `jsonschema_rs` validator class actually validates (after
+# the supplemental `uuid` registration for Draft 4 above). Anything outside the
+# matching set is annotation-only under that draft: negative-format generation
+# cannot produce a value the validator considers wrong, so callers should skip.
+VALIDATED_FORMATS_BY_DRAFT: dict[type[jsonschema_rs.Validator], frozenset[str]] = {
+    jsonschema_rs.Draft4Validator: frozenset(
+        {"date", "date-time", "email", "hostname", "idn-email", "ipv4", "ipv6", "regex", "time", "uri", "uuid"}
+    ),
+    jsonschema_rs.Draft6Validator: frozenset(
+        {
+            "date",
+            "date-time",
+            "email",
+            "hostname",
+            "idn-email",
+            "ipv4",
+            "ipv6",
+            "json-pointer",
+            "regex",
+            "time",
+            "uri",
+            "uri-reference",
+            "uri-template",
+        }
+    ),
+    jsonschema_rs.Draft7Validator: frozenset(
+        {
+            "date",
+            "date-time",
+            "email",
+            "hostname",
+            "idn-email",
+            "idn-hostname",
+            "ipv4",
+            "ipv6",
+            "iri",
+            "iri-reference",
+            "json-pointer",
+            "regex",
+            "relative-json-pointer",
+            "time",
+            "uri",
+            "uri-reference",
+            "uri-template",
+        }
+    ),
+    jsonschema_rs.Draft201909Validator: frozenset(
+        {
+            "date",
+            "date-time",
+            "duration",
+            "email",
+            "hostname",
+            "idn-email",
+            "idn-hostname",
+            "ipv4",
+            "ipv6",
+            "iri",
+            "iri-reference",
+            "json-pointer",
+            "regex",
+            "relative-json-pointer",
+            "time",
+            "uri",
+            "uri-reference",
+            "uri-template",
+            "uuid",
+        }
+    ),
+    jsonschema_rs.Draft202012Validator: frozenset(
+        {
+            "date",
+            "date-time",
+            "duration",
+            "email",
+            "hostname",
+            "idn-email",
+            "idn-hostname",
+            "ipv4",
+            "ipv6",
+            "iri",
+            "iri-reference",
+            "json-pointer",
+            "regex",
+            "relative-json-pointer",
+            "time",
+            "uri",
+            "uri-reference",
+            "uri-template",
+            "uuid",
+        }
+    ),
+}
+
+
 def make_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Validator:
     """Build a validator with project-wide kwargs: format/pattern checks and Draft 4 supplements."""
     kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS}
@@ -92,6 +187,7 @@ __all__ = [
     "Bundler",
     "BundleError",
     "DRAFT4_SUPPLEMENTAL_FORMATS",
+    "VALIDATED_FORMATS_BY_DRAFT",
     "FANCY_REGEX_OPTIONS",
     "is_valid",
     "make_validator",
