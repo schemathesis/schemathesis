@@ -391,3 +391,41 @@ def test_fk_body_consumer_not_classified_as_root(ctx):
         "POST_photos___201_GetPhoto__GET_photos_photoId_",
         "RANDOM__POST_albums",
     ]
+
+
+def test_self_referential_fk_creator_remains_root(ctx):
+    person_req = {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/person": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": person_req}}},
+                    "responses": {"201": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+            "/persons": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "array", "items": person_req}}},
+                    },
+                    "responses": {"201": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+            "/person/{id}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+        }
+    )
+    state_machine = schema.as_state_machine()
+    rule_names = sorted(
+        name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule")
+    )
+    assert "RANDOM__POST_person" in rule_names, rule_names
