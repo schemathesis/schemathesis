@@ -363,7 +363,11 @@ def xml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
 
 @REQUESTS_TRANSPORT.serializer("application/x-www-form-urlencoded")
 def urlencoded_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    return {"data": value}
+    if value is None or isinstance(value, (Mapping, str, bytes)):
+        return {"data": value}
+    # Out-of-spec non-object bodies (e.g. top-level arrays) ship as JSON-encoded bytes
+    # so the request still reaches the server instead of aborting locally.
+    return {"data": json.dumps(value).encode("utf-8")}
 
 
 @REQUESTS_TRANSPORT.serializer("text/plain")
