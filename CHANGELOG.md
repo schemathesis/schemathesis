@@ -10,6 +10,7 @@
 - Honour per-operation `phases.stateful.enabled = false` in the state machine.
 - Treat field-level body `must not be blank` feedback as a body-required signal so generation stops emitting empty bodies.
 - Recognise `content` as a single-property response wrapper during dependency inference.
+- Skip `use_after_free` false positives when the DELETE itself returned a non-2xx status (server crash or 404).
 
 ## [4.18.1](https://github.com/schemathesis/schemathesis/compare/v4.18.0...v4.18.1) - 2026-05-10
 
