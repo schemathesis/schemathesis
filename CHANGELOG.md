@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Skip stateful root rules for operations whose inputs reference producer-supplied resource fields.
 - Accept skewed length distributions across sibling quantifiers when rewriting `pattern` against `maxLength`.
 - Drop spec `example`/`examples`/`default` values that cannot be validated against the schema in positive coverage.
 - Honour per-operation `phases.stateful.enabled = false` in the state machine.

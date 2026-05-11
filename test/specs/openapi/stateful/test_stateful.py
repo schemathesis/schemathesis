@@ -331,3 +331,63 @@ def test_stateful_disabled_for_op_skips_rules(ctx, disabled_op, expected_rules):
         sorted(name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule"))
         == expected_rules
     )
+
+
+_ID_OBJECT = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+
+
+def test_fk_body_consumer_not_classified_as_root(ctx):
+    # POST /photos consumes Album.id via body `albumId`; can't succeed without a producer-supplied
+    # value, so it must not fire as a root while the clean Album producer exists.
+    schema = ctx.openapi.load_schema(
+        {
+            "/albums": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"201": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+            "/photos": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "albumId": {"type": "integer"},
+                                        "title": {"type": "string"},
+                                    },
+                                    "required": ["albumId", "title"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+            "/photos/{photoId}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "photoId", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+        }
+    )
+
+    state_machine = schema.as_state_machine()
+    assert sorted(
+        name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule")
+    ) == [
+        "POST_albums___201_PostAlbum__POST_photos",
+        "POST_photos___201_GetPhoto__GET_photos_photoId_",
+        "RANDOM__POST_albums",
+    ]

@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.specs.openapi.schemas import OpenApiSchema
+    from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, OperationNode
 
 FilterFunction = Callable[["StepOutput"], bool]
 
@@ -194,7 +195,7 @@ def create_state_machine(
     #   2. Don't waste the test budget (limited number of steps) on likely-to-fail operations
     #   3. Focus on transitions that are designed to work together via links
 
-    roots = classify_root_transitions(operations, transitions)
+    roots = classify_root_transitions(operations, transitions, schema.analysis.dependency_graph)
 
     for target in operations:
         if target.label in transitions.operations:
@@ -264,7 +265,9 @@ def create_state_machine(
     )
 
 
-def classify_root_transitions(operations: list[APIOperation], transitions: ApiTransitions) -> RootTransitions:
+def classify_root_transitions(
+    operations: list[APIOperation], transitions: ApiTransitions, graph: DependencyGraph
+) -> RootTransitions:
     """Find operations that can serve as root transitions."""
     roots = RootTransitions()
 
@@ -274,7 +277,7 @@ def classify_root_transitions(operations: list[APIOperation], transitions: ApiTr
         if not operation_transitions or not operation_transitions.outgoing:
             continue
 
-        if is_likely_root_transition(operation):
+        if is_likely_root_transition(operation, graph.operations.get(operation.label)):
             roots.reliable.add(operation.label)
         else:
             roots.fallback.add(operation.label)
@@ -282,8 +285,13 @@ def classify_root_transitions(operations: list[APIOperation], transitions: ApiTr
     return roots
 
 
-def is_likely_root_transition(operation: APIOperation) -> bool:
+def is_likely_root_transition(operation: APIOperation, node: OperationNode | None) -> bool:
     """Check if operation is likely to succeed as a root transition."""
+    # Foreign-key consumers depend on producer-supplied values; firing them with random
+    # data wastes the budget on guaranteed-fail calls.
+    if node is not None and any(slot.resource_field is not None for slot in node.inputs):
+        return False
+
     # POST operations are likely to create resources
     if operation.method == "post":
         return True
