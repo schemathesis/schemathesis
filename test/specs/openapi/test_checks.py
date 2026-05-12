@@ -25,6 +25,7 @@ from schemathesis.generation.meta import (
 from schemathesis.openapi.checks import UseAfterFree
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
+    _additional_properties_hint,
     _body_negation_becomes_valid_after_serialization,
     _is_prefix_operation,
     has_only_additional_properties_in_non_body_parameters,
@@ -342,6 +343,53 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
     )
     # Should not raise - the validator should handle patterns with large quantifiers
     assert has_only_additional_properties_in_non_body_parameters(case) is True
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_hint"),
+    [
+        pytest.param({"a": 1, "b": {"x": "q"}}, None, id="declared-keys-only"),
+        pytest.param({"a": 1, "b": {"x": "q"}, "extra": "yes"}, "`extra`", id="real-extra-fires"),
+    ],
+)
+def test_additional_properties_hint_resolves_bundled_ref(ctx, body, expected_hint):
+    # Bundled `$ref` bodies must be resolved before classifying extras.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "X", "version": "1"},
+            "paths": {
+                "/foo": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Foo"}}},
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "components": {
+                "schemas": {
+                    "Foo": {
+                        "type": "object",
+                        "properties": {
+                            "a": {"type": "integer"},
+                            "b": {"$ref": "#/components/schemas/Bar"},
+                        },
+                    },
+                    "Bar": {"type": "object", "properties": {"x": {"type": "string"}}},
+                },
+            },
+        }
+    )
+    operation = schema["/foo"]["POST"]
+    case = operation.Case(body=body, media_type="application/json", method="POST")
+    hint = _additional_properties_hint(case)
+    if expected_hint is None:
+        assert hint is None, f"False positive: {hint!r}"
+    else:
+        assert hint is not None and expected_hint in hint, f"Expected mention of {expected_hint} in {hint!r}"
 
 
 @pytest.mark.parametrize(
