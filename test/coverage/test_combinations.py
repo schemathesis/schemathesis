@@ -2527,6 +2527,14 @@ def test_ref_to_additive_schema_inherits_parent_properties():
     ]
 
 
+def test_negative_unique_items_on_scalar_param_emits_both_polarities(nctx):
+    # Scalar params with `uniqueItems` need both duplicate and unique pairs to cover both polarities.
+    schema = {"type": "integer", "uniqueItems": True}
+    covered = [v for v in cover_schema(nctx, schema) if isinstance(v, list)]
+    assert any(len(array) == 2 and array[0] == array[1] for array in covered), covered
+    assert any(len(array) == 2 and array[0] != array[1] for array in covered), covered
+
+
 def test_array_with_unique_items_enum_not_violated(pctx):
     schema = {
         "type": "array",

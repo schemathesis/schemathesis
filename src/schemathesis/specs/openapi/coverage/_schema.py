@@ -2338,6 +2338,32 @@ def _negative_unique_items(ctx: CoverageContext, schema: JsonSchemaObject) -> Ge
         description="Non-unique items",
         location=ctx.current_path,
     )
+    # When the declared type forbids arrays (e.g. Kubernetes paints `uniqueItems: true`
+    # onto every scalar query parameter), also emit a 2-element unique-array case so
+    # the uniqueItems-valid branch is exercised alongside the duplicate above. Schemas
+    # that already admit arrays don't need this — positive generation covers them.
+    if "array" not in get_type(schema):
+        # Restrict items to scalars so the pair survives round-tripping through repeated
+        # query/header/path values; nested objects/arrays collapse into a single slot.
+        pair_schema = {
+            **schema,
+            "type": "array",
+            "items": {"type": ["null", "boolean", "string", "number", "integer"]},
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": True,
+        }
+        try:
+            pair = jsonify(ctx.generate_from_schema(pair_schema))
+        except (InvalidArgument, Unsatisfiable):
+            return
+        if isinstance(pair, list) and len(pair) == 2 and pair[0] != pair[1]:
+            yield NegativeValue(
+                pair,
+                scenario=CoverageScenario.UNIQUE_ITEMS_ARRAY,
+                description="Unique items array",
+                location=ctx.current_path,
+            )
 
 
 def _negative_required(

@@ -84,6 +84,7 @@ class CoverageScenario(str, Enum):
     INVALID_PATTERN = "invalid_pattern"
     NOT_MULTIPLE_OF = "not_multiple_of"
     NON_UNIQUE_ITEMS = "non_unique_items"
+    UNIQUE_ITEMS_ARRAY = "unique_items_array"
 
     # Negative scenarios - Missing parameters
     MISSING_PARAMETER = "missing_parameter"
