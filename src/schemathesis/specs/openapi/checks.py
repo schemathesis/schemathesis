@@ -13,7 +13,7 @@ import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type, maybe_resolve_bundled
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
@@ -637,10 +637,13 @@ def _additional_properties_hint(case: Case) -> str | None:
         if alternative.media_type != case.media_type:
             continue
         raw = alternative.raw_schema
-        if not isinstance(raw, dict) or raw.get("additionalProperties") is False:
+        if not isinstance(raw, dict):
+            return None
+        resolved = maybe_resolve_bundled(raw)
+        if resolved.get("additionalProperties") is False:
             return None
 
-        extra = set(case.body.keys()) - set(raw.get("properties", {}).keys())
+        extra = set(case.body.keys()) - set(resolved.get("properties", {}).keys())
         if not extra:
             return None
 

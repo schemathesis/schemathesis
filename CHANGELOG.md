@@ -15,6 +15,7 @@
 - Treat 409 Conflict as a valid rejection status for `negative_data_rejection`.
 - Retry slow schema endpoints (read timeouts) under `--wait-for-schema`. [#4058](https://github.com/schemathesis/schemathesis/issues/4058)
 - False positive `negative_data_rejection` on query-level `additionalProperties` mutations. [#3730](https://github.com/schemathesis/schemathesis/issues/3730)
+- Resolve bundled `$ref` in `positive_data_acceptance` hint to avoid false "additional properties" suggestions.
 
 ## [4.18.3](https://github.com/schemathesis/schemathesis/compare/v4.18.2...v4.18.3) - 2026-05-12
 
