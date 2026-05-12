@@ -8201,3 +8201,170 @@ def test_unsatisfiable_items_schema_falls_back_to_single_item_negative(ctx):
     bodies = [case.body for case in _iter_cases(operation, GenerationMode.NEGATIVE) if case.body is not NOT_SET]
     single_item_arrays = [b for b in bodies if isinstance(b, list) and len(b) == 1]
     assert single_item_arrays, f"fallback should emit single-item arrays, got bodies: {bodies}"
+
+
+def _tool_branch_property(tag_keyword, value):
+    # `None` produces a bare string property so the pin falls back to the schema name.
+    if tag_keyword is None:
+        return {"type": "string"}
+    if tag_keyword == "enum":
+        return {"type": "string", "enum": [value]}
+    return {"type": "string", "const": value}
+
+
+def _tool_components(tag_keyword, *, mapping=None):
+    discriminator: dict = {"propertyName": "type"}
+    if mapping is not None:
+        discriminator["mapping"] = mapping
+    return {
+        "schemas": {
+            "Tool": {
+                "discriminator": discriminator,
+                "oneOf": [
+                    {"$ref": "#/components/schemas/FunctionTool"},
+                    {"$ref": "#/components/schemas/WebSearchTool"},
+                ],
+            },
+            "FunctionTool": {
+                "type": "object",
+                "required": ["type", "name"],
+                "properties": {
+                    "type": _tool_branch_property(tag_keyword, "function"),
+                    "name": {"type": "string"},
+                },
+            },
+            "WebSearchTool": {
+                "type": "object",
+                "required": ["type", "query"],
+                "properties": {
+                    "type": _tool_branch_property(tag_keyword, "web_search"),
+                    "query": {"type": "string"},
+                },
+            },
+        },
+    }
+
+
+def _discriminator_positive_bodies(operation):
+    return [
+        case.body
+        for case in iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+        if isinstance(case.body, dict)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("tag_keyword", "expected_tags"),
+    [
+        ("enum", {"function", "web_search"}),
+        ("const", {"function", "web_search"}),
+        (None, {"FunctionTool", "WebSearchTool"}),
+    ],
+)
+def test_discriminator_pin_uses_branch_value_when_available(ctx, tag_keyword, expected_tags):
+    # const/enum on the branch supplies the literal tag; absence falls back to the schema name.
+    raw = ctx.openapi.build_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["tools"],
+                                    "properties": {"tools": {"$ref": "#/components/schemas/Tool"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+        components=_tool_components(tag_keyword),
+    )
+    bodies = _discriminator_positive_bodies(ctx.openapi.from_full_schema(raw)["/r"]["POST"])
+    tags = {body["tools"]["type"] for body in bodies if isinstance(body.get("tools"), dict) and "type" in body["tools"]}
+    assert tags == expected_tags, f"expected {expected_tags}; got tags={tags}, bodies={bodies}"
+
+
+def test_discriminator_polymorphic_items_array_covers_each_branch(ctx):
+    raw = ctx.openapi.build_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["tools"],
+                                    "properties": {
+                                        "tools": {"type": "array", "items": {"$ref": "#/components/schemas/Tool"}},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+        components=_tool_components("enum"),
+    )
+    bodies = _discriminator_positive_bodies(ctx.openapi.from_full_schema(raw)["/r"]["POST"])
+    tags = {
+        item["type"]
+        for body in bodies
+        if isinstance(body.get("tools"), list)
+        for item in body["tools"]
+        if isinstance(item, dict) and "type" in item
+    }
+    assert tags == {"function", "web_search"}, f"expected both branches; got tags={tags}, bodies={bodies}"
+
+
+def test_discriminator_explicit_mapping_overrides_branch_const(ctx):
+    # The mapping pins FunctionTool to "f-tag" (conflicts with its const "function" -> unsatisfiable),
+    # and WebSearchTool to "web_search" (matches its const). If the mapping correctly wins over the
+    # branch const, only the WebSearchTool branch is generatable.
+    components = _tool_components(
+        "const",
+        mapping={
+            "f-tag": "#/components/schemas/FunctionTool",
+            "web_search": "#/components/schemas/WebSearchTool",
+        },
+    )
+    raw = ctx.openapi.build_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["tools"],
+                                    "properties": {"tools": {"$ref": "#/components/schemas/Tool"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+        components=components,
+    )
+    bodies = _discriminator_positive_bodies(ctx.openapi.from_full_schema(raw)["/r"]["POST"])
+    tags = {body["tools"]["type"] for body in bodies if isinstance(body.get("tools"), dict) and "type" in body["tools"]}
+    assert tags == {"web_search"}, f"mapping must override branch const; got tags={tags}, bodies={bodies}"

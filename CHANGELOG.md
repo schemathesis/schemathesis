@@ -10,6 +10,7 @@
 - Generate positive body cases for schemas inheriting `additionalProperties: false` through deep `allOf` chains.
 - Missing `sqlite-libs` in docker images.
 - Emit non-empty XML element values for string fields so server-side keywords reach coverage.
+- Cover each `discriminator` branch when the type tag literal differs from the schema name.
 
 ## [4.18.4](https://github.com/schemathesis/schemathesis/compare/v4.18.3...v4.18.4) - 2026-05-12
 
