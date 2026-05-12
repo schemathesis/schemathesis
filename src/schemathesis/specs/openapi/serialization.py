@@ -5,6 +5,7 @@ from collections.abc import Callable, Generator, Mapping
 from typing import Any
 from urllib.parse import quote
 
+from schemathesis.core.jsonschema import maybe_resolve_bundled
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 
 Generated = dict[str, Any]
@@ -54,7 +55,16 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
             style = definition.get("style")
             explode = definition.get("explode")
             schema = definition.get("schema", {})
+            # Track whether the parameter schema was a bare `$ref` at the top: only then is the
+            # OpenAPI-default `extracted_object` shape structurally ambiguous, and recursive
+            # bracketing the safe choice. Inline schemas keep their declared flat-extract semantics.
+            schema_was_top_ref = False
             if isinstance(schema, dict):
+                schema_was_top_ref = isinstance(schema.get("$ref"), str)
+                bundled = schema.get("x-bundled") if isinstance(schema.get("x-bundled"), dict) else None
+                schema = maybe_resolve_bundled(schema)
+                if bundled is not None and "x-bundled" not in schema:
+                    schema = {**schema, "x-bundled": bundled}
                 type_ = schema.get("type")
             else:
                 type_ = None
@@ -69,7 +79,7 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
             if location == "path":
                 yield from _serialize_path_openapi3(name, type_, style, explode)
             elif location == "query":
-                yield from _serialize_query_openapi3(name, type_, style, explode)
+                yield from _serialize_query_openapi3(name, type_, style, explode, schema, schema_was_top_ref)
             elif location == "header":
                 yield from _serialize_header_openapi3(name, type_, explode)
             elif location == "cookie":
@@ -188,16 +198,32 @@ def _serialize_path_openapi3(
 
 
 def _serialize_query_openapi3(
-    name: str, type_: str | None, style: str | None, explode: bool | None
+    name: str,
+    type_: str | None,
+    style: str | None,
+    explode: bool | None,
+    schema: dict[str, Any] | None = None,
+    schema_was_top_ref: bool = False,
 ) -> Generator[Callable | None, None, None]:
     if type_ == "object":
+        # OpenAPI has no spec-defined style for objects with nested-object properties.
+        # Only emit recursive bracket notation when the parameter schema was a bare top-level `$ref`
+        # (matches Spring `@ModelAttribute` and similar consumers). Inline schemas keep their
+        # declared flat-extract semantics so we don't regress documented `extracted_object` behaviour.
+        is_nested = schema_was_top_ref and _schema_has_nested_object_properties(schema)
         if style == "deepObject":
-            yield deep_object(name)
+            if is_nested:
+                yield nested_object(name)
+            else:
+                yield deep_object(name)
         if style is None or style == "form":
             if explode is False:
                 yield comma_delimited_object(name)
             if explode:
-                yield extracted_object(name)
+                if is_nested:
+                    yield nested_object(name)
+                else:
+                    yield extracted_object(name)
     elif type_ == "array" and explode is False:
         if style == "pipeDelimited":
             yield delimited(name, delimiter="|")
@@ -205,6 +231,32 @@ def _serialize_query_openapi3(
             yield delimited(name, delimiter=" ")
         if style is None or style == "form":  # "form" is the default style
             yield delimited(name, delimiter=",")
+
+
+def _schema_has_nested_object_properties(schema: dict[str, Any] | None) -> bool:
+    """Return True when at least one property in `schema` resolves to a nested object."""
+    if not isinstance(schema, dict):
+        return False
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping):
+        return False
+    bundled = schema.get("x-bundled")
+    for property_schema in properties.values():
+        if not isinstance(property_schema, dict):
+            continue
+        # Splice the parent's bundle map onto the property so nested `$ref`s resolve.
+        candidate = property_schema
+        if isinstance(bundled, dict) and "x-bundled" not in candidate and "$ref" in candidate:
+            candidate = {**candidate, "x-bundled": bundled}
+        resolved = maybe_resolve_bundled(candidate)
+        property_type = resolved.get("type") if isinstance(resolved, dict) else None
+        if property_type == "object":
+            return True
+        if isinstance(property_type, list) and "object" in property_type:
+            return True
+        if isinstance(resolved, dict) and "properties" in resolved:
+            return True
+    return False
 
 
 def _serialize_header_openapi3(
@@ -343,6 +395,41 @@ def extracted_object(item: Generated, name: str) -> None:
         item.update(generated)
     else:
         item[name] = ""
+
+
+@conversion
+def nested_object(item: Generated, name: str) -> None:
+    """Serialize a nested object with recursive bracket notation.
+
+    {"pagination": {"pageNumber": 1}} => request[pagination][pageNumber]=1
+    """
+    generated = item.pop(name)
+    if not generated:
+        item[name] = ""
+        return
+    if not isinstance(generated, dict):
+        item[name] = generated
+        return
+    flat: dict[str, Any] = {}
+    _flatten_nested(generated, name, flat)
+    item.update(flat)
+
+
+def _flatten_nested(value: Any, prefix: str, out: dict[str, Any]) -> None:
+    if isinstance(value, dict):
+        if not value:
+            out[prefix] = ""
+            return
+        for key, child in value.items():
+            _flatten_nested(child, f"{prefix}[{key}]", out)
+    elif isinstance(value, (list, tuple)):
+        if not value:
+            out[prefix] = ""
+            return
+        for index, child in enumerate(value):
+            _flatten_nested(child, f"{prefix}[{index}]", out)
+    else:
+        out[prefix] = value
 
 
 @conversion

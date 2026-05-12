@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Serialize nested-object query parameters using recursive bracket notation.
 - Detect Tomcat strict-decoder rejection when the response carries the default HTML error page.
 - Cover both branches of non-body `oneOf: [array, string]` parameters by forcing non-empty strings.
 - Pin `Content-Type` to the body media type when it is declared as an explicit header parameter.
