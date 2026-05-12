@@ -732,6 +732,15 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
         return sub
 
 
+def _has_array_sibling(sub_schemas: list) -> bool:
+    for sub in sub_schemas:
+        if isinstance(sub, dict):
+            ty = sub.get("type")
+            if ty == "array" or (isinstance(ty, list) and "array" in ty):
+                return True
+    return False
+
+
 def _merge_with_parent_context(parent: JsonSchemaObject, sub: JsonSchema) -> JsonSchema:
     if not isinstance(sub, dict):
         return sub
@@ -795,8 +804,23 @@ def _cover_positive_for_type(
                         parent_validator = make_validator_for(schema)
                     except Exception:
                         pass
+                # For non-body params, an empty bare string serializes to the same wire form as an
+                # empty array (`?p=`), so the string branch never disambiguates from a sibling array
+                # branch. Force non-empty strings.
+                disambiguate_string_branch = (
+                    ctx.location != ParameterLocation.BODY
+                    and isinstance(sub_schemas, list)
+                    and _has_array_sibling(sub_schemas)
+                )
                 for idx, sub_schema in enumerate(sub_schemas):
                     effective = _resolve_sub_schema(ctx, sub_schema)
+                    if (
+                        disambiguate_string_branch
+                        and isinstance(effective, dict)
+                        and effective.get("type") == "string"
+                        and "minLength" not in effective
+                    ):
+                        effective = {**effective, "minLength": 1}
                     if isinstance(effective, dict) and "properties" in effective:
                         # See GH-3584
                         # Sub-schema defines its own properties — treat as a complete type, do not inject parent properties.

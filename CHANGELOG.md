@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Cover both branches of non-body `oneOf: [array, string]` parameters by forcing non-empty strings.
 - Crash in coverage phase on schemas with property names `pattern`/`minLength`/`maxLength` (e.g. Kubernetes CRDs).
 - Crash in fuzzing phase on negative mutations of bundled `$ref` schemas carrying sibling validation keywords.
 - Generate a positive coverage case for `additionalProperties: {schema}` on objects without explicit `type: object`.
