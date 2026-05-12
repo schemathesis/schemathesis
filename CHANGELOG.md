@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.4...HEAD) - TBD
 
+### :bug: Fixed
+
+- Send `formData` Swagger 2.0 parameters as form payloads when `consumes` only declares non-form media types.
+
 ## [4.18.4](https://github.com/schemathesis/schemathesis/compare/v4.18.3...v4.18.4) - 2026-05-12
 
 ### :bug: Fixed
