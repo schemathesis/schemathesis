@@ -159,9 +159,18 @@ class UnsafePathDecoder(Probe):
         return session.prepare_request(request)
 
     def analyze_response(self, response: requests.Response) -> ProbeOutcome:
-        if response.status_code == 400 and not response.content:
+        if response.status_code == 400 and _is_path_decoder_rejection_body(response.content):
             return ProbeOutcome.FAILURE
         return ProbeOutcome.SUCCESS
+
+
+# Tomcat ships a default HTML error page (rather than an empty body) when its URI parser
+# rejects unsafe percent-encodings before routing — match its distinctive title.
+_TOMCAT_400_TITLE = b"<title>HTTP Status 400 \xe2\x80\x93 Bad Request</title>"
+
+
+def _is_path_decoder_rejection_body(content: bytes) -> bool:
+    return not content or _TOMCAT_400_TITLE in content
 
 
 PROBES = (NullByteInHeader, UnsafePathDecoder)
