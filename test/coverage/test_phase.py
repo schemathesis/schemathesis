@@ -965,6 +965,61 @@ def test_positive_oneof_number_branch_covered_when_example_pins_string(ctx):
     )
 
 
+def test_positive_oneof_query_array_and_string_both_reach_valid(ctx):
+    # Without a non-empty bare string the wire form `?domain=` matches the array branch too,
+    # so the string branch never reaches `valid` in tools that match by serialized form.
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "domain",
+                "in": "query",
+                "required": False,
+                "schema": {
+                    "oneOf": [
+                        {"type": "array", "items": {"type": "string"}, "maxItems": 20},
+                        {"type": "string"},
+                    ],
+                },
+            },
+        ],
+        method="get",
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    loaded.config.phases.coverage.generate_duplicate_query_parameters = False
+    operation = loaded["/foo"]["get"]
+    config = operation.schema.config
+    config.generation.update(modes=[GenerationMode.POSITIVE])
+    config.phases.examples.enabled = False
+    config.phases.fuzzing.enabled = False
+    config.phases.stateful.enabled = False
+    values = []
+
+    def collect(case):
+        if case.meta.phase.name != TestPhase.COVERAGE:
+            return
+        if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
+            return
+        values.append(case.query.get("domain"))
+
+    test_func = create_test(
+        operation=operation,
+        test_func=collect,
+        config=HypothesisTestConfig(
+            modes=[HypothesisTestMode.COVERAGE],
+            project=config,
+            settings=settings(phases=[Phase.explicit]),
+        ),
+    )
+    test_func()
+
+    has_non_empty_bare_string = any(isinstance(v, str) and v for v in values)
+    has_array = any(isinstance(v, list) for v in values)
+    assert has_non_empty_bare_string and has_array, (
+        f"Each oneOf branch must yield at least one positive case; got {values!r}"
+    )
+
+
 def test_no_redundant_type_violations_for_enum_string_property_in_multipart(ctx):
     # Multipart stringifies every value, so non-strings for a string-typed property
     # collapse into the enum negation already emitted.
