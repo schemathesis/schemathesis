@@ -759,7 +759,15 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     if meta is None or not isinstance(case.operation.schema, OpenApiSchema):
         # Ignore manually created cases
         return False
-    if (ParameterLocation.BODY in meta.components and meta.components[ParameterLocation.BODY].mode.is_negative) or (
+    # Component-mode flags overestimate negation: the engine flips a location's mode
+    # to negative whenever it tries to negate, even when it falls back to positive
+    # (e.g. path params that can't be negated). When per-case mutation metadata is
+    # available, trust the actually-targeted location over the coarse flags.
+    phase_data = meta.phase.data
+    if isinstance(phase_data, FuzzingPhaseData) and phase_data.mutations:
+        if phase_data.parameter_location in (ParameterLocation.BODY, ParameterLocation.PATH):
+            return False
+    elif (ParameterLocation.BODY in meta.components and meta.components[ParameterLocation.BODY].mode.is_negative) or (
         ParameterLocation.PATH in meta.components and meta.components[ParameterLocation.PATH].mode.is_negative
     ):
         # Body or path negations always imply other negations
