@@ -3460,6 +3460,47 @@ def test_positive_body_generated_for_object_with_metadata_and_unsatisfiable_opti
     )
 
 
+def test_positive_body_generated_when_required_excludes_forbidden_properties(ctx):
+    # A `readOnly` field listed in `required` must not block positive body generation.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "allOf": [{"type": "object"}],
+                                "properties": {
+                                    "id": {"type": "string", "readOnly": True},
+                                    "name": {"type": "string"},
+                                },
+                                "required": ["id", "name"],
+                            },
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/foo"]["POST"]
+    positive_bodies = [
+        case.body
+        for case in _iter_cases(operation, GenerationMode.POSITIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY
+    ]
+    assert positive_bodies, "Expected at least one positive body case"
+    assert all("id" not in body for body in positive_bodies), (
+        f"Positive bodies must not contain forbidden `id`; got: {positive_bodies}"
+    )
+
+
 def test_parameter_positive_coverage_when_body_fallback_negative(ctx):
     # An unsatisfiable body must not suppress positive coverage of unrelated parameters.
     schema = ctx.openapi.load_schema(
