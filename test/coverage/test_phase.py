@@ -2010,14 +2010,14 @@ def test_query_parameters_with_nested_enum(ctx):
             },
             {
                 "query": {
-                    "q1": [
-                        "A",
-                    ],
+                    "q1": [],
                 },
             },
             {
                 "query": {
-                    "q1": [],
+                    "q1": [
+                        "A",
+                    ],
                 },
             },
         ],

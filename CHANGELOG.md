@@ -7,6 +7,7 @@
 - Crash in coverage phase on schemas with property names `pattern`/`minLength`/`maxLength` (e.g. Kubernetes CRDs).
 - Crash in fuzzing phase on negative mutations of bundled `$ref` schemas carrying sibling validation keywords.
 - Generate a positive coverage case for `additionalProperties: {schema}` on objects without explicit `type: object`.
+- Emit a populated positive baseline for `type: array` parameters so item-level keywords reach coverage.
 
 ## [4.18.3](https://github.com/schemathesis/schemathesis/compare/v4.18.2...v4.18.3) - 2026-05-12
 
