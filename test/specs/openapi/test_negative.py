@@ -410,6 +410,41 @@ def test_mutated_body_with_shared_ref_does_not_crash(data):
     )
 
 
+@given(data=st.data())
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=200, derandomize=True)
+def test_mutated_body_with_bundled_ref_and_inline_enum_does_not_crash(data):
+    keywords = {
+        "type": "object",
+        "required": ["operation"],
+        "properties": {
+            "operation": {
+                "$ref": "#/x-bundled/AclOperation",
+                "enum": ["ALL", "READ", "WRITE", "CREATE", "DELETE", "ALTER", "DESCRIBE"],
+            },
+            "permission": {
+                "$ref": "#/x-bundled/AclPermission",
+                "enum": ["ALLOW", "DENY"],
+            },
+        },
+    }
+    non_keywords = {
+        BUNDLE_STORAGE_KEY: {
+            "AclOperation": {"type": "string"},
+            "AclPermission": {"type": "string"},
+        }
+    }
+    data.draw(
+        mutated(
+            keywords=keywords,
+            non_keywords=non_keywords,
+            location=ParameterLocation.BODY,
+            media_type="application/json",
+            allow_extra_parameters=True,
+            target_descriptors=compute_mutation_targets({**keywords, **non_keywords}),
+        )
+    )
+
+
 def test_openapi_31_legacy_exclusive_bounds_in_response_schema(ctx):
     schema = ctx.openapi.load_schema(
         {

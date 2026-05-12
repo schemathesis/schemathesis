@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- Crash in fuzzing phase on negative mutations of bundled `$ref` schemas carrying sibling validation keywords.
+
 ## [4.18.3](https://github.com/schemathesis/schemathesis/compare/v4.18.2...v4.18.3) - 2026-05-12
 
 ### :bug: Fixed
