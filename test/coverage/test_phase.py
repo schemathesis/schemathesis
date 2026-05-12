@@ -52,7 +52,8 @@ POSITIVE_CASES = [
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "6", "q2": "000"}, "body": {"j-prop": 0}},
     {"headers": {"h1": "5", "h2": "00"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
     {"headers": {"h1": "4", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
-    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"x-prop": ""}},
+    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"x-prop": Pattern(".+")}},
+    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"x-prop": Pattern(".+")}},
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
 ]
 NEGATIVE_CASES = [
@@ -142,7 +143,8 @@ MIXED_CASES = [
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": [None, None]},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": False},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": 0},
-    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": ""}},
+    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": Pattern(".+")}},
+    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": Pattern(".+")}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": {}}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": [None, None]}},
@@ -4247,15 +4249,18 @@ def test_path_parameter_with_slash_in_custom_format(ctx):
     assert all(v == "0.0.0.0%2F0" for v in path_values), f"Unexpected values: {path_values}"
 
 
-def _collect_xml_coverage_cases(ctx, body_schema):
-    """Build an XML-only schema, run in negative mode, and return coverage phase cases."""
-    loaded = load_schema(
-        ctx,
-        request_body={
-            "required": True,
-            "content": {"application/xml": {"schema": body_schema}},
-        },
-    )
+def _collect_xml_coverage_cases(ctx, body_schema, *, positive=False, full_schema=None):
+    """Build an XML schema, run coverage, and return coverage phase cases."""
+    if full_schema is not None:
+        loaded = schemathesis.openapi.from_dict(full_schema)
+    else:
+        loaded = load_schema(
+            ctx,
+            request_body={
+                "required": True,
+                "content": {"application/xml": {"schema": body_schema}},
+            },
+        )
     operation = loaded["/foo"]["post"]
 
     cases = []
@@ -4264,7 +4269,10 @@ def _collect_xml_coverage_cases(ctx, body_schema):
         if case.meta.phase.name == TestPhase.COVERAGE:
             cases.append(case)
 
-    run_negative_test(operation, collect)
+    if positive:
+        run_positive_test(operation, collect)
+    else:
+        run_negative_test(operation, collect)
     return cases
 
 
@@ -4325,6 +4333,61 @@ def test_xml_none_property_mutation_filtered_when_schema_accepts_empty_string(ct
     ]
     assert null_property_mutations == [], (
         f"None mutation for XML string field with maxLength:0 should be filtered, got: {null_property_mutations}"
+    )
+
+
+def test_xml_string_leaf_has_non_empty_positive_case(ctx):
+    # Empty XML elements bypass server-side string-keyword validators on common parsers.
+    cases = _collect_xml_coverage_cases(
+        ctx,
+        {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+        positive=True,
+    )
+    populated = [
+        c.body for c in cases if isinstance(c.body, dict) and isinstance(c.body.get("name"), str) and c.body["name"]
+    ]
+    assert populated, f"Expected at least one positive case with a non-empty 'name'; got: {[c.body for c in cases]}"
+
+
+def test_xml_optional_ref_object_property_populated_in_positive_cases(ctx):
+    raw = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Wrapper"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Wrapper": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "child": {"$ref": "#/components/schemas/Child"},
+                    },
+                    "required": ["id"],
+                },
+                "Child": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                    "required": ["value"],
+                },
+            }
+        },
+    )
+    cases = _collect_xml_coverage_cases(ctx, None, positive=True, full_schema=raw)
+    with_child = [
+        c.body
+        for c in cases
+        if isinstance(c.body, dict) and isinstance(c.body.get("child"), dict) and "value" in c.body["child"]
+    ]
+    assert with_child, (
+        f"Expected at least one positive case populating optional 'child'; got: {[c.body for c in cases]}"
     )
 
 

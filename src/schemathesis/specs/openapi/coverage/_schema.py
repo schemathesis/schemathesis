@@ -1610,8 +1610,24 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
                 _schema["examples"] = valid_examples
             else:
                 del _schema["examples"]
+        if _schema.get("type") == "string" and _xml_string_needs_non_empty(ctx, _schema):
+            _schema["minLength"] = 1
         return _schema
     return schema
+
+
+def _xml_string_needs_non_empty(ctx: CoverageContext, schema: JsonSchemaObject) -> bool:
+    # Empty XML elements (<tag></tag>) round-trip as None on common parsers (etree, xmltodict,
+    # default Jackson), so positive cases never exercise server-side string keywords and "kept-valid"
+    # context in negative cases reaches the server malformed. Force >= 1 character.
+    if ctx.location != ParameterLocation.BODY or ctx.media_type is None or not is_xml_parts(ctx.media_type):
+        return False
+    if schema.get("minLength") not in (None, 0):
+        return False
+    max_length = schema.get("maxLength")
+    if max_length is not None and max_length < 1:
+        return False
+    return "enum" not in schema and "const" not in schema
 
 
 _FAST_PATH_KEYS = frozenset({"properties", "required", "type"})
@@ -1707,6 +1723,9 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     ):
         # Don't apply it for known formats - they will insure the correct format during generation
         schema = _ensure_valid_headers_schema(schema)
+    elif _xml_string_needs_non_empty(ctx, schema):
+        schema = {**schema, "minLength": 1}
+        min_length = 1
 
     # Sentinel-based reads so falsy spec hints (`default: 0`, `example: ""`) and explicit
     # `default: null` / `example: null` aren't confused with "key absent".
