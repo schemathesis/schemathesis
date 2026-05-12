@@ -52,6 +52,34 @@ def path_decoder_strict_url(app_runner):
     return f"http://127.0.0.1:{port}/"
 
 
+_TOMCAT_400_HTML = (
+    '<!doctype html><html lang="en"><head>'
+    "<title>HTTP Status 400 – Bad Request</title>"
+    "</head><body><h1>HTTP Status 400 – Bad Request</h1></body></html>"
+)
+
+
+@pytest.fixture
+def path_decoder_strict_tomcat_html_url(app_runner):
+    # Tomcat ships a default HTML error page; the strict URL decoder still rejects before routing,
+    # but the body is non-empty.
+    app = Flask(__name__)
+
+    @app.before_request
+    def _reject_unsafe_path():
+        if "\\" in request.path or any(ord(c) < 0x20 for c in request.path):
+            return (_TOMCAT_400_HTML, 400, {"Content-Type": "text/html;charset=utf-8"})
+        return None
+
+    @app.route("/", defaults={"_path": ""})
+    @app.route("/<path:_path>")
+    def _ok(_path: str):
+        return "ok"
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/"
+
+
 @pytest.fixture
 def engine_ctx(openapi_30):
     return EngineContext(schema=openapi_30, stop_event=threading.Event())
@@ -125,6 +153,19 @@ def test_detect_null_byte_skipped(engine_ctx):
 
 def test_detect_unsafe_path_decoder_failure(engine_ctx, path_decoder_strict_url):
     engine_ctx.schema.config.update(base_url=path_decoder_strict_url)
+    results = probes.run(engine_ctx)
+    path_result = next(r for r in results if isinstance(r.probe, probes.UnsafePathDecoder))
+    assert path_result == probes.ProbeRun(
+        probe=probes.UnsafePathDecoder(),
+        outcome=probes.ProbeOutcome.FAILURE,
+        request=ANY,
+        response=ANY,
+        error=None,
+    )
+
+
+def test_detect_unsafe_path_decoder_failure_tomcat_html(engine_ctx, path_decoder_strict_tomcat_html_url):
+    engine_ctx.schema.config.update(base_url=path_decoder_strict_tomcat_html_url)
     results = probes.run(engine_ctx)
     path_result = next(r for r in results if isinstance(r.probe, probes.UnsafePathDecoder))
     assert path_result == probes.ProbeRun(
