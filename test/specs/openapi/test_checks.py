@@ -107,23 +107,25 @@ def build_metadata(
     parameter=None,
     parameter_location=None,
     location=None,
+    mutations=None,
 ):
     # When the test pins a type-mutation description, also populate the structured
     # Mutation record so the case carries what the engine produces for the same case.
-    mutations: tuple[Mutation, ...] = ()
-    if description.startswith("Invalid type") and parameter is not None:
-        mutations = (
-            Mutation(
-                path=(parameter,),
-                schema_pointer=f"/properties/{parameter}",
-                channel=MutationChannel.SCHEMA,
-                operator=OperatorKind.CHANGE_TYPE,
-                keywords=("type",),
-                parameter=parameter,
-                original_value=None,
-                new_value=None,
-            ),
-        )
+    if mutations is None:
+        mutations = ()
+        if description.startswith("Invalid type") and parameter is not None:
+            mutations = (
+                Mutation(
+                    path=(parameter,),
+                    schema_pointer=f"/properties/{parameter}",
+                    channel=MutationChannel.SCHEMA,
+                    operator=OperatorKind.CHANGE_TYPE,
+                    keywords=("type",),
+                    parameter=parameter,
+                    original_value=None,
+                    new_value=None,
+                ),
+            )
     return CaseMetadata(
         generation=GenerationInfo(
             time=0.1,
@@ -227,6 +229,89 @@ def sample_schema(ctx):
 def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kwargs, expected):
     operation = sample_schema["/test"]["POST"]
     case = operation.Case(**kwargs)
+    assert has_only_additional_properties_in_non_body_parameters(case) is expected
+
+
+def _mutation(operator, keywords, parameter=None):
+    return Mutation(
+        path=(parameter,) if parameter else (),
+        schema_pointer=f"/properties/{parameter}" if parameter else "",
+        channel=MutationChannel.SCHEMA if operator == OperatorKind.NEGATE_CONSTRAINTS else MutationChannel.VALUE,
+        operator=operator,
+        keywords=tuple(keywords),
+        parameter=parameter,
+        original_value=None,
+        new_value=None,
+    )
+
+
+_ADDITIONAL_PROPERTIES_MUTATION = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("additionalProperties",))
+_BODY_MIN_LENGTH_MUTATION = _mutation(OperatorKind.VALUE_VIOLATOR, ("minLength",), parameter="field")
+_PATH_PATTERN_MUTATION = _mutation(OperatorKind.VALUE_VIOLATOR, ("pattern",), parameter="id")
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        pytest.param(
+            {
+                "query": {"key": 5, "unknown": 3},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    path_parameters=GenerationMode.NEGATIVE,
+                    generation_mode=GenerationMode.NEGATIVE,
+                    parameter_location=ParameterLocation.QUERY,
+                    mutations=(_ADDITIONAL_PROPERTIES_MUTATION,),
+                ),
+            },
+            True,
+            id="phantom-path-negation-suppresses",
+        ),
+        # Issue #3730 reproducer: engine adds a nameless query param (`?=val`).
+        pytest.param(
+            {
+                "query": {"key": 5, "": "0"},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    path_parameters=GenerationMode.NEGATIVE,
+                    generation_mode=GenerationMode.NEGATIVE,
+                    parameter_location=ParameterLocation.QUERY,
+                    mutations=(_ADDITIONAL_PROPERTIES_MUTATION,),
+                ),
+            },
+            True,
+            id="empty-name-query-extra-suppresses",
+        ),
+        pytest.param(
+            {
+                "query": {"key": 5, "unknown": 3},
+                "_meta": build_metadata(
+                    body=GenerationMode.NEGATIVE,
+                    generation_mode=GenerationMode.NEGATIVE,
+                    parameter_location=ParameterLocation.BODY,
+                    mutations=(_BODY_MIN_LENGTH_MUTATION,),
+                ),
+            },
+            False,
+            id="real-body-mutation-still-denies",
+        ),
+        pytest.param(
+            {
+                "query": {"key": 5, "unknown": 3},
+                "_meta": build_metadata(
+                    path_parameters=GenerationMode.NEGATIVE,
+                    generation_mode=GenerationMode.NEGATIVE,
+                    parameter_location=ParameterLocation.PATH,
+                    mutations=(_PATH_PATTERN_MUTATION,),
+                ),
+            },
+            False,
+            id="real-path-mutation-still-denies",
+        ),
+    ],
+)
+def test_has_only_additional_properties_mutations_aware(sample_schema, kwargs, expected):
+    case = sample_schema["/test"]["POST"].Case(**kwargs)
     assert has_only_additional_properties_in_non_body_parameters(case) is expected
 
 
