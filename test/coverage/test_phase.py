@@ -1934,11 +1934,11 @@ def test_generate_empty_headers_too(ctx):
             },
             [
                 {"body": [False, False]},
-                {"body": [{}]},
-                {"body": [[None, None]]},
-                {"body": [""]},
-                {"body": [None]},
-                {"body": [0]},
+                {"body": [{}, False, False]},
+                {"body": [[None, None], False, False]},
+                {"body": ["", False, False]},
+                {"body": [None, False, False]},
+                {"body": [0, False, False]},
                 {"body": {}},
                 {"body": ""},
                 {},
@@ -8119,3 +8119,85 @@ def test_explicit_content_type_header_does_not_collide_with_body_coverage(ctx):
     assert all(b is NOT_SET for b in ct_mutation_bodies), (
         f"CT-mutation cases should not carry a body, got: {ct_mutation_bodies}"
     )
+
+
+def test_recursive_ref_negative_descends_past_self_reference(ctx):
+    # Self-referential arms must receive a type-violating element at the inner-`$ref` position,
+    # not just be skipped when the negative generator hits the recursion boundary.
+    schema = ctx.openapi.load_schema(
+        {
+            "/filter": {
+                "post": {
+                    "parameters": [
+                        {"name": "body", "in": "body", "required": True, "schema": {"$ref": "#/definitions/Filter"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+        definitions={
+            "Filter": {
+                "type": "object",
+                "properties": {
+                    "and": {
+                        "type": "array",
+                        "minItems": 2,
+                        "items": {"$ref": "#/definitions/Filter"},
+                    },
+                    "or": {
+                        "type": "array",
+                        "minItems": 2,
+                        "items": {"$ref": "#/definitions/Filter"},
+                    },
+                    "not": {"$ref": "#/definitions/Filter"},
+                    "leaf": {"type": "string"},
+                },
+            },
+        },
+    )
+    operation = schema["/filter"]["POST"]
+    validator = _body_validator(operation)
+
+    negatives = [case for case in _iter_cases(operation, GenerationMode.NEGATIVE) if case.body is not NOT_SET]
+    invalid_items_for: set[str] = set()
+    invalid_not = False
+    for case in negatives:
+        body = case.body
+        if not isinstance(body, dict) or validator.is_valid(body):
+            continue
+        for arm in ("and", "or"):
+            arm_value = body.get(arm)
+            if not isinstance(arm_value, list) or len(arm_value) < 2:
+                continue
+            if any(not isinstance(item, dict) for item in arm_value):
+                invalid_items_for.add(arm)
+        not_value = body.get("not")
+        if not_value is not None and not isinstance(not_value, dict):
+            invalid_not = True
+    assert invalid_items_for == {"and", "or"}, f"missing arm items violations: {invalid_items_for}"
+    assert invalid_not, "missing 'not' arm type violation"
+
+
+def test_unsatisfiable_items_schema_falls_back_to_single_item_negative(ctx):
+    # When the items schema can't produce a valid filler (here `{"not": {}}` matches nothing),
+    # the negative-items branch falls back to a single-item array rather than emitting nothing.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "array", "minItems": 2, "items": {"not": {}}}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    bodies = [case.body for case in _iter_cases(operation, GenerationMode.NEGATIVE) if case.body is not NOT_SET]
+    single_item_arrays = [b for b in bodies if isinstance(b, list) and len(b) == 1]
+    assert single_item_arrays, f"fallback should emit single-item arrays, got bodies: {bodies}"

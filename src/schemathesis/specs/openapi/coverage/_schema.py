@@ -1150,7 +1150,9 @@ def cover_schema_iter(
                     if isinstance(template, dict):
                         yield from _negative_property_names(ctx, template, value)
                 elif key == "items" and isinstance(value, dict):
-                    yield from _negative_items(ctx, value)
+                    parent_min_items = schema.get("minItems")
+                    min_items = parent_min_items if isinstance(parent_min_items, int) else 0
+                    yield from _negative_items(ctx, value, min_items=min_items)
                 elif key == "items" and isinstance(value, list):
                     yield from _negative_prefix_items(ctx, value)
                 elif key == "pattern":
@@ -2311,11 +2313,27 @@ def _negative_pattern_properties(
                 )
 
 
-def _negative_items(ctx: CoverageContext, schema: JsonSchema) -> Generator[GeneratedValue, None, None]:
+def _negative_items(
+    ctx: CoverageContext, schema: JsonSchema, *, min_items: int = 0
+) -> Generator[GeneratedValue, None, None]:
     """Arrays not matching the schema."""
     nctx = ctx.with_negative()
+    filler: object = NOT_SET
+    # Cap padding at NEGATIVE_MODE_MAX_ITEMS so an adversarial `minItems` doesn't blow up memory;
+    # above the cap, fall back to single-item arrays (same as pre-padding behavior for that range).
+    if 1 < min_items <= NEGATIVE_MODE_MAX_ITEMS:
+        try:
+            filler = ctx.with_positive().generate_from_schema(schema)
+        except (InvalidArgument, Unsatisfiable):
+            # Items schema can't produce a valid filler — fall back to single-item negative
+            # rather than emitting nothing.
+            pass
     for value in cover_schema_iter(nctx, schema):
-        items = [value.value]
+        if filler is not NOT_SET:
+            # Pad to satisfy `minItems` so the items[i] check fires instead of failing at length.
+            items = [value.value, *(filler for _ in range(min_items - 1))]
+        else:
+            items = [value.value]
         if ctx.leads_to_negative_test_case(items):
             yield NegativeValue(
                 items,
