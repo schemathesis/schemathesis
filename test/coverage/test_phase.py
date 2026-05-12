@@ -3156,6 +3156,49 @@ def test_additional_properties_with_schema_positive(ctx):
     )
 
 
+def test_additional_properties_without_type_positive(ctx):
+    # Azure swagger 2.0 schemas commonly omit `type: object` on tag maps; the implicit object
+    # must still get a positive case satisfying `additionalProperties` so coverage flips `valid`.
+    loaded = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "properties": {
+                            "tags": {
+                                "additionalProperties": {"type": "string"},
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    )
+    operation = loaded["/foo"]["post"]
+
+    cases = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    with_string_value = [
+        c
+        for c in cases
+        if isinstance(c.body, dict)
+        and isinstance(c.body.get("tags"), dict)
+        and any(isinstance(v, str) for v in c.body["tags"].values())
+    ]
+    assert with_string_value, (
+        f"Expected a positive case with a string-valued additional property under 'tags'. "
+        f"Got bodies: {[c.body for c in cases]}"
+    )
+
+
 def test_additional_properties_with_schema_negative(ctx):
     loaded = load_schema(
         ctx,

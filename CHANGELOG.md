@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Crash in fuzzing phase on negative mutations of bundled `$ref` schemas carrying sibling validation keywords.
+- Generate a positive coverage case for `additionalProperties: {schema}` on objects without explicit `type: object`.
 
 ## [4.18.3](https://github.com/schemathesis/schemathesis/compare/v4.18.2...v4.18.3) - 2026-05-12
 
