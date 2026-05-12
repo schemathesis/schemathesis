@@ -1923,8 +1923,18 @@ def _positive_array(
             and seen.insert(default)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    elif seen.insert(template):
-        yield PositiveValue(template, scenario=CoverageScenario.VALID_ARRAY, description="Valid array")
+    else:
+        # An empty template skips every items-level keyword on the wire; surface a non-empty
+        # baseline first so the recorder sees items satisfied.
+        items = schema.get("items")
+        if not template and isinstance(items, dict) and items:
+            for item in cover_schema_iter(ctx, items):
+                candidate = [item.value]
+                if seen.insert(candidate):
+                    yield PositiveValue(candidate, scenario=CoverageScenario.VALID_ARRAY, description="Valid array")
+                    break
+        if seen.insert(template):
+            yield PositiveValue(template, scenario=CoverageScenario.VALID_ARRAY, description="Valid array")
 
     # Boundary and near-boundary sizes
     min_items = schema.get("minItems")

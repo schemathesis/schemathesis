@@ -206,6 +206,13 @@ def test_positive_null_default_or_example_round_trips(pctx, schema):
     assert None in covered, f"`null` default/example was dropped: {covered!r}"
 
 
+def test_unbounded_array_positive_baseline_is_non_empty(pctx):
+    # An empty list never exercises items-level keywords on the wire; coverage must emit a populated baseline first.
+    covered = cover_schema(pctx, {"type": "array", "items": {"type": "integer", "format": "int32"}})
+    assert covered
+    assert covered[0], covered
+
+
 @pytest.mark.parametrize("allow_extra_parameters", [True, False])
 def test_query_unexpected_parameters_control(ctx_factory, allow_extra_parameters):
     schema = {
@@ -710,10 +717,10 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
         (
             {"type": "array", "items": {"type": "integer"}, "maxItems": 5},
             [
+                [0],
                 [],
                 [0, 0, 0, 0, 0],
                 [0, 0, 0, 0],
-                [0],
             ],
         ),
         # Multi-branch items must be exercised individually; boundary-size arrays
@@ -740,16 +747,16 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 },
             },
             [
+                [{"a": ""}],
                 [],
                 [{"a": ""}, {"a": ""}, {"a": ""}],
                 [{"a": ""}, {"a": ""}],
-                [{"a": ""}],
                 [{"b": ""}],
             ],
         ),
         (
             {"type": "array", "items": {"enum": ["FOO"]}},
-            [[], ["FOO"]],
+            [["FOO"], []],
         ),
         (
             {"type": "array", "items": {"enum": ["FOO"]}, "minItems": 1},
@@ -1911,7 +1918,7 @@ def test_large_arrays_nested(nctx):
                 "type": "array",
                 "items": {"$ref": "#/$defs/Tag"},
             },
-            [[], ["red"], ["blue"]],
+            [["red"], [], ["blue"]],
         ),
         # Nested $refs - reference pointing to another reference
         (
