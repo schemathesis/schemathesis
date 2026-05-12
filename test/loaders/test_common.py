@@ -1,8 +1,10 @@
 """Tests for common schema loading logic shared by all loaders."""
 
+import time
 from contextlib import suppress
 
 import pytest
+from flask import Flask, jsonify
 
 import schemathesis
 from schemathesis.core.transport import USER_AGENT
@@ -70,3 +72,23 @@ def test_auth_loader_options(ctx):
     api = ctx.openapi.apps.success()
     schemathesis.openapi.from_url(api.schema_url, auth=("test", "test"))
     assert api.schema_requests[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
+
+
+def test_wait_for_schema_retries_on_read_timeout(ctx, app_runner):
+    # A slow-to-respond server (read timeout) must be retried within the wait budget,
+    # the same way connection refused or HTTP 503 is.
+    schema = ctx.openapi.build_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    call_count = [0]
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        call_count[0] += 1
+        if call_count[0] == 1:
+            time.sleep(0.5)
+        return jsonify(schema)
+
+    url = app_runner.openapi_url(app)
+    loaded = schemathesis.openapi.from_url(url, wait_for_schema=5, timeout=0.2)
+    assert loaded.raw_schema == schema
+    assert call_count[0] == 2
