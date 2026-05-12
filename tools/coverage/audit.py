@@ -186,6 +186,8 @@ def audit_schema(
     generation_config = GenerationConfig()
     for operation_result in schema.get_all_operations():
         if not isinstance(operation_result, Ok):
+            err = operation_result.err()
+            result.errors.append(f"operation_build_failed: {err.__class__.__name__}: {err}")
             continue
         operation = operation_result.ok()
         result.operations += 1
