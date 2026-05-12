@@ -17,6 +17,7 @@
 - False positive `negative_data_rejection` on query-level `additionalProperties` mutations. [#3730](https://github.com/schemathesis/schemathesis/issues/3730)
 - Resolve bundled `$ref` in `positive_data_acceptance` hint to avoid false "additional properties" suggestions.
 - Generate positive body cases for schemas combining `allOf` with `readOnly` required properties.
+- Emit a unique-array case alongside the duplicate for scalar parameters declaring `uniqueItems`.
 
 ## [4.18.3](https://github.com/schemathesis/schemathesis/compare/v4.18.2...v4.18.3) - 2026-05-12
 
