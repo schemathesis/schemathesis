@@ -12,6 +12,7 @@
 - Emit a populated positive baseline for `type: array` parameters so item-level keywords reach coverage.
 - Drop wildcard `*/*` from Swagger 2.0 `consumes` so coverage requests carry a concrete `Content-Type`.
 - Treat 409 Conflict as a valid rejection status for `negative_data_rejection`.
+- Retry slow schema endpoints (read timeouts) under `--wait-for-schema`. [#4058](https://github.com/schemathesis/schemathesis/issues/4058)
 
 ## [4.18.3](https://github.com/schemathesis/schemathesis/compare/v4.18.2...v4.18.3) - 2026-05-12
 

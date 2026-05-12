@@ -105,7 +105,9 @@ def load_from_url(
         retried = retry(
             wait=wait_fixed(WAIT_FOR_SCHEMA_INTERVAL),
             stop=stop_after_delay(wait_for_schema),
-            retry=retry_if_exception_type((requests.exceptions.ConnectionError, _ServiceUnavailableError)),
+            retry=retry_if_exception_type(
+                (requests.exceptions.ConnectionError, requests.exceptions.Timeout, _ServiceUnavailableError)
+            ),
             reraise=True,
         )(_func)
 
