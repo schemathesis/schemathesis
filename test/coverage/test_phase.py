@@ -7926,3 +7926,53 @@ def test_multipart_body_with_binary_ref_completes_coverage(ctx):
         prepare_request(case, headers=None, config=config)
         count += 1
     assert count > 0
+
+
+def test_explicit_content_type_header_does_not_collide_with_body_coverage(ctx):
+    # When CT is declared as an explicit header parameter, body cases must keep CT pinned to the
+    # body's media type, and CT-mutation cases must not also carry a body (the two sweeps are independent).
+    schema = ctx.openapi.load_schema(
+        {
+            "/forgot": {
+                "post": {
+                    "consumes": ["application/json"],
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "in": "header",
+                            "type": "string",
+                            "enum": ["application/json", "application/xml"],
+                            "default": "application/json",
+                        },
+                        {
+                            "name": "body",
+                            "in": "body",
+                            "required": True,
+                            "schema": {"type": "object", "properties": {"email": {"type": "string"}}},
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/forgot"]["POST"]
+    body_cases_cts = set()
+    ct_mutation_bodies = []
+    for case in _iter_cases(operation, GenerationMode.POSITIVE) + _iter_cases(operation, GenerationMode.NEGATIVE):
+        headers = case.headers or {}
+        ct = headers.get("Content-Type")
+        param_loc = case.meta.phase.data.parameter_location
+        param_name = case.meta.phase.data.parameter
+        is_ct_mutation = param_loc == ParameterLocation.HEADER and (param_name or "").lower() == "content-type"
+        if is_ct_mutation:
+            ct_mutation_bodies.append(case.body)
+        elif case.body is not NOT_SET:
+            assert ct == "application/json", f"body case got Content-Type={ct!r}, expected 'application/json'"
+            body_cases_cts.add(ct)
+    assert body_cases_cts == {"application/json"}, f"expected body cases pinned to JSON, got {body_cases_cts}"
+    assert ct_mutation_bodies, "expected Content-Type mutation cases to be generated"
+    assert all(b is NOT_SET for b in ct_mutation_bodies), (
+        f"CT-mutation cases should not carry a body, got: {ct_mutation_bodies}"
+    )

@@ -507,6 +507,15 @@ def iter_coverage_cases(
             schema,
         )
         value = next(gen, NOT_SET)
+        # Pin the template's Content-Type to the body media type when CT is declared as an explicit
+        # header parameter — otherwise body cases inherit a fuzzed CT (often empty) and ship bodies
+        # that downstream tools can't dispatch. CT-mutation variants still flow through the iterator.
+        if location == ParameterLocation.HEADER and name.lower() == "content-type" and operation.body:
+            value = GeneratedValue.with_positive(
+                value=operation.body[0].media_type,
+                scenario=CoverageScenario.VALID_STRING,
+                description="Valid Content-Type pinned to body media type",
+            )
         if isinstance(value, NotSet):
             if location == ParameterLocation.PATH:
                 # Can't skip path parameters - they should be filled
@@ -774,6 +783,9 @@ def iter_coverage_cases(
 
     for (location, name), gen in generators.items():
         iterator = iter(gen)
+        # CT-mutation cases test Content-Type validation, not body validation; carrying the
+        # template's body would conflate the two sweeps (matches the missing-CT special-case below).
+        is_content_type_mutation = location == ParameterLocation.HEADER and name.lower() == "content-type"
         while True:
             instant = Instant()
             try:
@@ -782,19 +794,25 @@ def iter_coverage_cases(
             except StopIteration:
                 break
 
+            kwargs = data.kwargs
+            raw = data.raw
+            if is_content_type_mutation:
+                kwargs = {k: v for k, v in kwargs.items() if k not in ("body", "media_type")}
+                raw = {k: v for k, v in raw.items() if k not in ("body", "media_type")}
+
             if value.generation_mode == GenerationMode.NEGATIVE:
                 if template_body_is_fallback_negative:
                     # Skip: would emit a case with NEGATIVE body + NEGATIVE param.
                     continue
-                seen_negative.insert(data.kwargs)
+                seen_negative.insert(kwargs)
             elif value.generation_mode == GenerationMode.POSITIVE:
-                if has_required_body and not has_generated_required_body:
+                if has_required_body and not has_generated_required_body and not is_content_type_mutation:
                     continue
-                if not seen_positive.insert(data.kwargs):
+                if not seen_positive.insert(kwargs):
                     continue
 
             yield operation.Case(
-                **data.kwargs,
+                **kwargs,
                 _meta=_build_meta(
                     generation=GenerationInfo(time=instant.elapsed, mode=value.generation_mode),
                     components=data.components,
@@ -805,7 +823,7 @@ def iter_coverage_cases(
                         parameter=name,
                         parameter_location=location,
                     ),
-                    raw=data.raw,
+                    raw=raw,
                 ),
             )
     if template_body_is_fallback_negative:
