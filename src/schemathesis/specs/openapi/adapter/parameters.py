@@ -940,6 +940,11 @@ def iter_parameters_v2(
     bundle_cache: BundleCache,
 ) -> Iterator[OperationParameter]:
     media_types = definition.get("consumes", default_media_types)
+    # Wildcard `*/*` is valid Swagger but no real client sends it as Content-Type. Drop it when concrete
+    # entries exist; otherwise fall through to the JSON default so downstream dispatch can route bodies.
+    if media_types and any(m == "*/*" for m in media_types):
+        concrete = [m for m in media_types if m != "*/*"]
+        media_types = concrete or []
     # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
     body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
     # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
