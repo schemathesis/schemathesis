@@ -596,9 +596,18 @@ def _update_schema_pattern(
     schema: dict[str, Any], update_pattern: Callable[[str, int | None, int | None], str]
 ) -> None:
     pattern = schema.get("pattern")
+    # Meta-schemas (e.g. Kubernetes CRD `JSONSchemaProps`) carry property *names*
+    # `pattern` / `minLength` / `maxLength` whose values are sub-schema dicts; skip
+    # optimization unless these slots actually hold a regex string and integer bounds.
+    if not isinstance(pattern, str) or not pattern:
+        return
     min_length = schema.get("minLength")
     max_length = schema.get("maxLength")
-    if pattern and (min_length or max_length):
+    if not isinstance(min_length, int) or isinstance(min_length, bool):
+        min_length = None
+    if not isinstance(max_length, int) or isinstance(max_length, bool):
+        max_length = None
+    if min_length or max_length:
         new_pattern = update_pattern(pattern, min_length, max_length)
         if new_pattern != pattern:
             schema.pop("minLength", None)

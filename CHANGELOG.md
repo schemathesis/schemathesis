@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Crash in coverage phase on schemas with property names `pattern`/`minLength`/`maxLength` (e.g. Kubernetes CRDs).
 - Crash in fuzzing phase on negative mutations of bundled `$ref` schemas carrying sibling validation keywords.
 
 ## [4.18.3](https://github.com/schemathesis/schemathesis/compare/v4.18.2...v4.18.3) - 2026-05-12

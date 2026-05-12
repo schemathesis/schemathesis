@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
     CoverageScenario,
     GeneratedValue,
+    _apply_pattern_optimizations,
     _cover_positive_for_type,
     _positive_number,
     _positive_string,
@@ -1280,6 +1281,23 @@ def test_positive_pattern_with_char_class_and_min_length(pctx):
     covered = cover_schema(pctx, schema)
     for value in covered:
         assert len(value) >= 3, f"Generated string {value!r} violates minLength=3"
+
+
+def test_apply_pattern_optimizations_skips_non_keyword_property_names():
+    # JSON Schema meta-schemas (e.g. Kubernetes CRD `JSONSchemaProps`) declare sub-schemas
+    # whose property *names* happen to be `pattern` / `minLength` / `maxLength`. The walker
+    # must skip these — they are sub-schema dicts, not regex strings / integer bounds.
+    bundle = {
+        "JSONSchemaProps": {
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string"},
+                "minLength": {"type": "integer", "format": "int64"},
+                "maxLength": {"type": "integer", "format": "int64"},
+            },
+        }
+    }
+    _apply_pattern_optimizations(bundle, update_quantifier)
 
 
 def test_negative_pattern_with_incompatible_length(nctx):
