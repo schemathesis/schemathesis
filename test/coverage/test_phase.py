@@ -7881,6 +7881,45 @@ def test_coverage_pool_draws_survive_numeric_id_serialization(ctx):
     )
 
 
+@pytest.mark.parametrize(
+    "consumes",
+    [["*/*"], ["*/*", "application/json"], ["application/xml", "*/*"]],
+    ids=["wildcard-only", "wildcard-then-json", "xml-then-wildcard"],
+)
+def test_wildcard_consumes_picks_concrete_media_type(ctx, consumes):
+    # Real clients never send Content-Type: */*; coverage must pick a concrete media type.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "consumes": consumes,
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {"type": "object", "properties": {"x": {"type": "string"}}},
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/foo"]["POST"]
+    media_types = {
+        case.media_type for case in _iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET
+    }
+    assert "*/*" not in media_types, f"Wildcard leaked into Content-Type: {media_types}"
+    assert media_types, "expected at least one body-carrying case"
+    concrete = [m for m in consumes if m != "*/*"]
+    if concrete:
+        assert media_types <= set(concrete), f"Unexpected media types: {media_types}"
+    else:
+        assert media_types == {"application/json"}
+
+
 def test_multipart_body_with_binary_ref_completes_coverage(ctx):
     # Multipart bodies whose schema referenced a nested $ref aborted with a validator error mid-iteration.
     schema = ctx.openapi.from_full_schema(
