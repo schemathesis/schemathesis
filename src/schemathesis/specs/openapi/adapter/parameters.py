@@ -990,7 +990,12 @@ def iter_parameters_v2(
 
     if form_parameters:
         form_data = form_data_to_json_schema(form_parameters)
-        for media_type in form_data_media_types:
+        # `in: formData` requires a form MIME in `consumes`; if none present, pick multipart when a file param exists, else urlencoded.
+        form_media_types = [m for m in form_data_media_types if m in FORM_MEDIA_TYPES]
+        if not form_media_types:
+            has_file = any(parameter.get("type") == "file" for parameter in form_parameters)
+            form_media_types = ["multipart/form-data" if has_file else "application/x-www-form-urlencoded"]
+        for media_type in form_media_types:
             # Individual `formData` parameters are joined into a single "composite" one.
             yield OpenApiBody.from_form_parameters(
                 definition=form_data, media_type=media_type, name_to_uri=form_name_to_uri, adapter=adapter
