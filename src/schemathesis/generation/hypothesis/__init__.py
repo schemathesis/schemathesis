@@ -374,6 +374,10 @@ def setup() -> None:
                 return cached
 
         if not isinstance(schema, dict) or BUNDLE_STORAGE_KEY not in schema:
+            if isinstance(schema, dict):
+                ref = schema.get("$ref")
+                if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX) and len(schema) > 1:
+                    return schema
             result = _original_canonicalish(schema)
             if cache_key is not None:
                 _canonicalish_cache_set(cache_key, result)
