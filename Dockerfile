@@ -102,7 +102,7 @@ COPY --from=python-builder /opt/python /opt/python
 
 COPY --from=app-builder /opt/venv /opt/venv
 
-RUN apk add --no-cache ca-certificates libgcc libstdc++
+RUN apk add --no-cache ca-certificates libgcc libstdc++ sqlite-libs
 
 RUN addgroup --gid 1000 -S schemathesis && \
     adduser --uid 1000 -D -S schemathesis -G schemathesis -s /sbin/nologin
