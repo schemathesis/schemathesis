@@ -84,9 +84,14 @@ def _to_json_schema(
     convert_if_then_else: bool = True,
     name_to_uri: dict[str, str] | None = None,
     merge_ref_siblings: bool = True,
+    bundle: dict[str, Any] | None = None,
 ) -> JsonSchema:
     if not isinstance(schema, dict):
         return schema if isinstance(schema, bool) else {}
+    if bundle is None:
+        nested_bundle = schema.get(BUNDLE_STORAGE_KEY)
+        if isinstance(nested_bundle, dict):
+            bundle = nested_bundle
 
     # OpenAPI 3.0 / Swagger 2.0: keys alongside `$ref` are ignored. Drop them so generation and
     # validation observe the same shape; otherwise a sibling like `type: string` next to a `$ref`
@@ -175,7 +180,7 @@ def _to_json_schema(
         _rewrite_allof_of_contains_consts(schema)
 
     if not is_response_schema:
-        _pin_discriminator_property(schema, name_to_uri)
+        _pin_discriminator_property(schema, name_to_uri, bundle)
 
     for keyword, value in schema.items():
         if keyword in IN_VALUE and isinstance(value, dict):
@@ -189,6 +194,7 @@ def _to_json_schema(
                 convert_if_then_else=convert_if_then_else,
                 name_to_uri=name_to_uri,
                 merge_ref_siblings=merge_ref_siblings,
+                bundle=bundle,
             )
         elif keyword in IN_ITEM and isinstance(value, list):
             for idx, subschema in enumerate(value):
@@ -202,6 +208,7 @@ def _to_json_schema(
                     convert_if_then_else=convert_if_then_else,
                     name_to_uri=name_to_uri,
                     merge_ref_siblings=merge_ref_siblings,
+                    bundle=bundle,
                 )
         elif keyword in IN_CHILD and isinstance(value, dict):
             for name, subschema in value.items():
@@ -215,6 +222,7 @@ def _to_json_schema(
                     convert_if_then_else=convert_if_then_else,
                     name_to_uri=name_to_uri,
                     merge_ref_siblings=merge_ref_siblings,
+                    bundle=bundle,
                 )
 
     # A property forbidden inside an `allOf` branch (read/write-only rewrite produces `{"not": {}}`)
@@ -244,7 +252,11 @@ def _forbidden_in_allof_branches(schema: dict[str, Any]) -> set[str]:
     return forbidden
 
 
-def _pin_discriminator_property(schema: dict[str, Any], name_to_uri: dict[str, str] | None) -> None:
+def _pin_discriminator_property(
+    schema: dict[str, Any],
+    name_to_uri: dict[str, str] | None,
+    bundle: dict[str, Any] | None = None,
+) -> None:
     """Pin the discriminator property to its expected value in each oneOf/anyOf branch.
 
     When a schema has a `discriminator`, each branch in oneOf/anyOf is wrapped in
@@ -277,13 +289,35 @@ def _pin_discriminator_property(schema: dict[str, Any], name_to_uri: dict[str, s
                 original_uri = name_to_uri.get(bundled_name, "")
                 if "#" in original_uri:
                     resolved_ref = "#" + original_uri.split("#", 1)[1]
-            # Look up explicit mapping first, then fall back to schema name from ref path
-            disc_value = ref_to_value.get(resolved_ref) or resolved_ref.rstrip("/").rsplit("/", 1)[-1]
+            # Without an explicit mapping, prefer the branch's own const/enum so the literal
+            # tag (`"function"`) wins over the schema name (`FunctionTool`).
+            disc_value = (
+                ref_to_value.get(resolved_ref)
+                or _branch_discriminator_value(ref, property_name, bundle)
+                or resolved_ref.rstrip("/").rsplit("/", 1)[-1]
+            )
             if not disc_value:
                 continue
             # `enum` is used instead of `const` so the pin is recognized under Draft 4
             # (used by OpenAPI 2.0 / 3.0); Draft 4 silently ignores `const`.
             items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": [disc_value]}}}]}
+
+
+def _branch_discriminator_value(ref: str, property_name: str, bundle: dict[str, Any] | None) -> str | None:
+    if bundle is None or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
+        return None
+    bundled = bundle.get(ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :])
+    properties = bundled.get("properties") if isinstance(bundled, dict) else None
+    sub = properties.get(property_name) if isinstance(properties, dict) else None
+    if not isinstance(sub, dict):
+        return None
+    const = sub.get("const")
+    if isinstance(const, str):
+        return const
+    enum = sub.get("enum")
+    if isinstance(enum, list) and len(enum) == 1 and isinstance(enum[0], str):
+        return enum[0]
+    return None
 
 
 def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
