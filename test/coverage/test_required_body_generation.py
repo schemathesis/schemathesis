@@ -16,6 +16,7 @@ def _load_json_body_operation(
     version="3.0.2",
     body_required=True,
     parameters=None,
+    **kwargs,
 ):
     request_body = {"content": {"application/json": {"schema": body_schema}}}
     if body_required is not None:
@@ -23,7 +24,7 @@ def _load_json_body_operation(
     operation = {"requestBody": request_body, "responses": {"200": {"description": "OK"}}}
     if parameters is not None:
         operation["parameters"] = parameters
-    schema = ctx.openapi.load_schema({path: {method: operation}}, version=version)
+    schema = ctx.openapi.load_schema({path: {method: operation}}, version=version, **kwargs)
     return schema[path][method.upper()]
 
 
@@ -311,6 +312,55 @@ def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
         path="/cache",
     )
     _assert_generated_bodies_match_schema(operation, GenerationMode.NEGATIVE, require_bodies=False)
+
+
+def test_deep_allof_chain_with_inherited_additional_properties_populates_inner_required(ctx):
+    # `additionalProperties: false` inherited through a chain of allOf bases would otherwise drop the wrapper's required keys.
+    operation = _load_json_body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Envelope"},
+        path="/items",
+        method="put",
+        components={
+            "schemas": {
+                "Base": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"baseField": {"type": "string"}},
+                },
+                "Intermediate": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                },
+                "Wrapper": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "allOf": [{"$ref": "#/components/schemas/Intermediate"}],
+                    "properties": {
+                        "first": {"type": "string"},
+                        "second": {"type": "string"},
+                    },
+                    "required": ["first", "second"],
+                },
+                "Envelope": {
+                    "type": "object",
+                    "properties": {"payload": {"$ref": "#/components/schemas/Wrapper"}},
+                    "required": ["payload"],
+                },
+            }
+        },
+    )
+
+    bodies = [
+        case.body for case in _collect_coverage_cases(operation, GenerationMode.POSITIVE) if case.body is not None
+    ]
+    populated = [
+        body
+        for body in bodies
+        if isinstance(body.get("payload"), dict) and {"first", "second"} <= body["payload"].keys()
+    ]
+    assert populated, f"Expected positive body with `payload.first` and `payload.second`, got {bodies!r}"
 
 
 def test_required_enforced_when_properties_at_threshold(ctx):
