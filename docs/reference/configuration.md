@@ -794,7 +794,7 @@ These settings can only be applied at the project level.
 
       - `not_a_server_error`: `["2xx", "3xx", "4xx"]`
       - `positive_data_acceptance`: `["2xx", "401", "403", "404", "409", "5xx"]`
-      - `negative_data_rejection`: `["400", "401", "403", "404", "405", "406", "422", "428", "5xx"]`
+      - `negative_data_rejection`: `["400", "401", "403", "404", "405", "406", "409", "422", "428", "5xx"]`
       - `missing_required_header`: `["400", "401", "403", "406", "422"]`
 
     Defines the HTTP status codes expected from the API for specific checks. Different checks may interpret this setting differently:

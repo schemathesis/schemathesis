@@ -263,12 +263,15 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
     ("status_code", "should_raise"),
     [
         pytest.param(405, False, id="405-method-not-allowed-passes"),
+        # 409 short-circuits validation on uniqueness-gated endpoints (duplicate email etc.)
+        # before the server reaches the mutated field — treating it as "accepted" is a false positive.
+        pytest.param(409, False, id="409-conflict-passes"),
         pytest.param(200, True, id="200-still-flagged"),
     ],
 )
-def test_negative_data_rejection_status_code_405(response_factory, sample_schema, status_code, should_raise):
-    # 405 is routing-level rejection, not a data-validation outcome — supervisor
-    # warns separately when it dominates an operation.
+def test_negative_data_rejection_passes_for_rejection_status_codes(
+    response_factory, sample_schema, status_code, should_raise
+):
     response = response_factory.requests(status_code=status_code)
     operation = sample_schema["/test"]["POST"]
     case = operation.Case(
