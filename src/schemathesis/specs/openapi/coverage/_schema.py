@@ -1603,7 +1603,8 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
             if schema_keys <= _FAST_PATH_KEYS:
                 required_for_template = [k for k in required if k in all_properties]
             else:
-                required_for_template = list(all_properties)
+                # `{"not": {}}` marks a property as forbidden; requiring it makes the template unsatisfiable.
+                required_for_template = [k for k, v in all_properties.items() if v != {"not": {}}]
             return {
                 **schema,
                 "required": required_for_template,
