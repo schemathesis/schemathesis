@@ -761,7 +761,7 @@ def _cover_positive_for_type(
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty, ctx)
         template = ctx.generate_from_schema(template_schema)
-    elif "properties" in schema or "required" in schema:
+    elif _implies_object_type(schema):
         template_schema = _get_template_schema(schema, "object", ctx)
         template = ctx.generate_from_schema(template_schema)
     else:
@@ -897,7 +897,7 @@ def _cover_positive_for_type(
                         _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
                         schema,
                     )
-            elif "properties" in schema or "required" in schema:
+            elif _implies_object_type(schema):
                 yield from _filter_against_combinators(
                     _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
                     schema,
@@ -1539,6 +1539,21 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
 
 
 _FAST_PATH_KEYS = frozenset({"properties", "required", "type"})
+
+
+_OBJECT_ONLY_KEYWORDS = ("properties", "required", "patternProperties", "propertyNames", "dependencies")
+
+
+def _implies_object_type(schema: JsonSchemaObject) -> bool:
+    # `additionalProperties: {schema}` implicitly types the value as an object even when
+    # `type: object` is omitted (common in Azure swagger 2.0 tag maps); without this the
+    # positive object generator never runs and the keyword stays uncovered.
+    if any(key in schema for key in _OBJECT_ONLY_KEYWORDS):
+        return True
+    additional = schema.get("additionalProperties")
+    if isinstance(additional, dict):
+        return True
+    return False
 
 
 def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext) -> JsonSchemaObject:
