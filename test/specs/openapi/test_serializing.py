@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.serialization import (
+    _schema_has_nested_object_properties,
     comma_delimited_object,
     conversion,
     deep_object,
@@ -22,6 +23,8 @@ from schemathesis.specs.openapi.serialization import (
     matrix_array,
     matrix_object,
     matrix_primitive,
+    nested_object,
+    serialize_openapi3_parameters,
 )
 from schemathesis.transport.prepare import get_default_headers
 from test.utils import assert_requests_call
@@ -756,3 +759,180 @@ def test_unusual_form_schema(ctx, type_name):
         assert list(headers) == [*list(get_default_headers()), SCHEMATHESIS_TEST_CASE_HEADER, "content-type"]
 
     test()
+
+
+NESTED_OBJECT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "pagination": {
+            "type": "object",
+            "properties": {
+                "pageNumber": {"type": "integer"},
+                "pageSize": {"type": "integer"},
+            },
+        },
+    },
+}
+
+
+_NESTED_INPUT = {"pagination": {"pageNumber": 1, "pageSize": 10}}
+_NESTED_EXPECTED = {"request[pagination][pageNumber]": 1, "request[pagination][pageSize]": 10}
+
+
+@pytest.mark.parametrize(
+    ("definition", "input_value", "expected"),
+    [
+        pytest.param(
+            {
+                "name": "request",
+                "in": "query",
+                "required": True,
+                "schema": {"$ref": "#/x-bundled/Request", "x-bundled": {"Request": NESTED_OBJECT_SCHEMA}},
+            },
+            {"request": _NESTED_INPUT},
+            _NESTED_EXPECTED,
+            id="bundled-ref-nested",
+        ),
+        pytest.param(
+            {"name": "request", "in": "query", "required": True, "schema": NESTED_OBJECT_SCHEMA},
+            {"request": _NESTED_INPUT},
+            {"pagination": _NESTED_INPUT["pagination"]},
+            id="inline-nested-keeps-extract",
+        ),
+        pytest.param(
+            {
+                "name": "request",
+                "in": "query",
+                "required": True,
+                "style": "deepObject",
+                "explode": True,
+                "schema": NESTED_OBJECT_SCHEMA,
+            },
+            {"request": _NESTED_INPUT},
+            {"request[pagination]": _NESTED_INPUT["pagination"]},
+            id="deepObject-inline-stays-one-level",
+        ),
+        pytest.param(
+            {
+                "name": "id",
+                "in": "query",
+                "required": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {"role": {"type": "string"}, "firstName": {"type": "string"}},
+                },
+            },
+            {"id": {"role": "admin", "firstName": "Alex"}},
+            {"role": "admin", "firstName": "Alex"},
+            id="flat-object-extracted",
+        ),
+        pytest.param(
+            {
+                "name": "q",
+                "in": "query",
+                "required": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "foo-1": {"type": "string"},
+                        "spam-1": {"$ref": "#/x-bundled/Spam", "x-bundled": {"Spam": NESTED_OBJECT_SCHEMA}},
+                    },
+                },
+            },
+            {"q": {"foo-1": "value", "spam-1": {"pagination": {"pageNumber": 1, "pageSize": 10}}}},
+            {"foo-1": "value", "spam-1": {"pagination": {"pageNumber": 1, "pageSize": 10}}},
+            id="inline-object-with-ref-property-keeps-extract",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "required": True, "schema": {"type": "integer"}},
+            {"page": 42},
+            {"page": 42},
+            id="integer-passthrough",
+        ),
+        pytest.param(
+            {"name": "anything", "in": "query", "required": True},
+            {"anything": "ok"},
+            {"anything": "ok"},
+            id="no-schema-passthrough",
+        ),
+    ],
+)
+def test_query_parameter_serialization(definition, input_value, expected):
+    serializer = serialize_openapi3_parameters([definition])
+    actual = serializer(dict(input_value)) if serializer is not None else dict(input_value)
+    assert actual == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param(_NESTED_INPUT, _NESTED_EXPECTED, id="two-levels"),
+        pytest.param(
+            {"flat": "value", "nested": {"deep": {"leaf": True}}},
+            {"request[flat]": "value", "request[nested][deep][leaf]": True},
+            id="mixed-depths",
+        ),
+        pytest.param(
+            {"items": [1, 2, 3]},
+            {"request[items][0]": 1, "request[items][1]": 2, "request[items][2]": 3},
+            id="list-property",
+        ),
+        pytest.param({}, {"request": ""}, id="empty"),
+    ],
+)
+def test_nested_object_recursive_brackets(value, expected):
+    assert nested_object("request")({"request": value}) == expected
+
+
+@pytest.mark.parametrize(
+    ("input_value", "expected"),
+    [
+        pytest.param("oops", {"request": "oops"}, id="non-dict-string"),
+        pytest.param(42, {"request": 42}, id="non-dict-int"),
+        pytest.param({"meta": {}}, {"request[meta]": ""}, id="empty-nested-dict"),
+        pytest.param({"items": []}, {"request[items]": ""}, id="empty-nested-list"),
+        pytest.param({"items": ()}, {"request[items]": ""}, id="empty-tuple"),
+        pytest.param({"items": (1, 2)}, {"request[items][0]": 1, "request[items][1]": 2}, id="tuple-list-like"),
+    ],
+)
+def test_nested_object_corner_cases(input_value, expected):
+    assert nested_object("request")({"request": input_value}) == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        pytest.param(None, False, id="none-schema"),
+        pytest.param({}, False, id="empty-schema"),
+        pytest.param({"type": "object"}, False, id="no-properties-key"),
+        pytest.param({"type": "object", "properties": None}, False, id="properties-not-mapping"),
+        pytest.param({"type": "object", "properties": {"x": True}}, False, id="boolean-property-schema-skipped"),
+        pytest.param(
+            {"type": "object", "properties": {"x": {"type": "integer"}}}, False, id="flat-primitive-properties"
+        ),
+        pytest.param(
+            {
+                "type": "object",
+                "properties": {"x": {"type": ["object", "null"], "properties": {"y": {"type": "string"}}}},
+            },
+            True,
+            id="type-list-object",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"x": {"properties": {"y": {"type": "string"}}}}},
+            True,
+            id="implicit-object-via-properties",
+        ),
+        pytest.param(
+            {
+                "type": "object",
+                "properties": {"x": {"$ref": "#/x-bundled/Nested"}},
+                "x-bundled": {"Nested": {"type": "object", "properties": {"y": {"type": "string"}}}},
+            },
+            True,
+            id="ref-property-with-bundle-splice",
+        ),
+    ],
+)
+def test_schema_has_nested_object_properties_detection(schema, expected):
+    assert _schema_has_nested_object_properties(schema) is expected
