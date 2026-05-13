@@ -163,16 +163,7 @@
           "resource_field": "containerName"
         }
       ],
-      "outputs": [
-        {
-          "cardinality": "ONE",
-          "extract_object_keys": false,
-          "is_primitive_identifier": false,
-          "pointer": "/",
-          "resource": "Logs",
-          "status_code": "200"
-        }
-      ]
+      "outputs": []
     },
     "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerInstance/containerGroups/{containerGroupName}": {
       "inputs": [
@@ -273,16 +264,6 @@
           "null",
           "number",
           "object",
-          "string"
-        ]
-      }
-    },
-    "Logs": {
-      "fields": [
-        "content"
-      ],
-      "types": {
-        "content": [
           "string"
         ]
       }
