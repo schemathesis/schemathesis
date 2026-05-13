@@ -258,9 +258,9 @@
   
   ## Top server-error operations
   
-  | Operation | Total | 5xx | Ratio |
-  |-----------|-------|-----|-------|
-  | GET /flaky | 10 | 8 | 80.0% |
+  | Operation | Total | 5xx | P+5xx | N+5xx | Ratio |
+  |-----------|-------|-----|-------|-------|-------|
+  | GET /flaky | 10 | 8 | 6 | 2 | 80.0% |
   
   ## Reachability
   **Reached:** 3/3 operations (100.0%) produced ≥1 2xx response.

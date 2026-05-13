@@ -22,7 +22,7 @@ def _sample_run() -> RunMetrics:
             negative_rejected=4,
             positive_drift=5,
             negative_drift=2,
-            server_error=1,
+            positive_server_error=1,
             route_rejected=1,
             auth_rejected=2,
             other=2,
@@ -42,7 +42,7 @@ def _sample_run() -> RunMetrics:
                     positive_drift=1,
                     negative_rejected=2,
                     negative_drift=2,
-                    server_error=1,
+                    positive_server_error=1,
                     auth_rejected=2,
                     route_rejected=1,
                     other=2,
@@ -86,7 +86,7 @@ def test_render_markdown_with_stateful_snapshot(snapshot):
     run = _sample_run()
     run.stateful = OperationMetrics(
         label="Stateful tests",
-        buckets=Bucket(positive_accepted=10, positive_drift=20, server_error=5),
+        buckets=Bucket(positive_accepted=10, positive_drift=20, positive_server_error=5),
         wasted_by_location={"body": 12, "path": 8},
     )
     assert render_markdown(run) == snapshot
@@ -95,7 +95,7 @@ def test_render_markdown_with_stateful_snapshot(snapshot):
 def test_render_markdown_with_5xx_operation_snapshot(snapshot):
     run = _sample_run()
     run.operations["GET /flaky"] = OperationMetrics(
-        label="GET /flaky", buckets=Bucket(positive_accepted=2, server_error=8)
+        label="GET /flaky", buckets=Bucket(positive_accepted=2, positive_server_error=6, negative_server_error=2)
     )
     assert render_markdown(run) == snapshot
 
@@ -156,7 +156,8 @@ def test_render_markdown_failure_summary_with_two_fingerprints_snapshot(snapshot
 def test_render_markdown_no_top_5xx_section_when_no_5xx():
     run = _sample_run()
     for operation in run.operations.values():
-        operation.buckets.server_error = 0
+        operation.buckets.positive_server_error = 0
+        operation.buckets.negative_server_error = 0
     assert "## Top server-error operations" not in render_markdown(run)
 
 
@@ -172,7 +173,8 @@ def test_render_markdown_no_headline_when_balanced():
         negative_rejected=10,
         positive_drift=10,
         negative_drift=10,
-        server_error=10,
+        positive_server_error=5,
+        negative_server_error=5,
         route_rejected=10,
         auth_rejected=10,
         other=10,
@@ -222,7 +224,8 @@ def test_render_json_round_trips_run_metrics(analyzer_ndjson):
         "negative_rejected",
         "positive_drift",
         "negative_drift",
-        "server_error",
+        "positive_server_error",
+        "negative_server_error",
         "route_rejected",
         "auth_rejected",
         "other",

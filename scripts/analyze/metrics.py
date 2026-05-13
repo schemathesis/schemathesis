@@ -16,7 +16,12 @@ class CallBucket(enum.Enum):
     NEGATIVE_REJECTED = "negative_rejected"
     POSITIVE_DRIFT = "positive_drift"
     NEGATIVE_DRIFT = "negative_drift"
-    SERVER_ERROR = "server_error"
+    # SUT crashes on valid input — real bug.
+    POSITIVE_SERVER_ERROR = "positive_server_error"
+    # SUT crashes on invalid input instead of returning 4xx — server still has a bug but
+    # the engine did its job; counted separately so "we sent invalid data" doesn't drown
+    # out "we sent valid data and the server fell over".
+    NEGATIVE_SERVER_ERROR = "negative_server_error"
     ROUTE_REJECTED = "route_rejected"
     AUTH_REJECTED = "auth_rejected"
     OTHER = "other"
@@ -45,10 +50,15 @@ class Bucket:
     negative_rejected: int = 0
     positive_drift: int = 0
     negative_drift: int = 0
-    server_error: int = 0
+    positive_server_error: int = 0
+    negative_server_error: int = 0
     route_rejected: int = 0
     auth_rejected: int = 0
     other: int = 0
+
+    @property
+    def server_error(self) -> int:
+        return self.positive_server_error + self.negative_server_error
 
     @property
     def total(self) -> int:
@@ -57,7 +67,8 @@ class Bucket:
             + self.negative_rejected
             + self.positive_drift
             + self.negative_drift
-            + self.server_error
+            + self.positive_server_error
+            + self.negative_server_error
             + self.route_rejected
             + self.auth_rejected
             + self.other
@@ -70,7 +81,8 @@ class Bucket:
             + self.negative_rejected
             + self.positive_drift
             + self.negative_drift
-            + self.server_error
+            + self.positive_server_error
+            + self.negative_server_error
         )
 
     @property
@@ -84,7 +96,7 @@ class Bucket:
 
     @property
     def useful(self) -> int:
-        return self.positive_accepted + self.negative_rejected + self.server_error
+        return self.positive_accepted + self.negative_rejected + self.positive_server_error + self.negative_server_error
 
     @property
     def useful_ratio(self) -> float:
@@ -101,8 +113,10 @@ class Bucket:
                 self.positive_drift += 1
             case CallBucket.NEGATIVE_DRIFT:
                 self.negative_drift += 1
-            case CallBucket.SERVER_ERROR:
-                self.server_error += 1
+            case CallBucket.POSITIVE_SERVER_ERROR:
+                self.positive_server_error += 1
+            case CallBucket.NEGATIVE_SERVER_ERROR:
+                self.negative_server_error += 1
             case CallBucket.ROUTE_REJECTED:
                 self.route_rejected += 1
             case CallBucket.AUTH_REJECTED:
@@ -421,7 +435,9 @@ def classify_call(call: dict) -> CallClassification:
         if status in (404, 405) and not matches_route:
             return CallClassification(CallBucket.ROUTE_REJECTED)
         if 500 <= status < 600:
-            return CallClassification(CallBucket.SERVER_ERROR)
+            if mode == "negative":
+                return CallClassification(CallBucket.NEGATIVE_SERVER_ERROR)
+            return CallClassification(CallBucket.POSITIVE_SERVER_ERROR)
         if 200 <= status < 300:
             if mode == "negative":
                 return CallClassification(CallBucket.NEGATIVE_DRIFT)
