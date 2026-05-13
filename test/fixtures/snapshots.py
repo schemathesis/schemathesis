@@ -211,7 +211,7 @@ class CliSnapshotConfig:
             # whole `Invalid component:` body to a placeholder so version-specific
             # case selection doesn't break the snapshot.
             data = re.sub(
-                r"^([ \t]*Invalid component:).*$",
+                r"^([ \t]*Invalid component:)[^\n]*(?:\n[ \t]+- violates[^\n]*)*",
                 r"\1 <PLACEHOLDER>",
                 data,
                 flags=re.MULTILINE,

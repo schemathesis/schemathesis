@@ -607,11 +607,17 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
                 description = phase.data.description
                 if description:
                     description = description[0].lower() + description[1:]
-                if parts:
-                    parts.append(f"- {description}")
+                if len(phase.data.mutations) > 1:
+                    # Render each mutation on its own indented bullet under the header.
+                    header = " ".join(parts)
+                    body = "\n".join(f"  {line}" for line in description.split("\n"))
+                    extra_info = f"\nInvalid component: {header}\n{body}" if header else f"\nInvalid component:\n{body}"
                 else:
-                    parts.append(description)
-                extra_info = "\nInvalid component: " + " ".join(parts)
+                    if parts:
+                        parts.append(f"- {description}")
+                    else:
+                        parts.append(description)
+                    extra_info = "\nInvalid component: " + " ".join(parts)
         raise AcceptedNegativeData(
             operation=case.operation.label,
             message=f"Invalid data should have been rejected\nExpected: {', '.join(config.expected_statuses)}{extra_info}",
