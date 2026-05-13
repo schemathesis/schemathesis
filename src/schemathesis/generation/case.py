@@ -253,12 +253,12 @@ class Case:
                 if _contains_bytes(value):
                     return False
                 if alternative.media_type == self.media_type:
-                    return make_validator(alternative.optimized_schema, validator_cls).is_valid(value)
+                    return make_validator(alternative.validation_schema, validator_cls).is_valid(value)
         # Validate other locations against container schema
         container = getattr(self.operation, location.container_name)
         if isinstance(value, CaseInsensitiveDict):
             value = dict(value)
-        return make_validator(container.schema, validator_cls).is_valid(value)
+        return make_validator(container.validation_schema, validator_cls).is_valid(value)
 
     def _hash_container(self, value: object) -> int:
         """Create a hash representing the current state of a container.

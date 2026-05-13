@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Runtime Error on hook-driven revalidation of OpenAPI 3.1 parameters with `prefixItems`. [#4099](https://github.com/schemathesis/schemathesis/issues/4099)
 - Send `formData` Swagger 2.0 parameters as form payloads when `consumes` only declares non-form media types.
 - Generate positive body cases for schemas inheriting `additionalProperties: false` through deep `allOf` chains.
 - Missing `sqlite-libs` in docker images.

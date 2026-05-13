@@ -195,6 +195,50 @@ def test_nested_dict_modification_detected(ctx):
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
 
 
+def test_hook_modifies_query_with_prefix_items_revalidates(ctx):
+    # OpenAPI 3.1 query schemas with `prefixItems` must not crash Draft 2020-12 revalidation.
+    schema = ctx.openapi.load_schema(
+        {
+            "/box": {
+                "parameters": [
+                    {
+                        "name": "box",
+                        "in": "query",
+                        "schema": {
+                            "type": "array",
+                            "minItems": 4,
+                            "maxItems": 4,
+                            "prefixItems": [
+                                {"type": "number", "minimum": -180.0, "maximum": 180.0},
+                                {"type": "number", "minimum": -90.0, "maximum": 90.0},
+                                {"type": "number", "minimum": -180.0, "maximum": 180.0},
+                                {"type": "number", "minimum": -90.0, "maximum": 90.0},
+                            ],
+                            "items": {"type": "number", "minimum": -180.0, "maximum": 180.0},
+                        },
+                    },
+                ],
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+        },
+        version="3.1.0",
+    )
+    operation = schema["/box"]["GET"]
+
+    meta = make_positive_meta(ParameterLocation.QUERY)
+    case = Case(
+        operation=operation,
+        method="GET",
+        path="/box",
+        query={"box": [0, 0, 1, 1]},
+        meta=meta,
+    )
+
+    # Hook-style reassignment marks the container dirty and triggers revalidation.
+    case.query = {"box": [0, 0, 1, 1]}
+    assert case.meta.generation.mode == GenerationMode.POSITIVE
+
+
 def test_hook_adds_required_field_metadata_updates(ctx):
     # See GH-3073
     schema = ctx.openapi.load_schema(
