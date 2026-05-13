@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .formats import register_string_format as format
-from .formats import unregister_string_format
-from .media_types import register_media_type as media_type
+from schemathesis.specs.openapi.formats import register_string_format as format
+from schemathesis.specs.openapi.formats import unregister_string_format
+from schemathesis.specs.openapi.media_types import register_media_type as media_type
 
 if TYPE_CHECKING:
     from schemathesis.filters import HasAPIOperation, MatcherFunc

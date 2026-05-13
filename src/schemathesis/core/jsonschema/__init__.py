@@ -4,7 +4,7 @@ from typing import Any
 
 import jsonschema_rs
 
-from .bundler import (
+from schemathesis.core.jsonschema.bundler import (
     BUNDLE_STORAGE_KEY,
     REFERENCE_TO_BUNDLE_PREFIX,
     BundleCache,
@@ -16,8 +16,8 @@ from .bundler import (
     unbundle,
     unbundle_path,
 )
-from .keywords import ALL_KEYWORDS
-from .types import JsonSchema, get_type
+from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
+from schemathesis.core.jsonschema.types import JsonSchema, get_type
 
 # Support lookahead/lookbehind assertions common in ECMA-262 patterns,
 # with a large size limit to handle schemas with large quantifiers (e.g., {1,51200})

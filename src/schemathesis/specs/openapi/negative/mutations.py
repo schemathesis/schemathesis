@@ -21,9 +21,8 @@ from schemathesis.core.media_types import is_xml
 from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
-
-from .types import Draw, Schema
-from .utils import can_negate, is_binary_format
+from schemathesis.specs.openapi.negative.types import Draw, Schema
+from schemathesis.specs.openapi.negative.utils import can_negate, is_binary_format
 
 T = TypeVar("T")
 

@@ -12,9 +12,8 @@ from typing import Any
 from schemathesis.core.deserialization import DeserializationContext, deserialize_response
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer_all
 from schemathesis.generation.stateful.state_machine import StepOutput
+from schemathesis.specs.openapi.expressions import lexer, nodes, parser
 from schemathesis.specs.openapi.expressions.nodes import BodyResponse
-
-from . import lexer, nodes, parser
 
 __all__ = ["MultiMatch", "lexer", "nodes", "parser"]
 

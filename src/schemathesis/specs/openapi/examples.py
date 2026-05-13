@@ -26,12 +26,11 @@ from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, openapi_cases
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
-
-from ._hypothesis import get_default_format_strategies, openapi_cases
-from .formats import STRING_FORMATS
+from schemathesis.specs.openapi.formats import STRING_FORMATS
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -214,7 +213,7 @@ def extract_top_level(
     operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
 ) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
-    from .schemas import OpenApiSchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     assert isinstance(operation.schema, OpenApiSchema)
 
@@ -550,7 +549,7 @@ def extract_from_schemas(
     operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
 ) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
-    from .schemas import OpenApiSchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     assert isinstance(operation.schema, OpenApiSchema)
     merge_ref_siblings = operation.schema.adapter.ref_siblings

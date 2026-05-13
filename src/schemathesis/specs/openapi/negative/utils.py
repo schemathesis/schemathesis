@@ -3,7 +3,7 @@ from typing import Any, TypeGuard
 
 from hypothesis_jsonschema._canonicalise import canonicalish
 
-from .types import Schema
+from schemathesis.specs.openapi.negative.types import Schema
 
 
 def can_negate(schema: Schema) -> bool:

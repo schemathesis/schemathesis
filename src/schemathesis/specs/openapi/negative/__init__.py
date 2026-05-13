@@ -18,9 +18,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.transport.serialization import Binary, contains_binary
-
-from .mutations import (
+from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
     MutationChannel,
     MutationContext,
@@ -29,15 +27,15 @@ from .mutations import (
     compute_mutation_targets,
     metadata_with_description_override,
 )
-from .value_channel import apply_value_channel, collect_value_targets
+from schemathesis.specs.openapi.negative.value_channel import apply_value_channel, collect_value_targets
+from schemathesis.transport.serialization import Binary, contains_binary
 
 SYNTAX_FUZZING_PROBABILITY = 0.05
 VALUE_CHANNEL_PROBABILITY = 0.15
 
 if TYPE_CHECKING:
     from schemathesis.resources import PoolDraw
-
-    from .types import Draw, Schema
+    from schemathesis.specs.openapi.negative.types import Draw, Schema
 
 
 def _is_not_valid_json(data: bytes) -> bool:
