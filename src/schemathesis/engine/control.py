@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from schemathesis.engine import StopReason
 
 
-@dataclass
+@dataclass(slots=True)
 class ExecutionControl:
     """Controls engine execution flow and tracks failures."""
 
@@ -21,15 +21,6 @@ class ExecutionControl:
     _failures_counter: int
     has_reached_the_failure_limit: bool
     _start_time: float
-
-    __slots__ = (
-        "stop_event",
-        "max_failures",
-        "max_time",
-        "_failures_counter",
-        "has_reached_the_failure_limit",
-        "_start_time",
-    )
 
     def __init__(
         self,

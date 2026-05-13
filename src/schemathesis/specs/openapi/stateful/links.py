@@ -16,7 +16,7 @@ from schemathesis.specs.openapi import expressions
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
 
 
-@dataclass
+@dataclass(slots=True)
 class NormalizedParameter:
     """Processed link parameter with resolved container information."""
 
@@ -25,8 +25,6 @@ class NormalizedParameter:
     expression: str
     container_name: str
     is_required: bool
-
-    __slots__ = ("location", "name", "expression", "container_name", "is_required")
 
 
 @dataclass(repr=False)
@@ -208,13 +206,11 @@ class OpenApiLink:
         return None
 
 
-@dataclass
+@dataclass(slots=True)
 class StepOutputWrapper:
     """Wrapper for StepOutput that uses only case_id for hash-based caching."""
 
     output: StepOutput
-
-    __slots__ = ("output",)
 
     def __hash__(self) -> int:
         return hash(self.output.case.id)

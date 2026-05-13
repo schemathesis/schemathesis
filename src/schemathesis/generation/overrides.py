@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation, OperationParameter
 
 
-@dataclass
+@dataclass(slots=True)
 class Override:
     """Overrides for various parts of a test case."""
 
@@ -22,8 +22,6 @@ class Override:
     cookies: dict[str, str]
     path_parameters: dict[str, str]
     body: dict[str, str]
-
-    __slots__ = ("query", "headers", "cookies", "path_parameters", "body")
 
     def items(self) -> Iterator[tuple[ParameterLocation, dict[str, str]]]:
         for key, value in (
@@ -80,12 +78,10 @@ def _get_override_value(param: OperationParameter, parameters: dict[str, Any]) -
     return None
 
 
-@dataclass
+@dataclass(slots=True)
 class StoredValue:
     value: Any
     is_generated: bool
-
-    __slots__ = ("value", "is_generated")
 
 
 def store_original_state(value: Any) -> Any:

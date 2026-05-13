@@ -77,15 +77,13 @@ def bold(option: str) -> str:
 TRUNCATION_PLACEHOLDER = "[...]"
 
 
-@dataclass
+@dataclass(slots=True)
 class ProbingProgressManager:
     console: Console
     start_time: float
     progress: Progress
     progress_task_id: TaskID | None
     is_interrupted: bool
-
-    __slots__ = ("console", "start_time", "progress", "progress_task_id", "is_interrupted")
 
     def __init__(self, console: Console) -> None:
         from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
@@ -136,7 +134,7 @@ class ProbingProgressManager:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class WarningData:
     missing_auth: dict[int, set[str]]
     missing_test_data: set[str]
@@ -145,16 +143,6 @@ class WarningData:
     unused_openapi_auth: set[str]
     unsupported_regex: dict[str, set[str]]
     method_not_allowed: set[str]
-
-    __slots__ = (
-        "missing_auth",
-        "missing_test_data",
-        "validation_mismatch",
-        "missing_deserializer",
-        "unused_openapi_auth",
-        "unsupported_regex",
-        "method_not_allowed",
-    )
 
     def __init__(
         self,
@@ -204,7 +192,7 @@ class WarningData:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class OperationProgress:
     """Tracks individual operation progress."""
 
@@ -212,10 +200,8 @@ class OperationProgress:
     start_time: float
     task_id: TaskID
 
-    __slots__ = ("label", "start_time", "task_id")
 
-
-@dataclass
+@dataclass(slots=True)
 class UnitTestProgressManager:
     """Manages progress display for unit tests."""
 
@@ -240,25 +226,6 @@ class UnitTestProgressManager:
     stats_task_id: TaskID
 
     is_interrupted: bool
-
-    __slots__ = (
-        "console",
-        "title",
-        "current",
-        "total",
-        "start_time",
-        "title_progress",
-        "progress_bar",
-        "operations_progress",
-        "current_operations",
-        "stats",
-        "stats_progress",
-        "live",
-        "title_task_id",
-        "progress_task_id",
-        "stats_task_id",
-        "is_interrupted",
-    )
 
     def __init__(
         self,
@@ -432,7 +399,7 @@ class UnitTestProgressManager:
         return f"{icon}  {self.title} ({duration_message})\n\n    {message}"
 
 
-@dataclass
+@dataclass(slots=True)
 class StatefulProgressManager:
     """Manages progress display for stateful testing."""
 
@@ -459,26 +426,6 @@ class StatefulProgressManager:
     links_covered: set[str]
     stats: dict[Status, int]
     is_interrupted: bool
-
-    __slots__ = (
-        "console",
-        "title",
-        "links_selected",
-        "links_inferred",
-        "links_total",
-        "start_time",
-        "title_progress",
-        "progress_bar",
-        "stats_progress",
-        "live",
-        "title_task_id",
-        "progress_task_id",
-        "stats_task_id",
-        "scenarios",
-        "links_covered",
-        "stats",
-        "is_interrupted",
-    )
 
     def __init__(
         self, *, console: Console, title: str, links_selected: int, links_inferred: int, links_total: int
@@ -1477,14 +1424,12 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         self.display_final_line(ctx, event)
 
 
-@dataclass
+@dataclass(slots=True)
 class StatusCodeStatistic:
     """Statistics about HTTP status codes in a scenario."""
 
     counts: dict[int, int]
     total: int
-
-    __slots__ = ("counts", "total")
 
     def ratio_for(self, status_code: int) -> float:
         """Calculate the ratio of responses with the given status code."""

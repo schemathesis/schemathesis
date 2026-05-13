@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
-@dataclass
+@dataclass(slots=True)
 class ParameterExample:
     """A single example for a named parameter."""
 
@@ -48,17 +48,13 @@ class ParameterExample:
     name: str
     value: Any
 
-    __slots__ = ("container", "name", "value")
 
-
-@dataclass
+@dataclass(slots=True)
 class BodyExample:
     """A single example for a body."""
 
     value: Any
     media_type: str
-
-    __slots__ = ("value", "media_type")
 
 
 Example = ParameterExample | BodyExample

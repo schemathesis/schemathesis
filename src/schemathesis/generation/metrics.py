@@ -12,7 +12,7 @@ from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 
 
-@dataclass
+@dataclass(slots=True)
 class MetricContext:
     """Context for evaluating a metric on a single test execution.
 
@@ -25,8 +25,6 @@ class MetricContext:
     """Generated test case."""
     response: Response
     """The HTTP response returned by the server for this test case."""
-
-    __slots__ = ("case", "response")
 
 
 MetricFunction = Callable[[MetricContext], float]

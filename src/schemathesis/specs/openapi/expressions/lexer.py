@@ -15,15 +15,13 @@ class TokenType(int, Enum):
     RBRACKET = 6
 
 
-@dataclass
+@dataclass(slots=True)
 class Token:
     """Lexical token that may occur in a runtime expression."""
 
     value: str
     end: int
     type_: TokenType
-
-    __slots__ = ("value", "end", "type_")
 
     # Helpers for cleaner instantiation
 

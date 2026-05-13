@@ -26,7 +26,7 @@ class ShellType(str, Enum):
         return self == ShellType.FISH
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EscapeResult:
     """Result of escaping a value for shell."""
 
@@ -41,8 +41,6 @@ class EscapeResult:
 
     shell_used: ShellType
     """Which shell type the escaping is for."""
-
-    __slots__ = ("escaped_value", "needs_warning", "original_bytes", "shell_used")
 
 
 _DETECTED_SHELL: ShellType | None = None

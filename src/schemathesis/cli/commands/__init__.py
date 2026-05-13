@@ -126,11 +126,9 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
     ctx.obj = Data(config=config)
 
 
-@dataclass
+@dataclass(slots=True)
 class Group:
     name: str
-
-    __slots__ = ("name",)
 
     def add_option(self, *args: Any, **kwargs: Any) -> None:
         for command in (run, fuzz):

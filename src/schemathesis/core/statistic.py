@@ -3,21 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(slots=True)
 class FilteredCount:
     """Count of total items and those passing filters."""
 
     total: int
     selected: int
 
-    __slots__ = ("total", "selected")
-
     def __init__(self) -> None:
         self.total = 0
         self.selected = 0
 
 
-@dataclass
+@dataclass(slots=True)
 class ResourcePoolInventory:
     """Resource-pool descriptors discovered from the schema.
 
@@ -33,23 +31,19 @@ class ResourcePoolInventory:
     # Distinct resource types referenced by either side.
     resources: int
 
-    __slots__ = ("producer_labels", "consumer_labels", "resources")
-
     def __init__(self) -> None:
         self.producer_labels = []
         self.consumer_labels = []
         self.resources = 0
 
 
-@dataclass
+@dataclass(slots=True)
 class ApiStatistic:
     """Statistics about API operations and inferable stateful transitions."""
 
     operations: FilteredCount
     transitions: FilteredCount
     resource_pool: ResourcePoolInventory
-
-    __slots__ = ("operations", "transitions", "resource_pool")
 
     def __init__(self) -> None:
         self.operations = FilteredCount()

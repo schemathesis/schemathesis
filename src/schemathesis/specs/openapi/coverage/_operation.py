@@ -135,13 +135,11 @@ class Template:
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
 
-@dataclass
+@dataclass(slots=True)
 class TemplateValue:
     kwargs: dict[str, Any]
     raw: dict[str, Any]
     components: dict[ParameterLocation, ComponentInfo]
-
-    __slots__ = ("kwargs", "raw", "components")
 
 
 def _stringify_value(val: Any, container_name: str) -> Any:

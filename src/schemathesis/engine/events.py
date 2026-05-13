@@ -51,11 +51,9 @@ class PhaseEvent(EngineEvent):
     phase: Phase
 
 
-@dataclass
+@dataclass(slots=True)
 class StatefulPhasePayload:
     inferred_transitions: int
-
-    __slots__ = ("inferred_transitions",)
 
 
 @dataclass

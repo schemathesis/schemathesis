@@ -115,7 +115,7 @@ def wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
     return wrapper
 
 
-@dataclass
+@dataclass(slots=True)
 class CacheKey:
     """A cache key for API Operation / location.
 
@@ -127,8 +127,6 @@ class CacheKey:
     schema: JsonSchema
     validator_cls: type[jsonschema_rs.Validator]
     custom_format_names: frozenset[str]
-
-    __slots__ = ("operation_name", "location", "schema", "validator_cls", "custom_format_names")
 
     def __hash__(self) -> int:
         return hash((self.operation_name, self.location, self.custom_format_names))

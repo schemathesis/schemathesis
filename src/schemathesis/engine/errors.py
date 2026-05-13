@@ -456,13 +456,11 @@ class UnhealthyAPIError(Exception):
     """The API is unhealthy enough that the stateful phase cannot continue."""
 
 
-@dataclass
+@dataclass(slots=True)
 class UnrecoverableNetworkError:
     error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout
     code_sample: str
     reason: str | None
-
-    __slots__ = ("error", "code_sample", "reason")
 
     def __init__(
         self,
@@ -475,12 +473,11 @@ class UnrecoverableNetworkError:
         self.reason = reason
 
 
-@dataclass
+@dataclass(slots=True)
 class TestingState:
     # Dict keyed by exception id to handle hypothesis reporting any of the encountered errors
     _unrecoverable_network_errors: dict[int, UnrecoverableNetworkError]
 
-    __slots__ = ("_unrecoverable_network_errors",)
     __test__ = False  # opt out of pytest's class-collection heuristic
 
     def __init__(self) -> None:

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
 
 
-@dataclass
+@dataclass(slots=True)
 class HarHandler(EventHandler):
     """CLI event handler that writes network interactions to a HAR JSON file."""
 
@@ -24,8 +24,6 @@ class HarHandler(EventHandler):
     preserve_bytes: bool
     queue: Queue[_Initialize | _Process | _Finalize]
     worker: threading.Thread
-
-    __slots__ = ("output", "config", "preserve_bytes", "queue", "worker")
 
     def __init__(
         self,
@@ -79,18 +77,16 @@ def _run(
                 break
 
 
-@dataclass
+@dataclass(slots=True)
 class _Initialize:
     seed: int | None
-    __slots__ = ("seed",)
 
 
-@dataclass
+@dataclass(slots=True)
 class _Process:
     recorder: ScenarioRecorder
-    __slots__ = ("recorder",)
 
 
-@dataclass
+@dataclass(slots=True)
 class _Finalize:
-    __slots__ = ()
+    pass

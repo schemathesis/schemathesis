@@ -57,7 +57,7 @@ class PhaseSkipReason(str, enum.Enum):
     NOTHING_TO_TEST = "nothing to test"
 
 
-@dataclass
+@dataclass(slots=True)
 class Phase:
     """A logically separate engine execution phase."""
 
@@ -65,8 +65,6 @@ class Phase:
     is_supported: bool
     is_enabled: bool
     skip_reason: PhaseSkipReason | None
-
-    __slots__ = ("name", "is_supported", "is_enabled", "skip_reason")
 
     def __init__(
         self, name: PhaseName, is_supported: bool, is_enabled: bool = True, skip_reason: PhaseSkipReason | None = None

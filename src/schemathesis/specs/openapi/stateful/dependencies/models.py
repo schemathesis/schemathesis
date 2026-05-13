@@ -16,14 +16,12 @@ from schemathesis.specs.openapi.stateful.dependencies.naming import from_path, s
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 
-@dataclass
+@dataclass(slots=True)
 class DependencyGraph:
     """Graph of API operations and their resource dependencies."""
 
     operations: OperationMap
     resources: ResourceMap
-
-    __slots__ = ("operations", "resources")
 
     def serialize(self) -> dict[str, Any]:
         serialized = asdict(self)
@@ -584,7 +582,7 @@ def extend_pointer(base: str, field: str, parent_cardinality: Cardinality) -> st
     return base
 
 
-@dataclass
+@dataclass(slots=True)
 class LinkDefinition:
     """OpenAPI Link Object definition.
 
@@ -601,8 +599,6 @@ class LinkDefinition:
     request_body: dict[str, str] | list
     """Request body (e.g., {'path.id': '$response.body#/id'})"""
 
-    __slots__ = ("operation_ref", "parameters", "request_body")
-
     def to_openapi(self) -> dict[str, Any]:
         """Convert to OpenAPI Links format."""
         links: dict[str, Any] = {
@@ -617,7 +613,7 @@ class LinkDefinition:
         return links
 
 
-@dataclass
+@dataclass(slots=True)
 class ResponseLinks:
     """Collection of OpenAPI Links for a producer operation's response.
 
@@ -641,14 +637,12 @@ class ResponseLinks:
     links: dict[str, LinkDefinition]
     """Named links (e.g., {'GetUserById': LinkDefinition(...)})"""
 
-    __slots__ = ("producer_operation_ref", "status_code", "links")
-
     def to_openapi(self) -> dict[str, Any]:
         """Convert to OpenAPI response links format."""
         return {name: link_def.to_openapi() for name, link_def in self.links.items()}
 
 
-@dataclass
+@dataclass(slots=True)
 class NormalizedLink:
     """Normalized representation of a link."""
 
@@ -657,10 +651,8 @@ class NormalizedLink:
     parameters: set[str]
     request_body: Any
 
-    __slots__ = ("path", "method", "parameters", "request_body")
 
-
-@dataclass
+@dataclass(slots=True)
 class OperationNode:
     """An API operation with its input/output dependencies."""
 
@@ -670,8 +662,6 @@ class OperationNode:
     inputs: list[InputSlot]
     # What this operation PRODUCES
     outputs: list[OutputSlot]
-
-    __slots__ = ("method", "path", "inputs", "outputs")
 
 
 @dataclass(slots=True)
@@ -749,7 +739,7 @@ class NestedFKField:
     is_array: bool
 
 
-@dataclass
+@dataclass(slots=True)
 class ResourceDefinition:
     """A minimal description of a resource structure."""
 
@@ -764,8 +754,6 @@ class ResourceDefinition:
     fk_fields: list[FKField]
     # FK fields found at nested paths in the schema
     nested_fk_fields: list[NestedFKField]
-
-    __slots__ = ("name", "fields", "types", "source", "fk_fields", "nested_fk_fields")
 
     @classmethod
     def without_properties(cls, name: str) -> ResourceDefinition:

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(unsafe_hash=True, slots=True)
 class OperationById:
     """API operation identified by operationId."""
 
@@ -38,21 +38,17 @@ class OperationById:
     method: str
     path: str
 
-    __slots__ = ("value", "method", "path")
-
     def to_link_base(self) -> dict[str, Any]:
         return {"operationId": self.value, SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True}}
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(unsafe_hash=True, slots=True)
 class OperationByRef:
     """API operation identified by JSON reference path."""
 
     value: str
     method: str
     path: str
-
-    __slots__ = ("value", "method", "path")
 
     def to_link_base(self) -> dict[str, Any]:
         return {"operationRef": self.value, SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True}}
@@ -63,7 +59,7 @@ OperationReference = OperationById | OperationByRef
 SeenLinkKey = tuple[str, str, int, tuple[str, ...]]
 
 
-@dataclass
+@dataclass(slots=True)
 class MatchList:
     """Results of matching a location path against API operation."""
 
@@ -71,10 +67,8 @@ class MatchList:
     inexact: list[OperationReference]
     parameters: Mapping[str, Any]
 
-    __slots__ = ("exact", "inexact", "parameters")
 
-
-@dataclass
+@dataclass(slots=True)
 class LinkInferencer:
     """Infer OpenAPI links from Location headers for stateful testing."""
 
@@ -84,8 +78,6 @@ class LinkInferencer:
     _base_url: str | None
     _base_path: str
     _links_keyword: str
-
-    __slots__ = ("_adapter", "_operations", "_base_url", "_base_path", "_links_keyword")
 
     @classmethod
     def from_schema(cls, schema: OpenApiSchema) -> LinkInferencer:

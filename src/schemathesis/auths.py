@@ -33,7 +33,7 @@ AuthStorageMark = Mark["AuthStorage"](attr_name="auth_storage")
 Auth = TypeVar("Auth")
 
 
-@dataclass
+@dataclass(slots=True)
 class AuthContext:
     """Runtime context passed to authentication providers during token generation.
 
@@ -61,8 +61,6 @@ class AuthContext:
     """API operation currently being processed for authentication."""
     app: Any | None
     """Python application instance (ASGI/WSGI app) when using app integration, `None` otherwise."""
-
-    __slots__ = ("operation", "app")
 
 
 CacheKeyFunction = Callable[["Case", "AuthContext"], str | int]

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class OperationLookupEntry:
     path: str
     method: str
@@ -21,7 +21,6 @@ class OperationLookupEntry:
     resolver: Resolver
     definition: dict[str, Any]
     shared_parameters: tuple[dict[str, Any], ...]
-    __slots__ = ("path", "method", "scope", "resolver", "definition", "shared_parameters")
 
 
 class OperationLookup:

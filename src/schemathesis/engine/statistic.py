@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
 
-@dataclass
+@dataclass(slots=True)
 class GroupedFailures:
     """Represents failures grouped by case ID."""
 
@@ -26,10 +26,8 @@ class GroupedFailures:
     failures: list[Failure]
     response: Response | None
 
-    __slots__ = ("case_id", "code_sample", "failures", "response")
 
-
-@dataclass
+@dataclass(slots=True)
 class Statistic:
     """Running statistics about test execution."""
 
@@ -44,16 +42,6 @@ class Statistic:
     total_cases: int
     cases_with_failures: int
     cases_without_checks: int
-
-    __slots__ = (
-        "failures",
-        "unique_failures_map",
-        "extraction_failures",
-        "tested_operations",
-        "total_cases",
-        "cases_with_failures",
-        "cases_without_checks",
-    )
 
     def __init__(self) -> None:
         self.failures = {}

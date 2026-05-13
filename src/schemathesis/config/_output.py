@@ -66,7 +66,7 @@ DEFAULT_SENSITIVE_MARKERS = (
 DEFAULT_REPLACEMENT = "[Filtered]"
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class SanitizationConfig(DiffBase):
     """Configuration for sanitizing sensitive data."""
 
@@ -74,8 +74,6 @@ class SanitizationConfig(DiffBase):
     keys_to_sanitize: tuple[str, ...]
     sensitive_markers: tuple[str, ...]
     replacement: str
-
-    __slots__ = ("enabled", "keys_to_sanitize", "sensitive_markers", "replacement")
 
     def __init__(
         self,
@@ -109,7 +107,7 @@ MAX_LINES = 10
 MAX_WIDTH = 80
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class TruncationConfig(DiffBase):
     """Configuration for truncating large output."""
 
@@ -117,8 +115,6 @@ class TruncationConfig(DiffBase):
     max_payload_size: int
     max_lines: int
     max_width: int
-
-    __slots__ = ("enabled", "max_payload_size", "max_lines", "max_width")
 
     def __init__(
         self,
@@ -147,12 +143,10 @@ class TruncationConfig(DiffBase):
             self.enabled = enabled
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class OutputConfig(DiffBase):
     sanitization: SanitizationConfig
     truncation: TruncationConfig
-
-    __slots__ = ("sanitization", "truncation")
 
     def __init__(
         self,

@@ -34,12 +34,10 @@ class ReportFormat(str, Enum):
         }[self]
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class ReportConfig(DiffBase):
     enabled: bool
     path: Path | None
-
-    __slots__ = ("enabled", "path")
 
     def __init__(self, *, enabled: bool = False, path: Path | None = None) -> None:
         self.enabled = enabled
@@ -54,7 +52,7 @@ class ReportConfig(DiffBase):
         return cls(enabled=enabled, path=path)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class ReportsConfig(DiffBase):
     directory: Path
     preserve_bytes: bool
@@ -64,8 +62,6 @@ class ReportsConfig(DiffBase):
     ndjson: ReportConfig
     allure: ReportConfig
     _timestamp: str
-
-    __slots__ = ("directory", "preserve_bytes", "junit", "vcr", "har", "ndjson", "allure", "_timestamp")
 
     def __init__(
         self,

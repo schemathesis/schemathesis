@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.metrics import MetricFunction
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class GenerationConfig(DiffBase):
     modes: list[GenerationMode]
     max_examples: int | None
@@ -31,23 +31,6 @@ class GenerationConfig(DiffBase):
     unique_inputs: bool
     exclude_header_characters: str | None
     _is_default: bool
-
-    __slots__ = (
-        "modes",
-        "max_examples",
-        "no_shrink",
-        "deterministic",
-        "allow_x00",
-        "allow_extra_parameters",
-        "codec",
-        "maximize",
-        "with_security_parameters",
-        "graphql_allow_null",
-        "database",
-        "unique_inputs",
-        "exclude_header_characters",
-        "_is_default",
-    )
 
     def __init__(
         self,

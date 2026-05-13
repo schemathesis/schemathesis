@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from schemathesis.config._diff_base import DiffBase
@@ -56,11 +56,9 @@ def validate_status_codes(value: Sequence[str] | None) -> Sequence[str] | None:
     return value
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class SimpleCheckConfig(DiffBase):
     enabled: bool
-
-    __slots__ = ("enabled",)
 
     def __init__(self, *, enabled: bool = True) -> None:
         self.enabled = enabled
@@ -70,25 +68,21 @@ class SimpleCheckConfig(DiffBase):
         return cls(enabled=data.get("enabled", True))
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class MaxResponseTimeConfig(DiffBase):
     enabled: bool
     limit: float | None
-
-    __slots__ = ("enabled", "limit")
 
     def __init__(self, *, limit: float | None = None) -> None:
         self.enabled = limit is not None
         self.limit = limit
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class CheckConfig(DiffBase):
     enabled: bool
     expected_statuses: list[str]
     _DEFAULT_EXPECTED_STATUSES: ClassVar[list[str]]
-
-    __slots__ = ("enabled", "expected_statuses")
 
     def __init__(self, *, enabled: bool = True, expected_statuses: Sequence[str | int] | None = None) -> None:
         self.enabled = enabled
@@ -124,7 +118,7 @@ class MissingRequiredHeaderConfig(CheckConfig):
     _DEFAULT_EXPECTED_STATUSES = MISSING_REQUIRED_HEADER_EXPECTED_STATUSES
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class ChecksConfig(DiffBase):
     not_a_server_error: NotAServerErrorConfig
     status_code_conformance: SimpleCheckConfig
@@ -140,23 +134,6 @@ class ChecksConfig(DiffBase):
     unsupported_method: SimpleCheckConfig
     max_response_time: MaxResponseTimeConfig
     _unknown: dict[str, SimpleCheckConfig]
-
-    __slots__ = (
-        "not_a_server_error",
-        "status_code_conformance",
-        "content_type_conformance",
-        "response_schema_conformance",
-        "response_headers_conformance",
-        "positive_data_acceptance",
-        "negative_data_rejection",
-        "use_after_free",
-        "ensure_resource_availability",
-        "missing_required_header",
-        "ignored_auth",
-        "unsupported_method",
-        "max_response_time",
-        "_unknown",
-    )
 
     def __init__(
         self,
@@ -242,7 +219,7 @@ class ChecksConfig(DiffBase):
         excluded_check_names: list[str] | None = None,
         max_response_time: float | None = None,
     ) -> None:
-        known_names = {name for name in self.__slots__ if not name.startswith("_")}
+        known_names = {f.name for f in fields(self) if not f.name.startswith("_")}
         for name in known_names:
             # Check in explicitly excluded or not in explicitly included
             if name in (excluded_check_names or []) or (

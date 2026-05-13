@@ -45,15 +45,13 @@ class DefinitionKind(str, enum.Enum):
     PARAMETER = "Parameter Object"
 
 
-@dataclass
+@dataclass(slots=True)
 class SchemaLocation:
     kind: DefinitionKind
     # Hint about where the definition is located
     hint: str | None
     # Open API spec version
     version: str
-
-    __slots__ = ("kind", "hint", "version")
 
     @classmethod
     def response_schema(cls, version: str) -> SchemaLocation:

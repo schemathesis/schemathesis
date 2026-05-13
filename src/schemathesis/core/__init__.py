@@ -32,12 +32,10 @@ class SpecificationFeature(str, enum.Enum):
     EXAMPLES = "example_tests"
 
 
-@dataclass
+@dataclass(slots=True)
 class Specification:
     kind: SpecificationKind
     version: str
-
-    __slots__ = ("kind", "version")
 
     @classmethod
     def openapi(cls, version: str) -> Specification:

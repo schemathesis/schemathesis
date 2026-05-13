@@ -34,13 +34,11 @@ class NodeType(str, Enum):
     RESPONSE = "$response"
 
 
-@dataclass
+@dataclass(slots=True)
 class String(Node):
     """A simple string that is not evaluated somehow specifically."""
 
     value: str
-
-    __slots__ = ("value",)
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         """String tokens are passed as they are.
@@ -52,11 +50,9 @@ class String(Node):
         return self.value
 
 
-@dataclass
+@dataclass(slots=True)
 class URL(Node):
     """A node for `$url` expression."""
-
-    __slots__ = ()
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         import requests
@@ -67,35 +63,29 @@ class URL(Node):
         return cast(str, prepared.url)
 
 
-@dataclass
+@dataclass(slots=True)
 class Method(Node):
     """A node for `$method` expression."""
-
-    __slots__ = ()
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         return output.case.operation.method.upper()
 
 
-@dataclass
+@dataclass(slots=True)
 class StatusCode(Node):
     """A node for `$statusCode` expression."""
-
-    __slots__ = ()
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         return str(output.response.status_code)
 
 
-@dataclass
+@dataclass(slots=True)
 class NonBodyRequest(Node):
     """A node for `$request` expressions where location is not `body`."""
 
     location: str
     parameter: str
     extractor: Extractor | None
-
-    __slots__ = ("location", "parameter", "extractor")
 
     def __init__(self, location: str, parameter: str, extractor: Extractor | None = None) -> None:
         self.location = location
@@ -118,13 +108,11 @@ class NonBodyRequest(Node):
         return value
 
 
-@dataclass
+@dataclass(slots=True)
 class BodyRequest(Node):
     """A node for `$request` expressions where location is `body`."""
 
     pointer: str | None
-
-    __slots__ = ("pointer",)
 
     def __init__(self, pointer: str | None = None) -> None:
         self.pointer = pointer
@@ -136,14 +124,12 @@ class BodyRequest(Node):
         return resolve_pointer(document, self.pointer[1:])
 
 
-@dataclass
+@dataclass(slots=True)
 class HeaderResponse(Node):
     """A node for `$response.header` expressions."""
 
     parameter: str
     extractor: Extractor | None
-
-    __slots__ = ("parameter", "extractor")
 
     def __init__(self, parameter: str, extractor: Extractor | None = None) -> None:
         self.parameter = parameter
@@ -158,13 +144,11 @@ class HeaderResponse(Node):
         return value[0]
 
 
-@dataclass
+@dataclass(slots=True)
 class BodyResponse(Node):
     """A node for `$response.body` expressions."""
 
     pointer: str | None
-
-    __slots__ = ("pointer",)
 
     def __init__(self, pointer: str | None = None) -> None:
         self.pointer = pointer

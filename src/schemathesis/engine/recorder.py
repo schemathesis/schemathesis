@@ -179,7 +179,7 @@ class ScenarioRecorder:
                 yield node.value
 
 
-@dataclass
+@dataclass(slots=True)
 class CaseNode:
     """Represents a test case and its parent-child relationship."""
 
@@ -190,24 +190,18 @@ class CaseNode:
     transition: Transition | None
     is_transition_applied: bool
 
-    __slots__ = ("value", "parent_id", "transition", "is_transition_applied")
 
-
-@dataclass
+@dataclass(slots=True)
 class CheckNode:
     name: str
     status: Status
     failure_info: CheckFailureInfo | None
 
-    __slots__ = ("name", "status", "failure_info")
 
-
-@dataclass
+@dataclass(slots=True)
 class CheckFailureInfo:
     code_sample: str
     failure: Failure
-
-    __slots__ = ("code_sample", "failure")
 
 
 def serialize_payload(payload: bytes) -> str:
@@ -270,7 +264,7 @@ class Request:
         return None
 
 
-@dataclass
+@dataclass(slots=True)
 class Interaction:
     """Represents a single interaction with the tested application."""
 
@@ -278,20 +272,16 @@ class Interaction:
     response: Response | None
     timestamp: float
 
-    __slots__ = ("request", "response", "timestamp")
-
     def __init__(self, request: Request, response: Response | None) -> None:
         self.request = request
         self.response = response
         self.timestamp = time.time()
 
 
-@dataclass
+@dataclass(slots=True)
 class FailureData:
     """Details about a test failure, including the case and its context."""
 
     case: Case
     headers: dict[str, str]
     verify: bool
-
-    __slots__ = ("case", "headers", "verify")

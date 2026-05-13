@@ -125,7 +125,7 @@ def make_console(**kwargs: Any) -> Console:
     return Console(**kwargs)
 
 
-@dataclass
+@dataclass(slots=True)
 class LoadingProgressManager:
     """Manage the loading spinner and completion/error messages for schema loading."""
 
@@ -135,8 +135,6 @@ class LoadingProgressManager:
     progress: Progress
     progress_task_id: TaskID | None
     is_interrupted: bool
-
-    __slots__ = ("console", "location", "start_time", "progress", "progress_task_id", "is_interrupted")
 
     def __init__(self, console: Console, location: str) -> None:
         from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn

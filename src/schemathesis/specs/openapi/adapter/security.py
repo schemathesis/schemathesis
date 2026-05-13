@@ -159,13 +159,11 @@ class OpenApiSecurity:
         return False
 
 
-@dataclass
+@dataclass(slots=True)
 class OpenApiSecurityParameters:
     """Security parameters for an API operation."""
 
     _parameters: list[Mapping[str, Any]]
-
-    __slots__ = ("_parameters",)
 
     @classmethod
     def from_definition(

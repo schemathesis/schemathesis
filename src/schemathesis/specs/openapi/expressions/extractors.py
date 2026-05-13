@@ -10,13 +10,11 @@ class Extractor:
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(slots=True)
 class RegexExtractor(Extractor):
     """Extract value via a regex."""
 
     value: re.Pattern
-
-    __slots__ = ("value",)
 
     def extract(self, value: str) -> str | None:
         match = self.value.search(value)

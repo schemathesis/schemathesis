@@ -32,12 +32,10 @@ class BundleError(Exception):
         return f"Cannot bundle `{self.reference}`: expected JSON Schema (object or boolean), got {to_json_type_name(self.value)}"
 
 
-@dataclass
+@dataclass(slots=True)
 class Bundle:
     schema: JsonSchema
     name_to_uri: dict[str, str]
-
-    __slots__ = ("schema", "name_to_uri")
 
 
 class Bundler:
