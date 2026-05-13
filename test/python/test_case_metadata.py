@@ -239,6 +239,47 @@ def test_hook_modifies_query_with_prefix_items_revalidates(ctx):
     assert case.meta.generation.mode == GenerationMode.POSITIVE
 
 
+def test_hook_self_assigns_stringified_query_keeps_positive(ctx):
+    # See GH-4101 — stringified query containers must validate against the typed
+    # snapshot so a no-op hook reassignment doesn't flip the case to NEGATIVE.
+    schema = ctx.openapi.load_schema(
+        {
+            "/point": {
+                "parameters": [
+                    {
+                        "name": "lat",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "number", "minimum": -90, "maximum": 90},
+                    },
+                    {
+                        "name": "lon",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "number", "minimum": -180, "maximum": 180},
+                    },
+                ],
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+        },
+        version="3.1.0",
+    )
+    operation = schema["/point"]["GET"]
+
+    meta = make_positive_meta(ParameterLocation.QUERY)
+    meta.raw_containers[ParameterLocation.QUERY] = {"lat": 0, "lon": 0}
+    case = Case(
+        operation=operation,
+        method="GET",
+        path="/point",
+        query={"lat": "0", "lon": "0"},
+        meta=meta,
+    )
+
+    case.query = case.query
+    assert case.meta.generation.mode == GenerationMode.POSITIVE
+
+
 def test_hook_adds_required_field_metadata_updates(ctx):
     # See GH-3073
     schema = ctx.openapi.load_schema(

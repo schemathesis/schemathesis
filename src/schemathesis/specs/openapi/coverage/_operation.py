@@ -16,7 +16,7 @@ from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, MEDIA_TYPE_STRATEGIES, find_media_type_strategy
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -418,6 +418,16 @@ def iter_coverage_cases(
         phase: PhaseInfo,
         raw: dict[str, Any],
     ) -> CaseMetadata:
+        # Preserve typed parameter containers so revalidation can validate against
+        # the schema's abstraction level, not the stringified wire form on the case.
+        # Body is excluded — it doesn't go through parameter stringification.
+        raw_containers: dict[ParameterLocation, Any] = {
+            location: value
+            for name, value in raw.items()
+            if (location := CONTAINER_TO_LOCATION.get(name)) is not None
+            and location in components
+            and location != ParameterLocation.BODY
+        }
         # Filter operation-level draws/misses to only those whose slot actually appears in
         # the yielded request. Coverage variants that omit an optional resource-bound slot,
         # or synthesised probes that drop one parameter while keeping a pooled path param,
@@ -428,6 +438,7 @@ def iter_coverage_cases(
             phase=phase,
             pool_draws=_filter_draws_for_case(raw, correlated, correlated_draws),
             pool_misses=_filter_misses_for_case(raw, correlated_misses),
+            raw_containers=raw_containers,
         )
 
     inferred_properties_per_location: dict[ParameterLocation, dict[str, Any] | None] = {}
