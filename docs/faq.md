@@ -132,6 +132,21 @@ This helps catch authentication bypass vulnerabilities where APIs accept request
 !!! important ""
     The majority of test cases still use your provided authentication normally. Only specific security-focused tests intentionally modify it.
 
+## How do I authenticate when my API issues tokens from a login endpoint?
+
+Declare the login endpoint in `schemathesis.toml` and Schemathesis fetches the token for you:
+
+```toml
+[auth.dynamic.openapi.BearerAuth]
+path = "/auth/token"
+payload = { username = "${USERNAME}", password = "${PASSWORD}" }
+extract_selector = "/access_token"
+```
+
+Replace `BearerAuth` with the `securitySchemes` name from your OpenAPI spec. The token is fetched once, cached for the run, and applied to every request requiring that scheme.
+
+For tokens that expire mid-run or need per-scope caching, see [Dynamic Token Authentication](guides/auth.md#dynamic-token-authentication).
+
 ## Can I use Schemathesis with Allure?
 
 Yes. Use `--report-allure-path` to write Allure-compatible result files directly:
