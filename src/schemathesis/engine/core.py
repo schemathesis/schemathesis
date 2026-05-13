@@ -8,12 +8,11 @@ from schemathesis.config import FuzzConfig
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError
 from schemathesis.engine import Status, events, fuzz, run
+from schemathesis.engine.context import EngineContext
+from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
+from schemathesis.engine.run import Phase, PhaseName, PhaseSkipReason
 from schemathesis.schemas import BaseSchema
-
-from .context import EngineContext
-from .events import EventGenerator, StatefulPhasePayload
-from .run import Phase, PhaseName, PhaseSkipReason
 
 
 @dataclass(slots=True)

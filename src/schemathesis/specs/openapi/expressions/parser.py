@@ -4,8 +4,8 @@ import re
 from collections.abc import Generator
 from functools import lru_cache
 
-from . import extractors, lexer, nodes
-from .errors import RuntimeExpressionError, UnknownToken
+from schemathesis.specs.openapi.expressions import extractors, lexer, nodes
+from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError, UnknownToken
 
 
 @lru_cache
