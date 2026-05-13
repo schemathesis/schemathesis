@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.4...HEAD) - TBD
 
+### :wrench: Changed
+
+- Render `negative_data_rejection` mutation descriptions cleanly: no trailing `at`, readable original values.
+
 ### :bug: Fixed
 
 - Runtime Error on hook-driven revalidation of OpenAPI 3.1 parameters with `prefixItems`. [#4099](https://github.com/schemathesis/schemathesis/issues/4099)

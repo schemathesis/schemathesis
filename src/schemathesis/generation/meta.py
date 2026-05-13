@@ -137,7 +137,7 @@ class ExamplesPhaseData:
     mutations: tuple[Mutation, ...] = ()
 
 
-@dataclass
+@dataclass(slots=True)
 class CoveragePhaseData:
     """Metadata specific to coverage phase."""
 
@@ -146,8 +146,7 @@ class CoveragePhaseData:
     location: str | None
     parameter: str | None
     parameter_location: ParameterLocation | None
-
-    __slots__ = ("scenario", "description", "location", "parameter", "parameter_location")
+    mutations: tuple[Mutation, ...] = ()
 
 
 @dataclass

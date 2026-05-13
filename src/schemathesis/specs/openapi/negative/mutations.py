@@ -39,6 +39,37 @@ MAX_WALK_DEPTH = 32
 MAX_SECONDARY_TARGETS = 2
 
 
+def _render_mutation_value(value: JsonValue, *, bare: bool) -> str:
+    """Render a mutation's before/after value for display in a failure message.
+
+    `bare=True` skips string quoting; use it for `type`-keyword mutations where the
+    value is a type name (`object`, `integer`) rather than a string literal.
+    """
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    if isinstance(value, str) and not bare:
+        return f'"{value}"'
+    return str(value)
+
+
+def _render_mutation_description(mutation: Mutation) -> str:
+    """Render a single mutation as `violates <keywords> [at <pointer>] [(was X[, became Y])]`."""
+    keywords = ", ".join(f"`{k}`" for k in mutation.keywords)
+    message = f"violates {keywords}"
+    if mutation.schema_pointer:
+        message += f" at {mutation.schema_pointer}"
+    bare = mutation.keywords == ("type",)
+    parts: list[str] = []
+    if mutation.original_value is not None:
+        parts.append(f"was {_render_mutation_value(mutation.original_value, bare=bare)}")
+    # Dict `new_value` would dump the entire mutated body into the failure message; skip it.
+    if mutation.new_value is not None and not isinstance(mutation.new_value, dict):
+        parts.append(f"became {_render_mutation_value(mutation.new_value, bare=bare)}")
+    if parts:
+        message += f" ({', '.join(parts)})"
+    return message
+
+
 class MutationMetadata:
     """Per-case metadata: the structured Mutation records applied this case.
 
@@ -66,13 +97,11 @@ class MutationMetadata:
     def description(self) -> str | None:
         if not isinstance(self._description, NotSet):
             return self._description
-        if not self.mutations or len(self.mutations) > 1:
+        if not self.mutations:
             return None
-        mutation = self.mutations[0]
-        message = f"Violates `{', '.join(mutation.keywords)}` at {mutation.schema_pointer}"
-        if mutation.original_value is not None:
-            message += f" (expected {mutation.original_value})"
-        return message
+        if len(self.mutations) == 1:
+            return _render_mutation_description(self.mutations[0])
+        return "- " + "\n- ".join(_render_mutation_description(m) for m in self.mutations)
 
     @property
     def parameter(self) -> str | None:
