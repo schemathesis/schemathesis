@@ -192,12 +192,17 @@ def render_markdown(run: RunMetrics) -> str:
     )[:10]
     if fivexx_operations:
         write("## Top server-error operations\n\n")
-        write("| Operation | Total | 5xx | Ratio |\n")
-        write("|-----------|-------|-----|-------|\n")
+        # P+5xx = crash on valid input (real bug); N+5xx = crash on invalid input where
+        # the server should have returned 4xx (still a bug, lower severity).
+        write("| Operation | Total | 5xx | P+5xx | N+5xx | Ratio |\n")
+        write("|-----------|-------|-----|-------|-------|-------|\n")
         for operation in fivexx_operations:
             buckets = operation.buckets
             ratio = (buckets.server_error / buckets.total * 100) if buckets.total else 0.0
-            write(f"| {operation.label} | {buckets.total} | {buckets.server_error} | {ratio:.1f}% |\n")
+            write(
+                f"| {operation.label} | {buckets.total} | {buckets.server_error} | "
+                f"{buckets.positive_server_error} | {buckets.negative_server_error} | {ratio:.1f}% |\n"
+            )
         write("\n")
 
     timing_rows = _top_time_rows(run)

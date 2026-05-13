@@ -14,7 +14,9 @@ def test_bucket_handler_reached_ratio_division():
 
 def test_bucket_useful_ratio_excludes_drift():
     # Drift (P+4xx and N+2xx) reached the handler but did not exercise the operation as intended.
-    bucket = Bucket(positive_accepted=3, negative_rejected=2, server_error=1, positive_drift=4, negative_drift=2)
+    bucket = Bucket(
+        positive_accepted=3, negative_rejected=2, positive_server_error=1, positive_drift=4, negative_drift=2
+    )
     assert bucket.useful == 6
     assert bucket.useful_ratio == 0.5
 
@@ -50,9 +52,9 @@ def _call(*, status, mode="positive", components=None, matches_route=True):
         (_call(status=200), CallBucket.POSITIVE_ACCEPTED),
         (_call(status=200, mode="negative"), CallBucket.NEGATIVE_DRIFT),
         (_call(status=400, mode="negative"), CallBucket.NEGATIVE_REJECTED),
-        # 5xx wins over mode
-        (_call(status=503, mode="positive"), CallBucket.SERVER_ERROR),
-        (_call(status=502, mode="negative"), CallBucket.SERVER_ERROR),
+        # 5xx — split by mode so "crash on valid input" vs "crash on invalid input" remain distinct.
+        (_call(status=503, mode="positive"), CallBucket.POSITIVE_SERVER_ERROR),
+        (_call(status=502, mode="negative"), CallBucket.NEGATIVE_SERVER_ERROR),
         # Auth
         (_call(status=401), CallBucket.AUTH_REJECTED),
         (_call(status=403), CallBucket.AUTH_REJECTED),
@@ -100,7 +102,7 @@ def test_classify_positive_drift_surfaces_components_excluding_unknown():
     "call",
     [
         _call(status=400, mode="negative", components={"body": "negative"}),
-        _call(status=503, mode="positive", components={"body": "positive"}),
+        _call(status=503, mode="positive", components={"body": "positive"}),  # positive_server_error
         _call(status=200, mode="negative", components={"body": "negative"}),
     ],
     ids=["negative-rejected", "server-error", "negative-drift"],
