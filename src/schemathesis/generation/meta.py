@@ -200,10 +200,18 @@ class CaseMetadata:
     # Resource-bound (location, parameter_name) slots the engine wanted to fill from the pool
     # but couldn't (no captured instance). Lets the analyzer compute chain rate.
     pool_misses: tuple[tuple[str, str], ...]
+    # Typed (pre-serialization) container snapshots captured at generation time.
+    # Coverage stringifies query/path values for the wire; this preserves the
+    # original typed form so revalidation matches the schema's abstraction level.
+    raw_containers: dict[ParameterLocation, Any]
 
     # Dirty tracking for revalidation
     _dirty: set[ParameterLocation]
     _last_validated_hashes: dict[ParameterLocation, int]
+    # Initial container hashes captured once after generation; never updated.
+    # Lets revalidation detect whether a container still matches its wire-form
+    # snapshot (so the typed `raw_containers` value remains authoritative).
+    _initial_hashes: dict[ParameterLocation, int]
 
     __slots__ = (
         "generation",
@@ -211,8 +219,10 @@ class CaseMetadata:
         "phase",
         "pool_draws",
         "pool_misses",
+        "raw_containers",
         "_dirty",
         "_last_validated_hashes",
+        "_initial_hashes",
     )
 
     def __init__(
@@ -222,15 +232,18 @@ class CaseMetadata:
         phase: PhaseInfo,
         pool_draws: tuple[PoolDraw, ...] = (),
         pool_misses: tuple[tuple[str, str], ...] = (),
+        raw_containers: dict[ParameterLocation, Any] | None = None,
     ) -> None:
         self.generation = generation
         self.components = components
         self.phase = phase
         self.pool_draws = pool_draws
         self.pool_misses = pool_misses
+        self.raw_containers = raw_containers if raw_containers is not None else {}
         # Initialize dirty tracking
         self._dirty = set()
         self._last_validated_hashes = {}
+        self._initial_hashes = {}
 
     def mark_dirty(self, location: ParameterLocation) -> None:
         """Mark a component as modified and needing revalidation."""
@@ -286,6 +299,7 @@ class CaseMetadata:
                 for draw in self.pool_draws
             ],
             "pool_misses": [list(miss) for miss in self.pool_misses],
+            "raw_containers": {loc.name: value for loc, value in self.raw_containers.items()},
         }
 
     @classmethod
@@ -349,12 +363,16 @@ class CaseMetadata:
                 mutations=_load_mutations(phase_data_raw),
             )
         phase = PhaseInfo(name=TestPhase(data["phase"]["name"]), data=phase_data)
+        raw_containers = {
+            ParameterLocation[loc_name]: value for loc_name, value in data.get("raw_containers", {}).items()
+        }
         return cls(
             generation=generation,
             components=components,
             phase=phase,
             pool_draws=pool_draws,
             pool_misses=pool_misses,
+            raw_containers=raw_containers,
         )
 
 

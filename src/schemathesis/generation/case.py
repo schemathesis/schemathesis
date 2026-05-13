@@ -215,6 +215,9 @@ class Case:
             value = getattr(self, location.container_name)
             hash_value = self._hash_container(value)
             self._meta.update_validated_hash(location, hash_value)
+            # Snapshot the wire-form hash so revalidation can tell whether the
+            # container is still the unmodified value produced by generation.
+            self._meta._initial_hashes[location] = hash_value
 
     def _check_modifications(self) -> None:
         """Detect in-place modifications by comparing container hashes."""

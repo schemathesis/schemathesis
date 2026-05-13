@@ -226,11 +226,19 @@ class OpenApiSchema(BaseSchema):
         validator_cls = self.adapter.jsonschema_validator_cls
         for location in list(meta._dirty):
             value = getattr(case, location.container_name)
-            is_valid = case._validate_component(location, value, validator_cls)
+            current_hash = case._hash_container(value)
+            # When the container still equals its generated form, validate the typed
+            # snapshot — coverage stringifies query/path values for the wire and the
+            # validation schema is expressed in the typed form.
+            if current_hash == meta._initial_hashes.get(location) and location in meta.raw_containers:
+                validation_value = meta.raw_containers[location]
+            else:
+                validation_value = value
+            is_valid = case._validate_component(location, validation_value, validator_cls)
             if location in meta.components:
                 new_mode = GenerationMode.POSITIVE if is_valid else GenerationMode.NEGATIVE
                 meta.components[location] = ComponentInfo(mode=new_mode)
-            meta.update_validated_hash(location, case._hash_container(value))
+            meta.update_validated_hash(location, current_hash)
             meta.clear_dirty(location)
         if meta.components:
             if all(info.mode.is_positive for info in meta.components.values()):

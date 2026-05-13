@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - Runtime Error on hook-driven revalidation of OpenAPI 3.1 parameters with `prefixItems`. [#4099](https://github.com/schemathesis/schemathesis/issues/4099)
+- False positive `negative_data_rejection` when a `before_call` hook reassigns request parameters. [#4101](https://github.com/schemathesis/schemathesis/issues/4101)
 - Pad negative-mode arrays to satisfy `minItems` so per-item violations fire instead of length violations.
 - Send `formData` Swagger 2.0 parameters as form payloads when `consumes` only declares non-form media types.
 - Generate positive body cases for schemas inheriting `additionalProperties: false` through deep `allOf` chains.
