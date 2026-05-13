@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-@dataclass
+@dataclass(slots=True)
 class ApiKeyAuthProvider:
     """Auth provider for OpenAPI API Key authentication.
 
@@ -31,8 +31,6 @@ class ApiKeyAuthProvider:
     """The parameter name."""
     location: str
     """Where to place the key: 'header', 'query', or 'cookie'."""
-
-    __slots__ = ("value", "name", "location")
 
     def get(self, _: Case, __: AuthContext) -> str:
         """Return the configured API key value."""
@@ -48,7 +46,7 @@ class ApiKeyAuthProvider:
             case.cookies[self.name] = data
 
 
-@dataclass
+@dataclass(slots=True)
 class HttpBasicAuthProvider:
     """Auth provider for HTTP Basic authentication."""
 
@@ -56,8 +54,6 @@ class HttpBasicAuthProvider:
     """The username for basic auth."""
     password: str
     """The password for basic auth."""
-
-    __slots__ = ("username", "password")
 
     def get(self, _: Case, __: AuthContext) -> tuple[str, str]:
         return self.username, self.password
@@ -68,7 +64,7 @@ class HttpBasicAuthProvider:
         case.headers["Authorization"] = _basic_auth_str(*data)
 
 
-@dataclass
+@dataclass(slots=True)
 class HttpBearerAuthProvider:
     """Auth provider for HTTP Bearer token authentication.
 
@@ -77,8 +73,6 @@ class HttpBearerAuthProvider:
 
     bearer: str
     """The bearer token value."""
-
-    __slots__ = ("bearer",)
 
     def get(self, _: Case, __: AuthContext) -> str:
         """Return the configured bearer token."""
@@ -89,7 +83,7 @@ class HttpBearerAuthProvider:
         case.headers["Authorization"] = f"Bearer {data}"
 
 
-@dataclass
+@dataclass(slots=True)
 class DynamicTokenAuthProvider:
     """Auth provider that fetches a token from an endpoint at test time."""
 
@@ -99,8 +93,6 @@ class DynamicTokenAuthProvider:
     extract_from: str
     extract_selector: str
     _applier: HttpBearerAuthProvider | ApiKeyAuthProvider
-
-    __slots__ = ("path", "method", "payload", "extract_from", "extract_selector", "_applier")
 
     def get(self, case: Case, ctx: AuthContext) -> str:
         from schemathesis.transport import is_asgi_app

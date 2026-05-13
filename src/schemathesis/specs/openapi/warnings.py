@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
-@dataclass
+@dataclass(slots=True)
 class MissingDeserializerWarning:
     """Warning for responses with structured schemas but no registered deserializer."""
 
@@ -30,8 +30,6 @@ class MissingDeserializerWarning:
 
     content_type: str
     """Media type that has no deserializer."""
-
-    __slots__ = ("operation_label", "status_code", "content_type")
 
     @property
     def kind(self) -> SchemathesisWarning:
@@ -79,7 +77,7 @@ def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeseria
     return warnings
 
 
-@dataclass
+@dataclass(slots=True)
 class UnusedOpenAPIAuthWarning:
     """Warning for configured OpenAPI auth schemes that are not used in the schema."""
 
@@ -91,8 +89,6 @@ class UnusedOpenAPIAuthWarning:
 
     suggestion: str | None
     """Suggested scheme name if there's a close match."""
-
-    __slots__ = ("operation_label", "scheme_name", "suggestion")
 
     @property
     def kind(self) -> SchemathesisWarning:
@@ -135,7 +131,7 @@ def _find_closest_match(value: str, candidates: list[str]) -> str | None:
     return matches[0] if matches else None
 
 
-@dataclass
+@dataclass(slots=True)
 class UnsupportedRegexWarning:
     """Warning for regex patterns not supported by Python."""
 
@@ -144,8 +140,6 @@ class UnsupportedRegexWarning:
 
     pattern: str
     """The unsupported regex pattern."""
-
-    __slots__ = ("operation_label", "pattern")
 
     @property
     def kind(self) -> SchemathesisWarning:

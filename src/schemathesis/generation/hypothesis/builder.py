@@ -52,7 +52,7 @@ class HypothesisTestMode(str, Enum):
     FUZZING = "fuzzing"
 
 
-@dataclass
+@dataclass(slots=True)
 class HypothesisTestConfig:
     project: ProjectConfig
     modes: list[HypothesisTestMode]
@@ -62,17 +62,6 @@ class HypothesisTestConfig:
     as_strategy_kwargs: dict[str, Any]
     given_args: tuple[GivenInput, ...]
     given_kwargs: dict[str, GivenInput]
-
-    __slots__ = (
-        "project",
-        "modes",
-        "settings",
-        "explicit_settings",
-        "seed",
-        "as_strategy_kwargs",
-        "given_args",
-        "given_kwargs",
-    )
 
     def __init__(
         self,

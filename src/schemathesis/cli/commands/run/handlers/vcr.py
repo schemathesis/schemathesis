@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
 
 
-@dataclass
+@dataclass(slots=True)
 class VcrHandler(EventHandler):
     """CLI event handler that writes network interactions to a VCR YAML cassette."""
 
@@ -26,8 +26,6 @@ class VcrHandler(EventHandler):
     queue: Queue[_Initialize | _Process | _Finalize]
     worker: threading.Thread
     command: str
-
-    __slots__ = ("output", "config", "preserve_bytes", "queue", "worker", "command")
 
     def __init__(
         self,
@@ -84,18 +82,16 @@ def _run(
                 break
 
 
-@dataclass
+@dataclass(slots=True)
 class _Initialize:
     seed: int | None
-    __slots__ = ("seed",)
 
 
-@dataclass
+@dataclass(slots=True)
 class _Process:
     recorder: ScenarioRecorder
-    __slots__ = ("recorder",)
 
 
-@dataclass
+@dataclass(slots=True)
 class _Finalize:
-    __slots__ = ()
+    pass

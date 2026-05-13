@@ -27,11 +27,9 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 
-@dataclass
+@dataclass(slots=True)
 class ProbePayload:
     probes: list[ProbeRun]
-
-    __slots__ = ("probes",)
 
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
@@ -56,13 +54,11 @@ def run(ctx: EngineContext) -> list[ProbeRun]:
 HEADER_NAME = "X-Schemathesis-Probe"
 
 
-@dataclass
+@dataclass(slots=True)
 class Probe:
     """A request to determine the capabilities of the application under test."""
 
     name: str
-
-    __slots__ = ("name",)
 
     def prepare_request(
         self, session: requests.Session, request: requests.Request, schema: BaseSchema
@@ -82,15 +78,13 @@ class ProbeOutcome(str, enum.Enum):
     SKIP = "skip"
 
 
-@dataclass
+@dataclass(slots=True)
 class ProbeRun:
     probe: Probe
     outcome: ProbeOutcome
     request: requests.PreparedRequest | None
     response: requests.Response | None
     error: Exception | None
-
-    __slots__ = ("probe", "outcome", "request", "response", "error")
 
     def __init__(
         self,

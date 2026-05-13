@@ -26,22 +26,18 @@ if TYPE_CHECKING:
 _NO_MEDIA_TYPE = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class ResolvedSchema:
     """Schema and media type resolved for a specific response."""
-
-    __slots__ = ("schema", "media_type", "name_to_uri")
 
     schema: JsonSchema | None
     media_type: str | None
     name_to_uri: dict[str, str]
 
 
-@dataclass
+@dataclass(slots=True)
 class CachedValidation:
     """Cached schema and validator for a media type."""
-
-    __slots__ = ("schema", "validator", "name_to_uri")
 
     schema: JsonSchema | None
     validator: jsonschema_rs.Validator | None
@@ -168,7 +164,7 @@ class OpenApiResponse:
             yield name, link
 
 
-@dataclass
+@dataclass(slots=True)
 class OpenApiResponses:
     """Collection of OpenAPI response definitions."""
 
@@ -176,8 +172,6 @@ class OpenApiResponses:
     resolver: Resolver
     scope: str
     adapter: SpecificationAdapter
-
-    __slots__ = ("_inner", "resolver", "scope", "adapter")
 
     @classmethod
     def from_definition(
@@ -499,13 +493,11 @@ def _is_sse_media_type(value: str) -> bool:
         return False
 
 
-@dataclass
+@dataclass(slots=True)
 class OpenApiResponseHeaders:
     """Collection of OpenAPI response header definitions."""
 
     _inner: dict[str, OpenApiResponseHeader]
-
-    __slots__ = ("_inner",)
 
     def __bool__(self) -> bool:
         return bool(self._inner)

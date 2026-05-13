@@ -86,7 +86,7 @@ __all__ = [
 ]
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class SchemathesisConfig(DiffBase):
     color: bool | None
     suppress_health_check: list[HealthCheck]
@@ -97,18 +97,6 @@ class SchemathesisConfig(DiffBase):
     reports: ReportsConfig
     output: OutputConfig
     projects: ProjectsConfig
-
-    __slots__ = (
-        "color",
-        "suppress_health_check",
-        "_seed",
-        "_config_path",
-        "wait_for_schema",
-        "max_failures",
-        "reports",
-        "output",
-        "projects",
-    )
 
     def __init__(
         self,

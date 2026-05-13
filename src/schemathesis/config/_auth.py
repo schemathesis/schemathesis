@@ -9,26 +9,22 @@ from schemathesis.config._error import ConfigError
 from schemathesis.core.validation import is_latin_1_encodable
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class ApiKeyAuthConfig(DiffBase):
     """API Key authentication configuration."""
 
     api_key: str
 
-    __slots__ = ("api_key",)
-
     def __init__(self, *, api_key: str = "") -> None:
         self.api_key = resolve(api_key)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class HttpBasicAuthConfig(DiffBase):
     """HTTP Basic authentication configuration."""
 
     username: str
     password: str
-
-    __slots__ = ("username", "password")
 
     def __init__(self, *, username: str = "", password: str = "") -> None:
         resolved_username = resolve(username)
@@ -39,19 +35,17 @@ class HttpBasicAuthConfig(DiffBase):
         self.password = resolved_password
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class HttpBearerAuthConfig(DiffBase):
     """HTTP Bearer token authentication configuration."""
 
     bearer: str
 
-    __slots__ = ("bearer",)
-
     def __init__(self, *, bearer: str = "") -> None:
         self.bearer = resolve(bearer)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class DynamicTokenAuthConfig(DiffBase):
     """Dynamic token fetch authentication configuration."""
 
@@ -60,8 +54,6 @@ class DynamicTokenAuthConfig(DiffBase):
     payload: dict[str, str] | None
     extract_from: str
     extract_selector: str
-
-    __slots__ = ("path", "method", "payload", "extract_from", "extract_selector")
 
     def __init__(
         self,
@@ -85,13 +77,11 @@ class DynamicTokenAuthConfig(DiffBase):
         self.extract_selector = extract_selector
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class OpenAPIAuthConfig(DiffBase):
     """OpenAPI-aware authentication configuration."""
 
     schemes: dict[str, ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig]
-
-    __slots__ = ("schemes",)
 
     def __init__(self, *, schemes: dict[str, dict[str, Any]] | None = None) -> None:
         if schemes is None:
@@ -112,13 +102,11 @@ class OpenAPIAuthConfig(DiffBase):
         return len(self.schemes) > 0
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class OpenAPIDynamicAuthConfig(DiffBase):
     """OpenAPI-aware dynamic authentication configuration."""
 
     schemes: dict[str, DynamicTokenAuthConfig]
-
-    __slots__ = ("schemes",)
 
     def __init__(self, *, schemes: dict[str, dict[str, Any]] | None = None) -> None:
         self.schemes = {name: DynamicTokenAuthConfig(**cfg) for name, cfg in schemes.items()} if schemes else {}
@@ -128,13 +116,11 @@ class OpenAPIDynamicAuthConfig(DiffBase):
         return bool(self.schemes)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class AuthConfig(DiffBase):
     basic: tuple[str, str] | None
     openapi: OpenAPIAuthConfig
     dynamic: OpenAPIDynamicAuthConfig
-
-    __slots__ = ("basic", "openapi", "dynamic")
 
     def __init__(
         self,

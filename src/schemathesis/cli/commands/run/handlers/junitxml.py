@@ -12,12 +12,10 @@ if TYPE_CHECKING:
     from schemathesis.engine.recorder import ScenarioRecorder
 
 
-@dataclass
+@dataclass(slots=True)
 class JunitXMLHandler(EventHandler):
     output: TextOutput
     writer: JunitXmlWriter
-
-    __slots__ = ("output", "writer")
 
     def __init__(self, output: TextOutput) -> None:
         self.output = output

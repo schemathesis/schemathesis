@@ -117,13 +117,11 @@ def by_regex(ctx: HasAPIOperation, attribute: str, regex: re.Pattern) -> bool:
     return bool(regex.search(value))
 
 
-@dataclass(repr=False, frozen=True)
+@dataclass(repr=False, frozen=True, slots=True)
 class Filter:
     """Match API operations against a list of matchers."""
 
     matchers: tuple[Matcher, ...]
-
-    __slots__ = ("matchers",)
 
     def __repr__(self) -> str:
         inner = " && ".join(matcher.label for matcher in self.matchers)
@@ -137,14 +135,12 @@ class Filter:
         return all(matcher.match(ctx) for matcher in self.matchers)
 
 
-@dataclass
+@dataclass(slots=True)
 class FilterSet:
     """Combines multiple filters to apply inclusion and exclusion rules on API operations."""
 
     _includes: set[Filter]
     _excludes: set[Filter]
-
-    __slots__ = ("_includes", "_excludes")
 
     def __init__(self, _includes: set[Filter] | None = None, _excludes: set[Filter] | None = None) -> None:
         self._includes = _includes or set()

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
-@dataclass
+@dataclass(slots=True)
 class DeserializationContext:
     """Context passed to deserializers.
 
@@ -30,8 +30,6 @@ class DeserializationContext:
 
     operation: APIOperation
     case: Case | None
-
-    __slots__ = ("operation", "case")
 
 
 ResponseDeserializer = Callable[[DeserializationContext, Response], Any]

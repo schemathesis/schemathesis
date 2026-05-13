@@ -6,11 +6,9 @@ from typing import cast
 from schemathesis.config._diff_base import DiffBase
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class FuzzConfig(DiffBase):
     max_time: int | None
-
-    __slots__ = ("max_time",)
 
     def __init__(self, *, max_time: int | None = None) -> None:
         self.max_time = max_time

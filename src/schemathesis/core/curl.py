@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CurlCommand:
     """Result of generating a curl command."""
 
@@ -21,8 +21,6 @@ class CurlCommand:
 
     warnings: list[str]
     """Warnings about non-printable characters or shell compatibility."""
-
-    __slots__ = ("command", "warnings")
 
 
 def _escape_and_quote(value: str, warnings: list[str], ctx: str) -> str:

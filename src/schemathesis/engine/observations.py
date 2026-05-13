@@ -4,23 +4,19 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.schemas import APIOperation
 
 
-@dataclass
+@dataclass(slots=True)
 class LocationHeaderEntry:
     """Value of `Location` coming from API response with a given status code."""
 
     status_code: int
     value: str
 
-    __slots__ = ("status_code", "value")
 
-
-@dataclass
+@dataclass(slots=True)
 class Observations:
     """Repository for observations collected during test execution."""
 
     location_headers: dict[APIOperation, list[LocationHeaderEntry]]
-
-    __slots__ = ("location_headers",)
 
     def __init__(self) -> None:
         self.location_headers = {}

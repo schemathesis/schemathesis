@@ -34,24 +34,20 @@ class HookScope(int, Enum):
     TEST = 3
 
 
-@dataclass
+@dataclass(slots=True)
 class RegisteredHook:
     signature: inspect.Signature
     scopes: list[HookScope]
 
-    __slots__ = ("signature", "scopes")
-
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
 
-@dataclass
+@dataclass(slots=True)
 class HookContext:
     """A context that is passed to some hook functions."""
 
     operation: APIOperation | None
     """API operation that is currently being processed."""
-
-    __slots__ = ("operation",)
 
     def __init__(self, *, operation: APIOperation | None = None) -> None:
         self.operation = operation

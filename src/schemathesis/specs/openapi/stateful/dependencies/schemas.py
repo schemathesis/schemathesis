@@ -212,15 +212,13 @@ def _is_interesting_schema(schema: Mapping[str, Any]) -> bool:
     return bool(set(schema).intersection(ALL_KEYWORDS))
 
 
-@dataclass
+@dataclass(slots=True)
 class UnwrappedSchema:
     """Result of wrapper pattern detection."""
 
     pointer: str
     schema: Mapping[str, Any]
     ref: str | None
-
-    __slots__ = ("pointer", "schema", "ref")
 
 
 def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, resolver: Resolver) -> UnwrappedSchema:

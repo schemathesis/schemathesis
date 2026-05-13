@@ -86,13 +86,11 @@ def get_all_tests(
             yield result
 
 
-@dataclass
+@dataclass(slots=True)
 class LazySchema:
     fixture_name: str
     filter_set: FilterSet
     auth: AuthStorage
-
-    __slots__ = ("fixture_name", "filter_set", "auth")
 
     def __init__(
         self,

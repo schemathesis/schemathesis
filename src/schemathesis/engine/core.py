@@ -16,11 +16,9 @@ from .events import EventGenerator, StatefulPhasePayload
 from .run import Phase, PhaseName, PhaseSkipReason
 
 
-@dataclass
+@dataclass(slots=True)
 class Engine:
     schema: BaseSchema
-
-    __slots__ = ("schema",)
 
     def execute(self) -> EventStream:
         """Execute all test phases."""
@@ -125,13 +123,11 @@ class Engine:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class ExecutionPlan:
     """Manages test execution phases."""
 
     phases: list[Phase]
-
-    __slots__ = ("phases",)
 
     def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
@@ -188,7 +184,7 @@ class ExecutionPlan:
         return None
 
 
-@dataclass
+@dataclass(slots=True)
 class EventStream:
     """Schemathesis event stream.
 
@@ -197,8 +193,6 @@ class EventStream:
 
     generator: EventGenerator
     stop_event: threading.Event
-
-    __slots__ = ("generator", "stop_event")
 
     def __next__(self) -> events.EngineEvent:
         return next(self.generator)

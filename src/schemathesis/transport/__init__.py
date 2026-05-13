@@ -36,7 +36,7 @@ def get(app: object) -> BaseTransport:
 S = TypeVar("S", contravariant=True)
 
 
-@dataclass
+@dataclass(slots=True)
 class SerializationContext:
     """Context object passed to serializer functions.
 
@@ -45,8 +45,6 @@ class SerializationContext:
 
     case: Case
     """The generated test case."""
-
-    __slots__ = ("case",)
 
 
 Serializer = Callable[[SerializationContext, Body], dict[str, Any]]

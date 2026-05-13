@@ -10,7 +10,7 @@ from schemathesis.core.warnings import SchemathesisWarning
 __all__ = ["SchemathesisWarning", "WarningsConfig"]
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, slots=True)
 class WarningsConfig(DiffBase):
     """Configuration for warning display and failure behavior."""
 
@@ -19,8 +19,6 @@ class WarningsConfig(DiffBase):
 
     fail_on: list[SchemathesisWarning]
     """Which warnings should cause test failure."""
-
-    __slots__ = ("display", "fail_on")
 
     def __init__(
         self,

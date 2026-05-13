@@ -45,10 +45,8 @@ FILTER_CASE_UNSATISFIABLE_MESSAGE = """Your `filter_case` hook rejected all gene
 Schemathesis generated test data, but every case was rejected by your hook."""
 
 
-@dataclass
+@dataclass(slots=True)
 class FilterCaseTracker:
-    __slots__ = ("total", "rejected")
-
     total: int
     rejected: int
 
@@ -70,13 +68,11 @@ class FilterCaseTracker:
         return self.has_data and self.rejected == self.total
 
 
-@dataclass
+@dataclass(slots=True)
 class UnsatisfiableParameter:
     location: ParameterLocation
     name: str
     schema: JsonSchema
-
-    __slots__ = ("location", "name", "schema")
 
     def get_error_message(self, config: OutputConfig) -> str:
         formatted_schema = truncate_json(self.schema, config=config)
@@ -172,7 +168,7 @@ HEALTH_CHECK_TITLES = {
 }
 
 
-@dataclass
+@dataclass(slots=True)
 class SlowParameter:
     """Information about a parameter with slow or problematic data generation."""
 
@@ -180,8 +176,6 @@ class SlowParameter:
     name: str
     schema: JsonSchema
     original: HealthCheck
-
-    __slots__ = ("location", "name", "schema", "original")
 
     def get_error_message(self, config: OutputConfig) -> str:
         formatted_schema = truncate_json(self.schema, config=config)
