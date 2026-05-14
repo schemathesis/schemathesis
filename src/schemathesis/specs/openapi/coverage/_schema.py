@@ -162,6 +162,9 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
 
 
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
+# Upper bound on the size of strings synthesized to violate `maxLength`. Above this,
+# the negative case is skipped to avoid materializing huge payloads (e.g. in NDJSON).
+NEGATIVE_MODE_MAX_LENGTH_CAP = 1024 * 1024
 NEGATIVE_MODE_MAX_ITEMS = 15
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
@@ -1240,11 +1243,20 @@ def cover_schema_iter(
                                         description="String smaller than minLength",
                                         location=ctx.current_path,
                                     )
-                elif key == "maxLength" and value < INTERNAL_BUFFER_SIZE:
-                    # maxLength only constrains strings; skip when schema explicitly excludes string type
-                    if "string" in get_type(schema):
-                        try:
-                            min_length = max_length = value + 1
+                elif (
+                    key == "maxLength"
+                    and isinstance(value, int)
+                    and value < NEGATIVE_MODE_MAX_LENGTH_CAP
+                    and "string" in get_type(schema)
+                ):
+                    try:
+                        target_length = value + 1
+                        if target_length >= INTERNAL_BUFFER_SIZE:
+                            # Cheap synthesis: any character violates the bound; bypass Hypothesis
+                            # to avoid blowing past its internal buffer for very large limits.
+                            new_value = "a" * target_length
+                        else:
+                            min_length = max_length = target_length
                             new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
                             new_schema.pop("enum", None)
                             new_schema.pop("const", None)
@@ -1253,7 +1265,7 @@ def cover_schema_iter(
                                 if value > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
                                     # Large `maxLength` value can be extremely slow to generate when combined with `pattern`
                                     del new_schema["pattern"]
-                                    value = ctx.generate_from_schema(new_schema)
+                                    new_value = ctx.generate_from_schema(new_schema)
                                 elif ctx.update_pattern is not None:
                                     new_schema["pattern"] = ctx.update_pattern(
                                         schema["pattern"], min_length, max_length
@@ -1262,22 +1274,22 @@ def cover_schema_iter(
                                         # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
                                         del new_schema["minLength"]
                                         del new_schema["maxLength"]
-                                        value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
+                                        new_value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
                                     else:
-                                        value = ctx.generate_from_schema(new_schema)
+                                        new_value = ctx.generate_from_schema(new_schema)
                                 else:
-                                    value = ctx.generate_from_schema(new_schema)
+                                    new_value = ctx.generate_from_schema(new_schema)
                             else:
-                                value = ctx.generate_from_schema(new_schema)
-                            if seen.insert(value):
-                                yield NegativeValue(
-                                    value,
-                                    scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,
-                                    description="String larger than maxLength",
-                                    location=ctx.current_path,
-                                )
-                        except (InvalidArgument, Unsatisfiable):
-                            pass
+                                new_value = ctx.generate_from_schema(new_schema)
+                        if seen.insert(new_value):
+                            yield NegativeValue(
+                                new_value,
+                                scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,
+                                description="String larger than maxLength",
+                                location=ctx.current_path,
+                            )
+                    except (InvalidArgument, Unsatisfiable):
+                        pass
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":

@@ -329,6 +329,18 @@ def test_negative_string_with_pattern(nctx):
     assert_not_conform(covered, schema)
 
 
+@pytest.mark.parametrize("max_length", [65536, 350000])
+def test_negative_maxlength_above_buffer(nctx, max_length):
+    schema = {"type": "string", "maxLength": max_length}
+    above_max = [
+        value.value
+        for value in cover_schema_iter(nctx, schema)
+        if isinstance(value, GeneratedValue) and value.scenario is CoverageScenario.STRING_ABOVE_MAX_LENGTH
+    ]
+    assert len(above_max) == 1
+    assert len(above_max[0]) == max_length + 1
+
+
 @pytest.mark.parametrize("multiple_of", [None, 2])
 @pytest.mark.parametrize(
     ("schema", "values", "with_multiple_of"),
