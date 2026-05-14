@@ -14,17 +14,43 @@ from hypothesis.errors import Unsatisfiable
 import schemathesis
 from schemathesis.config import SanitizationConfig
 from schemathesis.config._generation import GenerationConfig
+from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.result import Ok
+from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
+from schemathesis.specs.openapi.schemas import HTTP_METHODS
 from schemathesis.transport.prepare import prepare_request
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 DEFAULT_FUZZING_MAX_EXAMPLES = 100
 
 _NO_SANITIZATION = SanitizationConfig(enabled=False)
+
+
+# Media types stripped from the audit's CoverageMap so they don't appear as gaps. Other
+# unsupported types stay in the spec and surface via `unknown_unsupported_media_types`,
+# so missing-serializer candidates remain visible.
+_KNOWN_UNSUPPORTED_MEDIA_TYPES: dict[str, str] = {
+    "application/x-msgpack": "binary msgpack",
+    "application/x-json-smile": "binary Smile encoding",
+    "application/vnd.kubernetes.protobuf": "Kubernetes protobuf binary",
+    "application/pdf": "opaque PDF binary",
+    "application/zip": "opaque ZIP archive",
+    "application/x-tar": "opaque TAR archive",
+    "application/dicom": "DICOM medical image",
+    "application/ndjson": "newline-delimited JSON streaming",
+}
+
+_KNOWN_UNSUPPORTED_PREFIXES: tuple[str, ...] = (
+    "image/",
+    "audio/",
+    "video/",
+    "message/",
+)
 
 
 class PhaseName(str, Enum):
@@ -48,12 +74,73 @@ class SchemaResult:
     statistic: dict[str, Any] | None = None
     gaps: list[dict[str, Any]] = field(default_factory=list)
     uncovered_keywords: list[dict[str, Any]] = field(default_factory=list)
+    # Spec-declared media types with no transport serializer and not on the explicit denylist.
+    unknown_unsupported_media_types: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class AuditOutcome:
     result: SchemaResult
     coverage_map: tracecov.CoverageMap | None
+
+
+def _is_known_unsupported(media_type: str) -> bool:
+    if media_type in _KNOWN_UNSUPPORTED_MEDIA_TYPES:
+        return True
+    return any(media_type.startswith(prefix) for prefix in _KNOWN_UNSUPPORTED_PREFIXES)
+
+
+def _is_serialisable_media_type(media_type: str) -> bool:
+    try:
+        return REQUESTS_TRANSPORT.get_first_matching_media_type(media_type) is not None
+    except MalformedMediaType:
+        # Malformed entries get dropped per-case by the runtime filter; leave the audit alone.
+        return True
+
+
+def _strip_known_unsupported_media_types(raw_schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Return `(filtered_schema, unknown_unsupported_media_types)`."""
+    filtered = deepclone(raw_schema)
+    unknown: set[str] = set()
+
+    def _filter_content(content: dict[str, Any]) -> None:
+        for media_type in list(content):
+            if _is_known_unsupported(media_type):
+                del content[media_type]
+            elif not _is_serialisable_media_type(media_type):
+                unknown.add(media_type)
+
+    def _filter_consumes(consumes: list[Any]) -> list[Any]:
+        kept: list[Any] = []
+        for media_type in consumes:
+            if isinstance(media_type, str) and _is_known_unsupported(media_type):
+                continue
+            if isinstance(media_type, str) and not _is_serialisable_media_type(media_type):
+                unknown.add(media_type)
+            kept.append(media_type)
+        return kept
+
+    paths = filtered.get("paths")
+    if isinstance(paths, dict):
+        for path_item in paths.values():
+            if not isinstance(path_item, dict):
+                continue
+            for method, operation in list(path_item.items()):
+                if method not in HTTP_METHODS or not isinstance(operation, dict):
+                    continue
+                body = operation.get("requestBody")
+                if isinstance(body, dict) and isinstance(body.get("content"), dict):
+                    _filter_content(body["content"])
+                    if not body["content"]:
+                        operation.pop("requestBody", None)
+                consumes = operation.get("consumes")
+                if isinstance(consumes, list):
+                    operation["consumes"] = _filter_consumes(consumes)
+    global_consumes = filtered.get("consumes")
+    if isinstance(global_consumes, list):
+        filtered["consumes"] = _filter_consumes(global_consumes)
+
+    return filtered, sorted(unknown)
 
 
 def _is_response_gap(gap: dict[str, Any]) -> bool:
@@ -176,8 +263,10 @@ def audit_schema(
     result = SchemaResult(api=api, corpus=corpus, phase=phase.value)
     started = time.monotonic()
     try:
-        schema = schemathesis.openapi.from_dict(raw_schema)
-        coverage_map = tracecov.CoverageMap.from_dict(raw_schema)
+        filtered_schema, unknown_unsupported = _strip_known_unsupported_media_types(raw_schema)
+        result.unknown_unsupported_media_types = unknown_unsupported
+        schema = schemathesis.openapi.from_dict(filtered_schema)
+        coverage_map = tracecov.CoverageMap.from_dict(filtered_schema)
     except Exception as exc:
         result.errors.append(f"load_failed: {exc.__class__.__name__}: {exc}")
         result.duration_seconds = time.monotonic() - started
