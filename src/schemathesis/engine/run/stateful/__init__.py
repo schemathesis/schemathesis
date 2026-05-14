@@ -19,7 +19,9 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
     try:
         state_machine = engine.schema._build_state_machine(
-            error_feedback=engine.error_feedback, link_calibration=engine.link_calibration
+            error_feedback=engine.error_feedback,
+            link_calibration=engine.link_calibration,
+            extra_data_source=engine.extra_data_source,
         )
     except Exception as exc:
         yield events.NonFatalError(error=exc, phase=phase.name, label=STATEFUL_TESTS_LABEL, related_to_operation=False)

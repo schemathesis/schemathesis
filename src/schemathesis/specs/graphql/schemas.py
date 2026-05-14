@@ -180,9 +180,10 @@ class GraphQLSchema(BaseSchema):
         *,
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
+        extra_data_source: ExtraDataSource | None,
     ) -> type[APIStateMachine]:
-        # `error_feedback` and `link_calibration` are OpenAPI-specific; GraphQL strategies
-        # and stateful transitions don't consume either signal.
+        # `error_feedback`, `link_calibration` and `extra_data_source` are OpenAPI-specific;
+        # GraphQL strategies and stateful transitions don't consume them.
         return self.as_state_machine()
 
     @override

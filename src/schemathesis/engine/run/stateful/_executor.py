@@ -4,13 +4,13 @@ import queue
 import time
 import unittest
 from typing import TYPE_CHECKING, Any
-from warnings import catch_warnings
+from warnings import catch_warnings, filterwarnings
 
 import hypothesis
 import requests
 from hypothesis import reject
 from hypothesis.control import current_build_context
-from hypothesis.errors import Flaky, Unsatisfiable, UnsatisfiedAssumption
+from hypothesis.errors import Flaky, HypothesisWarning, Unsatisfiable, UnsatisfiedAssumption
 from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 
@@ -47,6 +47,29 @@ from schemathesis.specs.openapi.stateful.link_calibration import record_link_out
 
 if TYPE_CHECKING:
     from schemathesis.core.error_feedback.store import Observation
+    from schemathesis.resources import ExtraDataSource
+
+
+def _replay_recorders_into_pool(extra_data_source: ExtraDataSource, recorders: list[ScenarioRecorder]) -> None:
+    """Feed every captured interaction from this suite into the pool.
+
+    Mirrors `record_extra_data_from_recorder` in the unit phase: the pool stays frozen during
+    Hypothesis runs (shrinking sees a stable strategy) and is refreshed at suite boundaries.
+    """
+    for recorder in recorders:
+        for case_id, interaction in recorder.interactions.items():
+            response = interaction.response
+            if response is None:
+                continue
+            case = recorder.cases[case_id].value
+            operation = case.operation
+            if extra_data_source.should_record(operation=operation.label):
+                extra_data_source.record_response(operation=operation, response=response, case=case)
+            if extra_data_source.should_record_request(operation=operation.label):
+                extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
+            if 200 <= response.status_code < 300 or response.status_code == 404:
+                extra_data_source.record_successful_delete(operation=operation, case=case)
+            response.clear_cache()
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
@@ -80,6 +103,10 @@ def execute_state_machine_loop(
     state = TestingState()
 
     check_context_cache = CheckContextCache()
+    # Recorders from every scenario in the current suite. The pool stays frozen during the
+    # suite (so Hypothesis shrinking sees a stable strategy); writes are replayed once the
+    # suite finishes, before the next iteration's strategies are built.
+    suite_recorders: list[ScenarioRecorder] = []
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -260,6 +287,8 @@ def execute_state_machine_loop(
                     is_final=build_ctx.is_final,
                 )
             )
+            if engine.extra_data_source is not None:
+                suite_recorders.append(self.recorder)
             ctx.maximize_metrics()
             ctx.reset_scenario()
             super().teardown()
@@ -270,6 +299,7 @@ def execute_state_machine_loop(
         # Promote observations from the previous run into the stable read state.
         if engine.link_calibration is not None:
             engine.link_calibration.begin_iteration()
+        suite_recorders.clear()
         # This loop is running until no new failures are found in a single iteration
         if engine.error_feedback is not None:
             engine.error_feedback.checkpoint()
@@ -293,6 +323,7 @@ def execute_state_machine_loop(
         seed += 1
         try:
             with catch_warnings(), ignore_hypothesis_output():
+                filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
                 InstrumentedStateMachine.run(settings=hypothesis_settings)
         except KeyboardInterrupt:
             # Raised in the state machine when the stop event is set or it is raised by the user's code
@@ -353,6 +384,10 @@ def execute_state_machine_loop(
             )
             break
         finally:
+            # Drain this suite's recorders into the pool before the next iteration's strategies
+            # are built; mirrors `record_extra_data_from_recorder` in the unit phase.
+            if engine.extra_data_source is not None and suite_recorders:
+                _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
             event_queue.put(
                 events.SuiteFinished(
                     id=suite_started.id,

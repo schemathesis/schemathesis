@@ -440,6 +440,7 @@ class BaseSchema(Mapping):
         *,
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
+        extra_data_source: ExtraDataSource | None,
     ) -> type[APIStateMachine]:
         """Engine-internal variant of `as_state_machine` that wires per-run state."""
         raise NotImplementedError

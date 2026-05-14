@@ -241,7 +241,7 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def as_state_machine(self) -> type[APIStateMachine]:
-        return self._build_state_machine(error_feedback=None, link_calibration=None)
+        return self._build_state_machine(error_feedback=None, link_calibration=None, extra_data_source=None)
 
     @override
     def _build_state_machine(
@@ -249,11 +249,17 @@ class OpenApiSchema(BaseSchema):
         *,
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
+        extra_data_source: ExtraDataSource | None,
     ) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
             self.analysis.inject_links()
-        return create_state_machine(self, error_feedback=error_feedback, link_calibration=link_calibration)
+        return create_state_machine(
+            self,
+            error_feedback=error_feedback,
+            link_calibration=link_calibration,
+            extra_data_source=extra_data_source,
+        )
 
     @override
     def get_unit_scheduler(
