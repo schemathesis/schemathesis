@@ -15,6 +15,7 @@ from schemathesis.specs.openapi.serialization import (
     conversion,
     deep_object,
     delimited,
+    delimited_nested,
     delimited_object,
     extracted_object,
     label_array,
@@ -429,6 +430,61 @@ def test_query_serialization_styles_swagger2(ctx, testdir, collection_format, ex
             }
         },
     }
+    assert_generates(ctx, testdir, raw_schema, (expected,), "query")
+
+
+@pytest.mark.parametrize(
+    ("outer", "inner", "expected"),
+    [
+        (",", "|", "30000142|30000144,50000001|50000002"),
+        ("|", ",", "30000142,30000144|50000001,50000002"),
+        (" ", "\t", "30000142\t30000144 50000001\t50000002"),
+    ],
+    ids=["csv-of-pipes", "pipes-of-csv", "ssv-of-tsv"],
+)
+def test_swagger2_nested_collection_format_converter(outer, inner, expected):
+    converter = delimited_nested("connections", outer=outer, inner=inner)
+    item = {"connections": [[30000142, 30000144], [50000001, 50000002]]}
+    assert converter(item) == {"connections": expected}
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("outer_format", "inner_format", "expected"),
+    [
+        ("csv", "pipes", {"connections": "30000142|30000144,50000001|50000002"}),
+        ("pipes", "csv", {"connections": "30000142,30000144|50000001,50000002"}),
+        ("ssv", "tsv", {"connections": "30000142\t30000144 50000001\t50000002"}),
+        # Inner `collectionFormat` omitted — defaults to csv
+        ("pipes", None, {"connections": "30000142,30000144|50000001,50000002"}),
+    ],
+    ids=["csv-of-pipes", "pipes-of-csv", "ssv-of-tsv", "pipes-of-default-csv"],
+)
+def test_query_serialization_nested_swagger2(ctx, testdir, outer_format, inner_format, expected):
+    items = {"type": "array", "items": {"type": "integer"}}
+    if inner_format is not None:
+        items["collectionFormat"] = inner_format
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "connections",
+                            "required": True,
+                            "type": "array",
+                            "items": items,
+                            "collectionFormat": outer_format,
+                            "enum": [[[30000142, 30000144], [50000001, 50000002]]],
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
     assert_generates(ctx, testdir, raw_schema, (expected,), "query")
 
 
