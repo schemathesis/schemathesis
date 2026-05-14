@@ -2587,3 +2587,13 @@ def test_negative_if_then_else_violates_branches(ctx_factory):
     cases = [v.value for v in cover_schema_iter(nctx, rewritten)]
     invalid = [c for c in cases if isinstance(c, dict) and not validator.is_valid(c)]
     assert invalid, "no negative cases violate the conditional"
+
+
+def test_minitems_one_yields_empty_array_negative_with_unresolvable_items(nctx):
+    schema = {"type": "array", "minItems": 1, "items": {"$ref": "#/components/schemas/Missing"}}
+    negatives = [
+        value.value
+        for value in cover_schema_iter(nctx, schema)
+        if isinstance(value, GeneratedValue) and value.scenario is CoverageScenario.ARRAY_BELOW_MIN_ITEMS
+    ]
+    assert negatives == [[]]
