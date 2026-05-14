@@ -2601,6 +2601,17 @@ def test_negative_if_then_else_violates_branches(ctx_factory):
     assert invalid, "no negative cases violate the conditional"
 
 
+def test_negative_allof_with_unmergeable_branches_terminates(nctx):
+    # `contains` with conflicting item types prevents canonicalish from merging the `allOf`.
+    schema = {
+        "allOf": [
+            {"type": "object", "properties": {"arr": {"type": "array", "contains": {"type": "string"}}}},
+            {"type": "object", "properties": {"arr": {"type": "array", "contains": {"type": "integer"}}}},
+        ],
+    }
+    list(cover_schema_iter(nctx, schema))
+
+
 def test_minitems_one_yields_empty_array_negative_with_unresolvable_items(nctx):
     schema = {"type": "array", "minItems": 1, "items": {"$ref": "#/components/schemas/Missing"}}
     negatives = [
