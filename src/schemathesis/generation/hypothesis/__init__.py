@@ -378,6 +378,9 @@ def setup() -> None:
                 ref = schema.get("$ref")
                 if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX) and len(schema) > 1:
                     return schema
+                # A ref-bearing fragment with no bundle root would crash on $ref resolution.
+                if _has_bundle_ref(schema):
+                    return schema
             result = _original_canonicalish(schema)
             if cache_key is not None:
                 _canonicalish_cache_set(cache_key, result)
