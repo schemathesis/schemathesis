@@ -6,7 +6,7 @@ import json
 import os
 from collections.abc import Mapping, MutableMapping
 from io import BytesIO
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlencode, urlparse
 
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -14,6 +14,7 @@ from typing_extensions import override
 
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
+from schemathesis.core.jsonschema import maybe_resolve_bundled, schema_with_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
@@ -296,6 +297,15 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     return body.getvalue()
 
 
+def _is_structured_schema(schema: dict[str, Any]) -> bool:
+    declared = schema.get("type")
+    if isinstance(declared, str):
+        return declared in {"object", "array"}
+    if isinstance(declared, list):
+        return any(t in {"object", "array"} for t in declared)
+    return "properties" in schema or "items" in schema or "additionalProperties" in schema
+
+
 def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
     """Return multipart field names mapped to the content-type declared via `encoding`."""
     operation = ctx.case.operation
@@ -309,6 +319,19 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
             content_type = selected.get(name) or body.get_property_content_type(name)
             if isinstance(content_type, str):
                 result[name] = content_type
+        # Default nested-object / array form-parts to JSON so the wire payload is parsable.
+        schema_node = body.definition.get("schema")
+        if isinstance(schema_node, dict):
+            properties = schema_node.get("properties")
+            if isinstance(properties, dict):
+                for name, prop in properties.items():
+                    if name in result or not isinstance(prop, dict):
+                        continue
+                    # Resolve a property-level `$ref` against the body schema's bundle so
+                    # a referent like `{type: string}` is left alone and `{type: object}` triggers JSON.
+                    spliced = cast("dict[str, Any]", schema_with_bundle(prop, schema_node))
+                    if _is_structured_schema(maybe_resolve_bundled(spliced)):
+                        result[name] = "application/json"
         break
     return result
 

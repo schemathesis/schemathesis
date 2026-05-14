@@ -218,6 +218,246 @@ def test_binary_data(ctx, media_type):
     assert_requests_call(case)
 
 
+def test_multipart_nested_object_serializes_as_json(ctx, case_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "consumes": ["multipart/form-data"],
+                    "parameters": [
+                        {
+                            "name": "formData",
+                            "in": "formData",
+                            "required": True,
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "object",
+                                "properties": {"value": {"type": "string"}},
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"formData": {"slot": {"value": "x"}}},
+        media_type="multipart/form-data",
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert serialized["files"] == [("formData", b'{"slot": {"value": "x"}}')]
+
+
+def _multipart_payload(serialized: dict, name: str) -> bytes:
+    [(part_name, payload)] = [(n, p) for n, p in serialized["files"] if n == name]
+    assert part_name == name
+    # The multipart wrapper is either flat bytes or (filename, content[, content_type]); flatten.
+    if isinstance(payload, tuple):
+        return payload[1]
+    return payload
+
+
+def test_multipart_ref_to_object_serializes_as_json(ctx, case_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"part": {"$ref": "#/components/schemas/Inner"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Inner": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                }
+            }
+        },
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"part": {"value": "x"}},
+        media_type="multipart/form-data",
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert _multipart_payload(serialized, "part") == b'{"value": "x"}'
+
+
+def test_multipart_ref_to_scalar_is_not_json_encoded(ctx, case_factory):
+    # A `$ref` to a primitive must NOT be JSON-encoded; the wire bytes should be the raw value,
+    # not a JSON-quoted form like b'"raw"'.
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"part": {"$ref": "#/components/schemas/Token"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"schemas": {"Token": {"type": "string"}}},
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"part": "raw"},
+        media_type="multipart/form-data",
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert _multipart_payload(serialized, "part") == "raw"
+
+
+def test_multipart_nullable_object_property_serializes_as_json(ctx, case_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "part": {
+                                            "type": ["object", "null"],
+                                            "properties": {"value": {"type": "string"}},
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"part": {"value": "x"}},
+        media_type="multipart/form-data",
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert _multipart_payload(serialized, "part") == b'{"value": "x"}'
+
+
+def test_multipart_property_without_type_but_with_properties_serializes_as_json(ctx, case_factory):
+    # Property schema with no `type` but with `properties` keyword — still structural.
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"part": {"properties": {"value": {"type": "string"}}}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"part": {"value": "x"}},
+        media_type="multipart/form-data",
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert _multipart_payload(serialized, "part") == b'{"value": "x"}'
+
+
+def test_multipart_boolean_property_schema_is_left_alone(ctx, case_factory):
+    # JSON Schema 2020-12 allows `true` as a property schema (accept anything).
+    # The default-JSON pass must skip it (no `type`, not a dict-with-structural-keys)
+    # rather than crash or stringify with repr.
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {"schema": {"type": "object", "properties": {"part": True}}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"part": "raw"},
+        media_type="multipart/form-data",
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert _multipart_payload(serialized, "part") == "raw"
+
+
+def test_multipart_boolean_schema_does_not_crash(ctx, case_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"multipart/form-data": {"schema": True}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"part": "value"},
+        media_type="multipart/form-data",
+    )
+    # Should not raise AttributeError on the boolean schema; we just want the call to succeed.
+    REQUESTS_TRANSPORT.serialize_case(case)
+
+
 def test_unknown_multipart_fields_openapi3(ctx):
     schema = ctx.openapi.load_schema(
         {

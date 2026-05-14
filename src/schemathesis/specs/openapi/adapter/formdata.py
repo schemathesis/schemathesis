@@ -49,7 +49,8 @@ def prepare_multipart_v3(
     for body in operation.body:
         main, sub = media_types.parse(body.media_type)
         if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
-            schema = body.definition.get("schema", {}) or {}
+            schema_node = body.definition.get("schema")
+            schema = schema_node if isinstance(schema_node, dict) else {}
             body_param = body
             break
 
@@ -62,7 +63,7 @@ def prepare_multipart_v3(
         elif body_param:
             content_type = body_param.get_property_content_type(name)
 
-        if property_schema:
+        if isinstance(property_schema, dict):
             if isinstance(value, list):
                 items_format = (property_schema.get("items") or {}).get("format")
                 if items_format in ("binary", "base64"):
