@@ -1465,7 +1465,14 @@ def cover_schema_iter(
                     else:
                         with _ignore_unfixable():
                             canonical = canonicalish(schema)
-                            yield from cover_schema_iter(nctx, canonical, seen)
+                            # When canonicalish keeps `allOf`, recursing on the canonical
+                            # form would loop; iterate sub-schemas instead.
+                            if isinstance(canonical, dict) and "allOf" in canonical:
+                                for idx, sub in enumerate(value):
+                                    with nctx.at(idx):
+                                        yield from cover_schema_iter(nctx, sub, seen)
+                            else:
+                                yield from cover_schema_iter(nctx, canonical, seen)
                 elif key == "anyOf":
                     nctx = ctx.with_negative()
                     resolved_schemas = [
