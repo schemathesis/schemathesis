@@ -3,7 +3,13 @@ from __future__ import annotations
 import pytest
 
 from schemathesis.generation import GenerationMode
-from tools.coverage.audit import PhaseName, audit_schema
+from tools.coverage.audit import (
+    _KNOWN_UNSUPPORTED_MEDIA_TYPES,
+    _KNOWN_UNSUPPORTED_PREFIXES,
+    PhaseName,
+    _strip_known_unsupported_media_types,
+    audit_schema,
+)
 
 _PATHS = {
     "/users/{id}": {
@@ -171,3 +177,157 @@ def test_audit_schema_fuzzing_uses_only_requested_generation_modes(ctx):
         fuzzing_max_examples=2,
     )
     assert outcome.result.cases_generated == 4  # 2 ops * 2 examples * 1 mode
+
+
+@pytest.mark.parametrize(
+    ("content_types", "expected_kept", "expected_unknown"),
+    [
+        (["application/json", "application/x-msgpack"], {"application/json"}, []),
+        (["application/json", "image/png", "video/mp4"], {"application/json"}, []),
+        (["application/json", "text/html"], {"application/json", "text/html"}, ["text/html"]),
+        (
+            ["application/json", "text/html", "text/csv"],
+            {"application/json", "text/html", "text/csv"},
+            ["text/csv", "text/html"],
+        ),
+        (
+            ["application/json", "application/x-msgpack", "image/png", "text/html"],
+            {"application/json", "text/html"},
+            ["text/html"],
+        ),
+    ],
+    ids=["explicit-deny", "prefix-deny", "unknown-surfaced", "multiple-unknowns-sorted", "mixed"],
+)
+def test_strip_known_unsupported_openapi3_content(ctx, content_types, expected_kept, expected_unknown):
+    schema = ctx.openapi.build_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {"content": {mt: {"schema": {"type": "string"}} for mt in content_types}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    filtered, unknown = _strip_known_unsupported_media_types(schema)
+    assert set(filtered["paths"]["/x"]["post"]["requestBody"]["content"]) == expected_kept
+    assert unknown == expected_unknown
+
+
+def test_strip_known_unsupported_drops_empty_request_body(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {"content": {"application/x-msgpack": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    filtered, _ = _strip_known_unsupported_media_types(schema)
+    assert "requestBody" not in filtered["paths"]["/x"]["post"]
+
+
+@pytest.mark.parametrize(
+    ("consumes", "expected_kept", "expected_unknown"),
+    [
+        (
+            ["application/json", "application/x-msgpack", "image/png", "text/html"],
+            ["application/json", "text/html"],
+            ["text/html"],
+        ),
+        (["application/json"], ["application/json"], []),
+        (["application/x-msgpack", "image/png"], [], []),
+    ],
+    ids=["mixed", "all-supported", "all-denied"],
+)
+def test_strip_known_unsupported_swagger2_per_op_consumes(ctx, consumes, expected_kept, expected_unknown):
+    schema = ctx.openapi.build_schema(
+        {
+            "/x": {
+                "post": {"consumes": consumes, "responses": {"200": {"description": "OK"}}},
+            }
+        },
+        version="2.0",
+    )
+    filtered, unknown = _strip_known_unsupported_media_types(schema)
+    assert filtered["paths"]["/x"]["post"]["consumes"] == expected_kept
+    assert unknown == expected_unknown
+
+
+@pytest.mark.parametrize("media_type", sorted(_KNOWN_UNSUPPORTED_MEDIA_TYPES))
+def test_known_unsupported_explicit_entry_is_stripped(ctx, media_type):
+    schema = ctx.openapi.build_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {"schema": {"type": "object"}},
+                            media_type: {"schema": {"type": "string"}},
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    filtered, unknown = _strip_known_unsupported_media_types(schema)
+    assert set(filtered["paths"]["/x"]["post"]["requestBody"]["content"]) == {"application/json"}
+    assert unknown == []
+
+
+@pytest.mark.parametrize("prefix", _KNOWN_UNSUPPORTED_PREFIXES)
+def test_known_unsupported_prefix_is_stripped(ctx, prefix):
+    sample = f"{prefix}sample"
+    schema = ctx.openapi.build_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {"schema": {"type": "object"}},
+                            sample: {"schema": {"type": "string", "format": "binary"}},
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    filtered, unknown = _strip_known_unsupported_media_types(schema)
+    assert set(filtered["paths"]["/x"]["post"]["requestBody"]["content"]) == {"application/json"}
+    assert unknown == []
+
+
+def test_strip_known_unsupported_swagger2_global_consumes(ctx):
+    schema = ctx.openapi.build_schema(
+        {"/x": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="2.0",
+        consumes=["application/json", "application/x-msgpack", "text/csv"],
+    )
+    filtered, unknown = _strip_known_unsupported_media_types(schema)
+    assert filtered["consumes"] == ["application/json", "text/csv"]
+    assert unknown == ["text/csv"]
+
+
+def test_audit_schema_records_unknown_unsupported(ctx):
+    raw = ctx.openapi.build_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {"schema": {"type": "object", "properties": {"a": {"type": "string"}}}},
+                            "text/html": {"schema": {"type": "string"}},
+                            "application/x-msgpack": {"schema": {"type": "object"}},
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    assert outcome.result.unknown_unsupported_media_types == ["text/html"]
