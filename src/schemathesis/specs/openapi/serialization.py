@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from schemathesis.core.jsonschema import maybe_resolve_bundled
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
+from schemathesis.specs.openapi.checks import _COLLECTION_FORMAT_DELIMITERS
 
 Generated = dict[str, Any]
 Definition = dict[str, Any]
@@ -303,14 +304,16 @@ def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | Non
             # Headers should be coerced to a string so we can check it for validity later
             yield to_string(name)
         if type_ in ("array", "object"):
-            if collection_format == "csv":
-                yield delimited(name, delimiter=",")
-            if collection_format == "ssv":
-                yield delimited(name, delimiter=" ")
-            if collection_format == "tsv":
-                yield delimited(name, delimiter="\t")
-            if collection_format == "pipes":
-                yield delimited(name, delimiter="|")
+            outer = _COLLECTION_FORMAT_DELIMITERS.get(collection_format)
+            if outer is None:
+                continue
+            items = definition.get("items")
+            if isinstance(items, dict) and items.get("type") == "array":
+                inner_format = items.get("collectionFormat", "csv")
+                inner = _COLLECTION_FORMAT_DELIMITERS.get(inner_format, ",")
+                yield delimited_nested(name, outer=outer, inner=inner)
+            else:
+                yield delimited(name, delimiter=outer)
 
 
 serialize_openapi3_parameters = make_serializer(_serialize_openapi3)
@@ -362,6 +365,13 @@ def to_json(item: Generated, name: str) -> None:
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
     item[name] = delimiter.join(map(str, force_iterable(item[name] if item[name] is not None else ())))
+
+
+@conversion
+def delimited_nested(item: Generated, name: str, *, outer: str, inner: str) -> None:
+    raw = item[name] if item[name] is not None else ()
+    encoded = (inner.join(map(str, force_iterable(elem))) for elem in force_iterable(raw))
+    item[name] = outer.join(encoded)
 
 
 @conversion
