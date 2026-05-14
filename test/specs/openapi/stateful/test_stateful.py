@@ -336,9 +336,10 @@ def test_stateful_disabled_for_op_skips_rules(ctx, disabled_op, expected_rules):
 _ID_OBJECT = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
 
 
-def test_fk_body_consumer_not_classified_as_root(ctx):
-    # POST /photos consumes Album.id via body `albumId`; can't succeed without a producer-supplied
-    # value, so it must not fire as a root while the clean Album producer exists.
+def test_fk_consumer_with_producer_stays_root(ctx):
+    # POST /photos consumes Album.id via body `albumId`; Album has a producer (POST /albums),
+    # so the chain can reach the consumer through a Link. The consumer stays in the reliable
+    # root set, letting the state machine also start chains from it.
     schema = ctx.openapi.load_schema(
         {
             "/albums": {
@@ -390,6 +391,57 @@ def test_fk_body_consumer_not_classified_as_root(ctx):
         "POST_albums___201_PostAlbum__POST_photos",
         "POST_photos___201_GetPhoto__GET_photos_photoId_",
         "RANDOM__POST_albums",
+        "RANDOM__POST_photos",
+    ]
+
+
+def test_unsatisfiable_fk_consumer_not_classified_as_root(ctx):
+    # POST /photos consumes Album.id via body `albumId`, but no operation produces Album.
+    # The clean list endpoint keeps the reliable set non-empty so the safety-net fallback
+    # doesn't fire, letting us observe that the unsatisfiable consumer was demoted.
+    schema = ctx.openapi.load_schema(
+        {
+            "/photos": {
+                "get": {
+                    "responses": {
+                        "200": {"content": {"application/json": {"schema": {"type": "array", "items": _ID_OBJECT}}}}
+                    }
+                },
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "albumId": {"type": "integer"},
+                                        "title": {"type": "string"},
+                                    },
+                                    "required": ["albumId", "title"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                },
+            },
+            "/photos/{photoId}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "photoId", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+        }
+    )
+
+    state_machine = schema.as_state_machine()
+    assert sorted(
+        name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule")
+    ) == [
+        "GET_photos___200_GetPhoto__GET_photos_photoId_",
+        "POST_photos___201_GetPhoto__GET_photos_photoId_",
+        "RANDOM__GET_photos",
     ]
 
 

@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- Restore stateful chain coverage for foreign-key consumers whose target resource is produced by another operation.
 - Serialize Swagger 2.0 nested array-of-array query parameters using each level's `collectionFormat`.
 - Emit empty-array negatives for `minItems: 1` arrays when `items` is unsatisfiable.
 - Emit string-too-long negatives for `maxLength` thresholds between 32 KB and 1 MB.

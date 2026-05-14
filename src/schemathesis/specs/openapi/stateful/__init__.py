@@ -276,14 +276,14 @@ def classify_root_transitions(
 ) -> RootTransitions:
     """Find operations that can serve as root transitions."""
     roots = RootTransitions()
+    produced_anywhere = {output.resource.name for op_node in graph.operations.values() for output in op_node.outputs}
 
     for operation in operations:
-        # Skip if operation has no outgoing transitions
         operation_transitions = transitions.operations.get(operation.label)
         if not operation_transitions or not operation_transitions.outgoing:
             continue
 
-        if is_likely_root_transition(operation, graph.operations.get(operation.label)):
+        if is_likely_root_transition(operation, graph.operations.get(operation.label), produced_anywhere):
             roots.reliable.add(operation.label)
         else:
             roots.fallback.add(operation.label)
@@ -291,12 +291,14 @@ def classify_root_transitions(
     return roots
 
 
-def is_likely_root_transition(operation: APIOperation, node: OperationNode | None) -> bool:
+def is_likely_root_transition(operation: APIOperation, node: OperationNode | None, produced_anywhere: set[str]) -> bool:
     """Check if operation is likely to succeed as a root transition."""
-    if node is not None:
-        produced = {slot.resource.name for slot in node.outputs}
-        if any(slot.resource_field is not None and slot.resource.name not in produced for slot in node.inputs):
-            return False
+    # FK consumers whose target resource has no producer anywhere are guaranteed to fail
+    # with random data; chains depending on a producer can still be reached via Links.
+    if node is not None and any(
+        slot.resource_field is not None and slot.resource.name not in produced_anywhere for slot in node.inputs
+    ):
+        return False
 
     # POST operations are likely to create resources
     if operation.method == "post":
