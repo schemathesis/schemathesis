@@ -13,18 +13,22 @@ from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wai
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import TypedDict
 
 # Make the repo-root `tools/` package importable when this script is invoked by file path
 # from outside the repository root (e.g. `python /path/to/scripts/coverage/audit.py`).
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from rich.console import Console
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TaskProgressColumn, TextColumn, TimeRemainingColumn
+
 from schemathesis.generation import GenerationMode
 from tools.corpus.io import (
     CORPUS_NAMES,
     CorpusEntry,
-    iter_corpus_entries_from_refs,
     iter_corpus_refs,
     iter_corpus_streaming,
+    load_corpus_entry,
 )
 from tools.corpus.locator import CORPUS_SCHEME, load_schema_dict
 from tools.coverage.aggregate import aggregate, render_markdown
@@ -37,7 +41,11 @@ from tools.coverage.audit import (
 
 DEFAULT_OUT_DIR = Path("out/coverage")
 _MODE_CHOICES = ("all", *(mode.value for mode in GenerationMode))
-_SCHEMA_BATCH_SIZE = 32
+# Recycle workers periodically to release accumulated memory.
+_MAX_TASKS_PER_CHILD = 50
+
+# A pending unit of work: the corpus tarball and the member name to audit.
+_Ref = tuple[str, str]
 
 
 def _iter_inputs(args: argparse.Namespace) -> Iterator[CorpusEntry]:
@@ -47,14 +55,26 @@ def _iter_inputs(args: argparse.Namespace) -> Iterator[CorpusEntry]:
     yield from iter_corpus_streaming(corpus=args.corpus, only=args.only, limit=args.limit)
 
 
+def _iter_refs(args: argparse.Namespace) -> Iterator[_Ref]:
+    yield from iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit)
+
+
+def _count_inputs(args: argparse.Namespace) -> int:
+    if args.spec is not None:
+        return 1
+    return sum(1 for _ in iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit))
+
+
 def _result_path(out_dir: Path, result: SchemaResult) -> Path:
     return out_dir / result.corpus / f"{result.api.replace('/', '__')}.json"
 
 
-@dataclass(slots=True, frozen=True)
-class _CorpusBatch:
-    corpus: str
-    members: tuple[str, ...]
+class _WorkerKwargs(TypedDict):
+    out_dir: Path
+    html_out: Path
+    phase: PhaseName
+    generation_modes: list[GenerationMode]
+    fuzzing_max_examples: int
 
 
 @dataclass(slots=True)
@@ -64,21 +84,6 @@ class _WorkerOutput:
     html_link: str | None
     corpus: str
     api: str
-
-
-def _iter_input_batches(args: argparse.Namespace, *, batch_size: int = _SCHEMA_BATCH_SIZE) -> Iterator[_CorpusBatch]:
-    current_corpus: str | None = None
-    members: list[str] = []
-    for corpus_name, member_name in iter_corpus_refs(corpus=args.corpus, only=args.only, limit=args.limit):
-        if current_corpus is None:
-            current_corpus = corpus_name
-        if corpus_name != current_corpus or len(members) >= batch_size:
-            yield _CorpusBatch(corpus=current_corpus, members=tuple(members))
-            current_corpus = corpus_name
-            members = []
-        members.append(member_name)
-    if current_corpus is not None and members:
-        yield _CorpusBatch(corpus=current_corpus, members=tuple(members))
 
 
 def _process_entry(
@@ -116,72 +121,63 @@ def _process_entry(
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w") as fd:
         json.dump(asdict(result), fd, default=str, indent=2)
-    output = _WorkerOutput(
+    return _WorkerOutput(
         result=result,
         target_name=target.name,
         html_link=html_link,
         corpus=entry.corpus,
         api=api_label,
     )
-    _print_outcome(output)
-    return output
 
 
-def _process_batch(
-    batch: _CorpusBatch,
+def _process_ref(
+    ref: _Ref,
     *,
     out_dir: Path,
     html_out: Path,
     phase: PhaseName,
     generation_modes: list[GenerationMode],
     fuzzing_max_examples: int,
-) -> list[_WorkerOutput]:
-    return [
-        _process_entry(
-            entry,
-            out_dir=out_dir,
-            html_out=html_out,
-            phase=phase,
-            generation_modes=generation_modes,
-            fuzzing_max_examples=fuzzing_max_examples,
-        )
-        for entry in iter_corpus_entries_from_refs(batch.corpus, batch.members)
-    ]
+) -> _WorkerOutput:
+    corpus_name, member_name = ref
+    entry = load_corpus_entry(corpus_name, member_name)
+    return _process_entry(
+        entry,
+        out_dir=out_dir,
+        html_out=html_out,
+        phase=phase,
+        generation_modes=generation_modes,
+        fuzzing_max_examples=fuzzing_max_examples,
+    )
 
 
-_MAX_TASKS_PER_CHILD = 50  # recycle workers periodically to release accumulated memory
-
-
-def _batch_refs(batch: _CorpusBatch) -> Iterator[str]:
-    for member in batch.members:
-        yield f"{CORPUS_SCHEME}{batch.corpus}/{member}"
-
-
-def _single_ref_batches(batch: _CorpusBatch) -> Iterator[_CorpusBatch]:
-    for member in batch.members:
-        yield _CorpusBatch(corpus=batch.corpus, members=(member,))
-
-
-def _record_crash(ref: str, reason: str, results: list[SchemaResult], *, phase: PhaseName) -> None:
+def _record_crash(
+    ref: _Ref,
+    reason: str,
+    results: list[SchemaResult],
+    *,
+    phase: PhaseName,
+    reporter: _Reporter,
+) -> None:
     """Persist a synthetic failure entry so a dead worker doesn't vanish from the summary."""
-    corpus, _, name = ref.removeprefix(CORPUS_SCHEME).partition("/")
-    api_label = name.removesuffix(".json")
-    print(f"[{corpus}] {api_label}\n     CRASH: {reason}", file=sys.stderr)
-    results.append(SchemaResult(api=api_label, corpus=corpus, phase=phase.value, errors=[f"worker_crashed: {reason}"]))
-
-
-def _record_batch_crash(batch: _CorpusBatch, reason: str, results: list[SchemaResult], *, phase: PhaseName) -> None:
-    for ref in _batch_refs(batch):
-        _record_crash(ref, reason, results, phase=phase)
+    corpus_name, member_name = ref
+    api_label = member_name.removesuffix(".json")
+    result = SchemaResult(api=api_label, corpus=corpus_name, phase=phase.value, errors=[f"worker_crashed: {reason}"])
+    results.append(result)
+    reporter.report(
+        _WorkerOutput(result=result, target_name="", html_link=None, corpus=corpus_name, api=api_label),
+        crashed=True,
+    )
 
 
 def _run_pool(
-    queue: list[_CorpusBatch],
+    queue: list[_Ref],
     *,
     max_workers: int,
-    worker_kwargs: dict,
+    worker_kwargs: _WorkerKwargs,
     results: list[SchemaResult],
-    crash_sink: list[_CorpusBatch] | None,
+    crash_sink: list[_Ref] | None,
+    reporter: _Reporter,
 ) -> None:
     """Process `queue` with a bounded in-flight window of `max_workers` tasks.
 
@@ -196,68 +192,69 @@ def _run_pool(
         executor = ProcessPoolExecutor(  # type: ignore[call-overload]
             max_workers=max_workers, mp_context=ctx, max_tasks_per_child=_MAX_TASKS_PER_CHILD
         )
-        in_flight: dict[Future[list[_WorkerOutput]], _CorpusBatch] = {}
+        in_flight: dict[Future[_WorkerOutput], _Ref] = {}
         try:
             while len(in_flight) < max_workers and cursor < len(queue):
-                batch = queue[cursor]
+                ref = queue[cursor]
                 cursor += 1
-                in_flight[executor.submit(_process_batch, batch, **worker_kwargs)] = batch
+                in_flight[executor.submit(_process_ref, ref, **worker_kwargs)] = ref
 
             broken = False
             while in_flight and not broken:
                 done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
                 for future in done:
-                    batch = in_flight.pop(future)
+                    ref = in_flight.pop(future)
                     try:
-                        outputs = future.result()
+                        output = future.result()
                     except BrokenProcessPool:
                         broken = True
                         if crash_sink is None:
-                            _record_batch_crash(batch, "killed worker in isolation", results, phase=phase)
+                            _record_crash(ref, "killed worker in isolation", results, phase=phase, reporter=reporter)
                         else:
-                            crash_sink.extend(_single_ref_batches(batch))
+                            crash_sink.append(ref)
                     except Exception as exc:
-                        _record_batch_crash(batch, f"{exc.__class__.__name__}: {exc}", results, phase=phase)
+                        _record_crash(ref, f"{exc.__class__.__name__}: {exc}", results, phase=phase, reporter=reporter)
                     else:
-                        for output in outputs:
-                            results.append(output.result)
+                        results.append(output.result)
+                        reporter.report(output)
                 if broken:
                     # the dead pool poisons every still-in-flight future; treat them as suspects.
-                    for batch in in_flight.values():
+                    for ref in in_flight.values():
                         if crash_sink is None:
-                            _record_batch_crash(batch, "killed worker in isolation", results, phase=phase)
+                            _record_crash(ref, "killed worker in isolation", results, phase=phase, reporter=reporter)
                         else:
-                            crash_sink.extend(_single_ref_batches(batch))
+                            crash_sink.append(ref)
                     in_flight.clear()
                 else:
                     while len(in_flight) < max_workers and cursor < len(queue):
-                        batch = queue[cursor]
+                        ref = queue[cursor]
                         cursor += 1
-                        in_flight[executor.submit(_process_batch, batch, **worker_kwargs)] = batch
+                        in_flight[executor.submit(_process_ref, ref, **worker_kwargs)] = ref
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
 
 
 def _run_parallel(
-    batches: Iterator[_CorpusBatch],
+    refs: Iterator[_Ref],
     *,
     max_workers: int,
-    worker_kwargs: dict,
+    worker_kwargs: _WorkerKwargs,
     results: list[SchemaResult],
+    reporter: _Reporter,
 ) -> None:
-    queue = list(batches)
-    crash_candidates: list[_CorpusBatch] = []
+    queue = list(refs)
+    crash_candidates: list[_Ref] = []
     _run_pool(
         queue,
         max_workers=max_workers,
         worker_kwargs=worker_kwargs,
         results=results,
         crash_sink=crash_candidates,
+        reporter=reporter,
     )
     if crash_candidates:
-        print(
-            f"\nretrying {len(crash_candidates)} crash-suspect refs one at a time to identify killers",
-            file=sys.stderr,
+        reporter.note(
+            f"retrying {len(crash_candidates)} crash-suspect refs one at a time to identify killers",
         )
         _run_pool(
             crash_candidates,
@@ -265,25 +262,124 @@ def _run_parallel(
             worker_kwargs=worker_kwargs,
             results=results,
             crash_sink=None,
+            reporter=reporter,
         )
 
 
-def _print_outcome(output: _WorkerOutput) -> None:
-    result = output.result
-    print(f"[{output.corpus}] {output.api}", file=sys.stderr)
-    keywords = (result.statistic or {}).get("keywords") or {}
-    examples = (result.statistic or {}).get("examples") or {}
-    flag = f" [errors={len(result.errors)}]" if result.errors else ""
-    print(
-        f"  -> {output.target_name} | ops={result.operations} cases={result.cases_generated} "
-        f"kw={keywords.get('full', 0)}/{keywords.get('total', 0)} "
-        f"ex={examples.get('seen', 0)}/{examples.get('total', 0)}{flag}",
-        file=sys.stderr,
+# Schema-path suffixes for uncovered keywords that schemathesis cannot exercise without user
+# intervention (e.g. unknown `format` values like `format: integer`). A schema whose only
+# coverage shortfall lives on one of these is considered complete for the live view.
+_IRREDUCIBLE_SCHEMA_PATH_SUFFIXES = ("/format",)
+
+
+def _only_irreducible_keywords(uncovered: list[dict]) -> bool:
+    return bool(uncovered) and all(
+        (entry.get("schema_path") or "").endswith(_IRREDUCIBLE_SCHEMA_PATH_SUFFIXES) for entry in uncovered
     )
-    for error in result.errors:
-        print(f"     error: {error}", file=sys.stderr)
-    if output.html_link is not None:
-        print(f"     report: {output.html_link}", file=sys.stderr)
+
+
+def _is_complete(result: SchemaResult) -> bool:
+    """A schema is complete when every measured surface is fully covered. Responses are excluded."""
+    if result.errors:
+        return False
+    statistic = result.statistic or {}
+    keywords = statistic.get("keywords") or {}
+    if int(keywords.get("full", 0)) < int(keywords.get("total", 0)) and not _only_irreducible_keywords(
+        result.uncovered_keywords
+    ):
+        return False
+    parameters = statistic.get("parameters") or {}
+    parameter_covered = int(parameters.get("full", 0)) + int(parameters.get("partial", 0))
+    if parameter_covered < int(parameters.get("total", 0)):
+        return False
+    examples = statistic.get("examples") or {}
+    if int(examples.get("seen", 0)) < int(examples.get("total", 0)):
+        return False
+    return True
+
+
+def _fraction(covered: int, total: int) -> str:
+    """Render `covered/total` with a colour matching how close to fully covered it is."""
+    if total == 0:
+        return f"[dim]{covered}/{total}[/]"
+    ratio = covered / total
+    if ratio >= 0.9:
+        color = "yellow"
+    else:
+        color = "red"
+    return f"[{color}]{covered}/{total}[/]"
+
+
+def _coverage_fields(result: SchemaResult) -> list[str]:
+    """Return one rendered `<name> N/M` per dimension that isn't fully covered. Responses are excluded."""
+    statistic = result.statistic or {}
+    keywords = statistic.get("keywords") or {}
+    parameters = statistic.get("parameters") or {}
+    examples = statistic.get("examples") or {}
+
+    keyword_covered = int(keywords.get("full", 0))
+    keyword_total = int(keywords.get("total", 0))
+    parameter_covered = int(parameters.get("full", 0)) + int(parameters.get("partial", 0))
+    parameter_total = int(parameters.get("total", 0))
+    example_seen = int(examples.get("seen", 0))
+    example_total = int(examples.get("total", 0))
+
+    fields: list[str] = []
+    if keyword_covered < keyword_total:
+        fields.append(f"keywords {_fraction(keyword_covered, keyword_total)}")
+    if parameter_covered < parameter_total:
+        fields.append(f"parameters {_fraction(parameter_covered, parameter_total)}")
+    if example_seen < example_total:
+        fields.append(f"examples {_fraction(example_seen, example_total)}")
+    return fields
+
+
+class _Reporter:
+    """Live stderr renderer: progress bar pinned at the bottom, incomplete schemas printed above."""
+
+    def __init__(self, total: int) -> None:
+        self.console = Console(stderr=True)
+        self.progress = Progress(
+            TextColumn("[bold]Schemas[/]"),
+            MofNCompleteColumn(),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            TextColumn("{task.fields[current]}", style="cyan"),
+            console=self.console,
+            transient=False,
+        )
+        self.task_id = self.progress.add_task("audit", total=total, current="")
+
+    def __enter__(self) -> _Reporter:
+        self.progress.start()
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.progress.stop()
+
+    def report(self, output: _WorkerOutput, *, crashed: bool = False) -> None:
+        if crashed or not _is_complete(output.result):
+            self._render(output, crashed=crashed)
+        self.progress.update(self.task_id, advance=1, current=f"{output.corpus} {output.api}")
+
+    def note(self, message: str) -> None:
+        self.console.print(f"[yellow]{message}[/]")
+
+    def _render(self, output: _WorkerOutput, *, crashed: bool) -> None:
+        result = output.result
+        parts: list[str] = [f"[magenta]\\[{output.corpus}][/] [bold]{output.api}[/]"]
+        parts.extend(_coverage_fields(result))
+        if crashed:
+            parts.append("[red bold]CRASHED[/]")
+        elif result.errors:
+            parts.append(f"[red]errors {len(result.errors)}[/]")
+        if output.html_link is not None:
+            parts.append(f"[link={output.html_link}][dim]report[/][/]")
+        self.console.print("  ".join(parts))
+        for error in result.errors:
+            first_line = error.splitlines()[0] if error else ""
+            self.console.print(f"    [red]![/] {first_line}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -353,27 +449,32 @@ def main(argv: list[str] | None = None) -> int:
 
     signal.signal(signal.SIGINT, _write_summary_and_exit)
 
-    worker_kwargs = {
-        "out_dir": args.out,
-        "html_out": html_out,
-        "phase": phase,
-        "generation_modes": generation_modes,
-        "fuzzing_max_examples": args.max_examples,
-    }
+    worker_kwargs = _WorkerKwargs(
+        out_dir=args.out,
+        html_out=html_out,
+        phase=phase,
+        generation_modes=generation_modes,
+        fuzzing_max_examples=args.max_examples,
+    )
+
+    total = _count_inputs(args)
 
     try:
-        if args.spec is not None or args.workers <= 1:
-            for entry in _iter_inputs(args):
-                output = _process_entry(entry, **worker_kwargs)
-                results.append(output.result)
-        else:
-            # `spawn` avoids fork-after-threads deadlocks from hypothesis/tracecov import-time threads.
-            _run_parallel(
-                _iter_input_batches(args),
-                max_workers=args.workers,
-                worker_kwargs=worker_kwargs,
-                results=results,
-            )
+        with _Reporter(total=total) as reporter:
+            if args.spec is not None or args.workers <= 1:
+                for entry in _iter_inputs(args):
+                    output = _process_entry(entry, **worker_kwargs)
+                    results.append(output.result)
+                    reporter.report(output)
+            else:
+                # `spawn` avoids fork-after-threads deadlocks from hypothesis/tracecov import-time threads.
+                _run_parallel(
+                    _iter_refs(args),
+                    max_workers=args.workers,
+                    worker_kwargs=worker_kwargs,
+                    results=results,
+                    reporter=reporter,
+                )
     except KeyboardInterrupt:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
         interrupted = True

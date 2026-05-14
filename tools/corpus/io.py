@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import io
 import os
 import pathlib
@@ -229,6 +230,39 @@ def iter_corpus_entries_from_refs(
         raise FileNotFoundError(f"{corpus_name}: {missing}")
     for member_name in requested:
         yield CorpusEntry(corpus=corpus_name, name=member_name, schema=schemas[member_name])
+
+
+# Per-process cache of (open archive, member-name index). gzip streams are random-access only
+# after a one-time decompression; we hold the decompressed bytes so subsequent extracts are
+# memcpy-cheap. Workers handle dozens of members from the same corpus, so the amortization wins.
+_INDEXED_ARCHIVES: dict[str, tuple[tarfile.TarFile, dict[str, tarfile.TarInfo]]] = {}
+
+
+def _open_indexed_corpus(
+    corpus_name: str, *, data_dir: pathlib.Path = DATA_DIR
+) -> tuple[tarfile.TarFile, dict[str, tarfile.TarInfo]]:
+    cached = _INDEXED_ARCHIVES.get(corpus_name)
+    if cached is not None:
+        return cached
+    path = data_dir / f"{corpus_name}.tar.gz"
+    with gzip.open(path, "rb") as fd:
+        raw = io.BytesIO(fd.read())
+    archive = tarfile.open(fileobj=raw, mode="r:")
+    index = {member.name: member for member in archive}
+    _INDEXED_ARCHIVES[corpus_name] = (archive, index)
+    return archive, index
+
+
+def load_corpus_entry(corpus_name: str, member_name: str, *, data_dir: pathlib.Path = DATA_DIR) -> CorpusEntry:
+    """Load a single member; first call per corpus decompresses, subsequent calls seek in memory."""
+    archive, index = _open_indexed_corpus(corpus_name, data_dir=data_dir)
+    member = index.get(member_name)
+    if member is None:
+        raise FileNotFoundError(f"{corpus_name}: {member_name}")
+    extracted = archive.extractfile(member)
+    if extracted is None:
+        raise FileNotFoundError(f"{corpus_name}: {member_name}")
+    return CorpusEntry(corpus=corpus_name, name=member_name, schema=json_loads(extracted.read()))
 
 
 def iter_corpus_streaming(

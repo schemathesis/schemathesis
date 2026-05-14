@@ -6,12 +6,14 @@ from tools.coverage.audit import PhaseName
 
 def test_record_crash_preserves_requested_phase():
     results = []
-
-    cli_audit._record_crash(
-        "corpus://openapi-3.0/acme.json",
-        "killed worker in isolation",
-        results,
-        phase=PhaseName.COVERAGE,
-    )
+    reporter = cli_audit._Reporter(total=1)
+    with reporter:
+        cli_audit._record_crash(
+            ("openapi-3.0", "acme.json"),
+            "killed worker in isolation",
+            results,
+            phase=PhaseName.COVERAGE,
+            reporter=reporter,
+        )
 
     assert results[0].phase == "coverage"
