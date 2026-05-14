@@ -1338,22 +1338,35 @@ def cover_schema_iter(
                         except (InvalidArgument, Unsatisfiable):
                             pass
                 elif key == "minItems" and isinstance(value, int) and value > 0:
-                    try:
-                        # Drop spec hints: they describe valid shapes, so `generate_from_schema`
-                        # would short-circuit to the example (vacuously accepted when a sibling
-                        # `$ref` blocks validator construction) and skip the bound we install.
-                        new_schema = {k: v for k, v in schema.items() if k not in ("example", "examples", "default")}
-                        new_schema.update({"minItems": value - 1, "maxItems": value - 1, "type": "array"})
-                        array_value = ctx.generate_from_schema(new_schema)
-                        if seen.insert(array_value):
+                    if value == 1:
+                        # The 0-item case is structurally trivial. Skip the Hypothesis round-trip
+                        # so unresolvable / unsatisfiable `items` schemas don't drop the negative.
+                        if seen.insert([]):
                             yield NegativeValue(
-                                array_value,
+                                [],
                                 scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
                                 description="Array with fewer items than allowed by minItems",
                                 location=ctx.current_path,
                             )
-                    except (InvalidArgument, Unsatisfiable):
-                        pass
+                    else:
+                        try:
+                            # Drop spec hints: they describe valid shapes, so `generate_from_schema`
+                            # would short-circuit to the example (vacuously accepted when a sibling
+                            # `$ref` blocks validator construction) and skip the bound we install.
+                            new_schema = {
+                                k: v for k, v in schema.items() if k not in ("example", "examples", "default")
+                            }
+                            new_schema.update({"minItems": value - 1, "maxItems": value - 1, "type": "array"})
+                            array_value = ctx.generate_from_schema(new_schema)
+                            if seen.insert(array_value):
+                                yield NegativeValue(
+                                    array_value,
+                                    scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
+                                    description="Array with fewer items than allowed by minItems",
+                                    location=ctx.current_path,
+                                )
+                        except (InvalidArgument, Unsatisfiable):
+                            pass
                 elif key == "additionalProperties" and schema.get("type") in ["object", None]:
                     if value is False and "pattern" not in schema:
                         # additionalProperties: false - add unexpected property
