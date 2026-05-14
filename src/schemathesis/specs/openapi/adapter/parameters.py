@@ -1605,7 +1605,11 @@ class OpenApiParameterSet(ParameterSet):
                         lambda x: GeneratedValue(serialize(x.value), x.meta, x.pool_draws, x.semantic_draws)
                     )
                 else:
-                    strategy = strategy.map(serialize)
+                    # Semantic overlay can wrap the value in `GeneratedValue` on substitution;
+                    # the wrapper preserves it (unwraps before `serialize`, re-wraps after).
+                    from schemathesis.specs.openapi.negative import wrap_map_hook_for_generated_value
+
+                    strategy = strategy.map(wrap_map_hook_for_generated_value(serialize))
 
             # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
             # `True` / `False` / `None` improves chances of them passing validation in apps
@@ -1634,7 +1638,12 @@ class OpenApiParameterSet(ParameterSet):
                 if is_negative:
                     strategy = strategy.filter(lambda x: query_filter(x.value))
                 else:
-                    strategy = strategy.filter(query_filter)
+                    from schemathesis.specs.openapi.negative import (
+                        wrap_filter_hook_for_generated_value,
+                        wrap_map_hook_for_generated_value,
+                    )
+
+                    strategy = strategy.filter(wrap_filter_hook_for_generated_value(query_filter))
                 if is_negative:
                     strategy = strategy.map(
                         lambda x: GeneratedValue(
@@ -1642,7 +1651,7 @@ class OpenApiParameterSet(ParameterSet):
                         )
                     )
                 else:
-                    strategy = strategy.map(jsonify_python_specific_types)
+                    strategy = strategy.map(wrap_map_hook_for_generated_value(jsonify_python_specific_types))
             else:
                 header_filter = is_valid_header
                 # Headers with special format do not need filtration
@@ -1650,7 +1659,9 @@ class OpenApiParameterSet(ParameterSet):
                     if is_negative:
                         strategy = strategy.filter(lambda x: header_filter(x.value))
                     else:
-                        strategy = strategy.filter(header_filter)
+                        from schemathesis.specs.openapi.negative import wrap_filter_hook_for_generated_value
+
+                        strategy = strategy.filter(wrap_filter_hook_for_generated_value(header_filter))
 
         # Apply hybrid approach when captured variants are available
         if captured_variants and usage_tracker is not None:

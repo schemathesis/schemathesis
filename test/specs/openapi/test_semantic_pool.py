@@ -1616,6 +1616,67 @@ def test_parameter_set_cache_distinguishes_semantic_source_from_no_source(ctx):
     )
 
 
+def test_parameter_set_strategy_does_not_leak_generated_value_through_filter(ctx):
+    # `is_valid_query` / `is_valid_header` expect a dict; the overlay can wrap the body in
+    # `GeneratedValue` on a substitution. Positive mode must unwrap before the location-specific
+    # filter, or the filter crashes with `AttributeError: 'GeneratedValue' object has no attribute 'items'`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/items": {
+                "get": {
+                    "parameters": [{"name": "label", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"label": {"type": "string"}},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        }
+    )
+    operation = schema["/api/items"]["GET"]
+    extra_data_source = schema.analysis.extra_data_source
+    assert isinstance(extra_data_source, OpenApiExtraDataSource)
+    assert extra_data_source.semantic_index is not None
+    extra_data_source.semantic_index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash=None,
+        normalized_name="label",
+        value="harvested",
+    )
+    parameter_set = operation.query
+    config = schema.config.generation_for(operation=operation, phase="fuzzing")
+    strategy = parameter_set.get_strategy(
+        operation, config, GenerationMode.POSITIVE, extra_data_source=extra_data_source
+    )
+
+    drawn: list[object] = []
+
+    # 30 draws at 0.5 per-leaf substitution probability make it overwhelmingly likely the
+    # overlay fires at least once; a single substitution exercises the filter path.
+    @given(strategy)
+    @settings(
+        max_examples=30,
+        derandomize=True,
+        database=None,
+        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+    )
+    def collect(value):
+        drawn.append(value)
+
+    collect()
+    assert drawn, "strategy produced no values"
+
+
 def test_strategy_caching_disabled_for_captured_variant_consumer(ctx):
     # Captured-variant consumers bind variants at build time, so the strategy must rebuild each call.
     schema = ctx.openapi.load_schema(
