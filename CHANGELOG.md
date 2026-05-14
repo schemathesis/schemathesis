@@ -12,6 +12,7 @@
 - Emit empty-array negatives for `minItems: 1` arrays when `items` is unsatisfiable.
 - Emit string-too-long negatives for `maxLength` thresholds between 32 KB and 1 MB.
 - Runtime Error in negative generation for FastAPI `Optional[Enum]` query parameters (`anyOf` with `$ref` and sibling `enum`).
+- Serialize nested-object multipart form-data parts as JSON instead of Python `repr`.
 
 ## [4.18.5](https://github.com/schemathesis/schemathesis/compare/v4.18.4...v4.18.5) - 2026-05-13
 
