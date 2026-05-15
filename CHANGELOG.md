@@ -14,6 +14,7 @@
 - Emit empty-array negatives for `minItems: 1` arrays when `items` is unsatisfiable.
 - Emit string-too-long negatives for `maxLength` thresholds between 32 KB and 1 MB.
 - Emit null variants for optional-nullable properties absent from the body template.
+- Cover properties inherited via `allOf` when a sibling property uses a bundled `$ref`.
 - Runtime Error in negative generation for FastAPI `Optional[Enum]` query parameters (`anyOf` with `$ref` and sibling `enum`).
 - Serialize nested-object multipart form-data parts as JSON instead of Python `repr`.
 
