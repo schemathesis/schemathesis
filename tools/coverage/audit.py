@@ -168,20 +168,20 @@ def _is_response_gap(gap: dict[str, Any]) -> bool:
 
 
 def _count_invalid_examples(node: Any) -> int:
-    """Count inline `example` values that fail their sibling schema.
+    """Count inline `example` / `default` values that fail their sibling schema.
 
-    Mirrors tracecov's `examples.total` accounting (inline `example` only, not the plural
-    `examples` container) so the adjustment lines up with the bucket it modifies.
+    Mirrors tracecov's `examples.total` accounting (single-valued keywords only, not the
+    plural `examples` container) so the adjustment lines up with the bucket it modifies.
     """
     if isinstance(node, dict):
         invalid = 0
-        if "example" in node:
-            sibling_schema = {k: v for k, v in node.items() if k not in ("example", "examples")}
-            if not is_valid(node["example"], sibling_schema):
+        sibling_schema = {k: v for k, v in node.items() if k not in ("example", "examples", "default")}
+        for keyword in ("example", "default"):
+            if keyword in node and not is_valid(node[keyword], sibling_schema):
                 invalid += 1
         for key, value in node.items():
-            # Don't descend into example payloads themselves (data, not schema).
-            if key in ("example", "examples"):
+            # Don't descend into example/default payloads themselves (data, not schema).
+            if key in ("example", "examples", "default"):
                 continue
             invalid += _count_invalid_examples(value)
         return invalid
