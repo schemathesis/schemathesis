@@ -70,6 +70,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.resources import ExtraDataSource
+    from schemathesis.specs.openapi.adapter.security import SecurityRequirements
 
 
 @lru_cache
@@ -93,7 +94,7 @@ class BaseSchema(Mapping):
         # Runtime auth-inference overlays keyed by operation label. Populated when the server enforces
         # auth on an operation the spec declares public; subsequent generations consult it instead of
         # mutating the parsed spec. Empty for schemas whose adapter doesn't run inference.
-        self._inferred_security: dict[str, list[Mapping[str, list[str]]]] = {}
+        self._inferred_security: dict[str, SecurityRequirements] = {}
         # Set by the startup probe when the server's URL decoder rejects backslash/control chars
         # in path strings; path generation sanitizes those chars to avoid wasting budget on
         # requests the app never sees.

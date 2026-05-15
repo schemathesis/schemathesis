@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.error_feedback.store import ParameterPath
+
 if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonValue
 
@@ -37,7 +39,7 @@ class Mutation:
     specific path, operator, and keyword set.
     """
 
-    path: tuple[str | int, ...]
+    path: ParameterPath
     schema_pointer: str
     channel: MutationChannel
     operator: OperatorKind

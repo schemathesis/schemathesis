@@ -3,8 +3,13 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field, replace
 from enum import Enum
+from typing import TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
+
+# JSON-Pointer-style path through a request payload. String segments index objects;
+# integer segments index arrays.
+ParameterPath: TypeAlias = tuple[str | int, ...]
 
 # Bound per (operation, location) bucket; lowest-count entry is evicted at the cap.
 MAX_ENTRIES_PER_BUCKET = 100
@@ -129,13 +134,13 @@ class Observation:
 
     operation_label: str
     location: ParameterLocation
-    parameter_path: tuple[str | int, ...]
+    parameter_path: ParameterPath
     kind: ObservationKind
     raw_message: str
     payload: ObservationPayload = None
 
 
-_EntryKey = tuple[tuple[str | int, ...], ObservationKind, object]
+_EntryKey = tuple[ParameterPath, ObservationKind, object]
 _BucketKey = tuple[str, ParameterLocation]
 
 

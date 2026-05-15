@@ -10,6 +10,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
@@ -127,7 +128,7 @@ def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
     obj["required"] = required
 
 
-def _walk_and_apply(schema: dict[str, Any], path: tuple[str | int, ...]) -> None:
+def _walk_and_apply(schema: dict[str, Any], path: ParameterPath) -> None:
     """Descend along `path` and mark the leaf as required.
 
     String-only paths only — synthesizing intermediate objects under `properties`
@@ -180,7 +181,7 @@ def _apply_size_bound_to_property(prop: dict[str, Any], payload: SizeBoundPayloa
                 prop[max_keyword] = payload.max
 
 
-def _walk_to_property(schema: dict[str, Any], path: tuple[str | int, ...]) -> dict[str, Any] | None:
+def _walk_to_property(schema: dict[str, Any], path: ParameterPath) -> dict[str, Any] | None:
     """Descend `schema` along `path`; return the leaf prop dict or None.
 
     String steps navigate `properties[<name>]` (object properties); int steps

@@ -19,6 +19,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
 )
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-WalkPair = tuple[tuple[str | int, ...], str]
+WalkPair = tuple[ParameterPath, str]
 AspNetShape = Mapping[str, Sequence[str]]
 
 # Vocabulary discriminator — substrings that lock detection to ASP.NET / FluentValidation.

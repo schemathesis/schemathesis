@@ -5,10 +5,14 @@ import json
 import string
 from collections.abc import Mapping
 from itertools import product
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+
+# HTTP headers in wire form: lowercased name -> list of values. The list shape
+# preserves repeated headers (Set-Cookie, Vary, ...) that a flat dict would collapse.
+Headers: TypeAlias = dict[str, list[str]]
 
 if TYPE_CHECKING:
     import httpx
@@ -43,7 +47,7 @@ class Response:
 
     status_code: int
     """HTTP status code (e.g., 200, 404, 500)."""
-    headers: dict[str, list[str]]
+    headers: Headers
     """Response headers with lowercase keys and list values."""
     content: bytes
     """Raw response body as bytes."""

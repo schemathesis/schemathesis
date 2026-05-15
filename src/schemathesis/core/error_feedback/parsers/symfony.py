@@ -19,6 +19,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
@@ -27,8 +28,6 @@ from schemathesis.core.error_feedback.store import (
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
-
-ParameterPath = tuple[str | int, ...]
 
 # Stable Symfony Validator constraint UUIDs — declared as `public const` on each
 # constraint class, covered by Symfony's BC promise. Browse the source at:

@@ -20,6 +20,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     SizeBoundPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
@@ -27,8 +28,6 @@ from schemathesis.core.parameters import ParameterLocation
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
-
-ParameterPath = tuple[str | int, ...]
 
 _FORMAT_TAGS: dict[str, str] = {"email": "email", "url": "uri", "uuid": "uuid"}
 _NUMERIC_KINDS: frozenset[str] = frozenset(

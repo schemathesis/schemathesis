@@ -20,6 +20,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     SizeBoundPayload,
     TypeMismatchPayload,
 )
@@ -28,8 +29,6 @@ from schemathesis.core.parameters import ParameterLocation
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
-
-ParameterPath = tuple[str | int, ...]
 
 # Wrapper keys used by webargs / flask-smorest / APIFlask. Treated as wrappers
 # only when the value is a dict, so a field literally named `errors` carrying

@@ -5,6 +5,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.core.error_feedback.store import ParameterPath
 from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
@@ -45,9 +46,9 @@ def _walk_body(
     *,
     rejected_value: str,
     state: _WalkState,
-) -> Iterator[tuple[tuple[str | int, ...], object]]:
+) -> Iterator[tuple[ParameterPath, object]]:
     """Yield every (path, value) where the value's wire form equals `rejected_value`."""
-    stack: list[tuple[tuple[str | int, ...], object, int]] = [((), body, 0)]
+    stack: list[tuple[ParameterPath, object, int]] = [((), body, 0)]
     while stack and state.nodes_left > 0:
         path, current, depth = stack.pop()
         state.nodes_left -= 1
@@ -69,7 +70,7 @@ def _walk_flat(
     *,
     rejected_value: str,
     state: _WalkState,
-) -> Iterator[tuple[tuple[str | int, ...], object]]:
+) -> Iterator[tuple[ParameterPath, object]]:
     """Yield (path, value) for query / headers / cookies / path_parameters."""
     for key, value in container.items():
         if state.nodes_left == 0:
@@ -83,7 +84,7 @@ def infer_path_from_request(
     *,
     case: Case,
     rejected_value: str,
-) -> tuple[ParameterLocation, tuple[str | int, ...]] | None:
+) -> tuple[ParameterLocation, ParameterPath] | None:
     """Find the parameter slot whose wire-form value equals `rejected_value`.
 
     Returns the single matching slot or `None` when the value is too low-entropy
@@ -95,7 +96,7 @@ def infer_path_from_request(
         return None
 
     state = _WalkState(nodes_left=_MAX_NODES)
-    candidates: list[tuple[ParameterLocation, tuple[str | int, ...]]] = []
+    candidates: list[tuple[ParameterLocation, ParameterPath]] = []
 
     body = case.body
     if isinstance(body, (dict, list)):
