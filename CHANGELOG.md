@@ -16,6 +16,7 @@
 - Emit null variants for optional-nullable properties absent from the body template.
 - Cover properties inherited via `allOf` when a sibling property uses a bundled `$ref`.
 - Emit `maxItems` negatives for `uniqueItems: true` arrays whose `items.enum` domain is exhausted.
+- Constrain Swagger 2.0 array query parameters with top-level `enum` to that domain via `items.enum`.
 - Runtime Error in negative generation for FastAPI `Optional[Enum]` query parameters (`anyOf` with `$ref` and sibling `enum`).
 - Serialize nested-object multipart form-data parts as JSON instead of Python `repr`.
 

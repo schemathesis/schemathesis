@@ -819,16 +819,32 @@ OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "descrip
 def extract_parameter_schema_v2(parameter: Mapping[str, Any]) -> JsonSchemaObject:
     # In Open API 2.0, schema for non-body parameters lives directly in the parameter definition
     schema = {key: value for key, value in parameter.items() if key not in OPENAPI_20_EXCLUDE_KEYS}
-    # `type: array` + `enum: [item-strings]` + `items` is a contradictory schema (likely a codegen artifact).
-    # Drop the top-level enum only when enum values are scalars, not arrays themselves.
+    # Swagger 2.0 idiom: `type: array` + scalar `enum` constrains item values, not the whole array.
+    # Move the enum onto `items` (intersecting with any existing `items.enum`).
     if (
         schema.get("type") == "array"
-        and "enum" in schema
-        and "items" in schema
+        and isinstance(schema.get("enum"), list)
+        and isinstance(schema.get("items"), dict)
         and all(not isinstance(v, list) for v in schema["enum"])
     ):
+        items = dict(schema["items"])
+        existing = items.get("enum")
+        if isinstance(existing, list):
+            allowed = {_hashable(v) for v in existing}
+            items["enum"] = [v for v in schema["enum"] if _hashable(v) in allowed]
+        else:
+            items["enum"] = list(schema["enum"])
+        schema["items"] = items
         del schema["enum"]
     return schema
+
+
+def _hashable(value: object) -> object:
+    if isinstance(value, list):
+        return tuple(_hashable(v) for v in value)
+    if isinstance(value, dict):
+        return tuple(sorted((k, _hashable(v)) for k, v in value.items()))
+    return value
 
 
 def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
