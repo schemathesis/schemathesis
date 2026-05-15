@@ -412,6 +412,27 @@ def test_required_enforced_when_properties_at_threshold(ctx):
     _assert_generated_bodies_match_schema(operation, GenerationMode.NEGATIVE)
 
 
+def test_optional_unsatisfiable_property_does_not_block_siblings(ctx):
+    # One optional property with mutually-exclusive `type` + `enum` (a spec bug) must not
+    # suppress coverage for the sibling properties.
+    operation = _load_json_body_operation(
+        ctx,
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "good": {"type": "string"},
+                "broken": {"type": "number", "enum": ["1", "2"]},
+                "choice": {"type": "string", "enum": ["a", "b"]},
+            },
+        },
+    )
+    cases = _collect_coverage_cases(operation, GenerationMode.POSITIVE)
+    assert cases, "Expected positive cases despite the unsatisfiable optional"
+    populated_choice = {c.body["choice"] for c in cases if isinstance(c.body, dict) and "choice" in c.body}
+    assert populated_choice == {"a", "b"}, f"Expected each enum value covered, got {populated_choice!r}"
+
+
 def test_optional_nullable_emits_null_when_template_omits_it(ctx):
     # When the template omits an optional, the sweep used to dedup the legitimate null
     # emission against an implicit `None`. `deprecated` is one of several root keywords
