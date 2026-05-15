@@ -25,7 +25,7 @@ def _percent(covered: int, total: int) -> float:
     return (covered / total * 100) if total else 0.0
 
 
-def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
+def aggregate(results: list[SchemaResult], *, wall_seconds: float = 0.0) -> dict[str, Any]:
     apis_with_results = apis_errored = 0
     cases_generated = 0
     duration_seconds = 0.0
@@ -91,6 +91,7 @@ def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
         "apis_errored": apis_errored,
         "cases_generated": cases_generated,
         "duration_seconds": round(duration_seconds, 2),
+        "wall_seconds": round(wall_seconds, 2),
         "rates": {
             "operations": {
                 "covered": operations_seen,
@@ -143,11 +144,14 @@ def _row(label: str, bucket: dict[str, Any]) -> str:
 def render_markdown(summary: dict[str, Any]) -> str:
     phase = summary.get("phase") or "unknown"
     lines: list[str] = [f"# Coverage audit summary ({phase} phase)", ""]
+    audited = summary["apis_with_results"]
+    errored = summary["apis_errored"]
+    lines.append(f"APIs audited: **{audited}** / {summary['apis_total']} (errored: {errored})")
+    wall = summary.get("wall_seconds") or summary["duration_seconds"]
     lines.append(
-        f"APIs audited: **{summary['apis_with_results']}** / {summary['apis_total']} "
-        f"(errored: {summary['apis_errored']})"
+        f"Cases generated: **{summary['cases_generated']:,}** in {wall:.1f}s wall "
+        f"({summary['duration_seconds']:.1f}s CPU)"
     )
-    lines.append(f"Cases generated: **{summary['cases_generated']:,}** in {summary['duration_seconds']:.1f}s")
     if summary.get("examples_invalid"):
         lines.append(
             f"Inline examples excluded as schema-invalid: **{summary['examples_invalid']:,}** "

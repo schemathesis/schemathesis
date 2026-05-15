@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import signal
 import sys
+import time
 import warnings
 from collections import Counter
 from collections.abc import Iterator
@@ -116,7 +117,7 @@ def _process_entry(
 
     html_link: str | None = None
     keyword_total = ((result.statistic or {}).get("keywords") or {}).get("total", 0)
-    if outcome.coverage_map is not None and result.gaps and keyword_total > 0:
+    if outcome.coverage_map is not None and result.gaps and keyword_total > 0 and not _is_complete(result):
         html_path = html_out / entry.corpus / f"{api_label.replace('/', '__')}.html"
         try:
             html_path.parent.mkdir(parents=True, exist_ok=True)
@@ -422,9 +423,10 @@ def _finalize(
     *,
     out_dir: Path,
     baseline: dict[str, Any] | None = None,
+    wall_seconds: float = 0.0,
 ) -> None:
     """Write summary files and print a headline table + path lines to stderr."""
-    summary = aggregate(results)
+    summary = aggregate(results, wall_seconds=wall_seconds)
     summary_json = out_dir / "summary.json"
     summary_md = out_dir / "summary.md"
     with summary_json.open("w") as fd:
@@ -456,11 +458,15 @@ def _finalize(
 
     console.print(table)
 
+    audited = summary["apis_with_results"]
+    errored = summary["apis_errored"]
     complete = sum(1 for result in results if _is_complete(result))
+    partial = audited - complete - errored
     console.print(
-        f"APIs: [bold]{summary['apis_with_results']}[/] audited "
-        f"([green]{complete} complete[/], [red]{summary['apis_errored']} errored[/]) | "
-        f"Cases: [bold]{summary['cases_generated']:,}[/] in {summary['duration_seconds']:.1f}s"
+        f"APIs: [bold]{audited}[/] audited "
+        f"([green]{complete} complete[/], [yellow]{partial} partial[/], [red]{errored} errored[/]) | "
+        f"Cases: [bold]{summary['cases_generated']:,}[/] in {summary['wall_seconds']:.1f}s wall "
+        f"({summary['duration_seconds']:.1f}s CPU)"
     )
     if summary.get("examples_invalid"):
         console.print(
@@ -560,10 +566,11 @@ def main(argv: list[str] | None = None) -> int:
 
     results: list[SchemaResult] = []
     interrupted = False
+    wall_started = time.monotonic()
 
     def _write_summary_and_exit(signum: int, frame: object) -> None:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
-        _finalize(results, out_dir=args.out, baseline=baseline)
+        _finalize(results, out_dir=args.out, baseline=baseline, wall_seconds=time.monotonic() - wall_started)
         os._exit(130)
 
     signal.signal(signal.SIGINT, _write_summary_and_exit)
@@ -598,7 +605,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
         interrupted = True
 
-    _finalize(results, out_dir=args.out, baseline=baseline)
+    _finalize(results, out_dir=args.out, baseline=baseline, wall_seconds=time.monotonic() - wall_started)
     return 130 if interrupted else 0
 
 
