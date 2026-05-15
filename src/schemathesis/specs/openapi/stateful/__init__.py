@@ -332,10 +332,15 @@ def into_step_input(
     def builder(_output: StepOutput) -> st.SearchStrategy[StepInput]:
         @st.composite  # type: ignore[untyped-decorator]
         def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
-            random = draw(st.randoms(use_true_random=True))
+            # Tracked random for binary "apply this link override?" decisions: they don't
+            # depend on SUT state, so the data tree can record them and replay deterministically.
+            # Separate untracked source for MultiMatch picks only, where list lengths can vary
+            # across replays when the SUT has mutable state.
+            biased_random = draw(st.randoms())
+            multi_match_random = draw(st.randoms(use_true_random=True))
 
             def biased_coin(p: float) -> bool:
-                return random.random() < p
+                return biased_random.random() < p
 
             # Extract transition data from previous operation's output
             transition = link.extract(output)
@@ -358,13 +363,8 @@ def into_step_input(
                         continue
 
                     value = extracted.value.ok()
-                    # Wildcard expressions yield multiple candidates. Pick via the
-                    # `use_true_random` instance so the per-step pick stays out of
-                    # Hypothesis's data tree — the producer's response shape can vary
-                    # across runs of the same byte stream when the API has mutable
-                    # state, and a tracked draw would be flagged as inconsistent.
                     if isinstance(value, MultiMatch):
-                        value = random.choice(value.values)
+                        value = multi_match_random.choice(value.values)
 
                     if calibrated:
                         p = use_p
