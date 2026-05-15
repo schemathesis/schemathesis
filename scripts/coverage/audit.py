@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from rich.console import Console
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, TaskProgressColumn, TextColumn, TimeRemainingColumn
+from rich.table import Table
 
 from schemathesis.generation import GenerationMode
 from tools.corpus.io import (
@@ -382,6 +383,52 @@ class _Reporter:
             self.console.print(f"    [red]![/] {first_line}")
 
 
+def _finalize(
+    results: list[SchemaResult],
+    *,
+    out_dir: Path,
+) -> None:
+    """Write summary files and print a headline table + path lines to stderr."""
+    summary = aggregate(results)
+    summary_json = out_dir / "summary.json"
+    summary_md = out_dir / "summary.md"
+    with summary_json.open("w") as fd:
+        json.dump(summary, fd, indent=2)
+    with summary_md.open("w") as fd:
+        fd.write(render_markdown(summary))
+
+    console = Console(stderr=True)
+    phase = summary.get("phase") or "unknown"
+    table = Table(title=f"Coverage audit ({phase} phase)", title_style="bold")
+    table.add_column("metric")
+    table.add_column("covered", justify="right")
+    table.add_column("total", justify="right")
+    table.add_column("%", justify="right")
+
+    rates = summary["rates"]
+    for label, key in (
+        ("operations", "operations"),
+        ("keywords (full only)", "keywords_full_only"),
+        ("keywords (partial+full)", "keywords_partial_or_full"),
+        ("parameters (partial+full)", "parameters_partial_or_full"),
+        ("examples", "examples"),
+    ):
+        bucket = rates[key]
+        table.add_row(label, f"{bucket['covered']:,}", f"{bucket['total']:,}", f"{bucket['pct']:.1f}%")
+
+    console.print(table)
+
+    complete = sum(1 for result in results if _is_complete(result))
+    console.print(
+        f"APIs: [bold]{summary['apis_with_results']}[/] audited "
+        f"([green]{complete} complete[/], [red]{summary['apis_errored']} errored[/]) | "
+        f"Cases: [bold]{summary['cases_generated']:,}[/] in {summary['duration_seconds']:.1f}s"
+    )
+    console.print(f"output  -> {out_dir}")
+    console.print(f"summary -> {summary_json}")
+    console.print(f"report  -> {summary_md}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -435,16 +482,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def _write_summary_and_exit(signum: int, frame: object) -> None:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
-        summary = aggregate(results)
-        summary_json = args.out / "summary.json"
-        summary_md = args.out / "summary.md"
-        with summary_json.open("w") as fd:
-            json.dump(summary, fd, indent=2)
-        with summary_md.open("w") as fd:
-            fd.write(render_markdown(summary))
-        print(f"audited={len(results)} -> {args.out}", file=sys.stderr)
-        print(f"summary -> {summary_json}", file=sys.stderr)
-        print(f"report  -> {summary_md}", file=sys.stderr)
+        _finalize(results, out_dir=args.out)
         os._exit(130)
 
     signal.signal(signal.SIGINT, _write_summary_and_exit)
@@ -479,17 +517,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
         interrupted = True
 
-    summary = aggregate(results)
-    summary_json = args.out / "summary.json"
-    summary_md = args.out / "summary.md"
-    with summary_json.open("w") as fd:
-        json.dump(summary, fd, indent=2)
-    with summary_md.open("w") as fd:
-        fd.write(render_markdown(summary))
-
-    print(f"audited={len(results)} -> {args.out}", file=sys.stderr)
-    print(f"summary -> {summary_json}", file=sys.stderr)
-    print(f"report  -> {summary_md}", file=sys.stderr)
+    _finalize(results, out_dir=args.out)
     return 130 if interrupted else 0
 
 
