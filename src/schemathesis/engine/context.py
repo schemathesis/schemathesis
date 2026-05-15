@@ -13,6 +13,7 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.engine.observations import Observations
+from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
@@ -52,6 +53,8 @@ class EngineContext:
         "_error_feedback_lock",
         "_supervisor",
         "_supervisor_lock",
+        "_cache",
+        "_cache_lock",
     )
 
     def __init__(
@@ -82,6 +85,8 @@ class EngineContext:
         self._error_feedback_lock = threading.Lock()
         self._supervisor = LazyInit.UNSET
         self._supervisor_lock = threading.Lock()
+        self._cache = LazyInit.UNSET
+        self._cache_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -178,6 +183,9 @@ class EngineContext:
 
     # Per-operation runtime supervisor that issues scheduling directives based on observed signals.
     supervisor: LazyInit[Supervisor] = LazyInit(lambda ctx: Supervisor())
+
+    # Runtime cache controller -- replay during probing, persist at end of run.
+    cache: LazyInit[Cache] = LazyInit(lambda ctx: Cache(ctx))
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:

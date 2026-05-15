@@ -25,11 +25,13 @@ if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
     from schemathesis.engine.run import Phase
+    from schemathesis.engine.run.cache import CacheReport
 
 
 @dataclass(slots=True)
 class ProbePayload:
     probes: list[ProbeRun]
+    cache: CacheReport | None = None
 
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
@@ -43,6 +45,9 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
         elif isinstance(result.probe, UnsafePathDecoder) and result.is_failure:
             ctx.schema.adapt_to_path_decoder_rejection()
         payload = Ok(ProbePayload(probes=probes))
+    cache_report = ctx.cache.run()
+    if cache_report is not None:
+        payload = Ok(ProbePayload(probes=probes, cache=cache_report))
     yield events.PhaseFinished(phase=phase, status=status, payload=payload)
 
 

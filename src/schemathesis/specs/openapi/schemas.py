@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig
     from schemathesis.core.adapter import OperationParameter
+    from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema
@@ -182,6 +183,7 @@ class OpenApiSchema(BaseSchema):
         case: Case,
         response: Response,
         transport_kwargs: dict[str, Any],
+        cache_writer: CacheWriter | None = None,
     ) -> None:
         from schemathesis.specs.openapi.auth_inference import record_auth_inference
 
@@ -191,6 +193,7 @@ class OpenApiSchema(BaseSchema):
             case=case,
             response=response,
             transport_kwargs=transport_kwargs,
+            cache_writer=cache_writer,
         )
 
     @override
@@ -424,8 +427,11 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def find_operation_by_label(self, label: str) -> APIOperation | None:
-        method, path = label.split(" ", maxsplit=1)
-        return self[path][method]
+        try:
+            method, path = label.split(" ", maxsplit=1)
+            return self[path][method]
+        except (OperationNotFound, ValueError):
+            return None
 
     @override
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:

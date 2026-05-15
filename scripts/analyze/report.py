@@ -141,6 +141,46 @@ def render_markdown(run: RunMetrics) -> str:
     if schema_quality:
         write(schema_quality + "\n\n")
 
+    if run.cache is not None or run.distinct_observations:
+        write("## Cache\n\n")
+        cache = run.cache
+        if cache is not None and not cache.available:
+            write("⚠️  Cache file was present but unreadable -- nothing hydrated this run.\n\n")
+        else:
+            replayed = cache.replayed if cache else 0
+            dropped = cache.dropped if cache else 0
+            skipped = cache.skipped if cache else 0
+            cache_total = replayed + dropped + skipped
+            distinct = run.distinct_observations
+            write("| Metric                 | Count |\n|------------------------|-------|\n")
+            write(f"| Replayed from cache    | {replayed:5d} |\n")
+            write(f"| Dropped (contradicted) | {dropped:5d} |\n")
+            write(f"| Skipped (transient)    | {skipped:5d} |\n")
+            write(f"| Cache entries seen     | {cache_total:5d} |\n")
+            write(f"| Distinct observations  | {distinct:5d} |\n\n")
+            if distinct and cache_total:
+                # Cache file always holds at most one entry per response, so
+                # entries <= observations by construction. The ratio shows how
+                # densely each entry packs signal: <1.0 means multi-observation
+                # responses (each replay covers several observations at once).
+                ratio = cache_total / distinct
+                write(
+                    f"**Coverage density: {ratio:.2f}** "
+                    f"({cache_total} cached entries vs {distinct} distinct observations).\n\n"
+                )
+            if replayed and distinct:
+                hydration_share = replayed / distinct * 100
+                write(
+                    f"**{replayed} entries replayed -> ~{hydration_share:.0f}% "
+                    "of total distinct observations hydrated from cache** "
+                    "(remainder came from live fuzzing this run).\n\n"
+                )
+            if dropped:
+                write(
+                    f"{dropped} stale entries dropped (server no longer "
+                    "produces the expected signal). Cache file shrank accordingly.\n\n"
+                )
+
     write("## Budget utilisation\n\n")
     rows = _budget_rows(run.buckets)
     width = max(len(label) for _, label in rows)

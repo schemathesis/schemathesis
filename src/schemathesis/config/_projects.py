@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from schemathesis.config._auth import AuthConfig
+from schemathesis.config._cache import CacheConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
@@ -490,6 +491,10 @@ class ProjectConfig(DiffBase):
     @property
     def reports(self) -> ReportsConfig:
         return self._get_parent().reports
+
+    @property
+    def cache(self) -> CacheConfig:
+        return self._get_parent().cache
 
     @property
     def suppress_health_check(self) -> list[HealthCheck]:

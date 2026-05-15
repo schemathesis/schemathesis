@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import datetime
-import io
 import logging
 import shlex
 from dataclasses import dataclass, field
+from io import BytesIO
 from textwrap import dedent
 from types import SimpleNamespace
 from typing import Any
@@ -20,6 +20,7 @@ from werkzeug.datastructures import Headers
 from werkzeug.test import TestResponse
 
 from schemathesis.cli.commands.run.handlers import output
+from schemathesis.core import storage
 from schemathesis.core.transport import Response
 
 from .utils import make_schema
@@ -67,6 +68,12 @@ def hypothesis_max_examples():
     # Returns max_examples when overridden via `--hypothesis-profile`, else None so each test can pick its own.
     value = settings().max_examples
     return None if value == 100 else value
+
+
+@pytest.fixture(autouse=True)
+def _isolate_schemathesis_state(tmp_path, monkeypatch):
+    """Redirect the per-project artifact root into `tmp_path` so xdist workers don't leak state."""
+    monkeypatch.setattr(storage, "DEFAULT_ROOT", tmp_path / ".schemathesis")
 
 
 @pytest.fixture
@@ -567,7 +574,7 @@ def response_factory():
             headers.setdefault("Content-Type", content_type)
         headers.setdefault("Content-Length", str(len(content)))
         response.headers.update(headers)
-        response.raw = HTTPResponse(body=io.BytesIO(content), status=status_code, headers=response.headers)
+        response.raw = HTTPResponse(body=BytesIO(content), status=status_code, headers=response.headers)
         response.request = requests.PreparedRequest()
         response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
         return response

@@ -142,6 +142,7 @@ def _do_call_and_validate(
             operation=case.operation,
             case=case,
             response=response,
+            cache_writer=ctx.cache.writer,
         )
         case.operation.schema.record_runtime_observations(
             store=ctx.error_feedback,
@@ -149,6 +150,7 @@ def _do_call_and_validate(
             case=case,
             response=response,
             transport_kwargs=transport_kwargs,
+            cache_writer=ctx.cache.writer,
         )
     if _targets_declared_method(case):
         is_documented_status = case.operation.responses.find_by_status_code(response.status_code) is not None
@@ -156,6 +158,8 @@ def _do_call_and_validate(
             operation_label=case.operation.label,
             status_code=response.status_code,
             is_documented_status=is_documented_status,
+            case=case,
+            cache_writer=ctx.cache.writer,
         )
     # Record DELETE attempts immediately to influence subsequent strategy draws.
     # Include both successful (2xx) and 404 responses - each attempt increases decay

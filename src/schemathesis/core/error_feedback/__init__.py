@@ -13,6 +13,7 @@ from schemathesis.core.error_feedback.store import (
     RequiresAuthPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
+    observation_fingerprint,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "RequiresAuthPayload",
     "SizeBoundPayload",
     "TypeMismatchPayload",
+    "observation_fingerprint",
 ]

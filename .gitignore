@@ -219,3 +219,4 @@ venv.bak/
 reports/
 .benchmarks/
 .worktrees/
+.schemathesis/

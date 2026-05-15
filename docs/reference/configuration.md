@@ -361,6 +361,42 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     max-width = 100
     ```
 
+### Cache
+
+Schemathesis caches discoveries that survive across runs — error-feedback observations parsed from 4xx bodies, operations that require authentication beyond what the spec declares, and operations that consistently return `405 Method Not Allowed`. On startup the cache is replayed during the probing phase so subsequent phases skip rediscovery.
+
+The cache lives at `.schemathesis/<project-slug>/cache/` in the working directory by default. The directory is created on first write; consider adding it to `.gitignore`. The cache is advisory — any read/write failure degrades to a no-op for the run.
+
+Sensitive headers, cookies, and body fields are stripped before persistence, following the same `output.sanitization` rules used elsewhere.
+
+#### `cache.enabled`
+
+!!! note ""
+
+    **Type**: `Boolean`  
+    **Default**: `true`  
+
+    Whether Schemathesis writes and replays the per-project cache.
+
+    ```toml
+    [cache]
+    enabled = false
+    ```
+
+#### `cache.directory`
+
+!!! note ""
+
+    **Type**: `String or null`  
+    **Default**: `null` (resolves to `.schemathesis/<project-slug>/cache/`)  
+
+    Override the cache location. Useful for CI workflows that share cache across builds via an artifact mount.
+
+    ```toml
+    [cache]
+    directory = "/var/cache/schemathesis"
+    ```
+
 ## Project Settings
 
 These settings can only be applied at the project level.

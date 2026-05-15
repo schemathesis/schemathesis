@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.result import Result
@@ -324,6 +324,22 @@ class FatalError(EngineEvent):
         self.exception = exception
 
 
+@dataclass(slots=True)
+class CacheRunMetrics:
+    """End-of-run cache-effectiveness metrics, surfaced for downstream analysis tooling."""
+
+    # Denominator for "share of signal recovered from cache": distinct error-feedback
+    # observations the store accumulated this run (live discovery + cache hydration).
+    observations_total: int = 0
+
+
+@dataclass(slots=True)
+class RunSummary:
+    """End-of-run summary carried on `EngineFinished.payload`."""
+
+    cache: CacheRunMetrics = field(default_factory=CacheRunMetrics)
+
+
 @dataclass
 class EngineFinished(EngineEvent):
     """The final event of the run. No more events after this point."""
@@ -331,11 +347,11 @@ class EngineFinished(EngineEvent):
     is_terminal = True
     running_time: float
     stop_reason: StopReason
-    payload: Any | None
+    payload: RunSummary | None
 
     __slots__ = ("id", "timestamp", "running_time", "stop_reason", "payload")
 
-    def __init__(self, *, running_time: float, stop_reason: StopReason, payload: Any | None = None) -> None:
+    def __init__(self, *, running_time: float, stop_reason: StopReason, payload: RunSummary | None = None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.running_time = running_time

@@ -59,6 +59,7 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext
     from schemathesis.core import Specification
+    from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.engine.context import EngineContext
@@ -476,6 +477,7 @@ class BaseSchema(Mapping):
         case: Case,
         response: Response,
         transport_kwargs: dict[str, Any],
+        cache_writer: CacheWriter | None = None,
     ) -> None:
         """Spec-specific runtime observations from a response (e.g. auth inference). Default: no-op."""
 

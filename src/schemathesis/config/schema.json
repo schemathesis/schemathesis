@@ -57,6 +57,19 @@
         }
       }
     },
+    "cache": {
+      "description": "Persistent per-project state reused across runs.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "directory": {
+          "type": "string"
+        }
+      }
+    },
     "output": {
       "$ref": "#/$defs/OutputConfig"
     },

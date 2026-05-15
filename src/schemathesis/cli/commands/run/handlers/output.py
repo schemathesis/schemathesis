@@ -51,9 +51,29 @@ if TYPE_CHECKING:
     from rich.progress import Progress, TaskID
     from rich.text import Text
 
+    from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
+
+
+def _format_cache_row(report: CacheReport | None) -> Text | None:
+    """Render the `Cache:` row, or `None` if there is nothing to show."""
+    from rich.text import Text
+
+    if report is None:
+        return None
+    if not report.available:
+        return Text("unavailable, running without cache")
+    parts = []
+    if report.replayed:
+        noun = "request" if report.replayed == 1 else "requests"
+        parts.append(f"{report.replayed} {noun} replayed")
+    if report.dropped:
+        parts.append(f"{report.dropped} stale removed")
+    if not parts:
+        return None
+    return Text(", ".join(parts))
 
 
 def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: str = "🕛") -> str:
@@ -735,7 +755,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                     padding=(0, 4),
                     collapse_padding=True,
                 )
-                table.add_column("Capability", style=Style(color="bright_white", bold=True))
+                table.add_column("Capability", style=Style(color="bright_white", bold=True), no_wrap=True)
                 table.add_column("Status", style="cyan")
                 for probe_run in payload.probes:
                     icon, style = {
@@ -746,8 +766,11 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
                     table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
 
-                message = Padding(table, BLOCK_PADDING)
-                self.console.print(message)
+                cache_row = _format_cache_row(payload.cache)
+                if cache_row is not None:
+                    table.add_row("Cache:", cache_row)
+
+                self.console.print(Padding(table, BLOCK_PADDING))
                 self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             self.stateful_tests_manager.stop()

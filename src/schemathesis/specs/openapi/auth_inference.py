@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.auths import AuthContext
+from schemathesis.core.cache import CacheWriter, Kind, request_from_case
 from schemathesis.core.error_feedback import (
     ErrorFeedbackStore,
     Observation,
@@ -101,6 +102,7 @@ def record_auth_inference(
     case: Case,
     response: Response,
     transport_kwargs: dict[str, Any],
+    cache_writer: CacheWriter | None = None,
 ) -> None:
     """Infer a missing security requirement when the server enforces auth on a publicly-declared operation.
 
@@ -148,4 +150,6 @@ def record_auth_inference(
         # Stored on the schema (not the operation) because operation instances aren't shared
         # across phases — the engine reparses operations per phase.
         operation.schema._inferred_security[operation.label] = [{scheme_name: []}]
+        if cache_writer is not None:
+            cache_writer.record(Kind.AUTH_REQUIRED, operation.label, request_from_case(case))
         return
