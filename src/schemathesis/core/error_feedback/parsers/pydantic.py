@@ -14,6 +14,7 @@ from schemathesis.core.error_feedback.store import (
     Observation,
     ObservationKind,
     ObservationPayload,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
@@ -46,7 +47,7 @@ HandlerResult = tuple[ObservationKind, ObservationPayload] | tuple[None, None]
 Handler = Callable[[dict], HandlerResult]
 
 
-def _split_loc(loc: list) -> tuple[ParameterLocation, tuple[str | int, ...]]:
+def _split_loc(loc: list) -> tuple[ParameterLocation, ParameterPath]:
     if loc and isinstance(loc[0], str) and loc[0] in _LOC_PREFIX_TO_LOCATION:
         return _LOC_PREFIX_TO_LOCATION[loc[0]], tuple(loc[1:])
     return ParameterLocation.BODY, tuple(loc)

@@ -14,6 +14,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureFlags, FeatureStrategy
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.error_feedback.store import ParameterPath
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
@@ -369,7 +370,7 @@ def _absolutize(target: MutationTarget, local: Mutation) -> Mutation:
     in error messages so callers see "parameter `X` in <location>" instead of just
     "in <location>".
     """
-    body_path_prefix: tuple[str | int, ...] = tuple(
+    body_path_prefix: ParameterPath = tuple(
         step.selector for step in target.path if step.keyword == "properties" and isinstance(step.selector, str)
     )
     pointer_segments: list[str] = []

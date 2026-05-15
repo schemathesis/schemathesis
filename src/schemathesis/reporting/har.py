@@ -14,6 +14,7 @@ import harfile
 from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
+from schemathesis.core.transport import Headers
 from schemathesis.engine.recorder import ScenarioRecorder
 
 if TYPE_CHECKING:
@@ -146,7 +147,7 @@ class HarWriter:
         self.close()
 
 
-def _headers_size(headers: dict[str, list[str]]) -> int:
+def _headers_size(headers: Headers) -> int:
     size = 0
     for name, values in headers.items():
         # 4 is for ": " and "\r\n"

@@ -9,7 +9,7 @@ from typing import IO, TYPE_CHECKING
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Headers, Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status
 from schemathesis.engine.recorder import CheckNode, Request, ScenarioRecorder
@@ -59,7 +59,7 @@ class VcrWriter:
             sensitive_markers = config.sanitization.sensitive_markers
             replacement = config.sanitization.replacement
 
-            def write_headers(headers: dict[str, list[str]]) -> None:
+            def write_headers(headers: Headers) -> None:
                 for name, values in headers.items():
                     lower_name = name.lower()
                     stream.write(f'      "{name}":\n')
@@ -69,7 +69,7 @@ class VcrWriter:
                         write_header_values(values)
         else:
 
-            def write_headers(headers: dict[str, list[str]]) -> None:
+            def write_headers(headers: Headers) -> None:
                 for name, values in headers.items():
                     stream.write(f'      "{name}":\n')
                     write_header_values(values)

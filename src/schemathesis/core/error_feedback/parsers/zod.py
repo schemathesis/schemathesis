@@ -12,6 +12,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     SizeBoundPayload,
     TypeMismatchPayload,
 )
@@ -59,7 +60,7 @@ def _has_zod_signature(issues: list[dict]) -> bool:
     return any(isinstance(issue.get("code"), str) and isinstance(issue.get("path"), list) for issue in issues)
 
 
-def _extract_path(issue: dict) -> tuple[str | int, ...] | None:
+def _extract_path(issue: dict) -> ParameterPath | None:
     raw = issue.get("path")
     if not isinstance(raw, list):
         return None

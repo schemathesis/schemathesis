@@ -17,6 +17,7 @@ from schemathesis.core.error_feedback.store import (
     FormatPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     TypeMismatchPayload,
 )
 
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-WalkPair = tuple[tuple[str | int, ...], str]
+WalkPair = tuple[ParameterPath, str]
 LaravelShape = Mapping[str, Sequence[str]]
 
 # Vocabulary discriminator — substrings that, if found in any message, lock detection to Laravel.
@@ -53,7 +54,7 @@ _LARAVEL_VOCABULARY: frozenset[str] = frozenset(
 def _walk(body: LaravelShape) -> Iterator[WalkPair]:
     """Yield `(path, message)` pairs; Laravel emits dotted keys for nested attributes."""
     for raw_key, messages in body.items():
-        key_path: tuple[str | int, ...] = tuple(raw_key.split(".")) if "." in raw_key else (raw_key,)
+        key_path: ParameterPath = tuple(raw_key.split(".")) if "." in raw_key else (raw_key,)
         for message in messages:
             if message:
                 yield (key_path, message)

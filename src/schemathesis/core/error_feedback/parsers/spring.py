@@ -12,6 +12,7 @@ from schemathesis.core.error_feedback.store import (
     Observation,
     ObservationKind,
     ObservationPayload,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
@@ -160,7 +161,7 @@ def _iter_carrier_strings(body: dict) -> Iterable[str]:
                     yield value
 
 
-def _split_path(field: str) -> tuple[str | int, ...]:
+def _split_path(field: str) -> ParameterPath:
     # Spring uses dotted paths for nested fields (e.g. `address.street`).
     return tuple(field.split(".")) if field else ()
 

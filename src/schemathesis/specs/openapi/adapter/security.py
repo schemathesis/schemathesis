@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from schemathesis.config import ApiKeyAuthConfig, DynamicTokenAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
 from schemathesis.config._error import ConfigError
@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 
 ORIGINAL_SECURITY_TYPE_KEY = "x-original-security-type"
+
+# OpenAPI `security` array: each entry maps scheme name to required scopes.
+SecurityRequirements: TypeAlias = list[Mapping[str, list[str]]]
 
 
 def _matches_security_parameter(
@@ -266,9 +269,7 @@ def has_optional_auth(schema: Mapping[str, Any], operation: Mapping[str, Any]) -
     return {} in operation.get("security", schema.get("security", []))
 
 
-def effective_security_requirements(
-    operation: APIOperation, raw_schema: Mapping[str, Any]
-) -> list[Mapping[str, list[str]]]:
+def effective_security_requirements(operation: APIOperation, raw_schema: Mapping[str, Any]) -> SecurityRequirements:
     """Return the operation's security requirements, including any runtime auth-inference overlay."""
     overlay = operation.schema._inferred_security.get(operation.label)
     if overlay is not None:

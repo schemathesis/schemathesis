@@ -8,6 +8,7 @@ from schemathesis.core.error_feedback.parsers.extractors import location_for_met
 from schemathesis.core.error_feedback.store import (
     Observation,
     ObservationKind,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
 )
@@ -15,8 +16,6 @@ from schemathesis.core.error_feedback.store import (
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
-
-ParameterPath = tuple[str | int, ...]
 
 # Confluent's `error_code` runs in two ranges: 4xx HTTP mirrors plus a 5-digit
 # extended namespace. Skip 5xx in either range — those signal broker / runtime

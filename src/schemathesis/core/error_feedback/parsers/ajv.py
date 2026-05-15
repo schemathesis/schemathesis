@@ -21,6 +21,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
@@ -33,7 +34,6 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 KeywordHandler = Callable[[dict], tuple[ClassificationResult, ...]]
-ParameterPath = tuple[str | int, ...]
 
 _LOCATION_PREFIXES: dict[str, ParameterLocation] = {
     "body": ParameterLocation.BODY,

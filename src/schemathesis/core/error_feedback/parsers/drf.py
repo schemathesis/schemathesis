@@ -17,6 +17,7 @@ from schemathesis.core.error_feedback.store import (
     FormatPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     TypeMismatchPayload,
 )
 
@@ -24,10 +25,10 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-WalkPair = tuple[tuple[str | int, ...], str]
+WalkPair = tuple[ParameterPath, str]
 
 
-def _walk(body: object, path: tuple[str | int, ...] = ()) -> Iterator[WalkPair]:
+def _walk(body: object, path: ParameterPath = ()) -> Iterator[WalkPair]:
     if isinstance(body, dict):
         for key, value in body.items():
             if not isinstance(key, str):

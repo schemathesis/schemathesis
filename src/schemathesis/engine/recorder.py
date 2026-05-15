@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from schemathesis.core.failures import Failure
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Headers, Response
 from schemathesis.engine import Status
 from schemathesis.generation.case import Case
 
@@ -216,7 +216,7 @@ class Request:
     uri: str
     body: bytes | None
     body_size: int | None
-    headers: dict[str, list[str]]
+    headers: Headers
 
     __slots__ = ("method", "uri", "body", "body_size", "headers", "_encoded_body_cache")
 
@@ -226,7 +226,7 @@ class Request:
         uri: str,
         body: bytes | None,
         body_size: int | None,
-        headers: dict[str, list[str]],
+        headers: Headers,
     ):
         self.method = method
         self.uri = uri

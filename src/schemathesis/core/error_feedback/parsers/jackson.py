@@ -13,6 +13,7 @@ from schemathesis.core.error_feedback.store import (
     Observation,
     ObservationKind,
     ObservationPayload,
+    ParameterPath,
     TypeMismatchPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
@@ -99,7 +100,7 @@ def _carrier_strings(body: dict) -> list[str]:
     return strings
 
 
-def _extract_path(message: str) -> tuple[str | int, ...] | None:
+def _extract_path(message: str) -> ParameterPath | None:
     chain_match = _REFERENCE_CHAIN.search(message)
     if chain_match is None:
         return None
@@ -121,7 +122,7 @@ def _match_type(message: str) -> str | None:
     return None
 
 
-def _resolve_date_parse_slot(case: Case, rejected_value: str) -> tuple[ParameterLocation, tuple[str | int, ...]] | None:
+def _resolve_date_parse_slot(case: Case, rejected_value: str) -> tuple[ParameterLocation, ParameterPath] | None:
     slot = infer_path_from_request(case=case, rejected_value=rejected_value)
     if slot is not None:
         return slot

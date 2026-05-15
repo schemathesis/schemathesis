@@ -10,6 +10,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ParameterPath,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
@@ -19,8 +20,6 @@ from schemathesis.core.parameters import ParameterLocation
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
-
-ParameterPath = tuple[str | int, ...]
 
 # Wire envelope: `{status_code, detail, extra: [{message, key, source}]}`.
 # `source` carries the request location of the offending value.

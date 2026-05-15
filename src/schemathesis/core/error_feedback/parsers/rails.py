@@ -17,6 +17,7 @@ from schemathesis.core.error_feedback.store import (
     BoundDirection,
     Observation,
     ObservationKind,
+    ParameterPath,
     TypeMismatchPayload,
 )
 
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
-WalkPair = tuple[tuple[str | int, ...], str]
+WalkPair = tuple[ParameterPath, str]
 ModernShape = Mapping[str, Sequence[str]]
 LegacyShape = Sequence[str]
 
@@ -65,7 +66,7 @@ _RAILS_VOCABULARY: frozenset[str] = frozenset(
 )
 
 
-def _walk_modern(body: ModernShape, path: tuple[str | int, ...] = ()) -> Iterator[WalkPair]:
+def _walk_modern(body: ModernShape, path: ParameterPath = ()) -> Iterator[WalkPair]:
     """Walk the modern `errors.as_json` shape — dict-of-lists of strings.
 
     Also handles the dotted-key form Rails emits for nested attributes
@@ -75,7 +76,7 @@ def _walk_modern(body: ModernShape, path: tuple[str | int, ...] = ()) -> Iterato
         if not isinstance(raw_key, str) or raw_key == _BASE_KEY:
             continue
         # Rails dotted-key for nested attributes; split into segments.
-        key_path: tuple[str | int, ...] = tuple(raw_key.split(".")) if "." in raw_key else (raw_key,)
+        key_path: ParameterPath = tuple(raw_key.split(".")) if "." in raw_key else (raw_key,)
         if not isinstance(value, list):
             continue
         for item in value:
@@ -103,7 +104,7 @@ def _split_legacy_message(line: str) -> tuple[str, str] | None:
     return "_".join(head.split()).lower(), line[match.start() :]
 
 
-def _walk_legacy(messages: LegacyShape, path: tuple[str | int, ...] = ()) -> Iterator[WalkPair]:
+def _walk_legacy(messages: LegacyShape, path: ParameterPath = ()) -> Iterator[WalkPair]:
     """Walk the legacy `full_messages` shape — flat list of humanised strings."""
     for line in messages:
         if not isinstance(line, str) or not line:

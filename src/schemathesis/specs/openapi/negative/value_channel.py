@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypeAlias
 
+from schemathesis.core.error_feedback.store import ParameterPath
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
@@ -97,10 +98,10 @@ def violate_required(body: dict[str, JsonValue], required: list[str]) -> dict[st
 def collect_value_targets(
     body: JsonValue,
     schema: JsonSchemaObject,
-    path: tuple[str | int, ...] = (),
+    path: ParameterPath = (),
     bundle: JsonSchemaObject | None = None,
     schema_pointer: str = "",
-) -> list[tuple[tuple[str | int, ...], str, JsonValue, str, JsonSchemaObject]]:
+) -> list[tuple[ParameterPath, str, JsonValue, str, JsonSchemaObject]]:
     """Emit `(path, schema_pointer, value, keyword, schema_at_path)` for every constraint-bearing leaf.
 
     `path` tracks the body location (with concrete keys/indices, possibly random
@@ -112,7 +113,7 @@ def collect_value_targets(
         bundle_candidate = schema.get(BUNDLE_STORAGE_KEY)
         bundle = bundle_candidate if isinstance(bundle_candidate, dict) else {}
 
-    targets: list[tuple[tuple[str | int, ...], str, JsonValue, str, JsonSchemaObject]] = []
+    targets: list[tuple[ParameterPath, str, JsonValue, str, JsonSchemaObject]] = []
 
     # Resolve $ref hops transparently.
     ref = schema.get("$ref")
@@ -171,7 +172,7 @@ def collect_value_targets(
 
 def apply_value_channel(
     body: JsonValue,
-    target_path: tuple[str | int, ...],
+    target_path: ParameterPath,
     keyword: ValueChannelKeyword,
     schema_at_path: JsonSchemaObject,
 ) -> tuple[JsonValue, JsonValue | None, JsonValue]:
