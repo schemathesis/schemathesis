@@ -374,7 +374,7 @@ class CoverageContext:
 
     def is_valid_for_location(self, value: Any) -> bool:
         if self.location in ("header", "cookie") and isinstance(value, str):
-            return not value or (is_latin_1_encodable(value) and not has_invalid_characters("", value))
+            return not value or (is_latin_1_encodable(value) and not has_invalid_characters("A", value))
         elif self.location == "path":
             return not is_invalid_path_parameter(value)
         return True

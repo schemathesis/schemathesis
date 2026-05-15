@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from math import inf, nextafter
 from unittest.mock import ANY
 
@@ -348,6 +349,23 @@ def test_negative_maxitems_when_unique_items_exhaust_enum(nctx):
     assert above_max, "Expected an above-maxItems negative case"
     assert all(len(v) == 12 for v in above_max)
     assert all(item in schema["items"]["enum"] for v in above_max for item in v)
+
+
+def test_negative_pattern_for_header_with_permissive_pattern(ctx_factory):
+    # `^[A-Z0-9_]*$` accepts the empty string; the negative emitter must still find one
+    # header-safe value that violates the pattern.
+    ctx = ctx_factory(location=ParameterLocation.HEADER, generation_modes=[GenerationMode.NEGATIVE])
+    schema = {"type": "string", "pattern": "^[A-Z0-9_]*$"}
+    out = [
+        v.value
+        for v in cover_schema_iter(ctx, schema)
+        if isinstance(v, GeneratedValue) and v.scenario is CoverageScenario.INVALID_PATTERN
+    ]
+    assert out, "Expected at least one pattern-violation negative for header parameter"
+    compiled = re.compile(schema["pattern"])
+    for value in out:
+        assert isinstance(value, str)
+        assert not compiled.fullmatch(value), f"Value {value!r} matches the pattern"
 
 
 def test_negative_maxlength_emitted_with_unsatisfiable_pattern(nctx):

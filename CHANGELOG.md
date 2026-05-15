@@ -20,6 +20,7 @@
 - Constrain Swagger 2.0 array query parameters with top-level `enum` to that domain via `items.enum`.
 - Cover sibling properties when one optional property has a self-contradicting schema.
 - Emit `maxLength` negatives even when the schema's `pattern` is intrinsically unsatisfiable.
+- Emit `pattern` negatives for header and cookie parameters.
 - Runtime Error in negative generation for FastAPI `Optional[Enum]` query parameters (`anyOf` with `$ref` and sibling `enum`).
 - Serialize nested-object multipart form-data parts as JSON instead of Python `repr`.
 
