@@ -167,26 +167,28 @@ def _is_response_gap(gap: dict[str, Any]) -> bool:
     return (gap.get("kind") or "").startswith("response_")
 
 
-def _count_invalid_examples(node: Any) -> int:
-    """Count inline `example` / `default` values that fail their sibling schema.
+def _strip_invalid_examples(node: Any) -> int:
+    """Drop inline `example`/`default` values that fail their sibling schema, return the count.
 
-    Mirrors tracecov's `examples.total` accounting (single-valued keywords only, not the
-    plural `examples` container) so the adjustment lines up with the bucket it modifies.
+    Schemathesis silently skips these during generation; tracecov otherwise renders them as
+    red cells in the per-API HTML. Stripping mutates `node` in place so both generation and
+    coverage tracking see the same view.
     """
     if isinstance(node, dict):
         invalid = 0
         sibling_schema = {k: v for k, v in node.items() if k not in ("example", "examples", "default")}
         for keyword in ("example", "default"):
             if keyword in node and not is_valid(node[keyword], sibling_schema):
+                del node[keyword]
                 invalid += 1
         for key, value in node.items():
             # Don't descend into example/default payloads themselves (data, not schema).
             if key in ("example", "examples", "default"):
                 continue
-            invalid += _count_invalid_examples(value)
+            invalid += _strip_invalid_examples(value)
         return invalid
     if isinstance(node, list):
-        return sum(_count_invalid_examples(item) for item in node)
+        return sum(_strip_invalid_examples(item) for item in node)
     return 0
 
 
@@ -308,6 +310,7 @@ def audit_schema(
     try:
         filtered_schema, unknown_unsupported = _strip_known_unsupported_media_types(raw_schema)
         result.unknown_unsupported_media_types = unknown_unsupported
+        result.examples_invalid = _strip_invalid_examples(filtered_schema)
         schema = schemathesis.openapi.from_dict(filtered_schema)
         coverage_map = tracecov.CoverageMap.from_dict(filtered_schema)
     except Exception as exc:
@@ -340,11 +343,6 @@ def audit_schema(
         statistic = coverage_map.statistic()
         # The audit ignores response coverage — no real responses are ever observed.
         statistic.pop("responses", None)
-        result.examples_invalid = _count_invalid_examples(filtered_schema)
-        if result.examples_invalid:
-            examples_bucket = statistic.get("examples")
-            if isinstance(examples_bucket, dict):
-                examples_bucket["total"] = max(0, int(examples_bucket.get("total", 0)) - result.examples_invalid)
         result.statistic = statistic
         result.gaps = [gap for gap in coverage_map.coverage_gaps() if not _is_response_gap(gap)]
         result.uncovered_keywords = [
