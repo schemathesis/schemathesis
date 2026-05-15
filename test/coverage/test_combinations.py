@@ -329,6 +329,27 @@ def test_negative_string_with_pattern(nctx):
     assert_not_conform(covered, schema)
 
 
+def test_negative_maxitems_when_unique_items_exhaust_enum(nctx):
+    # `uniqueItems: true` + `items.enum` of size `maxItems` makes a length-(max+1) unique
+    # array unsatisfiable. The maxItems negative is still meaningful (server may reject
+    # on length first), so emit one with duplicates from the enum domain.
+    schema = {
+        "type": "array",
+        "uniqueItems": True,
+        "minItems": 1,
+        "maxItems": 11,
+        "items": {"type": "string", "enum": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"]},
+    }
+    above_max = [
+        value.value
+        for value in cover_schema_iter(nctx, schema)
+        if isinstance(value, GeneratedValue) and value.scenario is CoverageScenario.ARRAY_ABOVE_MAX_ITEMS
+    ]
+    assert above_max, "Expected an above-maxItems negative case"
+    assert all(len(v) == 12 for v in above_max)
+    assert all(item in schema["items"]["enum"] for v in above_max for item in v)
+
+
 @pytest.mark.parametrize("max_length", [65536, 350000])
 def test_negative_maxlength_above_buffer(nctx, max_length):
     schema = {"type": "string", "maxLength": max_length}
