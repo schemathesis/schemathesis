@@ -9,6 +9,7 @@ import os
 import signal
 import sys
 import warnings
+from collections import Counter
 from collections.abc import Iterator
 
 # Audited corpora carry non-standard regex / format patterns that leak FutureWarnings mid-line into the live progress view
@@ -17,7 +18,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wai
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 # Make the repo-root `tools/` package importable when this script is invoked by file path
 # from outside the repository root (e.g. `python /path/to/scripts/coverage/audit.py`).
@@ -39,9 +40,11 @@ from tools.corpus.locator import CORPUS_SCHEME, load_schema_dict
 from tools.coverage.aggregate import aggregate, render_markdown
 from tools.coverage.audit import (
     DEFAULT_FUZZING_MAX_EXAMPLES,
+    AuditError,
     PhaseName,
     SchemaResult,
     audit_schema,
+    error_from_exc,
 )
 
 DEFAULT_OUT_DIR = Path("out/coverage")
@@ -120,7 +123,7 @@ def _process_entry(
             outcome.coverage_map.save_html_report(output_file=str(html_path), title=f"{entry.corpus} / {api_label}")
             html_link = f"file://{html_path.resolve()}"
         except Exception as exc:
-            result.errors.append(f"html_report_failed: {exc.__class__.__name__}: {exc}")
+            result.errors.append(error_from_exc("html_report_failed", exc))
 
     target = _result_path(out_dir, result)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -158,7 +161,7 @@ def _process_ref(
 
 def _record_crash(
     ref: _Ref,
-    reason: str,
+    error: AuditError,
     results: list[SchemaResult],
     *,
     phase: PhaseName,
@@ -167,12 +170,15 @@ def _record_crash(
     """Persist a synthetic failure entry so a dead worker doesn't vanish from the summary."""
     corpus_name, member_name = ref
     api_label = member_name.removesuffix(".json")
-    result = SchemaResult(api=api_label, corpus=corpus_name, phase=phase.value, errors=[f"worker_crashed: {reason}"])
+    result = SchemaResult(api=api_label, corpus=corpus_name, phase=phase.value, errors=[error])
     results.append(result)
     reporter.report(
         _WorkerOutput(result=result, target_name="", html_link=None, corpus=corpus_name, api=api_label),
         crashed=True,
     )
+
+
+_KILLED_IN_ISOLATION = AuditError(stage="worker_crashed", exception=None, message="killed worker in isolation")
 
 
 def _run_pool(
@@ -214,11 +220,13 @@ def _run_pool(
                     except BrokenProcessPool:
                         broken = True
                         if crash_sink is None:
-                            _record_crash(ref, "killed worker in isolation", results, phase=phase, reporter=reporter)
+                            _record_crash(ref, _KILLED_IN_ISOLATION, results, phase=phase, reporter=reporter)
                         else:
                             crash_sink.append(ref)
                     except Exception as exc:
-                        _record_crash(ref, f"{exc.__class__.__name__}: {exc}", results, phase=phase, reporter=reporter)
+                        _record_crash(
+                            ref, error_from_exc("worker_crashed", exc), results, phase=phase, reporter=reporter
+                        )
                     else:
                         results.append(output.result)
                         reporter.report(output)
@@ -226,7 +234,7 @@ def _run_pool(
                     # the dead pool poisons every still-in-flight future; treat them as suspects.
                     for ref in in_flight.values():
                         if crash_sink is None:
-                            _record_crash(ref, "killed worker in isolation", results, phase=phase, reporter=reporter)
+                            _record_crash(ref, _KILLED_IN_ISOLATION, results, phase=phase, reporter=reporter)
                         else:
                             crash_sink.append(ref)
                     in_flight.clear()
@@ -383,14 +391,37 @@ class _Reporter:
             parts.append(f"[link={output.html_link}][dim]report[/][/]")
         self.console.print("  ".join(parts))
         for error in result.errors:
-            first_line = error.splitlines()[0] if error else ""
-            self.console.print(f"    [red]![/] {first_line}")
+            message_head = error.message.splitlines()[0] if error.message else ""
+            class_segment = f"{error.exception}: " if error.exception else ""
+            self.console.print(f"    [red]![/] {error.stage}: {class_segment}{message_head}")
+
+
+_RATE_ROWS: tuple[tuple[str, str], ...] = (
+    ("operations", "operations"),
+    ("keywords (full only)", "keywords_full_only"),
+    ("keywords (partial+full)", "keywords_partial_or_full"),
+    ("parameters (partial+full)", "parameters_partial_or_full"),
+    ("examples", "examples"),
+)
+
+_SLOWEST_COUNT = 5
+_EXCEPTION_TOP = 10
+
+
+def _format_delta(delta: float, suffix: str = "%") -> str:
+    """Render a signed delta with colour: green when up, red when down, dim when zero."""
+    if delta > 0.05:
+        return f"[green]+{delta:.1f}{suffix}[/]"
+    if delta < -0.05:
+        return f"[red]{delta:.1f}{suffix}[/]"
+    return f"[dim]+0.0{suffix}[/]"
 
 
 def _finalize(
     results: list[SchemaResult],
     *,
     out_dir: Path,
+    baseline: dict[str, Any] | None = None,
 ) -> None:
     """Write summary files and print a headline table + path lines to stderr."""
     summary = aggregate(results)
@@ -403,22 +434,25 @@ def _finalize(
 
     console = Console(stderr=True)
     phase = summary.get("phase") or "unknown"
+    baseline_rates = (baseline or {}).get("rates") or {}
+
     table = Table(title=f"Coverage audit ({phase} phase)", title_style="bold")
     table.add_column("metric")
     table.add_column("covered", justify="right")
     table.add_column("total", justify="right")
     table.add_column("%", justify="right")
+    if baseline_rates:
+        table.add_column("delta", justify="right")
 
     rates = summary["rates"]
-    for label, key in (
-        ("operations", "operations"),
-        ("keywords (full only)", "keywords_full_only"),
-        ("keywords (partial+full)", "keywords_partial_or_full"),
-        ("parameters (partial+full)", "parameters_partial_or_full"),
-        ("examples", "examples"),
-    ):
+    for label, key in _RATE_ROWS:
         bucket = rates[key]
-        table.add_row(label, f"{bucket['covered']:,}", f"{bucket['total']:,}", f"{bucket['pct']:.1f}%")
+        row = [label, f"{bucket['covered']:,}", f"{bucket['total']:,}", f"{bucket['pct']:.1f}%"]
+        if baseline_rates:
+            prior = baseline_rates.get(key) or {}
+            prior_percentage = float(prior.get("pct", 0.0))
+            row.append(_format_delta(bucket["pct"] - prior_percentage))
+        table.add_row(*row)
 
     console.print(table)
 
@@ -428,6 +462,36 @@ def _finalize(
         f"([green]{complete} complete[/], [red]{summary['apis_errored']} errored[/]) | "
         f"Cases: [bold]{summary['cases_generated']:,}[/] in {summary['duration_seconds']:.1f}s"
     )
+    if summary.get("examples_invalid"):
+        console.print(
+            f"Excluded [bold]{summary['examples_invalid']:,}[/] inline examples that fail their own schema "
+            "(subtracted from the `examples` denominator)."
+        )
+
+    slowest = sorted(results, key=lambda r: r.duration_seconds, reverse=True)[:_SLOWEST_COUNT]
+    if slowest and slowest[0].duration_seconds > 0:
+        title = "Slowest API" if len(slowest) == 1 else f"Slowest {len(slowest)} APIs"
+        slow_table = Table(title=title, title_style="bold")
+        slow_table.add_column("corpus")
+        slow_table.add_column("api")
+        slow_table.add_column("seconds", justify="right")
+        for result in slowest:
+            slow_table.add_row(result.corpus, result.api, f"{result.duration_seconds:.1f}")
+        console.print(slow_table)
+
+    exception_counts: Counter[str] = Counter()
+    for result in results:
+        for error in result.errors:
+            if error.exception is not None:
+                exception_counts[error.exception] += 1
+    if exception_counts:
+        exc_table = Table(title="Exception classes", title_style="bold")
+        exc_table.add_column("class")
+        exc_table.add_column("count", justify="right")
+        for cls, count in exception_counts.most_common(_EXCEPTION_TOP):
+            exc_table.add_row(cls, f"{count:,}")
+        console.print(exc_table)
+
     console.print(f"output  -> {out_dir}")
     console.print(f"summary -> {summary_json}")
     console.print(f"report  -> {summary_md}")
@@ -466,6 +530,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT_DIR, help="Output dir for per-API JSON and summary.")
     parser.add_argument(
+        "--baseline",
+        type=Path,
+        help="Path to a prior summary.json to compare against; renders per-metric percentage delta in the summary.",
+    )
+    parser.add_argument(
         "--workers",
         type=int,
         default=os.cpu_count() or 1,
@@ -481,12 +550,20 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     html_out = args.out / "html"
 
+    baseline: dict[str, Any] | None = None
+    if args.baseline is not None:
+        try:
+            with args.baseline.open() as fd:
+                baseline = json.load(fd)
+        except (OSError, json.JSONDecodeError) as exc:
+            parser.error(f"--baseline {args.baseline}: {exc.__class__.__name__}: {exc}")
+
     results: list[SchemaResult] = []
     interrupted = False
 
     def _write_summary_and_exit(signum: int, frame: object) -> None:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
-        _finalize(results, out_dir=args.out)
+        _finalize(results, out_dir=args.out, baseline=baseline)
         os._exit(130)
 
     signal.signal(signal.SIGINT, _write_summary_and_exit)
@@ -521,7 +598,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
         interrupted = True
 
-    _finalize(results, out_dir=args.out)
+    _finalize(results, out_dir=args.out, baseline=baseline)
     return 130 if interrupted else 0
 
 

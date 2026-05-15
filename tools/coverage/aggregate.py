@@ -33,7 +33,7 @@ def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
     operations_seen = operations_total = 0
     keywords_full = keywords_full_partial = keywords_total = 0
     parameters_covered = parameters_total = 0
-    examples_seen = examples_total = 0
+    examples_seen = examples_total = examples_invalid = 0
 
     gap_kinds: Counter[str] = Counter()
     uncovered_path_counts: Counter[str] = Counter()
@@ -73,6 +73,7 @@ def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
         seen, total = _bucket_seen(statistic, "examples")
         examples_seen += seen
         examples_total += total
+        examples_invalid += result.examples_invalid
 
         for gap in result.gaps:
             gap_kinds[gap.get("kind", "unknown")] += 1
@@ -117,6 +118,7 @@ def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
                 "pct": _percent(examples_seen, examples_total),
             },
         },
+        "examples_invalid": examples_invalid,
         "gap_kinds": gap_kinds.most_common(),
         "top_uncovered_paths": [
             {
@@ -146,6 +148,11 @@ def render_markdown(summary: dict[str, Any]) -> str:
         f"(errored: {summary['apis_errored']})"
     )
     lines.append(f"Cases generated: **{summary['cases_generated']:,}** in {summary['duration_seconds']:.1f}s")
+    if summary.get("examples_invalid"):
+        lines.append(
+            f"Inline examples excluded as schema-invalid: **{summary['examples_invalid']:,}** "
+            "(already subtracted from the `examples` denominator)"
+        )
     lines.append("")
 
     rates = summary["rates"]
