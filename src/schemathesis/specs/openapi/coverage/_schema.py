@@ -2202,7 +2202,10 @@ def _positive_object(
             )
     seen = HashSet()
     for name, sub_schema in properties.items():
-        seen.insert(template.get(name))
+        # Skip pre-seed when the property is absent: `template.get(name)` would be None
+        # and dedup legitimate null emissions for nullable optionals.
+        if name in template:
+            seen.insert(template[name])
         for new in cover_schema_iter(ctx, sub_schema):
             if seen.insert(new.value):
                 yield PositiveValue(

@@ -13,6 +13,7 @@
 - Serialize Swagger 2.0 nested array-of-array query parameters using each level's `collectionFormat`.
 - Emit empty-array negatives for `minItems: 1` arrays when `items` is unsatisfiable.
 - Emit string-too-long negatives for `maxLength` thresholds between 32 KB and 1 MB.
+- Emit null variants for optional-nullable properties absent from the body template.
 - Runtime Error in negative generation for FastAPI `Optional[Enum]` query parameters (`anyOf` with `$ref` and sibling `enum`).
 - Serialize nested-object multipart form-data parts as JSON instead of Python `repr`.
 

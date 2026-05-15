@@ -377,3 +377,25 @@ def test_required_enforced_when_properties_at_threshold(ctx):
         path="/things",
     )
     _assert_generated_bodies_match_schema(operation, GenerationMode.NEGATIVE)
+
+
+def test_optional_nullable_emits_null_when_template_omits_it(ctx):
+    # When the template omits an optional, the sweep used to dedup the legitimate null
+    # emission against an implicit `None`. `deprecated` is one of several root keywords
+    # (also `title`, `readOnly`, unknown extensions) that make the template skip optionals.
+    operation = _load_json_body_operation(
+        ctx,
+        {
+            "deprecated": False,
+            "type": "object",
+            "required": ["req"],
+            "properties": {
+                "req": {"type": "string", "nullable": True},
+                "opt": {"type": "string", "nullable": True},
+            },
+        },
+    )
+    cases = _collect_coverage_cases(operation, GenerationMode.POSITIVE)
+    opt_values = [c.body["opt"] for c in cases if isinstance(c.body, dict) and "opt" in c.body]
+    assert None in opt_values
+    assert any(isinstance(v, str) for v in opt_values)
