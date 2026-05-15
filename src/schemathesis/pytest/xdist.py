@@ -17,13 +17,13 @@ from schemathesis.core.transport import Response
 if TYPE_CHECKING:
     from xdist.workermanage import WorkerController
 
+    from schemathesis.core.spec import SchemaMetadata
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.meta import CaseMetadata
     from schemathesis.reporting.allure import AllureWriter
     from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
-    from schemathesis.schemas import BaseSchema
 
 # schema_id -> {"writer_config": ..., "records": [...]}
 _XDIST_WRITERS_KEY: pytest.StashKey[dict[str, dict]] = pytest.StashKey()
@@ -239,7 +239,7 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
     return recorder, data["elapsed_sec"]
 
 
-def _schema_id(schema: BaseSchema) -> str:
+def _schema_id(schema: SchemaMetadata) -> str:
     """Stable cross-process identifier for a schema instance.
 
     Uses the schema's source location when available; falls back to a canonical
@@ -249,7 +249,7 @@ def _schema_id(schema: BaseSchema) -> str:
     return hashlib.sha256(source.encode()).hexdigest()[:16]
 
 
-def _serialize_writer_config(schema: BaseSchema) -> dict:
+def _serialize_writer_config(schema: SchemaMetadata) -> dict:
     """Serialize the minimal writer configuration for cross-process transport."""
     reports = schema.config.reports
     paths: dict[str, str | None] = {}

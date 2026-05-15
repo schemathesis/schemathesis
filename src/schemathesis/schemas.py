@@ -23,6 +23,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.core.result import Ok, Result
+from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transport import Response
@@ -68,7 +69,6 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.resources import ExtraDataSource
-    from schemathesis.specs.openapi.adapter.security import SecurityRequirements
 
 
 @lru_cache
@@ -89,14 +89,9 @@ class BaseSchema(Mapping):
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
-        # Runtime auth-inference overlays keyed by operation label. Populated when the server enforces
-        # auth on an operation the spec declares public; subsequent generations consult it instead of
-        # mutating the parsed spec. Empty for schemas whose adapter doesn't run inference.
-        self._inferred_security: dict[str, SecurityRequirements] = {}
-        # Set by the startup probe when the server's URL decoder rejects backslash/control chars
-        # in path strings; path generation sanitizes those chars to avoid wasting budget on
-        # requests the app never sees.
-        self._path_decoder_strict: bool = False
+        # Probe-driven runtime state mutated by the engine across phases of a single run.
+        # Concrete schemas may extend with spec-specific overlays.
+        self._probe_state = RuntimeProbeState()
 
     @property
     def specification(self) -> Specification:
@@ -553,7 +548,7 @@ class BaseSchema(Mapping):
 
     def adapt_to_path_decoder_rejection(self) -> None:
         """React to the engine probe finding that the app rejects unsafe characters in URL paths."""
-        self._path_decoder_strict = True
+        self._probe_state.path_decoder_strict = True
 
     def get_custom_format_strategies(
         self, generation_config: GenerationConfig, mode: GenerationMode

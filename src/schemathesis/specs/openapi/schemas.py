@@ -72,7 +72,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful import APIStateMachine
     from schemathesis.specs.openapi.adapter import OpenApiResponses
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
-    from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
+    from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, SecurityRequirements
 
     OpenApiOperation: TypeAlias = APIOperation[
         OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters, "OpenApiSchema"
@@ -100,6 +100,10 @@ class OpenApiSchema(BaseSchema):
         # Path-level dedup of undeclared-method coverage probes; cleared per coverage phase via
         # `reset_coverage_state`.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
+        # Per-operation security overlays populated by runtime auth inference. Empty when the server
+        # never enforces auth on a declared-public operation; otherwise generations consult this
+        # instead of mutating the parsed spec.
+        self._inferred_security: dict[str, SecurityRequirements] = {}
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
