@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
@@ -8,18 +9,25 @@ if TYPE_CHECKING:
     from schemathesis.config import SanitizationConfig
 
 
-def sanitize_value(item: object, *, config: SanitizationConfig) -> None:
-    """Sanitize sensitive values within a given item.
+def is_sensitive_key(key: str, keys_to_sanitize: Sequence[str], sensitive_markers: Sequence[str]) -> bool:
+    """Whether `key` matches the configured sensitivity rules (exact-in-list or substring marker)."""
+    lowered = key.lower()
+    if lowered in keys_to_sanitize:
+        return True
+    return any(marker in lowered for marker in sensitive_markers)
 
-    This function is recursive and will sanitize sensitive data within nested
-    dictionaries and lists as well.
-    """
+
+def sanitize_value(item: object, *, config: SanitizationConfig) -> None:
+    """Replace sensitive values within `item` with `config.replacement`; recurses into nested dicts/lists."""
     from requests.structures import CaseInsensitiveDict
 
     if isinstance(item, dict | CaseInsensitiveDict):
         for key in item:
-            lower_key = key.lower()
-            if lower_key in config.keys_to_sanitize or any(marker in lower_key for marker in config.sensitive_markers):
+            if is_sensitive_key(
+                key,
+                keys_to_sanitize=config.keys_to_sanitize,
+                sensitive_markers=config.sensitive_markers,
+            ):
                 if isinstance(item[key], list):
                     item[key] = [config.replacement]
                 else:
@@ -65,8 +73,7 @@ def _sanitize_url_cached(
     # Sanitize query parameters
     query = parse_qs(parsed.query, keep_blank_values=True)
     for key in query:
-        lower_key = key.lower()
-        if lower_key in keys_to_sanitize or any(marker in lower_key for marker in sensitive_markers):
+        if is_sensitive_key(key, keys_to_sanitize=keys_to_sanitize, sensitive_markers=sensitive_markers):
             query[key] = [replacement]
     sanitized_query = urlencode(query, doseq=True)
 

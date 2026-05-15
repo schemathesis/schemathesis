@@ -13,6 +13,7 @@ from schemathesis.config._auth import (
     HttpBasicAuthConfig,
     HttpBearerAuthConfig,
 )
+from schemathesis.config._cache import CacheConfig
 from schemathesis.config._checks import (
     CheckConfig,
     ChecksConfig,
@@ -54,6 +55,7 @@ __all__ = [
     "ReportsConfig",
     "ReportFormat",
     "DEFAULT_REPORT_DIRECTORY",
+    "CacheConfig",
     "GenerationConfig",
     "OutputConfig",
     "SanitizationConfig",
@@ -95,6 +97,7 @@ class SchemathesisConfig(DiffBase):
     wait_for_schema: float | int | None
     max_failures: int | None
     reports: ReportsConfig
+    cache: CacheConfig
     output: OutputConfig
     projects: ProjectsConfig
 
@@ -107,6 +110,7 @@ class SchemathesisConfig(DiffBase):
         wait_for_schema: float | int | None = None,
         max_failures: int | None = None,
         reports: ReportsConfig | None = None,
+        cache: CacheConfig | None = None,
         output: OutputConfig | None = None,
         projects: ProjectsConfig | None = None,
     ):
@@ -117,6 +121,7 @@ class SchemathesisConfig(DiffBase):
         self.wait_for_schema = wait_for_schema
         self.max_failures = max_failures
         self.reports = reports or ReportsConfig()
+        self.cache = cache or CacheConfig()
         self.output = output or OutputConfig()
         self.projects = projects or ProjectsConfig()
         self.projects._set_parent(self)
@@ -220,6 +225,7 @@ class SchemathesisConfig(DiffBase):
             wait_for_schema=data.get("wait-for-schema"),
             max_failures=data.get("max-failures"),
             reports=ReportsConfig.from_dict(data.get("reports", {})),
+            cache=CacheConfig.from_dict(data.get("cache", {})),
             output=OutputConfig.from_dict(data.get("output", {})),
             projects=ProjectsConfig.from_dict(data),
         )

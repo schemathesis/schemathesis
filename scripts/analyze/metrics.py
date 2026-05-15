@@ -254,6 +254,16 @@ class EngineError:
 
 
 @dataclass(slots=True)
+class CacheMetrics:
+    """Probing-phase cache replay outcome; `available=False` means corrupt-but-present file."""
+
+    available: bool = True
+    replayed: int = 0
+    dropped: int = 0
+    skipped: int = 0
+
+
+@dataclass(slots=True)
 class PhaseMetrics:
     name: str
     duration_seconds: float
@@ -410,6 +420,13 @@ class RunMetrics:
     # `NonFatalError` / `InternalError` events deduped by `(type, phase, operation_label)`,
     # sorted by count desc.
     engine_errors: list[EngineError] = field(default_factory=list)
+    # Observation-cache replay outcome carried on the probing PhaseFinished
+    # event. `None` when the run had no cache file or caching was disabled.
+    cache: CacheMetrics | None = None
+    # Distinct error-feedback observations the in-memory store accumulated
+    # during the run (live discovery + cache hydration combined). Carried on
+    # EngineFinished.payload. 0 when error-feedback is disabled.
+    distinct_observations: int = 0
 
 
 @dataclass(slots=True, frozen=True)
@@ -966,9 +983,15 @@ def analyze(path: Path) -> RunMetrics:
                         run.pool_draws.inventory.resources = int(inventory.get("resources") or 0)
             elif event_name == "EngineStarted" and isinstance(timestamp, (int, float)):
                 engine_started_at = float(timestamp)
-            elif event_name == "EngineFinished" and isinstance(timestamp, (int, float)):
-                if engine_started_at is not None:
+            elif event_name == "EngineFinished":
+                if isinstance(timestamp, (int, float)) and engine_started_at is not None:
                     run.duration_seconds = max(0.0, float(timestamp) - engine_started_at)
+                summary = payload.get("payload")
+                if isinstance(summary, dict):
+                    cache_summary = summary.get("cache") or {}
+                    observations_total = cache_summary.get("observations_total")
+                    if isinstance(observations_total, int):
+                        run.distinct_observations = observations_total
             elif event_name in ("NonFatalError", "InternalError"):
                 value = payload.get("value")
                 if isinstance(value, dict):
@@ -997,6 +1020,15 @@ def analyze(path: Path) -> RunMetrics:
                     current_phase = name
             elif event_name == "PhaseFinished":
                 name = _phase_name(payload)
+                if name == "API probing":
+                    cache_payload = (payload.get("payload") or {}).get("cache")
+                    if isinstance(cache_payload, dict):
+                        run.cache = CacheMetrics(
+                            available=bool(cache_payload.get("available", True)),
+                            replayed=int(cache_payload.get("replayed") or 0),
+                            dropped=int(cache_payload.get("dropped") or 0),
+                            skipped=int(cache_payload.get("skipped") or 0),
+                        )
                 if name and name in open_phases and isinstance(timestamp, (int, float)):
                     state = open_phases.pop(name)
                     run.phases.append(

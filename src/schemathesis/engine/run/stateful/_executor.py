@@ -15,6 +15,8 @@ from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
+from schemathesis.core.cache import Kind, request_from_case
+from schemathesis.core.error_feedback import observation_fingerprint
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
@@ -240,8 +242,15 @@ def execute_state_machine_loop(
 
             if engine.error_feedback is not None:
                 # Field-level observations steer subsequent positive-mode generation.
-                for observation in observations:
-                    engine.error_feedback.record(observation)
+                if observations:
+                    for observation in observations:
+                        engine.error_feedback.record(observation)
+                    engine.cache.record(
+                        Kind.ERROR_FEEDBACK,
+                        case.operation.label,
+                        request_from_case(case),
+                        observation_keys=[observation_fingerprint(observation) for observation in observations],
+                    )
                 # Schema-level cross-cutting observations (e.g. auth retries).
                 case.operation.schema.record_runtime_observations(
                     store=engine.error_feedback,
@@ -249,6 +258,7 @@ def execute_state_machine_loop(
                     case=case,
                     response=response,
                     transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
+                    cache_writer=engine.cache.writer,
                 )
 
             cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")

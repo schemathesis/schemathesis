@@ -20,7 +20,7 @@ def get_all_config_files(*subdirectories: str) -> dict[str, Path]:
     return result
 
 
-ALL_CONFIGS = get_all_config_files("common", "report", "parameters", "operations", "fuzz")
+ALL_CONFIGS = get_all_config_files("common", "report", "cache", "parameters", "operations", "fuzz")
 
 
 @pytest.mark.parametrize(

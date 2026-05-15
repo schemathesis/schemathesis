@@ -6,6 +6,7 @@
 
 - Stateful tests damp reuse of extracted values from unreliable API links.
 - Reuse response field values across operations without an inferred producer-consumer link.
+- Persist error-feedback, auth, and 405 discoveries to `.schemathesis/`; probing replays them to skip rediscovery.
 
 ### :bug: Fixed
 

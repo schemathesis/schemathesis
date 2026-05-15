@@ -145,11 +145,33 @@ _BucketKey = tuple[str, ParameterLocation]
 
 
 def _entry_key(observation: Observation) -> _EntryKey:
-    # MIN and MAX numeric bounds for the same path are independent constraints —
-    # discriminate them so both sides survive dedup.
-    if isinstance(observation.payload, NumericBoundPayload):
-        return (observation.parameter_path, observation.kind, observation.payload.direction)
-    return (observation.parameter_path, observation.kind, None)
+    # Payload variants on the same (path, kind) carry independent signals — discriminate so each
+    # variant gets its own slot. SizeBoundPayload is the exception: it intentionally collapses so
+    # complementary min/max observations can merge in-place (see `record` below).
+    payload = observation.payload
+    discriminator: BoundDirection | str | tuple[str, ...] | None
+    if isinstance(payload, NumericBoundPayload):
+        discriminator = payload.direction
+    elif isinstance(payload, FormatPayload):
+        discriminator = payload.name
+    elif isinstance(payload, PatternPayload):
+        discriminator = payload.regex
+    elif isinstance(payload, EnumPayload):
+        discriminator = payload.values
+    elif isinstance(payload, TypeMismatchPayload):
+        discriminator = payload.type_name
+    else:
+        discriminator = None
+    return (observation.parameter_path, observation.kind, discriminator)
+
+
+def observation_fingerprint(observation: Observation) -> str:
+    """Dedup key across all buckets: `(operation_label, location, parameter_path, kind, payload-discriminator)`."""
+    bucket = observation.operation_label, observation.location.value
+    path, kind, discriminator = _entry_key(observation)
+    if isinstance(discriminator, BoundDirection):
+        discriminator = discriminator.value
+    return repr((bucket, tuple(path), kind.value, discriminator))
 
 
 @dataclass(slots=True)
@@ -189,6 +211,11 @@ class ErrorFeedbackStore:
         """Engine-side boundary marker; never call from inside a Hypothesis suite."""
         with self._lock:
             self._generation += 1
+
+    def distinct_observations(self) -> int:
+        """Total distinct observations recorded across every bucket."""
+        with self._lock:
+            return sum(len(bucket.entries) for bucket in self._buckets.values())
 
     def record(self, observation: Observation) -> None:
         """Insert with dedup on (path, kind, payload-discriminator); evicts the lowest-count entry when full."""

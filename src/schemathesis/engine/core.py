@@ -168,7 +168,14 @@ class ExecutionPlan:
 
     def _finish(self, ctx: EngineContext) -> EventGenerator:
         """Finish the test run."""
-        yield events.EngineFinished(running_time=ctx.running_time, stop_reason=ctx.stop_reason)
+        ctx.cache.flush()
+        store = ctx.error_feedback
+        summary = events.RunSummary(
+            cache=events.CacheRunMetrics(
+                observations_total=store.distinct_observations() if store is not None else 0,
+            ),
+        )
+        yield events.EngineFinished(running_time=ctx.running_time, stop_reason=ctx.stop_reason, payload=summary)
 
     def _adapt_execution(self, engine: EngineContext, phase: Phase) -> StatefulPhasePayload | None:
         if engine.has_reached_the_failure_limit:

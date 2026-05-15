@@ -3,8 +3,13 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 
+from schemathesis.core.cache import CacheWriter, Kind, request_from_case
 from schemathesis.core.warnings import SchemathesisWarning
+
+if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
 
 # Fires only on operations that 405 from the first call; any non-405 cancels
 # the streak permanently. High enough to ride out noisy early-response orderings.
@@ -28,6 +33,10 @@ class Verdict:
 
 
 _DEFAULT_VERDICT = Verdict(directive=SchedulingDirective.RUN)
+
+
+def _method_not_allowed_verdict(reason: str) -> Verdict:
+    return Verdict(directive=SchedulingDirective.SKIP, reason=reason, warning=SchemathesisWarning.METHOD_NOT_ALLOWED)
 
 
 @dataclass(slots=True)
@@ -56,7 +65,16 @@ class Supervisor:
         self._records: dict[str, _OperationRecord] = {}
         self._lock = threading.Lock()
 
-    def record_response(self, *, operation_label: str, status_code: int, is_documented_status: bool = False) -> None:
+    def record_response(
+        self,
+        *,
+        operation_label: str,
+        status_code: int,
+        is_documented_status: bool = False,
+        case: Case | None = None,
+        cache_writer: CacheWriter | None = None,
+    ) -> None:
+        flipped_now = False
         with self._lock:
             record = self._records.get(operation_label)
             if record is None:
@@ -72,14 +90,26 @@ class Supervisor:
             else:
                 record.counters.other += 1
             if record.counters.other == 0 and record.counters.method_not_allowed >= METHOD_NOT_ALLOWED_THRESHOLD:
-                record.verdict = Verdict(
-                    directive=SchedulingDirective.SKIP,
-                    reason=(
-                        f"Skipped after {record.counters.method_not_allowed} consecutive "
-                        f"`405 Method Not Allowed` responses"
-                    ),
-                    warning=SchemathesisWarning.METHOD_NOT_ALLOWED,
+                record.verdict = _method_not_allowed_verdict(
+                    f"Skipped after {record.counters.method_not_allowed} consecutive `405 Method Not Allowed` responses"
                 )
+                flipped_now = True
+        if flipped_now and cache_writer is not None and case is not None:
+            cache_writer.record(Kind.METHOD_NOT_ALLOWED, operation_label, request_from_case(case))
+
+    def hydrate_method_not_allowed_skip(self, operation_label: str) -> None:
+        """Apply the same SKIP verdict the live `record_response` streak would have produced."""
+        with self._lock:
+            record = self._records.get(operation_label)
+            if record is None:
+                record = _OperationRecord()
+                self._records[operation_label] = record
+            elif record.verdict.directive is not SchedulingDirective.RUN:
+                return
+            record.verdict = _method_not_allowed_verdict(
+                f"Skipped after {METHOD_NOT_ALLOWED_THRESHOLD}+ consecutive `405 Method Not Allowed` responses"
+                " (restored from cache)"
+            )
 
     def verdict(self, operation_label: str) -> Verdict:
         record = self._records.get(operation_label)
