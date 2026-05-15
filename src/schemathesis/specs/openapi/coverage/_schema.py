@@ -767,6 +767,33 @@ def _merge_with_parent_context(parent: JsonSchemaObject, sub: JsonSchema) -> Jso
     return result
 
 
+def _generate_oversized_string(
+    ctx: CoverageContext, original_schema: JsonSchemaObject, new_schema: dict[str, Any], target_length: int
+) -> str | None:
+    pattern = new_schema.get("pattern")
+    if not isinstance(pattern, str):
+        return ctx.generate_from_schema(new_schema)
+    min_length = max_length = target_length
+    try:
+        if target_length - 1 > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
+            # Pattern combined with a large length is too slow; drop it.
+            return ctx.generate_from_schema({k: v for k, v in new_schema.items() if k != "pattern"})
+        if ctx.update_pattern is not None:
+            updated = ctx.update_pattern(pattern, min_length, max_length)
+            if updated != pattern:
+                return ctx.generate_from_schema({**new_schema, "pattern": updated})
+            stripped = {k: v for k, v in new_schema.items() if k not in ("minLength", "maxLength")}
+            return ctx.generate_from_schema(stripped).ljust(max_length, "0")
+        return ctx.generate_from_schema(new_schema)
+    except (InvalidArgument, Unsatisfiable):
+        # Pattern intrinsically unsatisfiable: synthesize a fixed-length string so the
+        # maxLength rule still fires even though the value also violates the pattern.
+        # Only do it within the negative-fuzzing pattern cap to avoid shipping huge payloads.
+        if target_length <= NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN + 1:
+            return "a" * target_length
+        return None
+
+
 def _generate_template_with_deflation_fallback(
     ctx: CoverageContext, schema: JsonSchemaObject, template_schema: JsonSchemaObject
 ) -> Any:
@@ -1267,6 +1294,7 @@ def cover_schema_iter(
                 ):
                     try:
                         target_length = value + 1
+                        new_value: str | None
                         if target_length >= INTERNAL_BUFFER_SIZE:
                             # Cheap synthesis: any character violates the bound; bypass Hypothesis
                             # to avoid blowing past its internal buffer for very large limits.
@@ -1277,27 +1305,8 @@ def cover_schema_iter(
                             new_schema.pop("enum", None)
                             new_schema.pop("const", None)
                             new_schema["type"] = "string"
-                            if "pattern" in new_schema:
-                                if value > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
-                                    # Large `maxLength` value can be extremely slow to generate when combined with `pattern`
-                                    del new_schema["pattern"]
-                                    new_value = ctx.generate_from_schema(new_schema)
-                                elif ctx.update_pattern is not None:
-                                    new_schema["pattern"] = ctx.update_pattern(
-                                        schema["pattern"], min_length, max_length
-                                    )
-                                    if new_schema["pattern"] == schema["pattern"]:
-                                        # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
-                                        del new_schema["minLength"]
-                                        del new_schema["maxLength"]
-                                        new_value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
-                                    else:
-                                        new_value = ctx.generate_from_schema(new_schema)
-                                else:
-                                    new_value = ctx.generate_from_schema(new_schema)
-                            else:
-                                new_value = ctx.generate_from_schema(new_schema)
-                        if seen.insert(new_value):
+                            new_value = _generate_oversized_string(ctx, schema, new_schema, target_length)
+                        if new_value is not None and seen.insert(new_value):
                             yield NegativeValue(
                                 new_value,
                                 scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,

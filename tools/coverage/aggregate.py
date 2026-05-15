@@ -137,7 +137,7 @@ def aggregate(results: list[SchemaResult]) -> dict[str, Any]:
 
 
 def _row(label: str, bucket: dict[str, Any]) -> str:
-    return f"| {label} | {bucket['covered']} | {bucket['total']} | {bucket['pct']:.1f}% |"
+    return f"| {label} | {bucket['covered']} | {bucket['total']} | {bucket['pct']:.2f}% |"
 
 
 def render_markdown(summary: dict[str, Any]) -> str:
@@ -184,7 +184,7 @@ def render_markdown(summary: dict[str, Any]) -> str:
     if summary["worst_apis"]:
         lines += ["## Worst-covered APIs (by keyword %)", "", "| corpus | api | keyword % |", "|---|---|---:|"]
         for entry in summary["worst_apis"]:
-            lines.append(f"| {entry['corpus']} | {entry['api']} | {entry['keyword_pct']:.1f}% |")
+            lines.append(f"| {entry['corpus']} | {entry['api']} | {entry['keyword_pct']:.2f}% |")
         lines.append("")
 
     return "\n".join(lines)

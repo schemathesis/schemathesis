@@ -350,6 +350,20 @@ def test_negative_maxitems_when_unique_items_exhaust_enum(nctx):
     assert all(item in schema["items"]["enum"] for v in above_max for item in v)
 
 
+def test_negative_maxlength_emitted_with_unsatisfiable_pattern(nctx):
+    # An unsatisfiable `pattern` would block the length-violation generator; the maxLength
+    # rule is still server-side enforceable, so emit a too-long string even if it also
+    # violates the broken pattern.
+    schema = {"type": "string", "maxLength": 90, "minLength": 1, "pattern": r" ^[-\w\._\(\)]+[^\.]$"}
+    above_max = [
+        v.value
+        for v in cover_schema_iter(nctx, schema)
+        if isinstance(v, GeneratedValue) and v.scenario is CoverageScenario.STRING_ABOVE_MAX_LENGTH
+    ]
+    assert above_max, "Expected an above-maxLength negative case"
+    assert all(len(s) == 91 for s in above_max)
+
+
 @pytest.mark.parametrize("max_length", [65536, 350000])
 def test_negative_maxlength_above_buffer(nctx, max_length):
     schema = {"type": "string", "maxLength": max_length}
