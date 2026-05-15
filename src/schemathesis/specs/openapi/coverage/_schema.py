@@ -767,6 +767,22 @@ def _merge_with_parent_context(parent: JsonSchemaObject, sub: JsonSchema) -> Jso
     return result
 
 
+def _generate_template_with_deflation_fallback(
+    ctx: CoverageContext, schema: JsonSchemaObject, template_schema: JsonSchemaObject
+) -> Any:
+    try:
+        return ctx.generate_from_schema(template_schema)
+    except Unsatisfiable:
+        # `_get_template_schema` may promote optionals to required for completeness; one
+        # unsatisfiable optional then sinks the whole template. Retry with only the
+        # schema's original required so the per-property sweep can still emit each
+        # property individually.
+        original_required = schema.get("required", []) if isinstance(schema, dict) else []
+        properties = template_schema.get("properties", {}) if isinstance(template_schema, dict) else {}
+        deflated = {**template_schema, "required": [k for k in original_required if k in properties]}
+        return ctx.generate_from_schema(deflated)
+
+
 def _cover_positive_for_type(
     ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -777,10 +793,10 @@ def _cover_positive_for_type(
 
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty, ctx)
-        template = ctx.generate_from_schema(template_schema)
+        template = _generate_template_with_deflation_fallback(ctx, schema, template_schema)
     elif _implies_object_type(schema):
         template_schema = _get_template_schema(schema, "object", ctx)
-        template = ctx.generate_from_schema(template_schema)
+        template = _generate_template_with_deflation_fallback(ctx, schema, template_schema)
     else:
         template = None
     if GenerationMode.POSITIVE in ctx.generation_modes:
