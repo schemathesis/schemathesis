@@ -27,16 +27,14 @@ from schemathesis.generation.hypothesis._response_matching import find_matching_
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, openapi_cases
-from schemathesis.specs.openapi.adapter import OpenApiResponses
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
-from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.formats import STRING_FORMATS
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
+    from schemathesis.specs.openapi.schemas import OpenApiOperation, OpenApiSchema
 
 
 @dataclass(slots=True)
@@ -152,7 +150,7 @@ def _build_location_schema(
 
 
 def get_strategies_from_examples(
-    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
+    operation: OpenApiOperation,
     extra_data_source: OpenApiExtraDataSource | None = None,
     fill_missing_from_pool: bool = False,
     **kwargs: Any,
@@ -210,13 +208,9 @@ def get_strategies_from_examples(
 
 
 def extract_top_level(
-    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
+    operation: OpenApiOperation,
 ) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-    assert isinstance(operation.schema, OpenApiSchema)
-
     merge_ref_siblings = operation.schema.adapter.ref_siblings
     responses = list(operation.responses.iter_examples())
     for parameter in operation.iter_parameters():
@@ -546,12 +540,9 @@ def load_external_example(url: str) -> bytes:
 
 
 def extract_from_schemas(
-    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
+    operation: OpenApiOperation,
 ) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-    assert isinstance(operation.schema, OpenApiSchema)
     merge_ref_siblings = operation.schema.adapter.ref_siblings
     for parameter in operation.iter_parameters():
         try:
@@ -750,7 +741,7 @@ def _yield_examples_per_branch(
 
 def extract_from_schema(
     *,
-    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
+    operation: OpenApiOperation,
     schema: dict[str, Any],
     example_keyword: str,
     examples_container_keyword: str,

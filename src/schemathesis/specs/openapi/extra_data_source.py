@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
+    from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 RequirementKey = tuple[str, ParameterLocation, str]
 DedupKey: TypeAlias = tuple[type, str | int | float | bool | None]
@@ -344,7 +345,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
     def get_captured_variants(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
     ) -> list[CapturedVariant] | None:
@@ -400,9 +401,6 @@ class OpenApiExtraDataSource(ExtraDataSource):
         else:
             variants = self._collect_object_variants(slots, location)
 
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-        assert isinstance(operation.schema, OpenApiSchema)
         validator_cls = operation.schema.adapter.jsonschema_validator_cls
         validators = {
             slot.lookup_key: _build_property_validator(slot.leaf_schema, schema, validator_cls) for slot in slots

@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import re
-from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterator, Mapping
 from contextlib import suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import cached_property
-from json import JSONDecodeError
-from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
-import jsonschema_rs
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 from typing_extensions import override
@@ -21,60 +17,50 @@ from schemathesis.config import (
     FuzzingPhaseConfig,
     OperationOrdering,
 )
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, Body, Specification, deserialization
-from schemathesis.core.adapter import OperationParameter, ResponsesContainer
-from schemathesis.core.compat import RefResolutionError
+from schemathesis.core import NOT_SET, Body, Specification
 from schemathesis.core.errors import (
-    SCHEMA_ERROR_SUGGESTION,
-    HookExecutionError,
-    InfiniteRecursiveReference,
     InvalidSchema,
-    MalformedMediaType,
     OperationNotFound,
-    SchemaLocation,
 )
-from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema import Bundler
-from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX, BundleCache
+from schemathesis.core.jsonschema.bundler import BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
-from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic
-from schemathesis.core.transforms import get_template_fields
 from schemathesis.core.transport import Response, restful_method_priority
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
-from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.resources import ExtraDataSource
 from schemathesis.specs.openapi import adapter
-from schemathesis.specs.openapi.adapter import OpenApiResponses
-from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
-from schemathesis.specs.openapi.adapter.responses import ResolvedSchema
-from schemathesis.specs.openapi.adapter.security import OpenApiSecurity, OpenApiSecurityParameters
+from schemathesis.specs.openapi.adapter.security import OpenApiSecurity
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
-from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
 
 from ...generation import GenerationMode
 from ...hooks import (
     HookContext,
     HookDispatcher,
-    dispatch_before_init_operation,
     dispatch_before_process_path,
 )
-from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
+from ...schemas import APIOperation, APIOperationMap, BaseSchema
 from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
+from .operations import HTTP_METHODS, SCHEMA_PARSING_ERRORS, OperationLoader
 from .stateful import create_state_machine
+from .validation import ResponseValidator
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import TypeAlias
+
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig
+    from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema
@@ -84,9 +70,13 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful import APIStateMachine
+    from schemathesis.specs.openapi.adapter import OpenApiResponses
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
+    from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
 
-HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"})
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
+    OpenApiOperation: TypeAlias = APIOperation[
+        OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters, "OpenApiSchema"
+    ]
 
 _V3_1 = version.parse("3.1")
 _V3_2 = version.parse("3.2")
@@ -105,6 +95,8 @@ class OpenApiSchema(BaseSchema):
         self._bundler = Bundler()
         self._bundle_cache: BundleCache = {}
         self._operation_lookup = OperationLookup(self, HTTP_METHODS)
+        self._operations = OperationLoader(self)
+        self._response_validator = ResponseValidator(self)
         # Path-level dedup of undeclared-method coverage probes; cleared per coverage phase via
         # `reset_coverage_state`.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
@@ -130,8 +122,8 @@ class OpenApiSchema(BaseSchema):
 
         raise InvalidSchema("Unable to determine Open API version for this schema.")
 
-    @cached_property
     @override
+    @cached_property
     def specification(self) -> Specification:
         return Specification.openapi(version=self._spec_version)
 
@@ -434,155 +426,12 @@ class OpenApiSchema(BaseSchema):
             message += f". Did you mean `{matches[0]}`?"
         raise OperationNotFound(message=message, item=item) from exc
 
-    def _should_skip(
-        self,
-        path: str,
-        method: str,
-        definition: dict[str, Any],
-        _ctx_cache: SimpleNamespace = SimpleNamespace(
-            operation=APIOperation(
-                method="",
-                path="",
-                label="",
-                definition=OperationDefinition(raw=None),
-                schema=None,  # type: ignore[arg-type]
-                responses=None,
-                security=None,
-            )
-        ),
-    ) -> bool:
-        if method not in HTTP_METHODS:
-            return True
-        if self.filter_set.is_empty():
-            return False
-        # Attribute assignment is way faster than creating a new namespace every time
-        operation = _ctx_cache.operation
-        operation.method = method
-        operation.path = path
-        operation.label = f"{method.upper()} {path}"
-        operation.definition.raw = definition
-        operation.schema = self
-        return not self.filter_set.match(_ctx_cache)
+    def _should_skip(self, path: str, method: str, definition: dict[str, Any]) -> bool:
+        return self._operations._should_skip(path, method, definition)
 
     @override
     def _measure_statistic(self) -> ApiStatistic:
-        statistic = ApiStatistic()
-        paths = self._get_paths()
-        if paths is None:
-            return statistic
-
-        # Hoist the filter check out of the per-operation loop: when no filters are
-        # configured, every operation is selected and we skip the per-call dispatch.
-        filters_active = not self.filter_set.is_empty()
-        should_skip = self._should_skip
-        links_keyword = self.adapter.links_keyword
-        root_resolver = self.root_resolver
-
-        # For operationId lookup
-        selected_operations_by_id: set[str] = set()
-        # Tuples of (method, path)
-        selected_operations_by_path: set[tuple[str, str]] = set()
-        collected_links: list[dict] = []
-
-        for path, path_item in paths.items():
-            try:
-                if "$ref" in path_item:
-                    path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
-                else:
-                    path_resolver = root_resolver
-                for method, definition in path_item.items():
-                    if method not in HTTP_METHODS or not definition:
-                        continue
-                    statistic.operations.total += 1
-                    is_selected = not should_skip(path, method, definition) if filters_active else True
-                    if is_selected:
-                        statistic.operations.selected += 1
-                        # Store both identifiers
-                        if "operationId" in definition:
-                            selected_operations_by_id.add(definition["operationId"])
-                        selected_operations_by_path.add((method, path))
-                    for response in definition.get("responses", {}).values():
-                        if "$ref" in response:
-                            _, response = resolve_reference(path_resolver, response["$ref"])
-                        defined_links = response.get(links_keyword)
-                        if defined_links is not None:
-                            statistic.transitions.total += len(defined_links)
-                            if is_selected:
-                                collected_links.extend(defined_links.values())
-            except SCHEMA_PARSING_ERRORS:
-                continue
-
-        def is_link_selected(link: dict) -> bool:
-            if "$ref" in link:
-                _, link = resolve_reference(root_resolver, link["$ref"])
-
-            if "operationId" in link:
-                return link["operationId"] in selected_operations_by_id
-            else:
-                try:
-                    resolve_reference(root_resolver, link["operationRef"])
-                    _, _, suffix = link["operationRef"].partition("#/paths/")
-                    path, method = suffix.rsplit("/", maxsplit=1)
-                    path = path.replace("~1", "/").replace("~0", "~")
-                    return (method, path) in selected_operations_by_path
-                except Exception:
-                    return False
-
-        for link in collected_links:
-            if is_link_selected(link):
-                statistic.transitions.selected += 1
-
-        # Resource-pool inventory: counts of descriptor-producing operations, resource-bound
-        # consumer operations, and distinct resource types. Lets the analyzer compute
-        # "exercised N of M known edges" from the post-run NDJSON.
-        # Hook/schema errors raised by `analyze` re-fire during engine iteration where
-        # they're handled; defer to that path so the loader doesn't crash.
-        try:
-            descriptors = self.analysis.resource_descriptors
-            graph = self.analysis.dependency_graph
-        except (HookExecutionError, *SCHEMA_PARSING_ERRORS):
-            return statistic
-        # Intersect with the run's selected operations so coverage ratios match what the run exercised.
-        selected_labels = {f"{method.upper()} {path}" for method, path in selected_operations_by_path}
-        producer_labels: set[str] = set()
-        resource_names: set[str] = set()
-        for descriptor in descriptors:
-            if descriptor.operation in selected_labels:
-                producer_labels.add(descriptor.operation)
-                resource_names.add(descriptor.resource_name)
-        consumer_labels: set[str] = set()
-        for label, operation in graph.operations.items():
-            if label not in selected_labels:
-                continue
-            resource_bound = [slot for slot in operation.inputs if slot.resource_field is not None]
-            if resource_bound:
-                consumer_labels.add(label)
-                resource_names.update(slot.resource.name for slot in resource_bound)
-        statistic.resource_pool.producer_labels = sorted(producer_labels)
-        statistic.resource_pool.consumer_labels = sorted(consumer_labels)
-        statistic.resource_pool.resources = len(resource_names)
-
-        return statistic
-
-    def _operation_iter(self) -> Iterator[tuple[str, str, dict[str, Any]]]:
-        paths = self._get_paths()
-        if paths is None:
-            return
-        root_resolver = self.root_resolver
-        filters_active = not self.filter_set.is_empty()
-        should_skip = self._should_skip
-        for path, path_item in paths.items():
-            try:
-                if "$ref" in path_item:
-                    _, path_item = resolve_reference(root_resolver, path_item["$ref"])
-                for method, definition in path_item.items():
-                    if method not in HTTP_METHODS:
-                        continue
-                    if filters_active and should_skip(path, method, definition):
-                        continue
-                    yield method, path, definition
-            except SCHEMA_PARSING_ERRORS:
-                continue
+        return self._operations.measure_statistic()
 
     @override
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
@@ -602,57 +451,7 @@ class OpenApiSchema(BaseSchema):
         operations and show errors for invalid ones.
         """
         __tracebackhide__ = True
-        paths = self._get_paths()
-        if paths is None:
-            if version.parse(self.specification.version) >= _V3_1:
-                return
-            self._raise_invalid_schema(KeyError("paths"))
-
-        context = HookContext()
-        # Optimization: local variables are faster than attribute access
-        filters_active = not self.filter_set.is_empty()
-        should_skip = self._should_skip
-        iter_parameters = self._iter_parameters
-        make_operation = self.make_operation
-        root_resolver = self.root_resolver
-        for path, path_item in paths.items():
-            method = None
-            try:
-                dispatch_before_process_path(self, context, path, path_item)
-                if "$ref" in path_item:
-                    path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
-                    scope = path_resolver.base_uri
-                else:
-                    path_resolver = root_resolver
-                    scope = path_resolver.base_uri
-                shared_parameters = path_item.get("parameters", [])
-                for method, entry in path_item.items():
-                    if method not in HTTP_METHODS:
-                        continue
-                    try:
-                        if filters_active and should_skip(path, method, entry):
-                            continue
-                        parameters = iter_parameters(entry, shared_parameters, resolver=path_resolver)
-                        operation = make_operation(
-                            path,
-                            method,
-                            parameters,
-                            entry,
-                            scope,
-                            resolver=path_resolver,
-                        )
-                        yield Ok(operation)
-                    except SCHEMA_PARSING_ERRORS as exc:
-                        yield self._into_err(exc, path, method)
-            except SCHEMA_PARSING_ERRORS as exc:
-                yield self._into_err(exc, path, method)
-
-    def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
-        __tracebackhide__ = True
-        try:
-            self._raise_invalid_schema(error, path, method)
-        except InvalidSchema as exc:
-            return Err(exc)
+        yield from self._operations.iter_all()
 
     def _raise_invalid_schema(
         self,
@@ -661,21 +460,7 @@ class OpenApiSchema(BaseSchema):
         method: str | None = None,
     ) -> NoReturn:
         __tracebackhide__ = True
-        if isinstance(error, InfiniteRecursiveReference):
-            raise InvalidSchema(str(error), path=path, method=method) from None
-        if isinstance(error, RefResolutionError):
-            raise InvalidSchema.from_reference_resolution_error(error, path=path, method=method) from None
-        try:
-            self.validate()
-        except jsonschema_rs.ValidationError as exc:
-            raise InvalidSchema.from_jsonschema_error(
-                exc,
-                path=path,
-                method=method,
-                config=self.config.output,
-                location=SchemaLocation.maybe_from_error_path(exc.instance_path, self.specification.version),
-            ) from None
-        raise InvalidSchema(SCHEMA_ERROR_SUGGESTION, path=path, method=method) from error
+        self._operations._raise_invalid_schema(error, path, method)
 
     @override
     def validate(self) -> None:
@@ -691,38 +476,15 @@ class OpenApiSchema(BaseSchema):
         shared_parameters: Sequence[dict[str, Any]],
         resolver: Resolver | None = None,
     ) -> list[OperationParameter]:
-        return list(
-            self.adapter.iter_parameters(
-                definition,
-                shared_parameters,
-                self.default_media_types,
-                self.root_resolver if resolver is None else resolver,
-                self.adapter,
-                self._bundler,
-                self._bundle_cache,
-            )
-        )
+        return self._operations._iter_parameters(definition, shared_parameters, resolver=resolver)
 
     def _parse_responses(
         self, definition: dict[str, Any], scope: str, resolver: Resolver | None = None
     ) -> OpenApiResponses:
-        responses = definition.get("responses", {})
-        return OpenApiResponses.from_definition(
-            definition=responses,
-            resolver=self.root_resolver if resolver is None else resolver,
-            scope=scope,
-            adapter=self.adapter,
-        )
+        return self._operations._parse_responses(definition, scope, resolver=resolver)
 
     def _parse_security(self, definition: dict[str, Any]) -> OpenApiSecurityParameters:
-        # Security schemes live at the schema root; refs in `securitySchemes` resolve relative
-        # to the root document, not to whichever path-scoped resolver the operation was loaded with.
-        return OpenApiSecurityParameters.from_definition(
-            schema=self.raw_schema,
-            operation=definition,
-            resolver=self.root_resolver,
-            adapter=self.adapter,
-        )
+        return self._operations._parse_security(definition)
 
     def make_operation(
         self,
@@ -734,49 +496,7 @@ class OpenApiSchema(BaseSchema):
         resolver: Resolver | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
-        base_url = self.get_base_url()
-        responses = self._parse_responses(definition, scope, resolver=resolver)
-        security = self._parse_security(definition)
-        operation: APIOperation[OperationParameter, ResponsesContainer, OpenApiSecurityParameters] = APIOperation(
-            path=path,
-            method=method,
-            definition=OperationDefinition(definition),
-            base_url=base_url,
-            app=self.app,
-            schema=self,
-            responses=responses,
-            security=security,
-            path_parameters=OpenApiParameterSet(ParameterLocation.PATH, adapter=self.adapter),
-            query=OpenApiParameterSet(ParameterLocation.QUERY, adapter=self.adapter),
-            headers=OpenApiParameterSet(ParameterLocation.HEADER, adapter=self.adapter),
-            cookies=OpenApiParameterSet(ParameterLocation.COOKIE, adapter=self.adapter),
-        )
-        for parameter in parameters:
-            operation.add_parameter(parameter)
-        # Inject unconstrained path parameters if any is missing
-        missing_parameter_names = get_template_fields(operation.path) - {
-            parameter.name for parameter in operation.path_parameters
-        }
-        for name in missing_parameter_names:
-            operation.add_parameter(
-                self.adapter.build_path_parameter({"name": name, INJECTED_PATH_PARAMETER_KEY: True})
-            )
-        config = self.config.generation_for(operation=operation)
-        if config.with_security_parameters:
-            for param in operation.security.iter_parameters():
-                param_name = param.get("name")
-                param_location = param.get("in")
-                if (
-                    param_name is not None
-                    and param_location is not None
-                    and operation.get_parameter(name=param_name, location=param_location) is not None
-                ):
-                    continue
-                operation.add_parameter(
-                    OpenApiParameter.from_definition(definition=param, name_to_uri={}, adapter=self.adapter)
-                )
-        dispatch_before_init_operation(self, HookContext(operation=operation), operation)
-        return operation
+        return self._operations.make_operation(path, method, parameters, definition, scope, resolver=resolver)
 
     @property
     def root_resolver(self) -> Resolver:
@@ -915,242 +635,7 @@ class OpenApiSchema(BaseSchema):
         case: Case | None = None,
     ) -> bool | None:
         __tracebackhide__ = True
-        definition = operation.responses.find_by_status_code(response.status_code)
-        if definition is None:
-            return None
-
-        documented_media_types = self.get_content_types(operation, response)
-
-        failures: list[Failure] = []
-
-        content_types = response.headers.get("content-type")
-        resolved_content_type = content_types[0] if content_types else None
-
-        resolved = definition.get_schema(resolved_content_type)
-        if resolved.schema is None:
-            return None
-
-        sse_validator = None
-        validator = None
-        try:
-            sse_validator = definition.get_sse_validator(resolved.media_type, resolved.schema)
-        except (MalformedMediaType, ValueError) as exc:
-            raise InvalidSchema(
-                f"Invalid response schema for SSE content validation:\n\n  {exc}",
-                path=operation.path,
-                method=operation.method,
-            ) from exc
-        except jsonschema_rs.ValidationError as exc:
-            raise InvalidSchema.from_jsonschema_error(
-                exc,
-                path=operation.path,
-                method=operation.method,
-                config=self.config.output,
-                location=SchemaLocation.response_schema(self.specification.version),
-            ) from exc
-        if sse_validator is None:
-            try:
-                validator = definition.get_validator(resolved.media_type, resolved.schema)
-            except jsonschema_rs.ValidationError as exc:
-                raise InvalidSchema.from_jsonschema_error(
-                    exc,
-                    path=operation.path,
-                    method=operation.method,
-                    config=self.config.output,
-                    location=SchemaLocation.response_schema(self.specification.version),
-                ) from exc
-            if validator is None:
-                return None
-
-        if resolved_content_type is None:
-            formatted_content_types = [f"\n- `{content_type}`" for content_type in documented_media_types]
-            message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
-            failures.append(
-                MissingContentType(operation=operation.label, message=message, media_types=documented_media_types)
-            )
-            content_type = resolved.media_type or "application/json"
-        else:
-            content_type = resolved_content_type
-
-        context = deserialization.DeserializationContext(operation=operation, case=case)
-
-        try:
-            data = deserialization.deserialize_response(response, content_type, context=context)
-        except JSONDecodeError as exc:
-            failures.append(MalformedJson.from_exception(operation=operation.label, exc=exc))
-            _maybe_raise_one_or_more(failures)
-            return None
-        except NotImplementedError:
-            # No deserializer available for this media type - skip validation
-            # This is expected for many media types (images, binary formats, etc.)
-            return None
-        except Exception as exc:
-            failures.append(
-                Failure(
-                    operation=operation.label,
-                    title="Content deserialization error",
-                    message=f"Failed to deserialize response content:\n\n  {exc}",
-                )
-            )
-            _maybe_raise_one_or_more(failures)
-            return None
-
-        if sse_validator is not None:
-
-            def deserialize_embedded_payload(content_media_type: str, payload: str) -> Any:
-                embedded_response = Response(
-                    status_code=response.status_code,
-                    headers={"content-type": [content_media_type]},
-                    content=payload.encode("utf-8"),
-                    request=response.request,
-                    elapsed=response.elapsed,
-                    verify=response.verify,
-                    message=response.message,
-                    http_version=response.http_version,
-                    encoding="utf-8",
-                )
-                return deserialization.deserialize_response(embedded_response, content_media_type, context=context)
-
-            with sse_validator.with_deserializer(deserialize_embedded_payload):
-                for idx, event_data in enumerate(data):
-                    try:
-                        sse_validator.validate(event_data)
-                    except jsonschema_rs.ValidationError as exc:
-                        cause = exc.__cause__
-                        if isinstance(cause, ContentSchemaViolation):
-                            failure = JsonSchemaError.from_exception(
-                                title="SSE event payload violates content schema",
-                                operation=operation.label,
-                                exc=cause.original,
-                                root_schema=cause.content_schema,
-                                config=operation.schema.config.output,
-                                name_to_uri=resolved.name_to_uri,
-                            )
-                        else:
-                            failure = JsonSchemaError.from_exception(
-                                title="SSE event violates schema",
-                                operation=operation.label,
-                                exc=exc,
-                                root_schema=resolved.schema,
-                                config=operation.schema.config.output,
-                                name_to_uri=resolved.name_to_uri,
-                            )
-                        failure.message = f"Event #{idx}: {failure.message}"
-                        if failure not in failures:
-                            failures.append(failure)
-        elif validator is not None:
-            try:
-                for err in validator.iter_errors(data):
-                    failure = JsonSchemaError.from_exception(
-                        operation=operation.label,
-                        exc=err,
-                        root_schema=resolved.schema,
-                        config=operation.schema.config.output,
-                        name_to_uri=resolved.name_to_uri,
-                    )
-                    if failure not in failures:
-                        failures.append(failure)
-            except ValueError as exc:
-                # jsonschema_rs raises ValueError for lone Unicode surrogate characters
-                # (e.g. \uDCF3), which are not valid JSON per RFC 8259 even though
-                # Python's json.loads accepts them. Treat as malformed JSON.
-                doc = response.content.decode("latin-1")
-                position, lineno, colno = _find_surrogate_location(doc)
-                failures.append(
-                    MalformedJson(
-                        operation=operation.label,
-                        validation_message=str(exc),
-                        document=doc,
-                        position=position,
-                        lineno=lineno,
-                        colno=colno,
-                        message=f"Response contains invalid JSON (lone Unicode surrogate characters are not valid per RFC 8259):\n\n  {exc}",
-                    )
-                )
-        discriminator_failure = _check_discriminator(operation, data, resolved)
-        if discriminator_failure is not None:
-            failures.append(discriminator_failure)
-        _maybe_raise_one_or_more(failures)
-        return None  # explicitly return None for mypy
-
-
-_SURROGATE_ESCAPE_RE = re.compile(r"\\u[Dd][89a-fA-F][0-9a-fA-F]{2}")
-
-
-def _find_surrogate_location(doc: str) -> tuple[int, int, int]:
-    """Return (position, lineno, colno) of the first lone surrogate escape in a JSON document."""
-    match = _SURROGATE_ESCAPE_RE.search(doc)
-    if match is None:
-        return 0, 1, 1
-    pos = match.start()
-    text_before = doc[:pos]
-    lineno = text_before.count("\n") + 1
-    colno = pos - text_before.rfind("\n")
-    return pos, lineno, colno
-
-
-def _check_discriminator(
-    operation: APIOperation,
-    data: object,
-    resolved: ResolvedSchema,
-) -> Failure | None:
-    """Return a failure if the discriminator property value is not in the known schema mapping."""
-    if not isinstance(data, dict):
-        return None
-    schema = resolved.schema
-    if not isinstance(schema, dict):
-        return None
-    discriminator = schema.get("discriminator")
-    if not isinstance(discriminator, dict):
-        return None
-    property_name = discriminator.get("propertyName")
-    if not property_name:
-        return None
-    value = data.get(property_name)
-    if not isinstance(value, str):
-        return None
-
-    known_values: set[str] = set()
-    # Explicit mapping keys are always valid values
-    explicit_mapping = discriminator.get("mapping")
-    if isinstance(explicit_mapping, dict):
-        known_values.update(explicit_mapping.keys())
-    # Implicit mapping from schema names in anyOf/oneOf always applies alongside explicit mapping
-    for keyword in ("anyOf", "oneOf"):
-        for item in schema.get(keyword) or []:
-            if not isinstance(item, dict):
-                continue
-            ref = item.get("$ref", "")
-            if not isinstance(ref, str) or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
-                continue
-            bundled_name = ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
-            original_uri = resolved.name_to_uri.get(bundled_name)
-            if original_uri and "#" in original_uri:
-                fragment = original_uri.split("#", 1)[1]
-                schema_name = fragment.rstrip("/").rsplit("/", 1)[-1]
-                if schema_name:
-                    known_values.add(schema_name)
-
-    if not known_values or value in known_values:
-        return None
-
-    known = ", ".join(f"'{v}'" for v in sorted(known_values))
-    return Failure(
-        operation=operation.label,
-        title="Discriminator value not in schema mapping",
-        message=(
-            f"Response contains discriminator property '{property_name}' with value {value!r},\n"
-            f"which does not match any of the known schema values: {known}"
-        ),
-    )
-
-
-def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
-    if not failures:
-        return
-    if len(failures) == 1:
-        raise failures[0] from None
-    raise FailureGroup(failures) from None
+        return self._response_validator.validate(operation, response, case=case)
 
 
 @dataclass

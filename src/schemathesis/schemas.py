@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
-from functools import cached_property, lru_cache, partial, wraps
+from functools import cached_property, lru_cache, wraps
 from inspect import iscoroutinefunction
 from itertools import chain
 from typing import (
@@ -31,7 +31,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
 from schemathesis.generation.meta import CaseMetadata
-from schemathesis.hooks import HookDispatcherMark, _should_skip_hook
+from schemathesis.hooks import HookDispatcherMark
 from schemathesis.transport.prepare import prepare_path
 
 from .auths import AuthStorage
@@ -43,8 +43,6 @@ from .filters import (
     is_deprecated,
 )
 from .hooks import (
-    GLOBAL_HOOK_DISPATCHER,
-    HookContext,
     HookDispatcher,
     HookScope,
     to_filterable_hook,
@@ -681,6 +679,7 @@ class PayloadAlternatives(ParameterSet[P]):
 
 R = TypeVar("R", bound=ResponsesContainer)
 S = TypeVar("S")
+SchemaT = TypeVar("SchemaT", bound="BaseSchema")
 D = TypeVar("D", bound=dict)
 
 
@@ -701,7 +700,7 @@ class OperationDefinition(Generic[D]):
 
 
 @dataclass()
-class APIOperation(Generic[P, R, S]):
+class APIOperation(Generic[P, R, S, SchemaT]):
     """An API operation (e.g., `GET /users`)."""
 
     # `path` does not contain `basePath`
@@ -710,7 +709,7 @@ class APIOperation(Generic[P, R, S]):
     path: str
     method: str
     definition: OperationDefinition = field(repr=False)
-    schema: BaseSchema
+    schema: SchemaT
     responses: R
     security: S
     label: str = None  # type: ignore[assignment]
@@ -727,7 +726,7 @@ class APIOperation(Generic[P, R, S]):
         if self.label is None:
             self.label = f"{self.method.upper()} {self.path}"  # type: ignore[unreachable]
 
-    def __deepcopy__(self, memo: dict) -> APIOperation[P, R, S]:
+    def __deepcopy__(self, memo: dict) -> APIOperation[P, R, S, SchemaT]:
         return self
 
     def __hash__(self) -> int:
@@ -799,6 +798,7 @@ class APIOperation(Generic[P, R, S]):
             **kwargs: Extra arguments to the underlying strategy function.
 
         """
+        from schemathesis.generation._hooks import apply_case_hooks
         from schemathesis.generation.hypothesis import setup
 
         setup()
@@ -806,47 +806,7 @@ class APIOperation(Generic[P, R, S]):
             headers = kwargs.setdefault("headers", {})
             headers.update(self.schema.config.headers)
         strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, **kwargs)
-
-        def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
-            context = HookContext(operation=self)
-            for hook in dispatcher.get_all_by_name("before_generate_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                _strategy = hook(context, _strategy)
-            for hook in dispatcher.get_all_by_name("filter_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                bound_hook = partial(hook, context)
-                if self.filter_case_tracker is None:
-                    self.filter_case_tracker = FilterCaseTracker()
-                tracker = self.filter_case_tracker
-
-                def _tracking_filter(
-                    case: Case, _hook: Callable = bound_hook, _tracker: FilterCaseTracker = tracker
-                ) -> bool:
-                    result = _hook(case)
-                    _tracker.record(result)
-                    return result
-
-                _strategy = _strategy.filter(_tracking_filter)
-            for hook in dispatcher.get_all_by_name("map_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                hook = partial(hook, context)
-                _strategy = _strategy.map(hook)
-            for hook in dispatcher.get_all_by_name("flatmap_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                hook = partial(hook, context)
-                _strategy = _strategy.flatmap(hook)
-            return _strategy
-
-        strategy = _apply_hooks(GLOBAL_HOOK_DISPATCHER, strategy)
-        strategy = _apply_hooks(self.schema.hooks, strategy)
-        hooks = kwargs.get("hooks")
-        if hooks is not None:
-            strategy = _apply_hooks(hooks, strategy)
-        return strategy
+        return apply_case_hooks(strategy, self, local=kwargs.get("hooks"))
 
     def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
         return self.schema.get_strategies_from_examples(self, **kwargs)
