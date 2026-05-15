@@ -8,7 +8,11 @@ import multiprocessing
 import os
 import signal
 import sys
+import warnings
 from collections.abc import Iterator
+
+# Audited corpora carry non-standard regex / format patterns that leak FutureWarnings mid-line into the live progress view
+warnings.filterwarnings("ignore", category=FutureWarning)
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import asdict, dataclass
