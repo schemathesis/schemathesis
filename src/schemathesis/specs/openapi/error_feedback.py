@@ -24,7 +24,7 @@ from schemathesis.specs.openapi.adapter import v3_1
 from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex
 
 if TYPE_CHECKING:
-    from schemathesis.schemas import APIOperation
+    from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 
 class Adjustment(Protocol):
@@ -39,7 +39,7 @@ class Adjustment(Protocol):
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -53,7 +53,7 @@ ADJUSTMENTS: Registry[type[Adjustment]] = Registry()
 
 def apply_adjustments(
     *,
-    operation: APIOperation,
+    operation: OpenApiOperation,
     location: ParameterLocation,
     schema: JsonSchema,
     store: ErrorFeedbackStore,
@@ -227,7 +227,7 @@ class FormatAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -264,7 +264,7 @@ class SizeBoundAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -333,7 +333,7 @@ class NumericBoundAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -345,9 +345,6 @@ class NumericBoundAdjustment:
         if not targets:
             return schema
 
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-        assert isinstance(operation.schema, OpenApiSchema)
         is_2020_12 = operation.schema.adapter is v3_1
         for observation in observations:
             assert isinstance(observation.payload, NumericBoundPayload)
@@ -385,7 +382,7 @@ class PatternAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -457,7 +454,7 @@ class TypeMismatchAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -504,7 +501,7 @@ class EnumAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -538,7 +535,7 @@ class RequiredFieldAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -570,7 +567,7 @@ class UnexpectedPropertyAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],

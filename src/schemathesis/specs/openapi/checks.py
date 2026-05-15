@@ -175,7 +175,7 @@ def _reraise_malformed_media_type(case: Case, location: str, actual: str, define
 @requires_openapi_schema
 @skips_on_unexpected_http_status
 def response_headers_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    from schemathesis.specs.openapi.schemas import _maybe_raise_one_or_more
+    from schemathesis.specs.openapi.validation import _maybe_raise_one_or_more
 
     # Find the matching response definition
     response_definition = case.operation.responses.find_by_status_code(response.status_code)

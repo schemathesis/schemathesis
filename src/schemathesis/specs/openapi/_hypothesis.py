@@ -4,7 +4,7 @@ import re
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import jsonschema_rs
 from hypothesis import event, note, reject
@@ -62,6 +62,9 @@ from schemathesis.specs.openapi.negative import (
 from schemathesis.specs.openapi.negative.mutations import MutationMetadata
 from schemathesis.specs.openapi.negative.utils import can_negate, is_binary_format
 from schemathesis.transport.serialization import quote_all
+
+if TYPE_CHECKING:
+    from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 SLASH = "/"
 # Probability of generating valid headers in negative mode
@@ -475,7 +478,7 @@ def _maybe_set_optional_body(
 
 def _build_form_strategy_with_encoding(
     parameter: OpenApiBody,
-    operation: APIOperation,
+    operation: OpenApiOperation,
     generation_config: GenerationConfig,
     generation_mode: GenerationMode,
 ) -> st.SearchStrategy | None:
@@ -543,9 +546,6 @@ def _build_form_strategy_with_encoding(
             # This property has custom content type - will be handled separately
             continue
         else:
-            from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-            assert isinstance(operation.schema, OpenApiSchema)
             strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
             property_strategies[property_name] = strategy_factory(
                 subschema,

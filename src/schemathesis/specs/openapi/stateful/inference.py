@@ -84,7 +84,7 @@ class LinkInferencer:
         # NOTE: Use `matchit` for routing in the future
         rules = []
         operations = []
-        for method, path, definition in schema._operation_iter():
+        for method, path, definition in schema._operations.iter_operations():
             operation_id = definition.get("operationId")
             operation: OperationById | OperationByRef
             if operation_id:

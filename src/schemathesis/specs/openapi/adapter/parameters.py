@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.specs.openapi.extra_data_source import CapturedVariant, VariantUsageTracker
     from schemathesis.specs.openapi.negative.mutations import MutationTargetDescriptor
+    from schemathesis.specs.openapi.schemas import OpenApiOperation
     from schemathesis.specs.openapi.semantic_pool import LeafDescriptor, SemanticValueIndex
 
 
@@ -647,7 +648,7 @@ class OpenApiComponent(ABC):
 
         return examples
 
-    def _get_strategy_examples(self, operation: APIOperation) -> list[JsonValue]:
+    def _get_strategy_examples(self, operation: OpenApiOperation) -> list[JsonValue]:
         """Extract examples using proper OAS3 Example Object unpacking for the definition container.
 
         Unlike `_extract_examples`, uses `extract_inner_examples` which correctly handles
@@ -655,9 +656,7 @@ class OpenApiComponent(ABC):
         and resolving `$ref`s via the operation schema.
         """
         from schemathesis.specs.openapi.examples import extract_inner_examples
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
-        assert isinstance(operation.schema, OpenApiSchema)
         examples: list[JsonValue] = []
 
         container = self.definition.get(self.adapter.examples_container_keyword)
@@ -835,7 +834,7 @@ class OpenApiBody(OpenApiComponent):
 
     def get_strategy(
         self,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         generation_config: GenerationConfig,
         generation_mode: GenerationMode,
         extra_data_source: ExtraDataSource | None = None,
@@ -867,7 +866,6 @@ class OpenApiBody(OpenApiComponent):
 
         # Import here to avoid circular dependency
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         # Check for captured variants for hybrid approach
         captured_variants: list[CapturedVariant] | None = None
@@ -893,7 +891,6 @@ class OpenApiBody(OpenApiComponent):
                 schema=schema,
                 store=error_feedback,
             )
-        assert isinstance(operation.schema, OpenApiSchema)
         # Reuse the precomputed target walk recipes when the strategy is generating against
         # `optimized_schema` directly (no error-feedback adjustment fired).
         target_descriptors = (
@@ -1448,7 +1445,7 @@ class OpenApiParameterSet(ParameterSet):
 
     def get_strategy(
         self,
-        operation: APIOperation,
+        operation: OpenApiOperation,
         generation_config: GenerationConfig,
         generation_mode: GenerationMode,
         exclude: Iterable[str] = (),
@@ -1478,7 +1475,6 @@ class OpenApiParameterSet(ParameterSet):
             make_negative_strategy,
         )
         from schemathesis.specs.openapi.negative import GeneratedValue
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         def _quote_all_safe(value: dict[str, Any]) -> dict[str, Any]:
             """Quote path parameter values, preserving invalid inputs for later filtering."""
@@ -1524,7 +1520,6 @@ class OpenApiParameterSet(ParameterSet):
             # Nothing to negate - all properties were excluded
             strategy = st.none()
         else:
-            assert isinstance(operation.schema, OpenApiSchema)
             # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
             validation_schema_obj: JsonSchema | None = None
             if strategy_factory is make_negative_strategy:

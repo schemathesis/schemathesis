@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError, format_transition
@@ -12,6 +12,9 @@ from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import expressions
+
+if TYPE_CHECKING:
+    from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
 
@@ -52,13 +55,10 @@ class OpenApiLink:
         "_cached_extract",
     )
 
-    def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: APIOperation):
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
-
+    def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: OpenApiOperation):
         self.name = name
         self.status_code = status_code
         self.source = source
-        assert isinstance(source.schema, OpenApiSchema)
         errors = []
 
         get_operation: Callable[[str], APIOperation]

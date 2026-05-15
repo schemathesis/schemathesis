@@ -470,7 +470,7 @@ def graphql_cases(
     gql_mode = GqlMode.NEGATIVE if generation_mode == GenerationMode.NEGATIVE else GqlMode.POSITIVE
     effective_mode = generation_mode
     strategy = strategy_factory(
-        operation.schema.client_schema,  # type: ignore[attr-defined]
+        operation.schema.client_schema,
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
         print_ast=_noop,
@@ -489,7 +489,7 @@ def graphql_cases(
         # Fall back to positive mode when both modes are enabled
         effective_mode = GenerationMode.POSITIVE
         fallback_strategy = strategy_factory(
-            operation.schema.client_schema,  # type: ignore[attr-defined]
+            operation.schema.client_schema,
             fields=[definition.field_name],
             custom_scalars=custom_scalars,
             print_ast=_noop,
@@ -511,7 +511,7 @@ def graphql_cases(
             if random_source.random() < SUBSTITUTION_PROBABILITY:
                 substitute_pool_values(
                     operation_node=operation_node,
-                    client_schema=operation.schema.client_schema,  # type: ignore[attr-defined]
+                    client_schema=operation.schema.client_schema,
                     pool=extra_data_source,
                     random=random_source,
                 )
