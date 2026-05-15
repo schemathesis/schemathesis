@@ -15,6 +15,7 @@ import schemathesis
 from schemathesis.config import SanitizationConfig
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core.jsonschema import is_valid
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
@@ -60,6 +61,22 @@ class PhaseName(str, Enum):
 
 
 @dataclass(slots=True)
+class AuditError:
+    # Where in the audit the failure happened: `load_failed`, `operation_build_failed`,
+    # `stats_failed`, `html_report_failed`, `worker_crashed`, or `METHOD /path` for a
+    # per-operation generation failure.
+    stage: str
+    # Exception class name; None when the failure isn't an exception (e.g. a crashed worker
+    # whose cause we couldn't capture).
+    exception: str | None
+    message: str
+
+
+def error_from_exc(stage: str, exc: BaseException) -> AuditError:
+    return AuditError(stage=stage, exception=exc.__class__.__name__, message=str(exc))
+
+
+@dataclass(slots=True)
 class SchemaResult:
     api: str
     corpus: str
@@ -67,7 +84,7 @@ class SchemaResult:
     operations: int = 0
     cases_generated: int = 0
     duration_seconds: float = 0.0
-    errors: list[str] = field(default_factory=list)
+    errors: list[AuditError] = field(default_factory=list)
     # `(METHOD path, mode)` pairs the generator could not satisfy — distinguishes a real coverage
     # gap from a schema with nothing to exercise on that mode.
     unsatisfiable: list[tuple[str, str]] = field(default_factory=list)
@@ -76,6 +93,9 @@ class SchemaResult:
     uncovered_keywords: list[dict[str, Any]] = field(default_factory=list)
     # Spec-declared media types with no transport serializer and not on the explicit denylist.
     unknown_unsupported_media_types: list[str] = field(default_factory=list)
+    # Spec-declared inline `example` values that fail their own sibling schema. Schemathesis
+    # silently skips these, so leaving them in the `examples.total` denominator inflates gaps.
+    examples_invalid: int = 0
 
 
 @dataclass(slots=True)
@@ -145,6 +165,29 @@ def _strip_known_unsupported_media_types(raw_schema: dict[str, Any]) -> tuple[di
 
 def _is_response_gap(gap: dict[str, Any]) -> bool:
     return (gap.get("kind") or "").startswith("response_")
+
+
+def _count_invalid_examples(node: Any) -> int:
+    """Count inline `example` values that fail their sibling schema.
+
+    Mirrors tracecov's `examples.total` accounting (inline `example` only, not the plural
+    `examples` container) so the adjustment lines up with the bucket it modifies.
+    """
+    if isinstance(node, dict):
+        invalid = 0
+        if "example" in node:
+            sibling_schema = {k: v for k, v in node.items() if k not in ("example", "examples")}
+            if not is_valid(node["example"], sibling_schema):
+                invalid += 1
+        for key, value in node.items():
+            # Don't descend into example payloads themselves (data, not schema).
+            if key in ("example", "examples"):
+                continue
+            invalid += _count_invalid_examples(value)
+        return invalid
+    if isinstance(node, list):
+        return sum(_count_invalid_examples(item) for item in node)
+    return 0
 
 
 def _is_response_keyword(entry: dict[str, Any]) -> bool:
@@ -268,7 +311,7 @@ def audit_schema(
         schema = schemathesis.openapi.from_dict(filtered_schema)
         coverage_map = tracecov.CoverageMap.from_dict(filtered_schema)
     except Exception as exc:
-        result.errors.append(f"load_failed: {exc.__class__.__name__}: {exc}")
+        result.errors.append(error_from_exc("load_failed", exc))
         result.duration_seconds = time.monotonic() - started
         return AuditOutcome(result=result, coverage_map=None)
 
@@ -276,7 +319,7 @@ def audit_schema(
     for operation_result in schema.get_all_operations():
         if not isinstance(operation_result, Ok):
             err = operation_result.err()
-            result.errors.append(f"operation_build_failed: {err.__class__.__name__}: {err}")
+            result.errors.append(error_from_exc("operation_build_failed", err))
             continue
         operation = operation_result.ok()
         result.operations += 1
@@ -289,7 +332,7 @@ def audit_schema(
                 coverage_map.record_schemathesis_interactions(case.method, operation.full_path, [interaction])
                 result.cases_generated += 1
         except Exception as exc:
-            result.errors.append(f"{operation.method} {operation.full_path}: {exc.__class__.__name__}: {exc}")
+            result.errors.append(error_from_exc(f"{operation.method.upper()} {operation.full_path}", exc))
         for mode in unsatisfiable:
             result.unsatisfiable.append((f"{operation.method.upper()} {operation.full_path}", mode.value))
 
@@ -297,13 +340,18 @@ def audit_schema(
         statistic = coverage_map.statistic()
         # The audit ignores response coverage — no real responses are ever observed.
         statistic.pop("responses", None)
+        result.examples_invalid = _count_invalid_examples(filtered_schema)
+        if result.examples_invalid:
+            examples_bucket = statistic.get("examples")
+            if isinstance(examples_bucket, dict):
+                examples_bucket["total"] = max(0, int(examples_bucket.get("total", 0)) - result.examples_invalid)
         result.statistic = statistic
         result.gaps = [gap for gap in coverage_map.coverage_gaps() if not _is_response_gap(gap)]
         result.uncovered_keywords = [
             entry for entry in coverage_map.uncovered_keywords() if not _is_response_keyword(entry)
         ]
     except Exception as exc:
-        result.errors.append(f"stats_failed: {exc.__class__.__name__}: {exc}")
+        result.errors.append(error_from_exc("stats_failed", exc))
 
     result.duration_seconds = time.monotonic() - started
     return AuditOutcome(result=result, coverage_map=coverage_map)
