@@ -20,6 +20,7 @@ def setup() -> None:
     from hypothesis_jsonschema._canonicalise import merged as _original_merged
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
+    from schemathesis.core.compat import RefResolutionError
     from schemathesis.core.errors import InvalidSchema
     from schemathesis.core.jsonschema import (
         BUNDLE_STORAGE_KEY,
@@ -378,10 +379,13 @@ def setup() -> None:
                 ref = schema.get("$ref")
                 if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX) and len(schema) > 1:
                     return schema
-                # A ref-bearing fragment with no bundle root would crash on $ref resolution.
-                if _has_bundle_ref(schema):
-                    return schema
-            result = _original_canonicalish(schema)
+            try:
+                result = _original_canonicalish(schema)
+            except RefResolutionError:
+                # Bundle ref without the bundle root: only the deep resolution crashes;
+                # the structural canonicalization that already happened is discarded.
+                assert isinstance(schema, dict)
+                return schema
             if cache_key is not None:
                 _canonicalish_cache_set(cache_key, result)
             return result

@@ -399,3 +399,47 @@ def test_optional_nullable_emits_null_when_template_omits_it(ctx):
     opt_values = [c.body["opt"] for c in cases if isinstance(c.body, dict) and "opt" in c.body]
     assert None in opt_values
     assert any(isinstance(v, str) for v in opt_values)
+
+
+def test_enum_in_allof_base_with_sibling_ref_property_covers_every_value(ctx):
+    # `allOf:[base]` + sibling `properties` with a `$ref` (common in Azure specs).
+    # The bundled-ref short-circuit used to skip canonical allOf merging, dropping every
+    # enum value reachable only through the base.
+    operation = _load_json_body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Outer"},
+        components={
+            "schemas": {
+                "Base": {
+                    "type": "object",
+                    "properties": {"storageType": {"type": "string", "enum": ["A", "B"]}},
+                },
+                "Source": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "required": ["name"],
+                },
+                "PublishingProfile": {
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                    "type": "object",
+                    "properties": {"source": {"$ref": "#/components/schemas/Source"}},
+                    "required": ["source"],
+                },
+                "Outer": {
+                    "type": "object",
+                    "properties": {"pubProfile": {"$ref": "#/components/schemas/PublishingProfile"}},
+                    "required": ["pubProfile"],
+                },
+            }
+        },
+    )
+    cases = _collect_coverage_cases(operation, GenerationMode.POSITIVE)
+    seen = set()
+    for case in cases:
+        body = case.body
+        if not isinstance(body, dict):
+            continue
+        pub = body.get("pubProfile")
+        if isinstance(pub, dict) and isinstance(pub.get("storageType"), str):
+            seen.add(pub["storageType"])
+    assert seen == {"A", "B"}, f"Expected both enum values covered, got {seen!r}"
