@@ -293,6 +293,39 @@ def test_swagger2_array_query_param_with_top_level_enum(ctx):
         assert isinstance(c.query["purposes"], list), f"Expected list, got: {c.query['purposes']!r}"
 
 
+def test_swagger2_array_query_param_top_level_enum_constrains_items(ctx):
+    # Swagger 2.0 idiom: parameter-level `enum` on a `type: array` parameter constrains items.
+    schema = ctx.openapi.load_schema(
+        {
+            "/listings": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "status",
+                            "in": "query",
+                            "required": True,
+                            "type": "array",
+                            "collectionFormat": "multi",
+                            "enum": ["Active", "Pending", "Closed"],
+                            "items": {"type": "string"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    operation = schema["/listings"]["GET"]
+    cases = _collect_coverage_cases(operation, GenerationMode.POSITIVE)
+    items_seen: set[str] = set()
+    for case in cases:
+        value = case.query.get("status") if isinstance(case.query, dict) else None
+        if isinstance(value, list):
+            items_seen.update(item for item in value if isinstance(item, str))
+    assert items_seen == {"Active", "Pending", "Closed"}, f"Expected each enum value covered, got {items_seen!r}"
+
+
 def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
     # When a schema property has type:integer but also specifies minLength/maxLength
     operation = _load_json_body_operation(
