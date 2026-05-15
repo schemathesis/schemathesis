@@ -776,7 +776,7 @@ def generate_parameter(
     value = generated.value
     if value is not None and location == ParameterLocation.PATH:
         value = quote_all(value)
-        if operation.schema._path_decoder_strict:
+        if operation.schema._probe_state.path_decoder_strict:
             value = _strip_path_decoder_unsafe(value)
 
     used_generator: GenerationMode | None = generator

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.checks import CheckResult
+    from schemathesis.core.spec import SchemaMetadata
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
 
@@ -538,7 +539,7 @@ unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
 
 
-def _dispatch_schema_cascade(schema: BaseSchema, name: str, context: HookContext, *args: Any) -> None:
+def _dispatch_schema_cascade(schema: SchemaMetadata, name: str, context: HookContext, *args: Any) -> None:
     dispatchers: tuple[HookDispatcher, ...] = (GLOBAL_HOOK_DISPATCHER, schema.hooks)
     local = schema.get_local_hook_dispatcher()
     if local is not None:
@@ -546,11 +547,13 @@ def _dispatch_schema_cascade(schema: BaseSchema, name: str, context: HookContext
     _dispatch_to_all(name, dispatchers, context, *args)
 
 
-def dispatch_before_process_path(schema: BaseSchema, context: HookContext, path: str, methods: dict[str, Any]) -> None:
+def dispatch_before_process_path(
+    schema: SchemaMetadata, context: HookContext, path: str, methods: dict[str, Any]
+) -> None:
     _dispatch_schema_cascade(schema, "before_process_path", context, path, methods)
 
 
-def dispatch_before_init_operation(schema: BaseSchema, context: HookContext, operation: APIOperation) -> None:
+def dispatch_before_init_operation(schema: SchemaMetadata, context: HookContext, operation: APIOperation) -> None:
     _dispatch_schema_cascade(schema, "before_init_operation", context, operation)
 
 

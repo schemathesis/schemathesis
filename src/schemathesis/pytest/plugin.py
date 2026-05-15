@@ -52,6 +52,7 @@ from schemathesis.schemas import APIOperation
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
 
+    from schemathesis.core.spec import SchemaMetadata
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.pytest.reporting import PytestReportDispatcher
     from schemathesis.reporting.allure import AllureWriter, _AllureCallBuffer, _AllureHookForwarder
@@ -490,7 +491,7 @@ def pytest_configure(config: pytest.Config) -> None:
         config.pluginmanager.register(XdistReportingPlugin(), "schemathesis-xdist")
 
 
-def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]:
+def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]:
     from schemathesis.config._report import ReportFormat
     from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
@@ -548,7 +549,7 @@ def _write_to_writers(
             writer.write(recorder)
 
 
-def _register_allure_forwarder(item: pytest.Item, schema: BaseSchema) -> None:
+def _register_allure_forwarder(item: pytest.Item, schema: SchemaMetadata) -> None:
     """Register a per-item hook forwarder for dynamic allure API calls."""
     entry = item.config.stash[_CASSETTE_KEY].get(id(schema))
     if entry is None:
@@ -572,7 +573,7 @@ def _register_allure_forwarder(item: pytest.Item, schema: BaseSchema) -> None:
 
 def _push_to_xdist_workeroutput(
     workeroutput: dict,
-    schema: BaseSchema,
+    schema: SchemaMetadata,
     recorder: ScenarioRecorder,
     elapsed_sec: float,
     tags: list[str] | None = None,

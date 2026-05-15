@@ -9,10 +9,10 @@ if TYPE_CHECKING:
     import requests
 
     from schemathesis.checks import CheckResult
+    from schemathesis.core.spec import SchemaMetadata
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.hooks import HookContext
-    from schemathesis.schemas import BaseSchema
 
 
 class PytestReportDispatcher:
@@ -23,7 +23,7 @@ class PytestReportDispatcher:
     This separation keeps the dispatcher unchanged when xdist support is added later.
     """
 
-    def __init__(self, schema: BaseSchema) -> None:
+    def __init__(self, schema: SchemaMetadata) -> None:
         self._schema = schema
         self._recorders: dict[str, ScenarioRecorder] = {}
         self._start_times: dict[str, float] = {}
