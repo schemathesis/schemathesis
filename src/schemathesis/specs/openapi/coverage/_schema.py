@@ -1336,19 +1336,26 @@ def cover_schema_iter(
                                 location=ctx.current_path,
                             )
                     else:
+                        # Force the array to have one more item than allowed
+                        new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
+                        oversized: list | None = None
                         try:
-                            # Force the array to have one more item than allowed
-                            new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
-                            array_value = ctx.generate_from_schema(new_schema)
-                            if seen.insert(array_value):
-                                yield NegativeValue(
-                                    array_value,
-                                    scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
-                                    description="Array with more items than allowed by maxItems",
-                                    location=ctx.current_path,
-                                )
+                            oversized = ctx.generate_from_schema(new_schema)
                         except (InvalidArgument, Unsatisfiable):
-                            pass
+                            # `uniqueItems: true` over a finite items domain (e.g. enum) makes a
+                            # length-(max+1) unique array unsatisfiable; drop uniqueness so the
+                            # maxItems violation still ships, even if it also violates uniqueItems.
+                            if new_schema.get("uniqueItems"):
+                                relaxed = {k: v for k, v in new_schema.items() if k != "uniqueItems"}
+                                with suppress(InvalidArgument, Unsatisfiable):
+                                    oversized = ctx.generate_from_schema(relaxed)
+                        if oversized is not None and seen.insert(oversized):
+                            yield NegativeValue(
+                                oversized,
+                                scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
+                                description="Array with more items than allowed by maxItems",
+                                location=ctx.current_path,
+                            )
                 elif key == "minItems" and isinstance(value, int) and value > 0:
                     if value == 1:
                         # The 0-item case is structurally trivial. Skip the Hypothesis round-trip
