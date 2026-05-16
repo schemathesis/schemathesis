@@ -750,6 +750,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                     pattern_hash=leaf.pattern_hash,
                     normalized_name=leaf.normalized_name,
                     value=leaf.value,
+                    source_operation=operation.label,
                 )
 
     def record_successful_delete(
