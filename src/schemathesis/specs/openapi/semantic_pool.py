@@ -58,19 +58,28 @@ ALLOWED_FORMATS: dict[str, frozenset[str]] = {
 PoolValue = str | int | float
 
 
+class SemanticCandidate(NamedTuple):
+    value: PoolValue
+    source_operation: str
+
+
 @dataclass(slots=True)
 class BoundedValues:
-    """Dedup-on-insert ordered set, bounded by ``max_size``, with per-value draw recency."""
+    """Dedup-on-insert ordered set of (value, producing-op) pairs, bounded by ``max_size``.
+
+    First add wins: if the same value is later observed from a different operation, the
+    original ``source_operation`` is preserved.
+    """
 
     max_size: int = MAX_VALUES_PER_KEY
-    _values: dict[PoolValue, None] = field(default_factory=dict)
+    _values: dict[PoolValue, str] = field(default_factory=dict)
     _last_drawn: dict[PoolValue, int] = field(default_factory=dict)
     _step: int = 0
 
-    def add(self, value: PoolValue) -> None:
+    def add(self, value: PoolValue, source_operation: str) -> None:
         if value in self._values:
             return
-        self._values[value] = None
+        self._values[value] = source_operation
         if len(self._values) > self.max_size:
             evicted = next(iter(self._values))
             del self._values[evicted]
@@ -82,6 +91,9 @@ class BoundedValues:
 
     def values(self) -> tuple[PoolValue, ...]:
         return tuple(self._values)
+
+    def entries(self) -> tuple[SemanticCandidate, ...]:
+        return tuple(SemanticCandidate(value, op) for value, op in self._values.items())
 
     def __len__(self) -> int:
         return len(self._values)
@@ -104,14 +116,15 @@ class SemanticValueIndex:
         pattern_hash: str | None,
         normalized_name: str | None,
         value: PoolValue,
+        source_operation: str,
     ) -> None:
         with self._lock:
             if format_token is not None:
-                self.by_format.setdefault((type_token, format_token), BoundedValues()).add(value)
+                self.by_format.setdefault((type_token, format_token), BoundedValues()).add(value, source_operation)
             elif pattern_hash is not None:
-                self.by_pattern.setdefault((type_token, pattern_hash), BoundedValues()).add(value)
+                self.by_pattern.setdefault((type_token, pattern_hash), BoundedValues()).add(value, source_operation)
             elif normalized_name:
-                self.by_name.setdefault((type_token, normalized_name), BoundedValues()).add(value)
+                self.by_name.setdefault((type_token, normalized_name), BoundedValues()).add(value, source_operation)
 
     def lookup(
         self,
@@ -120,7 +133,7 @@ class SemanticValueIndex:
         format_token: str | None,
         pattern_hash: str | None,
         normalized_name: str | None,
-    ) -> tuple[PoolValue, ...]:
+    ) -> tuple[SemanticCandidate, ...]:
         # Short-circuit excluded formats so pattern/name fallbacks can't smuggle in an identity-shaped value
         # (e.g. a UUID stored under a name bucket because the producer omitted `format`).
         if format_token is not None and not is_pool_eligible(type_token=type_token, format_token=format_token):
@@ -129,15 +142,15 @@ class SemanticValueIndex:
             if format_token is not None:
                 bucket = self.by_format.get((type_token, format_token))
                 if bucket is not None and len(bucket) > 0:
-                    return bucket.values()
+                    return bucket.entries()
             if pattern_hash is not None:
                 bucket = self.by_pattern.get((type_token, pattern_hash))
                 if bucket is not None and len(bucket) > 0:
-                    return bucket.values()
+                    return bucket.entries()
             if normalized_name:
                 bucket = self.by_name.get((type_token, normalized_name))
                 if bucket is not None and len(bucket) > 0:
-                    return bucket.values()
+                    return bucket.entries()
             return ()
 
     def record_draw(

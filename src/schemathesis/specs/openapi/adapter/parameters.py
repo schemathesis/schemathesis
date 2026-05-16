@@ -163,7 +163,8 @@ def build_semantic_overlay(
             )
             if not candidates:
                 continue
-            value = draw(st.sampled_from(candidates))
+            candidate = draw(st.sampled_from(candidates))
+            value = candidate.value
             if validator is not None and not _example_is_valid(value, validator):
                 continue
             if not copied:
@@ -193,6 +194,7 @@ def build_semantic_overlay(
                     pattern_hash=descriptor.pattern_hash,
                     normalized_name=descriptor.normalized_name,
                     value=value,
+                    source_operation=candidate.source_operation,
                 )
             )
         if new_draws is None and not isinstance(base, GeneratedValue):

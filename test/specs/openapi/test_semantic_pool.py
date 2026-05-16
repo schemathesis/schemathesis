@@ -25,6 +25,7 @@ from schemathesis.specs.openapi.semantic_pool import (
     BoundedValues,
     IngestionLeaf,
     LeafDescriptor,
+    SemanticCandidate,
     SemanticValueIndex,
     is_pool_eligible,
     iter_consumer_leaves,
@@ -52,25 +53,32 @@ def test_is_pool_eligible_string(format_token, expected):
 
 def test_bounded_values_add_dedups():
     bounded = BoundedValues(max_size=10)
-    bounded.add("a")
-    bounded.add("a")
-    bounded.add("b")
+    bounded.add("a", "GET /producer")
+    bounded.add("a", "GET /producer")
+    bounded.add("b", "GET /producer")
     assert bounded.values() == ("a", "b")
 
 
 def test_bounded_values_evicts_oldest_above_cap():
     bounded = BoundedValues(max_size=3)
     for value in ["a", "b", "c", "d"]:
-        bounded.add(value)
+        bounded.add(value, "GET /producer")
     assert bounded.values() == ("b", "c", "d")
 
 
 def test_bounded_values_record_draw_does_not_change_order():
     bounded = BoundedValues(max_size=10)
-    bounded.add("a")
-    bounded.add("b")
+    bounded.add("a", "GET /producer")
+    bounded.add("b", "GET /producer")
     bounded.record_draw("a")
     assert bounded.values() == ("a", "b")
+
+
+def test_bounded_values_preserves_first_source_operation():
+    bounded = BoundedValues(max_size=10)
+    bounded.add("a", "GET /first")
+    bounded.add("a", "GET /second")
+    assert bounded.entries() == (SemanticCandidate("a", "GET /first"),)
 
 
 @pytest.mark.parametrize(
@@ -90,6 +98,7 @@ def test_index_routes_to_expected_bucket(format_token, pattern_hash_value, norma
         pattern_hash=pattern_hash_value,
         normalized_name=normalized_name,
         value="value",
+        source_operation="GET /producer",
     )
     bucket_name, key = expected_key
     buckets = {"by_format": index.by_format, "by_pattern": index.by_pattern, "by_name": index.by_name}
@@ -101,22 +110,60 @@ def test_index_routes_to_expected_bucket(format_token, pattern_hash_value, norma
 
 def test_lookup_priority_format_beats_name():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token="email", pattern_hash=None, normalized_name="email", value="a@b.com")
-    index.add(type_token="string", format_token=None, pattern_hash=None, normalized_name="email", value="not-email")
+    index.add(
+        type_token="string",
+        format_token="email",
+        pattern_hash=None,
+        normalized_name="email",
+        value="a@b.com",
+        source_operation="GET /users",
+    )
+    index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash=None,
+        normalized_name="email",
+        value="not-email",
+        source_operation="GET /users",
+    )
     assert index.lookup(type_token="string", format_token="email", pattern_hash=None, normalized_name="email") == (
-        "a@b.com",
+        SemanticCandidate("a@b.com", "GET /users"),
     )
 
 
 def test_lookup_falls_back_to_pattern_when_format_empty():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token=None, pattern_hash="hash", normalized_name=None, value="v1")
-    assert index.lookup(type_token="string", format_token="email", pattern_hash="hash", normalized_name=None) == ("v1",)
+    index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash="hash",
+        normalized_name=None,
+        value="v1",
+        source_operation="GET /producer",
+    )
+    assert index.lookup(type_token="string", format_token="email", pattern_hash="hash", normalized_name=None) == (
+        SemanticCandidate("v1", "GET /producer"),
+    )
 
 
 def test_lookup_returns_empty_tuple_when_no_match():
     index = SemanticValueIndex()
     assert index.lookup(type_token="string", format_token="email", pattern_hash=None, normalized_name="email") == ()
+
+
+def test_index_add_tags_value_with_source_operation():
+    index = SemanticValueIndex()
+    index.add(
+        type_token="string",
+        format_token="email",
+        pattern_hash=None,
+        normalized_name="email",
+        value="alice@example.com",
+        source_operation="POST /api/users",
+    )
+    assert index.lookup(type_token="string", format_token="email", pattern_hash=None, normalized_name="email") == (
+        SemanticCandidate("alice@example.com", "POST /api/users"),
+    )
 
 
 def test_walker_yields_email_from_object_property():
@@ -403,11 +450,14 @@ def _ingest_2xx(operation, *, body, extra_data_source, case_factory, response_fa
 
 
 def _lookup_by_descriptor(index, descriptor):
-    return index.lookup(
-        type_token=descriptor.type,
-        format_token=descriptor.format,
-        pattern_hash=descriptor.pattern_hash,
-        normalized_name=descriptor.normalized_name,
+    return tuple(
+        candidate.value
+        for candidate in index.lookup(
+            type_token=descriptor.type,
+            format_token=descriptor.format,
+            pattern_hash=descriptor.pattern_hash,
+            normalized_name=descriptor.normalized_name,
+        )
     )
 
 
@@ -421,8 +471,9 @@ def _extra_data_source_for(ctx, schema_dict):
 
 def test_record_response_populates_semantic_index(ctx, case_factory, response_factory):
     schema, extra_data_source = _extra_data_source_for(ctx, _PRODUCER_SCHEMA)
+    operation = schema["/api/produce"]["GET"]
     _ingest_2xx(
-        schema["/api/produce"]["GET"],
+        operation,
         body={"contact": "alice@example.com"},
         extra_data_source=extra_data_source,
         case_factory=case_factory,
@@ -430,7 +481,7 @@ def test_record_response_populates_semantic_index(ctx, case_factory, response_fa
     )
     assert extra_data_source.semantic_index.lookup(
         type_token="string", format_token="email", pattern_hash=None, normalized_name="contact"
-    ) == ("alice@example.com",)
+    ) == (SemanticCandidate("alice@example.com", operation.label),)
 
 
 def test_record_response_skips_non_2xx(ctx, case_factory, response_factory):
@@ -490,11 +541,14 @@ def test_record_response_excludes_path_parameter_names(ctx, case_factory, respon
         )
     )
     extra_data_source.record_response(operation=operation, response=response, case=case)
-    pool = extra_data_source.semantic_index.lookup(
-        type_token="string", format_token="email", pattern_hash=None, normalized_name="email"
-    )
-    assert "x@y.com" not in pool
-    assert "owner@example.com" in pool
+    pool_values = {
+        candidate.value
+        for candidate in extra_data_source.semantic_index.lookup(
+            type_token="string", format_token="email", pattern_hash=None, normalized_name="email"
+        )
+    }
+    assert "x@y.com" not in pool_values
+    assert "owner@example.com" in pool_values
 
 
 def test_scenario_email_cross_operation_flow(ctx, case_factory, response_factory):
@@ -1125,6 +1179,7 @@ def test_overlay_skips_candidate_violating_consumer_constraint():
         pattern_hash=None,
         normalized_name="email",
         value=too_long,
+        source_operation="GET /producer",
     )
     descriptor = LeafDescriptor(
         path=("recipient_email",),
@@ -1251,6 +1306,7 @@ def test_lookup_blocks_name_fallback_for_excluded_format():
         pattern_hash=None,
         normalized_name="id",
         value="550e8400-e29b-41d4-a716-446655440000",
+        source_operation="GET /producer",
     )
     assert index.lookup(type_token="string", format_token="uuid", pattern_hash=None, normalized_name="id") == ()
 
@@ -1355,6 +1411,7 @@ def test_overlay_validates_against_container_when_substitution_violates_parent_c
         pattern_hash=None,
         normalized_name="email",
         value=blocked,
+        source_operation="GET /producer",
     )
     descriptor = LeafDescriptor(
         path=("email",),
@@ -1444,6 +1501,7 @@ def test_overlay_does_not_mutate_shared_example_dict():
         pattern_hash=None,
         normalized_name="email",
         value="harvested@example.com",
+        source_operation="GET /producer",
     )
     descriptor = LeafDescriptor(
         path=("email",),
@@ -1652,6 +1710,7 @@ def test_parameter_set_strategy_does_not_leak_generated_value_through_filter(ctx
         pattern_hash=None,
         normalized_name="label",
         value="harvested",
+        source_operation="GET /producer",
     )
     parameter_set = operation.query
     config = schema.config.generation_for(operation=operation, phase="fuzzing")
@@ -1725,6 +1784,7 @@ def _email_provenance_setup():
         pattern_hash=None,
         normalized_name="email",
         value="harvested@example.com",
+        source_operation="GET /producer",
     )
     descriptor = LeafDescriptor(
         path=("email",),
@@ -1769,6 +1829,7 @@ def test_overlay_records_semantic_draw_when_substitution_fires():
                 pattern_hash=None,
                 normalized_name="email",
                 value="harvested@example.com",
+                source_operation="GET /producer",
             ),
         )
         assert value.value == {"email": "harvested@example.com"}
@@ -1802,7 +1863,14 @@ def test_overlay_emits_no_semantic_draws_when_index_is_empty():
 
 def test_add_is_noop_when_no_key_is_provided():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token=None, pattern_hash=None, normalized_name=None, value="orphan")
+    index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash=None,
+        normalized_name=None,
+        value="orphan",
+        source_operation="GET /producer",
+    )
     assert not index.by_format
     assert not index.by_pattern
     assert not index.by_name
@@ -1815,9 +1883,16 @@ def test_lookup_returns_empty_when_all_keys_are_none():
 
 def test_lookup_falls_through_pattern_to_name_when_pattern_bucket_is_absent():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token=None, pattern_hash=None, normalized_name="city", value="Berlin")
+    index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash=None,
+        normalized_name="city",
+        value="Berlin",
+        source_operation="GET /producer",
+    )
     assert index.lookup(type_token="string", format_token=None, pattern_hash="missing", normalized_name="city") == (
-        "Berlin",
+        SemanticCandidate("Berlin", "GET /producer"),
     )
 
 
@@ -1825,22 +1900,34 @@ def test_record_draw_uses_pattern_bucket_when_only_pattern_is_provided():
     phone_hash = pattern_hash("^\\+\\d+$")
     index = SemanticValueIndex()
     index.add(
-        type_token="string", format_token=None, pattern_hash=phone_hash, normalized_name=None, value="+12025551234"
+        type_token="string",
+        format_token=None,
+        pattern_hash=phone_hash,
+        normalized_name=None,
+        value="+12025551234",
+        source_operation="GET /producer",
     )
     index.record_draw(
         type_token="string", format_token=None, pattern_hash=phone_hash, normalized_name=None, value="+12025551234"
     )
     assert index.lookup(type_token="string", format_token=None, pattern_hash=phone_hash, normalized_name=None) == (
-        "+12025551234",
+        SemanticCandidate("+12025551234", "GET /producer"),
     )
 
 
 def test_record_draw_uses_name_bucket_when_only_name_is_provided():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token=None, pattern_hash=None, normalized_name="city", value="Berlin")
+    index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash=None,
+        normalized_name="city",
+        value="Berlin",
+        source_operation="GET /producer",
+    )
     index.record_draw(type_token="string", format_token=None, pattern_hash=None, normalized_name="city", value="Berlin")
     assert index.lookup(type_token="string", format_token=None, pattern_hash=None, normalized_name="city") == (
-        "Berlin",
+        SemanticCandidate("Berlin", "GET /producer"),
     )
 
 
@@ -2031,7 +2118,14 @@ def test_consumer_walker_returns_empty_for_top_level_primitive_schema():
 
 def test_overlay_returns_base_unchanged_when_inner_yields_non_dict():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token="email", pattern_hash=None, normalized_name="email", value="x@y.com")
+    index.add(
+        type_token="string",
+        format_token="email",
+        pattern_hash=None,
+        normalized_name="email",
+        value="x@y.com",
+        source_operation="GET /producer",
+    )
     descriptor = LeafDescriptor(
         path=("email",),
         type="string",
@@ -2055,7 +2149,14 @@ def test_overlay_returns_base_unchanged_when_inner_yields_non_dict():
 
 def test_overlay_skips_substitution_when_descriptor_path_is_absent_from_body():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token="email", pattern_hash=None, normalized_name="email", value="x@y.com")
+    index.add(
+        type_token="string",
+        format_token="email",
+        pattern_hash=None,
+        normalized_name="email",
+        value="x@y.com",
+        source_operation="GET /producer",
+    )
     descriptors = [
         LeafDescriptor(
             path=("missing_email",),
@@ -2093,6 +2194,7 @@ def test_overlay_unwraps_inner_generated_value_and_appends_semantic_draws():
         pattern_hash=None,
         normalized_name="email",
         value="harvested@example.com",
+        source_operation="GET /producer",
     )
     descriptor = LeafDescriptor(
         path=("email",),
@@ -2127,6 +2229,7 @@ def test_overlay_records_multiple_substitutions_in_a_single_draw():
             pattern_hash=None,
             normalized_name=normalized,
             value=f"{normalized}@example.com",
+            source_operation="GET /producer",
         )
     descriptors = [
         LeafDescriptor(
@@ -2212,6 +2315,7 @@ def test_overlay_continues_when_descriptor_schema_breaks_validator_construction(
         pattern_hash="hash-1",
         normalized_name="phone",
         value="+12025551234",
+        source_operation="GET /producer",
     )
     descriptor = LeafDescriptor(
         path=("phone",),
@@ -2240,7 +2344,14 @@ def test_overlay_continues_when_descriptor_schema_breaks_validator_construction(
 
 def test_overlay_continues_when_container_validator_construction_fails():
     index = SemanticValueIndex()
-    index.add(type_token="string", format_token="email", pattern_hash=None, normalized_name="email", value="x@y.com")
+    index.add(
+        type_token="string",
+        format_token="email",
+        pattern_hash=None,
+        normalized_name="email",
+        value="x@y.com",
+        source_operation="GET /producer",
+    )
     descriptor = LeafDescriptor(
         path=("email",),
         type="string",

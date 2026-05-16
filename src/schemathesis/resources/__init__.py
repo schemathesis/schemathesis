@@ -35,6 +35,7 @@ class SemanticDraw:
     pattern_hash: str | None
     normalized_name: str
     value: str | int | float
+    source_operation: str
 
 
 @dataclass(slots=True, frozen=True)

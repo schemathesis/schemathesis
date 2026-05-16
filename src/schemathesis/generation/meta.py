@@ -312,6 +312,7 @@ class CaseMetadata:
                     "pattern_hash": draw.pattern_hash,
                     "normalized_name": draw.normalized_name,
                     "value": draw.value,
+                    "source_operation": draw.source_operation,
                 }
                 for draw in self.semantic_draws
             ],
@@ -349,6 +350,7 @@ class CaseMetadata:
                 pattern_hash=draw["pattern_hash"],
                 normalized_name=draw["normalized_name"],
                 value=draw["value"],
+                source_operation=draw["source_operation"],
             )
             for draw in data.get("semantic_draws", [])
         )
