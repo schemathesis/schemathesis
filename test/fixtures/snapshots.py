@@ -304,15 +304,26 @@ class CliSnapshotConfig:
 
 
 def clean_unit_tests(lines):
+    capabilities_idx = None
     for idx, line in enumerate(lines):
         if "API capabilities" in line:
-            probing_idx = idx + 4
+            capabilities_idx = idx
             break
         if "API probing" in line:
+            # No capability block follows; probing failed/skipped.
             probing_idx = idx + 2
             break
     else:
         return lines
+
+    if capabilities_idx is not None:
+        # Keep every row of the capability block up to the next phase marker rather than
+        # trimming to a fixed line count; lets future capability rows render without losing them.
+        probing_idx = capabilities_idx + 1
+        while probing_idx < len(lines) and not any(
+            f"{phase} (in" in lines[probing_idx] for phase in ("Examples", "Coverage", "Fuzzing")
+        ):
+            probing_idx += 1
 
     indices = []
     for idx, line in enumerate(lines[probing_idx:], start=probing_idx):
