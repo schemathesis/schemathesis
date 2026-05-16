@@ -5,7 +5,7 @@ import json
 import string
 from collections.abc import Mapping
 from itertools import product
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, overload
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -13,6 +13,30 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 # HTTP headers in wire form: lowercased name -> list of values. The list shape
 # preserves repeated headers (Set-Cookie, Vary, ...) that a flat dict would collapse.
 Headers: TypeAlias = dict[str, list[str]]
+
+# Wire-form HTTP method (uppercase). `Case.method` and user-facing API surfaces use this.
+HttpMethod: TypeAlias = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "QUERY"]
+_HTTP_METHODS: frozenset[str] = frozenset(
+    {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "QUERY"}
+)
+
+# Schema-form HTTP method (lowercase). OpenAPI declares operations under lowercase verb keys,
+# so `APIOperation.method` carries this form; the wire `HttpMethod` is its uppercase counterpart.
+HttpMethodSchema: TypeAlias = Literal["get", "post", "put", "patch", "delete", "head", "options", "trace", "query"]
+_HTTP_METHODS_SCHEMA: frozenset[str] = frozenset(
+    {"get", "post", "put", "patch", "delete", "head", "options", "trace", "query"}
+)
+
+
+def is_http_method_schema(value: str) -> TypeGuard[HttpMethodSchema]:
+    """Narrow a string to `HttpMethodSchema` when it matches a supported lowercase method."""
+    return value in _HTTP_METHODS_SCHEMA
+
+
+# OpenAPI status code key — concrete (`"200"`), class wildcard (`"2XX"`), or fallback (`"default"`).
+# Used in response definitions and check configuration.
+StatusCodePattern: TypeAlias = str
+
 
 if TYPE_CHECKING:
     import httpx
@@ -107,6 +131,12 @@ class Response:
         self.encoding = encoding
         self._override = _override
 
+    @overload
+    @classmethod
+    def from_any(cls, response: Response) -> Response: ...
+    @overload
+    @classmethod
+    def from_any(cls, response: httpx.Response | requests.Response | TestResponse) -> Response: ...
     @classmethod
     def from_any(cls, response: Response | httpx.Response | requests.Response | TestResponse) -> Response:
         import httpx
@@ -235,7 +265,7 @@ class Response:
         return self._encoded_body
 
 
-def expand_status_code(status_code: str | int) -> list[int]:
+def expand_status_code(status_code: StatusCodePattern | int) -> list[int]:
     """Expand OpenAPI status code patterns like '2XX' or 'default' into concrete codes.
 
     Args:
@@ -249,7 +279,7 @@ def expand_status_code(status_code: str | int) -> list[int]:
     return [int("".join(expanded)) for expanded in product(*chars)]
 
 
-def status_code_matches(pattern: str, response_code: int) -> bool:
+def status_code_matches(pattern: StatusCodePattern, response_code: int) -> bool:
     """Check if a response status code matches an OpenAPI status code pattern.
 
     Args:

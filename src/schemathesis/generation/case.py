@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from jsonschema_rs import Validator
 
@@ -13,7 +13,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
-from schemathesis.core.transport import Response, prepare_urlencoded
+from schemathesis.core.transport import HttpMethod, Response, prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.engine import Status
 from schemathesis.generation import generate_random_case_id
@@ -61,12 +61,15 @@ def _contains_bytes(value: Body) -> bool:
     return False
 
 
+OperationT = TypeVar("OperationT", bound="APIOperation")
+
+
 @dataclass
-class Case:
+class Case(Generic[OperationT]):
     """Generated test case data for a single API operation."""
 
-    operation: APIOperation
-    method: str
+    operation: OperationT
+    method: HttpMethod
     """HTTP verb (`GET`, `POST`, etc.)"""
     path: str
     """Path template from schema (e.g., `/users/{user_id}`)"""
@@ -117,8 +120,8 @@ class Case:
 
     def __init__(
         self,
-        operation: APIOperation,
-        method: str,
+        operation: OperationT,
+        method: HttpMethod,
         path: str,
         *,
         id: str | None = None,

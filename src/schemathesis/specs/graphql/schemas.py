@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass
 from difflib import get_close_matches
+from functools import cached_property
 from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
@@ -61,7 +62,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.spec import ApiSchema
-    from schemathesis.core.transport import Response
+    from schemathesis.core.transport import HttpMethod, Response
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.run import Phase
@@ -244,13 +245,11 @@ class GraphQLSchema(BaseSchema):
 
         return LayeredScheduler(layers, errors=errors)
 
-    @property
+    @cached_property
     def client_schema(self) -> graphql.GraphQLSchema:
         import graphql
 
-        if not hasattr(self, "_client_schema"):
-            self._client_schema = graphql.build_client_schema(self.raw_schema)
-        return self._client_schema
+        return graphql.build_client_schema(self.raw_schema)
 
     @property
     @override
@@ -271,7 +270,7 @@ class GraphQLSchema(BaseSchema):
             base_url=self.get_base_url(),
             path=self.base_path,
             label="",
-            method="POST",
+            method="post",
             schema=self,
             responses=GraphQLResponses(),
             security=None,
@@ -325,7 +324,7 @@ class GraphQLSchema(BaseSchema):
             base_url=self.get_base_url(),
             path=self.base_path,
             label=f"{operation_type.name}.{field_name}",
-            method="POST",
+            method="post",
             app=self.app,
             schema=self,
             responses=GraphQLResponses(),
@@ -365,7 +364,7 @@ class GraphQLSchema(BaseSchema):
         self,
         *,
         operation: APIOperation,
-        method: str | None = None,
+        method: HttpMethod | None = None,
         path: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
@@ -378,7 +377,7 @@ class GraphQLSchema(BaseSchema):
     ) -> Case:
         return Case(
             operation=operation,
-            method=method or operation.method.upper(),
+            method=method or cast("HttpMethod", operation.method.upper()),
             path=path or operation.path,
             path_parameters=path_parameters or {},
             headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),

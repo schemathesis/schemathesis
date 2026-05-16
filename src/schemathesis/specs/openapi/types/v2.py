@@ -7,7 +7,7 @@ from typing import Any, Literal, TypeAlias
 
 from typing_extensions import NotRequired, TypedDict
 
-from schemathesis.specs.openapi.types.common import Reference, SchemaOrRef, _SecurityTypeKey
+from schemathesis.specs.openapi.types.common import OperationSecurity, Reference, SchemaOrRef, _SecurityTypeKey
 
 
 class BodyParameter(TypedDict):
@@ -113,10 +113,18 @@ Responses: TypeAlias = Mapping[str, ResponseOrRef]
 
 
 class Operation(TypedDict):
-    responses: Responses
+    responses: NotRequired[Responses]
     parameters: NotRequired[list[Parameter]]
     consumes: NotRequired[list[str]]
     produces: NotRequired[list[str]]
+    operationId: NotRequired[str]
+    tags: NotRequired[list[str]]
+    security: NotRequired[OperationSecurity]
+    deprecated: NotRequired[bool]
+    summary: NotRequired[str]
+    description: NotRequired[str]
+    externalDocs: NotRequired[dict[str, Any]]
+    schemes: NotRequired[list[str]]
 
 
 # Security parameter types

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError, format_transition
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import ContainerName, ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
@@ -26,7 +26,7 @@ class NormalizedParameter:
     location: ParameterLocation | None
     name: str
     expression: str
-    container_name: str
+    container_name: ContainerName
     is_required: bool
 
 
@@ -152,7 +152,7 @@ class OpenApiLink:
             result.append(NormalizedParameter(location, name, expression, container_name, is_required=is_required))
         return result
 
-    def _get_parameter_container(self, location: ParameterLocation | None, name: str) -> str:
+    def _get_parameter_container(self, location: ParameterLocation | None, name: str) -> ContainerName:
         """Resolve parameter container either from explicit location or by looking up in target operation."""
         if location:
             return location.container_name
@@ -175,13 +175,13 @@ class OpenApiLink:
             request_body=self.extract_body(output),
         )
 
-    def extract_parameters(self, output: StepOutput) -> dict[str, dict[str, ExtractedParam]]:
+    def extract_parameters(self, output: StepOutput) -> dict[ContainerName, dict[str, ExtractedParam]]:
         """Extract parameters using runtime expressions.
 
         Returns a two-level dictionary: container -> parameter name -> extracted value
         """
         eval_fn = expressions.evaluate_wildcard if self.is_inferred else expressions.evaluate
-        extracted: dict[str, dict[str, ExtractedParam]] = {}
+        extracted: dict[ContainerName, dict[str, ExtractedParam]] = {}
         for parameter in self.parameters:
             container = extracted.setdefault(parameter.container_name, {})
             value: Result[Any, Exception]

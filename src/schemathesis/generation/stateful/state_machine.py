@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from schemathesis.checks import CheckResult
+    from schemathesis.core.parameters import ContainerName
     from schemathesis.hooks import HookContext
     from schemathesis.schemas import BaseSchema
 
@@ -77,7 +78,7 @@ class Transition:
     id: str
     parent_id: str
     is_inferred: bool
-    parameters: dict[str, dict[str, ExtractedParam]]
+    parameters: dict[ContainerName, dict[str, ExtractedParam]]
     request_body: ExtractedParam | None
 
     __slots__ = ("id", "parent_id", "is_inferred", "parameters", "request_body")
