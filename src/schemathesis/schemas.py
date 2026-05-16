@@ -543,6 +543,12 @@ class BaseSchema(Mapping):
         """Apply spec-specific transformations to a generated body before sending."""
         return body
 
+    def evaluate_server_error(self, case: Case, response: Response) -> None:
+        """Raise a Failure if the schema's own conventions classify this response as a server error.
+
+        Default no-op; specs whose errors aren't fully captured by HTTP status (e.g. GraphQL 200 + errors body) override.
+        """
+
     def adapt_to_null_byte_in_header_failure(self) -> None:
         """React to the engine probe finding that null bytes in headers crash the app under test."""
 

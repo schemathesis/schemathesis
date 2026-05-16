@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass
@@ -60,6 +61,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.spec import ApiSchema
+    from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.run import Phase
@@ -395,6 +397,36 @@ class GraphQLSchema(BaseSchema):
     @override
     def validate(self) -> None:
         return None
+
+    @override
+    def evaluate_server_error(self, case: Case, response: Response) -> None:
+        from schemathesis.core.failures import AcceptedNegativeData, MalformedJson
+        from schemathesis.graphql.checks import GraphQLClientError
+        from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
+
+        is_negative_mode = case.meta is not None and case.meta.generation.mode.is_negative
+        try:
+            data = response.json()
+            if is_negative_mode:
+                errors = data.get("errors")
+                if errors is None or len(errors) == 0:
+                    description = ""
+                    if case.meta and case.meta.phase.data.description:
+                        description = f"\n{case.meta.phase.data.description}"
+                    raise AcceptedNegativeData(
+                        operation=case.operation.label,
+                        message=f"Invalid data should have been rejected by GraphQL schema validation{description}",
+                        status_code=response.status_code,
+                        expected_statuses=[],
+                    )
+                if is_client_error(data):
+                    return
+            validate_graphql_response(case, data)
+        except GraphQLClientError:
+            if not is_negative_mode:
+                raise
+        except json.JSONDecodeError as exc:
+            raise MalformedJson.from_exception(operation=case.operation.label, exc=exc) from None
 
 
 @dataclass

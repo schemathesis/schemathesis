@@ -5,10 +5,6 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class RuntimeProbeState:
-    """Mutable state populated by engine-side probes during a run.
-
-    Schemas hold a `RuntimeProbeState` for cross-phase persistence within a single run. Engine probes
-    write into it; generation strategies read from it. Outside an engine run, the state stays at defaults.
-    """
+    """Mutable state populated by engine probes; read by generation strategies. Defaults outside a run."""
 
     path_decoder_strict: bool = False

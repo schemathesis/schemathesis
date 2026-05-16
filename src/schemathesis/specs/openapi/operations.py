@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator, Iterator, Sequence
-from types import SimpleNamespace
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import jsonschema_rs
@@ -38,13 +38,31 @@ SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSc
 _V3_1 = version.parse("3.1")
 
 
-class OperationLoader:
-    """Owns OpenAPI operation iteration, construction, and the statistic walk over `paths`."""
+@dataclass(slots=True)
+class _FilterContext:
+    """`HasAPIOperation` wrapper; the inner operation is mutated per candidate during filtering."""
 
-    __slots__ = ("schema",)
+    operation: APIOperation
+
+
+class OperationLoader:
+    """OpenAPI operation iteration, construction, and the statistic walk over `paths`."""
+
+    __slots__ = ("schema", "_filter_context")
 
     def __init__(self, schema: OpenApiSchema) -> None:
         self.schema = schema
+        # Filter hot path mutates the shared operation's identity fields instead of allocating a fresh one per call.
+        filter_operation: APIOperation = APIOperation(
+            method="",
+            path="",
+            label="",
+            definition=OperationDefinition(raw=None),
+            schema=schema,
+            responses=None,
+            security=None,
+        )
+        self._filter_context = _FilterContext(operation=filter_operation)
 
     def iter_all(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Yield every operation as `Ok` or `Err`.
@@ -212,36 +230,19 @@ class OperationLoader:
 
         return statistic
 
-    def _should_skip(
-        self,
-        path: str,
-        method: str,
-        definition: dict[str, Any],
-        _ctx_cache: SimpleNamespace = SimpleNamespace(
-            operation=APIOperation(
-                method="",
-                path="",
-                label="",
-                definition=OperationDefinition(raw=None),
-                schema=None,
-                responses=None,
-                security=None,
-            )
-        ),
-    ) -> bool:
+    def _should_skip(self, path: str, method: str, definition: dict[str, Any]) -> bool:
         if method not in HTTP_METHODS:
             return True
         schema = self.schema
         if schema.filter_set.is_empty():
             return False
-        # Attribute assignment is way faster than creating a new namespace every time
-        operation = _ctx_cache.operation
+        context = self._filter_context
+        operation = context.operation
         operation.method = method
         operation.path = path
         operation.label = f"{method.upper()} {path}"
         operation.definition.raw = definition
-        operation.schema = schema
-        return not schema.filter_set.match(_ctx_cache)
+        return not schema.filter_set.match(context)
 
     def _iter_parameters(
         self,
