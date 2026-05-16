@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
+from schemathesis.engine._lazy import LazyInit
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.link_calibration import LinkCalibrationState
@@ -75,11 +76,11 @@ class EngineContext:
         self.observations = observations
         self._thread_local = threading.local()
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
-        self._extra_data_source: ExtraDataSource | None = None
+        self._extra_data_source = LazyInit.UNSET
         self._extra_data_source_lock = threading.Lock()
-        self._error_feedback: ErrorFeedbackStore | None = None
+        self._error_feedback = LazyInit.UNSET
         self._error_feedback_lock = threading.Lock()
-        self._supervisor: Supervisor | None = None
+        self._supervisor = LazyInit.UNSET
         self._supervisor_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
@@ -166,39 +167,17 @@ class EngineContext:
         kwargs["session"] = self.get_session(operation=operation)
         return kwargs
 
-    @property
-    def extra_data_source(self) -> ExtraDataSource | None:
-        """Extra data source for augmenting test generation with real data.
+    # Extra data source for augmenting test generation with real data.
+    # Lazily initialized to support per-operation configuration overrides.
+    extra_data_source: LazyInit[ExtraDataSource | None] = LazyInit(lambda ctx: ctx.schema.create_extra_data_source())
 
-        Lazily initialized to support per-operation configuration overrides.
-        """
-        # First check without lock (fast path for already initialized)
-        if self._extra_data_source is None:
-            with self._extra_data_source_lock:
-                # Double-check pattern: another thread might have initialized it while we waited for the lock
-                if self._extra_data_source is None:
-                    self._extra_data_source = self.schema.create_extra_data_source()
-        return self._extra_data_source
+    # Store of parser observations from 4xx responses; returns `None` when disabled by config.
+    error_feedback: LazyInit[ErrorFeedbackStore | None] = LazyInit(
+        lambda ctx: ErrorFeedbackStore() if ctx.config.phases.fuzzing.error_feedback.is_enabled else None
+    )
 
-    @property
-    def error_feedback(self) -> ErrorFeedbackStore | None:
-        """Store of parser observations from 4xx responses."""
-        if not self.config.phases.fuzzing.error_feedback.is_enabled:
-            return None
-        if self._error_feedback is None:
-            with self._error_feedback_lock:
-                if self._error_feedback is None:
-                    self._error_feedback = ErrorFeedbackStore()
-        return self._error_feedback
-
-    @property
-    def supervisor(self) -> Supervisor:
-        """Per-operation runtime supervisor that issues scheduling directives based on observed signals."""
-        if self._supervisor is None:
-            with self._supervisor_lock:
-                if self._supervisor is None:
-                    self._supervisor = Supervisor()
-        return self._supervisor
+    # Per-operation runtime supervisor that issues scheduling directives based on observed signals.
+    supervisor: LazyInit[Supervisor] = LazyInit(lambda ctx: Supervisor())
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:

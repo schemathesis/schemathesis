@@ -168,6 +168,8 @@ class TransportShape(Protocol):
 
     def prepare_request_body(self, body: Body) -> Body: ...  # pragma: no cover
 
+    def evaluate_server_error(self, case: Case, response: Response) -> None: ...  # pragma: no cover
+
     def prepare_multipart(
         self,
         form_data: dict[str, Any],
@@ -210,7 +212,4 @@ class ApiSchema(
     AuthBackend,
     Protocol,
 ):
-    """The full contract a concrete schema implementation satisfies.
-
-    Composed of role-specific protocols so callers can declare narrow contracts where applicable.
-    """
+    """Full schema contract; composed of role protocols so callers can depend on a narrow slice."""

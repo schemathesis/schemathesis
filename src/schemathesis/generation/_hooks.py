@@ -19,10 +19,7 @@ def apply_case_hooks(
     operation: APIOperation,
     local: HookDispatcher | None,
 ) -> SearchStrategy[Case]:
-    """Layer `before_generate_case`, `filter_case`, `map_case`, `flatmap_case` hooks onto a case strategy.
-
-    Applies dispatchers in fixed order: global, schema, local (if provided).
-    """
+    """Layer case hooks onto `strategy` in dispatcher order: global, schema, local."""
     strategy = _apply_dispatcher(strategy, GLOBAL_HOOK_DISPATCHER, operation)
     strategy = _apply_dispatcher(strategy, operation.schema.hooks, operation)
     if local is not None:
