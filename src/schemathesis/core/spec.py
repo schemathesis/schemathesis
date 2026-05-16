@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchemaObject
     from schemathesis.core.result import Result
     from schemathesis.core.schema_analysis import SchemaWarning
-    from schemathesis.core.transport import Response
+    from schemathesis.core.transport import HttpMethod, Response
     from schemathesis.generation import GenerationMode
     from schemathesis.generation.case import Case
     from schemathesis.generation.meta import CaseMetadata
@@ -94,7 +94,7 @@ class CaseFactory(Protocol):
         self,
         *,
         operation: APIOperation,
-        method: str | None = ...,
+        method: HttpMethod | None = ...,
         path: str | None = ...,
         path_parameters: dict[str, Any] | None = ...,
         headers: dict[str, Any] | CaseInsensitiveDict | None = ...,

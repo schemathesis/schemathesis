@@ -10,7 +10,7 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from itertools import combinations
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any, TypeGuard, cast
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
@@ -39,6 +39,8 @@ from schemathesis.transport.serialization import quote_all
 if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.core.parameters import ContainerName
+    from schemathesis.core.transport import HttpMethod
     from schemathesis.resources import ExtraDataSource, PoolDraw
     from schemathesis.schemas import APIOperation, ParameterSet
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
@@ -424,7 +426,7 @@ def iter_coverage_cases(
         raw_containers: dict[ParameterLocation, Any] = {
             location: value
             for name, value in raw.items()
-            if (location := CONTAINER_TO_LOCATION.get(name)) is not None
+            if (location := CONTAINER_TO_LOCATION.get(cast("ContainerName", name))) is not None
             and location in components
             and location != ParameterLocation.BODY
         }
@@ -853,7 +855,7 @@ def iter_coverage_cases(
             data = template.unmodified()
             yield operation.Case(
                 **data.kwargs,
-                method=method.upper(),
+                method=cast("HttpMethod", method.upper()),
                 _meta=_build_meta(
                     generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                     components=data.components,

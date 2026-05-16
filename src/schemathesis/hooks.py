@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.checks import CheckResult
+    from schemathesis.core.parameters import ContainerName
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
@@ -225,7 +226,7 @@ class HookDispatcher:
     def apply_to_container(
         self,
         strategy: st.SearchStrategy,
-        container: str,
+        container: ContainerName,
         context: HookContext,
         *,
         filter_wrapper: Callable[[Callable], Callable] | None = None,
@@ -305,7 +306,7 @@ def apply_to_all_dispatchers(
     context: HookContext,
     hooks: HookDispatcher | None,
     strategy: st.SearchStrategy,
-    container: str,
+    container: ContainerName,
     *,
     filter_wrapper: Callable[[Callable], Callable] | None = None,
     map_wrapper: Callable[[Callable], Callable] | None = None,

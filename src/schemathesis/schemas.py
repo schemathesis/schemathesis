@@ -26,7 +26,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
@@ -398,7 +398,7 @@ class BaseSchema(Mapping):
         self,
         *,
         operation: APIOperation,
-        method: str | None = None,
+        method: HttpMethod | None = None,
         path: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
@@ -709,7 +709,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     # Example <scheme>://<host>/<basePath>/users - "/users" is path
     # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
     path: str
-    method: str
+    method: HttpMethodSchema
     definition: OperationDefinition = field(repr=False)
     schema: SchemaT
     responses: R
@@ -885,7 +885,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     def Case(
         self,
         *,
-        method: str | None = None,
+        method: HttpMethod | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,

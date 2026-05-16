@@ -1,7 +1,10 @@
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, TypeAlias
 
-LOCATION_TO_CONTAINER = {
+# Attribute name on `Case` / `APIOperation` holding generated values for a parameter location.
+ContainerName: TypeAlias = Literal["path_parameters", "query", "headers", "cookies", "body"]
+
+LOCATION_TO_CONTAINER: dict[str, ContainerName] = {
     "path": "path_parameters",
     "query": "query",
     "header": "headers",
@@ -31,7 +34,7 @@ class ParameterLocation(str, Enum):
     UNKNOWN = None
 
     if TYPE_CHECKING:
-        container_name: str
+        container_name: ContainerName
         is_in_header: bool
 
 
@@ -52,7 +55,7 @@ ParameterLocation.UNKNOWN.is_in_header = False
 
 HEADER_LOCATIONS = frozenset([ParameterLocation.HEADER, ParameterLocation.COOKIE])
 
-CONTAINER_TO_LOCATION = {
+CONTAINER_TO_LOCATION: dict[ContainerName, ParameterLocation] = {
     "path_parameters": ParameterLocation.PATH,
     "query": ParameterLocation.QUERY,
     "headers": ParameterLocation.HEADER,

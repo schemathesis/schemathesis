@@ -18,7 +18,7 @@ from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableRef
 from schemathesis.core.jsonschema import is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import ContainerName, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 class ParameterExample:
     """A single example for a named parameter."""
 
-    container: str
+    container: ContainerName
     name: str
     value: Any
 

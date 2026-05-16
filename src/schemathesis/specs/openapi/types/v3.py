@@ -7,7 +7,7 @@ from typing import Any, Literal, TypeAlias
 
 from typing_extensions import NotRequired, TypedDict
 
-from schemathesis.specs.openapi.types.common import Reference, SchemaOrRef, _SecurityTypeKey
+from schemathesis.specs.openapi.types.common import OperationSecurity, Reference, SchemaOrRef, _SecurityTypeKey
 
 
 class Example(TypedDict):
@@ -119,9 +119,20 @@ Parameter: TypeAlias = ParameterWithSchemaAndIn | ParameterWithContentAndIn | Re
 
 
 class Operation(TypedDict):
-    responses: Responses
+    # `responses` is required in 3.0 but NotRequired in 3.1+ — we use NotRequired so the type
+    # works for both, then guard at use sites where 3.0 strictness applies.
+    responses: NotRequired[Responses]
     requestBody: NotRequired[RequestBodyOrRef]
     parameters: NotRequired[list[Parameter]]
+    operationId: NotRequired[str]
+    tags: NotRequired[list[str]]
+    security: NotRequired[OperationSecurity]
+    deprecated: NotRequired[bool]
+    summary: NotRequired[str]
+    description: NotRequired[str]
+    externalDocs: NotRequired[dict[str, Any]]
+    servers: NotRequired[list[dict[str, Any]]]
+    callbacks: NotRequired[dict[str, Any]]
 
 
 # Security parameter types

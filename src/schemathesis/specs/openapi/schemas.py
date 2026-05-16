@@ -28,7 +28,7 @@ from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, 
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic
-from schemathesis.core.transport import Response, restful_method_priority
+from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response, restful_method_priority
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
@@ -73,10 +73,12 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter import OpenApiResponses
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
     from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, SecurityRequirements
+    from schemathesis.specs.openapi.types import OperationObject
 
     OpenApiOperation: TypeAlias = APIOperation[
         OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters, "OpenApiSchema"
     ]
+    OpenApiCase: TypeAlias = Case[OpenApiOperation]
 
 _V3_1 = version.parse("3.1")
 _V3_2 = version.parse("3.2")
@@ -436,7 +438,7 @@ class OpenApiSchema(BaseSchema):
             message += f". Did you mean `{matches[0]}`?"
         raise OperationNotFound(message=message, item=item) from exc
 
-    def _should_skip(self, path: str, method: str, definition: dict[str, Any]) -> bool:
+    def _should_skip(self, path: str, method: str, definition: OperationObject) -> bool:
         return self._operations._should_skip(path, method, definition)
 
     @override
@@ -482,37 +484,35 @@ class OpenApiSchema(BaseSchema):
 
     def _iter_parameters(
         self,
-        definition: dict[str, Any],
+        definition: OperationObject,
         shared_parameters: Sequence[dict[str, Any]],
         resolver: Resolver | None = None,
     ) -> list[OperationParameter]:
         return self._operations._iter_parameters(definition, shared_parameters, resolver=resolver)
 
     def _parse_responses(
-        self, definition: dict[str, Any], scope: str, resolver: Resolver | None = None
+        self, definition: OperationObject, scope: str, resolver: Resolver | None = None
     ) -> OpenApiResponses:
         return self._operations._parse_responses(definition, scope, resolver=resolver)
 
-    def _parse_security(self, definition: dict[str, Any]) -> OpenApiSecurityParameters:
+    def _parse_security(self, definition: OperationObject) -> OpenApiSecurityParameters:
         return self._operations._parse_security(definition)
 
     def make_operation(
         self,
         path: str,
-        method: str,
+        method: HttpMethodSchema,
         parameters: list[OperationParameter],
-        definition: dict[str, Any],
+        definition: OperationObject,
         scope: str,
         resolver: Resolver | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
         return self._operations.make_operation(path, method, parameters, definition, scope, resolver=resolver)
 
-    @property
+    @cached_property
     def root_resolver(self) -> Resolver:
-        if not hasattr(self, "_root_resolver"):
-            self._root_resolver = make_root_resolver(self.raw_schema, location=self.location)
-        return self._root_resolver
+        return make_root_resolver(self.raw_schema, location=self.location)
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         """Content types available for this API operation."""
@@ -609,7 +609,7 @@ class OpenApiSchema(BaseSchema):
         self,
         *,
         operation: APIOperation,
-        method: str | None = None,
+        method: HttpMethod | None = None,
         path: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
@@ -624,7 +624,7 @@ class OpenApiSchema(BaseSchema):
             media_type = operation._get_default_media_type()
         return Case(
             operation=operation,
-            method=method or operation.method.upper(),
+            method=method or cast("HttpMethod", operation.method.upper()),
             path=path or operation.path,
             path_parameters=path_parameters or {},
             headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),
@@ -683,7 +683,9 @@ class MethodMap(Mapping):
             )
         except SCHEMA_PARSING_ERRORS as exc:
             schema._raise_invalid_schema(exc, path, method)
-        return schema.make_operation(path, method, parameters, operation, self._scope, resolver=self._resolver)
+        return schema.make_operation(
+            path, cast("HttpMethodSchema", method), parameters, operation, self._scope, resolver=self._resolver
+        )
 
     def __getitem__(self, item: str) -> APIOperation:
         try:

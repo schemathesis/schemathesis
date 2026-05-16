@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator, Iterator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 import jsonschema_rs
 from packaging import version
@@ -22,6 +22,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transforms import get_template_fields
+from schemathesis.core.transport import is_http_method_schema
 from schemathesis.hooks import HookContext, dispatch_before_init_operation, dispatch_before_process_path
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.adapter import OpenApiResponses
@@ -30,7 +31,9 @@ from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameter
 
 if TYPE_CHECKING:
     from schemathesis.core.adapter import ResponsesContainer
+    from schemathesis.core.transport import HttpMethodSchema
     from schemathesis.specs.openapi.schemas import OpenApiSchema
+    from schemathesis.specs.openapi.types import OperationObject
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"})
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
@@ -53,8 +56,9 @@ class OperationLoader:
     def __init__(self, schema: OpenApiSchema) -> None:
         self.schema = schema
         # Filter hot path mutates the shared operation's identity fields instead of allocating a fresh one per call.
+        # `method` is a placeholder that gets overwritten on every `_should_skip` call.
         filter_operation: APIOperation = APIOperation(
-            method="",
+            method=cast("HttpMethodSchema", ""),
             path="",
             label="",
             definition=OperationDefinition(raw=None),
@@ -96,7 +100,7 @@ class OperationLoader:
                     scope = path_resolver.base_uri
                 shared_parameters = path_item.get("parameters", [])
                 for method, entry in path_item.items():
-                    if method not in HTTP_METHODS:
+                    if not is_http_method_schema(method):
                         continue
                     try:
                         if filters_active and should_skip(path, method, entry):
@@ -230,8 +234,8 @@ class OperationLoader:
 
         return statistic
 
-    def _should_skip(self, path: str, method: str, definition: dict[str, Any]) -> bool:
-        if method not in HTTP_METHODS:
+    def _should_skip(self, path: str, method: str, definition: OperationObject) -> bool:
+        if not is_http_method_schema(method):
             return True
         schema = self.schema
         if schema.filter_set.is_empty():
@@ -246,7 +250,7 @@ class OperationLoader:
 
     def _iter_parameters(
         self,
-        definition: dict[str, Any],
+        definition: OperationObject,
         shared_parameters: Sequence[dict[str, Any]],
         resolver: Resolver | None = None,
     ) -> list[OperationParameter]:
@@ -264,7 +268,7 @@ class OperationLoader:
         )
 
     def _parse_responses(
-        self, definition: dict[str, Any], scope: str, resolver: Resolver | None = None
+        self, definition: OperationObject, scope: str, resolver: Resolver | None = None
     ) -> OpenApiResponses:
         schema = self.schema
         responses = definition.get("responses", {})
@@ -275,7 +279,7 @@ class OperationLoader:
             adapter=schema.adapter,
         )
 
-    def _parse_security(self, definition: dict[str, Any]) -> OpenApiSecurityParameters:
+    def _parse_security(self, definition: OperationObject) -> OpenApiSecurityParameters:
         # Security schemes live at the schema root; refs in `securitySchemes` resolve relative
         # to the root document, not to whichever path-scoped resolver the operation was loaded with.
         schema = self.schema
@@ -289,9 +293,9 @@ class OperationLoader:
     def make_operation(
         self,
         path: str,
-        method: str,
+        method: HttpMethodSchema,
         parameters: list[OperationParameter],
-        definition: dict[str, Any],
+        definition: OperationObject,
         scope: str,
         resolver: Resolver | None = None,
     ) -> APIOperation:
