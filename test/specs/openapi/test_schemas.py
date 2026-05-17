@@ -1,7 +1,7 @@
 import pytest
 
 import schemathesis
-from schemathesis.core.errors import OperationNotFound
+from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.schemas import APIOperation
 
 
@@ -146,6 +146,24 @@ def test_query_method_operation_is_discovered(ctx):
     operations = list(schema.get_all_operations())
     assert len(operations) == 1
     assert operations[0].ok().method == "query"
+
+
+def test_external_file_ref_in_body_raises_invalid_schema(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/probe": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "external.json"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    with pytest.raises(InvalidSchema, match="Unresolvable"):
+        schema["/probe"]["POST"]
 
 
 def test_non_string_parameter_location(ctx):

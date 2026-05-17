@@ -10,6 +10,7 @@
 
 ### :bug: Fixed
 
+- Surface a clean schema error for body `$ref` strings without a `/` separator.
 - RecursionError in coverage phase on multi-branch `allOf` schemas that `canonicalish` cannot simplify.
 - Restore stateful chain coverage for foreign-key consumers whose target resource is produced by another operation.
 - Serialize Swagger 2.0 nested array-of-array query parameters using each level's `collectionFormat`.
