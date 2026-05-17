@@ -25,6 +25,7 @@
 - Runtime Error in negative generation for FastAPI `Optional[Enum]` query parameters (`anyOf` with `$ref` and sibling `enum`).
 - Serialize nested-object multipart form-data parts as JSON instead of Python `repr`.
 - False positive `positive_data_acceptance` for body schemas with `additionalProperties: false` inherited via `allOf`.
+- False positive `positive_data_acceptance` for `maxItems: 0` arrays whose `items` schema is satisfiable.
 
 ## [4.18.5](https://github.com/schemathesis/schemathesis/compare/v4.18.4...v4.18.5) - 2026-05-13
 
