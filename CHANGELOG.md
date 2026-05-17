@@ -10,6 +10,7 @@
 
 ### :bug: Fixed
 
+- Out-of-memory in coverage phase on wide, deeply-nested OpenAPI schemas (e.g. AWS Glue, Microsoft Graph).
 - Surface a clean schema error for body `$ref` strings without a `/` separator.
 - RecursionError in coverage phase on multi-branch `allOf` schemas that `canonicalish` cannot simplify.
 - Restore stateful chain coverage for foreign-key consumers whose target resource is produced by another operation.
