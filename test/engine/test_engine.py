@@ -275,7 +275,7 @@ def test_form_data(ctx):
     # And there should be no errors or failures
     stream.assert_no_errors()
     stream.assert_no_failures()
-    multipart_requests = [r for r in api.requests if r.method == "POST" and r.path == "/api/multipart"]
+    multipart_requests = api.calls_to("/api/multipart", method="POST")
     # And the application should receive 3 requests as specified in `max_examples`
     assert len(multipart_requests) == 3
     # And the Content-Type of incoming requests should be `multipart/form-data`
@@ -530,7 +530,7 @@ def test_payload_explicit_example(ctx):
     stream.assert_no_errors()
     stream.assert_no_failures()
 
-    payload_requests = [r for r in api.requests if r.method == "POST" and r.path == "/api/payload"]
+    payload_requests = api.calls_to("/api/payload", method="POST")
     # And this example should be sent to the app
     assert payload_requests[0].json() == {"name": "John"}
 
@@ -583,7 +583,7 @@ def test_explicit_example_disable(ctx, mocker):
     # Then run should be successful
     stream.assert_no_errors()
     stream.assert_no_failures()
-    payload_requests = [r for r in api.requests if r.method == "POST" and r.path == "/api/payload"]
+    payload_requests = api.calls_to("/api/payload", method="POST")
     assert len(payload_requests) == 1
 
     # And this example should NOT be used

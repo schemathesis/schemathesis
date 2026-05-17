@@ -42,6 +42,12 @@ class OpenAPIServer:
     requests: list[CapturedRequest] = field(default_factory=list)
     schema_requests: list[CapturedRequest] = field(default_factory=list)
 
+    def calls_to(self, path: str, *, method: str | None = None) -> list[CapturedRequest]:
+        return [r for r in self.requests if r.path == path and (method is None or r.method == method)]
+
+    def calls_under(self, prefix: str, *, method: str | None = None) -> list[CapturedRequest]:
+        return [r for r in self.requests if r.path.startswith(prefix) and (method is None or r.method == method)]
+
 
 @dataclass(slots=True)
 class GraphQLServer:

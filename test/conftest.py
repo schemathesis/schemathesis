@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 from io import BytesIO
 from textwrap import dedent
-from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -393,6 +394,13 @@ def testdir(testdir):
     return testdir
 
 
+@dataclass(frozen=True)
+class ResponseFactory:
+    httpx: Callable[..., httpx.Response]
+    requests: Callable[..., requests.Response]
+    wsgi: Callable[..., TestResponse]
+
+
 @pytest.fixture
 def response_factory():
     def httpx_factory(
@@ -453,13 +461,13 @@ def response_factory():
         )
         return response
 
-    return SimpleNamespace(httpx=httpx_factory, requests=requests_factory, wsgi=werkzeug_factory)
+    return ResponseFactory(httpx=httpx_factory, requests=requests_factory, wsgi=werkzeug_factory)
 
 
 @pytest.fixture
 def case_factory(swagger_20):
     def factory(**kwargs):
-        operation = kwargs.pop("operation", swagger_20["/users"]["get"])
+        operation = kwargs.pop("operation", None) or swagger_20["/users"]["get"]
         kwargs.setdefault("method", "GET")
         kwargs.setdefault("media_type", "application/json")
         return operation.Case(**kwargs)

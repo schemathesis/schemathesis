@@ -48,13 +48,10 @@ def test_unsupported_openapi_version(version, expected):
         schemathesis.openapi.from_dict({"openapi": version})
 
 
-def test_number_deserializing(testdir):
-    # When numbers in a schema are written in scientific notation but without a dot
-    # (achieved by dumping the schema with json.dumps)
-    schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+def test_number_deserializing(ctx, testdir):
+    # Scientific-notation numbers without a dot (via json.dumps) must round-trip through the YAML loader.
+    schema = ctx.openapi.build_schema(
+        {
             "/teapot": {
                 "get": {
                     "summary": "Test",
@@ -70,7 +67,7 @@ def test_number_deserializing(testdir):
                 }
             }
         },
-    }
+    )
 
     schema_path = testdir.makefile(".yaml", schema=json.dumps(schema))
     # Then yaml loader should parse them without schema validation errors

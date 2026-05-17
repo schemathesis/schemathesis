@@ -765,7 +765,7 @@ def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
     # Then Schemathesis should resolve it and run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # And all relevant requests should contain proper data for resolved references
-    teapot_calls = [r for r in api.requests if r.method == "POST" and r.path == "/api/teapot"]
+    teapot_calls = api.calls_to("/api/teapot", method="POST")
     payload = teapot_calls[0].json()
     assert isinstance(payload["name"], str)
     assert isinstance(payload["photoUrls"], list)

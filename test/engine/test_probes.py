@@ -1,4 +1,5 @@
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import ANY
 
@@ -11,45 +12,44 @@ from schemathesis.engine.context import EngineContext
 from schemathesis.engine.run import probes
 
 
+def _make_strict_server(app_runner, reject: Callable[[], object]) -> str:
+    app = Flask(__name__)
+    app.before_request(reject)
+
+    @app.route("/", defaults={"_path": ""})
+    @app.route("/<path:_path>")
+    def _ok(_path: str):
+        return "ok"
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/"
+
+
 @pytest.fixture
 def null_byte_strict_url(app_runner):
     # NullByteInHeader probe expects 400 when the server rejects the byte; Flask/Werkzeug accept it by default.
-    app = Flask(__name__)
-
-    @app.before_request
-    def _reject_null_bytes():
+    def reject():
         for value in request.headers.values():
             if "\x00" in value:
                 return ("rejected", 400)
         return None
 
-    @app.route("/", defaults={"_path": ""})
-    @app.route("/<path:_path>")
-    def _ok(_path: str):
-        return "ok"
+    return _make_strict_server(app_runner, reject)
 
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}/"
+
+def _unsafe_path() -> bool:
+    return "\\" in request.path or any(ord(c) < 0x20 for c in request.path)
 
 
 @pytest.fixture
 def path_decoder_strict_url(app_runner):
     # Tomcat-style strict URL decoder: 400 with empty body when path carries backslash/control chars.
-    app = Flask(__name__)
-
-    @app.before_request
-    def _reject_unsafe_path():
-        if "\\" in request.path or any(ord(c) < 0x20 for c in request.path):
+    def reject():
+        if _unsafe_path():
             return ("", 400)
         return None
 
-    @app.route("/", defaults={"_path": ""})
-    @app.route("/<path:_path>")
-    def _ok(_path: str):
-        return "ok"
-
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}/"
+    return _make_strict_server(app_runner, reject)
 
 
 _TOMCAT_400_HTML = (
@@ -63,21 +63,12 @@ _TOMCAT_400_HTML = (
 def path_decoder_strict_tomcat_html_url(app_runner):
     # Tomcat ships a default HTML error page; the strict URL decoder still rejects before routing,
     # but the body is non-empty.
-    app = Flask(__name__)
-
-    @app.before_request
-    def _reject_unsafe_path():
-        if "\\" in request.path or any(ord(c) < 0x20 for c in request.path):
+    def reject():
+        if _unsafe_path():
             return (_TOMCAT_400_HTML, 400, {"Content-Type": "text/html;charset=utf-8"})
         return None
 
-    @app.route("/", defaults={"_path": ""})
-    @app.route("/<path:_path>")
-    def _ok(_path: str):
-        return "ok"
-
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}/"
+    return _make_strict_server(app_runner, reject)
 
 
 @pytest.fixture
