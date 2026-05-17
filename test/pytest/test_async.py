@@ -2,7 +2,7 @@ import pytest
 
 from schemathesis.generation.modes import GenerationMode
 
-from .utils import integer
+from ..utils import integer
 
 ALL_PLUGINS = {"asyncio": "@pytest.mark.asyncio", "trio": "@pytest.mark.trio"}
 

@@ -1,6 +1,6 @@
 from schemathesis.generation.modes import GenerationMode
 
-from .utils import integer
+from ..utils import integer
 
 
 def test_common_parameters(testdir):

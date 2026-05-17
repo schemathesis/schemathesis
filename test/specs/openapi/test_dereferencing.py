@@ -14,8 +14,7 @@ from schemathesis.core.jsonschema.resolver import resolve_reference
 from schemathesis.core.result import Ok
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.stateful import dependencies
-
-from .utils import as_param, get_schema_path, integer
+from test.utils import as_param, get_schema_path, integer
 
 USER_REFERENCE = {"$ref": "#/components/schemas/User"}
 ELIDABLE_SCHEMA = {"description": "Test", "type": "object", "properties": {"foo": {"type": "integer"}}}
