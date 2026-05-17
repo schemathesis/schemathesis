@@ -703,7 +703,7 @@ class OperationDefinition(Generic[D]):
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
 
-@dataclass()
+@dataclass(repr=False)
 class APIOperation(Generic[P, R, S, SchemaT]):
     """An API operation (e.g., `GET /users`)."""
 
@@ -729,6 +729,11 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     def __post_init__(self) -> None:
         if self.label is None:
             self.label = f"{self.method.upper()} {self.path}"  # type: ignore[unreachable]
+
+    def __repr__(self) -> str:
+        return f"<APIOperation label={self.label!r}>"
+
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def __deepcopy__(self, memo: dict) -> APIOperation[P, R, S, SchemaT]:
         return self

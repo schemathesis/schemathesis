@@ -315,6 +315,13 @@ class CoverageContext:
         self._schema_generation_cache = _schema_generation_cache if _schema_generation_cache is not None else {}
         self.allow_extra_parameters = allow_extra_parameters
 
+    def __repr__(self) -> str:
+        # Bound methods are used as Hypothesis filter predicates; the default slot dump
+        # would push the full `root_schema` into every retry event in `ConjectureData.events`.
+        return f"<CoverageContext path={self.current_path!r}>"
+
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
+
     @property
     def resolver(self) -> Resolver:
         """Lazy-initialized cached resolver."""
