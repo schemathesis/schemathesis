@@ -103,7 +103,7 @@ def build_metadata(
     headers=None,
     cookies=None,
     body=None,
-    generation_mode=GenerationMode.POSITIVE,
+    generation_modes=(GenerationMode.POSITIVE,),
     description="",
     parameter=None,
     parameter_location=None,
@@ -130,7 +130,7 @@ def build_metadata(
     return CaseMetadata(
         generation=GenerationInfo(
             time=0.1,
-            mode=generation_mode,
+            mode=generation_modes[0],
         ),
         components={
             kind: ComponentInfo(mode=value)
@@ -260,7 +260,7 @@ _PATH_PATTERN_MUTATION = _mutation(OperatorKind.VALUE_VIOLATOR, ("pattern",), pa
                 "_meta": build_metadata(
                     query=GenerationMode.NEGATIVE,
                     path_parameters=GenerationMode.NEGATIVE,
-                    generation_mode=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
                     parameter_location=ParameterLocation.QUERY,
                     mutations=(_ADDITIONAL_PROPERTIES_MUTATION,),
                 ),
@@ -275,7 +275,7 @@ _PATH_PATTERN_MUTATION = _mutation(OperatorKind.VALUE_VIOLATOR, ("pattern",), pa
                 "_meta": build_metadata(
                     query=GenerationMode.NEGATIVE,
                     path_parameters=GenerationMode.NEGATIVE,
-                    generation_mode=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
                     parameter_location=ParameterLocation.QUERY,
                     mutations=(_ADDITIONAL_PROPERTIES_MUTATION,),
                 ),
@@ -288,7 +288,7 @@ _PATH_PATTERN_MUTATION = _mutation(OperatorKind.VALUE_VIOLATOR, ("pattern",), pa
                 "query": {"key": 5, "unknown": 3},
                 "_meta": build_metadata(
                     body=GenerationMode.NEGATIVE,
-                    generation_mode=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
                     parameter_location=ParameterLocation.BODY,
                     mutations=(_BODY_MIN_LENGTH_MUTATION,),
                 ),
@@ -301,7 +301,7 @@ _PATH_PATTERN_MUTATION = _mutation(OperatorKind.VALUE_VIOLATOR, ("pattern",), pa
                 "query": {"key": 5, "unknown": 3},
                 "_meta": build_metadata(
                     path_parameters=GenerationMode.NEGATIVE,
-                    generation_mode=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
                     parameter_location=ParameterLocation.PATH,
                     mutations=(_PATH_PATTERN_MUTATION,),
                 ),
@@ -410,7 +410,7 @@ def test_negative_data_rejection_passes_for_rejection_status_codes(
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
         ),
         query={"key": 1},
     )
@@ -435,7 +435,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
         ),
         query={"key": 5, "unknown": 3},
     )
@@ -491,7 +491,7 @@ def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_m
             body=body_mode,
             query=query_mode,
             headers=header_mode,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
         ),
         body={},
         media_type=media_type,
@@ -585,7 +585,7 @@ def test_positive_data_acceptance(
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE],
         ),
     )
     ctx = CheckContext(
@@ -876,7 +876,7 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
         ),
         query={"page": [67]},  # Single-element array
     )
@@ -935,7 +935,7 @@ def test_negative_data_rejection_multi_element_array_with_valid_element(ctx, res
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
             description="Invalid type array (expected integer)",
             parameter="page_size",
             parameter_location=ParameterLocation.QUERY,
@@ -990,7 +990,7 @@ def test_negative_data_rejection_multi_element_array_string_numeric_element(ctx,
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
             description="Invalid type array (expected integer)",
             parameter="page_size",
             parameter_location=ParameterLocation.QUERY,
@@ -1043,7 +1043,7 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
             description="Invalid type object (expected integer)",
             parameter="id",
             parameter_location=ParameterLocation.QUERY,
@@ -1085,7 +1085,7 @@ def test_negative_data_rejection_path_string_numeric_serialization(ctx, response
     case = operation.Case(
         _meta=build_metadata(
             path_parameters=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
             description="Invalid type string (expected integer)",
             parameter="id",
             parameter_location=ParameterLocation.PATH,
@@ -1132,7 +1132,7 @@ def test_negative_data_rejection_path_string_numeric_serialization_with_other_ne
         _meta=build_metadata(
             path_parameters=GenerationMode.NEGATIVE,
             query=GenerationMode.NEGATIVE,
-            generation_mode=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
             description="Invalid type string (expected integer)",
             parameter="id",
             parameter_location=ParameterLocation.PATH,

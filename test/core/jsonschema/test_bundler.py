@@ -387,6 +387,25 @@ DEFINITIONS = {
             },
         ),
     ],
+    ids=[
+        "true-schema",
+        "false-schema",
+        "empty-schema",
+        "scalar-no-ref",
+        "single-ref",
+        "ref-to-truthy",
+        "ref-with-siblings",
+        "multiple-distinct-refs",
+        "deduplicated-refs",
+        "array-items-ref",
+        "anyof-refs",
+        "nested-ref-chain",
+        "self-recursive",
+        "mutual-recursion",
+        "preserves-existing-definitions",
+        "patternproperties-with-recursive-ref",
+        "query-expression-deep-recursion",
+    ],
 )
 def test_bundle(schema, store, expected):
     resolver = make_root_resolver(store)

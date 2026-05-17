@@ -65,6 +65,7 @@ from schemathesis.config import (
             ),
         ),
     ],
+    ids=["empty", "single", "first-wins", "nested-merge", "override-project-defaults"],
 )
 def test_checks_config_from_hierarchy(configs, expected):
     assert ChecksConfig.from_hierarchy(configs) == expected

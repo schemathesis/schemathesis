@@ -20,7 +20,7 @@ def test_baseline_e2e(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, checks=[response_schema_conformance], max_examples=3).execute()
 
-    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    api_calls = api.calls_under("/api/")
     assert api_calls
     assert {call.path for call in api_calls} == {"/api/baseline"}
 
@@ -30,7 +30,7 @@ def test_formdata_serialised_as_multipart(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    uploads = [r for r in api.requests if r.path == "/api/upload"]
+    uploads = api.calls_to("/api/upload")
     assert uploads
     for call in uploads:
         assert call.headers.get("Content-Type", "").startswith("multipart/form-data")
@@ -41,7 +41,7 @@ def test_collection_format_serialization(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=20, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    captured = [r for r in api.requests if r.path == "/api/search"]
+    captured = api.calls_to("/api/search")
     assert captured
 
     delimiters = {"csv": ",", "ssv": " ", "tsv": "\t", "pipes": "|"}
@@ -77,7 +77,7 @@ def test_security_credentials_propagate(ctx, path, stream_kwargs, expected_heade
     schema = schemathesis.openapi.from_url(api.schema_url).include(path=path)
     EventStream(schema, max_examples=3, **stream_kwargs).execute()
 
-    captured = [r for r in api.requests if r.path == f"/api{path}"]
+    captured = api.calls_to(f"/api{path}")
     header_name, expected_value = expected_header
     # Engine also drives auth-omitted negatives; require at least one positive carry.
     assert any(call.headers.get(header_name) == expected_value for call in captured)
@@ -103,7 +103,7 @@ def test_examples_phase_uses_x_example(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, phases=[PhaseName.EXAMPLES]).execute()
 
-    examples_calls = [r for r in api.requests if r.path == "/api/examples"]
+    examples_calls = api.calls_to("/api/examples")
     assert examples_calls
     bodies = [c.json() for c in examples_calls]
     assert {"name": "from-x-example"} in bodies
@@ -116,7 +116,7 @@ def test_response_header_validation_only_complains_about_headers(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[response_headers_conformance], max_examples=3).execute()
 
-    assert [r for r in api.requests if r.path == "/api/headers"]
+    assert api.calls_to("/api/headers")
     for finished in stream.find_all(events.ScenarioFinished):
         for checks in finished.recorder.checks.values():
             for check in checks:
@@ -145,7 +145,7 @@ def test_path_parameter_reaches_endpoint(ctx, factory_name, path_prefix):
     api = getattr(ctx.openapi.apps, factory_name)()
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
-    assert [r for r in api.requests if r.path.startswith(path_prefix)]
+    assert api.calls_under(path_prefix)
 
 
 def test_all_parameter_locations_resolve(ctx):
@@ -154,7 +154,7 @@ def test_all_parameter_locations_resolve(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    captured = [r for r in api.requests if r.path.startswith("/api/all/")]
+    captured = api.calls_under("/api/all/")
     assert captured
     for call in captured:
         assert "query_param" in call.query
@@ -199,14 +199,14 @@ def test_no_response_body_validation_passes(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(schema, checks=[response_schema_conformance], max_examples=3).execute()
     stream.assert_no_failures()
-    assert [r for r in api.requests if r.path == "/api/no-content"]
+    assert api.calls_to("/api/no-content")
 
 
 def test_native_examples_phase_loads(ctx):
     api = ctx.openapi.apps.swagger_v2_native_response_examples()
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, phases=[PhaseName.EXAMPLES, PhaseName.FUZZING], max_examples=3).execute()
-    assert [r for r in api.requests if r.path == "/api/items"]
+    assert api.calls_to("/api/items")
 
 
 def test_collection_format_multi_uses_repeated_query_keys(ctx):
@@ -216,7 +216,7 @@ def test_collection_format_multi_uses_repeated_query_keys(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=20, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    captured = [r for r in api.requests if r.path == "/api/search"]
+    captured = api.calls_to("/api/search")
     assert any(r.raw_query.count("multi=") >= 2 for r in captured)
 
 
@@ -225,7 +225,7 @@ def test_optional_security_does_not_require_credentials(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url).include(path="/private/optional")
     EventStream(schema, max_examples=3).execute()
 
-    optional_calls = [r for r in api.requests if r.path == "/api/private/optional"]
+    optional_calls = api.calls_to("/api/private/optional")
     # Engine reaches the endpoint even without credentials configured.
     assert any("Authorization" not in call.headers for call in optional_calls)
 
@@ -235,7 +235,7 @@ def test_parameter_ref_resolves(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    listings = [r for r in api.requests if r.path == "/api/listing"]
+    listings = api.calls_to("/api/listing")
     assert listings
     assert all("page" in call.query for call in listings)
 
@@ -251,7 +251,7 @@ def test_path_level_parameters_apply_to_each_operation(ctx, method):
     schema = schemathesis.openapi.from_url(api.schema_url).include(method=method)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    captured = [r for r in api.requests if r.path.startswith("/api/path-shared/") and r.method == method]
+    captured = api.calls_under("/api/path-shared/", method=method)
     assert captured
     assert all("trace" in call.query for call in captured)
 
@@ -261,7 +261,7 @@ def test_form_urlencoded_body_uses_urlencoding(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    posts = [r for r in api.requests if r.path == "/api/form-urlencoded"]
+    posts = api.calls_to("/api/form-urlencoded")
     assert posts
     for call in posts:
         assert call.headers.get("Content-Type", "").startswith("application/x-www-form-urlencoded")
@@ -272,7 +272,7 @@ def test_multiple_path_parameters_resolve(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, max_examples=3, modes=[schemathesis.GenerationMode.POSITIVE]).execute()
 
-    captured = [r for r in api.requests if r.path.startswith("/api/orgs/")]
+    captured = api.calls_under("/api/orgs/")
     assert captured
     for call in captured:
         # Path: /api/orgs/{org_id}/users/{user_id} — both segments must be filled.
@@ -326,7 +326,7 @@ def test_and_security_carries_both_credentials(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     EventStream(schema, headers={"X-API-Key": "k"}, auth=("u", "p"), max_examples=3).execute()
 
-    captured = [r for r in api.requests if r.path == "/api/private/and"]
+    captured = api.calls_to("/api/private/and")
     assert any(
         call.headers.get("X-Api-Key") == "k" and call.headers.get("Authorization") == "Basic dTpw" for call in captured
     )
