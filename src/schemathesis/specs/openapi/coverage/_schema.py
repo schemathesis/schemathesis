@@ -974,9 +974,23 @@ def _cover_positive_for_type(
                 )
         if "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
-            # These violations are positive for the outer schema, so flip the mode
+            # These violations are positive for the outer schema, so flip the mode.
+            # The inner-violation alone doesn't guarantee the value satisfies the outer's
+            # other constraints (type, properties, etc.); validate before yielding.
             nctx = ctx.with_negative()
-            yield from _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen))
+            outer_validator: jsonschema_rs.Validator | None = None
+            try:
+                outer_validator = make_validator_for(schema)
+            except Exception:
+                pass
+            for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen)):
+                if (
+                    outer_validator is not None
+                    and flipped.generation_mode == GenerationMode.POSITIVE
+                    and not outer_validator.is_valid(flipped.value)
+                ):
+                    continue
+                yield flipped
 
 
 def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] = frozenset()) -> None:
