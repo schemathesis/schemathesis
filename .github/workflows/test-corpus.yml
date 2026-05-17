@@ -124,3 +124,22 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
 
       - run: uvx --from=".[tests]" pytest test-corpus/test_corpus.py -k test_graphql -n auto --durations=20 --dist=worksteal
+
+  corpus-schemastore:
+    name: Schemastore conformance probe
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - run: uvx --from=".[tests]" pytest test-corpus/test_schemastore.py -n auto --durations=20 --dist=worksteal
