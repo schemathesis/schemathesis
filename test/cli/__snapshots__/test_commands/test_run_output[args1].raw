@@ -6,6 +6,6 @@ Schemathesis dev
 
 
 Usage: schemathesis run [OPTIONS] LOCATION
-Try 'schemathesis run -h' for help.
+Try 'schemathesis run --help' for help.
 
 Error: The `--url` option is required when specifying a schema via a file.
