@@ -344,6 +344,25 @@ def test_positive_array_with_maxitems_zero(ctx):
     _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
 
 
+def test_positive_not_flip_validates_against_outer_constraints(ctx):
+    # The `not` flip yields values that satisfy `not` but may violate other outer constraints (e.g. property types).
+    operation = _load_json_body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "image_url": {"type": "string"},
+                "file_id": {"type": "string"},
+            },
+            "anyOf": [{"required": ["image_url"]}, {"required": ["file_id"]}],
+            "not": {"required": ["image_url", "file_id"]},
+            "additionalProperties": False,
+        },
+        version="3.1.0",
+    )
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
+
+
 def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
     # When a schema property has type:integer but also specifies minLength/maxLength
     operation = _load_json_body_operation(
