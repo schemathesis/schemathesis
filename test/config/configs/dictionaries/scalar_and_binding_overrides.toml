@@ -1,0 +1,6 @@
+[dictionaries.x]
+values = [1]
+
+[parameters]
+api_version = "v2"
+"query.q" = { dictionary = "x" }

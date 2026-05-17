@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any
 
 from schemathesis.config._checks import ChecksConfig
+from schemathesis.config._dictionaries import DictionaryDefinition
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
@@ -128,10 +129,15 @@ class FuzzingPhaseConfig(DiffBase):
         )
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FuzzingPhaseConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> FuzzingPhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
-            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             operation_ordering=data.get("operation-ordering", "auto"),
             extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {})),
@@ -188,11 +194,16 @@ class ExamplesPhaseConfig(DiffBase):
         )
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ExamplesPhaseConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> ExamplesPhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
             fill_missing=data.get("fill-missing", False),
-            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             operation_ordering=data.get("operation-ordering", "auto"),
             extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {}))
@@ -255,14 +266,19 @@ class CoveragePhaseConfig(DiffBase):
         )
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> CoveragePhaseConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> CoveragePhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
             generate_duplicate_query_parameters=data.get("generate-duplicate-query-parameters", False),
             unexpected_methods={method.lower() for method in data.get("unexpected-methods", [])}
             if "unexpected-methods" in data
             else None,
-            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             operation_ordering=data.get("operation-ordering", "auto"),
             extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {}))
@@ -343,11 +359,16 @@ class StatefulPhaseConfig(DiffBase):
         )
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> StatefulPhaseConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> StatefulPhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
             max_steps=data.get("max-steps"),
-            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             inference=InferenceConfig.from_dict(data.get("inference", {})),
             link_calibration=data.get("link-calibration", True),
@@ -387,7 +408,12 @@ class PhasesConfig(DiffBase):
         }[name]  # type: ignore[return-value]
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PhasesConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> PhasesConfig:
         # Use the outer "enabled" value as default for all phases.
         default_enabled = data.get("enabled", None)
 
@@ -398,10 +424,10 @@ class PhasesConfig(DiffBase):
             return sub
 
         return cls(
-            examples=ExamplesPhaseConfig.from_dict(merge(data.get("examples", {}))),
-            coverage=CoveragePhaseConfig.from_dict(merge(data.get("coverage", {}))),
-            fuzzing=FuzzingPhaseConfig.from_dict(merge(data.get("fuzzing", {}))),
-            stateful=StatefulPhaseConfig.from_dict(merge(data.get("stateful", {}))),
+            examples=ExamplesPhaseConfig.from_dict(merge(data.get("examples", {})), dictionaries=dictionaries),
+            coverage=CoveragePhaseConfig.from_dict(merge(data.get("coverage", {})), dictionaries=dictionaries),
+            fuzzing=FuzzingPhaseConfig.from_dict(merge(data.get("fuzzing", {})), dictionaries=dictionaries),
+            stateful=StatefulPhaseConfig.from_dict(merge(data.get("stateful", {})), dictionaries=dictionaries),
         )
 
     def update(self, *, phases: list[str]) -> None:

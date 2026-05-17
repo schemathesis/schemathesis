@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from schemathesis.config._auth import AuthConfig
 from schemathesis.config._cache import CacheConfig
 from schemathesis.config._checks import ChecksConfig
+from schemathesis.config._dictionaries import DictionaryDefinition
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
@@ -159,7 +160,13 @@ class ProjectConfig(DiffBase):
         self.operations = operations or OperationsConfig()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ProjectConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> ProjectConfig:
+        dictionaries = dictionaries or {}
         return cls(
             base_url=resolve(data.get("base-url")),
             headers={resolve(key): resolve(value) for key, value in data.get("headers", {}).items()}
@@ -176,15 +183,18 @@ class ProjectConfig(DiffBase):
             request_retries=_parse_request_retries(data.get("request-retries")),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
-            parameters=load_parameters(data),
+            parameters=load_parameters(data, dictionaries=dictionaries),
             auth=AuthConfig.from_dict(data.get("auth", {})),
             warnings=WarningsConfig.from_value(data.get("warnings")),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
-            phases=PhasesConfig.from_dict(data.get("phases", {})),
+            phases=PhasesConfig.from_dict(data.get("phases", {}), dictionaries=dictionaries),
             fuzz=FuzzConfig.from_dict(data.get("fuzz", {})),
-            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),
             operations=OperationsConfig(
-                operations=[OperationConfig.from_dict(operation) for operation in data.get("operations", [])]
+                operations=[
+                    OperationConfig.from_dict(operation, dictionaries=dictionaries)
+                    for operation in data.get("operations", [])
+                ]
             ),
         )
 
@@ -472,6 +482,10 @@ class ProjectConfig(DiffBase):
         return self._parent
 
     @property
+    def dictionaries(self) -> dict[str, DictionaryDefinition]:
+        return self._get_parent().dictionaries
+
+    @property
     def output(self) -> OutputConfig:
         return self._get_parent().output
 
@@ -547,10 +561,18 @@ class ProjectsConfig(DiffBase):
         return self._override
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ProjectsConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> ProjectsConfig:
         return cls(
-            default=ProjectConfig.from_dict(data),
-            named={project["title"]: ProjectConfig.from_dict(project) for project in data.get("project", [])},
+            default=ProjectConfig.from_dict(data, dictionaries=dictionaries),
+            named={
+                project["title"]: ProjectConfig.from_dict(project, dictionaries=dictionaries)
+                for project in data.get("project", [])
+            },
         )
 
     def _set_parent(self, parent: SchemathesisConfig) -> None:

@@ -21,8 +21,8 @@ class ConfigError(SchemathesisError):
         message = error.message
         if error.kind.name == "enum":
             message = _format_enum_error(error)
-        elif error.kind.name == "minimum":
-            message = _format_minimum_error(error)
+        elif error.kind.name in _BOUND_PREDICATES:
+            message = _format_bound_error(error, _BOUND_PREDICATES[error.kind.name])
         elif error.kind.name == "required":
             message = _format_required_error(error)
         elif error.kind.name == "type":
@@ -38,19 +38,20 @@ class ConfigError(SchemathesisError):
         return cls(message)
 
 
-def _format_minimum_error(error: ValidationError) -> str:
-    variants = resolve_path(CONFIG_SCHEMA, error.schema_path)
-    assert isinstance(variants, int | float)
-    section = path_to_section_name(error.instance_path[:-1])
+_BOUND_PREDICATES = {
+    "minimum": "Must be at least",
+    "exclusiveMinimum": "Must be greater than",
+    "maximum": "Must be at most",
+}
+
+
+def _format_bound_error(error: ValidationError, predicate: str) -> str:
     assert error.instance_path
-
+    section = path_to_section_name(error.instance_path[:-1])
     prop_name = error.instance_path[-1]
-    min_value = error.kind.value
-    actual_value = error.instance
-
     return (
-        f"Error in {section} section:\n  Value too low:\n\n"
-        f"  - '{prop_name}' -> Must be at least {min_value}, but got {actual_value}."
+        f"Error in {section} section:\n  Value out of range:\n\n"
+        f"  - '{prop_name}' -> {predicate} {error.kind.value}, but got {error.instance}."
     )
 
 
@@ -174,6 +175,9 @@ def _format_anyof_error(error: ValidationError) -> str:
 
 def _format_oneof_error(error: ValidationError) -> str:
     """Format oneOf validation errors, particularly for auth.openapi."""
+    schema_path = list(error.schema_path)
+    if schema_path[:2] == ["$defs", "DictionaryDefinition"]:
+        return _format_dictionary_definition_oneof(error)
     if list(error.instance_path)[:2] == ["auth", "openapi"] and len(error.instance_path) == 3:
         section = path_to_section_name(error.instance_path)
 
@@ -225,6 +229,18 @@ def _format_oneof_error(error: ValidationError) -> str:
             return "'request-retries' table requires 'max-attempts'"
 
     return error.message  # pragma: no cover
+
+
+def _format_dictionary_definition_oneof(error: ValidationError) -> str:
+    section = path_to_section_name(error.instance_path)
+    instance = error.instance if isinstance(error.instance, dict) else {}
+    if "values" in instance and "from-file" in instance:
+        return f"Error in {section} section:\n  `values` and `from-file` are mutually exclusive - pick one."
+    return (
+        f"Error in {section} section:\n"
+        "  Must define either `values` (inline entries) "
+        "or `from-file` (path to a libFuzzer/AFL-format file)."
+    )
 
 
 def path_to_section_name(path: list[int | str]) -> str:

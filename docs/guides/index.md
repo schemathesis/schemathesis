@@ -67,3 +67,6 @@ Combine Schemathesis with custom Hypothesis strategies or use Schemathesis strat
 
 ### [Targeted Testing](targeted.md)
 Use property-based testing strategies to find performance issues and edge cases by directing test generation toward specific goals.
+
+### [Fuzz Dictionaries](fuzz-dictionary.md)
+Feed curated value pools (SQL injection payloads, real IDs, classic security strings) into generation, broadly by type or pinpointed at a parameter.

@@ -1,0 +1,6 @@
+[dictionaries.ids]
+values = [1, 2, 3]
+
+[parameters]
+"path.user_id" = { dictionary = "ids" }
+"query.q" = { dictionary = "ids", probability = 0.25 }

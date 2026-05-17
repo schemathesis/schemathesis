@@ -1,0 +1,2 @@
+Error in [dictionaries.x] section:
+  `values` and `from-file` are mutually exclusive - pick one.

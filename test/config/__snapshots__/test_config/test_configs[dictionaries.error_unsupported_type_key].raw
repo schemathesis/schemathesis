@@ -1,0 +1,6 @@
+Error in [generation.dictionaries] section:
+  Unknown properties:
+
+  - 'boolean'
+
+Valid properties for [generation.dictionaries] are: 'string', 'integer', 'number'.

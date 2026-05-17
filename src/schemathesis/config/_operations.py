@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config._auth import AuthConfig
 from schemathesis.config._checks import ChecksConfig
+from schemathesis.config._dictionaries import DictionaryDefinition
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
@@ -296,7 +297,12 @@ class OperationConfig(DiffBase):
         self.generation = generation or GenerationConfig()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> OperationConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> OperationConfig:
         filter_set = FilterSet()
         seen = set()
         for key_suffix, arg_suffix in (("", ""), ("-regex", "_regex")):
@@ -346,10 +352,10 @@ class OperationConfig(DiffBase):
             request_retries=_parse_request_retries(data.get("request-retries")),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
-            parameters=load_parameters(data),
+            parameters=load_parameters(data, dictionaries=dictionaries or {}),
             warnings=warnings,
             auth=AuthConfig.from_dict(data.get("auth", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
-            phases=PhasesConfig.from_dict(data.get("phases", {})),
-            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            phases=PhasesConfig.from_dict(data.get("phases", {}), dictionaries=dictionaries),
+            generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),
         )

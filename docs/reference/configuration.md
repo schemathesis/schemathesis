@@ -75,6 +75,37 @@ include-name = "GET /users/{user_id}/"
 parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 ```
 
+## Fuzz Dictionaries
+
+Curated value pools that Schemathesis samples during request generation. Define dictionaries once and enable them either by JSON Schema type or by named parameter.
+
+```toml
+[dictionaries.users]
+values = [42, 100, 9999]
+
+[dictionaries.edge]
+values = ["admin", "root", "' OR 1=1--"]
+
+# Sample from `edge` for every string parameter, 5% of the time
+[generation.dictionaries]
+string = { dictionary = "edge", probability = 0.05 }
+integer = { dictionary = "users", probability = 0.1 }
+
+# Target a specific parameter; defaults to probability = 1.0
+[parameters]
+"path.user_id" = { dictionary = "users" }
+"query.q" = { dictionary = "edge", probability = 0.2 }
+```
+
+Load entries from a libFuzzer/AFL-format file via `from-file = "fuzz/edge.dict"` instead of `values = [...]`. Paths resolve relative to the config file directory; absolute paths are accepted.
+
+Rules:
+
+- `values` and `from-file` are mutually exclusive; `values` accepts strings, integers, and finite numbers.
+- Type-wide bindings filter entries by the target type (`integer` keeps base-10 ints, `number` keeps finite numbers, `string` keeps everything); a dictionary with zero eligible entries for its bound type is a config error.
+- `probability` is required for type-wide bindings (greater than 0, at most 1) and optional for parameter bindings (defaults to `1.0`).
+- Parameter bindings win over type-wide; operation-scoped wins over global. Scalar parameter overrides still force the exact value.
+
 ## Global Settings
 
 #### `color`

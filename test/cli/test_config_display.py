@@ -63,3 +63,36 @@ def test_cli_no_config_display_without_file(ctx, cli, app_runner, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+def test_cli_displays_dictionary_stats(ctx, cli, app_runner, snapshot_cli):
+    paths = {
+        "/test": {
+            "get": {
+                "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    schema = ctx.openapi.build_schema(paths)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    base_url = app_runner.openapi_url(app, path="")
+    schema_path = ctx.openapi.write_schema(paths)
+
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--url={base_url}/api",
+            "-c",
+            "not_a_server_error",
+            "--max-examples=1",
+            config={
+                "dictionaries": {
+                    "edge": {"values": ["admin", "root", "guest"]},
+                    "ids": {"values": ["abc", "def"]},
+                },
+                "parameters": {"query.q": {"dictionary": "edge"}},
+            },
+        )
+        == snapshot_cli
+    )

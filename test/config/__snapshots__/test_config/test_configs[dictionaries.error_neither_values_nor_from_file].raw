@@ -1,0 +1,2 @@
+Error in [dictionaries.x] section:
+  Must define either `values` (inline entries) or `from-file` (path to a libFuzzer/AFL-format file).

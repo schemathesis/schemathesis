@@ -42,3 +42,5 @@ Complex schemas can trigger Hypothesis health checks by spending too much time f
 
 !!! info "For Researchers"
     When running multiple iterations, prefer higher `--max-examples` with fewer iterations rather than low examples with many iterations. For example, 2 runs of 500 examples each are more effective than 10 runs of 100 examples because Hypothesis can better explore the input space in longer runs.
+
+For security assessments, pair these settings with a curated wordlist via [Fuzz Dictionaries](fuzz-dictionary.md) to feed SQL injection, XSS, or other classic payloads into generation.

@@ -34,6 +34,7 @@ SYNTAX_FUZZING_PROBABILITY = 0.05
 VALUE_CHANNEL_PROBABILITY = 0.15
 
 if TYPE_CHECKING:
+    from schemathesis.generation.dictionaries import DictionaryDraw
     from schemathesis.resources import PoolDraw, SemanticDraw
     from schemathesis.specs.openapi.negative.types import Draw, Schema
 
@@ -67,6 +68,7 @@ class GeneratedValue:
     meta: MutationMetadata | None
     pool_draws: tuple[PoolDraw, ...] = ()
     semantic_draws: tuple[SemanticDraw, ...] = ()
+    dictionary_draws: tuple[DictionaryDraw, ...] = ()
 
 
 def wrap_filter_hook_for_generated_value(hook: Callable) -> Callable:
@@ -91,7 +93,11 @@ def wrap_map_hook_for_generated_value(hook: Callable) -> Callable:
         if isinstance(value, GeneratedValue):
             result = hook(value.value)
             return GeneratedValue(
-                value=result, meta=value.meta, pool_draws=value.pool_draws, semantic_draws=value.semantic_draws
+                value=result,
+                meta=value.meta,
+                pool_draws=value.pool_draws,
+                semantic_draws=value.semantic_draws,
+                dictionary_draws=value.dictionary_draws,
             )
         return hook(value)
 
@@ -111,8 +117,15 @@ def wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
             meta = value.meta
             pool_draws = value.pool_draws
             semantic_draws = value.semantic_draws
+            dictionary_draws = value.dictionary_draws
             return hook(value.value).map(
-                lambda v: GeneratedValue(value=v, meta=meta, pool_draws=pool_draws, semantic_draws=semantic_draws)
+                lambda v: GeneratedValue(
+                    value=v,
+                    meta=meta,
+                    pool_draws=pool_draws,
+                    semantic_draws=semantic_draws,
+                    dictionary_draws=dictionary_draws,
+                )
             )
         return hook(value)
 

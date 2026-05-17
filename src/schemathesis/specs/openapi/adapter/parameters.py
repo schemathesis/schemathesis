@@ -1599,12 +1599,41 @@ class OpenApiParameterSet(ParameterSet):
             if self.location == ParameterLocation.PATH:
                 explicit_intent_path_names = _get_explicit_intent_path_names(parameters=self.items)
 
+            from schemathesis.generation.dictionaries import (
+                build_dictionary_overlay_strategy,
+                resolve_parameter_bindings,
+            )
+
+            schema_properties = schema_obj.get("properties", {}) if isinstance(schema_obj, dict) else {}
+            bindings = resolve_parameter_bindings(
+                operation=operation,
+                location=self.location,
+                properties=schema_properties,
+                generation_config=generation_config,
+            )
+            if bindings:
+                strategy = build_dictionary_overlay_strategy(
+                    strategy,
+                    bindings=bindings,
+                    operation_label=operation.label,
+                    parameter_location=self.location,
+                    schema_properties=schema_properties,
+                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+                    generation_mode=generation_mode,
+                )
+
             serialize = operation.get_parameter_serializer(self.location)
             if serialize is not None:
                 if is_negative:
                     # Apply serialize only to the value part of GeneratedValue
                     strategy = strategy.map(
-                        lambda x: GeneratedValue(serialize(x.value), x.meta, x.pool_draws, x.semantic_draws)
+                        lambda x: GeneratedValue(
+                            serialize(x.value),
+                            x.meta,
+                            x.pool_draws,
+                            x.semantic_draws,
+                            x.dictionary_draws,
+                        )
                     )
                 else:
                     # Semantic overlay can wrap the value in `GeneratedValue` on substitution;
@@ -1625,15 +1654,28 @@ class OpenApiParameterSet(ParameterSet):
                             x.meta,
                             x.pool_draws,
                             x.semantic_draws,
+                            x.dictionary_draws,
                         )
                     )
                     # Keep strict anti-misrouting defaults for negative generation.
                     # Explicit %2F allowances apply only to positive data.
                     strategy = strategy.filter(lambda x: is_valid_path(x.value))
                 else:
-                    strategy = strategy.map(_quote_all_safe).map(jsonify_python_specific_types)
+                    # Dictionary / semantic overlays can wrap the value in `GeneratedValue`
+                    # under positive mode; route both helpers through the unwrap-rewrap
+                    # adapters so substituted path values still serialize correctly.
+                    from schemathesis.specs.openapi.negative import (
+                        wrap_filter_hook_for_generated_value,
+                        wrap_map_hook_for_generated_value,
+                    )
+
+                    strategy = strategy.map(wrap_map_hook_for_generated_value(_quote_all_safe)).map(
+                        wrap_map_hook_for_generated_value(jsonify_python_specific_types)
+                    )
                     strategy = strategy.filter(
-                        lambda x, allow=explicit_intent_path_names: is_valid_path(x, allow_encoded_slash_for=allow)
+                        wrap_filter_hook_for_generated_value(
+                            lambda x, allow=explicit_intent_path_names: is_valid_path(x, allow_encoded_slash_for=allow)
+                        )
                     )
             elif self.location == ParameterLocation.QUERY:
                 query_filter = is_valid_query
@@ -1649,7 +1691,11 @@ class OpenApiParameterSet(ParameterSet):
                 if is_negative:
                     strategy = strategy.map(
                         lambda x: GeneratedValue(
-                            jsonify_python_specific_types(x.value), x.meta, x.pool_draws, x.semantic_draws
+                            jsonify_python_specific_types(x.value),
+                            x.meta,
+                            x.pool_draws,
+                            x.semantic_draws,
+                            x.dictionary_draws,
                         )
                     )
                 else:

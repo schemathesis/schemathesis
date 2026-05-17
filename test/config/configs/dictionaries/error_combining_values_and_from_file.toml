@@ -1,0 +1,3 @@
+[dictionaries.x]
+values = [1]
+from-file = "x.dict"

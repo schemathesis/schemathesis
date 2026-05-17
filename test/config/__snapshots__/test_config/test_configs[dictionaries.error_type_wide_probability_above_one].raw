@@ -1,0 +1,4 @@
+Error in [generation.dictionaries.integer] section:
+  Value out of range:
+
+  - 'probability' -> Must be at most 1, but got 1.5.

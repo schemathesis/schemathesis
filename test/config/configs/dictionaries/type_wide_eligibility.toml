@@ -1,0 +1,5 @@
+[dictionaries.mixed]
+values = ["1", "2", "not-a-number"]
+
+[generation.dictionaries]
+integer = { dictionary = "mixed", probability = 0.5 }

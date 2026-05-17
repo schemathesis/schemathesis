@@ -1,0 +1,5 @@
+[dictionaries.x]
+values = ["abc", "def"]
+
+[generation.dictionaries]
+integer = { dictionary = "x", probability = 0.5 }

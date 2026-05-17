@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(parameters={'api_version': 'v2', 'query.q': ParameterDictionaryBinding(dictionary='x', probability=1.0)})), dictionaries={'x': DictionaryDefinition(name='x', entries=(DictionaryEntry(value=1, index=0),), source_kind='values', source_path=None)})

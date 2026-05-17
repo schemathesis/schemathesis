@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.mutations import Mutation
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import PoolDraw, SemanticDraw
+
+if TYPE_CHECKING:
+    from schemathesis.generation.dictionaries import DictionaryDraw
 
 
 class TestPhase(str, Enum):
@@ -202,6 +205,8 @@ class CaseMetadata:
     pool_misses: tuple[tuple[str, str], ...]
     # Semantic value index substitutions applied by the overlay (one entry per leaf substituted).
     semantic_draws: tuple[SemanticDraw, ...]
+    # Configured fuzz-dictionary draws applied to named parameters at generation time.
+    dictionary_draws: tuple[DictionaryDraw, ...]
     # Typed (pre-serialization) container snapshots captured at generation time.
     # Coverage stringifies query/path values for the wire; this preserves the
     # original typed form so revalidation matches the schema's abstraction level.
@@ -222,6 +227,7 @@ class CaseMetadata:
         "pool_draws",
         "pool_misses",
         "semantic_draws",
+        "dictionary_draws",
         "raw_containers",
         "_dirty",
         "_last_validated_hashes",
@@ -236,6 +242,7 @@ class CaseMetadata:
         pool_draws: tuple[PoolDraw, ...] = (),
         pool_misses: tuple[tuple[str, str], ...] = (),
         semantic_draws: tuple[SemanticDraw, ...] = (),
+        dictionary_draws: tuple[DictionaryDraw, ...] = (),
         raw_containers: dict[ParameterLocation, Any] | None = None,
     ) -> None:
         self.generation = generation
@@ -244,6 +251,7 @@ class CaseMetadata:
         self.pool_draws = pool_draws
         self.pool_misses = pool_misses
         self.semantic_draws = semantic_draws
+        self.dictionary_draws = dictionary_draws
         self.raw_containers = raw_containers if raw_containers is not None else {}
         # Initialize dirty tracking
         self._dirty = set()
@@ -315,6 +323,20 @@ class CaseMetadata:
                     "source_operation": draw.source_operation,
                 }
                 for draw in self.semantic_draws
+            ],
+            "dictionary_draws": [
+                {
+                    "dictionary": draw.dictionary,
+                    "source_kind": draw.source_kind,
+                    "source_path": draw.source_path,
+                    "entry_index": draw.entry_index,
+                    "operation_label": draw.operation_label,
+                    "parameter_location": draw.parameter_location,
+                    "parameter_name": draw.parameter_name,
+                    "value": draw.value,
+                    "matches_schema": draw.matches_schema,
+                }
+                for draw in self.dictionary_draws
             ],
             "raw_containers": {loc.name: value for loc, value in self.raw_containers.items()},
         }
@@ -395,6 +417,22 @@ class CaseMetadata:
         raw_containers = {
             ParameterLocation[loc_name]: value for loc_name, value in data.get("raw_containers", {}).items()
         }
+        from schemathesis.generation.dictionaries import DictionaryDraw
+
+        dictionary_draws = tuple(
+            DictionaryDraw(
+                dictionary=draw["dictionary"],
+                source_kind=draw["source_kind"],
+                source_path=draw["source_path"],
+                entry_index=draw["entry_index"],
+                operation_label=draw["operation_label"],
+                parameter_location=draw["parameter_location"],
+                parameter_name=draw["parameter_name"],
+                value=draw["value"],
+                matches_schema=draw["matches_schema"],
+            )
+            for draw in data.get("dictionary_draws", [])
+        )
         return cls(
             generation=generation,
             components=components,
@@ -402,6 +440,7 @@ class CaseMetadata:
             pool_draws=pool_draws,
             pool_misses=pool_misses,
             semantic_draws=semantic_draws,
+            dictionary_draws=dictionary_draws,
             raw_containers=raw_containers,
         )
 
