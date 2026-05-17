@@ -8,6 +8,10 @@
 - Reuse response field values across operations without an inferred producer-consumer link.
 - Persist error-feedback, auth, and 405 discoveries to `.schemathesis/`; probing replays them to skip rediscovery.
 
+### :wrench: Changed
+
+- Bound hypothesis-jsonschema caches; ~35% lower coverage-phase peak memory on long-running schemas.
+
 ### :bug: Fixed
 
 - Out-of-memory in coverage phase on wide, deeply-nested OpenAPI schemas (e.g. AWS Glue, Microsoft Graph).
