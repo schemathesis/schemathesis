@@ -326,6 +326,24 @@ def test_swagger2_array_query_param_top_level_enum_constrains_items(ctx):
     assert items_seen == {"Active", "Pending", "Closed"}, f"Expected each enum value covered, got {items_seen!r}"
 
 
+def test_positive_array_with_maxitems_zero(ctx):
+    # `maxItems: 0` permits only `[]`; the items-baseline path must not synthesize a non-empty array.
+    operation = _load_json_body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "stacks": {
+                    "type": "array",
+                    "maxItems": 0,
+                    "items": {"type": "string", "enum": ["unknown"]},
+                },
+            },
+        },
+    )
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
+
+
 def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
     # When a schema property has type:integer but also specifies minLength/maxLength
     operation = _load_json_body_operation(
