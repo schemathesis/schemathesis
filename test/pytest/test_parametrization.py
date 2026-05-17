@@ -5,7 +5,7 @@ import schemathesis
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import PayloadAlternatives
 
-from .utils import assert_requests_call, integer
+from ..utils import assert_requests_call, integer
 
 
 @pytest.fixture

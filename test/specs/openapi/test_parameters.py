@@ -12,8 +12,7 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
-
-from .utils import as_param
+from test.utils import as_param
 
 
 @pytest.mark.parametrize("schema_name", ["simple_swagger.yaml", "simple_openapi.yaml"])

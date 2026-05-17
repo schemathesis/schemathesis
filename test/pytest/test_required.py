@@ -2,7 +2,7 @@ import pytest
 
 from schemathesis.generation.modes import GenerationMode
 
-from .utils import as_param
+from ..utils import as_param
 
 
 def test_required_parameters(testdir):

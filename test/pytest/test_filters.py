@@ -2,7 +2,7 @@ import pytest
 
 from schemathesis.generation.modes import GenerationMode
 
-from .utils import integer
+from ..utils import integer
 
 
 @pytest.mark.parametrize("filter", ["method='GET'", "method='get'", "method_regex='GET'", "method_regex='get'"])
