@@ -990,8 +990,7 @@ def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] 
     all_of = schema.get("allOf")
     if not all_of:
         return
-    raw_parent_properties = schema.get("properties")
-    parent_properties: dict[str, Any] = raw_parent_properties if isinstance(raw_parent_properties, dict) else {}
+    parent_required = _required_keys(schema)
     for idx, sub_schema in enumerate(all_of):
         if isinstance(sub_schema, dict) and "$ref" in sub_schema:
             ref = sub_schema["$ref"]
@@ -1000,23 +999,32 @@ def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] 
                 all_of[idx] = resolved
                 if isinstance(resolved, dict):
                     _inline_allof_refs(resolved, ctx, seen | {ref})
-                    _relax_inherited_additional_properties(resolved, parent_properties)
+                    _relax_inherited_additional_properties(resolved, parent_required)
         elif isinstance(sub_schema, dict):
             _inline_allof_refs(sub_schema, ctx, seen)
-            _relax_inherited_additional_properties(sub_schema, parent_properties)
+            _relax_inherited_additional_properties(sub_schema, parent_required)
+
+
+def _required_keys(schema: dict[str, Any]) -> frozenset[str]:
+    raw = schema.get("required")
+    if not isinstance(raw, list):
+        return frozenset()
+    return frozenset(key for key in raw if isinstance(key, str))
 
 
 def _relax_inherited_additional_properties(
-    branch: dict[str, Any], parent_properties: dict[str, Any], bundle: dict[str, Any] | None = None
+    branch: dict[str, Any], parent_required: frozenset[str], bundle: dict[str, Any] | None = None
 ) -> None:
-    # Inherited `additionalProperties: false` from an allOf base forbids extras the outer
-    # declares, leaving the canonical intersection unsatisfiable; drop it so the outer's
-    # required keys survive through chained bases (resolved via `bundle`).
-    if not parent_properties:
+    # Inherited `additionalProperties: false` from an allOf base forbids extras the outer's
+    # `required` declares, leaving the canonical intersection unsatisfiable; drop the base's
+    # constraint so the required keys survive. Only fire when an outer-required key is actually
+    # missing from the branch -- otherwise the strict schema is satisfiable (e.g. by `{}`) and
+    # relaxing would generate inputs that fail validation against the original schema.
+    if not parent_required:
         return
     raw_branch_properties = branch.get("properties")
     branch_properties: dict[str, Any] = raw_branch_properties if isinstance(raw_branch_properties, dict) else {}
-    if any(key not in branch_properties for key in parent_properties):
+    if any(key not in branch_properties for key in parent_required):
         if branch.get("additionalProperties") is False:
             del branch["additionalProperties"]
     nested = branch.get("allOf")
@@ -1025,7 +1033,7 @@ def _relax_inherited_additional_properties(
             if not isinstance(inner, dict):
                 continue
             node = {**inner, BUNDLE_STORAGE_KEY: bundle} if bundle is not None and "$ref" in inner else inner
-            _relax_inherited_additional_properties(maybe_resolve_bundled(node), parent_properties, bundle)
+            _relax_inherited_additional_properties(maybe_resolve_bundled(node), parent_required, bundle)
 
 
 def _deep_relax_inherited_additional_properties(schema: dict[str, Any], bundle: dict[str, Any] | None) -> None:
@@ -1033,13 +1041,14 @@ def _deep_relax_inherited_additional_properties(schema: dict[str, Any], bundle: 
     # base accordingly so deep wrapper chains stay generatable.
     all_of = schema.get("allOf")
     raw_parent_properties = schema.get("properties")
-    parent_properties: dict[str, Any] = raw_parent_properties if isinstance(raw_parent_properties, dict) else {}
-    if isinstance(all_of, list) and parent_properties:
+    has_parent_properties = isinstance(raw_parent_properties, dict) and bool(raw_parent_properties)
+    if isinstance(all_of, list) and has_parent_properties:
+        parent_required = _required_keys(schema)
         for branch in all_of:
             if not isinstance(branch, dict):
                 continue
             node = {**branch, BUNDLE_STORAGE_KEY: bundle} if bundle is not None and "$ref" in branch else branch
-            _relax_inherited_additional_properties(maybe_resolve_bundled(node), parent_properties, bundle)
+            _relax_inherited_additional_properties(maybe_resolve_bundled(node), parent_required, bundle)
     for value in schema.values():
         if isinstance(value, dict):
             _deep_relax_inherited_additional_properties(value, bundle)

@@ -21,6 +21,7 @@ from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData
+from schemathesis.core.jsonschema import make_validator_for
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
@@ -4065,6 +4066,60 @@ def test_required_outside_allof_propagated_into_canonicalised_branches(ctx):
         if isinstance(sched, dict) and not all(k in sched for k in required):
             bad.append(sched)
     assert not bad, f"Generated nested object missing outer-required properties. Got: {bad}"
+
+
+def test_positive_body_under_allof_with_optional_outer_property_only(ctx):
+    # Base's `additionalProperties: false` forbids the outer's only optional property in positive cases.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "t", "version": "1"},
+            "components": {
+                "schemas": {
+                    "Base": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {"etag": {"type": "string"}},
+                    }
+                }
+            },
+            "paths": {
+                "/x": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "allOf": [{"$ref": "#/components/schemas/Base"}],
+                                        "properties": {"properties": {"properties": {"x": {"type": "string"}}}},
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "ok"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/x"]["POST"]
+    validator = make_validator_for(operation.body[0].optimized_schema)
+    cases: list = []
+
+    def collect(case):
+        if (
+            case.meta.phase.name == TestPhase.COVERAGE
+            and case.meta.components[ParameterLocation.BODY].mode == GenerationMode.POSITIVE
+        ):
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    invalid = [c.body for c in cases if not validator.is_valid(c.body)]
+    assert not invalid, f"Positive coverage produced bodies invalid per the strict schema: {invalid}"
 
 
 def test_ref_with_type_sibling_dropped_in_openapi_3_0(ctx):

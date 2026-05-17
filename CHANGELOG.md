@@ -24,6 +24,7 @@
 - Emit `pattern` negatives for header and cookie parameters.
 - Runtime Error in negative generation for FastAPI `Optional[Enum]` query parameters (`anyOf` with `$ref` and sibling `enum`).
 - Serialize nested-object multipart form-data parts as JSON instead of Python `repr`.
+- False positive `positive_data_acceptance` for optional body properties under `allOf` bases with `additionalProperties: false`.
 
 ## [4.18.5](https://github.com/schemathesis/schemathesis/compare/v4.18.4...v4.18.5) - 2026-05-13
 
