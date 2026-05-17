@@ -220,3 +220,4 @@ reports/
 .benchmarks/
 .worktrees/
 .schemathesis/
+test-corpus/.schemastore-cache/
