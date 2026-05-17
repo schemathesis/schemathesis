@@ -20,7 +20,6 @@ from schemathesis.core.jsonschema import (
     is_valid,
     make_validator,
     make_validator_for,
-    maybe_resolve_bundled,
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
@@ -577,12 +576,8 @@ class CoverageContext:
 
         # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
         cloned = deepclone(schema)
-        bundle: dict[str, Any] | None = None
-        if isinstance(cloned, dict):
-            if BUNDLE_STORAGE_KEY in cloned:
-                _apply_pattern_optimizations(cloned[BUNDLE_STORAGE_KEY], self.update_pattern)
-                bundle = cloned[BUNDLE_STORAGE_KEY]
-            _deep_relax_inherited_additional_properties(cloned, bundle)
+        if isinstance(cloned, dict) and BUNDLE_STORAGE_KEY in cloned:
+            _apply_pattern_optimizations(cloned[BUNDLE_STORAGE_KEY], self.update_pattern)
         strategy = from_schema(cloned, custom_formats=self.custom_formats)
         # Keep generation consistent with the validator draft semantics used by this operation.
         # This avoids producing positive values that the validator for the same schema would reject.
@@ -990,8 +985,6 @@ def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] 
     all_of = schema.get("allOf")
     if not all_of:
         return
-    raw_parent_properties = schema.get("properties")
-    parent_properties: dict[str, Any] = raw_parent_properties if isinstance(raw_parent_properties, dict) else {}
     for idx, sub_schema in enumerate(all_of):
         if isinstance(sub_schema, dict) and "$ref" in sub_schema:
             ref = sub_schema["$ref"]
@@ -1000,53 +993,8 @@ def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] 
                 all_of[idx] = resolved
                 if isinstance(resolved, dict):
                     _inline_allof_refs(resolved, ctx, seen | {ref})
-                    _relax_inherited_additional_properties(resolved, parent_properties)
         elif isinstance(sub_schema, dict):
             _inline_allof_refs(sub_schema, ctx, seen)
-            _relax_inherited_additional_properties(sub_schema, parent_properties)
-
-
-def _relax_inherited_additional_properties(
-    branch: dict[str, Any], parent_properties: dict[str, Any], bundle: dict[str, Any] | None = None
-) -> None:
-    # Inherited `additionalProperties: false` from an allOf base forbids extras the outer
-    # declares, leaving the canonical intersection unsatisfiable; drop it so the outer's
-    # required keys survive through chained bases (resolved via `bundle`).
-    if not parent_properties:
-        return
-    raw_branch_properties = branch.get("properties")
-    branch_properties: dict[str, Any] = raw_branch_properties if isinstance(raw_branch_properties, dict) else {}
-    if any(key not in branch_properties for key in parent_properties):
-        if branch.get("additionalProperties") is False:
-            del branch["additionalProperties"]
-    nested = branch.get("allOf")
-    if isinstance(nested, list):
-        for inner in nested:
-            if not isinstance(inner, dict):
-                continue
-            node = {**inner, BUNDLE_STORAGE_KEY: bundle} if bundle is not None and "$ref" in inner else inner
-            _relax_inherited_additional_properties(maybe_resolve_bundled(node), parent_properties, bundle)
-
-
-def _deep_relax_inherited_additional_properties(schema: dict[str, Any], bundle: dict[str, Any] | None) -> None:
-    # Find every nested object that declares both `allOf` and own `properties`, and relax each
-    # base accordingly so deep wrapper chains stay generatable.
-    all_of = schema.get("allOf")
-    raw_parent_properties = schema.get("properties")
-    parent_properties: dict[str, Any] = raw_parent_properties if isinstance(raw_parent_properties, dict) else {}
-    if isinstance(all_of, list) and parent_properties:
-        for branch in all_of:
-            if not isinstance(branch, dict):
-                continue
-            node = {**branch, BUNDLE_STORAGE_KEY: bundle} if bundle is not None and "$ref" in branch else branch
-            _relax_inherited_additional_properties(maybe_resolve_bundled(node), parent_properties, bundle)
-    for value in schema.values():
-        if isinstance(value, dict):
-            _deep_relax_inherited_additional_properties(value, bundle)
-        elif isinstance(value, list):
-            for item in value:
-                if isinstance(item, dict):
-                    _deep_relax_inherited_additional_properties(item, bundle)
 
 
 @contextmanager
