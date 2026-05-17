@@ -77,7 +77,11 @@
       "type": "string"
     },
     "parameters": {
-      "type": "object"
+      "$ref": "#/$defs/ParametersConfig"
+    },
+    "dictionaries": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/DictionaryDefinition" }
     },
     "generation": {
       "$ref": "#/$defs/GenerationConfig"
@@ -633,7 +637,75 @@
         },
         "unique-inputs": {
           "type": "boolean"
+        },
+        "dictionaries": {
+          "$ref": "#/$defs/TypeDictionariesConfig"
         }
+      }
+    },
+    "DictionaryDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": ["string", "integer", "number"]
+          }
+        },
+        "from-file": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "oneOf": [
+        { "required": ["values"] },
+        { "required": ["from-file"] }
+      ]
+    },
+    "TypeDictionariesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "string": { "$ref": "#/$defs/DictionaryBinding" },
+        "integer": { "$ref": "#/$defs/DictionaryBinding" },
+        "number": { "$ref": "#/$defs/DictionaryBinding" }
+      }
+    },
+    "DictionaryBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dictionary", "probability"],
+      "properties": {
+        "dictionary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "ParametersConfig": {
+      "type": "object",
+      "additionalProperties": {
+        "if": {
+          "type": "object",
+          "required": ["dictionary"]
+        },
+        "then": { "$ref": "#/$defs/ParameterDictionaryBinding" }
+      }
+    },
+    "ParameterDictionaryBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dictionary"],
+      "properties": {
+        "dictionary": { "type": "string", "minLength": 1 },
+        "probability": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
       }
     },
     "OutputConfig": {
@@ -698,7 +770,7 @@
           "type": "string"
         },
         "parameters": {
-          "type": "object"
+          "$ref": "#/$defs/ParametersConfig"
         },
         "generation": {
           "$ref": "#/$defs/GenerationConfig"

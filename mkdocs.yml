@@ -32,6 +32,7 @@ nav:
       - guides/stateful-testing.md
       - Hypothesis Strategies: guides/hypothesis-strategies.md
       - guides/targeted.md
+      - Fuzz Dictionaries: guides/fuzz-dictionary.md
 
   - Core Concepts:
       - explanations/data-generation.md

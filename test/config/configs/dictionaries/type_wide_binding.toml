@@ -1,0 +1,9 @@
+[dictionaries.edge]
+values = ["admin", "root"]
+
+[dictionaries.ids]
+values = [1, 2, 3]
+
+[generation.dictionaries]
+string = { dictionary = "edge", probability = 0.1 }
+integer = { dictionary = "ids", probability = 0.5 }

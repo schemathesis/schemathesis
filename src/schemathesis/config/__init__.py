@@ -21,6 +21,7 @@ from schemathesis.config._checks import (
     PositiveDataAcceptanceConfig,
     SimpleCheckConfig,
 )
+from schemathesis.config._dictionaries import DictionaryDefinition, parse_dictionaries
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._error import ConfigError
 from schemathesis.config._fuzz import FuzzConfig
@@ -85,6 +86,7 @@ __all__ = [
     "HttpBasicAuthConfig",
     "HttpBearerAuthConfig",
     "FuzzConfig",
+    "DictionaryDefinition",
 ]
 
 
@@ -100,6 +102,7 @@ class SchemathesisConfig(DiffBase):
     cache: CacheConfig
     output: OutputConfig
     projects: ProjectsConfig
+    dictionaries: dict[str, DictionaryDefinition]
 
     def __init__(
         self,
@@ -113,6 +116,7 @@ class SchemathesisConfig(DiffBase):
         cache: CacheConfig | None = None,
         output: OutputConfig | None = None,
         projects: ProjectsConfig | None = None,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
     ):
         self.color = color
         self.suppress_health_check = suppress_health_check or []
@@ -125,6 +129,7 @@ class SchemathesisConfig(DiffBase):
         self.output = output or OutputConfig()
         self.projects = projects or ProjectsConfig()
         self.projects._set_parent(self)
+        self.dictionaries = dictionaries or {}
 
     @property
     def seed(self) -> int:
@@ -196,19 +201,21 @@ class SchemathesisConfig(DiffBase):
     @classmethod
     def from_path(cls, path: PathLike | str) -> SchemathesisConfig:
         """Load configuration from a file path."""
+        resolved_path = str(Path(path).resolve())
+        base_dir = os.path.dirname(resolved_path)
         with open(path, encoding="utf-8") as fd:
-            config = cls.from_str(fd.read())
-            config._config_path = str(Path(path).resolve())
+            config = cls.from_str(fd.read(), base_dir=base_dir)
+            config._config_path = resolved_path
             return config
 
     @classmethod
-    def from_str(cls, data: str) -> SchemathesisConfig:
+    def from_str(cls, data: str, *, base_dir: str | None = None) -> SchemathesisConfig:
         """Parse configuration from a string."""
         parsed = tomli.loads(data)
-        return cls.from_dict(parsed)
+        return cls.from_dict(parsed, base_dir=base_dir)
 
     @classmethod
-    def from_dict(cls, data: dict) -> SchemathesisConfig:
+    def from_dict(cls, data: dict, *, base_dir: str | None = None) -> SchemathesisConfig:
         """Create a config instance from a dictionary."""
         from jsonschema_rs import ValidationError
 
@@ -218,6 +225,8 @@ class SchemathesisConfig(DiffBase):
             CONFIG_VALIDATOR.validate(data)
         except ValidationError as exc:
             raise ConfigError.from_validation_error(exc) from None
+        dictionaries = parse_dictionaries(data, base_dir=base_dir)
+        projects = ProjectsConfig.from_dict(data, dictionaries=dictionaries)
         return cls(
             color=data.get("color"),
             suppress_health_check=[HealthCheck(name) for name in data.get("suppress-health-check", [])],
@@ -227,5 +236,6 @@ class SchemathesisConfig(DiffBase):
             reports=ReportsConfig.from_dict(data.get("reports", {})),
             cache=CacheConfig.from_dict(data.get("cache", {})),
             output=OutputConfig.from_dict(data.get("output", {})),
-            projects=ProjectsConfig.from_dict(data),
+            projects=projects,
+            dictionaries=dictionaries,
         )

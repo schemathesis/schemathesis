@@ -1,0 +1,5 @@
+[dictionaries.ids]
+values = [1]
+
+[parameters]
+"foo.bar" = { dictionary = "ids" }

@@ -1,0 +1,5 @@
+[dictionaries.x]
+values = [1]
+
+[generation.dictionaries]
+integer = { dictionary = "x" }

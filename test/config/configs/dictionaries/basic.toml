@@ -1,0 +1,5 @@
+[dictionaries.users]
+values = [42, 100, 9999]
+
+[dictionaries.edge]
+values = ["admin", "root", "' OR 1=1--"]

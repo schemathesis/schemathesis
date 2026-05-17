@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ProjectConfig
+from schemathesis.config._dictionaries import ParameterDictionaryBinding, lookup_parameter
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import diff
 
@@ -69,13 +70,12 @@ def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override
 
 
 def _get_override_value(param: OperationParameter, parameters: dict[str, Any]) -> Any:
-    key = param.name
-    full_key = f"{param.location.value}.{param.name}"
-    if key in parameters:
-        return parameters[key]
-    elif full_key in parameters:
-        return parameters[full_key]
-    return None
+    # Dictionary bindings are handled by the strategy overlay; the override pipeline
+    # is for scalar "force this value" entries only.
+    value = lookup_parameter(parameters, name=param.name, location=param.location.value)
+    if isinstance(value, ParameterDictionaryBinding):
+        return None
+    return value
 
 
 @dataclass(slots=True)

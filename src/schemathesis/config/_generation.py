@@ -3,7 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.config._dictionaries import (
+    DictionaryBinding,
+    DictionaryDefinition,
+    coerce_entries_for_type,
+    require_known_dictionary,
+)
 from schemathesis.config._diff_base import DiffBase
+from schemathesis.config._error import ConfigError
 from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
@@ -30,6 +37,7 @@ class GenerationConfig(DiffBase):
     database: str | None
     unique_inputs: bool
     exclude_header_characters: str | None
+    dictionaries: dict[str, DictionaryBinding]
     _is_default: bool
 
     def __init__(
@@ -48,6 +56,7 @@ class GenerationConfig(DiffBase):
         database: str | None = None,
         unique_inputs: bool = False,
         exclude_header_characters: str | None = None,
+        dictionaries: dict[str, DictionaryBinding] | None = None,
     ) -> None:
         from schemathesis.generation import GenerationMode
 
@@ -64,6 +73,7 @@ class GenerationConfig(DiffBase):
         self.database = database
         self.unique_inputs = unique_inputs
         self.exclude_header_characters = exclude_header_characters
+        self.dictionaries = dictionaries or {}
 
         # Check if all parameters match their default values
         object.__setattr__(
@@ -81,7 +91,8 @@ class GenerationConfig(DiffBase):
             and graphql_allow_null is True
             and database is None
             and unique_inputs is False
-            and exclude_header_characters is None,
+            and exclude_header_characters is None
+            and not (dictionaries or {}),
         )
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -92,7 +103,12 @@ class GenerationConfig(DiffBase):
         object.__setattr__(self, name, value)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> GenerationConfig:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        dictionaries: dict[str, DictionaryDefinition] | None = None,
+    ) -> GenerationConfig:
         mode_raw = data.get("mode")
         if mode_raw == "all":
             modes = list(GenerationMode)
@@ -115,6 +131,7 @@ class GenerationConfig(DiffBase):
             database=data.get("database"),
             unique_inputs=data.get("unique-inputs", False),
             exclude_header_characters=data.get("exclude-header-characters"),
+            dictionaries=_parse_type_wide_bindings(data.get("dictionaries"), dictionaries or {}),
         )
 
     def update(
@@ -155,6 +172,18 @@ class GenerationConfig(DiffBase):
         if exclude_header_characters is not None:
             self.exclude_header_characters = exclude_header_characters
 
+    @classmethod
+    def from_hierarchy(cls, configs: list[GenerationConfig]) -> GenerationConfig:  # type: ignore[override]
+        # Bare `super()` breaks under `@dataclass(slots=True)` on Python < 3.13.
+        merged: GenerationConfig = DiffBase.from_hierarchy.__func__(cls, configs)  # type: ignore[attr-defined]
+        # Per-type merge so an operation override composes with the project-level binding
+        # at a different type, rather than replacing it.
+        merged_dictionaries: dict[str, DictionaryBinding] = {}
+        for config in reversed(configs):
+            merged_dictionaries.update(config.dictionaries)
+        merged.dictionaries = merged_dictionaries
+        return merged
+
 
 def _get_maximize(value: Any) -> list[MetricFunction]:
     from schemathesis.generation.metrics import METRICS
@@ -166,3 +195,18 @@ def _get_maximize(value: Any) -> list[MetricFunction]:
     else:
         metrics = []
     return METRICS.get_by_names(metrics)
+
+
+def _parse_type_wide_bindings(
+    raw: dict[str, dict[str, Any]] | None, dictionaries: dict[str, DictionaryDefinition]
+) -> dict[str, DictionaryBinding]:
+    if not raw:
+        return {}
+    result: dict[str, DictionaryBinding] = {}
+    for ty, value in raw.items():
+        name: str = value["dictionary"]
+        require_known_dictionary(f"`generation.dictionaries.{ty}`", name, dictionaries)
+        if not coerce_entries_for_type(dictionaries[name].entries, ty):
+            raise ConfigError(f"Dictionary `{name}` has no entries eligible for `{ty}` under `generation.dictionaries`")
+        result[ty] = DictionaryBinding(dictionary=name, probability=float(value["probability"]))
+    return result

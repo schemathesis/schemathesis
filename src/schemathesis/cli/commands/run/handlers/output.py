@@ -675,6 +675,12 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         table.add_row("Operations:", f"{statistic.selected} selected / {statistic.total} total")
         if event.config.config_path:
             table.add_row("Configuration:", event.config.config_path)
+        dictionaries = event.config.dictionaries
+        if dictionaries:
+            total_values = sum(len(d.entries) for d in dictionaries.values())
+            entry_word = "entry" if total_values == 1 else "entries"
+            dict_word = "dictionary" if len(dictionaries) == 1 else "dictionaries"
+            table.add_row("Dictionaries:", f"{len(dictionaries)} {dict_word} / {total_values} {entry_word}")
 
         message = Padding(table, BLOCK_PADDING)
         self.console.print(message)
