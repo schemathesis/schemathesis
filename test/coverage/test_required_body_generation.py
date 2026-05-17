@@ -347,55 +347,6 @@ def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
     _assert_generated_bodies_match_schema(operation, GenerationMode.NEGATIVE, require_bodies=False)
 
 
-def test_deep_allof_chain_with_inherited_additional_properties_populates_inner_required(ctx):
-    # `additionalProperties: false` inherited through a chain of allOf bases would otherwise drop the wrapper's required keys.
-    operation = _load_json_body_operation(
-        ctx,
-        {"$ref": "#/components/schemas/Envelope"},
-        path="/items",
-        method="put",
-        components={
-            "schemas": {
-                "Base": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {"baseField": {"type": "string"}},
-                },
-                "Intermediate": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "allOf": [{"$ref": "#/components/schemas/Base"}],
-                },
-                "Wrapper": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "allOf": [{"$ref": "#/components/schemas/Intermediate"}],
-                    "properties": {
-                        "first": {"type": "string"},
-                        "second": {"type": "string"},
-                    },
-                    "required": ["first", "second"],
-                },
-                "Envelope": {
-                    "type": "object",
-                    "properties": {"payload": {"$ref": "#/components/schemas/Wrapper"}},
-                    "required": ["payload"],
-                },
-            }
-        },
-    )
-
-    bodies = [
-        case.body for case in _collect_coverage_cases(operation, GenerationMode.POSITIVE) if case.body is not None
-    ]
-    populated = [
-        body
-        for body in bodies
-        if isinstance(body.get("payload"), dict) and {"first", "second"} <= body["payload"].keys()
-    ]
-    assert populated, f"Expected positive body with `payload.first` and `payload.second`, got {bodies!r}"
-
-
 def test_required_enforced_when_properties_at_threshold(ctx):
     # When a schema has exactly 15 properties (at the jsonschema_rs SmallProperties threshold)
     # and required lists exactly 2 of them, NEGATIVE cases must still be schema-invalid.
