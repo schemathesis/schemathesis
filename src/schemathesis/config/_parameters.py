@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from schemathesis.config._dictionaries import (
+    BODY_PREFIX,
     SUPPORTED_LOCATION_PREFIXES,
     DictionaryDefinition,
     ParameterDictionaryBinding,
+    parse_body_path,
     require_known_dictionary,
 )
 from schemathesis.config._env import resolve
@@ -24,6 +26,8 @@ def load_parameters(
     for key, value in data.get("parameters", {}).items():
         if isinstance(value, dict) and "dictionary" in value:
             _validate_dictionary_location_prefix(key)
+            if key.startswith(BODY_PREFIX):
+                parse_body_path(key)
             name: str = value["dictionary"]
             require_known_dictionary(f"Parameter `{key}`", name, dictionaries)
             parameters[key] = ParameterDictionaryBinding(

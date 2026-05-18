@@ -99,6 +99,23 @@ integer = { dictionary = "users", probability = 0.1 }
 
 Load entries from a libFuzzer/AFL-format file via `from-file = "fuzz/edge.dict"` instead of `values = [...]`. Paths resolve relative to the config file directory; absolute paths are accepted.
 
+For request bodies, target fields with a JSONPath subset ([RFC 9535](https://www.rfc-editor.org/rfc/rfc9535)) rooted at `body.`:
+
+```toml
+[dictionaries.card_numbers]
+values = ["1234-5678-9012-3456", "4111-1111-1111-1111"]
+
+[dictionaries.emails]
+values = ["test@example.com", "admin@example.com"]
+
+[parameters]
+"body.ccNumber" = { dictionary = "card_numbers" }
+"body.user.email" = { dictionary = "emails" }
+"body.items[*].name" = { dictionary = "emails", probability = 0.4 }
+```
+
+Body keys support dotted names for object properties, `[*]` for "every array element", and `body.[*]` when the body itself is a top-level array. Recursive descent (`body..x`), positional indices (`body.x[3]`), filters, and slices are not supported.
+
 Rules:
 
 - `values` and `from-file` are mutually exclusive; `values` accepts strings, integers, and finite numbers.
