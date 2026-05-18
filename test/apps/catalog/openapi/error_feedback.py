@@ -153,6 +153,8 @@ def planted_bug() -> OpenAPIApp:
 
 def nested_planted_bug() -> OpenAPIApp:
     # 400 gate keyed on a dotted path (`contact.email`); feedback must lift the bound onto the nested object.
+    # `contact` is required so Hypothesis always emits the nested container the hint targets — without it,
+    # most generated bodies skip `contact` entirely and the bug stays unreachable within --max-examples=10.
     spec = build_schema(
         {
             "/profiles": {
@@ -167,6 +169,7 @@ def nested_planted_bug() -> OpenAPIApp:
                                         "name": {"type": "string"},
                                         "contact": {"type": "object", "properties": {}},
                                     },
+                                    "required": ["contact"],
                                 }
                             }
                         },
@@ -187,7 +190,9 @@ def nested_planted_bug() -> OpenAPIApp:
         body = request.get_json(silent=True)
         contact = body.get("contact") if isinstance(body, dict) else None
         email = contact.get("email") if isinstance(contact, dict) else None
-        if not isinstance(email, str) or not email.strip():
+        # Accept any non-empty string — whitespace-only values count, so generators that emit
+        # `" "` from a "must-not-be-blank" hint still reach the planted 500.
+        if not isinstance(email, str) or not email:
             return jsonify({"messages": ["contact.email - must not be blank"]}), 400
         return "", 500
 

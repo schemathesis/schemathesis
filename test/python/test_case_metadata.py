@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import Phase, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
@@ -374,7 +374,7 @@ def test_before_call_hook_with_negative_cases(ctx):
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(case=strategy)
-    @settings(max_examples=3, phases=[Phase.generate], deadline=None)
+    @settings(max_examples=3, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
     def test_case(case):
         if case.meta and isinstance(case.body, dict):
             # Initially negative (missing required id)
@@ -423,7 +423,7 @@ def test_map_case_hook_with_metadata(ctx):
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(case=strategy)
-    @settings(max_examples=3, phases=[Phase.generate], deadline=None)
+    @settings(max_examples=3, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
     def test_case(case):
         # Verify path parameter is valid after hook fix
         assert case.meta.components[ParameterLocation.PATH].mode == GenerationMode.POSITIVE

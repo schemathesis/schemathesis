@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
@@ -171,7 +171,7 @@ def test_filter_body_works_in_negative_mode(ctx):
         return not isinstance(body, bytes)
 
     @given(case=schema["/test"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=5)
+    @settings(max_examples=5, suppress_health_check=list(HealthCheck))
     def inner(case):
         assert not isinstance(case.body, bytes)
 

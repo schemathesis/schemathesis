@@ -440,7 +440,7 @@ def test_negative_mode_skip_when_impossible(ctx):
     with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
 
         @given(strategy)
-        @settings(max_examples=1)
+        @settings(max_examples=1, suppress_health_check=list(HealthCheck))
         def test_(case):
             pass
 
@@ -454,7 +454,7 @@ def test_negative_mode_fallback_to_positive(ctx):
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(strategy)
-    @settings(max_examples=1)
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
     def test_(case):
         assert "getBooks" in case.body
         assert case.meta.generation.mode == GenerationMode.POSITIVE

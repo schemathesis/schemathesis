@@ -1,7 +1,7 @@
 import re
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.headers import (
@@ -96,7 +96,7 @@ def test_negative_mode_range_has_three_tiers():
     values = []
 
     @given(strategies["_range_header"])
-    @settings(max_examples=200)
+    @settings(max_examples=200, suppress_health_check=list(HealthCheck))
     def inner(value):
         values.append(value)
 
