@@ -82,3 +82,20 @@ def test_resolve_reference_translates_missing_references_to_ref_resolution_error
         resolve_reference(resolver, "https://example.com/missing.json")
 
     assert exc.value.__notes__ == ["https://example.com/missing.json"]
+
+
+def test_resolve_reference_to_file_path_with_uri_reserved_characters(tmp_path):
+    # Split-file OpenAPI layouts mirror path templates; refs like 'paths/{id}/op.yaml' must resolve.
+    target_dir = tmp_path / "paths" / "{id}"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "op.yaml"
+    target_file.write_text("$defs:\n  value:\n    type: string\n")
+
+    root_file = tmp_path / "root.yaml"
+    root_schema = {"$ref": "paths/{id}/op.yaml#/$defs/value"}
+    root_file.write_text(json.dumps(root_schema))
+
+    resolver = make_root_resolver(root_schema, location=root_file.as_uri())
+    _, resolved = resolve_reference(resolver, root_schema["$ref"])
+
+    assert resolved == {"type": "string"}

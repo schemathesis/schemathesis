@@ -6,7 +6,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
-from urllib.parse import urldefrag, urljoin
+from urllib.parse import quote, urldefrag, urljoin, urlsplit, urlunsplit
 from urllib.request import urlopen
 
 import jsonschema_rs
@@ -64,6 +64,24 @@ class Resolver:
         return value
 
 
+# RFC 3986 §3.3 path characters plus `%` so already percent-encoded sequences pass through.
+_SAFE_URI_PATH_CHARS = "/:@!$&'()*+,;=%-._~"
+
+
+def _quote_unsafe_uri_path(uri: str) -> str:
+    """Percent-encode reserved characters in a URI's path component.
+
+    `urljoin` does not percent-encode, so a relative `$ref` like
+    `./paths/{id}/op.yaml` produces a URI with raw `{`/`}` that
+    `jsonschema_rs.Registry` rejects as an invalid URI reference.
+    """
+    parts = urlsplit(uri)
+    quoted_path = quote(parts.path, safe=_SAFE_URI_PATH_CHARS)
+    if quoted_path == parts.path:
+        return uri
+    return urlunsplit(parts._replace(path=quoted_path))
+
+
 def _normalize_location(location: str) -> str:
     """Convert a plain filesystem path to a `file://` URI so relative refs resolve via urljoin.
 
@@ -71,7 +89,7 @@ def _normalize_location(location: str) -> str:
     a scheme that `urljoin` does not treat as relative-aware.
     """
     if "://" in location or location.startswith("urn:"):
-        return location
+        return _quote_unsafe_uri_path(location)
     return Path(os.path.abspath(location)).as_uri()
 
 
