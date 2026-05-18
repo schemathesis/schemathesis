@@ -4,4 +4,4 @@ Stdout:
 Usage: schemathesis run [OPTIONS] LOCATION
 Try 'schemathesis run --help' for help.
 
-Error: Invalid value: Could not open file '\x00': embedded null byte
+Error: Invalid value: Could not create directory 'd\x00': embedded null byte
