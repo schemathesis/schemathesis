@@ -107,8 +107,8 @@ def build_semantic_overlay(
     """
     from hypothesis import strategies as st
 
+    from schemathesis.generation.value import GeneratedValue
     from schemathesis.specs.openapi.examples import _example_is_valid
-    from schemathesis.specs.openapi.negative import GeneratedValue
     from schemathesis.specs.openapi.semantic_pool import SEMANTIC_OVERLAY_PROBABILITY
 
     paired: list[tuple[LeafDescriptor, jsonschema_rs.Validator | None]] = []
@@ -284,7 +284,7 @@ def build_hybrid_strategy(
     """
     from hypothesis import strategies as st
 
-    from schemathesis.specs.openapi.negative import GeneratedValue
+    from schemathesis.generation.value import GeneratedValue
 
     # Pre-compute keys for all variants
     variant_keys = [_variant_key(v.overlay) for v in captured_variants]
@@ -961,6 +961,10 @@ class OpenApiBody(OpenApiComponent):
             else:
                 strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
 
+        from schemathesis.generation.body_overrides import (
+            build_body_override_overlay_strategy,
+            resolve_body_overrides,
+        )
         from schemathesis.generation.dictionaries import (
             build_body_dictionary_overlay_strategy,
             resolve_body_bindings,
@@ -979,6 +983,10 @@ class OpenApiBody(OpenApiComponent):
                 validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                 generation_mode=generation_mode,
             )
+
+        body_overrides = resolve_body_overrides(operation=operation, body_schema=schema)
+        if body_overrides:
+            strategy = build_body_override_overlay_strategy(strategy, overrides=body_overrides)
 
         # Cache the strategy keyed by feedback generation and semantic-index identity
         if use_cache:
@@ -1000,7 +1008,7 @@ class OpenApiBody(OpenApiComponent):
         """Build strategy for negative mode when captured values are available."""
         from hypothesis import strategies as st
 
-        from schemathesis.specs.openapi.negative import GeneratedValue
+        from schemathesis.generation.value import GeneratedValue
 
         positive_strategy = self.get_strategy(
             operation, generation_config, GenerationMode.POSITIVE, extra_data_source=None
@@ -1488,6 +1496,7 @@ class OpenApiParameterSet(ParameterSet):
         # Import here to avoid circular dependency
         from hypothesis import strategies as st
 
+        from schemathesis.generation.value import GeneratedValue
         from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query
         from schemathesis.specs.openapi._hypothesis import (
             GENERATOR_MODE_TO_STRATEGY_FACTORY,
@@ -1495,7 +1504,6 @@ class OpenApiParameterSet(ParameterSet):
             jsonify_python_specific_types,
             make_negative_strategy,
         )
-        from schemathesis.specs.openapi.negative import GeneratedValue
 
         def _quote_all_safe(value: dict[str, Any]) -> dict[str, Any]:
             """Quote path parameter values, preserving invalid inputs for later filtering."""
@@ -1760,7 +1768,7 @@ class OpenApiParameterSet(ParameterSet):
         """
         from hypothesis import strategies as st
 
-        from schemathesis.specs.openapi.negative import GeneratedValue
+        from schemathesis.generation.value import GeneratedValue
 
         # Get positive strategy with hybrid approach
         positive_strategy = self.get_strategy(

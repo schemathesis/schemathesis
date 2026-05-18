@@ -10,6 +10,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import PoolPick
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import (
@@ -19,7 +20,6 @@ from schemathesis.resources.repository import (
 )
 from schemathesis.specs.openapi._hypothesis import openapi_cases
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
-from schemathesis.specs.openapi.negative import GeneratedValue
 
 USER_RESOURCE = "User"
 POST_USERS = "POST /users"

@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 from schemathesis.core import transport
 from schemathesis.core.deserialization import register_deserializer
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import SemanticDraw
 from schemathesis.specs.openapi.adapter.parameters import (
     _MISSING,
@@ -20,7 +21,6 @@ from schemathesis.specs.openapi.adapter.parameters import (
 )
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 from schemathesis.specs.openapi.formats import HEADER_FORMAT
-from schemathesis.specs.openapi.negative import GeneratedValue
 from schemathesis.specs.openapi.semantic_pool import (
     BoundedValues,
     IngestionLeaf,

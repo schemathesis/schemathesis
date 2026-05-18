@@ -18,6 +18,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
     MutationChannel,
@@ -34,8 +35,6 @@ SYNTAX_FUZZING_PROBABILITY = 0.05
 VALUE_CHANNEL_PROBABILITY = 0.15
 
 if TYPE_CHECKING:
-    from schemathesis.generation.dictionaries import DictionaryDraw
-    from schemathesis.resources import PoolDraw, SemanticDraw
     from schemathesis.specs.openapi.negative.types import Draw, Schema
 
 
@@ -54,21 +53,6 @@ def _random_non_json_bytes() -> st.SearchStrategy[bytes]:
     Used for syntax-level fuzzing of JSON endpoints.
     """
     return st.binary(min_size=1, max_size=1024).filter(_is_not_valid_json)
-
-
-@dataclass(slots=True)
-class GeneratedValue:
-    """Wrapper for generated values with optional mutation metadata.
-
-    This allows us to pass both the value and metadata through the generation pipeline
-    without using tuples, making the code cleaner and type-safe.
-    """
-
-    value: Any
-    meta: MutationMetadata | None
-    pool_draws: tuple[PoolDraw, ...] = ()
-    semantic_draws: tuple[SemanticDraw, ...] = ()
-    dictionary_draws: tuple[DictionaryDraw, ...] = ()
 
 
 def wrap_filter_hook_for_generated_value(hook: Callable) -> Callable:

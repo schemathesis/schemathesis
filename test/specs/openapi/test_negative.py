@@ -18,9 +18,10 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
-from schemathesis.specs.openapi.negative import GeneratedValue, mutated, negative_schema
+from schemathesis.specs.openapi.negative import mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
     MutationContext,
     MutationResult,

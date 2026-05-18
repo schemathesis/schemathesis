@@ -6,8 +6,9 @@ from hypothesis import strategies as st
 from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
-from schemathesis.specs.openapi.negative import GeneratedValue, _strip_binary, negative_schema
+from schemathesis.specs.openapi.negative import _strip_binary, negative_schema
 from schemathesis.specs.openapi.negative.mutations import MutationChannel
 from schemathesis.specs.openapi.negative.value_channel import (
     apply_value_channel,

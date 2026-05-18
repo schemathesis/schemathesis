@@ -8,6 +8,7 @@
 - Reuse response field values across operations without an inferred producer-consumer link.
 - Persist error-feedback, auth, and 405 discoveries to `.schemathesis/`; probing replays them to skip rediscovery.
 - Fuzz dictionaries: sample curated values during generation via `[dictionaries.<name>]` and `[generation.dictionaries]`. [#2121](https://github.com/schemathesis/schemathesis/issues/2121)
+- Override body fields via `[parameters]` with `body.<jsonpath>` keys.
 
 ### :racing_car: Performance
 

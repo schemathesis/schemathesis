@@ -40,6 +40,7 @@ from schemathesis.generation.meta import (
     StatefulPhaseData,
     TestPhase,
 )
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.resources import ExtraDataSource, PoolDraw, SemanticDraw
@@ -55,7 +56,6 @@ from schemathesis.specs.openapi.formats import (
 )
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS, get_header_format_strategies
 from schemathesis.specs.openapi.negative import (
-    GeneratedValue,
     negative_schema,
     wrap_filter_hook_for_generated_value,
     wrap_flatmap_hook_for_generated_value,

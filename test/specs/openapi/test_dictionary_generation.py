@@ -13,8 +13,8 @@ from schemathesis.generation.dictionaries import (
     build_dictionary_overlay_strategy,
     resolve_parameter_bindings,
 )
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import SemanticDraw
-from schemathesis.specs.openapi.negative import GeneratedValue
 
 
 def _load_schema_with_dictionaries(ctx, config: dict, paths: dict, *, version: str = "3.0.2"):
@@ -1076,25 +1076,25 @@ def test_body_binding_literal_and_non_body_keys_are_skipped(ctx):
         },
     )
     operation = schema["/items"]["POST"]
-    literal_leaks = 0
+    literal_applied_cases = 0
     token_dict_draws = 0
     bodies_seen = 0
 
     @given(case=operation.as_strategy())
     @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
     def collect(case):
-        nonlocal literal_leaks, token_dict_draws, bodies_seen
+        nonlocal literal_applied_cases, token_dict_draws, bodies_seen
         if isinstance(case.body, dict):
             bodies_seen += 1
             if case.body.get("literal") == "LITERAL":
-                literal_leaks += 1
+                literal_applied_cases += 1
         if case._meta is None:
             return
         token_dict_draws += sum(1 for d in case._meta.dictionary_draws if d.body_path == "/token")
 
     collect()
-    assert bodies_seen > 0, "no body was generated; literal-leak guard would be vacuous"
-    assert literal_leaks == 0, "literal body override leaked into wire"
+    assert bodies_seen > 0
+    assert literal_applied_cases == bodies_seen, "literal body override must apply to every case"
     assert token_dict_draws > 0, "dictionary binding on sibling body key did not fire"
 
 
