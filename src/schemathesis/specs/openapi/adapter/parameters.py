@@ -961,6 +961,25 @@ class OpenApiBody(OpenApiComponent):
             else:
                 strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
 
+        from schemathesis.generation.dictionaries import (
+            build_body_dictionary_overlay_strategy,
+            resolve_body_bindings,
+        )
+
+        body_bindings = resolve_body_bindings(
+            operation=operation,
+            body_schema=schema,
+            generation_config=generation_config,
+        )
+        if body_bindings:
+            strategy = build_body_dictionary_overlay_strategy(
+                strategy,
+                bindings=body_bindings,
+                operation_label=operation.label,
+                validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+                generation_mode=generation_mode,
+            )
+
         # Cache the strategy keyed by feedback generation and semantic-index identity
         if use_cache:
             slot = (strategy, feedback_generation, semantic_id)

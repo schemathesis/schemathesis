@@ -273,11 +273,13 @@ def openapi_cases(
             body_metadata = None
             body_pool_draws: tuple[PoolDraw, ...] = ()
             body_semantic_draws: tuple[SemanticDraw, ...] = ()
+            body_dictionary_draws: tuple[DictionaryDraw, ...] = ()
             # Negative strategy returns GeneratedValue, positive returns just value
             if isinstance(body_result, GeneratedValue):
                 body_metadata = body_result.meta
                 body_pool_draws = body_result.pool_draws
                 body_semantic_draws = body_result.semantic_draws
+                body_dictionary_draws = body_result.dictionary_draws
                 body_result = body_result.value
             body_ = ValueContainer(
                 value=body_result,
@@ -286,6 +288,7 @@ def openapi_cases(
                 meta=body_metadata,
                 pool_draws=body_pool_draws,
                 semantic_draws=body_semantic_draws,
+                dictionary_draws=body_dictionary_draws,
             )
         else:
             body_ = ValueContainer(value=body, location="body", generator=None, meta=None)

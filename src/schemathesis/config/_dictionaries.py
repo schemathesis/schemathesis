@@ -12,8 +12,44 @@ EntryValue = str | int | float
 TypeKey = Literal["string", "integer", "number"]
 SUPPORTED_TYPE_KEYS: tuple[TypeKey, ...] = get_args(TypeKey)
 
-DictionaryLocationPrefix = Literal["path", "query", "header", "cookie"]
+DictionaryLocationPrefix = Literal["path", "query", "header", "cookie", "body"]
 SUPPORTED_LOCATION_PREFIXES: tuple[DictionaryLocationPrefix, ...] = get_args(DictionaryLocationPrefix)
+BODY_PREFIX = "body."
+
+
+def parse_body_path(expr: str) -> str:
+    """Translate a `body.<path>` binding key to a JSON Pointer with `*` wildcards."""
+    if not expr.startswith(BODY_PREFIX):
+        raise ConfigError(f"Body binding key must start with `body.`: `{expr}`")
+    rest = expr[len(BODY_PREFIX) :]
+    if not rest:
+        raise ConfigError(f"Body binding key has empty path: `{expr}`")
+    segments: list[str] = []
+    for part in rest.split("."):
+        if not part:
+            raise ConfigError(f"Empty segment in body path: `{expr}`")
+        if part == "[*]":
+            segments.append("*")
+            continue
+        if "[" in part:
+            name, _, after = part.partition("[")
+            if not _is_valid_body_segment(name):
+                raise ConfigError(f"Invalid segment `{name}` in body path: `{expr}`")
+            if after != "*]":
+                raise ConfigError(f"Only `[*]` is supported in body paths (got `[{after}` in `{expr}`)")
+            segments.append(name)
+            segments.append("*")
+        else:
+            if not _is_valid_body_segment(part):
+                raise ConfigError(f"Invalid segment `{part}` in body path: `{expr}`")
+            segments.append(part)
+    return "/" + "/".join(segments)
+
+
+def _is_valid_body_segment(name: str) -> bool:
+    if not name:
+        return False
+    return all(c.isalnum() or c in "_-" for c in name)
 
 
 @dataclass(slots=True, frozen=True)

@@ -3,7 +3,7 @@ import os
 import pytest
 
 from schemathesis.config import ConfigError, SchemathesisConfig
-from schemathesis.config._dictionaries import coerce_entries_for_type
+from schemathesis.config._dictionaries import coerce_entries_for_type, parse_body_path
 from schemathesis.config._generation import GenerationConfig
 
 
@@ -165,3 +165,43 @@ def test_libfuzzer_invalid_entry_name(tmp_path, content, match):
 def test_coerce_entries_for_type_edges(values, ty, expected):
     config = SchemathesisConfig.from_dict({"dictionaries": {"x": {"values": values}}})
     assert coerce_entries_for_type(config.dictionaries["x"].entries, ty) == expected
+
+
+@pytest.mark.parametrize(
+    "expr,expected",
+    [
+        ("body.x", "/x"),
+        ("body.user.email", "/user/email"),
+        ("body.items[*].name", "/items/*/name"),
+        ("body.tags[*]", "/tags/*"),
+        ("body.[*]", "/*"),
+        ("body.deeply.nested.field", "/deeply/nested/field"),
+        ("body.with-dash.under_score", "/with-dash/under_score"),
+    ],
+    ids=lambda v: v if isinstance(v, str) else "",
+)
+def test_parse_body_path_valid(expr, expected):
+    assert parse_body_path(expr) == expected
+
+
+@pytest.mark.parametrize(
+    "expr",
+    [
+        "body.",
+        "body..x",
+        "body.x..y",
+        "body.x[3]",
+        "body.x[a]",
+        "body.x[*][*]",
+        "body.x[**]",
+        "body.@invalid",
+        "body.@bad[*]",
+        "body.[a]",
+        "body.x.",
+        "not_body.x",
+    ],
+    ids=lambda v: v,
+)
+def test_parse_body_path_rejects(expr):
+    with pytest.raises(ConfigError):
+        parse_body_path(expr)

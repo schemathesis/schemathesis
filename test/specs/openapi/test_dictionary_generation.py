@@ -4,7 +4,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from schemathesis.config import SchemathesisConfig
+from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.core.error_feedback import ErrorFeedbackStore, Observation, ObservationKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
@@ -17,8 +17,8 @@ from schemathesis.resources import SemanticDraw
 from schemathesis.specs.openapi.negative import GeneratedValue
 
 
-def _load_schema_with_dictionaries(ctx, config: dict, paths: dict):
-    schema = ctx.openapi.load_schema(paths)
+def _load_schema_with_dictionaries(ctx, config: dict, paths: dict, *, version: str = "3.0.2"):
+    schema = ctx.openapi.load_schema(paths, version=version)
     parent_config = SchemathesisConfig.from_dict(config)
     schema.config._parent = parent_config
     schema.config.generation = parent_config.projects.default.generation
@@ -574,3 +574,673 @@ def test_overlay_shares_slot_with_prior_semantic_substitution(ctx):
     assert kept_semantic > 0 and dict_won > 0, (
         f"semantic/dict 50/50 split never took both paths: semantic={kept_semantic}, dict={dict_won}"
     )
+
+
+def _path_with_body(body_schema: dict, *, required: bool = True) -> dict:
+    body = {"content": {"application/json": {"schema": body_schema}}}
+    if required:
+        body["required"] = True
+    return {
+        "/items": {
+            "post": {
+                "requestBody": body,
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_top_level_field(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"cc": {"values": ["1234-5678-9012-3456"]}},
+            "parameters": {"body.ccNumber": {"dictionary": "cc"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {"ccNumber": {"type": "string"}, "name": {"type": "string"}},
+                "required": ["ccNumber"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    seen_values: set[str] = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=15, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        seen_values.add(case.body.get("ccNumber"))
+
+    collect()
+    assert seen_values == {"1234-5678-9012-3456"}
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_nested_field(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"emails": {"values": ["x@y.com"]}},
+            "parameters": {"body.user.email": {"dictionary": "emails"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "type": "object",
+                        "properties": {"email": {"type": "string"}},
+                        "required": ["email"],
+                    }
+                },
+                "required": ["user"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    seen: set[str] = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        seen.add(case.body.get("user", {}).get("email"))
+
+    collect()
+    assert seen == {"x@y.com"}
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_array_wildcard(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"names": {"values": ["widget"]}},
+            "parameters": {"body.items[*].name": {"dictionary": "names"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "properties": {"name": {"type": "string"}},
+                            "required": ["name"],
+                        },
+                    }
+                },
+                "required": ["items"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    elements_with_widget = 0
+    total_elements = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal elements_with_widget, total_elements
+        for item in case.body.get("items", []):
+            total_elements += 1
+            if item.get("name") == "widget":
+                elements_with_widget += 1
+
+    collect()
+    assert total_elements > 0 and elements_with_widget == total_elements
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_top_level_array(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"tags": {"values": ["alpha"]}},
+            "parameters": {"body.[*]": {"dictionary": "tags"}},
+        },
+        _path_with_body(
+            {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    elements_seen = 0
+    elements_with_alpha = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal elements_seen, elements_with_alpha
+        for item in case.body or []:
+            elements_seen += 1
+            if item == "alpha":
+                elements_with_alpha += 1
+
+    collect()
+    assert elements_seen > 0 and elements_with_alpha == elements_seen
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_skipped_when_path_does_not_resolve(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"missing": {"values": ["X"]}},
+            "parameters": {"body.notInSchema": {"dictionary": "missing"}},
+        },
+        _path_with_body({"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}),
+    )
+    operation = schema["/items"]["POST"]
+    leaks = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal leaks
+        if "notInSchema" in (case.body or {}):
+            leaks += 1
+
+    collect()
+    assert leaks == 0
+
+
+def test_body_binding_invalid_syntax_rejected_at_config_load():
+    with pytest.raises(ConfigError, match="Only `\\[\\*\\]` is supported"):
+        SchemathesisConfig.from_dict(
+            {
+                "dictionaries": {"x": {"values": ["X"]}},
+                "parameters": {"body.items[3]": {"dictionary": "x"}},
+            }
+        )
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_draws_recorded_on_meta(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"cc": {"values": ["1234-5678-9012-3456"]}},
+            "parameters": {"body.ccNumber": {"dictionary": "cc"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {"ccNumber": {"type": "string"}},
+                "required": ["ccNumber"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    body_draws: list[DictionaryDraw] = []
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        if case._meta is None:
+            return
+        body_draws.extend(d for d in case._meta.dictionary_draws if d.body_path is not None)
+
+    collect()
+    assert body_draws, "expected body_path-bearing draws on case._meta.dictionary_draws"
+    assert all(d.body_path == "/ccNumber" and d.value == "1234-5678-9012-3456" for d in body_draws)
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_true_subschema_accepts_entries(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"toks": {"values": ["sk-abc"]}},
+            "parameters": {"body.token": {"dictionary": "toks"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {"token": True},
+                "required": ["token"],
+            }
+        ),
+        version="3.1.0",
+    )
+    operation = schema["/items"]["POST"]
+    seen: list[DictionaryDraw] = []
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        if case._meta is None:
+            return
+        for draw_ in case._meta.dictionary_draws:
+            if draw_.body_path == "/token":
+                seen.append(draw_)
+
+    collect()
+    assert seen, "no entries substituted into body.token (true subschema misclassified)"
+    assert all(d.matches_schema for d in seen), "true subschema must classify entries as matches_schema=True"
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_resolves_through_boolean_items(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"vals": {"values": ["seed"]}},
+            "parameters": {"body.[*]": {"dictionary": "vals"}},
+        },
+        _path_with_body({"type": "array", "minItems": 1, "items": True}),
+        version="3.1.0",
+    )
+    operation = schema["/items"]["POST"]
+    elements_seen = 0
+    elements_with_seed = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal elements_seen, elements_with_seed
+        for item in case.body or []:
+            elements_seen += 1
+            if item == "seed":
+                elements_with_seed += 1
+
+    collect()
+    assert elements_seen > 0 and elements_with_seed == elements_seen
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_drops_descendant_mutations_under_overwrite(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"users": {"values": ["override"]}},
+            "parameters": {"body.user": {"dictionary": "users"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "type": "object",
+                        "properties": {"email": {"type": "string", "minLength": 5}},
+                        "required": ["email"],
+                    },
+                    "sibling": {"type": "string", "minLength": 5},
+                },
+                "required": ["user", "sibling"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    overwrites_seen = 0
+    saw_sibling_mutation = False
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal overwrites_seen, saw_sibling_mutation
+        if case._meta is None:
+            return
+        overrides = [d for d in case._meta.dictionary_draws if d.body_path == "/user"]
+        if not overrides:
+            return
+        overwrites_seen += 1
+        for mutation in case._meta.phase.data.mutations:
+            assert not (mutation.path and mutation.path[:1] == ("user",)), (
+                f"mutation descendant of overwritten /user not dropped: path={mutation.path!r}"
+            )
+            if mutation.path and mutation.path[:1] == ("sibling",):
+                saw_sibling_mutation = True
+
+    collect()
+    assert overwrites_seen > 0, "scenario never produced a /user overwrite"
+    assert saw_sibling_mutation, (
+        "no sibling mutation observed in any overwrite case; absence-of-user-mutation could be vacuous"
+    )
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_probability_mixes_substituted_and_native(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"tokens": {"values": ["SENTINEL"]}},
+            "parameters": {"body.token": {"dictionary": "tokens", "probability": 0.3}},
+        },
+        _path_with_body({"type": "object", "properties": {"token": {"type": "string"}}, "required": ["token"]}),
+    )
+    operation = schema["/items"]["POST"]
+    substituted = 0
+    native = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal substituted, native
+        token = (case.body or {}).get("token")
+        if token == "SENTINEL":
+            substituted += 1
+        elif token is not None:
+            native += 1
+
+    collect()
+    assert substituted > 0 and native > 0, f"probability 0.3 did not mix outcomes: subst={substituted}, native={native}"
+
+
+@pytest.mark.hypothesis_nested
+def test_operation_scoped_body_binding_applies(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"tokens": {"values": ["OPERATION-SCOPED"]}},
+            "operations": [
+                {
+                    "include-name": "POST /items",
+                    "parameters": {"body.token": {"dictionary": "tokens"}},
+                }
+            ],
+        },
+        _path_with_body({"type": "object", "properties": {"token": {"type": "string"}}, "required": ["token"]}),
+    )
+    operation = schema["/items"]["POST"]
+    seen_values: set[str] = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        seen_values.add((case.body or {}).get("token"))
+
+    collect()
+    assert "OPERATION-SCOPED" in seen_values
+
+
+@pytest.mark.hypothesis_nested
+def test_operation_scoped_body_binding_wins_over_global(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {
+                "global": {"values": ["GLOBAL"]},
+                "op": {"values": ["OPERATION"]},
+            },
+            "parameters": {"body.token": {"dictionary": "global"}},
+            "operations": [
+                {
+                    "include-name": "POST /items",
+                    "parameters": {"body.token": {"dictionary": "op"}},
+                }
+            ],
+        },
+        _path_with_body({"type": "object", "properties": {"token": {"type": "string"}}, "required": ["token"]}),
+    )
+    operation = schema["/items"]["POST"]
+    seen_values: set[str] = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        seen_values.add((case.body or {}).get("token"))
+
+    collect()
+    assert seen_values == {"OPERATION"}
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_drops_indexed_mutation_under_wildcard_overwrite(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"replacements": {"values": ["ab"]}},
+            "parameters": {"body.items[*]": {"dictionary": "replacements"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {"type": "string", "minLength": 5},
+                    },
+                    "sibling": {"type": "string", "minLength": 5},
+                },
+                "required": ["items", "sibling"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    overwrites_seen = 0
+    saw_sibling_mutation = False
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal overwrites_seen, saw_sibling_mutation
+        if case._meta is None:
+            return
+        overrides = [d for d in case._meta.dictionary_draws if d.body_path == "/items/*"]
+        if not overrides:
+            return
+        overwrites_seen += 1
+        for mutation in case._meta.phase.data.mutations:
+            assert not (
+                len(mutation.path) >= 2 and mutation.path[0] == "items" and isinstance(mutation.path[1], int)
+            ), f"indexed mutation under /items/* overwrite not dropped: path={mutation.path!r}"
+            if mutation.path and mutation.path[:1] == ("sibling",):
+                saw_sibling_mutation = True
+
+    collect()
+    assert overwrites_seen > 0, "scenario never produced a /items/* overwrite"
+    assert saw_sibling_mutation, (
+        "no sibling mutation observed in any overwrite case; absence-of-items-mutation could be vacuous"
+    )
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_literal_and_non_body_keys_are_skipped(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"vals": {"values": ["DICT"]}},
+            "parameters": {
+                "query.q": {"dictionary": "vals"},
+                "body.literal": "LITERAL",
+                "body.token": {"dictionary": "vals"},
+            },
+        },
+        {
+            "/items": {
+                "post": {
+                    "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "token": {"type": "string"},
+                                        "literal": {"type": "string"},
+                                    },
+                                    "required": ["token"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    literal_leaks = 0
+    token_dict_draws = 0
+    bodies_seen = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal literal_leaks, token_dict_draws, bodies_seen
+        if isinstance(case.body, dict):
+            bodies_seen += 1
+            if case.body.get("literal") == "LITERAL":
+                literal_leaks += 1
+        if case._meta is None:
+            return
+        token_dict_draws += sum(1 for d in case._meta.dictionary_draws if d.body_path == "/token")
+
+    collect()
+    assert bodies_seen > 0, "no body was generated; literal-leak guard would be vacuous"
+    assert literal_leaks == 0, "literal body override leaked into wire"
+    assert token_dict_draws > 0, "dictionary binding on sibling body key did not fire"
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_skipped_when_descending_through_non_object_schema(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"vals": {"values": ["X"]}},
+            "parameters": {"body.token.deeper": {"dictionary": "vals"}},
+        },
+        _path_with_body({"type": "object", "properties": {"token": {"type": "string"}}, "required": ["token"]}),
+    )
+    operation = schema["/items"]["POST"]
+    leaks = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal leaks
+        token = (case.body or {}).get("token")
+        if isinstance(token, dict) and "deeper" in token:
+            leaks += 1
+
+    collect()
+    assert leaks == 0
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_skipped_when_wildcard_target_lacks_items(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"vals": {"values": ["SENTINEL_UNIQUE_VALUE_12345"]}},
+            "parameters": {"body.tags[*]": {"dictionary": "vals"}},
+        },
+        _path_with_body({"type": "object", "properties": {"tags": {"type": "array"}}, "required": ["tags"]}),
+    )
+    operation = schema["/items"]["POST"]
+    leaks = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal leaks
+        for item in (case.body or {}).get("tags", []):
+            if item == "SENTINEL_UNIQUE_VALUE_12345":
+                leaks += 1
+
+    collect()
+    assert leaks == 0
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_returns_inner_when_all_entries_filtered(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"too_short": {"values": ["ab"]}},
+            "parameters": {"body.token": {"dictionary": "too_short"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {"token": {"type": "string", "minLength": 5}},
+                "required": ["token"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    body_draws = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal body_draws
+        if case._meta is None:
+            return
+        body_draws += sum(1 for d in case._meta.dictionary_draws if d.body_path is not None)
+
+    collect()
+    assert body_draws == 0
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_keeps_mutation_when_path_does_not_match(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"users": {"values": ["ab"]}},
+            "parameters": {"body.user": {"dictionary": "users"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {
+                    "user": {"type": "string", "minLength": 5},
+                    "tag": {"type": "string", "minLength": 5},
+                },
+                "required": ["user", "tag"],
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    saw_kept_mutation = False
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal saw_kept_mutation
+        if case._meta is None:
+            return
+        body_overrides = [d for d in case._meta.dictionary_draws if d.body_path == "/user"]
+        if not body_overrides:
+            return
+        for mutation in case._meta.phase.data.mutations:
+            if mutation.path and mutation.path[0] == "tag":
+                saw_kept_mutation = True
+
+    collect()
+    assert saw_kept_mutation, "expected mutation on sibling field `tag` to be preserved when /user is overwritten"
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_skipped_when_descending_past_boolean_leaf(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"vals": {"values": ["X"]}},
+            "parameters": {"body.token.field": {"dictionary": "vals"}},
+        },
+        _path_with_body(
+            {"type": "object", "properties": {"token": True}, "required": ["token"]},
+        ),
+        version="3.1.0",
+    )
+    operation = schema["/items"]["POST"]
+    leaks = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal leaks
+        token = (case.body or {}).get("token")
+        if isinstance(token, dict) and "field" in token:
+            leaks += 1
+
+    collect()
+    assert leaks == 0

@@ -49,6 +49,35 @@ Lower the probability to mix dictionary draws with random IDs:
 "path.user_id" = { dictionary = "users", probability = 0.5 }
 ```
 
+## Target Body Fields
+
+For request bodies, address fields with a JSONPath subset rooted at `body.`:
+
+```toml
+[dictionaries.card_numbers]
+values = ["4111-1111-1111-1111", "5500-0000-0000-0004"]
+
+[dictionaries.emails]
+values = ["test@example.com", "admin@example.com"]
+
+[parameters]
+"body.ccNumber" = { dictionary = "card_numbers" }
+"body.user.email" = { dictionary = "emails" }
+```
+
+Use `[*]` to substitute at every array element:
+
+```toml
+[dictionaries.tag_words]
+values = ["sale", "featured", "archived"]
+
+[parameters]
+"body.tags[*]" = { dictionary = "tag_words", probability = 0.4 }
+"body.items[*].name" = { dictionary = "tag_words" }
+```
+
+For a body that's itself a top-level array, use `body.[*]`. Recursive descent (`body..x`), positional indices (`body.x[3]`), filters, and slices are not supported.
+
 ## Apply Different Dictionaries Per Operation
 
 Use `[[operations]]` with the existing filter vocabulary:
