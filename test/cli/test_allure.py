@@ -121,3 +121,8 @@ def test_allure_layer_label(ctx, cli, tmp_path):
     assert result_files
     data = json.loads(result_files[0].read_text())
     assert any(lbl["name"] == "layer" and lbl["value"] == "API" for lbl in data["labels"])
+
+
+def test_allure_path_with_null_byte_reports_clean_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, config={"reports": {"allure": {"path": "d\x00"}}}) == snapshot_cli

@@ -15,7 +15,7 @@ from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL
-from schemathesis.cli.ext.fs import open_file
+from schemathesis.cli.ext.fs import open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.config import ReportFormat
 from schemathesis.core.errors import format_exception
@@ -81,6 +81,7 @@ def initialize_report_handlers(
         except ImportError as exc:
             raise click.ClickException(str(exc)) from exc
         allure_path = config.reports.get_path(ReportFormat.ALLURE)
+        prepare_directory(allure_path)
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
 
     for custom_handler in CUSTOM_HANDLERS:

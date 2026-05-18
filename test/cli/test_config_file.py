@@ -98,6 +98,36 @@ def test_with_null_byte(cli, snapshot_cli):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
+def test_report_path_parent_dir_not_writable(cli, tmp_path, snapshot_cli):
+    readonly = tmp_path / "readonly"
+    readonly.mkdir()
+    os.chmod(readonly, 0o000)
+    try:
+        path = readonly / "missing" / "report.xml"
+        assert (
+            cli.main("run", "http://127.0.0.1", config={"reports": {"junit": {"enabled": True, "path": str(path)}}})
+            == snapshot_cli
+        )
+    finally:
+        os.chmod(readonly, 0o755)
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
+def test_report_path_file_not_writable(cli, tmp_path, snapshot_cli):
+    readonly = tmp_path / "readonly"
+    readonly.mkdir()
+    os.chmod(readonly, 0o555)
+    try:
+        path = readonly / "report.xml"
+        assert (
+            cli.main("run", "http://127.0.0.1", config={"reports": {"junit": {"enabled": True, "path": str(path)}}})
+            == snapshot_cli
+        )
+    finally:
+        os.chmod(readonly, 0o755)
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
 def test_permission_denied(cli, tmp_path, snapshot_cli):
     config_file = tmp_path / "config.toml"
     config_file.write_text("color = true")
