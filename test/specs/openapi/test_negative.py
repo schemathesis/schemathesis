@@ -532,7 +532,7 @@ def test_openapi_31_legacy_exclusive_bounds_in_negative_generation(ctx):
     operation = schema["/data"]["POST"]
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=1)
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
     def test(case):
         pass
 

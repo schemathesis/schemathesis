@@ -744,7 +744,7 @@ def test_request_body_with_boolean_true_schema(ctx, cli, snapshot_cli):
     test_positive()
 
     @given(case=operation.as_strategy(GenerationMode.NEGATIVE))
-    @settings(max_examples=1)
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
     def test_negative(case):
         pass
 

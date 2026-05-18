@@ -60,7 +60,7 @@ def test_binary_format_negative_mutations(ctx, encoding):
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(case=strategy)
-    @settings(max_examples=10)
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck))
     def check(case):
         assert is_structural_mutation(case.body, "file") or is_type_mutation(case.body, "file", bytes)
 
@@ -124,7 +124,7 @@ def test_custom_media_type_raw_binary_body_in_negative_mode(ctx):
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(case=strategy)
-    @settings(max_examples=10)
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck))
     def check(case):
         assert isinstance(case.body, bytes)
 

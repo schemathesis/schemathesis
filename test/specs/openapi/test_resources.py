@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 import requests
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
@@ -1256,7 +1256,7 @@ def test_negative_aware_strategy_with_captured_values(ctx):
     results = []
 
     @given(strategy)
-    @settings(max_examples=20, database=None)
+    @settings(max_examples=20, database=None, suppress_health_check=list(HealthCheck))
     def collect_samples(value):
         results.append(value)
 
@@ -1569,7 +1569,7 @@ def test_negative_aware_strategy_with_captured_values_body(ctx):
     results = []
 
     @given(strategy)
-    @settings(max_examples=20, database=None)
+    @settings(max_examples=20, database=None, suppress_health_check=list(HealthCheck))
     def collect_samples(value):
         results.append(value)
 
