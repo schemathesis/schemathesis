@@ -14,6 +14,7 @@
 
 ### :bug: Fixed
 
+- Schema loading crash for external `$ref` paths containing URI-reserved characters (e.g. `paths/{id}/op.yaml`). [#4152](https://github.com/schemathesis/schemathesis/issues/4152)
 - Out-of-memory in coverage phase on wide, deeply-nested OpenAPI schemas (e.g. AWS Glue, Microsoft Graph).
 - Surface a clean schema error for body `$ref` strings without a `/` separator.
 - Crash when `--report-allure-path` (or `reports.allure.path`) cannot be used as a filesystem path.

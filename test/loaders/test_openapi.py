@@ -77,6 +77,40 @@ def test_number_deserializing(ctx, testdir):
     assert isinstance(value, float)
 
 
+def test_split_file_schema_with_uri_reserved_path_chars(tmp_path):
+    # Split-file OpenAPI layouts mirror path templates; refs like './paths/{id}/op.yaml' must resolve.
+    target_dir = tmp_path / "paths" / "{id}"
+    target_dir.mkdir(parents=True)
+    (target_dir / "op.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        )
+    )
+    root = tmp_path / "openapi.yaml"
+    root.write_text(
+        yaml.safe_dump(
+            {
+                "openapi": "3.0.0",
+                "info": {"title": "repro", "version": "1.0"},
+                "paths": {"/items/{id}": {"$ref": "./paths/{id}/op.yaml"}},
+            }
+        )
+    )
+
+    schema = schemathesis.openapi.from_path(str(root))
+    operation = schema["/items/{id}"]["GET"]
+
+    assert operation.label == "GET /items/{id}"
+    assert operation.definition.raw["operationId"] == "getItem"
+    assert [(p.name, p.location) for p in operation.iter_parameters()] == [("id", "path")]
+
+
 def test_unsupported_type():
     # When Schemathesis can't detect the Open API spec version
     with pytest.raises(
