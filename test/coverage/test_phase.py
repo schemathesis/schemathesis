@@ -3257,6 +3257,63 @@ def test_additional_properties_without_type_positive(ctx):
     )
 
 
+def test_items_without_type_positive(ctx):
+    # Swagger 2.0 schemas commonly omit `type: array` on properties carrying only `items`
+    # (clearblade.com et al.). Without an array-typed positive case, the items sub-schema
+    # never gets a valid value and referenced definitions stay uncovered.
+    loaded = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "change": {
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "add": {"type": "string"},
+                                        "remove": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    )
+    operation = loaded["/foo"]["post"]
+
+    cases = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    with_valid_array = [
+        c
+        for c in cases
+        if isinstance(c.body, dict)
+        and isinstance(c.body.get("change"), list)
+        and c.body["change"]
+        and all(
+            isinstance(item, dict)
+            and (isinstance(item.get("add"), str) or "add" not in item)
+            and (isinstance(item.get("remove"), str) or "remove" not in item)
+            for item in c.body["change"]
+        )
+    ]
+    assert with_valid_array, (
+        f"Expected a positive case with 'change' as a non-empty array of valid items. "
+        f"Got bodies: {[c.body for c in cases]}"
+    )
+
+
 def test_additional_properties_with_schema_negative(ctx):
     loaded = load_schema(
         ctx,

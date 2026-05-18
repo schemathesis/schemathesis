@@ -826,6 +826,9 @@ def _cover_positive_for_type(
     elif _implies_object_type(schema):
         template_schema = _get_template_schema(schema, "object", ctx)
         template = _generate_template_with_deflation_fallback(ctx, schema, template_schema)
+    elif _implies_array_type(schema):
+        template_schema = _get_template_schema(schema, "array", ctx)
+        template = _generate_template_with_deflation_fallback(ctx, schema, template_schema)
     else:
         template = None
     if GenerationMode.POSITIVE in ctx.generation_modes:
@@ -981,6 +984,8 @@ def _cover_positive_for_type(
                     schema,
                     ctx,
                 )
+            elif _implies_array_type(schema):
+                yield from _positive_array(ctx, schema, cast(list, template))
         if "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
             # These violations are positive for the outer schema, so flip the mode.
@@ -1677,6 +1682,19 @@ _FAST_PATH_KEYS = frozenset({"properties", "required", "type"})
 
 _OBJECT_ONLY_KEYWORDS = ("properties", "required", "patternProperties", "propertyNames", "dependencies")
 
+_ARRAY_ONLY_KEYWORDS = (
+    "items",
+    "prefixItems",
+    "additionalItems",
+    "unevaluatedItems",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "contains",
+    "minContains",
+    "maxContains",
+)
+
 
 def _implies_object_type(schema: JsonSchemaObject) -> bool:
     # `additionalProperties: {schema}` implicitly types the value as an object even when
@@ -1688,6 +1706,13 @@ def _implies_object_type(schema: JsonSchemaObject) -> bool:
     if isinstance(additional, dict):
         return True
     return False
+
+
+def _implies_array_type(schema: JsonSchemaObject) -> bool:
+    # Swagger 2.0 / OpenAPI schemas commonly omit `type: array` on properties carrying only
+    # `items` (e.g. clearblade.com). Without an array-typed positive variant the items
+    # sub-schema is never exercised positively and any `$ref`-pulled definition stays uncovered.
+    return any(key in schema for key in _ARRAY_ONLY_KEYWORDS)
 
 
 def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext) -> JsonSchemaObject:
