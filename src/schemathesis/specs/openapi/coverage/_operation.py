@@ -160,6 +160,9 @@ def _stringify_value(val: Any, container_name: str) -> Any:
         # use comma-separated values style for arrays
         return ",".join(str(_stringify_value(sub, container_name)) for sub in val)
     if isinstance(val, dict):
+        # Headers/cookies/query are typically all-string dicts; skip the per-value recursion.
+        if all(type(v) is str for v in val.values()):
+            return dict(val)
         return {key: _stringify_value(sub, container_name) for key, sub in val.items()}
     return val
 

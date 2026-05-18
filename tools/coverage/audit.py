@@ -197,6 +197,10 @@ def _is_response_keyword(entry: dict[str, Any]) -> bool:
 
 
 def _case_to_interaction(case: Case) -> tracecov.HttpInteraction:
+    # Skip the modification-detection hash on `case.meta` access: the audit never mutates
+    # cases or revalidates them, so the cost (canonical-JSON encoding bodies the size of an
+    # Azure ApplicationGateway) is pure waste.
+    object.__setattr__(case, "_freeze_metadata", True)
     prepared = prepare_request(case, headers=None, config=_NO_SANITIZATION)
     body = prepared.body.encode("utf-8") if isinstance(prepared.body, str) else prepared.body
     # `requests` collapses an empty form body to None even though the wire still carries
