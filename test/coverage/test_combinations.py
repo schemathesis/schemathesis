@@ -7,6 +7,7 @@ from unittest.mock import ANY
 
 import jsonschema_rs
 import pytest
+from hypothesis.errors import Unsatisfiable
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
@@ -2249,7 +2250,6 @@ def test_generate_from_schema_reflects_bundle_mutations():
         "oneOf": [{"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}],
         BUNDLE_STORAGE_KEY: {"schema1": {"type": "integer"}},
     }
-    shared_cache: dict = {}
 
     def make_ctx() -> CoverageContext:
         return CoverageContext(
@@ -2260,7 +2260,6 @@ def test_generate_from_schema_reflects_bundle_mutations():
             is_required=True,
             custom_formats=get_default_format_strategies(),
             validator_cls=jsonschema_rs.Draft4Validator,
-            _schema_generation_cache=shared_cache,
         )
 
     assert isinstance(make_ctx().generate_from_schema(schema), int)
@@ -2268,6 +2267,21 @@ def test_generate_from_schema_reflects_bundle_mutations():
     schema[BUNDLE_STORAGE_KEY]["schema1"] = {"type": "string"}
 
     assert isinstance(make_ctx().generate_from_schema(schema), str)
+
+
+def test_generate_from_schema_caches_unsatisfiable_verdict(pctx):
+    # JS-style `/.../`-wrapped pattern can never match; the second call must still raise
+    # Unsatisfiable, served from the cached sentinel rather than re-running Hypothesis.
+    schema = {"type": "string", "pattern": "/^x$/", "format": "date-time"}
+    with pytest.raises(Unsatisfiable):
+        pctx.generate_from_schema(schema)
+    with pytest.raises(Unsatisfiable):
+        pctx.generate_from_schema(schema)
+
+
+def test_generate_from_schema_serves_cached_value(pctx):
+    # Two calls on identical schema/context: second must equal the first, served from cache.
+    assert pctx.generate_from_schema({"type": "string"}) == pctx.generate_from_schema({"type": "string"})
 
 
 def test_items_false_with_prefix_items(pctx):

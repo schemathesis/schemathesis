@@ -9,6 +9,7 @@ from schemathesis.cli.ext.groups import GROUPS, GroupedOption
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
+from schemathesis.generation.hypothesis import custom_formats_cache, schema_generation_cache
 from schemathesis.specs.openapi import media_types
 from schemathesis.specs.openapi.formats import STRING_FORMATS
 from schemathesis.transport.asgi import ASGI_TRANSPORT
@@ -53,3 +54,6 @@ def reset_hooks():
         command.params[:] = [
             p for p in command.params if not (isinstance(p, GroupedOption) and p.group not in builtin_groups)
         ]
+    # Process-wide caches; clear so monkeypatched strategies in one test don't leak cached results.
+    schema_generation_cache._data.clear()
+    custom_formats_cache._data.clear()

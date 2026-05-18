@@ -3,9 +3,11 @@ from __future__ import annotations
 import warnings
 from collections import OrderedDict
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Final
 
-_MISSING = object()
+_MISSING: Final = object()
+# Sentinel cached when generation raised `Unsatisfiable`.
+UNSATISFIABLE_RESULT: Final = object()
 
 
 class _BoundedCache:
@@ -17,17 +19,24 @@ class _BoundedCache:
         self._data: OrderedDict[Any, Any] = OrderedDict()
         self._maxsize = maxsize
 
-    def get(self, key: Any) -> Any:
+    def get(self, key: Any, default: Any = _MISSING) -> Any:
         if key in self._data:
             self._data.move_to_end(key)
             return self._data[key]
-        return _MISSING
+        return default
 
     def __setitem__(self, key: Any, value: Any) -> None:
         self._data[key] = value
         self._data.move_to_end(key)
         while len(self._data) > self._maxsize:
             self._data.popitem(last=False)
+
+
+# Cross-operation cache for `CoverageContext.generate_from_schema`.
+schema_generation_cache: Final[_BoundedCache] = _BoundedCache(maxsize=2048)
+# Stable identity for per-(generation_config, mode) custom-format dicts, so downstream caches
+# keyed on `id(custom_formats)` actually hit instead of seeing a fresh dict per call.
+custom_formats_cache: Final[_BoundedCache] = _BoundedCache(maxsize=32)
 
 
 def setup() -> None:
