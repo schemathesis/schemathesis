@@ -4,8 +4,8 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.hooks import HookContext, _should_skip_hook
-from schemathesis.specs.openapi.negative import GeneratedValue
 
 
 def register_default(dispatcher):

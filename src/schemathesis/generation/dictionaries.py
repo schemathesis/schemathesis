@@ -23,11 +23,11 @@ from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import PoolDraw, SemanticDraw
 
 if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig, ProjectConfig
-    from schemathesis.specs.openapi.negative import GeneratedValue
     from schemathesis.specs.openapi.negative.mutations import MutationMetadata
     from schemathesis.specs.openapi.schemas import OpenApiOperation
 
@@ -166,8 +166,6 @@ def build_dictionary_overlay_strategy(
     generation_mode: GenerationMode,
 ) -> st.SearchStrategy:
     # Build-time mode filter so a substitution can't silently flip the case mode chosen by `inner`.
-    from schemathesis.specs.openapi.negative import GeneratedValue
-
     location_value = parameter_location.value
 
     eligible_per_parameter: dict[str, tuple[tuple[int, EntryValue, bool], ...]] = {}
@@ -280,17 +278,20 @@ def resolve_body_bindings(
     body_schema: JsonSchema,
     generation_config: GenerationConfig,
 ) -> list[_ResolvedBodyBinding]:
-    # Operation-specific bindings win over global; bindings with unresolved paths are dropped.
+    # Operation-scope vetoes global entries under the same key regardless of form; unresolved paths drop.
     config: ProjectConfig = operation.schema.config
     dictionaries = config.dictionaries
     if not dictionaries:
         return []
     operation_config = config.operations.get_for_operation(operation)
+    operation_scoped_body_keys = {key for key in operation_config.parameters if key.startswith(BODY_PREFIX)}
     seen: set[str] = set()
     resolved: list[_ResolvedBodyBinding] = []
-    for source in (operation_config.parameters, config.parameters):
+    for is_operation_source, source in ((True, operation_config.parameters), (False, config.parameters)):
         for key, binding in source.items():
             if not key.startswith(BODY_PREFIX):
+                continue
+            if not is_operation_source and key in operation_scoped_body_keys:
                 continue
             if not isinstance(binding, ParameterDictionaryBinding):
                 continue
@@ -343,8 +344,6 @@ def build_body_dictionary_overlay_strategy(
     generation_mode: GenerationMode,
 ) -> st.SearchStrategy:
     # Build-time mode filter so a substitution can't silently flip the case mode chosen by `inner`.
-    from schemathesis.specs.openapi.negative import GeneratedValue
-
     eligible_per_binding: list[tuple[_ResolvedBodyBinding, tuple[tuple[int, EntryValue, bool], ...]]] = []
     for binding in bindings:
         classified = _classify_entries(binding.entries, binding.leaf_schema, validator_cls, generation_mode)
@@ -459,18 +458,32 @@ def _make_replacement(
     return replace
 
 
-def _walk_substitute(target: JsonValue, segments: list[str], replace: Callable[[JsonValue], JsonValue]) -> JsonValue:
+def _walk_substitute(
+    target: JsonValue,
+    segments: list[str],
+    replace: Callable[[JsonValue], JsonValue],
+    *,
+    create_missing: bool = False,
+) -> JsonValue:
     if not segments:
         return replace(target)
     head, *rest = segments
     if head == "*":
         if not isinstance(target, list):
             return target
-        return [_walk_substitute(item, rest, replace) for item in target]
+        return [_walk_substitute(item, rest, replace, create_missing=create_missing) for item in target]
     if isinstance(target, dict):
         if head not in target:
-            return target
+            # Force-insert only when the remaining path is fully scalar — a `*` in `rest` would
+            # need an array of unknown length, so leave missing optional arrays untouched.
+            if not create_missing or "*" in rest:
+                return target
+            new_dict = dict(target)
+            new_dict[head] = _walk_substitute({}, rest, replace, create_missing=True)
+            return new_dict
         new_dict = dict(target)
-        new_dict[head] = _walk_substitute(target[head], rest, replace)
+        new_dict[head] = _walk_substitute(target[head], rest, replace, create_missing=create_missing)
         return new_dict
+    if create_missing and "*" not in segments and isinstance(target, (str, int, float, bool, type(None))):
+        return _walk_substitute({}, segments, replace, create_missing=True)
     return target
