@@ -352,6 +352,9 @@ class WrongLinkTypeMismatch:
     def apply(self, app: Flask, store: UserStore) -> None:
         store.config.wrong_link_type_mismatch = True
         spec = app.config["schema"]
+        # Empty `name` would yield `/users/` which Flask routes to NotFound before any handler runs,
+        # turning every link execution into a 404 the calibrator early-returns on.
+        spec["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 1
         spec["paths"]["/users"]["post"]["responses"]["201"]["links"]["DeleteUser"]["parameters"]["userId"] = (
             "$response.body#/name"
         )
@@ -365,6 +368,9 @@ class WrongLinkParserAttributed:
     def apply(self, app: Flask, store: UserStore) -> None:
         store.config.wrong_link_parser_attributed = True
         spec = app.config["schema"]
+        # Empty `name` would yield `/users/` which Flask routes to NotFound before any handler runs,
+        # turning every link execution into a 404 the calibrator early-returns on.
+        spec["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 1
         spec["paths"]["/users"]["post"]["responses"]["201"]["links"]["DeleteUser"]["parameters"]["userId"] = (
             "$response.body#/name"
         )
