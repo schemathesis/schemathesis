@@ -28,6 +28,7 @@ from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_stra
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis import _MISSING, custom_formats_cache
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -931,6 +932,18 @@ def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_custom_formats(generation_config: GenerationConfig, mode: GenerationMode) -> dict[str, st.SearchStrategy]:
+    cache_key = (id(generation_config), mode)
+    cached = custom_formats_cache.get(cache_key)
+    if cached is not _MISSING:
+        return cached
+    custom_formats = _build_custom_formats_uncached(generation_config, mode)
+    custom_formats_cache[cache_key] = custom_formats
+    return custom_formats
+
+
+def _build_custom_formats_uncached(
+    generation_config: GenerationConfig, mode: GenerationMode
+) -> dict[str, st.SearchStrategy]:
     custom_formats = {**get_default_format_strategies(), **STRING_FORMATS}
     header_values_kwargs: dict[str, Any] = {}
     if generation_config.exclude_header_characters is not None:

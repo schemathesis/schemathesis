@@ -9,9 +9,10 @@
 - Persist error-feedback, auth, and 405 discoveries to `.schemathesis/`; probing replays them to skip rediscovery.
 - Fuzz dictionaries: sample curated values during generation via `[dictionaries.<name>]` and `[generation.dictionaries]`. [#2121](https://github.com/schemathesis/schemathesis/issues/2121)
 
-### :wrench: Changed
+### :racing_car: Performance
 
 - Bound hypothesis-jsonschema caches; ~35% lower coverage-phase peak memory on long-running schemas.
+- Cache schema generation across operations during the coverage phase.
 
 ### :bug: Fixed
 

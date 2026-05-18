@@ -4748,6 +4748,23 @@ def test_hostname_negative_format_respects_validator_draft(monkeypatch, validato
             next(generator)
 
 
+def test_negative_format_serves_cached_value(nctx):
+    # Random strings almost never look like IPv4, so the violation filter accepts and the
+    # strategy returns immediately. The second call must yield the same value, served from cache.
+    schema = {"type": "string", "format": "ipv4"}
+    assert next(_negative_format(nctx, schema, "ipv4")).value == next(_negative_format(nctx, schema, "ipv4")).value
+
+
+def test_negative_format_serves_cached_unsatisfiable(nctx):
+    # Lowercase-letter strings are valid single-label hostnames, so the violation filter
+    # rejects every draw. The second call must raise from the cached sentinel.
+    schema = {"type": "string", "format": "hostname", "pattern": "^[a-z]+$"}
+    with pytest.raises(Unsatisfiable):
+        next(_negative_format(nctx, schema, "hostname"))
+    with pytest.raises(Unsatisfiable):
+        next(_negative_format(nctx, schema, "hostname"))
+
+
 @pytest.mark.parametrize(
     ("types", "expected_kind"),
     [(["string", "number", "null"], (int, float)), (["string", "integer", "null"], int)],

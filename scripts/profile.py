@@ -391,7 +391,7 @@ def coverage(
     _get_profiler()
 
     from schemathesis.generation import hypothesis
-    from schemathesis.generation.progressive import CoverageGenerator
+    from schemathesis.generation.drivers import CoverageGenerator
 
     hypothesis.setup()
 
