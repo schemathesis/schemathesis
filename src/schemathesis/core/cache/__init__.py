@@ -1,3 +1,4 @@
+from schemathesis.core.cache.bounded import MISSING, BoundedCache
 from schemathesis.core.cache.io import (
     ENTRIES_FILENAME,
     MANIFEST_FILENAME,
@@ -10,6 +11,8 @@ from schemathesis.core.cache.models import FORMAT_VERSION, Entry, Kind, Manifest
 from schemathesis.core.cache.writer import CacheWriter, request_from_case
 
 __all__ = [
+    "MISSING",
+    "BoundedCache",
     "CacheWriter",
     "ENTRIES_FILENAME",
     "Entry",

@@ -4,6 +4,7 @@ from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
+import jsonschema_rs
 from jsonschema_rs import Validator
 
 from schemathesis import hooks, transport
@@ -271,6 +272,15 @@ class Case(Generic[OperationT]):
 
         Recursively hashes nested dicts/lists/tuples and primitives to detect modifications.
         """
+        if isinstance(value, NotSet):
+            return _NOTSET_HASH
+        # Plain JSON-shaped containers (the common case for bodies) go through canonical JSON in
+        # Rust; deeply-nested schemas like Kubernetes Pods are ~10x faster than recursive hashing.
+        if type(value) is dict or type(value) is list:
+            try:
+                return hash((type(value), jsonschema_rs.canonical.json.to_string(value)))
+            except (TypeError, ValueError):
+                pass
         if isinstance(value, Mapping):
             return hash(
                 (
@@ -278,10 +288,8 @@ class Case(Generic[OperationT]):
                     tuple(sorted(((k, self._hash_container(v)) for k, v in value.items()), key=lambda x: str(x[0]))),
                 )
             )
-        elif isinstance(value, list | tuple):
+        if isinstance(value, list | tuple):
             return hash((type(value), tuple(self._hash_container(item) for item in value)))
-        elif isinstance(value, NotSet):
-            return _NOTSET_HASH
         return hash((type(value), value))
 
     @property

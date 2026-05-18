@@ -47,6 +47,7 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
+from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
@@ -56,7 +57,7 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
-from schemathesis.generation.hypothesis import _MISSING, UNSATISFIABLE_RESULT, examples, schema_generation_cache
+from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.transport.serialization import contains_binary
@@ -103,6 +104,11 @@ def conforms_to_format(value: object, format: str, validator_cls: type[jsonschem
 
 def _remove_examples(schema: dict[str, Any]) -> dict[str, Any]:
     """Recursively remove 'examples' field from a schema for jsonschema-rs compatibility."""
+    # Sub-schemas reached via `$ref` are the same dict instance across calls, so id-keyed
+    # caching saves rewalking shared definitions (e.g. k8s ObjectMeta referenced everywhere).
+    cached = _REMOVE_EXAMPLES_CACHE.get(id(schema))
+    if cached is not MISSING:
+        return cached
     result = {}
     for key, value in schema.items():
         if key == "examples":
@@ -113,7 +119,11 @@ def _remove_examples(schema: dict[str, Any]) -> dict[str, Any]:
             result[key] = [_remove_examples(item) if isinstance(item, dict) else item for item in value]  # type: ignore[assignment]
         else:
             result[key] = value
+    _REMOVE_EXAMPLES_CACHE[id(schema)] = result
     return result
+
+
+_REMOVE_EXAMPLES_CACHE: BoundedCache = BoundedCache(maxsize=4096)
 
 
 def _replace_zero_with_nonzero(x: float) -> float:
@@ -436,7 +446,7 @@ class CoverageContext:
             cached = schema_generation_cache.get(cache_key)
             if cached is UNSATISFIABLE_RESULT:
                 raise Unsatisfiable
-            if cached is not _MISSING:
+            if cached is not MISSING:
                 return deepclone(cached) if isinstance(cached, (dict, list)) else cached
         try:
             value = self._generate_from_schema_inner(schema)
@@ -2588,7 +2598,7 @@ def _negative_format(
         cached = schema_generation_cache.get(cache_key)
         if cached is UNSATISFIABLE_RESULT:
             raise Unsatisfiable
-        if cached is not _MISSING:
+        if cached is not MISSING:
             yield NegativeValue(
                 cached,
                 scenario=CoverageScenario.INVALID_FORMAT,
