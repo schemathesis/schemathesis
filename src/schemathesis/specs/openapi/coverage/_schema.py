@@ -973,11 +973,13 @@ def _cover_positive_for_type(
                     yield from _filter_against_combinators(
                         _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
                         schema,
+                        ctx,
                     )
             elif _implies_object_type(schema):
                 yield from _filter_against_combinators(
                     _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
                     schema,
+                    ctx,
                 )
         if "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
@@ -1562,7 +1564,7 @@ def is_invalid_for_oneOf(value: object, idx: int, validators: list[jsonschema_rs
 
 
 def _filter_against_combinators(
-    cases: Generator[GeneratedValue, None, None], schema: JsonSchema
+    cases: Generator[GeneratedValue, None, None], schema: JsonSchema, ctx: CoverageContext
 ) -> Generator[GeneratedValue, None, None]:
     """Drop outer-only object values that violate `anyOf`/`oneOf` on the same schema.
 
@@ -1573,8 +1575,13 @@ def _filter_against_combinators(
     if not isinstance(schema, dict) or ("anyOf" not in schema and "oneOf" not in schema):
         yield from cases
         return
+    # Sub-schemas keep `$ref` pointing into the root's `x-bundled` map; the validator
+    # cannot resolve those without the bundle attached.
+    full_schema: JsonSchema = schema
+    if BUNDLE_STORAGE_KEY in ctx.root_schema:
+        full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
     try:
-        validator = make_validator_for(schema)
+        validator = make_validator_for(full_schema)
     except Exception:
         yield from cases
         return
