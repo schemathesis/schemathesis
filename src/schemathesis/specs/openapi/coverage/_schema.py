@@ -2718,6 +2718,31 @@ def _negative_type(
     # read as valid strings server-side, collapsing into the enum/format/range negation.
     if "string" in types and ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type):
         return
+    # Same parameter shape recurs across many operations; one Hypothesis draw covers the whole audit.
+    try:
+        cache_key = (
+            "negative_type",
+            tuple(sorted(types)),
+            schema_cache_key(schema),
+            ctx.location,
+            ctx.media_type,
+            ctx.validator_cls,
+            tuple(ctx.path),
+        )
+    except (TypeError, ValueError):
+        cache_key = None
+    if cache_key is not None:
+        cached = schema_generation_cache.get(cache_key)
+        if cached is not MISSING:
+            for value in cached:
+                if seen.insert(value) and ctx.is_valid_for_location(value):
+                    yield NegativeValue(
+                        value,
+                        scenario=CoverageScenario.INCORRECT_TYPE,
+                        description="Incorrect type",
+                        location=ctx.current_path,
+                    )
+            return
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
 
     filter_func = {
@@ -2802,8 +2827,16 @@ def _negative_type(
     if apply_validation and ctx.will_be_serialized_to_string():
         for ty, strategy in strategies.items():
             strategies[ty] = strategy.filter(_does_not_match_the_original_schema)
+    # Materialize before yielding so the cache fills even when the consumer stops mid-iteration.
+    generated_values: list[Any] = []
     for strategy in strategies.values():
-        value = ctx.generate_from(strategy)
+        try:
+            generated_values.append(ctx.generate_from(strategy))
+        except Unsatisfiable:
+            break
+    if cache_key is not None:
+        schema_generation_cache[cache_key] = generated_values
+    for value in generated_values:
         if seen.insert(value) and ctx.is_valid_for_location(value):
             yield NegativeValue(
                 value, scenario=CoverageScenario.INCORRECT_TYPE, description="Incorrect type", location=ctx.current_path
