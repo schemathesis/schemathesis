@@ -4186,6 +4186,60 @@ def test_positive_body_under_unsatisfiable_allof_chain(ctx):
     assert not invalid, f"Positive coverage produced bodies invalid per the strict schema: {invalid}"
 
 
+def test_positive_body_with_sibling_oneof_required_via_ref(ctx):
+    # Sibling `oneOf: [{required: [a]}, {required: [b]}]` makes a and b mutually exclusive;
+    # the combinator filter needs the root bundle attached to resolve sub-refs and apply it.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"inner": {"$ref": "#/components/schemas/Inner"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Inner": {
+                    "type": "object",
+                    "properties": {
+                        "a": {"$ref": "#/components/schemas/Leaf"},
+                        "b": {"$ref": "#/components/schemas/Leaf"},
+                    },
+                    "oneOf": [{"required": ["a"]}, {"required": ["b"]}],
+                },
+                "Leaf": {"type": "array", "items": {"type": "string"}},
+            }
+        },
+    )
+    operation = schema["/x"]["POST"]
+    validator = make_validator_for(operation.body[0].optimized_schema)
+    cases: list = []
+
+    def collect(case):
+        if (
+            case.meta.phase.name == TestPhase.COVERAGE
+            and case.meta.components[ParameterLocation.BODY].mode == GenerationMode.POSITIVE
+        ):
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    invalid = [c.body for c in cases if not validator.is_valid(c.body)]
+    assert not invalid, f"Positive coverage produced bodies invalid per the strict schema: {invalid}"
+
+
 def test_ref_with_type_sibling_dropped_in_openapi_3_0(ctx):
     schema = ctx.openapi.from_full_schema(
         {
