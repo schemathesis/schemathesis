@@ -291,11 +291,14 @@ def _pin_discriminator_property(
                     resolved_ref = "#" + original_uri.split("#", 1)[1]
             # Without an explicit mapping, prefer the branch's own const/enum so the literal
             # tag (`"function"`) wins over the schema name (`FunctionTool`).
-            disc_value = (
-                ref_to_value.get(resolved_ref)
-                or _branch_discriminator_value(ref, property_name, bundle)
-                or resolved_ref.rstrip("/").rsplit("/", 1)[-1]
-            )
+            disc_value = ref_to_value.get(resolved_ref) or _branch_discriminator_value(ref, property_name, bundle)
+            if disc_value is None:
+                # Fall back to schema name -- unless the target is itself polymorphic,
+                # in which case the real discriminator values live on its inner branches
+                # and pinning here would force a value none of them accept.
+                if _branch_is_polymorphic(ref, bundle):
+                    continue
+                disc_value = resolved_ref.rstrip("/").rsplit("/", 1)[-1]
             if not disc_value:
                 continue
             # `enum` is used instead of `const` so the pin is recognized under Draft 4
@@ -318,6 +321,15 @@ def _branch_discriminator_value(ref: str, property_name: str, bundle: dict[str, 
     if isinstance(enum, list) and len(enum) == 1 and isinstance(enum[0], str):
         return enum[0]
     return None
+
+
+def _branch_is_polymorphic(ref: str, bundle: dict[str, Any] | None) -> bool:
+    if bundle is None or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
+        return False
+    bundled = bundle.get(ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :])
+    if not isinstance(bundled, dict):
+        return False
+    return "oneOf" in bundled or "anyOf" in bundled
 
 
 def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
