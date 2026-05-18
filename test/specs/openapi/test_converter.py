@@ -645,6 +645,57 @@ def test_discriminator_property_pinned(schema, expected):
     assert to_json_schema(schema, nullable_keyword="nullable") == expected
 
 
+def test_discriminator_pin_skipped_for_polymorphic_branch_target(ctx):
+    # Schema-name fallback is wrong when the $ref target is itself polymorphic.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [{"$ref": "#/components/schemas/Item"}],
+                                    "discriminator": {"propertyName": "type"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Item": {
+                    "oneOf": [
+                        {"$ref": "#/components/schemas/Msg"},
+                        {"$ref": "#/components/schemas/Resp"},
+                    ],
+                },
+                "Msg": {
+                    "type": "object",
+                    "properties": {"type": {"const": "msg"}},
+                    "required": ["type"],
+                },
+                "Resp": {
+                    "type": "object",
+                    "properties": {"type": {"const": "resp"}},
+                    "required": ["type"],
+                },
+            }
+        },
+    )
+    validator = make_validator(
+        schema["/items"]["POST"].body[0].optimized_schema, schema.adapter.jsonschema_validator_cls
+    )
+    assert validator.is_valid({"type": "msg"})
+    assert validator.is_valid({"type": "resp"})
+    assert not validator.is_valid({"type": "Item"})
+
+
 def test_discriminator_pin_validates_with_openapi_3_0_draft4(ctx):
     # OpenAPI 3.0 uses Draft 4, which silently ignores `const`. Pin keyword must use `enum` so the
     # discriminator branches are actually disambiguated at validation time.

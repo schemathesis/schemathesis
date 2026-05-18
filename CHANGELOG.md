@@ -33,6 +33,7 @@
 - False positive `positive_data_acceptance` for body schemas with `additionalProperties: false` inherited via `allOf`.
 - False positive `positive_data_acceptance` for `maxItems: 0` arrays whose `items` schema is satisfiable.
 - False positive `positive_data_acceptance` for `not` clauses whose violations breach other outer constraints.
+- False positive `positive_data_acceptance` when a discriminator branch references a polymorphic schema.
 
 ## [4.18.5](https://github.com/schemathesis/schemathesis/compare/v4.18.4...v4.18.5) - 2026-05-13
 
