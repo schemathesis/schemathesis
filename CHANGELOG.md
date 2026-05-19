@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.5...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.19.0...HEAD) - TBD
+
+## [4.19.0](https://github.com/schemathesis/schemathesis/compare/v4.18.5...v4.19.0) - 2026-05-19
 
 ### :rocket: Added
 
@@ -21,7 +23,7 @@
 - Out-of-memory in coverage phase on wide, deeply-nested OpenAPI schemas (e.g. AWS Glue, Microsoft Graph).
 - Surface a clean schema error for body `$ref` strings without a `/` separator.
 - Crash when `--report-allure-path` (or `reports.allure.path`) cannot be used as a filesystem path.
-- RecursionError in coverage phase on multi-branch `allOf` schemas that `canonicalish` cannot simplify.
+- `RecursionError` in coverage phase on multi-branch `allOf` schemas that `canonicalish` cannot simplify.
 - Restore stateful chain coverage for foreign-key consumers whose target resource is produced by another operation.
 - Serialize Swagger 2.0 nested array-of-array query parameters using each level's `collectionFormat`.
 - Emit empty-array negatives for `minItems: 1` arrays when `items` is unsatisfiable.
