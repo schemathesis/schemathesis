@@ -14,6 +14,7 @@ def prepare_multipart_v2(
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
     files: list[tuple[str, Any]] = []
     data: dict[str, Any] = {}
+    selected = selected_content_types or {}
     is_multipart = "multipart/form-data" in operation.schema.get_request_payload_content_types(operation)
 
     known_fields: dict[str, dict[str, Any]] = {}
@@ -22,9 +23,15 @@ def prepare_multipart_v2(
             known_fields.update(parameter.definition["schema"].get("properties", {}))
 
     def add_file(name: str, value: Any) -> None:
+        content_type = selected.get(name)
         if isinstance(value, list):
             for item in value:
-                files.append((name, (None, item)))
+                if content_type:
+                    files.append((name, (None, item, content_type)))
+                else:
+                    files.append((name, (None, item)))
+        elif content_type:
+            files.append((name, (None, value, content_type)))
         else:
             files.append((name, value))
 

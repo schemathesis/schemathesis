@@ -298,6 +298,10 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
 
 
 def _is_structured_schema(schema: dict[str, Any]) -> bool:
+    # Arrays of binary parts (e.g. `items.format: binary`) are file uploads, not JSON payloads.
+    items = schema.get("items")
+    if isinstance(items, dict) and items.get("format") in {"binary", "base64"}:
+        return False
     declared = schema.get("type")
     if isinstance(declared, str):
         return declared in {"object", "array"}
@@ -366,11 +370,14 @@ def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, An
     if isinstance(value, bytes):
         return {"data": value}
     if isinstance(value, dict):
-        for name, content_type in _collect_encoded_fields(ctx).items():
+        encoded_fields = _collect_encoded_fields(ctx)
+        for name, content_type in encoded_fields.items():
             if name in value:
                 value[name] = _serialize_part_value(ctx, value[name], content_type)
         multipart = _prepare_form_data(value)
-        files, data = ctx.case.operation.prepare_multipart(multipart, ctx.case.multipart_content_types)
+        # Surface auto-discovered per-part content types on the wire; case-level overrides still win.
+        selected = {**encoded_fields, **(ctx.case.multipart_content_types or {})}
+        files, data = ctx.case.operation.prepare_multipart(multipart, selected)
         return {"files": files, "data": data}
     # Uncommon schema. For example - `{"type": "string"}`
     boundary = choose_boundary()
