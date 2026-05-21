@@ -1185,13 +1185,19 @@ def cover_schema_iter(
                 elif key == "type":
                     yield from _negative_type(ctx, value, seen, schema)
                 elif key == "properties":
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                    template = template or _generate_template_with_deflation_fallback(
+                        ctx, schema, _get_template_schema(schema, "object", ctx)
+                    )
                     yield from _negative_properties(ctx, template, value)
                 elif key == "patternProperties":
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                    template = template or _generate_template_with_deflation_fallback(
+                        ctx, schema, _get_template_schema(schema, "object", ctx)
+                    )
                     yield from _negative_pattern_properties(ctx, template, value)
                 elif key == "propertyNames" and isinstance(value, dict):
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                    template = template or _generate_template_with_deflation_fallback(
+                        ctx, schema, _get_template_schema(schema, "object", ctx)
+                    )
                     if isinstance(template, dict):
                         yield from _negative_property_names(ctx, template, value)
                 elif key == "items" and isinstance(value, dict):
@@ -1317,7 +1323,9 @@ def cover_schema_iter(
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                    template = template or _generate_template_with_deflation_fallback(
+                        ctx, schema, _get_template_schema(schema, "object", ctx)
+                    )
                     yield from _negative_required(ctx, template, value)
                 elif key == "maxItems" and isinstance(value, int) and value < INTERNAL_BUFFER_SIZE:
                     if value > NEGATIVE_MODE_MAX_ITEMS:
@@ -1420,7 +1428,9 @@ def cover_schema_iter(
                             ParameterLocation.BODY,
                         ):
                             continue
-                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                        template = template or _generate_template_with_deflation_fallback(
+                            ctx, schema, _get_template_schema(schema, "object", ctx)
+                        )
                         yield NegativeValue(
                             {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
                             scenario=CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES,
@@ -1429,7 +1439,9 @@ def cover_schema_iter(
                         )
                     elif isinstance(value, dict):
                         # additionalProperties with schema - generate invalid values for the schema
-                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                        template = template or _generate_template_with_deflation_fallback(
+                            ctx, schema, _get_template_schema(schema, "object", ctx)
+                        )
                         existing_keys = set(schema.get("properties", {}).keys()) | set(template.keys())
                         additional_key = _pick_property_name(schema, existing_keys, ctx)
                         if additional_key is None:
@@ -1448,7 +1460,9 @@ def cover_schema_iter(
                     # Skip if additionalProperties is false - can't add more properties cleanly
                     if additional_properties is False:
                         continue
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
+                    template = template or _generate_template_with_deflation_fallback(
+                        ctx, schema, _get_template_schema(schema, "object", ctx)
+                    )
                     obj_value = dict(template)
                     existing_keys = set(obj_value.keys())
                     needed = value + 1 - len(existing_keys)

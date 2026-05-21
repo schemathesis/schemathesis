@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.19.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Restore per-property negatives in coverage phase when an unsatisfiable optional property would otherwise sink the template draw.
+
 ## [4.19.0](https://github.com/schemathesis/schemathesis/compare/v4.18.5...v4.19.0) - 2026-05-19
 
 ### :rocket: Added
