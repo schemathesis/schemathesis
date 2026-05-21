@@ -249,7 +249,7 @@ def test_multipart_nested_object_serializes_as_json(ctx, case_factory):
         media_type="multipart/form-data",
     )
     serialized = REQUESTS_TRANSPORT.serialize_case(case)
-    assert serialized["files"] == [("formData", b'{"slot": {"value": "x"}}')]
+    assert serialized["files"] == [("formData", (None, b'{"slot": {"value": "x"}}', "application/json"))]
 
 
 def _multipart_payload(serialized: dict, name: str) -> bytes:
@@ -259,6 +259,15 @@ def _multipart_payload(serialized: dict, name: str) -> bytes:
     if isinstance(payload, tuple):
         return payload[1]
     return payload
+
+
+def _multipart_content_type(serialized: dict, name: str) -> str | None:
+    payloads = [p for n, p in serialized["files"] if n == name]
+    assert payloads, f"no part named {name!r}"
+    for payload in payloads:
+        if isinstance(payload, tuple) and len(payload) >= 3:
+            return payload[2]
+    return None
 
 
 def test_multipart_ref_to_object_serializes_as_json(ctx, case_factory):
@@ -456,6 +465,109 @@ def test_multipart_boolean_schema_does_not_crash(ctx, case_factory):
     )
     # Should not raise AttributeError on the boolean schema; we just want the call to succeed.
     REQUESTS_TRANSPORT.serialize_case(case)
+
+
+@pytest.mark.parametrize(
+    ("load_kwargs", "body", "field", "expected"),
+    [
+        (
+            {
+                "paths": {
+                    "/upload": {
+                        "post": {
+                            "consumes": ["multipart/form-data"],
+                            "parameters": [
+                                {
+                                    "name": "formData",
+                                    "in": "formData",
+                                    "required": True,
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "object",
+                                        "properties": {"value": {"type": "string"}},
+                                    },
+                                }
+                            ],
+                            "responses": {"200": {"description": "OK"}},
+                        }
+                    }
+                },
+                "version": "2.0",
+            },
+            {"formData": {"slot": {"value": "x"}}},
+            "formData",
+            "application/json",
+        ),
+        (
+            {
+                "paths": {
+                    "/upload": {
+                        "post": {
+                            "requestBody": {
+                                "required": True,
+                                "content": {
+                                    "multipart/form-data": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "parts": {
+                                                    "type": "array",
+                                                    "items": {"$ref": "#/components/schemas/Inner"},
+                                                }
+                                            },
+                                        }
+                                    }
+                                },
+                            },
+                            "responses": {"200": {"description": "OK"}},
+                        }
+                    }
+                },
+                "components": {"schemas": {"Inner": {"type": "object", "properties": {"value": {"type": "string"}}}}},
+            },
+            {"parts": [{"value": "x"}]},
+            "parts",
+            "application/json",
+        ),
+        (
+            {
+                "paths": {
+                    "/upload": {
+                        "post": {
+                            "requestBody": {
+                                "required": True,
+                                "content": {
+                                    "multipart/form-data": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {"note": {"type": "string"}},
+                                        }
+                                    }
+                                },
+                            },
+                            "responses": {"200": {"description": "OK"}},
+                        }
+                    }
+                },
+            },
+            {"note": "hello"},
+            "note",
+            None,
+        ),
+    ],
+    ids=["swagger2-object", "openapi3-array-of-ref", "openapi3-scalar-noop"],
+)
+def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field, expected):
+    # Tagging only fires for JSON-encoded parts; primitives must stay untagged or the wire JSON-quotes them.
+    schema = ctx.openapi.load_schema(**load_kwargs)
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body=body,
+        media_type="multipart/form-data",
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert _multipart_content_type(serialized, field) == expected
 
 
 def test_unknown_multipart_fields_openapi3(ctx):
