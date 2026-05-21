@@ -13,6 +13,11 @@ schema_generation_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)
 # Stable identity for per-(generation_config, mode) custom-format dicts, so downstream caches
 # keyed on `id(custom_formats)` actually hit instead of seeing a fresh dict per call.
 custom_formats_cache: Final[BoundedCache] = BoundedCache(maxsize=32)
+_resolve_result_cache: Final[BoundedCache] = BoundedCache(maxsize=256)
+_merged_result_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
+_canonicalish_result_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)
+_from_schema_result_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
+_merged_as_strategies_result_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
 
 
 def setup() -> None:
@@ -93,12 +98,6 @@ def setup() -> None:
 
     SCHEMA_KEYS = frozenset(SCHEMA_KEYS)
     SCHEMA_OBJECT_KEYS = frozenset(SCHEMA_OBJECT_KEYS)
-
-    _resolve_result_cache = BoundedCache(maxsize=256)
-    _merged_result_cache = BoundedCache(maxsize=512)
-    _canonicalish_result_cache = BoundedCache(maxsize=2048)
-    _from_schema_result_cache = BoundedCache(maxsize=512)
-    _merged_as_strategies_result_cache = BoundedCache(maxsize=512)
 
     def _is_trivial_truthy(schema: object) -> bool:
         return schema is True or schema == {}
