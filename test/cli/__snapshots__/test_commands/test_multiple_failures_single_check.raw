@@ -42,6 +42,7 @@ __________________________ GET /api/multiple_failures __________________________
 Reproduce with:
 
     curl -X GET 'http://127.0.0.1/api/multiple_failures?id=0'
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import click
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.commands.run.handlers.crashes import CrashHandler
 from schemathesis.cli.commands.run.handlers.har import HarHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
@@ -18,6 +19,7 @@ from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACK
 from schemathesis.cli.ext.fs import open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.config import ReportFormat
+from schemathesis.core.cache import effective_directory
 from schemathesis.core.errors import format_exception
 
 if TYPE_CHECKING:
@@ -83,6 +85,19 @@ def initialize_report_handlers(
         allure_path = config.reports.get_path(ReportFormat.ALLURE)
         prepare_directory(allure_path)
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
+
+    if config.cache.enabled:
+        schema_location = params.get("location") or ""
+        crashes_directory = effective_directory(config.cache.directory, None) / "crashes"
+        sanitization = config.output.sanitization
+        handlers.append(
+            CrashHandler(
+                directory=crashes_directory,
+                schema_location=schema_location,
+                base_url=config.base_url or "",
+                sanitization=sanitization,
+            )
+        )
 
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))

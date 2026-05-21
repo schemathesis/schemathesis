@@ -1,0 +1,10 @@
+Exit code: 0
+---
+Stdout:
+
+Replaying 1 case (1 failed check) from /tmp/test_replay_fixed0/GET_users_not_a_server_error_testtest.json
+
+     GET /users ...........................................................................................................................................................................................................  ✓ FIXED       100ms
+Removed 1 crash file (pass --keep to retain).
+
+=============================== 1 fixed in 1.00s ===============================

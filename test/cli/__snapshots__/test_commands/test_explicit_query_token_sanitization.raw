@@ -43,6 +43,7 @@ _______________________________ GET /api/failure _______________________________
 Reproduce with:
 
     curl -X GET 'http://127.0.0.1/api/failure?token=%5BFiltered%5D'
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

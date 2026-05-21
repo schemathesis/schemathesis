@@ -8,6 +8,7 @@ import click
 
 from schemathesis.cli.commands.data import Data
 from schemathesis.cli.commands.fuzz import fuzz as fuzz_command
+from schemathesis.cli.commands.replay import replay as replay_command
 from schemathesis.cli.commands.run import run as run_command
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
 from schemathesis.cli.core import get_terminal_width
@@ -146,3 +147,5 @@ fuzz = schemathesis.command(
     cls=CommandWithGroupedOptions,
     context_settings={"terminal_width": get_terminal_width(), **CONTEXT_SETTINGS},
 )(fuzz_command)
+
+schemathesis.add_command(replay_command)

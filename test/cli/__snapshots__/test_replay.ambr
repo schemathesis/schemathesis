@@ -1,0 +1,131 @@
+# serializer version: 1
+# name: test_render_error_outcome
+  '''
+  Replaying 1 case (1 failed check) from .schemathesis/crashes/
+  
+       GET /accounts/{id}/verify ................................................  ! ERROR        62ms
+       extraction failed at step 2 - $response.body#/id not found
+  
+  ======================================== 1 errored in 0.14s ========================================
+  
+  '''
+# ---
+# name: test_render_full_report_with_url_override
+  '''
+  Replaying 2 cases (3 failed checks) from .schemathesis/crashes/
+  
+    Base URL: https://staging.example.com
+  
+       GET /users ...............................................................  ✓ FIXED       142ms
+  
+      POST /orders ..............................................................  ✗ FAILED       85ms
+  - response_schema_conformance
+  - not_a_server_error
+  
+  [500] Internal Server Error:
+  
+      `{"error": "unhandled exception"}`
+  
+  Reproduce with:
+  
+      curl -X POST http://x/orders
+      st replay Xt9Kp2
+  
+  ==================================== 1 fixed, 1 failed in 0.14s ====================================
+  
+  '''
+# ---
+# name: test_render_partial_fix
+  '''
+  Replaying 1 case (3 failed checks) from .schemathesis/crashes/
+  
+      POST /orders ..............................................................  ✗ FAILED       95ms
+  - not_a_server_error  500 -> 200
+  - response_schema_conformance
+  - positive_data_acceptance  500 -> 200
+  
+  [200] OK:
+  
+      `{"data": "ok"}`
+  
+  Reproduce with:
+  
+      curl -X POST http://x/orders
+      st replay Xt9Kp2
+  
+  ======================================== 1 failed in 0.14s =========================================
+  
+  '''
+# ---
+# name: test_render_removal_notice
+  '''
+  Replaying 1 case (1 failed check) from .schemathesis/crashes/
+  
+       GET /users ...............................................................  ✓ FIXED       142ms
+  
+  Removed 5 crash files (pass --keep to retain).
+  
+  ========================================= 1 fixed in 0.14s =========================================
+  
+  '''
+# ---
+# name: test_render_stateful_changed_with_chain
+  '''
+  Replaying 1 case (1 failed check) from .schemathesis/crashes/
+  
+    DELETE /users/{user_id} .....................................................  ~ CHANGED     312ms
+       1  POST     /auth/login                                                   200 -> 200
+       2  POST     /users                                                        201 -> 201  ~
+       3  GET      /users/{user_id}/profile                                      200 -> 200
+       4  DELETE   /users/{user_id}                                              500 -> 503  ~
+  - not_a_server_error  500 -> 503
+  
+  was  [500] Internal Server Error:
+  
+      `{"error": "crash"}`
+  
+  now  [503] Service Unavailable:
+  
+      `{"error": "service unavailable"}`
+  
+  Reproduce with:
+  
+      curl -X DELETE http://x/users/1
+      st replay Xt9Kp2
+  
+  ======================================== 1 changed in 0.14s ========================================
+  
+  '''
+# ---
+# name: test_render_unit_failing_multi_check
+  '''
+  Replaying 1 case (3 failed checks) from .schemathesis/crashes/
+  
+      POST /orders ..............................................................  ✗ FAILED       85ms
+  - response_schema_conformance
+  - not_a_server_error
+  - positive_data_acceptance
+  
+  [500] Internal Server Error:
+  
+      `{"error": "unhandled exception"}`
+  
+  Reproduce with:
+  
+      curl -X POST http://x/orders
+      st replay Xt9Kp2
+  
+  ======================================== 1 failed in 0.14s =========================================
+  
+  '''
+# ---
+# name: test_render_unit_fixed
+  '''
+  Replaying 1 case (1 failed check) from .schemathesis/crashes/
+  
+       GET /users ...............................................................  ✓ FIXED       142ms
+  
+  ========================================= 1 fixed in 0.14s =========================================
+  
+  '''
+# ---

@@ -1,0 +1,18 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case (1 failed check) from /tmp/test_replay_still_failing0/GET_broken_not_a_server_error_testtest.json
+
+     GET /broken ..........................................................................................................................................................................................................  ✗ FAILED      100ms
+- not_a_server_error
+
+[500] Internal Server Error:
+
+    `{"error":"still broken"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

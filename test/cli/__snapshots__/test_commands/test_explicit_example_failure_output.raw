@@ -42,6 +42,7 @@ _______________________________ GET /api/failure _______________________________
 Reproduce with:
 
     curl -X GET 'http://127.0.0.1/api/failure?key=foo'
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

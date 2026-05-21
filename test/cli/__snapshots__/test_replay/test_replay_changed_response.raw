@@ -1,0 +1,22 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case (1 failed check) from /tmp/test_replay_changed_response0
+
+     GET /data ............................................................................................................................................................................................................  ~ CHANGED     100ms
+- response_schema_conformance  200 -> 200
+
+was  [200] OK:
+
+    `{"value": "old"}`
+
+now  [200] OK:
+
+    `{"value":"new"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+============================== 1 changed in 1.00s ==============================

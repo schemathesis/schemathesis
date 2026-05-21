@@ -47,6 +47,7 @@ ________________________________ GET /api/flaky ________________________________
 Reproduce with:
 
     curl -X GET -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' 'http://127.0.0.1/api/flaky?id=0'
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 
