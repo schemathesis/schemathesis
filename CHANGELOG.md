@@ -12,6 +12,7 @@
 - Emit `minLength` negatives for string schemas whose `pattern` requires more characters than `minLength - 1`.
 - Cover the `enum` / `const` keywords when entries violate the declared `type` by emitting each entry as a negative case.
 - Set `Content-Type: application/json` on JSON-serialized nested `multipart/form-data` parts.
+- Emit a non-empty alphabetic string (e.g. `AAA`) as the string-type negative for non-string parameters so `?q=` no longer collapses to absent on the wire.
 
 ## [4.19.0](https://github.com/schemathesis/schemathesis/compare/v4.18.5...v4.19.0) - 2026-05-19
 

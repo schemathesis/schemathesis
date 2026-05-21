@@ -184,6 +184,13 @@ JSON_STRATEGY: st.SearchStrategy = st.recursive(
 )
 ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY, min_size=2, max_size=3)
 OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(max_size=16), JSON_STRATEGY, max_size=2)
+# Alphabetic non-empty string used for wrong-type negatives; shrinks to "AAA".
+# Plain `st.text()` shrinks to "", which serializes to absent on the wire
+# (`?p=`, empty header, empty body) and defeats the type violation.
+NEGATIVE_STRING_STRATEGY: st.SearchStrategy = st.text(
+    alphabet=st.characters(min_codepoint=65, max_codepoint=122, categories=["L"]),
+    min_size=3,
+)
 
 
 STRATEGIES_FOR_TYPE = {
@@ -2320,12 +2327,7 @@ def _negative_enum(
             return False
         return seen.insert(x)
 
-    strategy = (
-        st.text(alphabet=st.characters(min_codepoint=65, max_codepoint=122, categories=["L"]), min_size=3)
-        | st.none()
-        | st.booleans()
-        | NUMERIC_STRATEGY
-    ).filter(is_not_in_value)
+    strategy = (NEGATIVE_STRING_STRATEGY | st.none() | st.booleans() | NUMERIC_STRATEGY).filter(is_not_in_value)
     yield NegativeValue(
         ctx.generate_from(strategy),
         scenario=CoverageScenario.INVALID_ENUM_VALUE,
@@ -2780,6 +2782,8 @@ def _negative_type(
                     )
             return
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
+    if "string" in strategies:
+        strategies["string"] = NEGATIVE_STRING_STRATEGY
 
     filter_func = {
         "path": lambda x: not is_invalid_path_parameter(x),
