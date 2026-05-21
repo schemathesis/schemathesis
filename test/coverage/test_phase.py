@@ -940,6 +940,55 @@ def test_negative_type_violations_for_enum_property_under_allof(ctx):
     )
 
 
+def test_negative_per_property_emitted_when_inflated_template_unsatisfiable(ctx):
+    # One unsatisfiable optional property must not silence per-property negatives on the others.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "format": {"enum": ["json", "xml"], "type": "string"},
+                                        "unsat": {"type": "integer", "minimum": 10, "maximum": 5},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/foo"]["POST"]
+    cases = list(
+        iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+    )
+    enum_invalid = [
+        c.body
+        for c in cases
+        if isinstance(c.body, dict)
+        and "format" in c.body
+        and c.body["format"] not in ("json", "xml")
+        and c.meta.generation.mode == GenerationMode.NEGATIVE
+    ]
+    assert enum_invalid, (
+        f"Expected a negative case with an invalid 'format' enum value; got bodies: {[c.body for c in cases]}"
+    )
+
+
 def test_positive_oneof_number_branch_covered_when_example_pins_string(ctx):
     # Spec example "5xx" satisfies the string branch but not the number branch; without a
     # baseline fallback the number branch yields no positive case and `/oneOf/0/type` ends
