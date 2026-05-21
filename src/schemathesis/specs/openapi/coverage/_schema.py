@@ -1275,15 +1275,19 @@ def cover_schema_iter(
                                     new_schema["pattern"] = ctx.update_pattern(
                                         schema["pattern"], min_length, max_length
                                     )
-                                    if new_schema["pattern"] == schema["pattern"]:
-                                        # Pattern wasn't updated, try to generate a valid value then shrink the string to the required length
-                                        del new_schema["minLength"]
-                                        del new_schema["maxLength"]
-                                        value = ctx.generate_from_schema(new_schema)[:max_length]
-                                    else:
-                                        value = ctx.generate_from_schema(new_schema)
-                                else:
+                                try:
                                     value = ctx.generate_from_schema(new_schema)
+                                except Unsatisfiable:
+                                    # Pattern's minimum match length exceeds maxLength; drop the bounds,
+                                    # keep the pattern, generate a full-length match, then truncate.
+                                    # The truncated value violates `pattern` (and minLength), which is
+                                    # acceptable: the case is a negative one anyway.
+                                    if "pattern" not in new_schema:
+                                        raise
+                                    fallback = {**new_schema}
+                                    del fallback["minLength"]
+                                    del fallback["maxLength"]
+                                    value = ctx.generate_from_schema(fallback)[:max_length]
                                 if ctx.is_valid_for_location(value) and seen.insert(value):
                                     yield NegativeValue(
                                         value,

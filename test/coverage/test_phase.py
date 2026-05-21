@@ -5934,6 +5934,44 @@ def test_coverage_negative_string_length_nullable(ctx):
         assert not validator.is_valid(case.body), f"NEGATIVE body is schema-valid: {case.body!r}"
 
 
+def test_negative_min_length_emitted_when_pattern_requires_more_than_bound(ctx):
+    # When `minLength > 1` AND `pattern` requires more chars than `minLength - 1`,
+    # the bounded draw is unsatisfiable; fall back to truncation rather than dropping the negative.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "minLength": 2,
+                                    "pattern": "^[A-Z][A-Za-z0-9-_+]+(?:/[A-Z][A-Za-z0-9-_+]+)*$",
+                                    "type": "string",
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = loaded["/foo"]["POST"]
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
+    short_strings = [
+        c.body
+        for c in cases
+        if isinstance(c.body, str)
+        and c.meta is not None
+        and c.meta.phase.data.scenario == CoverageScenario.STRING_BELOW_MIN_LENGTH
+    ]
+    assert short_strings, f"Expected a STRING_BELOW_MIN_LENGTH negative; got bodies: {[c.body for c in cases]}"
+    for body in short_strings:
+        assert len(body) < 2, f"Negative body {body!r} is not shorter than minLength=2"
+
+
 def test_coverage_negative_string_property_form_urlencoded_not_wire_identical(ctx):
     loaded = ctx.openapi.load_schema(
         {
