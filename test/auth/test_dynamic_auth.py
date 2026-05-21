@@ -172,11 +172,124 @@ def test_api_key_auth_unknown_location_is_noop(auth_operation):
             {"path": "/api/auth", "extract_from": "body", "extract_selector": "access_token"},
             "extract_selector.*must start with '/'",
         ),
+        (
+            {"path": "/api/auth", "extract_selector": "/token", "payload_content_type": ""},
+            "payload_content_type.*non-empty",
+        ),
     ],
 )
 def test_config_rejects_invalid_fields(kwargs, match):
     with pytest.raises(ConfigError, match=match):
         DynamicTokenAuthConfig(**kwargs)
+
+
+@pytest.fixture
+def form_auth_app(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/data": {"get": {"operationId": "getData", "responses": {"200": {"description": "OK"}}}}}
+    )
+    received: dict = {}
+
+    @app.route("/api/form-auth", methods=["POST"])
+    def form_auth():
+        received["content_type"] = request.content_type
+        received["form"] = dict(request.form)
+        received["raw"] = request.get_data(as_text=True)
+        return jsonify({"access_token": "form-token"})
+
+    return app, received
+
+
+def test_form_payload_sent_as_urlencoded(form_auth_app, app_runner):
+    app, received = form_auth_app
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = schema["/data"]["GET"]
+    provider = DynamicTokenAuthProvider(
+        path="/api/form-auth",
+        method="post",
+        payload={"grant_type": "password", "username": "alice", "password": "s3cret"},
+        payload_content_type="application/x-www-form-urlencoded",
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    assert provider.get(operation.Case(), AuthContext(operation=operation, app=None)) == "form-token"
+    assert received == {
+        "content_type": "application/x-www-form-urlencoded",
+        "form": {"grant_type": "password", "username": "alice", "password": "s3cret"},
+        "raw": "grant_type=password&username=alice&password=s3cret",
+    }
+
+
+def test_json_payload_default_unchanged(form_auth_app, app_runner):
+    app, received = form_auth_app
+
+    @app.route("/api/json-auth", methods=["POST"])
+    def json_auth():
+        received["content_type"] = request.content_type
+        received["json"] = request.get_json(silent=True)
+        return jsonify({"access_token": "json-token"})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = schema["/data"]["GET"]
+    provider = DynamicTokenAuthProvider(
+        path="/api/json-auth",
+        method="post",
+        payload={"username": "alice", "password": "s3cret"},
+        payload_content_type="application/json",
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    assert provider.get(operation.Case(), AuthContext(operation=operation, app=None)) == "json-token"
+    assert received == {
+        "content_type": "application/json",
+        "json": {"username": "alice", "password": "s3cret"},
+    }
+
+
+def test_custom_json_variant_content_type(form_auth_app, app_runner):
+    app, received = form_auth_app
+
+    @app.route("/api/vnd-auth", methods=["POST"])
+    def vnd_auth():
+        received["content_type"] = request.content_type
+        received["json"] = request.get_json(silent=True, force=True)
+        return jsonify({"access_token": "vnd-token"})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = schema["/data"]["GET"]
+    provider = DynamicTokenAuthProvider(
+        path="/api/vnd-auth",
+        method="post",
+        payload={"key": "value"},
+        payload_content_type="application/vnd.api+json; charset=utf-8",
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    assert provider.get(operation.Case(), AuthContext(operation=operation, app=None)) == "vnd-token"
+    assert received == {
+        "content_type": "application/vnd.api+json; charset=utf-8",
+        "json": {"key": "value"},
+    }
+
+
+def test_unsupported_content_type_raises_at_runtime(form_auth_app, app_runner):
+    app, _ = form_auth_app
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = schema["/data"]["GET"]
+    provider = DynamicTokenAuthProvider(
+        path="/api/form-auth",
+        method="post",
+        payload={"key": "value"},
+        payload_content_type="application/xml",
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    with pytest.raises(AuthenticationError, match="Unsupported payload_content_type 'application/xml'"):
+        provider.get(operation.Case(), AuthContext(operation=operation, app=None))
 
 
 @pytest.mark.parametrize(

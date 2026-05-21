@@ -52,6 +52,7 @@ class DynamicTokenAuthConfig(DiffBase):
     path: str
     method: str
     payload: dict[str, str] | None
+    payload_content_type: str
     extract_from: str
     extract_selector: str
 
@@ -61,6 +62,7 @@ class DynamicTokenAuthConfig(DiffBase):
         path: str = "",
         method: str = "post",
         payload: dict[str, str] | None = None,
+        payload_content_type: str = "application/json",
         extract_from: str = "body",
         extract_selector: str = "",
     ) -> None:
@@ -70,9 +72,12 @@ class DynamicTokenAuthConfig(DiffBase):
             raise ConfigError(
                 f"Dynamic auth `extract_selector` must start with '/' when extract_from='body': {extract_selector!r}"
             )
+        if not payload_content_type:
+            raise ConfigError("Dynamic auth `payload_content_type` must be a non-empty media type string.")
         self.path = path
         self.method = method.lower()
         self.payload = {k: resolve(v) for k, v in payload.items()} if payload else None
+        self.payload_content_type = payload_content_type
         self.extract_from = extract_from
         self.extract_selector = extract_selector
 

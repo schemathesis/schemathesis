@@ -356,6 +356,7 @@ def build_auth_provider(
                 path=config.path,
                 method=config.method,
                 payload=config.payload,
+                payload_content_type=config.payload_content_type,
                 extract_from=config.extract_from,
                 extract_selector=config.extract_selector,
                 _applier=applier,

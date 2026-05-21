@@ -1,0 +1,6 @@
+# Dynamic auth with form-urlencoded payload
+[auth.dynamic.openapi.BearerAuth]
+path = "/auth/token"
+payload = { grant_type = "password", username = "${TEST_STRING_1}", password = "${TEST_STRING_2}" }
+payload_content_type = "application/x-www-form-urlencoded"
+extract_selector = "/access_token"

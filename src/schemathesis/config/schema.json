@@ -320,11 +320,12 @@
       "additionalProperties": false,
       "required": ["path", "extract_selector"],
       "properties": {
-        "path":             { "type": "string" },
-        "method":           { "type": "string", "pattern": "(?i)(?:GET|POST|PUT|PATCH|DELETE)", "default": "post" },
-        "payload":          { "type": "object", "additionalProperties": { "type": "string" } },
-        "extract_from":     { "type": "string", "enum": ["body", "header"], "default": "body" },
-        "extract_selector": { "type": "string" }
+        "path":                 { "type": "string" },
+        "method":               { "type": "string", "pattern": "(?i)(?:GET|POST|PUT|PATCH|DELETE)", "default": "post" },
+        "payload":              { "type": "object", "additionalProperties": { "type": "string" } },
+        "payload_content_type": { "type": "string", "default": "application/json" },
+        "extract_from":         { "type": "string", "enum": ["body", "header"], "default": "body" },
+        "extract_selector":     { "type": "string" }
       }
     },
     "ChecksConfig": {

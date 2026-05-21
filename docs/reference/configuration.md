@@ -808,6 +808,16 @@ These settings can only be applied at the project level.
     extract_selector = "/access_token"
     ```
 
+    **HTTP Bearer - OAuth 2.0 password grant (form-encoded body):**
+
+    ```toml
+    [auth.dynamic.openapi.BearerAuth]
+    path = "/auth/token"
+    payload = { grant_type = "password", username = "${USERNAME}", password = "${PASSWORD}" }
+    payload_content_type = "application/x-www-form-urlencoded"
+    extract_selector = "/access_token"
+    ```
+
     **HTTP Bearer - token from a response header:**
 
     ```toml
@@ -829,7 +839,8 @@ These settings can only be applied at the project level.
     |-------|---------|-------------|
     | `path` | required | Path on the API host, must start with `/` |
     | `method` | `"post"` | HTTP method for the token fetch request |
-    | `payload` | `{}` | JSON body sent with the fetch request; supports `${ENV_VAR}` substitution |
+    | `payload` | `{}` | Body sent with the fetch request; supports `${ENV_VAR}` substitution |
+    | `payload_content_type` | `"application/json"` | Media type for the payload. Accepts `application/json` (and any `+json` variant, optionally with parameters such as `; charset=utf-8`) or `application/x-www-form-urlencoded` |
     | `extract_from` | `"body"` | Source of the token: `"body"` or `"header"` |
     | `extract_selector` | required | [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) when `extract_from = "body"`, or header name when `extract_from = "header"` |
 

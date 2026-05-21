@@ -105,6 +105,16 @@ payload = { username = "${USERNAME}", password = "${PASSWORD}" }
 extract_selector = "/access_token"
 ```
 
+For login endpoints that expect form-encoded credentials (common for OAuth 2.0 password grants), set `payload_content_type`:
+
+```toml
+[auth.dynamic.openapi.BearerAuth]
+path = "/auth/token"
+payload = { grant_type = "password", username = "${USERNAME}", password = "${PASSWORD}" }
+payload_content_type = "application/x-www-form-urlencoded"
+extract_selector = "/access_token"
+```
+
 If the token is in a response header instead of the body:
 
 ```toml
@@ -120,7 +130,8 @@ Works the same way for `apiKey` schemes — Schemathesis reads the parameter nam
 |-------|---------|-------------|
 | `path` | required | Path on the API host (must start with `/`) |
 | `method` | `"post"` | HTTP method for the fetch request |
-| `payload` | `{}` | JSON body sent with the fetch request; supports `${ENV_VAR}` substitution |
+| `payload` | `{}` | Body sent with the fetch request; supports `${ENV_VAR}` substitution |
+| `payload_content_type` | `"application/json"` | Media type for the payload; accepts `application/json` (and any `+json` variant) or `application/x-www-form-urlencoded` |
 | `extract_from` | `"body"` | Where to find the token: `"body"` or `"header"` |
 | `extract_selector` | required | JSON Pointer (body) or header name |
 
