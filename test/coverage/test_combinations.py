@@ -131,7 +131,7 @@ def nctx(ctx_factory):
         ({"enum": [1, 2]}, [1, 2]),
         ({"const": 42}, [42]),
         ({"not": {}}, []),
-        ({"not": {"type": "null"}}, [0, "false", "", ["null", "null"]]),
+        ({"not": {"type": "null"}}, [0, "false", "AAA", ["null", "null"]]),
     ],
 )
 def test_positive_primitive_schemas(pctx, schema, expected):
@@ -157,13 +157,14 @@ class AnyNumber:
         (False, [None, True, False, "", 0, [None, None], {}]),
         (True, []),
         ({}, []),
-        ({"type": "null"}, [0, "false", "", ["null", "null"]]),
-        ({"type": "boolean"}, [0, "null", "", ["null", "null"]]),
-        ({"type": ["boolean", "null"]}, [0, "", ["null", "null"]]),
+        ({"type": "null"}, [0, "false", "AAA", ["null", "null"]]),
+        ({"type": "boolean"}, [0, "null", "AAA", ["null", "null"]]),
+        ({"type": ["boolean", "null"]}, [0, "AAA", ["null", "null"]]),
         # canonicalish drops `type` when `enum` is present; infer it from the values so type
-        # violations still appear alongside the enum violation.
-        ({"enum": [1, 2]}, ["AAA", "false", "null", "", ["null", "null"]]),
-        ({"enum": [1, 2, {}]}, ["AAA", "false", "null", "", ["null", "null"]]),
+        # violations still appear alongside the enum violation. The enum-negative "AAA"
+        # collides with the type-negative "AAA" and dedupes to one entry.
+        ({"enum": [1, 2]}, ["AAA", "false", "null", ["null", "null"]]),
+        ({"enum": [1, 2, {}]}, ["AAA", "false", "null", ["null", "null"]]),
         ({"enum": ["a", "b"]}, ["AAA", 0, "false", "null", ["null", "null"]]),
         ({"const": 42}, ["AAA"]),
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
@@ -213,6 +214,21 @@ def test_unbounded_array_positive_baseline_is_non_empty(pctx):
     covered = cover_schema(pctx, {"type": "array", "items": {"type": "integer", "format": "int32"}})
     assert covered
     assert covered[0], covered
+
+
+@pytest.mark.parametrize(
+    "location",
+    [ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.BODY],
+    ids=["query", "header", "body"],
+)
+def test_negative_type_string_for_integer_is_non_empty(ctx_factory, location):
+    # `_negative_type` draws `st.text()` for the string-type negative on a non-string
+    # parameter; Hypothesis shrinks to "" and `_is_not_numeric_string` passes it through.
+    # `?param=` / empty header / empty body collapse to absent on the wire, so the
+    # negative can't demonstrate a type violation against the declared `integer` type.
+    ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], location=location)
+    values = [v.value for v in cover_schema_iter(ctx, {"type": "integer", "format": "int32"})]
+    assert "" not in values, f"{location}: empty string emitted as string-type negative; got {values!r}"
 
 
 @pytest.mark.parametrize("allow_extra_parameters", [True, False])
@@ -1305,15 +1321,15 @@ def test_negative_pattern(nctx, schema, expected):
     [
         (
             {"type": "object", "propertyNames": {"maxLength": 3}},
-            [0, "false", "null", "", ["null", "null"], {"0000": ""}],
+            [0, "false", "null", "AAA", ["null", "null"], {"0000": ""}],
         ),
         (
             {"type": "object", "propertyNames": {"pattern": "^[a-z]+$"}},
-            [0, "false", "null", "", ["null", "null"], {"": ""}],
+            [0, "false", "null", "AAA", ["null", "null"], {"": ""}],
         ),
         (
             {"type": "object", "propertyNames": {"minLength": 3}},
-            [0, "false", "null", "", ["null", "null"], {"00": ""}],
+            [0, "false", "null", "AAA", ["null", "null"], {"00": ""}],
         ),
     ],
 )
@@ -1416,7 +1432,7 @@ def test_positive_multiple_types(pctx):
                     {"minimum": 5},
                 ],
             },
-            [4, AnyNumber(), "false", "null", "", ["null", "null"]],
+            [4, AnyNumber(), "false", "null", "AAA", ["null", "null"]],
         ),
         (
             {
@@ -1491,7 +1507,7 @@ def test_negative_combinators(nctx, schema, expected):
             },
             [
                 False,
-                "",
+                "AAA",
                 [
                     None,
                     None,
@@ -1509,7 +1525,7 @@ def test_negative_combinators(nctx, schema, expected):
             },
             [
                 False,
-                "",
+                "AAA",
                 [
                     None,
                     None,
@@ -1640,7 +1656,7 @@ def test_negative_value_locations(nctx, schema, expected):
                 0,
                 "false",
                 "null",
-                "",
+                "AAA",
                 [
                     "null",
                     "null",
@@ -2047,7 +2063,7 @@ def test_positive_bundled_schema_refs(pctx, schema, expected):
         # Basic $ref negative case
         (
             {"$defs": {"PositiveInt": {"type": "integer", "minimum": 1}}, "$ref": "#/$defs/PositiveInt"},
-            [AnyNumber(), "false", "null", "", ["null", "null"], 0],
+            [AnyNumber(), "false", "null", "AAA", ["null", "null"], 0],
         ),
         # $ref in object properties - missing required property
         (
@@ -2061,7 +2077,7 @@ def test_positive_bundled_schema_refs(pctx, schema, expected):
                 0,
                 "false",
                 "null",
-                "",
+                "AAA",
                 ["null", "null"],
                 {"name": 0},
                 {"name": "00"},
@@ -2079,7 +2095,7 @@ def test_positive_bundled_schema_refs(pctx, schema, expected):
                 0,
                 "false",
                 "null",
-                "",
+                "AAA",
                 [
                     "null",
                     "null",
