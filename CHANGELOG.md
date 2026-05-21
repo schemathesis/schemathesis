@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.19.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Form-encoded payloads for dynamic auth via `payload_content_type`. [#4167](https://github.com/schemathesis/schemathesis/issues/4167)
+
 ### :bug: Fixed
 
 - Restore per-property negatives in coverage phase when an unsatisfiable optional property would otherwise sink the template draw.
