@@ -695,6 +695,65 @@ $ st fuzz [OPTIONS] SCHEMA
     $ st fuzz openapi.yaml --max-time 3600
     ```
 
+## `replay`
+
+The `replay` command re-runs cases that failed a previous `run` or `fuzz`. Failing cases are recorded automatically as crash files under the project cache directory; see [Replaying Failures](../guides/crash-reproduction.md).
+
+```console
+$ st replay [OPTIONS] [PATH]
+```
+
+!!! note "Optional Parameter"
+
+    **PATH**: What to replay. Omit it to replay every recorded crash for the project. Otherwise pass a crash file, a directory of crash files, or a case ID (as printed in the `Reproduce with:` block of a failing run).
+
+    ```console
+    $ st replay
+    $ st replay Xt9Kp2
+    $ st replay .schemathesis/myapi/cache/crashes/abc123.json
+    ```
+
+### Options
+
+#### `--url URL`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `null`  
+
+    Override the base URL recorded in the crash file, for replaying against a different environment.
+
+    ```console
+    $ st replay --url https://staging.example.com
+    ```
+
+#### `--schema-location TEXT`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `null`  
+
+    Override the schema location used to reload operations. Required when the location recorded in the crash file is unreachable (e.g. crash files copied from CI).
+
+    ```console
+    $ st replay --schema-location ./openapi.json
+    ```
+
+#### `--keep`
+
+!!! note ""
+
+    **Type**: `Flag`  
+    **Default**: `false`  
+
+    Retain crash files for cases that now pass. By default, fixed crashes are removed so the directory reflects only what is still broken.
+
+    ```console
+    $ st replay --keep
+    ```
+
 ## Exit codes
 
 Schemathesis uses predictable exit codes so automation can interpret results:

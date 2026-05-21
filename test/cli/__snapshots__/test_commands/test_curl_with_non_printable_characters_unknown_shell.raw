@@ -57,6 +57,8 @@ Reproduce with:
 
     ⚠️  Request body contains non-printable characters. Actual value: b'data\x1f'
 
+    st replay <PLACEHOLDER>
+
 =================================== WARNINGS ===================================
 
 Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation

@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Class-based checks that run per response and once after the whole run. [#1147](https://github.com/schemathesis/schemathesis/issues/1147), [#1689](https://github.com/schemathesis/schemathesis/issues/1689)
+- Record failing cases as crash files and replay them with `st replay`. [#3006](https://github.com/schemathesis/schemathesis/issues/3006)
 
 ### :wrench: Changed
 

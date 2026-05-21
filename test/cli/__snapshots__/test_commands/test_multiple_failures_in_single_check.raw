@@ -60,6 +60,8 @@ Reproduce with:
 
     curl -X GET http://127.0.0.1/success
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

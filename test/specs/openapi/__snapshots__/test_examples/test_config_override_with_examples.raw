@@ -39,6 +39,8 @@ Reproduce with:
 
     curl -X PUT -H 'Content-Type: application/json' -d '{"property": "whatever"}' http://127.0.0.1/api/primary/subs/whatever
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

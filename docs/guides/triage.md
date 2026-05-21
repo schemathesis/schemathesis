@@ -59,6 +59,8 @@ The fewest in number but highest severity — your API is crashing on generated 
 
 For each server error, follow the diagnostic process from the [CLI Tutorial](../tutorials/cli.md#first-test-run): run the reproduction `curl`, read the response body, and trace the minimal failing input back to its schema definition. These need individual investigation — there is no batch fix.
 
+After a fix, confirm the exact failing case is gone with [`st replay`](crash-reproduction.md) instead of re-running the whole suite.
+
 ## What's Next
 
 Once your run is clean, see [Optimizing for Maximum Bug Detection](config-optimization.md) to run longer, higher-coverage sessions.

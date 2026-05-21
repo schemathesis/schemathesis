@@ -39,6 +39,8 @@ Reproduce with:
 
     curl -X TRACE http://127.0.0.1/basic
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

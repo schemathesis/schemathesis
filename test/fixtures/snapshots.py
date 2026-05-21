@@ -106,6 +106,8 @@ class CliSnapshotConfig:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
                 data = data.replace(str(Path(self.testdir.tmpdir).parent) + os.path.sep, "/tmp/")
+            if os.path.sep != "/":
+                data = re.sub(r"/tmp/\S+", lambda match: match.group(0).replace(os.path.sep, "/"), data)
         if "Configuration:" in data:
             lines = []
             for line in data.splitlines():
@@ -188,6 +190,8 @@ class CliSnapshotConfig:
                 if re.match(r".*\d+\. Test Case ID", line):
                     sequential_id = line.split(".")[0]
                     lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
+                elif re.match(r"\s+st replay \S+", line):
+                    lines[idx] = "    st replay <PLACEHOLDER>"
             data = "\n".join(lines) + "\n"
         if self.replace_uuid:
             data = re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
@@ -231,6 +235,8 @@ class CliSnapshotConfig:
                 flags=re.MULTILINE,
             )
         if self.replace_reproduce_with:
+            # Collapse only the (variable) curl line; the `st replay <id>` line is masked separately by
+            # `replace_test_case_id` so it reads `st replay <PLACEHOLDER>` everywhere, with or without this flag.
             lines = []
             seen = False
             for line in data.splitlines():
@@ -251,6 +257,9 @@ class CliSnapshotConfig:
                 lines.append("Schema Loading Error")
                 continue
             if IS_WINDOWS and ("Loading specification" in line or "Loaded specification" in line):
+                line = line.replace("\\", "/")
+            if IS_WINDOWS and line.startswith("Replaying ") and " from " in line:
+                # `st replay` echoes the crash file/dir path, which uses `\` on Windows.
                 line = line.replace("\\", "/")
             if (
                 any(marker in line for marker in FLASK_MARKERS)

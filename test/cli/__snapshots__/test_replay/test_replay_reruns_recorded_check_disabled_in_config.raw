@@ -1,0 +1,25 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_reruns_recorded_ch0/GET_boom_not_a_server_error_testtest.json
+
+  x FAILED GET /boom
+
+=================================== FAILURES ===================================
+__________________________________ GET /boom ___________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `{"error":"boom"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

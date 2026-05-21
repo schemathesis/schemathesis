@@ -1,0 +1,11 @@
+Exit code: 0
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_applies_per_operat1/GET_boom_not_a_server_error_testtest.json
+
+  + FIXED  GET /boom
+
+Removed 1 crash file (pass --keep to retain).
+
+=============================== 1 fixed in 1.00s ===============================

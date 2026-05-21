@@ -42,6 +42,8 @@ Reproduce with:
 
     <PLACEHOLDER>
 
+    st replay <PLACEHOLDER>
+
 2. Test Case ID: <PLACEHOLDER>
 
 - Server error
@@ -53,6 +55,8 @@ Reproduce with:
 Reproduce with:
 
     <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

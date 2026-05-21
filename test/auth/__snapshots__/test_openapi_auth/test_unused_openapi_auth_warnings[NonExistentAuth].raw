@@ -39,6 +39,8 @@ Reproduce with:
 
     curl -X GET -H 'X-API-Key: [Filtered]' http://127.0.0.1/api-key-header
 
+    st replay <PLACEHOLDER>
+
 =================================== WARNINGS ===================================
 
 Authentication failed: 1 operation returned authentication errors

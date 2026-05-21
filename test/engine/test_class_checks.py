@@ -1,36 +1,29 @@
+import pytest
+
 import schemathesis
 from schemathesis.engine import events
 from schemathesis.engine.run import PhaseName
 from test.utils import EventStream
 
 
-def test_disabled_after_run_check_does_not_execute(ctx, restore_checks):
+@pytest.mark.parametrize("method_name", ["after_run", "after_response"])
+def test_disabled_check_does_not_execute(ctx, restore_checks, method_name):
     called = []
 
-    @schemathesis.check
-    class TrackAfterRun:
-        def after_run(self, ctx):
+    if method_name == "after_run":
+
+        def method(self, ctx):
             called.append(True)
+    else:
+
+        def method(self, ctx, response, case):
+            called.append(True)
+
+    schemathesis.check(type("Tracked", (), {method_name: method}))
 
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    schema.config.checks.update(excluded_check_names=["TrackAfterRun"])
-    EventStream(schema, phases=[PhaseName.FUZZING], max_examples=3).execute()
-
-    assert not called
-
-
-def test_disabled_after_response_check_does_not_execute(ctx, restore_checks):
-    called = []
-
-    @schemathesis.check
-    class TrackAfterResponse:
-        def after_response(self, ctx, response, case):
-            called.append(True)
-
-    api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_url(api.schema_url)
-    schema.config.checks.update(excluded_check_names=["TrackAfterResponse"])
+    schema.config.checks.update(excluded_check_names=["Tracked"])
     EventStream(schema, phases=[PhaseName.FUZZING], max_examples=3).execute()
 
     assert not called

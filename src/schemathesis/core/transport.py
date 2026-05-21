@@ -240,6 +240,13 @@ class Response:
         """Decode response content as text using the detected or default encoding."""
         return self.content.decode(self.encoding or "utf-8")
 
+    def text_lossy(self) -> str:
+        """Decode like `text` but never raise: replace undecodable bytes, fall back to UTF-8 on an unknown charset."""
+        try:
+            return self.content.decode(self.encoding or "utf-8", errors="replace")
+        except LookupError:
+            return self.content.decode("utf-8", errors="replace")
+
     def json(self) -> Any:
         """Parse response content as JSON.
 

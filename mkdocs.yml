@@ -13,6 +13,7 @@ nav:
   - How-To Guides:
       - guides/index.md
       - Triaging Failures: guides/triage.md
+      - Replaying Failures: guides/crash-reproduction.md
       - Optimizing for Maximum Bug Detection: guides/config-optimization.md
       - guides/auth.md
       - guides/schema-conformance.md

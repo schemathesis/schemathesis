@@ -47,6 +47,8 @@ Reproduce with:
 
     curl -X GET http://127.0.0.1/api/malformed_json
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

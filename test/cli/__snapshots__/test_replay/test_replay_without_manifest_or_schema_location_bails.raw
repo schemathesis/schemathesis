@@ -1,0 +1,4 @@
+Exit code: 2
+---
+Stdout:
+Error: cannot replay without a schema. Pass --schema-location <url-or-path>.

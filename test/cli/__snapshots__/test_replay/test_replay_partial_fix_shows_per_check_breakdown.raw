@@ -1,0 +1,52 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_partial_fix_shows_0/.schemathesis/default/cache/crashes
+
+  x FAILED GET /data
+
+    + not_a_server_error
+    x response_schema_conformance
+
+=================================== FAILURES ===================================
+__________________________________ GET /data ___________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    "value" is a required property
+
+    Schema:
+
+        {
+            "required": [
+                "value"
+            ],
+            "properties": {
+                "value": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        }
+
+    Value:
+
+        {
+            "wrong": "shape"
+        }
+
+[200] OK:
+
+    `{"wrong":"shape"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+Removed 1 crash file (pass --keep to retain).
+
+========================== 1 fixed, 1 failed in 1.00s ==========================

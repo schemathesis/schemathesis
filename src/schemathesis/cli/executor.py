@@ -84,6 +84,18 @@ def initialize_report_handlers(
         prepare_directory(allure_path)
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
 
+    if config.cache.enabled:
+        from schemathesis.cli.commands.run.handlers.crashes import CrashHandler
+
+        handlers.append(
+            CrashHandler(
+                cache_directory=config.cache.directory,
+                schema_location=params.get("location") or "",
+                base_url=config.base_url or "",
+                sanitization=config.output.sanitization,
+            )
+        )
+
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))
 

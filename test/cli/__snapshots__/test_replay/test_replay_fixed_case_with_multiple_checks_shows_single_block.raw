@@ -1,0 +1,11 @@
+Exit code: 0
+---
+Stdout:
+
+Replaying 1 case from Fx1Cd2
+
+  + FIXED  GET /users
+
+Removed 2 crash files (pass --keep to retain).
+
+=============================== 2 fixed in 1.00s ===============================

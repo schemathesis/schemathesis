@@ -47,6 +47,8 @@ Reproduce with:
 
     curl -X PUT http://127.0.0.1/api/api/v1/items
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

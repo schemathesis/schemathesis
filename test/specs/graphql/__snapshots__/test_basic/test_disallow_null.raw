@@ -37,6 +37,8 @@ Reproduce with:
 
     curl -X POST -H 'Content-Type: application/json' -d '{"query": "{\n  getValue(value: 0)\n}"}' http://127.0.0.1/graphql
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

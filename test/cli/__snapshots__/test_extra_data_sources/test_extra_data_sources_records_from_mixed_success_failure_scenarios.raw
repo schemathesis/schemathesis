@@ -62,6 +62,8 @@ Reproduce with:
 
     <PLACEHOLDER>
 
+    st replay <PLACEHOLDER>
+
 _________________________________ POST /items __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
@@ -74,6 +76,8 @@ _________________________________ POST /items __________________________________
 Reproduce with:
 
     <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

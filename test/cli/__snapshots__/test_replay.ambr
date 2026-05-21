@@ -1,0 +1,67 @@
+# serializer version: 1
+# name: test_render_error_outcome
+  '''
+  Replaying 1 case from .schemathesis/crashes/
+  
+    ! ERROR  GET /accounts/{id}/verify
+  
+      extraction failed at step 2 - $response.body#/id not found
+  
+  ============================== 1 errored in 0.14s ==============================
+  
+  '''
+# ---
+# name: test_render_removal_notice
+  '''
+  Replaying 1 case from .schemathesis/crashes/
+  
+    + FIXED  GET /users
+  
+  Removed 5 crash files (pass --keep to retain).
+  
+  =============================== 1 fixed in 0.14s ===============================
+  
+  '''
+# ---
+# name: test_render_step_chain
+  '''
+  Replaying 1 case from .schemathesis/crashes/
+  
+    x FAILED GET /c
+  
+  =================================== FAILURES ===================================
+  ____________________________________ GET /c ____________________________________
+  
+       1  GET  /a  200 -> 302  ~
+       2  GET  /b  404  ~
+       3  GET  /d  200  ~
+       4  GET  /c  500 -> 503  ~
+  
+  1. Test Case ID: Cd1234
+  
+  - Server error
+  
+  [503] Service Unavailable:
+  
+      `{"error": "down"}`
+  
+  Reproduce with:
+  
+      curl http://127.0.0.1
+      
+      st replay Cd1234
+  
+  ============================== 1 failed in 0.14s ===============================
+  
+  '''
+# ---
+# name: test_render_unit_fixed
+  '''
+  Replaying 1 case from .schemathesis/crashes/
+  
+    + FIXED  GET /users
+  
+  =============================== 1 fixed in 0.14s ===============================
+  
+  '''
+# ---

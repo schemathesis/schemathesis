@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from itertools import combinations
-from time import perf_counter
 from typing import TYPE_CHECKING, Any, TypeGuard, cast
 
 from schemathesis.core import NOT_SET, NotSet, media_types
@@ -17,6 +16,7 @@ from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, MEDIA_TYPE_STRATEGIES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
+from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -44,17 +44,6 @@ if TYPE_CHECKING:
     from schemathesis.resources import ExtraDataSource, PoolDraw
     from schemathesis.schemas import APIOperation, ParameterSet
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
-
-
-class Instant:
-    __slots__ = ("start",)
-
-    def __init__(self) -> None:
-        self.start = perf_counter()
-
-    @property
-    def elapsed(self) -> float:
-        return perf_counter() - self.start
 
 
 class Template:

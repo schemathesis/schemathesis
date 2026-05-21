@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_invalid_link_locat0/.schemathesis/default/cache/crashes
+
+  ! ERROR  GET /target
+
+    extraction failed at step 2 - 'bogus' is not a valid ParameterLocation
+
+============================== 1 errored in 1.00s ==============================
