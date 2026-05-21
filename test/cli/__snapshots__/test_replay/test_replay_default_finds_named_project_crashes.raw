@@ -1,0 +1,11 @@
+Exit code: 0
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_default_finds_name0/.schemathesis/test/cache/crashes
+
+  + FIXED  GET /users
+
+Removed 1 crash file (pass --keep to retain).
+
+=============================== 1 fixed in 1.00s ===============================

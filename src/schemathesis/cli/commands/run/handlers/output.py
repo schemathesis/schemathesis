@@ -1343,7 +1343,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                     fg="red",
                 )
             )
-        display_failures(ctx.statistic, ctx.config.output)
+        display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
         if not self.warnings.is_empty:
             self.display_warnings()
         if ctx.statistic.extraction_failures:

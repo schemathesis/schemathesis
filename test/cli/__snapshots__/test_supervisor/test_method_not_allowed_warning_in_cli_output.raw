@@ -51,6 +51,8 @@ Reproduce with:
 
     <PLACEHOLDER>
 
+    st replay <PLACEHOLDER>
+
 =================================== WARNINGS ===================================
 
 Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed` — skipped from later phases

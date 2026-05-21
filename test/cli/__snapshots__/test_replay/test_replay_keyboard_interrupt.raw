@@ -1,0 +1,25 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_keyboard_interrupt0
+
+  x FAILED GET /a
+
+=================================== FAILURES ===================================
+____________________________________ GET /a ____________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `{"error":"boom"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+====================== 1 failed, interrupted after 0.00s =======================

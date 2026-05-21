@@ -39,6 +39,8 @@ Reproduce with:
 
     curl -X GET -H 'Authorization: [Filtered]' -H 'X-API-Key: [Filtered]' http://127.0.0.1/multiple-auth-and
 
+    st replay <PLACEHOLDER>
+
 =================================== WARNINGS ===================================
 
 Authentication failed: 1 operation returned authentication errors

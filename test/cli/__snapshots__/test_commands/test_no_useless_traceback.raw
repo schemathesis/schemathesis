@@ -51,6 +51,8 @@ Reproduce with:
 
     <PLACEHOLDER>
 
+    st replay <PLACEHOLDER>
+
 =================================== WARNINGS ===================================
 
 Unsupported regex patterns: 1 operation contain regex patterns not supported by Python and were removed

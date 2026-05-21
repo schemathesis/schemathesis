@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_corrupt_meta_is_er0/.schemathesis/default/cache/crashes
+
+  ! ERROR  GET /users
+
+    step 1: incompatible or corrupted crash data
+
+============================== 1 errored in 1.00s ==============================

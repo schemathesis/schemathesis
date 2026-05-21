@@ -140,6 +140,9 @@ uvx schemathesis run http://127.0.0.1:8080/openapi.json \
 
 The `--include-operation-id` option targets only the specific operation we fixed, making the test run faster during development. You can also filter by HTTP method (`--include-method POST`) or path patterns (`--include-path /bookings`).
 
+!!! tip "Replay the exact failure instead"
+    To re-check the precise case that failed - rather than generate fresh data and hope it recurs - run `st replay`. Schemathesis records every failure to disk, and replay re-sends those exact requests. See [Replaying Failures](../guides/crash-reproduction.md).
+
 ## Generating more test cases
 
 !!! question "Want to find more bugs?"

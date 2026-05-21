@@ -1,0 +1,9 @@
+Exit code: 0
+---
+Stdout:
+
+Replaying 0 cases from /tmp/test_replay_unreadable_crash_f0/.schemathesis/default/cache/crashes
+
+Skipped 1 incompatible crash file (could not be read; kept on disk).
+
+=================================== in 1.00s ===================================

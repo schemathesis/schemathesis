@@ -38,6 +38,8 @@ Reproduce with:
 
     curl -X GET http://127.0.0.1/api/networks/fd00%3A%3A%2F64
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

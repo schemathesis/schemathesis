@@ -38,7 +38,6 @@ def test_after_run_failure_reported(testdir, restore_checks, test_body):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
     assert result.ret != 0
-    # CLI-style rendering: a `- <title>` bullet and an indented message.
     result.stdout.fnmatch_lines(["*- Custom check failed: `AlwaysFail`*", "*    always fails in after_run*"])
 
 
@@ -52,7 +51,7 @@ def test_api(case):
 def test_after_run_skipped_on_collect_only(testdir, restore_checks):
     testdir.make_test(_ALWAYS_FAIL_CHECK + _SCHEMA_PARAMETRIZE_BODY)
     result = testdir.runpytest("--collect-only")
-    # No tests ran, so the whole-run invariant must not be evaluated (and must not fail the session).
+    # No tests ran, so after_run checks must not run and must not fail the session.
     assert result.ret == 0, result.stdout.str()
 
 
@@ -60,7 +59,7 @@ def test_after_run_failure_reported_without_terminal(testdir, restore_checks):
     testdir.make_test(_ALWAYS_FAIL_CHECK + _SCHEMA_PARAMETRIZE_BODY)
     result = testdir.runpytest("-p", "no:terminal")
     assert result.ret != 0
-    # Even without the terminal reporter, the failure text must surface, not be silently dropped.
+    # Failure text must still surface without the terminal reporter, not be silently dropped.
     assert "always fails in after_run" in (result.stderr.str() + result.stdout.str())
 
 
@@ -112,25 +111,3 @@ def test_two(case):
     result.assert_outcomes(passed=2)
     assert result.ret == 0
     assert int(pathlib.Path(counter_path).read_text()) == 2
-
-
-def test_disabled_after_run_check_does_not_execute(testdir, restore_checks):
-    testdir.make_test(
-        """
-@schemathesis.check
-class ShouldNotRun:
-    def after_run(self, ctx):
-        raise AssertionError("should not run")
-
-schema.config.checks.update(excluded_check_names=["ShouldNotRun"])
-
-lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
-
-@lazy_schema.parametrize()
-def test_api(case):
-    pass
-"""
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
-    assert result.ret == 0

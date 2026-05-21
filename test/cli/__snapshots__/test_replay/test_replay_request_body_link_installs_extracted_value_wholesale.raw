@@ -1,0 +1,29 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_request_body_link_0/.schemathesis/default/cache/crashes
+
+  x FAILED POST /target
+
+=================================== FAILURES ===================================
+_________________________________ POST /target _________________________________
+
+     1  GET   /source  200
+     2  POST  /target  500
+
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `{"error":"boom"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

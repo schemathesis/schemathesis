@@ -1,0 +1,4 @@
+Exit code: 2
+---
+Stdout:
+Error: failed to load schema from http://127.0.0.1/users

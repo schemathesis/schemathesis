@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_missing_path_is_er0/GET_gone_not_a_server_error_testtest.json
+
+  ! ERROR  GET /gone
+
+    operation not found in schema at step 1
+
+============================== 1 errored in 1.00s ==============================

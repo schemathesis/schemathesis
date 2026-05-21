@@ -13,5 +13,6 @@ Options:
   -h, --help          Show this message and exit
 
 Commands:
-  fuzz  Run continuous API fuzzing
-  run   Run property-based API tests
+  fuzz    Run continuous API fuzzing
+  replay  Replay stored crash files
+  run     Run property-based API tests

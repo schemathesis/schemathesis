@@ -259,7 +259,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
                     if idx < len(_errors):
                         click.echo()
 
-        display_failures(ctx.statistic, ctx.config.output)
+        display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
 
         display_section_name("SUMMARY")
         click.echo()

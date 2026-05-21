@@ -43,6 +43,8 @@ Reproduce with:
 
     curl -X GET http://127.0.0.1/api/failure
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

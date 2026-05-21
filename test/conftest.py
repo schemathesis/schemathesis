@@ -28,6 +28,7 @@ pytest_plugins = [
     "pytester",
     "pytest_mock",
     "test.fixtures.ctx",
+    "test.fixtures.crashes",
     "test.fixtures.app_runner",
     "test.fixtures.snapshots",
     "test.fixtures.reset",

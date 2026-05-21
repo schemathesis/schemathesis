@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_intermediate_step_0/.schemathesis/default/cache/crashes
+
+  ! ERROR  GET /users
+
+    operation not found in schema at step 1
+
+============================== 1 errored in 1.00s ==============================

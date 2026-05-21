@@ -46,6 +46,8 @@ Reproduce with:
 
     curl -X GET http://127.0.0.1/api/basic
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

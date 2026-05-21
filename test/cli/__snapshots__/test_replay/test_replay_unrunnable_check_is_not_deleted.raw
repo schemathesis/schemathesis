@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_unrunnable_check_i0/.schemathesis/default/cache/crashes
+
+  ! ERROR  GET /users
+
+    ! check_defined_in_an_extension_we_did_not_load  check not available to re-run
+
+============================== 1 errored in 1.00s ==============================

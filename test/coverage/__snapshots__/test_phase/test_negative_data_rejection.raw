@@ -39,6 +39,8 @@ Reproduce with:
 
     curl -X GET 'http://127.0.0.1/api/success?page_num=1000'
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

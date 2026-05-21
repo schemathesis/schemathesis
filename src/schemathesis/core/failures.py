@@ -135,7 +135,7 @@ class CustomFailure(Failure):
         operation: str | None,
         title: str,
         message: str,
-        exception: AssertionError,
+        exception: Exception,
         case_id: str | None = None,
         severity: Severity = Severity.MEDIUM,
     ) -> None:
@@ -179,6 +179,11 @@ class ResponseTimeExceeded(Failure):
     @property
     def _unique_key(self) -> str:
         return self.title
+
+
+def is_reproducible_failure(failure: Failure) -> bool:
+    """Re-sending the request can reproduce this failure; timing-dependent ones cannot."""
+    return not isinstance(failure, ResponseTimeExceeded)
 
 
 class ServerError(Failure):

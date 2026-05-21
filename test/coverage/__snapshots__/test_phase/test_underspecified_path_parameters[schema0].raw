@@ -39,6 +39,8 @@ Reproduce with:
 
     curl -X PUT http://127.0.0.1/api/organizations/null/
 
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:

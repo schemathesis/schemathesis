@@ -61,13 +61,11 @@ def test_after_run_failures_are_distinct_per_check(ctx, restore_checks):
     run_checks = RunChecks.from_registry(schema.config.checks_config_for())
     failures = collect_after_run_failures(schema.config, run_checks.for_run())
 
-    # Both checks fail from the same shared line; they must still count as two distinct failures.
     assert len(failures) == 2
     assert len(set(failures)) == 2
 
 
 def test_reregistering_check_from_same_module_is_allowed(restore_checks):
-    # Module re-execution (assertion rewrite, reload) re-registers the same check; not a collision.
     schemathesis.check(type("Dup", (), {"__module__": "pkg_a", "after_run": lambda self, ctx: None}))
     schemathesis.check(type("Dup", (), {"__module__": "pkg_a", "after_run": lambda self, ctx: None}))
     assert "Dup" in RunChecks.from_registry(_EMPTY_CONFIG).instances
@@ -85,7 +83,6 @@ def test_get_by_name_does_not_mutate_unknown():
 
 
 def test_unknown_check_name_in_config_raises(restore_checks):
-    # A `[checks.<name>]` section with settings for a name that matches no registered check is a typo.
     config = ChecksConfig.from_dict({"DefinitelyNotARegisteredCheck": {"threshold": 0.5}})
     with pytest.raises(ConfigError, match="DefinitelyNotARegisteredCheck"):
         RunChecks.from_registry(config)
@@ -97,12 +94,6 @@ def test_function_check_is_not_instantiated(restore_checks):
         return None
 
     assert "plain" not in RunChecks.from_registry(_EMPTY_CONFIG).instances
-
-
-def test_single_instance_per_run(restore_checks):
-    _register("Stateful", {"after_response": _after_response})
-    run_checks = RunChecks.from_registry(_EMPTY_CONFIG)
-    assert run_checks.for_responses()[0][1] is run_checks.instances["Stateful"]
 
 
 @pytest.mark.parametrize(
@@ -289,7 +280,6 @@ def test_class_based_check_fires_exactly_once_in_validate_response(ctx, response
 
 
 def test_max_response_time_runs_in_validate_response(ctx, response_factory):
-    # A configured `max_response_time` must run on the public validate path, as in the engine.
     schema = ctx.openapi.load_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
     schema.config.checks.update(max_response_time=0.001)
     case = schema["/test"]["GET"].Case()

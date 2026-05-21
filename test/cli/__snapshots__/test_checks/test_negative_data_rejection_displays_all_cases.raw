@@ -40,6 +40,8 @@ Reproduce with:
 
     <PLACEHOLDER>
 
+    st replay <PLACEHOLDER>
+
 2. Test Case ID: <PLACEHOLDER>
 
 - Response violates schema
@@ -79,6 +81,8 @@ Reproduce with:
 Reproduce with:
 
     <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

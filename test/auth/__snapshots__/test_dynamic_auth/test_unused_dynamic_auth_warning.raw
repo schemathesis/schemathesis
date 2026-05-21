@@ -39,6 +39,8 @@ Reproduce with:
 
     curl -X GET -H 'Authorization: [Filtered]' http://127.0.0.1/data
 
+    st replay <PLACEHOLDER>
+
 =================================== WARNINGS ===================================
 
 Unused OpenAPI auth: 1 configured auth scheme not defined in the schema

@@ -1,0 +1,11 @@
+Exit code: 0
+---
+Stdout:
+
+Replaying 1 case from Cd7Xy9
+
+  + FIXED  GET /users
+
+Removed 1 crash file (pass --keep to retain).
+
+=============================== 1 fixed in 1.00s ===============================

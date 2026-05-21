@@ -488,7 +488,7 @@ def collect_after_run_failures(
                     operation=None,
                     title=f"Check `{name}` raised an unexpected error",
                     message=f"{type(exc).__name__}: {exc}",
-                    exception=exc,  # type: ignore[arg-type]
+                    exception=exc,
                 )
             )
     return failures

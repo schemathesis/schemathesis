@@ -45,6 +45,8 @@ Reproduce with:
 
     curl -X DELETE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
 
+    st replay <PLACEHOLDER>
+
 __________________________________ TRACE /foo __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
@@ -61,6 +63,8 @@ __________________________________ TRACE /foo __________________________________
 Reproduce with:
 
     curl -X TRACE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
+
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

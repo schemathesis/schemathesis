@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/test_replay_no_recorded_checks0/.schemathesis/default/cache/crashes
+
+  ! ERROR  GET /users
+
+    recorded no checks to verify
+
+============================== 1 errored in 1.00s ==============================

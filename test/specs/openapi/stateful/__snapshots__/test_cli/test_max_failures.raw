@@ -42,6 +42,8 @@ Reproduce with:
 
     <PLACEHOLDER>
 
+    st replay <PLACEHOLDER>
+
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
@@ -54,6 +56,8 @@ ________________________________ Stateful tests ________________________________
 Reproduce with:
 
     <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

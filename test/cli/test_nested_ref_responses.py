@@ -1,5 +1,5 @@
 import pytest
-from flask import jsonify
+from flask import jsonify, request
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -194,6 +194,13 @@ def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
     @app.route("/items", methods=["POST"])
     def create_item():
         # Accept all requests to trigger negative_data_rejection failures
+        body = request.get_data()
+        try:
+            text = body.decode("utf-8")
+        except UnicodeDecodeError:
+            return jsonify({"error": "non-printable"}), 400
+        if any(ord(char) < 32 or ord(char) == 127 for char in text):
+            return jsonify({"error": "non-printable"}), 400
         return jsonify({"id": 1}), 201
 
     result = cli.run_openapi_app(
