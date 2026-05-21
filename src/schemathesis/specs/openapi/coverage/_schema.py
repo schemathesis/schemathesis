@@ -1174,11 +1174,11 @@ def cover_schema_iter(
         for key, value in schema.items():
             with _ignore_unfixable(), ctx.at(key):
                 if key == "enum":
-                    yield from _negative_enum(ctx, value, seen)
+                    yield from _negative_enum(ctx, value, seen, schema)
                     if inferred_types:
                         yield from _negative_type(ctx, inferred_types, seen, schema)
                 elif key == "const":
-                    for value_ in _negative_enum(ctx, [value], seen):
+                    for value_ in _negative_enum(ctx, [value], seen, schema):
                         yield value_
                     if inferred_types:
                         yield from _negative_type(ctx, inferred_types, seen, schema)
@@ -2312,7 +2312,9 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
         yield next(combinations(optional, size))
 
 
-def _negative_enum(ctx: CoverageContext, value: list, seen: HashSet) -> Generator[GeneratedValue, None, None]:
+def _negative_enum(
+    ctx: CoverageContext, value: list, seen: HashSet, schema: JsonSchemaObject | None = None
+) -> Generator[GeneratedValue, None, None]:
     def is_not_in_value(x: Any) -> bool:
         if x in value or not ctx.is_valid_for_location(x):
             return False
@@ -2330,6 +2332,22 @@ def _negative_enum(ctx: CoverageContext, value: list, seen: HashSet) -> Generato
         description="Invalid enum value",
         location=ctx.current_path,
     )
+    # Self-contradictory schemas (e.g. `enum: [2, 4]` or `const: 2` with `type: string`) skip every entry
+    # on the positive path, so emit each mismatched entry as a negative to keep the keyword covered.
+    if isinstance(schema, dict):
+        declared_types = set(get_type(schema))
+        if declared_types:
+            for entry in value:
+                if to_json_type_name(entry) in declared_types:
+                    continue
+                if not ctx.is_valid_for_location(entry) or not seen.insert(entry):
+                    continue
+                yield NegativeValue(
+                    entry,
+                    scenario=CoverageScenario.INCORRECT_TYPE,
+                    description="Enum value with type mismatching the declared 'type'",
+                    location=ctx.current_path,
+                )
 
 
 def _negative_properties(

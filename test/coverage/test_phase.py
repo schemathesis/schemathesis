@@ -5752,6 +5752,74 @@ def test_coverage_negative_string_length_with_enum(ctx):
         assert not validator.is_valid(case.body), f"NEGATIVE body is schema-valid: {case.body!r}"
 
 
+def test_negative_enum_emits_entries_with_type_mismatch_for_keyword_coverage(ctx):
+    # Positive path skips every entry as `type`-invalid, so only negatives can exercise `enum` here.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "chunk_size": {"enum": [2, 4, 6, 8, 10], "type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = loaded["/foo"]["POST"]
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
+    emitted = {
+        c.body["chunk_size"]
+        for c in cases
+        if isinstance(c.body, dict) and "chunk_size" in c.body and isinstance(c.body["chunk_size"], int)
+    }
+    assert {2, 4, 6, 8, 10}.issubset(emitted), f"Expected each enum entry as a negative; got: {emitted}"
+
+
+def test_negative_const_emits_value_with_type_mismatch_for_keyword_coverage(ctx):
+    # Positive path skips the const value as `type`-invalid, so only the negative can exercise `const` here.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "chunk_size": {"const": 42, "type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = loaded["/foo"]["POST"]
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
+    emitted = {
+        c.body["chunk_size"]
+        for c in cases
+        if isinstance(c.body, dict) and "chunk_size" in c.body and isinstance(c.body["chunk_size"], int)
+    }
+    assert 42 in emitted, f"Expected const value as a negative; got: {emitted}"
+
+
 def test_coverage_positive_template_with_enum_and_type_mismatch(ctx):
     # YAML parsing artifacts (e.g. bare `true`/`false`) in an enum with type:"string" must not
     # produce a schema-invalid template body.
