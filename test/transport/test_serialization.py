@@ -467,8 +467,30 @@ def test_multipart_boolean_schema_does_not_crash(ctx, case_factory):
     REQUESTS_TRANSPORT.serialize_case(case)
 
 
+_SWAGGER2_BINARY_ARRAY_SCHEMA = {
+    "paths": {
+        "/upload": {
+            "post": {
+                "consumes": ["multipart/form-data"],
+                "parameters": [
+                    {
+                        "name": "files",
+                        "in": "formData",
+                        "required": True,
+                        "type": "array",
+                        "items": {"type": "string", "format": "binary"},
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    },
+    "version": "2.0",
+}
+
+
 @pytest.mark.parametrize(
-    ("load_kwargs", "body", "field", "expected"),
+    ("load_kwargs", "body", "field", "expected", "case_kwargs"),
     [
         (
             {
@@ -497,6 +519,7 @@ def test_multipart_boolean_schema_does_not_crash(ctx, case_factory):
             {"formData": {"slot": {"value": "x"}}},
             "formData",
             "application/json",
+            {},
         ),
         (
             {
@@ -528,6 +551,7 @@ def test_multipart_boolean_schema_does_not_crash(ctx, case_factory):
             {"parts": [{"value": "x"}]},
             "parts",
             "application/json",
+            {},
         ),
         (
             {
@@ -553,11 +577,32 @@ def test_multipart_boolean_schema_does_not_crash(ctx, case_factory):
             {"note": "hello"},
             "note",
             None,
+            {},
+        ),
+        (
+            _SWAGGER2_BINARY_ARRAY_SCHEMA,
+            {"files": [b"\x01", b"\x02"]},
+            "files",
+            None,
+            {},
+        ),
+        (
+            _SWAGGER2_BINARY_ARRAY_SCHEMA,
+            {"files": [b"\x01", b"\x02"]},
+            "files",
+            "image/png",
+            {"multipart_content_types": {"files": "image/png"}},
         ),
     ],
-    ids=["swagger2-object", "openapi3-array-of-ref", "openapi3-scalar-noop"],
+    ids=[
+        "swagger2-object",
+        "openapi3-array-of-ref",
+        "openapi3-scalar-noop",
+        "swagger2-binary-array",
+        "swagger2-binary-array-user-override",
+    ],
 )
-def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field, expected):
+def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field, expected, case_kwargs):
     # Tagging only fires for JSON-encoded parts; primitives must stay untagged or the wire JSON-quotes them.
     schema = ctx.openapi.load_schema(**load_kwargs)
     case = case_factory(
@@ -565,6 +610,7 @@ def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field
         method="POST",
         body=body,
         media_type="multipart/form-data",
+        **case_kwargs,
     )
     serialized = REQUESTS_TRANSPORT.serialize_case(case)
     assert _multipart_content_type(serialized, field) == expected
