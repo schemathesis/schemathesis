@@ -16,6 +16,10 @@ from schemathesis.engine.observations import Observations
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
+from schemathesis.python._constants.adapters import default_adapters
+from schemathesis.python._constants.orchestrator import ExtractionResult, extract_all
+from schemathesis.python._constants.pool import ConstantsPool, ConstantsValueSource
+from schemathesis.python._constants.registry import default_registry
 from schemathesis.schemas import APIOperation, BaseSchema
 
 if TYPE_CHECKING:
@@ -55,6 +59,10 @@ class EngineContext:
         "_supervisor_lock",
         "_cache",
         "_cache_lock",
+        "_constants_extraction",
+        "_constants_extraction_lock",
+        "_constants_value_source",
+        "_constants_value_source_lock",
     )
 
     def __init__(
@@ -87,6 +95,10 @@ class EngineContext:
         self._supervisor_lock = threading.Lock()
         self._cache = LazyInit.UNSET
         self._cache_lock = threading.Lock()
+        self._constants_extraction = LazyInit.UNSET
+        self._constants_extraction_lock = threading.Lock()
+        self._constants_value_source = LazyInit.UNSET
+        self._constants_value_source_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -186,6 +198,25 @@ class EngineContext:
 
     # Runtime cache controller -- replay during probing, persist at end of run.
     cache: LazyInit[Cache] = LazyInit(lambda ctx: Cache(ctx))
+
+    # Extracted constants from user-defined sources; lazily computed once per run.
+    constants_extraction: LazyInit[ExtractionResult] = LazyInit(lambda ctx: _build_constants_extraction())
+
+    # Cached wrapper over the extracted pool, reused for every operation's strategy build.
+    constants_value_source: LazyInit[ConstantsValueSource] = LazyInit(lambda ctx: _build_constants_value_source(ctx))
+
+
+def _build_constants_extraction() -> ExtractionResult:
+    registry = default_registry()
+    # Short-circuit: AST scanning is the only expensive step in this subsystem.
+    # If the user hasn't registered any source, do nothing at all.
+    if not registry.entries():
+        return ExtractionResult(pool=ConstantsPool())
+    return extract_all(registry=registry, adapters=default_adapters())
+
+
+def _build_constants_value_source(ctx: EngineContext) -> ConstantsValueSource:
+    return ConstantsValueSource(ctx.constants_extraction.pool)
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:

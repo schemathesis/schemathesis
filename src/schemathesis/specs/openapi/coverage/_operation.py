@@ -41,6 +41,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.parameters import ContainerName
     from schemathesis.core.transport import HttpMethod
+    from schemathesis.python._constants.pool import ConstantsValueSource
     from schemathesis.resources import ExtraDataSource, PoolDraw
     from schemathesis.schemas import APIOperation, ParameterSet
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
@@ -387,7 +388,14 @@ def iter_coverage_cases(
     extra_data_source: ExtraDataSource | None = None,
     unexpected_methods_seen: set[tuple[str, str]] | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsValueSource | None = None,
 ) -> Generator[Case, None, None]:
+    # `constants_value_source` is accepted to keep the engine-side surface uniform across
+    # phases. The coverage phase enumerates per-parameter values directly and does not
+    # currently apply the constants overlay (which composes at the object level); the kwarg
+    # is plumbed through so future per-parameter pool injection can flip on without another
+    # signature migration. See `OpenApiBody.get_strategy` for the active overlay site.
+    _ = constants_value_source
     generators: dict[tuple[ParameterLocation, str], Generator[GeneratedValue, None, None]] = {}
     serializers = operation.get_parameter_serializers()
     template = Template(serializers)

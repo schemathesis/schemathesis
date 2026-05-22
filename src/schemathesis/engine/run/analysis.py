@@ -23,4 +23,10 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
         return
     if warnings:
         yield events.SchemaAnalysisWarnings(phase=phase, warnings=warnings)
+
+    # Harvest literal constants from user-supplied Python source. No-op when no source
+    # callable was registered via `@schemathesis.python.constants` — the lazy access
+    # only triggers AST scanning if there's something to scan.
+    _ = ctx.constants_value_source
+
     yield events.PhaseFinished(phase=phase, status=Status.SUCCESS, payload=None)

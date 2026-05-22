@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.python._constants.pool import ConstantsValueSource
     from schemathesis.resources import ExtraDataSource
 
 
@@ -437,6 +438,7 @@ class BaseSchema(Mapping):
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
         extra_data_source: ExtraDataSource | None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> type[APIStateMachine]:
         """Engine-internal variant of `as_state_machine` that wires per-run state."""
         raise NotImplementedError
@@ -489,6 +491,7 @@ class BaseSchema(Mapping):
         generation_config: GenerationConfig,
         extra_data_source: ExtraDataSource | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> Iterator[Case]:
         raise NotImplementedError
 

@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.python._constants.pool import ConstantsValueSource
     from schemathesis.resources import ExtraDataSource
 
 
@@ -184,9 +185,10 @@ class GraphQLSchema(BaseSchema):
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
         extra_data_source: ExtraDataSource | None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> type[APIStateMachine]:
-        # `error_feedback`, `link_calibration` and `extra_data_source` are OpenAPI-specific;
-        # GraphQL strategies and stateful transitions don't consume them.
+        # `error_feedback`, `link_calibration`, `extra_data_source`, and `constants_value_source`
+        # are OpenAPI-specific; GraphQL strategies and stateful transitions don't consume them.
         return self.as_state_machine()
 
     @override
@@ -220,6 +222,7 @@ class GraphQLSchema(BaseSchema):
         generation_config: GenerationConfig,
         extra_data_source: ExtraDataSource | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> Iterator[Case]:
         # GraphQL has no coverage phase yet; the schema-level case enumerator is empty.
         return iter(())
@@ -483,6 +486,7 @@ def graphql_cases(
     # Not supported for GraphQL, passed here to unify interfaces
     extra_data_source: ExtraDataSource | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsValueSource | None = None,
     mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], None] | None = None,
 ) -> Any:
     import graphql

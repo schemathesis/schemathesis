@@ -24,6 +24,7 @@ from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.python._constants.pool import ConstantsValueSource, ConstantType, ConstantValue
 from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
@@ -84,6 +85,9 @@ PATH_INTEGER_POSITIVE_BIAS = 0.8
 # 20% example usage provides good coverage of domain-specific values
 # while still allowing hypothesis-generated exploration.
 EXAMPLE_USAGE_PROBABILITY = 0.20
+
+CONSTANTS_OVERLAY_PROBABILITY = 0.30
+"""Probability of substituting a constant-pool value when one is available for a parameter's type."""
 
 
 def _variant_key(variant: dict[str, Any]) -> str:
@@ -203,6 +207,130 @@ def build_semantic_overlay(
         return GeneratedValue(body, inner_meta, inner_pool_draws, combined_semantic)
 
     return overlaid()
+
+
+def build_constants_overlay_strategy(
+    inner: st.SearchStrategy,
+    *,
+    source: ConstantsValueSource,
+    schema_properties: dict,
+    validator_cls: type,
+    container_schema: dict | None = None,
+    probability: float = CONSTANTS_OVERLAY_PROBABILITY,
+) -> st.SearchStrategy:
+    """Probabilistically substitute generated values with constants from the SUT source.
+
+    Per-parameter substitution: for each property whose primitive type matches a non-empty
+    constants pool, pre-filter pool values against the property's JSON Schema, then sample
+    a schema-valid value with `probability` and replace. Properties with no schema-valid
+    candidates are skipped so we never weaken a positive case.
+
+    When `container_schema` is provided, the substituted object is revalidated against it
+    before being returned; if cross-field constraints (`oneOf`, `if/then`, `dependentRequired`,
+    etc.) reject the substitution, the original generated value is kept.
+    """
+    from hypothesis import strategies as st
+
+    from schemathesis.core.jsonschema import make_validator
+    from schemathesis.generation.value import GeneratedValue
+
+    # Resolve once: parameter name -> tuple of schema-valid pool values for that parameter.
+    candidates: dict[str, tuple[ConstantValue, ...]] = {}
+    for name, schema in schema_properties.items():
+        if not isinstance(schema, dict):
+            continue
+        keys = _constant_types_for(schema.get("type"))
+        pool_values: list[ConstantValue] = []
+        for key in keys:
+            if source.is_active(key):
+                pool_values.extend(source.pool.values_for(key))
+        if not pool_values:
+            continue
+        try:
+            validator = make_validator(schema, validator_cls)
+        except Exception:
+            continue
+        valid = tuple(value for value in pool_values if validator.is_valid(value))
+        if valid:
+            candidates[name] = valid
+
+    if not candidates:
+        return inner
+
+    container_validator = None
+    if isinstance(container_schema, dict):
+        try:
+            container_validator = make_validator(container_schema, validator_cls)
+        except Exception:
+            container_validator = None
+
+    @st.composite  # type: ignore[untyped-decorator,unused-ignore]
+    def overlay(draw: st.DrawFn) -> Any:
+        produced = draw(inner)
+        random = draw(st.randoms())
+
+        if isinstance(produced, GeneratedValue):
+            value = produced.value
+            meta = produced.meta
+            pool_draws = produced.pool_draws
+            semantic_draws = produced.semantic_draws
+            dictionary_draws = produced.dictionary_draws
+        else:
+            value = produced
+            meta = None
+            pool_draws = ()
+            semantic_draws = ()
+            dictionary_draws = ()
+
+        if not isinstance(value, dict):
+            return produced
+
+        new_value = dict(value)
+        substituted = False
+        for name, valid_values in candidates.items():
+            if name not in new_value:
+                continue
+            if random.random() >= probability:
+                continue
+            new_value[name] = random.choice(valid_values)
+            substituted = True
+
+        if not substituted and not isinstance(produced, GeneratedValue):
+            return produced
+
+        # Guard against cross-field constraints that leaf-level validation can't catch.
+        if substituted and container_validator is not None and not container_validator.is_valid(new_value):
+            return produced
+
+        return GeneratedValue(
+            value=new_value,
+            meta=meta,
+            pool_draws=pool_draws,
+            semantic_draws=semantic_draws,
+            dictionary_draws=dictionary_draws,
+        )
+
+    return overlay()
+
+
+def _constant_types_for(json_schema_type: object) -> tuple[ConstantType, ...]:
+    # `type: "number"` accepts both integers and floats per JSON Schema, so both pool
+    # buckets must be considered. OpenAPI 3.1 / JSON Schema 2020-12 also allows multi-type
+    # declarations like `["string", "null"]`; aggregate across members in declaration order.
+    if isinstance(json_schema_type, list):
+        result: list[ConstantType] = []
+        for member in json_schema_type:
+            for key in _constant_types_for(member):
+                if key not in result:
+                    result.append(key)
+        return tuple(result)
+    if json_schema_type == "string":
+        return ("string",)
+    if json_schema_type == "integer":
+        return ("integer",)
+    if json_schema_type == "number":
+        return ("float", "integer")
+    return ()
 
 
 def _captured_variants_active(extra_data_source: ExtraDataSource | None, operation: APIOperation) -> bool:
@@ -785,8 +913,8 @@ class OpenApiBody(OpenApiComponent):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._positive_strategy_cache: tuple[st.SearchStrategy, int | None, int | None] | NotSet = NOT_SET
-        self._negative_strategy_cache: tuple[st.SearchStrategy, int | None, int | None] | NotSet = NOT_SET
+        self._positive_strategy_cache: tuple[st.SearchStrategy, int | None, int | None, int | None] | NotSet = NOT_SET
+        self._negative_strategy_cache: tuple[st.SearchStrategy, int | None, int | None, int | None] | NotSet = NOT_SET
         self._is_negatable: bool | NotSet = NOT_SET
 
     @property
@@ -842,6 +970,7 @@ class OpenApiBody(OpenApiComponent):
         extra_data_source: ExtraDataSource | None = None,
         mix_examples: bool = True,
         error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
         # The captured-variant overlay binds resource values at build time, so caching it
@@ -850,20 +979,29 @@ class OpenApiBody(OpenApiComponent):
         use_cache = mix_examples and not _captured_variants_active(extra_data_source, operation)
         feedback_generation = error_feedback.generation if error_feedback is not None else None
         semantic_id = _semantic_cache_key(extra_data_source)
+        constants_id = id(constants_value_source) if constants_value_source is not None else None
 
         # Check cache based on generation mode (only when extra data sources are not used)
         if use_cache:
             if generation_mode == GenerationMode.POSITIVE:
                 cached = self._positive_strategy_cache
                 if cached is not NOT_SET and not isinstance(cached, NotSet):
-                    cached_strategy, cached_generation, cached_semantic = cached
-                    if cached_generation == feedback_generation and cached_semantic == semantic_id:
+                    cached_strategy, cached_generation, cached_semantic, cached_constants = cached
+                    if (
+                        cached_generation == feedback_generation
+                        and cached_semantic == semantic_id
+                        and cached_constants == constants_id
+                    ):
                         return cached_strategy
             else:
                 cached = self._negative_strategy_cache
                 if cached is not NOT_SET and not isinstance(cached, NotSet):
-                    cached_strategy, cached_generation, cached_semantic = cached
-                    if cached_generation == feedback_generation and cached_semantic == semantic_id:
+                    cached_strategy, cached_generation, cached_semantic, cached_constants = cached
+                    if (
+                        cached_generation == feedback_generation
+                        and cached_semantic == semantic_id
+                        and cached_constants == constants_id
+                    ):
                         return cached_strategy
 
         # Import here to avoid circular dependency
@@ -956,7 +1094,13 @@ class OpenApiBody(OpenApiComponent):
         if captured_variants and usage_tracker is not None:
             if generation_mode.is_negative:
                 strategy = self._build_negative_aware_strategy(
-                    operation, generation_config, captured_variants, usage_tracker
+                    operation,
+                    generation_config,
+                    captured_variants,
+                    usage_tracker,
+                    mix_examples=mix_examples,
+                    error_feedback=error_feedback,
+                    constants_value_source=constants_value_source,
                 )
             else:
                 strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
@@ -969,6 +1113,16 @@ class OpenApiBody(OpenApiComponent):
             build_body_dictionary_overlay_strategy,
             resolve_body_bindings,
         )
+
+        body_schema_properties = schema.get("properties", {}) if isinstance(schema, dict) else {}
+        if constants_value_source is not None and generation_mode == GenerationMode.POSITIVE:
+            strategy = build_constants_overlay_strategy(
+                strategy,
+                source=constants_value_source,
+                schema_properties=body_schema_properties,
+                validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+                container_schema=schema if isinstance(schema, dict) else None,
+            )
 
         body_bindings = resolve_body_bindings(
             operation=operation,
@@ -988,9 +1142,9 @@ class OpenApiBody(OpenApiComponent):
         if body_overrides:
             strategy = build_body_override_overlay_strategy(strategy, overrides=body_overrides)
 
-        # Cache the strategy keyed by feedback generation and semantic-index identity
+        # Cache the strategy keyed by feedback generation, semantic-index identity, and constants-source identity
         if use_cache:
-            slot = (strategy, feedback_generation, semantic_id)
+            slot = (strategy, feedback_generation, semantic_id, constants_id)
             if generation_mode == GenerationMode.POSITIVE:
                 self._positive_strategy_cache = slot
             else:
@@ -1004,6 +1158,10 @@ class OpenApiBody(OpenApiComponent):
         generation_config: GenerationConfig,
         captured_variants: list[CapturedVariant],
         usage_tracker: VariantUsageTracker,
+        *,
+        mix_examples: bool = True,
+        error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available."""
         from hypothesis import strategies as st
@@ -1011,7 +1169,13 @@ class OpenApiBody(OpenApiComponent):
         from schemathesis.generation.value import GeneratedValue
 
         positive_strategy = self.get_strategy(
-            operation, generation_config, GenerationMode.POSITIVE, extra_data_source=None
+            operation,
+            generation_config,
+            GenerationMode.POSITIVE,
+            extra_data_source=None,
+            mix_examples=mix_examples,
+            error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
         )
         positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
@@ -1021,7 +1185,12 @@ class OpenApiBody(OpenApiComponent):
         )
 
         negative_strategy = self.get_strategy(
-            operation, generation_config, GenerationMode.NEGATIVE, extra_data_source=None
+            operation,
+            generation_config,
+            GenerationMode.NEGATIVE,
+            extra_data_source=None,
+            mix_examples=mix_examples,
+            error_feedback=error_feedback,
         )
 
         @st.composite  # type: ignore[untyped-decorator]
@@ -1394,7 +1563,7 @@ class OpenApiParameterSet(ParameterSet):
         self._validation_schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
         self._strategy_cache: dict[
-            tuple[frozenset[str], GenerationMode, int | None, int | None], st.SearchStrategy
+            tuple[frozenset[str], GenerationMode, int | None, int | None, int | None], st.SearchStrategy
         ] = {}
         self._strict_validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
@@ -1481,12 +1650,14 @@ class OpenApiParameterSet(ParameterSet):
         extra_data_source: ExtraDataSource | None = None,
         mix_examples: bool = True,
         error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
         feedback_generation = error_feedback.generation if error_feedback is not None else None
         semantic_id = _semantic_cache_key(extra_data_source)
-        cache_key = (exclude_key, generation_mode, feedback_generation, semantic_id)
+        constants_id = id(constants_value_source) if constants_value_source is not None else None
+        cache_key = (exclude_key, generation_mode, feedback_generation, semantic_id, constants_id)
 
         use_cache = mix_examples and not _captured_variants_active(extra_data_source, operation)
 
@@ -1632,6 +1803,14 @@ class OpenApiParameterSet(ParameterSet):
             )
 
             schema_properties = schema_obj.get("properties", {}) if isinstance(schema_obj, dict) else {}
+            if constants_value_source is not None and not is_negative:
+                strategy = build_constants_overlay_strategy(
+                    strategy,
+                    source=constants_value_source,
+                    schema_properties=schema_properties,
+                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+                    container_schema=schema_obj if isinstance(schema_obj, dict) else None,
+                )
             bindings = resolve_parameter_bindings(
                 operation=operation,
                 location=self.location,
@@ -1744,7 +1923,14 @@ class OpenApiParameterSet(ParameterSet):
                 # In negative mode with captured values, mostly use positive strategy
                 # to leverage valuable captured IDs for testing deeper application logic
                 strategy = self._build_negative_aware_strategy(
-                    operation, generation_config, exclude, captured_variants, usage_tracker
+                    operation,
+                    generation_config,
+                    exclude,
+                    captured_variants,
+                    usage_tracker,
+                    mix_examples=mix_examples,
+                    error_feedback=error_feedback,
+                    constants_value_source=constants_value_source,
                 )
             else:
                 strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
@@ -1760,6 +1946,10 @@ class OpenApiParameterSet(ParameterSet):
         exclude: Iterable[str],
         captured_variants: list[CapturedVariant],
         usage_tracker: VariantUsageTracker,
+        *,
+        mix_examples: bool = True,
+        error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available.
 
@@ -1772,7 +1962,14 @@ class OpenApiParameterSet(ParameterSet):
 
         # Get positive strategy with hybrid approach
         positive_strategy = self.get_strategy(
-            operation, generation_config, GenerationMode.POSITIVE, exclude, extra_data_source=None
+            operation,
+            generation_config,
+            GenerationMode.POSITIVE,
+            exclude,
+            extra_data_source=None,
+            mix_examples=mix_examples,
+            error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
         )
         positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         # Wrap in GeneratedValue for consistent return type with negative strategy
@@ -1784,7 +1981,13 @@ class OpenApiParameterSet(ParameterSet):
 
         # Get negative strategy without extra_data_source to avoid recursion
         negative_strategy = self.get_strategy(
-            operation, generation_config, GenerationMode.NEGATIVE, exclude, extra_data_source=None
+            operation,
+            generation_config,
+            GenerationMode.NEGATIVE,
+            exclude,
+            extra_data_source=None,
+            mix_examples=mix_examples,
+            error_feedback=error_feedback,
         )
 
         @st.composite  # type: ignore[untyped-decorator]

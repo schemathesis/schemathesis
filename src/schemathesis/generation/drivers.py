@@ -117,6 +117,7 @@ class CoverageGenerator:
         auth_context = auths.AuthContext(operation=operation, app=operation.app)
         extra_data_source = as_strategy_kwargs.get("extra_data_source")
         error_feedback = as_strategy_kwargs.get("error_feedback")
+        constants_value_source = as_strategy_kwargs.get("constants_value_source")
         overrides = {
             container: as_strategy_kwargs[container]
             for container in LOCATION_TO_CONTAINER.values()
@@ -138,6 +139,7 @@ class CoverageGenerator:
                 generation_config=self._generation_config,
                 extra_data_source=extra_data_source,
                 error_feedback=error_feedback,
+                constants_value_source=constants_value_source,
             ):
                 if (
                     case.media_type
@@ -216,7 +218,7 @@ class ExamplesGenerator:
 
         if self._fill_missing and not cases:
             try:
-                add_single_example(operation.as_strategy(), cases)
+                add_single_example(operation.as_strategy(**self._as_strategy_kwargs), cases)
             except (
                 InvalidSchema,
                 InfiniteRecursiveReference,

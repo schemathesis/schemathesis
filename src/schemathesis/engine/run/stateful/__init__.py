@@ -18,10 +18,14 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     from schemathesis.engine.run.stateful._executor import execute_state_machine_loop
 
     try:
+        constants_value_source = (
+            engine.constants_value_source if not engine.constants_extraction.pool.is_empty() else None
+        )
         state_machine = engine.schema._build_state_machine(
             error_feedback=engine.error_feedback,
             link_calibration=engine.link_calibration,
             extra_data_source=engine.extra_data_source,
+            constants_value_source=constants_value_source,
         )
     except Exception as exc:
         yield events.NonFatalError(error=exc, phase=phase.name, label=STATEFUL_TESTS_LABEL, related_to_operation=False)

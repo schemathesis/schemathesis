@@ -71,6 +71,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful import APIStateMachine
+    from schemathesis.python._constants.pool import ConstantsValueSource
     from schemathesis.specs.openapi.adapter import OpenApiResponses
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
     from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, SecurityRequirements
@@ -205,6 +206,7 @@ class OpenApiSchema(BaseSchema):
         generation_config: GenerationConfig,
         extra_data_source: ExtraDataSource | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> Iterator[Case]:
         from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 
@@ -218,6 +220,7 @@ class OpenApiSchema(BaseSchema):
             extra_data_source=extra_data_source,
             unexpected_methods_seen=self.coverage_unexpected_methods_seen,
             error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
         )
 
     @override
@@ -259,6 +262,7 @@ class OpenApiSchema(BaseSchema):
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
         extra_data_source: ExtraDataSource | None,
+        constants_value_source: ConstantsValueSource | None = None,
     ) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
@@ -268,6 +272,7 @@ class OpenApiSchema(BaseSchema):
             error_feedback=error_feedback,
             link_calibration=link_calibration,
             extra_data_source=extra_data_source,
+            constants_value_source=constants_value_source,
         )
 
     @override
@@ -573,6 +578,7 @@ class OpenApiSchema(BaseSchema):
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         extra_data_source: ExtraDataSource | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
+        constants_value_source: ConstantsValueSource | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return openapi_cases(
@@ -582,6 +588,7 @@ class OpenApiSchema(BaseSchema):
             generation_mode=generation_mode,
             extra_data_source=extra_data_source,
             error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
             **kwargs,
         )
 

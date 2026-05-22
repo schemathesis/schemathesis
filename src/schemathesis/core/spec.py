@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.meta import CaseMetadata
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.hooks import HookDispatcher
+    from schemathesis.python._constants.pool import ConstantsValueSource
     from schemathesis.resources import ExtraDataSource
     from schemathesis.schemas import APIOperation
 
@@ -132,6 +133,7 @@ class CoverageBackend(Protocol):
         generation_config: GenerationConfig,
         extra_data_source: ExtraDataSource | None = ...,
         error_feedback: ErrorFeedbackStore | None = ...,
+        constants_value_source: ConstantsValueSource | None = ...,
     ) -> Iterator[Case]: ...  # pragma: no cover
 
 

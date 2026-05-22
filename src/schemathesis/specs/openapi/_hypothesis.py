@@ -67,6 +67,7 @@ from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
     from schemathesis.generation.dictionaries import DictionaryDraw
+    from schemathesis.python._constants.pool import ConstantsValueSource
     from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 SLASH = "/"
@@ -119,6 +120,7 @@ def openapi_cases(
     phase: TestPhase = TestPhase.FUZZING,
     extra_data_source: ExtraDataSource | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsValueSource | None = None,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -153,6 +155,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     headers_ = generate_parameter(
         ParameterLocation.HEADER,
@@ -166,6 +169,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     cookies_ = generate_parameter(
         ParameterLocation.COOKIE,
@@ -179,6 +183,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     query_ = generate_parameter(
         ParameterLocation.QUERY,
@@ -192,6 +197,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
 
     if body is NOT_SET:
@@ -216,6 +222,7 @@ def openapi_cases(
                 extra_data_source=extra_data_source,
                 error_feedback=error_feedback,
                 mix_examples=mix_examples,
+                constants_value_source=constants_value_source,
             )
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
@@ -670,6 +677,7 @@ def _get_body_strategy(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsValueSource | None = None,
 ) -> st.SearchStrategy:
     # Check for custom encoding in form bodies (multipart/form-data or application/x-www-form-urlencoded)
     if parameter.media_type in FORM_MEDIA_TYPES:
@@ -693,6 +701,7 @@ def _get_body_strategy(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     return _maybe_set_optional_body(strategy, parameter, operation, draw, error_feedback)
 
@@ -709,6 +718,7 @@ def get_parameters_value(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsValueSource | None = None,
 ) -> GeneratedValue:
     """Get the final value for the specified location.
 
@@ -724,6 +734,7 @@ def get_parameters_value(
             extra_data_source=extra_data_source,
             mix_examples=mix_examples,
             error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = _draw(draw, strategy, operation)
@@ -740,6 +751,7 @@ def get_parameters_value(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = _draw(draw, strategy, operation)
@@ -821,6 +833,7 @@ def generate_parameter(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsValueSource | None = None,
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -845,6 +858,7 @@ def generate_parameter(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     value = generated.value
     if value is not None and location == ParameterLocation.PATH:
@@ -897,6 +911,7 @@ def get_parameters_strategy(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsValueSource | None = None,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = getattr(operation, location.container_name)
@@ -910,6 +925,7 @@ def get_parameters_strategy(
             extra_data_source=extra_data_source,
             mix_examples=mix_examples,
             error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
         )
     # No parameters defined for this location
     return _NONE_STRATEGY

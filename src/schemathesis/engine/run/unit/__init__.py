@@ -333,4 +333,8 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
     if ctx.error_feedback is not None:
         kwargs["error_feedback"] = ctx.error_feedback
 
+    # Inject constants value source if the pool is non-empty.
+    if not ctx.constants_extraction.pool.is_empty():
+        kwargs["constants_value_source"] = ctx.constants_value_source
+
     return kwargs
