@@ -2703,3 +2703,125 @@ def test_minitems_one_yields_empty_array_negative_with_unresolvable_items(nctx):
         if isinstance(value, GeneratedValue) and value.scenario is CoverageScenario.ARRAY_BELOW_MIN_ITEMS
     ]
     assert negatives == [[]]
+
+
+@pytest.mark.parametrize(
+    ("schema", "expects_baseline"),
+    [
+        (
+            {
+                "type": "array",
+                "items": {"type": "object"},
+                "properties": {"key": {"type": "string"}, "value": {"type": "string"}},
+                "required": ["key", "value"],
+            },
+            True,
+        ),
+        (
+            {
+                "type": ["array", "null"],
+                "properties": {"x": {"type": "string"}},
+                "required": ["x"],
+            },
+            True,
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"key": {"type": "string"}},
+                "required": ["key"],
+            },
+            False,
+        ),
+        (
+            {
+                "type": ["object", "string"],
+                "properties": {"x": {"type": "string"}},
+                "required": ["x"],
+            },
+            False,
+        ),
+    ],
+    ids=[
+        "outer-array-excludes-object",
+        "type-list-excludes-object",
+        "type-object-includes-object",
+        "type-list-includes-object",
+    ],
+)
+def test_negative_properties_baseline_emission(ctx_factory, schema, expects_baseline):
+    # Outer `type` excludes object -> emit a bare template alongside per-leaf negatives;
+    # `type` includes object -> positive path already emits it, no double-counting.
+    nctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    inner_validator = jsonschema_rs.Draft7Validator(
+        {
+            "type": "object",
+            "properties": schema["properties"],
+            "required": schema["required"],
+        }
+    )
+    cases = [value.value for value in cover_schema_iter(nctx, schema)]
+    baselines = [c for c in cases if isinstance(c, dict) and inner_validator.is_valid(c)]
+    if expects_baseline:
+        assert baselines, f"no baseline emitted: {cases}"
+        leaf_negatives = [c for c in cases if isinstance(c, dict) and not inner_validator.is_valid(c) and c != {}]
+        assert leaf_negatives, f"per-leaf negatives lost: {cases}"
+    else:
+        assert baselines == [], f"unexpected baseline: {baselines}"
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "array", "patternProperties": {"^x_": {"type": "string"}}},
+        {"type": "array", "propertyNames": {"pattern": "^x_"}},
+    ],
+    ids=["patternProperties", "propertyNames"],
+)
+def test_negative_object_keyword_baseline_emission(ctx_factory, schema):
+    # `_negative_type` already emits `{}` for `type: array`; the new baseline path emits a
+    # second `{}`. Counting both guards against a regression in the baseline branch.
+    nctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    cases = [value.value for value in cover_schema_iter(nctx, schema)]
+    assert cases.count({}) >= 2, f"baseline `{{}}` emission missing: {cases}"
+
+
+def test_get_properties_resolves_ref_to_implied_object(pctx):
+    # Without ref resolution, the nested value would be generated as any JSON value -- often `null`.
+    schema = {
+        "$defs": {
+            "Inner": {
+                "properties": {
+                    "key": {"type": "string", "example": "myKey"},
+                    "value": {"type": "string", "example": "myValue"},
+                }
+            }
+        },
+        "type": "object",
+        "required": ["nested"],
+        "properties": {"nested": {"$ref": "#/$defs/Inner"}},
+    }
+    pctx.root_schema = schema
+    cases = [v.value for v in cover_schema_iter(pctx, schema)]
+    populated = [c for c in cases if isinstance(c, dict) and isinstance(c.get("nested"), dict) and c["nested"]]
+    assert populated, f"nested ref-to-object never materialized: {cases}"
+
+
+def test_get_properties_preserves_required_outside_properties(pctx):
+    # Required keys not declared in `properties` must still reach the generated template.
+    schema = {
+        "$defs": {
+            "Inner": {
+                "required": ["name"],
+                "properties": {"value": {"type": "string"}},
+            }
+        },
+        "type": "object",
+        "required": ["nested"],
+        "properties": {"nested": {"$ref": "#/$defs/Inner"}},
+    }
+    pctx.root_schema = schema
+    cases = [v.value for v in cover_schema_iter(pctx, schema)]
+    nested_objects = [c["nested"] for c in cases if isinstance(c, dict) and isinstance(c.get("nested"), dict)]
+    assert nested_objects, f"no nested object emitted: {cases}"
+    assert all("name" in n for n in nested_objects), f"required key dropped: {nested_objects}"

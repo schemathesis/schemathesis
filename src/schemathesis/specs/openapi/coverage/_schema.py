@@ -1214,19 +1214,13 @@ def cover_schema_iter(
                 elif key == "type":
                     yield from _negative_type(ctx, value, seen, schema)
                 elif key == "properties":
-                    template = template or _generate_template_with_deflation_fallback(
-                        ctx, schema, _get_template_schema(schema, "object", ctx)
-                    )
+                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
                     yield from _negative_properties(ctx, template, value)
                 elif key == "patternProperties":
-                    template = template or _generate_template_with_deflation_fallback(
-                        ctx, schema, _get_template_schema(schema, "object", ctx)
-                    )
+                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
                     yield from _negative_pattern_properties(ctx, template, value)
                 elif key == "propertyNames" and isinstance(value, dict):
-                    template = template or _generate_template_with_deflation_fallback(
-                        ctx, schema, _get_template_schema(schema, "object", ctx)
-                    )
+                    template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
                     if isinstance(template, dict):
                         yield from _negative_property_names(ctx, template, value)
                 elif key == "items" and isinstance(value, dict):
@@ -1713,6 +1707,30 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
                 return {"enum": valid}
         if schema.get("type") == "object":
             return _get_template_schema(schema, "object", ctx)
+        # Without forcing object generation here, Hypothesis treats `properties`-only or
+        # `$ref`-to-properties-only sub-schemas as "any value" and can emit `null` or `{}`.
+        implied: JsonSchemaObject | None = None
+        if "$ref" in schema:
+            try:
+                candidate = ctx.resolve_ref(schema["$ref"])
+                if isinstance(candidate, dict) and (
+                    candidate.get("type") == "object" or ("type" not in candidate and _implies_object_type(candidate))
+                ):
+                    implied = candidate
+            except RefResolutionError:
+                pass
+        elif "type" not in schema and _implies_object_type(schema):
+            implied = schema
+        if implied is not None:
+            # Without inflating `required`, the template is `{}` for schemas that declare
+            # properties but no required list. Keep original required so keys outside
+            # `properties` still appear.
+            properties = implied.get("properties") or {}
+            original_required = list(implied.get("required") or [])
+            inflated_required = list(
+                dict.fromkeys(original_required + [k for k, v in properties.items() if v != {"not": {}}])
+            )
+            return _get_template_schema({**implied, "required": inflated_required}, "object", ctx)
         _schema = deepclone(schema)
         if ctx.update_pattern is not None:
             _update_schema_pattern(_schema, ctx.update_pattern)
@@ -1783,6 +1801,34 @@ def _implies_array_type(schema: JsonSchemaObject) -> bool:
     # `items` (e.g. clearblade.com). Without an array-typed positive variant the items
     # sub-schema is never exercised positively and any `$ref`-pulled definition stays uncovered.
     return any(key in schema for key in _ARRAY_ONLY_KEYWORDS)
+
+
+def _type_excludes_object(schema: JsonSchemaObject) -> bool:
+    ty = schema.get("type")
+    if isinstance(ty, str):
+        return ty != "object"
+    if isinstance(ty, list):
+        return "object" not in ty
+    return False
+
+
+def _ensure_object_template_with_baseline(
+    ctx: CoverageContext, schema: JsonSchemaObject, template: Any
+) -> Generator[GeneratedValue, None, Any]:
+    # First-time object template build emits a baseline `NegativeValue` when the outer type
+    # excludes object; the inner `properties` applicator otherwise never sees an
+    # all-children-valid case (per-leaf negatives each break one child).
+    if template is not None:
+        return template
+    template = _generate_template_with_deflation_fallback(ctx, schema, _get_template_schema(schema, "object", ctx))
+    if isinstance(template, dict) and _type_excludes_object(schema):
+        yield NegativeValue(
+            template,
+            scenario=CoverageScenario.INCORRECT_TYPE,
+            description="Object body where non-object type expected",
+            location=ctx.current_path,
+        )
+    return template
 
 
 def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext) -> JsonSchemaObject:
