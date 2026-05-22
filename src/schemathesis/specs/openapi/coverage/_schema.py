@@ -607,10 +607,13 @@ class CoverageContext:
                 )
 
         if keys == ["allOf"]:
-            for idx, sub_schema in enumerate(schema["allOf"]):
-                if isinstance(sub_schema, dict) and "$ref" in sub_schema:
-                    schema["allOf"][idx] = self.resolve_ref(sub_schema["$ref"])
-
+            # Resolve refs into a fresh list so the caller's schema is not mutated; the
+            # validator cache relies on schemas remaining structurally stable after first use.
+            resolved_all_of = [
+                self.resolve_ref(item["$ref"]) if isinstance(item, dict) and "$ref" in item else item
+                for item in schema["allOf"]
+            ]
+            schema = {**schema, "allOf": resolved_all_of}
             schema = canonicalish(schema)
             if isinstance(schema, dict) and "allOf" not in schema:
                 return self.generate_from_schema(schema)
@@ -2825,6 +2828,8 @@ def _negative_type(
     if "string" in types and ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type):
         return
     # Same parameter shape recurs across many operations; one Hypothesis draw covers the whole audit.
+    # `ctx.path` is intentionally absent: the cached values are path-agnostic — the JSON pointer
+    # only stamps `NegativeValue.location` at yield time below.
     try:
         cache_key = (
             "negative_type",
@@ -2833,7 +2838,6 @@ def _negative_type(
             ctx.location,
             ctx.media_type,
             ctx.validator_cls,
-            tuple(ctx.path),
         )
     except (TypeError, ValueError):
         cache_key = None
