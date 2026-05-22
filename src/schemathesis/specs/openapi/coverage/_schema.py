@@ -294,6 +294,7 @@ class CoverageContext:
         "generation_modes",
         "is_required",
         "path",
+        "_path_str_cache_cell",
         "custom_formats",
         "validator_cls",
         "update_pattern",
@@ -314,6 +315,7 @@ class CoverageContext:
         validator_cls: type[jsonschema_rs.Validator],
         update_pattern: Callable[[str, int | None, int | None], str] | None = None,
         _resolver: Resolver | None = None,
+        _path_str_cache_cell: list[str | None] | None = None,
         allow_extra_parameters: bool = True,
     ) -> None:
         self.root_schema = root_schema
@@ -322,6 +324,12 @@ class CoverageContext:
         self.generation_modes = generation_modes if generation_modes is not None else list(GenerationMode)
         self.is_required = is_required
         self.path = path or []
+        # Single-cell cache for the joined path string. with_positive / with_negative share the
+        # cell so any context that mutates the shared path list (via at()) invalidates the cache
+        # for all contexts pointing at it.
+        self._path_str_cache_cell: list[str | None] = (
+            _path_str_cache_cell if _path_str_cache_cell is not None else [None]
+        )
         self.custom_formats = custom_formats
         self.validator_cls = validator_cls
         self.update_pattern = update_pattern
@@ -350,14 +358,20 @@ class CoverageContext:
     @contextmanager
     def at(self, key: str | int) -> Generator[None, None, None]:
         self.path.append(key)
+        self._path_str_cache_cell[0] = None
         try:
             yield
         finally:
             self.path.pop()
+            self._path_str_cache_cell[0] = None
 
     @property
     def current_path(self) -> str:
-        return "/" + "/".join(str(key) for key in self.path)
+        cached = self._path_str_cache_cell[0]
+        if cached is None:
+            cached = "/" + "/".join(str(key) for key in self.path)
+            self._path_str_cache_cell[0] = cached
+        return cached
 
     def with_positive(self) -> CoverageContext:
         return CoverageContext(
@@ -371,6 +385,7 @@ class CoverageContext:
             validator_cls=self.validator_cls,
             update_pattern=self.update_pattern,
             _resolver=self._resolver,
+            _path_str_cache_cell=self._path_str_cache_cell,
             allow_extra_parameters=self.allow_extra_parameters,
         )
 
@@ -386,6 +401,7 @@ class CoverageContext:
             validator_cls=self.validator_cls,
             update_pattern=self.update_pattern,
             _resolver=self._resolver,
+            _path_str_cache_cell=self._path_str_cache_cell,
             allow_extra_parameters=self.allow_extra_parameters,
         )
 

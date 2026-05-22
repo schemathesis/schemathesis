@@ -9,6 +9,7 @@
 ### :racing_car: Performance
 
 - ~50% lower coverage-phase wall on definition-heavy schemas.
+- Cache repeated computations during the coverage phase.
 
 ### :bug: Fixed
 
