@@ -150,7 +150,7 @@ def test_bundle_recursive_with_siblings(benchmark):
             },
         },
     }
-    schemas = [{"$ref": "#/definitions/ReportConfigFilter"} for _ in range(100)]
+    schemas = [{"$ref": "#/definitions/ReportConfigFilter"} for _ in range(250)]
 
     resolver = make_root_resolver({"definitions": definitions})
 
@@ -201,7 +201,8 @@ def test_bundle_mutual_recursion(benchmark):
     benchmark(_bundle_many, schemas, resolver)
 
 
-def _bundle_parameter_schemas(raw_schema: dict, resolver: Resolver) -> None:
+def _collect_parameter_schemas(raw_schema: dict) -> list[dict]:
+    schemas: list[dict] = []
     for path_item in raw_schema.get("paths", {}).values():
         if not isinstance(path_item, dict):
             continue
@@ -211,11 +212,17 @@ def _bundle_parameter_schemas(raw_schema: dict, resolver: Resolver) -> None:
             for parameter in operation.get("parameters", []) or []:
                 schema = parameter.get("schema") if isinstance(parameter, dict) else None
                 if isinstance(schema, dict):
-                    bundle(schema, resolver, inline_recursive=True)
+                    schemas.append(schema)
             for response in (operation.get("responses") or {}).values():
                 schema = response.get("schema") if isinstance(response, dict) else None
                 if isinstance(schema, dict):
-                    bundle(schema, resolver, inline_recursive=True)
+                    schemas.append(schema)
+    return schemas
+
+
+def _bundle_each(schemas: list[dict], resolver: Resolver) -> None:
+    for schema in schemas:
+        bundle(schema, resolver, inline_recursive=True)
 
 
 @pytest.mark.benchmark(group="bundle-real-world")
@@ -226,4 +233,7 @@ def _bundle_parameter_schemas(raw_schema: dict, resolver: Resolver) -> None:
 )
 def test_bundle_real_world(benchmark, raw_schema):
     resolver = make_root_resolver(raw_schema)
-    benchmark(_bundle_parameter_schemas, raw_schema, resolver)
+    # Duplicate the collected list to lift each iteration above the ~1 ms floor at
+    # which CodSpeed starts producing usable flame graphs.
+    schemas = _collect_parameter_schemas(raw_schema) * 8
+    benchmark(_bundle_each, schemas, resolver)
