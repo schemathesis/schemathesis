@@ -699,8 +699,14 @@ def _convert_bytes_for_hashing(value: Any) -> Any:
 
 
 def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
-    if isinstance(value, (dict, list)):
-        # Convert bytes to a hashable representation before JSON encoding
+    if type(value) is dict or type(value) is list:
+        # Plain JSON-shaped containers (the common case) canonicalize in Rust without
+        # an intermediate Python-side deep-copy. Bytes inside the value reject the
+        # native call; fall back to the bytes-aware path.
+        try:
+            return type(value), jsonschema_rs.canonical.json.to_string(value)
+        except (TypeError, ValueError):
+            pass
         converted = _convert_bytes_for_hashing(value)
         serialized = _encode(converted)
         return type(value), serialized

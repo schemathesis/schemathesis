@@ -6,6 +6,10 @@
 
 - Form-encoded payloads for dynamic auth via `payload_content_type`. [#4167](https://github.com/schemathesis/schemathesis/issues/4167)
 
+### :racing_car: Performance
+
+- ~50% lower coverage-phase wall on definition-heavy schemas.
+
 ### :bug: Fixed
 
 - Restore per-property negatives in coverage phase when an unsatisfiable optional property would otherwise sink the template draw.
