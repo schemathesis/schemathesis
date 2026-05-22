@@ -19,6 +19,7 @@ from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.value import GeneratedValue
+from schemathesis.specs.openapi.adapter.parameters import _constant_values_at_draws, _prune_modified_constants
 from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
     MutationChannel,
@@ -70,11 +71,12 @@ def wrap_filter_hook_for_generated_value(hook: Callable) -> Callable:
     return wrapper
 
 
-def wrap_map_hook_for_generated_value(hook: Callable) -> Callable:
+def wrap_map_hook_for_generated_value(hook: Callable, *, prune_constants: bool = True) -> Callable:
     """Adapter so user-supplied map hooks see plain values when negative-mode wraps them."""
 
     def wrapper(value: Any) -> Any:
         if isinstance(value, GeneratedValue):
+            previous_constants = _constant_values_at_draws(value.constants_draws, value.value)
             result = hook(value.value)
             return GeneratedValue(
                 value=result,
@@ -82,6 +84,11 @@ def wrap_map_hook_for_generated_value(hook: Callable) -> Callable:
                 pool_draws=value.pool_draws,
                 semantic_draws=value.semantic_draws,
                 dictionary_draws=value.dictionary_draws,
+                constants_draws=(
+                    _prune_modified_constants(value.constants_draws, previous_constants, result)
+                    if prune_constants
+                    else value.constants_draws
+                ),
             )
         return hook(value)
 
@@ -102,6 +109,8 @@ def wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
             pool_draws = value.pool_draws
             semantic_draws = value.semantic_draws
             dictionary_draws = value.dictionary_draws
+            constants_draws = value.constants_draws
+            previous_constants = _constant_values_at_draws(constants_draws, value.value)
             return hook(value.value).map(
                 lambda v: GeneratedValue(
                     value=v,
@@ -109,6 +118,7 @@ def wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
                     pool_draws=pool_draws,
                     semantic_draws=semantic_draws,
                     dictionary_draws=dictionary_draws,
+                    constants_draws=_prune_modified_constants(constants_draws, previous_constants, v),
                 )
             )
         return hook(value)

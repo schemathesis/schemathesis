@@ -32,6 +32,7 @@ from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, format_fa
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.generation import overrides
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
     GivenKwargsMark,
@@ -49,6 +50,7 @@ from schemathesis.generation.stateful.state_machine import StatefulCallbackMark,
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_openapi_auth_warnings
+from schemathesis.python._constants.orchestrator import make_registered_constants_value_source
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
@@ -135,7 +137,9 @@ class SchemathesisCase(PyCollector):
     def _get_test_name(self, operation: APIOperation) -> str:
         return f"{self.name}[{operation.label}]"
 
-    def _gen_items(self, result: Result[APIOperation, InvalidSchema]) -> Generator[SchemathesisFunction, None, None]:
+    def _gen_items(
+        self, result: Result[APIOperation, InvalidSchema], feedback: FeedbackSources
+    ) -> Generator[SchemathesisFunction, None, None]:
         """Generate all tests for the given API operation.
 
         Could produce more than one test item if
@@ -202,6 +206,7 @@ class SchemathesisCase(PyCollector):
                         project=self.schema.config,
                         as_strategy_kwargs=as_strategy_kwargs,
                         seed=self.schema.config.seed,
+                        feedback=feedback,
                     ),
                 )
                 if inspect.iscoroutinefunction(self.test_function):
@@ -287,7 +292,10 @@ class SchemathesisCase(PyCollector):
         try:
             track_schema(self.config, self.schema)
             emit_openapi_auth_warnings(self.schema)
-            items = [item for operation in self.schema.get_all_operations() for item in self._gen_items(operation)]
+            feedback = FeedbackSources(constants_value_source=make_registered_constants_value_source())
+            items = [
+                item for operation in self.schema.get_all_operations() for item in self._gen_items(operation, feedback)
+            ]
             if not items:
                 fail_on_no_matches(self.nodeid)
             return items

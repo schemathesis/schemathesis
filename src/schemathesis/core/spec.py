@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.meta import CaseMetadata
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.hooks import HookDispatcher
+    from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource
     from schemathesis.schemas import APIOperation
 
@@ -161,6 +162,7 @@ class StatefulBackend(Protocol):
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
         extra_data_source: ExtraDataSource | None,
+        constants_value_source: ConstantsPool | None = ...,
     ) -> type[APIStateMachine]: ...  # pragma: no cover
 
     def apply_stateful_inference(self, ctx: EngineContext) -> int: ...  # pragma: no cover

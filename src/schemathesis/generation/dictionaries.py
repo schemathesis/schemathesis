@@ -25,9 +25,11 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import PoolDraw, SemanticDraw
+from schemathesis.specs.openapi.adapter.parameters import _prune_overwritten_constants
 
 if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig, ProjectConfig
+    from schemathesis.python._constants.pool import ConstantDraw
     from schemathesis.specs.openapi.negative.mutations import MutationMetadata
     from schemathesis.specs.openapi.schemas import OpenApiOperation
 
@@ -189,12 +191,14 @@ def build_dictionary_overlay_strategy(
         existing_pool: tuple[PoolDraw, ...] = ()
         existing_semantic: tuple[SemanticDraw, ...] = ()
         existing_dictionary: tuple[DictionaryDraw, ...] = ()
+        existing_constants: tuple[ConstantDraw, ...] = ()
         if isinstance(produced, GeneratedValue):
             value = produced.value
             existing_meta = produced.meta
             existing_pool = produced.pool_draws
             existing_semantic = produced.semantic_draws
             existing_dictionary = produced.dictionary_draws
+            existing_constants = produced.constants_draws
         else:
             value = produced
 
@@ -258,6 +262,7 @@ def build_dictionary_overlay_strategy(
             pool_draws=existing_pool,
             semantic_draws=existing_semantic,
             dictionary_draws=combined_draws,
+            constants_draws=_prune_overwritten_constants(existing_constants, new_value),
         )
 
     return overlay()
@@ -360,12 +365,14 @@ def build_body_dictionary_overlay_strategy(
         existing_pool: tuple[PoolDraw, ...] = ()
         existing_semantic: tuple[SemanticDraw, ...] = ()
         existing_dictionary: tuple[DictionaryDraw, ...] = ()
+        existing_constants: tuple[ConstantDraw, ...] = ()
         if isinstance(produced, GeneratedValue):
             value = produced.value
             existing_meta = produced.meta
             existing_pool = produced.pool_draws
             existing_semantic = produced.semantic_draws
             existing_dictionary = produced.dictionary_draws
+            existing_constants = produced.constants_draws
         else:
             value = produced
 
@@ -408,6 +415,7 @@ def build_body_dictionary_overlay_strategy(
             pool_draws=existing_pool,
             semantic_draws=existing_semantic,
             dictionary_draws=combined_draws,
+            constants_draws=_prune_overwritten_constants(existing_constants, value),
         )
 
     return overlay()

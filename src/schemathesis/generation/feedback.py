@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource
 
 
@@ -18,3 +19,4 @@ class FeedbackSources:
 
     extra_data_source: ExtraDataSource | None = None
     error_feedback: ErrorFeedbackStore | None = None
+    constants_value_source: ConstantsPool | None = None
