@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import time
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import hypothesis
 import tracecov
@@ -24,7 +26,7 @@ from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.schemas import HTTP_METHODS
-from schemathesis.transport.prepare import prepare_request
+from schemathesis.transport.prepare import normalize_base_url, prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 DEFAULT_FUZZING_MAX_EXAMPLES = 100
@@ -196,24 +198,77 @@ def _is_response_keyword(entry: dict[str, Any]) -> bool:
     return "/responses/" in (entry.get("schema_path") or "")
 
 
+def _attach_query(url: str, params: Any) -> str:
+    if not params:
+        return url
+    if isinstance(params, str):
+        query_str = params
+    elif isinstance(params, Mapping):
+        query_str = urlencode(list(params.items()), doseq=True)
+    else:
+        query_str = urlencode(params, doseq=True)
+    if not query_str:
+        return url
+    scheme, netloc, path, existing, fragment = urlsplit(url)
+    merged = f"{existing}&{query_str}" if existing else query_str
+    return urlunsplit((scheme, netloc, path, merged, fragment))
+
+
+def _audit_body(kwargs: dict[str, Any]) -> tuple[bytes | None, str | None]:
+    """Encode the body for an audit interaction. Returns (body_bytes, fallback_reason)."""
+    if "files" in kwargs:
+        return None, "multipart files require requests' encoder"
+    if "json" in kwargs:
+        try:
+            return json.dumps(kwargs["json"], allow_nan=False).encode("utf-8"), None
+        except (TypeError, ValueError) as exc:
+            return None, f"json encoding failed: {exc}"
+    data = kwargs.get("data")
+    if data is None:
+        return None, None
+    if isinstance(data, bytes):
+        return data, None
+    if isinstance(data, str):
+        return data.encode("utf-8"), None
+    if isinstance(data, Mapping):
+        try:
+            return urlencode(list(data.items()), doseq=True).encode("utf-8"), None
+        except (TypeError, ValueError) as exc:
+            return None, f"form encoding failed: {exc}"
+    return None, f"unsupported data type {type(data).__name__}"
+
+
 def _case_to_interaction(case: Case) -> tracecov.HttpInteraction:
     # Skip the modification-detection hash on `case.meta` access: the audit never mutates
     # cases or revalidates them, so the cost (canonical-JSON encoding bodies the size of an
     # Azure ApplicationGateway) is pure waste.
     object.__setattr__(case, "_freeze_metadata", True)
-    prepared = prepare_request(case, headers=None, config=_NO_SANITIZATION)
-    body = prepared.body.encode("utf-8") if isinstance(prepared.body, str) else prepared.body
-    # `requests` collapses an empty form body to None even though the wire still carries
-    # zero bytes — pass b"" so the recorder parses it as `{}` and `/required` flips invalid.
-    if body is None and prepared.headers.get("Content-Length") == "0":
+    base_url = normalize_base_url(case.operation.base_url)
+    kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url, headers=None)
+    body, fallback = _audit_body(kwargs)
+    if fallback is not None:
+        # Multipart/files and exotic encodings fall back to the requests machinery so the wire
+        # bytes still match what a real call would send.
+        prepared = prepare_request(case, headers=None, config=_NO_SANITIZATION)
+        body = prepared.body.encode("utf-8") if isinstance(prepared.body, str) else prepared.body
+        if body is None and prepared.headers.get("Content-Length") == "0":
+            body = b""
+        return tracecov.HttpInteraction(
+            request=tracecov.HttpRequest(
+                method=case.method, url=prepared.url, body=body, headers=dict(prepared.headers)
+            ),
+            response=None,
+            timestamp=time.time(),
+        )
+    url = _attach_query(kwargs["url"], kwargs.get("params"))
+    headers = dict(kwargs["headers"])
+    if body is not None:
+        headers.setdefault("Content-Length", str(len(body)))
+    elif kwargs.get("data") == {} or kwargs.get("data") == "":
         body = b""
+        headers.setdefault("Content-Length", "0")
     return tracecov.HttpInteraction(
-        request=tracecov.HttpRequest(
-            method=case.method,
-            url=prepared.url,
-            body=body,
-            headers=dict(prepared.headers),
-        ),
+        request=tracecov.HttpRequest(method=case.method, url=url, body=body, headers=headers),
         response=None,
         timestamp=time.time(),
     )
