@@ -512,9 +512,12 @@ class OpenApiSchema(BaseSchema):
         definition: OperationObject,
         scope: str,
         resolver: Resolver | None = None,
+        path_item: Mapping[str, Any] | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
-        return self._operations.make_operation(path, method, parameters, definition, scope, resolver=resolver)
+        return self._operations.make_operation(
+            path, method, parameters, definition, scope, resolver=resolver, path_item=path_item
+        )
 
     @cached_property
     def root_resolver(self) -> Resolver:
@@ -690,7 +693,13 @@ class MethodMap(Mapping):
         except SCHEMA_PARSING_ERRORS as exc:
             schema._raise_invalid_schema(exc, path, method)
         return schema.make_operation(
-            path, cast("HttpMethodSchema", method), parameters, operation, self._scope, resolver=self._resolver
+            path,
+            cast("HttpMethodSchema", method),
+            parameters,
+            operation,
+            self._scope,
+            resolver=self._resolver,
+            path_item=self._path_item,
         )
 
     def __getitem__(self, item: str) -> APIOperation:

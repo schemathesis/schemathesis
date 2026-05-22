@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Generator, Iterator, Sequence
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
@@ -28,6 +28,7 @@ from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
+from schemathesis.specs.openapi.adapter.servers import resolve_operation_base_url
 
 if TYPE_CHECKING:
     from schemathesis.core.adapter import ResponsesContainer
@@ -113,6 +114,7 @@ class OperationLoader:
                             entry,
                             scope,
                             resolver=path_resolver,
+                            path_item=path_item,
                         )
                         yield Ok(operation)
                     except SCHEMA_PARSING_ERRORS as exc:
@@ -298,10 +300,19 @@ class OperationLoader:
         definition: OperationObject,
         scope: str,
         resolver: Resolver | None = None,
+        path_item: Mapping[str, Any] | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
         schema = self.schema
-        base_url = schema.get_base_url()
+        if schema.config.base_url is not None:
+            base_url = schema.get_base_url()
+        else:
+            base_url = resolve_operation_base_url(
+                operation=definition,
+                path_item=path_item,
+                fallback_base_url=schema.get_base_url(),
+                location=schema.location,
+            )
         responses = self._parse_responses(definition, scope, resolver=resolver)
         security = self._parse_security(definition)
         operation: APIOperation[OperationParameter, ResponsesContainer, OpenApiSecurityParameters, OpenApiSchema] = (

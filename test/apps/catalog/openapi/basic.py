@@ -16,6 +16,13 @@ def success() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def per_path_servers() -> OpenAPIApp:
+    spec = build_schema(schemas.per_path_servers())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_per_path_servers(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def failure() -> OpenAPIApp:
     spec = build_schema(schemas.failure())
     app = make_flask_app_from_schema(spec)
