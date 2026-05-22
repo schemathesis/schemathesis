@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.specs.openapi.adapter.servers import format_server_url
 
 
 def base_path_v2(raw_schema: Mapping[str, Any]) -> str:
@@ -20,22 +21,5 @@ def base_path_v3(raw_schema: Mapping[str, Any]) -> str:
         return "/"
     if not isinstance(servers, list):
         raise InvalidSchema("'servers' must be a list of server objects")
-    server = servers[0]
-    if not isinstance(server, dict):
-        raise InvalidSchema("'servers[0]' must be a server object")
-    url = server.get("url")
-    if not isinstance(url, str):
-        raise InvalidSchema("'servers[0].url' must be a string")
-    variables = server.get("variables", {})
-    if not isinstance(variables, dict):
-        raise InvalidSchema("'servers[0].variables' must be a mapping")
-    defaults: dict[str, Any] = {}
-    for name, spec in variables.items():
-        if not isinstance(spec, dict) or "default" not in spec:
-            raise InvalidSchema(f"'servers[0].variables.{name}' must be an object with a 'default' field")
-        defaults[name] = spec["default"]
-    try:
-        formatted = url.format(**defaults)
-    except (KeyError, IndexError) as exc:
-        raise InvalidSchema(f"'servers[0].url' references undefined variable: {exc}") from exc
+    formatted = format_server_url(servers[0])
     return urlsplit(formatted).path or "/"

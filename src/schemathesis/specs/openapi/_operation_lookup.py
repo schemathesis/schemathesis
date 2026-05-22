@@ -23,6 +23,7 @@ class OperationLookupEntry:
     resolver: Resolver
     definition: OperationObject
     shared_parameters: tuple[dict[str, Any], ...]
+    path_item: Mapping[str, Any] | None
 
 
 class OperationLookup:
@@ -101,6 +102,7 @@ class OperationLookup:
                     resolver=resolved_resolver if "$ref" in path_item else root_resolver,
                     definition=definition,
                     shared_parameters=shared_parameters,
+                    path_item=resolved_path_item,
                 )
                 operation_id = definition.get("operationId")
                 if operation_id is not None:
@@ -127,6 +129,7 @@ class OperationLookup:
             resolver=resolved_resolver,
             definition=definition,
             shared_parameters=shared_parameters,
+            path_item=path_item,
         )
         operations_by_reference = self._get_operations_by_reference()
         operations_by_reference[reference] = entry
@@ -141,7 +144,13 @@ class OperationLookup:
     def _make_operation(self, entry: OperationLookupEntry) -> APIOperation:
         parameters = self.schema._iter_parameters(entry.definition, entry.shared_parameters, resolver=entry.resolver)
         return self.schema.make_operation(
-            entry.path, entry.method, parameters, entry.definition, entry.scope, resolver=entry.resolver
+            entry.path,
+            entry.method,
+            parameters,
+            entry.definition,
+            entry.scope,
+            resolver=entry.resolver,
+            path_item=entry.path_item,
         )
 
     @staticmethod

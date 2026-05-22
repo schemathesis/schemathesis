@@ -7,6 +7,19 @@ def success() -> dict[str, Any]:
     return {"/api/success": {"get": {"responses": {"200": {"description": "Success"}}}}}
 
 
+def per_path_servers() -> dict[str, Any]:
+    return {
+        "/api/admin": {
+            "servers": [{"url": "/zone-a"}],
+            "get": {"responses": {"200": {"description": "OK"}}},
+        },
+        "/api/public": {
+            "servers": [{"url": "/zone-b"}],
+            "get": {"responses": {"200": {"description": "OK"}}},
+        },
+    }
+
+
 def failure() -> dict[str, Any]:
     return {
         "/api/failure": {

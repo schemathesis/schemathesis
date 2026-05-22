@@ -24,6 +24,16 @@ def register_success(app: Flask) -> None:
         return jsonify({"success": True})
 
 
+def register_per_path_servers(app: Flask) -> None:
+    @app.route("/zone-a/api/admin", methods=["GET"])
+    def per_path_servers_admin() -> Any:
+        return jsonify({"zone": "a"})
+
+    @app.route("/zone-b/api/public", methods=["GET"])
+    def per_path_servers_public() -> Any:
+        return jsonify({"zone": "b"})
+
+
 def register_failure(app: Flask) -> None:
     @app.route("/api/failure", methods=["GET"])
     def failure_endpoint() -> Any:

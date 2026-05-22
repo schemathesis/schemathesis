@@ -16,6 +16,7 @@
 
 - Emit an all-valid object baseline for `properties` declared next to a non-object `type`.
 - Populate nested object templates referenced via `$ref` instead of generating `null`/`{}`.
+- Honor `servers[]` declared at path-item and operation scopes. [#4166](https://github.com/schemathesis/schemathesis/issues/4166)
 - Restore per-property negatives in coverage phase when an unsatisfiable optional property would otherwise sink the template draw.
 - Emit `minLength` negatives for string schemas whose `pattern` requires more characters than `minLength - 1`.
 - Cover the `enum` / `const` keywords when entries violate the declared `type` by emitting each entry as a negative case.

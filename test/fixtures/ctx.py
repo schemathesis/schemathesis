@@ -62,6 +62,9 @@ class OpenAPIApps:
     def success(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success())
 
+    def per_path_servers(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.per_path_servers())
+
     def failure(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.failure())
 
