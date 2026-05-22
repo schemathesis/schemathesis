@@ -100,6 +100,7 @@ def prepare_body(case: Case) -> Body:
     return case.operation.schema.prepare_request_body(case.body)
 
 
+@lru_cache(maxsize=128)
 def normalize_base_url(base_url: str | None) -> str | None:
     """Normalize base URL by ensuring proper hostname for local URLs.
 
