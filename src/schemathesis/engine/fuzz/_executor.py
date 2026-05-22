@@ -27,7 +27,7 @@ from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
 
 if TYPE_CHECKING:
-    from schemathesis.config import FuzzConfig, ProjectConfig
+    from schemathesis.config import FuzzConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
@@ -52,14 +52,27 @@ MAX_SCENARIO_STEPS = 6
 _LINK_BIAS_CHOICES = [True] * 8 + [False] * 2
 
 
-def _build_strategy_kwargs(config: ProjectConfig, *, operation: APIOperation) -> dict[str, object]:
-    override = overrides.for_operation(config, operation=operation)
+def _build_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, object]:
+    override = overrides.for_operation(ctx.config, operation=operation)
     # `body` is not part of the parameter override system and is never populated by `for_operation`.
-    return {
+    kwargs: dict[str, object] = {
         loc: getattr(override, loc)
         for loc in ("query", "headers", "cookies", "path_parameters")
         if getattr(override, loc)
     }
+    if ctx.error_feedback is not None:
+        kwargs["error_feedback"] = ctx.error_feedback
+    if (
+        ctx.config.phases_for(operation=operation).fuzzing.extra_data_sources.is_enabled
+        and ctx.extra_data_source is not None
+    ):
+        kwargs["extra_data_source"] = ctx.extra_data_source
+    # The pool is extracted once before this run and is read-only during draws, and value
+    # selection uses Hypothesis's own `st.randoms()` -- so the strategy is reproducible with
+    # no external randomness or mutable state for Hypothesis to flag as flaky.
+    if not ctx.constants_extraction.is_empty():
+        kwargs["constants_value_source"] = ctx.constants_extraction
+    return kwargs
 
 
 def _preflight_operations(
@@ -144,7 +157,7 @@ def _run_forever(
 ) -> EventGenerator:
     ctx.apply_stateful_inference()
     strategy_kwargs_by_label: dict[str, dict[str, object]] = {
-        op.label: _build_strategy_kwargs(ctx.config, operation=op) for op in operations
+        op.label: _build_strategy_kwargs(ctx, operation=op) for op in operations
     }
     generation_modes_by_label: dict[str, list] = {
         op.label: ctx.config.generation_for(operation=op).modes for op in operations

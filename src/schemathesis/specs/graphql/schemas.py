@@ -50,7 +50,7 @@ from schemathesis.transport.prepare import prepare_path
 from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
-from .substitution import SUBSTITUTION_PROBABILITY, substitute_pool_values
+from .substitution import SUBSTITUTION_PROBABILITY, substitute_constants, substitute_pool_values
 
 if TYPE_CHECKING:
     from random import Random
@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool
     from schemathesis.resources import ExtraDataSource
 
 
@@ -184,9 +185,10 @@ class GraphQLSchema(BaseSchema):
         error_feedback: ErrorFeedbackStore | None,
         link_calibration: LinkCalibrationState | None,
         extra_data_source: ExtraDataSource | None,
+        constants_value_source: ConstantsPool | None = None,
     ) -> type[APIStateMachine]:
-        # `error_feedback`, `link_calibration` and `extra_data_source` are OpenAPI-specific;
-        # GraphQL strategies and stateful transitions don't consume them.
+        # `error_feedback`, `link_calibration`, `extra_data_source`, and `constants_value_source`
+        # are OpenAPI-specific; GraphQL strategies and stateful transitions don't consume them.
         return self.as_state_machine()
 
     @override
@@ -489,6 +491,7 @@ def graphql_cases(
     # Not supported for GraphQL, passed here to unify interfaces
     extra_data_source: ExtraDataSource | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsPool | None = None,
     mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], None] | None = None,
 ) -> Any:
     import graphql
@@ -543,6 +546,7 @@ def graphql_cases(
         (d for d in ast_node.definitions if isinstance(d, graphql.OperationDefinitionNode)),
         None,
     )
+    constants_draws: tuple[ConstantDraw, ...] = ()
     if operation_node is not None:
         if isinstance(extra_data_source, GraphQLResourcePool):
             random_source = draw(st.randoms())
@@ -554,6 +558,15 @@ def graphql_cases(
                     random=random_source,
                     schema_index=operation.schema.analysis.schema_index,
                 )
+        if constants_value_source is not None and effective_mode.is_positive:
+            constants_draws = tuple(
+                substitute_constants(
+                    operation_node=operation_node,
+                    client_schema=operation.schema.client_schema,
+                    pool=constants_value_source,
+                    random=draw(st.randoms()),
+                )
+            )
         if mutate_ast is not None:
             mutate_ast(operation_node, draw(st.randoms()))
     body = graphql.print_ast(ast_node)
@@ -610,6 +623,7 @@ def graphql_cases(
                 ]
                 if value is not NOT_SET
             },
+            constants_draws=constants_draws,
         ),
         media_type=media_type or "application/json",
     )

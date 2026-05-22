@@ -223,7 +223,7 @@ class ExamplesGenerator:
 
         if self._fill_missing and not cases:
             try:
-                add_single_example(operation.as_strategy(), cases)
+                add_single_example(operation.as_strategy(**self._as_strategy_kwargs), cases)
             except (
                 InvalidSchema,
                 InfiniteRecursiveReference,

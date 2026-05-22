@@ -81,6 +81,7 @@ def create_test(
         "auth_storage": auth_storage,
         "extra_data_source": config.feedback.extra_data_source,
         "error_feedback": config.feedback.error_feedback,
+        "constants_value_source": config.feedback.constants_value_source,
         **config.as_strategy_kwargs,
     }
     generation = config.project.generation_for(operation=operation)

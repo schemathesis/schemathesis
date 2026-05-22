@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Reuse literal values from the application's Python source during generation via `@schemathesis.python.constants`.
 - Web Fuzzing Commons authentication via `[auth.wfc]`.
 - Automatic `429` retries honoring the `Retry-After` header with `--rate-limit=auto`. [#1722](https://github.com/schemathesis/schemathesis/issues/1722)
 - `checks.response_schema_conformance.validate-formats` to disable `format` validation in response checks. [#2481](https://github.com/schemathesis/schemathesis/issues/2481)

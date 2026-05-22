@@ -30,12 +30,14 @@ from schemathesis.generation.stateful.state_machine import (
     _normalize_name,
 )
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi.adapter.parameters import _prune_overwritten_body_constants
 from schemathesis.specs.openapi.expressions import MultiMatch
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.generation.stateful.state_machine import StepOutput
+    from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource
     from schemathesis.specs.openapi.schemas import OpenApiSchema
     from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, OperationNode
@@ -157,6 +159,7 @@ def create_state_machine(
     error_feedback: ErrorFeedbackStore | None = None,
     link_calibration: LinkCalibrationState | None = None,
     extra_data_source: ExtraDataSource | None = None,
+    constants_value_source: ConstantsPool | None = None,
 ) -> type[APIStateMachine]:
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
@@ -227,6 +230,7 @@ def create_state_machine(
                                     error_feedback=error_feedback,
                                     link_calibration=link_calibration,
                                     extra_data_source=extra_data_source,
+                                    constants_value_source=constants_value_source,
                                 )
                             ),
                         )
@@ -239,6 +243,7 @@ def create_state_machine(
                         phase=TestPhase.STATEFUL,
                         error_feedback=error_feedback,
                         extra_data_source=extra_data_source,
+                        constants_value_source=constants_value_source,
                     )
                 else:
                     _strategies = {
@@ -247,6 +252,7 @@ def create_state_machine(
                             phase=TestPhase.STATEFUL,
                             error_feedback=error_feedback,
                             extra_data_source=extra_data_source,
+                            constants_value_source=constants_value_source,
                         )
                         for method in config.modes
                     }
@@ -326,6 +332,7 @@ def into_step_input(
     error_feedback: ErrorFeedbackStore | None = None,
     link_calibration: LinkCalibrationState | None = None,
     extra_data_source: ExtraDataSource | None = None,
+    constants_value_source: ConstantsPool | None = None,
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
     """A single transition between API operations."""
 
@@ -410,6 +417,7 @@ def into_step_input(
                         phase=TestPhase.STATEFUL,
                         error_feedback=error_feedback,
                         extra_data_source=extra_data_source,
+                        constants_value_source=constants_value_source,
                         **overrides,
                     )
                     for mode in modes
@@ -437,6 +445,10 @@ def into_step_input(
                 elif biased_coin(use_p):
                     case.body = request_body
                     applied_parameters.append((ParameterLocation.BODY, None))
+                if case._meta is not None:
+                    case._meta.constants_draws = _prune_overwritten_body_constants(
+                        case._meta.constants_draws, case.body
+                    )
             return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
 
         return inner(output=_output)

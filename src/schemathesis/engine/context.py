@@ -17,6 +17,8 @@ from schemathesis.engine.observations import Observations
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
+from schemathesis.python._constants.orchestrator import extract_registered
+from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
@@ -59,6 +61,8 @@ class EngineContext:
         "_cache_lock",
         "_checks",
         "_checks_lock",
+        "_constants_extraction",
+        "_constants_extraction_lock",
     )
 
     def __init__(
@@ -93,6 +97,8 @@ class EngineContext:
         self._cache_lock = threading.Lock()
         self._checks = LazyInit.UNSET
         self._checks_lock = threading.Lock()
+        self._constants_extraction = LazyInit.UNSET
+        self._constants_extraction_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -129,6 +135,10 @@ class EngineContext:
     def apply_stateful_inference(self) -> int:
         """Discover spec-specific stateful transitions; return the number available."""
         return self.schema.apply_stateful_inference(self)
+
+    def extract_constants(self) -> None:
+        """Force one-time constant extraction so later strategy builds hit a ready pool."""
+        self.constants_extraction  # noqa: B018
 
     def stop(self) -> None:
         self.control.stop()
@@ -191,6 +201,9 @@ class EngineContext:
 
     # Per-run class-based check instances, shared across worker threads.
     checks: LazyInit[RunChecks] = LazyInit(lambda ctx: RunChecks.from_registry(config=ctx.config.checks_config_for()))
+
+    # Extracted constants from user-defined sources; lazily computed once per run.
+    constants_extraction: LazyInit[ConstantsPool] = LazyInit(lambda ctx: extract_registered())
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:

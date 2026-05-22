@@ -339,4 +339,12 @@ def build_feedback_sources(ctx: EngineContext, *, operation: APIOperation, phase
     if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)):
         if phase_config.extra_data_sources.is_enabled and ctx.extra_data_source is not None:
             extra_data_source = ctx.extra_data_source
-    return FeedbackSources(extra_data_source=extra_data_source, error_feedback=ctx.error_feedback)
+    constants_value_source = None
+    # Inject constants value source only when the pool is non-empty.
+    if not ctx.constants_extraction.is_empty():
+        constants_value_source = ctx.constants_extraction
+    return FeedbackSources(
+        extra_data_source=extra_data_source,
+        error_feedback=ctx.error_feedback,
+        constants_value_source=constants_value_source,
+    )

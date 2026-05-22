@@ -10,6 +10,7 @@ input-object arguments and to elements of list-typed arguments.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from random import Random
 from typing import TYPE_CHECKING, Final
@@ -17,17 +18,48 @@ from typing import TYPE_CHECKING, Final
 import graphql
 
 from schemathesis.core.text import to_pascal_case, to_snake_case
+from schemathesis.python._constants.pool import ConstantDraw, ConstantType, ConstantValue, Origin
 from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
 from schemathesis.specs.graphql.handles import HANDLE_SCALARS, Handle, SchemaIndex
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 
 # Probability that captured values replace matching argument literals;
 # the remaining 0.3 leaves Hypothesis room to explore fresh values.
 SUBSTITUTION_PROBABILITY: Final = 0.7
+
+# Per-argument probability that a source-extracted constant replaces a scalar literal.
+# Matches the OpenAPI overlay so Hypothesis keeps room to explore fresh values.
+CONSTANTS_SUBSTITUTION_PROBABILITY: Final = 0.15
+
+# GraphQL scalar name -> constant pool types eligible to fill it. Follows GraphQL literal
+# coercion: an `Int` literal is a valid `Float`, and `ID` accepts string or integer literals.
+_SCALAR_CONSTANT_TYPES: Final[dict[str, tuple[ConstantType, ...]]] = {
+    "String": ("string",),
+    "Int": ("integer",),
+    "Float": ("float", "integer"),
+    "ID": ("string", "integer"),
+}
+
+
+def _fits_graphql_int(value: ConstantValue) -> bool:
+    # `Int` is a signed 32-bit integer; a wider harvested literal is invalid and the server rejects it.
+    return isinstance(value, int) and graphql.GRAPHQL_MIN_INT <= value <= graphql.GRAPHQL_MAX_INT
+
+
+def _fits_graphql_float(value: ConstantValue) -> bool:
+    # A harvested integer can exceed the float range; only a finite float is a valid `Float` literal.
+    if not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except OverflowError:
+        return False
+
 
 # Returns a substitution value for the given handle, or None to keep the original.
 ValueProvider = Callable[[Handle, Random], str | None]
@@ -71,6 +103,164 @@ def substitute_bundle_values(
         return bundle_values.get(handle)
 
     _substitute(operation_node, client_schema, provider, random, schema_index)
+
+
+def substitute_constants(
+    *,
+    operation_node: graphql.OperationDefinitionNode,
+    client_schema: graphql.GraphQLSchema,
+    pool: ConstantsPool,
+    random: Random,
+    probability: float = CONSTANTS_SUBSTITUTION_PROBABILITY,
+) -> list[ConstantDraw]:
+    """Replace scalar argument literals with type-compatible constants extracted from the SUT source.
+
+    Matches by scalar type rather than id-handle semantics, so it targets free-form scalar
+    arguments the resource pool leaves alone. Returns the substitutions applied, for provenance.
+    """
+    root = _root_type_for(client_schema, operation_node.operation)
+    assert root is not None, "query and mutation operations always have a root type"
+    draws: list[ConstantDraw] = []
+    _walk_constants(operation_node.selection_set, root, pool, random, probability, draws, ())
+    return draws
+
+
+def _walk_constants(
+    selection_set: graphql.SelectionSetNode | None,
+    parent_type: graphql.GraphQLObjectType,
+    pool: ConstantsPool,
+    random: Random,
+    probability: float,
+    draws: list[ConstantDraw],
+    path: tuple[str, ...],
+) -> None:
+    assert selection_set is not None, "the operation root and object-typed fields always carry a selection set"
+    for selection in selection_set.selections:
+        # Arguments inside inline fragments (interface/union selections) are not substituted.
+        if not isinstance(selection, graphql.FieldNode):
+            continue
+        field_def = parent_type.fields.get(selection.name.value)
+        if field_def is None:
+            # Meta-fields such as `__typename` are valid selections but absent from the type's fields.
+            continue
+        field_path = (*path, selection.name.value)
+        for argument in selection.arguments:
+            argument_definition = field_def.args.get(argument.name.value)
+            assert argument_definition is not None, "a generated argument exists on its field"
+            new_value = _substitute_constant_value(
+                argument.value,
+                argument_definition.type,
+                (*field_path, argument.name.value),
+                argument.name.value,
+                pool,
+                random,
+                probability,
+                draws,
+            )
+            if new_value is not None:
+                argument.value = new_value
+        unwrapped_return = _unwrap(field_def.type)
+        if isinstance(unwrapped_return, graphql.GraphQLObjectType):
+            _walk_constants(selection.selection_set, unwrapped_return, pool, random, probability, draws, field_path)
+
+
+def _substitute_constant_value(
+    value: graphql.ValueNode,
+    value_type: graphql.GraphQLType,
+    path: tuple[str, ...],
+    parameter_name: str,
+    pool: ConstantsPool,
+    random: Random,
+    probability: float,
+    draws: list[ConstantDraw],
+) -> graphql.ValueNode | None:
+    inner = value_type
+    while isinstance(inner, graphql.GraphQLNonNull):
+        inner = inner.of_type
+    if isinstance(inner, graphql.GraphQLList) and isinstance(value, graphql.ListValueNode):
+        # List elements reuse the argument's path; `body_path` does not distinguish individual elements.
+        new_values = list(value.values)
+        replaced_any = False
+        for list_index, element in enumerate(new_values):
+            replaced = _substitute_constant_value(
+                element, inner.of_type, path, parameter_name, pool, random, probability, draws
+            )
+            if replaced is not None:
+                new_values[list_index] = replaced
+                replaced_any = True
+        return graphql.ListValueNode(values=tuple(new_values)) if replaced_any else None
+    if isinstance(inner, graphql.GraphQLScalarType):
+        return _scalar_constant_node(inner.name, path, parameter_name, pool, random, probability, draws)
+    if isinstance(inner, graphql.GraphQLInputObjectType) and isinstance(value, graphql.ObjectValueNode):
+        new_fields = list(value.fields)
+        replaced_any = False
+        for field_index, field_node in enumerate(new_fields):
+            field_def = inner.fields.get(field_node.name.value)
+            assert field_def is not None, "a generated input-object field exists on its input type"
+            replaced = _substitute_constant_value(
+                field_node.value,
+                field_def.type,
+                (*path, field_node.name.value),
+                field_node.name.value,
+                pool,
+                random,
+                probability,
+                draws,
+            )
+            if replaced is not None:
+                new_fields[field_index] = graphql.ObjectFieldNode(name=field_node.name, value=replaced)
+                replaced_any = True
+        return graphql.ObjectValueNode(fields=tuple(new_fields)) if replaced_any else None
+    return None
+
+
+def _scalar_constant_node(
+    scalar_name: str,
+    path: tuple[str, ...],
+    parameter_name: str,
+    pool: ConstantsPool,
+    random: Random,
+    probability: float,
+    draws: list[ConstantDraw],
+) -> graphql.ValueNode | None:
+    types = _SCALAR_CONSTANT_TYPES.get(scalar_name)
+    if types is None:
+        return None
+    if not any(pool.has_values_for(type_) for type_ in types):
+        return None
+    # Gate before materialising the candidate list; most draws skip at this probability.
+    if random.random() >= probability:
+        return None
+    candidates: list[tuple[ConstantValue, Origin | None]] = []
+    for type_ in types:
+        for entry in pool.entries_for(type_):
+            if scalar_name == "Int" and not _fits_graphql_int(entry.value):
+                continue
+            if scalar_name == "Float" and not _fits_graphql_float(entry.value):
+                continue
+            candidates.append((entry.value, entry.origins[0] if entry.origins else None))
+    if not candidates:
+        return None
+    chosen, origin = random.choice(candidates)
+    draws.append(
+        ConstantDraw(
+            location="body",
+            parameter_name=parameter_name,
+            value=chosen,
+            origin=origin,
+            body_path="/" + "/".join(path),
+        )
+    )
+    return _constant_value_node(scalar_name, chosen)
+
+
+def _constant_value_node(scalar_name: str, value: ConstantValue) -> graphql.ValueNode:
+    if scalar_name == "Int":
+        return graphql.IntValueNode(value=str(value))
+    if scalar_name == "Float":
+        return graphql.FloatValueNode(value=str(float(value)))
+    # `String` and `ID` both render as string literals; `ID` also accepts integer constants.
+    return graphql.StringValueNode(value=value if isinstance(value, str) else str(value))
 
 
 def _substitute(

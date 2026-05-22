@@ -12,11 +12,13 @@ from schemathesis.core import transport
 from schemathesis.core.deserialization import register_deserializer
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue
+from schemathesis.python._constants.pool import ConstantEntry, ConstantsPool, Origin
 from schemathesis.resources import SemanticDraw
 from schemathesis.specs.openapi.adapter.parameters import (
     _MISSING,
     _get_at_path,
     _set_at_path,
+    build_constants_overlay_strategy,
     build_semantic_overlay,
 )
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
@@ -2407,3 +2409,43 @@ def test_overlay_continues_when_container_validator_construction_fails():
     assert any(isinstance(value, GeneratedValue) and value.value == {"email": "x@y.com"} for value in drawn), (
         "container validator failure stopped overlay substitution"
     )
+
+
+def test_semantic_overlay_drops_overwritten_constant_provenance():
+    # A field that is both a constants candidate and a semantic consumer-leaf: when the semantic value
+    # overwrites the substituted constant, its ConstantDraw must not survive as false provenance.
+    pool = ConstantsPool()
+    pool.add(
+        ConstantEntry(value="CONST_TOKEN_1234", type="string", origins=(Origin(source="s", module="m", adapter=None),))
+    )
+    inner = build_constants_overlay_strategy(
+        st.fixed_dictionaries({"code": st.just("placeholder")}),
+        source=pool,
+        schema_properties={"code": {"type": "string"}},
+        validator_cls=jsonschema_rs.Draft202012Validator,
+        location="body",
+        probability=1.0,
+    )
+    index = SemanticValueIndex()
+    index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash=None,
+        normalized_name="code",
+        value="SEMANTIC_VAL_5678",
+        source_operation="GET /producer",
+    )
+    descriptor = LeafDescriptor(
+        path=("code",), type="string", format=None, pattern_hash=None, normalized_name="code", schema={"type": "string"}
+    )
+    overlay = build_semantic_overlay(inner, [descriptor], index, jsonschema_rs.Draft202012Validator)
+
+    @given(overlay)
+    @settings(max_examples=60, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+    def collect(result):
+        if not isinstance(result, GeneratedValue):
+            return
+        for draw in result.constants_draws:
+            assert result.value["code"] == draw.value, "stale constant provenance after semantic overwrite"
+
+    collect()

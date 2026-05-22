@@ -23,4 +23,8 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
         return
     if warnings:
         yield events.SchemaAnalysisWarnings(phase=phase, warnings=warnings)
+
+    # No-op unless a source was registered via `@schemathesis.python.constants`.
+    ctx.extract_constants()
+
     yield events.PhaseFinished(phase=phase, status=Status.SUCCESS, payload=None)

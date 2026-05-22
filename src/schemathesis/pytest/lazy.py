@@ -15,6 +15,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
 from schemathesis.generation import overrides
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
     GIVEN_REFRESH_ATTR,
@@ -30,6 +31,7 @@ from schemathesis.generation.hypothesis.given import (
 from schemathesis.pytest._keys import track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_openapi_auth_warnings
+from schemathesis.python._constants.orchestrator import make_registered_constants_value_source
 from schemathesis.schemas import BaseSchema
 
 if TYPE_CHECKING:
@@ -49,6 +51,7 @@ def get_all_tests(
     given_kwargs: dict[str, GivenInput] | None,
 ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
     """Generate all operations and Hypothesis tests for them."""
+    feedback = FeedbackSources(constants_value_source=make_registered_constants_value_source())
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
@@ -80,6 +83,7 @@ def get_all_tests(
                     project=schema.config,
                     as_strategy_kwargs=_as_strategy_kwargs,
                     given_kwargs=given_kwargs or {},
+                    feedback=feedback,
                 ),
             )
             yield Ok((operation, test))

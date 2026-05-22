@@ -52,7 +52,11 @@ from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatc
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.resources import ExtraDataSource, PoolDraw, SemanticDraw
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import (
+    OpenApiBody,
+    OpenApiParameterSet,
+    build_constants_overlay_strategy,
+)
 from schemathesis.specs.openapi.formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
     HEADER_FORMAT,
@@ -74,6 +78,7 @@ from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
     from schemathesis.generation.dictionaries import DictionaryDraw
+    from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool
     from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 SLASH = "/"
@@ -126,6 +131,7 @@ def openapi_cases(
     phase: TestPhase = TestPhase.FUZZING,
     extra_data_source: ExtraDataSource | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsPool | None = None,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -160,6 +166,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     headers_ = generate_parameter(
         ParameterLocation.HEADER,
@@ -173,6 +180,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     cookies_ = generate_parameter(
         ParameterLocation.COOKIE,
@@ -186,6 +194,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     query_ = generate_parameter(
         ParameterLocation.QUERY,
@@ -199,6 +208,7 @@ def openapi_cases(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
 
     if body is NOT_SET:
@@ -223,6 +233,7 @@ def openapi_cases(
                 extra_data_source=extra_data_source,
                 error_feedback=error_feedback,
                 mix_examples=mix_examples,
+                constants_value_source=constants_value_source,
             )
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
@@ -271,6 +282,7 @@ def openapi_cases(
                             x.pool_draws,
                             x.semantic_draws,
                             x.dictionary_draws,
+                            x.constants_draws,
                         )
                         if isinstance(x, GeneratedValue)
                         else prepare_urlencoded_form(x)
@@ -281,12 +293,14 @@ def openapi_cases(
             body_pool_draws: tuple[PoolDraw, ...] = ()
             body_semantic_draws: tuple[SemanticDraw, ...] = ()
             body_dictionary_draws: tuple[DictionaryDraw, ...] = ()
+            body_constants_draws: tuple[ConstantDraw, ...] = ()
             # Negative strategy returns GeneratedValue, positive returns just value
             if isinstance(body_result, GeneratedValue):
                 body_metadata = body_result.meta
                 body_pool_draws = body_result.pool_draws
                 body_semantic_draws = body_result.semantic_draws
                 body_dictionary_draws = body_result.dictionary_draws
+                body_constants_draws = body_result.constants_draws
                 body_result = body_result.value
             body_ = ValueContainer(
                 value=body_result,
@@ -296,6 +310,7 @@ def openapi_cases(
                 pool_draws=body_pool_draws,
                 semantic_draws=body_semantic_draws,
                 dictionary_draws=body_dictionary_draws,
+                constants_draws=body_constants_draws,
             )
         else:
             body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
@@ -461,6 +476,11 @@ def openapi_cases(
         for container in (query_, path_parameters_, headers_, cookies_, body_)
         for draw in container.dictionary_draws
     )
+    constants_draws = tuple(
+        draw
+        for container in (query_, path_parameters_, headers_, cookies_, body_)
+        for draw in container.constants_draws
+    )
     instance = operation.Case(
         media_type=media_type,
         path_parameters=path_parameters_.value or {},
@@ -489,6 +509,7 @@ def openapi_cases(
             pool_draws=pool_draws,
             semantic_draws=semantic_draws,
             dictionary_draws=dictionary_draws,
+            constants_draws=constants_draws,
         ),
     )
     auth_context = auths.AuthContext(
@@ -508,6 +529,23 @@ class FormBodyWithContentTypes:
 
     body: dict[str, Any]
     content_types: dict[str, str]  # property_name -> selected content type
+
+
+def _form_property_value(value: GeneratedValue | dict[str, Any], key: str) -> Any:
+    """Reduce a `{key: value}` overlay result to its single value, keeping any constants provenance."""
+    if isinstance(value, GeneratedValue):
+        inner = value.value[key]
+        if value.constants_draws:
+            return GeneratedValue(
+                inner,
+                value.meta,
+                value.pool_draws,
+                value.semantic_draws,
+                value.dictionary_draws,
+                value.constants_draws,
+            )
+        return inner
+    return value[key]
 
 
 def _body_required_per_feedback(operation: APIOperation, error_feedback: ErrorFeedbackStore | None) -> bool:
@@ -546,6 +584,7 @@ def _build_form_strategy_with_encoding(
     operation: OpenApiOperation,
     generation_config: GenerationConfig,
     generation_mode: GenerationMode,
+    constants_value_source: ConstantsPool | None = None,
 ) -> st.SearchStrategy | None:
     """Build a strategy for form bodies that have custom encoding contentType.
 
@@ -612,7 +651,7 @@ def _build_form_strategy_with_encoding(
             continue
         else:
             strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
-            property_strategies[property_name] = strategy_factory(
+            strategy = strategy_factory(
                 subschema,
                 operation.label,
                 ParameterLocation.BODY,
@@ -620,26 +659,40 @@ def _build_form_strategy_with_encoding(
                 generation_config,
                 operation.schema.adapter.jsonschema_validator_cls,
             )
+            if constants_value_source is not None and generation_mode.is_positive:
+                strategy = build_constants_overlay_strategy(
+                    st.fixed_dictionaries({property_name: strategy}),
+                    source=constants_value_source,
+                    schema_properties={property_name: subschema},
+                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+                    location="body",
+                ).map(lambda value, key=property_name: _form_property_value(value, key))
+            property_strategies[property_name] = strategy
 
     # Build fixed dictionary strategy with optional properties
     required = set(schema.get("required", []))
     required_strategies = {k: v for k, v in property_strategies.items() if k in required}
     optional_strategies = {k: _JUST_NOT_SET | v for k, v in property_strategies.items() if k not in required}
 
-    def _unwrap(value: Any) -> Any:
-        return value.value if isinstance(value, GeneratedValue) else value
-
     @st.composite  # type: ignore[untyped-decorator]
-    def build_body(draw: st.DrawFn) -> FormBodyWithContentTypes:
+    def build_body(draw: st.DrawFn) -> FormBodyWithContentTypes | GeneratedValue:
         body: dict[str, Any] = {}
         selected_content_types: dict[str, str] = {}
+        constants_draws: list[ConstantDraw] = []
+
+        def _take(strategy: st.SearchStrategy) -> Any:
+            result = draw(strategy)
+            if isinstance(result, GeneratedValue):
+                constants_draws.extend(result.constants_draws)
+                return result.value
+            return result
 
         # Generate required properties
         for key, strategy in required_strategies.items():
-            body[key] = _unwrap(draw(strategy))
+            body[key] = _take(strategy)
         # Generate optional properties, filtering out NOT_SET
         for key, strategy in optional_strategies.items():
-            value = _unwrap(draw(strategy))
+            value = _take(strategy)
             if value is not NOT_SET:
                 body[key] = value
 
@@ -663,7 +716,10 @@ def _build_form_strategy_with_encoding(
         for property_name, content_type_list in property_content_type_selections.items():
             selected_content_types[property_name] = draw(st.sampled_from(content_type_list))
 
-        return FormBodyWithContentTypes(body=body, content_types=selected_content_types)
+        result = FormBodyWithContentTypes(body=body, content_types=selected_content_types)
+        if constants_draws:
+            return GeneratedValue(result, None, (), (), (), tuple(constants_draws))
+        return result
 
     return build_body()
 
@@ -677,10 +733,17 @@ def _get_body_strategy(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsPool | None = None,
 ) -> st.SearchStrategy:
     # Check for custom encoding in form bodies (multipart/form-data or application/x-www-form-urlencoded)
     if parameter.media_type in FORM_MEDIA_TYPES:
-        custom_strategy = _build_form_strategy_with_encoding(parameter, operation, generation_config, generation_mode)
+        custom_strategy = _build_form_strategy_with_encoding(
+            parameter,
+            operation,
+            generation_config,
+            generation_mode,
+            constants_value_source,
+        )
         if custom_strategy is not None:
             return custom_strategy
 
@@ -700,6 +763,7 @@ def _get_body_strategy(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     return _maybe_set_optional_body(strategy, parameter, operation, draw, error_feedback)
 
@@ -716,6 +780,7 @@ def get_parameters_value(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsPool | None = None,
 ) -> GeneratedValue:
     """Get the final value for the specified location.
 
@@ -731,6 +796,7 @@ def get_parameters_value(
             extra_data_source=extra_data_source,
             mix_examples=mix_examples,
             error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = _draw(draw, strategy, operation)
@@ -747,6 +813,7 @@ def get_parameters_value(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = _draw(draw, strategy, operation)
@@ -755,12 +822,14 @@ def get_parameters_value(
         pool_draws = new.pool_draws
         semantic_draws = new.semantic_draws
         dictionary_draws = new.dictionary_draws
+        constants_draws = new.constants_draws
         new = new.value
     else:
         meta = None
         pool_draws = ()
         semantic_draws = ()
         dictionary_draws = ()
+        constants_draws = ()
     if new is not None:
         copied = dict(value)
         copied.update(new)
@@ -770,6 +839,7 @@ def get_parameters_value(
             pool_draws=pool_draws,
             semantic_draws=semantic_draws,
             dictionary_draws=dictionary_draws,
+            constants_draws=constants_draws,
         )
     return GeneratedValue(
         value=value,
@@ -777,6 +847,7 @@ def get_parameters_value(
         pool_draws=pool_draws,
         semantic_draws=semantic_draws,
         dictionary_draws=dictionary_draws,
+        constants_draws=constants_draws,
     )
 
 
@@ -791,6 +862,7 @@ class ValueContainer:
     pool_draws: tuple[PoolDraw, ...] = ()
     semantic_draws: tuple[SemanticDraw, ...] = ()
     dictionary_draws: tuple[DictionaryDraw, ...] = ()
+    constants_draws: tuple[ConstantDraw, ...] = ()
 
     @property
     def is_generated(self) -> bool:
@@ -828,6 +900,7 @@ def generate_parameter(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsPool | None = None,
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -852,6 +925,7 @@ def generate_parameter(
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
         mix_examples=mix_examples,
+        constants_value_source=constants_value_source,
     )
     value = generated.value
     if value is not None and location == ParameterLocation.PATH:
@@ -872,6 +946,7 @@ def generate_parameter(
         pool_draws=generated.pool_draws,
         semantic_draws=generated.semantic_draws,
         dictionary_draws=generated.dictionary_draws,
+        constants_draws=generated.constants_draws,
     )
 
 
@@ -904,6 +979,7 @@ def get_parameters_strategy(
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
     error_feedback: ErrorFeedbackStore | None = None,
+    constants_value_source: ConstantsPool | None = None,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = getattr(operation, location.container_name)
@@ -917,6 +993,7 @@ def get_parameters_strategy(
             extra_data_source=extra_data_source,
             mix_examples=mix_examples,
             error_feedback=error_feedback,
+            constants_value_source=constants_value_source,
         )
     # No parameters defined for this location
     return _NONE_STRATEGY

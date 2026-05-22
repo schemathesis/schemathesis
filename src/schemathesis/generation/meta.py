@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -11,6 +12,7 @@ from schemathesis.resources import PoolDraw, SemanticDraw
 
 if TYPE_CHECKING:
     from schemathesis.generation.dictionaries import DictionaryDraw
+    from schemathesis.python._constants.pool import ConstantDraw
 
 
 class TestPhase(str, Enum):
@@ -207,6 +209,8 @@ class CaseMetadata:
     semantic_draws: tuple[SemanticDraw, ...] = ()
     # Configured fuzz-dictionary draws applied to named parameters at generation time.
     dictionary_draws: tuple[DictionaryDraw, ...] = ()
+    # Constant-pool substitutions applied by the overlay (one entry per property substituted).
+    constants_draws: tuple[ConstantDraw, ...] = ()
     # Typed (pre-serialization) container snapshots captured at generation time.
     # Coverage stringifies query/path values for the wire; this preserves the
     # original typed form so revalidation matches the schema's abstraction level.
@@ -304,6 +308,20 @@ class CaseMetadata:
                 }
                 for draw in self.dictionary_draws
             ],
+            "constants_draws": [
+                {
+                    "location": draw.location,
+                    "parameter_name": draw.parameter_name,
+                    "value": _encode_constant_value(draw.value),
+                    "origin": (
+                        {"source": draw.origin.source, "module": draw.origin.module, "adapter": draw.origin.adapter}
+                        if draw.origin is not None
+                        else None
+                    ),
+                    "body_path": draw.body_path,
+                }
+                for draw in self.constants_draws
+            ],
             "raw_containers": {loc.name: value for loc, value in self.raw_containers.items()},
         }
 
@@ -399,6 +417,22 @@ class CaseMetadata:
             )
             for draw in data.get("dictionary_draws", [])
         )
+        from schemathesis.python._constants.pool import ConstantDraw, Origin
+
+        constants_draws = tuple(
+            ConstantDraw(
+                location=draw["location"],
+                parameter_name=draw["parameter_name"],
+                value=_decode_constant_value(draw["value"]),
+                origin=(
+                    Origin(source=o["source"], module=o["module"], adapter=o["adapter"])
+                    if (o := draw["origin"]) is not None
+                    else None
+                ),
+                body_path=draw.get("body_path"),
+            )
+            for draw in data.get("constants_draws", [])
+        )
         return cls(
             generation=generation,
             components=components,
@@ -407,9 +441,27 @@ class CaseMetadata:
             pool_misses=pool_misses,
             semantic_draws=semantic_draws,
             dictionary_draws=dictionary_draws,
+            constants_draws=constants_draws,
             raw_containers=raw_containers,
         )
 
 
 def _load_mutations(raw: dict[str, Any]) -> tuple[Mutation, ...]:
     return tuple(Mutation.from_dict(m) for m in raw.get("mutations", ()))
+
+
+# Constant values can be raw bytes (harvested `b"..."` literals substituted into `format: binary`
+# fields); tag them so `to_dict` output stays JSON-serializable for crash reports and transport.
+_BYTES_TAG = "__schemathesis_bytes__"
+
+
+def _encode_constant_value(value: str | int | float | bytes) -> str | int | float | dict[str, str]:
+    if isinstance(value, bytes):
+        return {_BYTES_TAG: base64.b64encode(value).decode()}
+    return value
+
+
+def _decode_constant_value(value: str | int | float | dict[str, str]) -> str | int | float | bytes:
+    if isinstance(value, dict):
+        return base64.b64decode(value[_BYTES_TAG])
+    return value

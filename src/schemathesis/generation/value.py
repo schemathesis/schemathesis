@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from schemathesis.generation.dictionaries import DictionaryDraw
+    from schemathesis.python._constants.pool import ConstantDraw
     from schemathesis.resources import PoolDraw, SemanticDraw
     from schemathesis.specs.openapi.negative.mutations import MutationMetadata
 
@@ -18,3 +19,4 @@ class GeneratedValue:
     pool_draws: tuple[PoolDraw, ...] = ()
     semantic_draws: tuple[SemanticDraw, ...] = ()
     dictionary_draws: tuple[DictionaryDraw, ...] = ()
+    constants_draws: tuple[ConstantDraw, ...] = ()

@@ -67,12 +67,18 @@ def build_body_override_overlay_strategy(
                 for d in produced.dictionary_draws
                 if d.body_path is None or not is_overridden_path(tuple(d.body_path[1:].split("/")))
             )
+            constants_draws = tuple(
+                d
+                for d in produced.constants_draws
+                if d.body_path is None or not is_overridden_path(tuple(d.body_path[1:].split("/")))
+            )
             return GeneratedValue(
                 value=apply(produced.value),
                 meta=meta,
                 pool_draws=produced.pool_draws,
                 semantic_draws=produced.semantic_draws,
                 dictionary_draws=dictionary_draws,
+                constants_draws=constants_draws,
             )
         return apply(produced)
 
