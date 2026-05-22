@@ -10,6 +10,7 @@
 
 - ~50% lower coverage-phase wall on definition-heavy schemas.
 - Cache repeated computations during the coverage phase.
+- Faster schema bundling for specs with recursive references.
 
 ### :bug: Fixed
 

@@ -4,6 +4,7 @@ import sys
 import pytest
 
 from schemathesis.core.jsonschema import bundle
+from schemathesis.core.jsonschema.bundler import Bundler
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -80,8 +81,10 @@ def test_bundle_duplicate_references(benchmark):
 
 
 def _bundle_many(schemas: list, resolver: Resolver) -> None:
+    # Share a single Bundler across sites — matches production OpenApiSchema._bundler lifetime, exercises the cache.
+    bundler = Bundler()
     for schema in schemas:
-        bundle(schema, resolver, inline_recursive=True)
+        bundler.bundle_for_generation(schema, resolver)
 
 
 @pytest.mark.benchmark(group="bundle-recursive-self-ref")
@@ -221,8 +224,9 @@ def _collect_parameter_schemas(raw_schema: dict) -> list[dict]:
 
 
 def _bundle_each(schemas: list[dict], resolver: Resolver) -> None:
+    bundler = Bundler()
     for schema in schemas:
-        bundle(schema, resolver, inline_recursive=True)
+        bundler.bundle_for_generation(schema, resolver)
 
 
 @pytest.mark.benchmark(group="bundle-real-world")

@@ -42,11 +42,14 @@ class Bundler:
     """Bundler tracks schema ids stored in a bundle."""
 
     counter: int
+    # Post-prune inlined clones keyed by (uri, inlining-scope); scope is in the key because pruning depends on it.
+    _inline_clone_cache: dict[tuple[str, frozenset[str]], dict[str, Any]]
 
-    __slots__ = ("counter",)
+    __slots__ = ("counter", "_inline_clone_cache")
 
     def __init__(self) -> None:
         self.counter = 0
+        self._inline_clone_cache = {}
 
     def bundle(self, schema: JsonSchema, resolver: Resolver, *, inline_recursive: bool) -> Bundle:
         """Bundle a JSON Schema by embedding all references."""
@@ -169,17 +172,23 @@ class Bundler:
                         # Track that we're inlining this schema
                         inlining_for_recursion.add(resolved_uri)
                         try:
-                            cloned = deepclone(resolved_schema)
+                            cache_key = (resolved_uri, frozenset(inlining_for_recursion))
+                            cached_clone = self._inline_clone_cache.get(cache_key)
+                            if cached_clone is not None:
+                                cloned = cached_clone
+                            else:
+                                cloned = deepclone(resolved_schema)
 
-                            def _is_recursive(ref: str) -> bool:
-                                try:
-                                    target_uri = resolve_reference_uri(next_resolver.base_uri, ref)
-                                except Exception:
-                                    return False
-                                return target_uri in inlining_for_recursion
+                                def _is_recursive(ref: str) -> bool:
+                                    try:
+                                        target_uri = resolve_reference_uri(next_resolver.base_uri, ref)
+                                    except Exception:
+                                        return False
+                                    return target_uri in inlining_for_recursion
 
-                            # Drop self-refs from optional positions so the cloned schema is generatable.
-                            prune_optional_refs(cloned, is_recursive_ref=_is_recursive)
+                                # Drop self-refs from optional positions so the cloned schema is generatable.
+                                prune_optional_refs(cloned, is_recursive_ref=_is_recursive)
+                                self._inline_clone_cache[cache_key] = cloned
 
                             result = {
                                 key: _bundle_value(key, value, current_resolver)
