@@ -139,6 +139,15 @@ VALIDATED_FORMATS_BY_DRAFT: dict[type[jsonschema_rs.Validator], frozenset[str]] 
 # Negative-property recursion in the coverage phase builds a validator per sub-schema per call;
 # without this LRU, the same schema shape recompiles thousands of times on schemas like k8s Pods.
 validator_cache: BoundedCache = BoundedCache(maxsize=1024)
+# Entries pin the schemas whose `id()` is part of the cache key so GC can't reuse the id.
+_seeded_validator_cache: BoundedCache = BoundedCache(maxsize=1024)
+
+
+def _build_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Validator:
+    kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS}
+    if validator_cls is jsonschema_rs.Draft4Validator:
+        kwargs["formats"] = DRAFT4_SUPPLEMENTAL_FORMATS
+    return validator_cls(schema, **kwargs)
 
 
 def make_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Validator:
@@ -151,12 +160,25 @@ def make_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Val
         cached = validator_cache.get(cache_key)
         if cached is not MISSING:
             return cached
-    kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS}
-    if validator_cls is jsonschema_rs.Draft4Validator:
-        kwargs["formats"] = DRAFT4_SUPPLEMENTAL_FORMATS
-    validator = validator_cls(schema, **kwargs)
+    validator = _build_validator(schema, validator_cls)
     if cache_key is not None:
         validator_cache[cache_key] = validator
+    return validator
+
+
+def make_validator_with_seed(
+    schema_builder: Callable[[], JsonSchema],
+    validator_cls: type,
+    seed: tuple[Any, ...],
+    keep_alive: tuple[Any, ...] = (),
+) -> jsonschema_rs.Validator:
+    """Cache a validator by `seed` directly, skipping canonical-JSON serialization."""
+    cache_key = (seed, validator_cls)
+    cached = _seeded_validator_cache.get(cache_key)
+    if cached is not MISSING:
+        return cached[0]
+    validator = _build_validator(schema_builder(), validator_cls)
+    _seeded_validator_cache[cache_key] = (validator, keep_alive)
     return validator
 
 

@@ -20,6 +20,7 @@ from schemathesis.core.jsonschema import (
     is_valid,
     make_validator,
     make_validator_for,
+    make_validator_with_seed,
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
@@ -2436,10 +2437,18 @@ def _negative_properties(
         # values the body validator silently accepts; filter those out below.
         sub_has_ref = isinstance(sub_schema, dict) and "$ref" in sub_schema
         if isinstance(sub_schema, dict):
-            # Include bundled definitions so $ref references in sub_schema resolve
-            validator_schema = sub_schema if bundle is None else {**sub_schema, BUNDLE_STORAGE_KEY: bundle}
+            # Cache by (sub_schema, bundle) identity — same pair recurs across operations.
+            def _builder(s: dict = sub_schema, b: dict | None = bundle) -> JsonSchema:
+                return s if b is None else {**s, BUNDLE_STORAGE_KEY: b}
+
+            keep_alive: tuple[Any, ...] = (sub_schema,) if bundle is None else (sub_schema, bundle)
             try:
-                validator = make_validator(validator_schema, ctx.validator_cls)
+                validator = make_validator_with_seed(
+                    schema_builder=_builder,
+                    validator_cls=ctx.validator_cls,
+                    seed=(id(sub_schema), id(bundle)),
+                    keep_alive=keep_alive,
+                )
             except Exception:
                 pass
         with nctx.at(key):
