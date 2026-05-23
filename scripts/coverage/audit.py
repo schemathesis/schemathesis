@@ -47,6 +47,7 @@ from tools.coverage.audit import (
     audit_schema,
     error_from_exc,
 )
+from tools.coverage.caches import clear_internal_caches
 
 DEFAULT_OUT_DIR = Path("out/coverage")
 _MODE_CHOICES = ("all", *(mode.value for mode in GenerationMode))
@@ -130,13 +131,17 @@ def _process_entry(
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w") as fd:
         json.dump(asdict(result), fd, default=str, indent=2)
-    return _WorkerOutput(
+    output = _WorkerOutput(
         result=result,
         target_name=target.name,
         html_link=html_link,
         corpus=entry.corpus,
         api=api_label,
     )
+    # Prevent schema-derived state from carrying across the worker's task batch.
+    del outcome
+    clear_internal_caches()
+    return output
 
 
 def _process_ref(
@@ -294,7 +299,8 @@ def _only_irreducible_keywords(uncovered: list[dict]) -> bool:
 
 def _is_complete(result: SchemaResult) -> bool:
     """A schema is complete when every measured surface is fully covered. Responses are excluded."""
-    if result.errors:
+    # Errors without an operation coordinate (load_failed, stats_failed) leave no measurable surface.
+    if any(not error.path or not error.method for error in result.errors):
         return False
     statistic = result.statistic or {}
     keywords = statistic.get("keywords") or {}
@@ -302,13 +308,15 @@ def _is_complete(result: SchemaResult) -> bool:
         result.uncovered_keywords
     ):
         return False
-    parameters = statistic.get("parameters") or {}
-    parameter_covered = int(parameters.get("full", 0)) + int(parameters.get("partial", 0))
-    if parameter_covered < int(parameters.get("total", 0)):
-        return False
-    examples = statistic.get("examples") or {}
-    if int(examples.get("seen", 0)) < int(examples.get("total", 0)):
-        return False
+    # Errored ops leave dead parameter/example slots that we can't attribute back to subtract.
+    if not result.errors:
+        parameters = statistic.get("parameters") or {}
+        parameter_covered = int(parameters.get("full", 0)) + int(parameters.get("partial", 0))
+        if parameter_covered < int(parameters.get("total", 0)):
+            return False
+        examples = statistic.get("examples") or {}
+        if int(examples.get("seen", 0)) < int(examples.get("total", 0)):
+            return False
     return True
 
 
@@ -407,6 +415,17 @@ _RATE_ROWS: tuple[tuple[str, str], ...] = (
 
 _SLOWEST_COUNT = 5
 _EXCEPTION_TOP = 10
+_RSS_JUMPS_TOP = 10
+
+
+def _format_bytes(value: int) -> str:
+    """Render a signed byte count as KB/MB/GB at the largest fitting unit."""
+    sign = "-" if value < 0 else ""
+    magnitude = abs(value)
+    for unit, divisor in (("GB", 1024**3), ("MB", 1024**2), ("KB", 1024)):
+        if magnitude >= divisor:
+            return f"{sign}{magnitude / divisor:.1f} {unit}"
+    return f"{sign}{magnitude} B"
 
 
 def _format_delta(delta: float, suffix: str = "%") -> str:
@@ -416,6 +435,23 @@ def _format_delta(delta: float, suffix: str = "%") -> str:
     if delta < -0.05:
         return f"[red]{delta:.1f}{suffix}[/]"
     return f"[dim]+0.0{suffix}[/]"
+
+
+def _format_count_delta(delta: int) -> str:
+    if delta > 0:
+        return f"[green]+{delta:,}[/]"
+    if delta < 0:
+        return f"[red]{delta:,}[/]"
+    return "[dim]+0[/]"
+
+
+def _delta_cell(bucket: dict[str, Any], prior: dict[str, Any]) -> str:
+    """Render absolute newly-covered count + percentage delta. Show 'totals shifted' when denominators differ."""
+    pct_delta = _format_delta(float(bucket["pct"]) - float(prior.get("pct", 0.0)))
+    if int(bucket["total"]) != int(prior.get("total", 0)):
+        return f"{pct_delta} [dim](totals shifted)[/]"
+    covered_delta = int(bucket["covered"]) - int(prior.get("covered", 0))
+    return f"{_format_count_delta(covered_delta)} {pct_delta}"
 
 
 def _finalize(
@@ -452,16 +488,17 @@ def _finalize(
         row = [label, f"{bucket['covered']:,}", f"{bucket['total']:,}", f"{bucket['pct']:.1f}%"]
         if baseline_rates:
             prior = baseline_rates.get(key) or {}
-            prior_percentage = float(prior.get("pct", 0.0))
-            row.append(_format_delta(bucket["pct"] - prior_percentage))
+            row.append(_delta_cell(bucket, prior))
         table.add_row(*row)
 
     console.print(table)
 
     audited = summary["apis_with_results"]
     errored = summary["apis_errored"]
-    complete = sum(1 for result in results if _is_complete(result))
-    partial = audited - complete - errored
+    # "complete" means no remaining gaps AND no errors. Schemas where the only gaps came
+    # from errored operations are filtered out of the live view but still count as `errored`.
+    complete = sum(1 for result in results if _is_complete(result) and not result.errors)
+    partial = max(audited - complete - errored, 0)
     console.print(
         f"APIs: [bold]{audited}[/] audited "
         f"([green]{complete} complete[/], [yellow]{partial} partial[/], [red]{errored} errored[/]) | "
@@ -484,6 +521,24 @@ def _finalize(
         for result in slowest:
             slow_table.add_row(result.corpus, result.api, f"{result.duration_seconds:.1f}")
         console.print(slow_table)
+
+    top_rss = summary.get("top_rss_jumps") or []
+    if top_rss:
+        rss_table = Table(title=f"Top {len(top_rss)} RSS jumps", title_style="bold")
+        rss_table.add_column("corpus")
+        rss_table.add_column("api")
+        rss_table.add_column("operation")
+        rss_table.add_column("delta", justify="right")
+        for entry in top_rss:
+            delta = int(entry["delta_bytes"])
+            color = "red" if delta > 0 else "green" if delta < 0 else "dim"
+            rss_table.add_row(
+                entry["corpus"],
+                entry["api"],
+                entry["operation"],
+                f"[{color}]{_format_bytes(delta)}[/]",
+            )
+        console.print(rss_table)
 
     exception_counts: Counter[str] = Counter()
     for result in results:

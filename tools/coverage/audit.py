@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import time
 from collections.abc import Generator, Mapping
 from dataclasses import dataclass, field
@@ -30,6 +32,19 @@ from schemathesis.transport.prepare import normalize_base_url, prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 DEFAULT_FUZZING_MAX_EXAMPLES = 100
+
+# Linux exposes resident-set size via /proc/self/statm (field 2, in pages). Other platforms
+# return None and audit_schema skips RSS tracking — the dimension is purely informational.
+_STATM_AVAILABLE = sys.platform == "linux" and os.path.exists("/proc/self/statm")
+_PAGESIZE = os.sysconf("SC_PAGESIZE") if hasattr(os, "sysconf") else 4096
+
+
+def _rss_bytes() -> int | None:
+    if not _STATM_AVAILABLE:
+        return None
+    with open("/proc/self/statm") as fd:
+        return int(fd.readline().split()[1]) * _PAGESIZE
+
 
 _NO_SANITIZATION = SanitizationConfig(enabled=False)
 
@@ -72,10 +87,18 @@ class AuditError:
     # whose cause we couldn't capture).
     exception: str | None
     message: str
+    # Operation coordinates when known; used by the audit to attribute gaps to the failing
+    # operation so a schema isn't reported as incomplete just because one $ref is broken.
+    path: str | None = None
+    method: str | None = None
 
 
-def error_from_exc(stage: str, exc: BaseException) -> AuditError:
-    return AuditError(stage=stage, exception=exc.__class__.__name__, message=str(exc))
+def error_from_exc(stage: str, exc: BaseException, *, path: str | None = None, method: str | None = None) -> AuditError:
+    if path is None:
+        path = getattr(exc, "path", None)
+    if method is None:
+        method = getattr(exc, "method", None)
+    return AuditError(stage=stage, exception=exc.__class__.__name__, message=str(exc), path=path, method=method)
 
 
 @dataclass(slots=True)
@@ -98,6 +121,12 @@ class SchemaResult:
     # Spec-declared inline `example` values that fail their own sibling schema. Schemathesis
     # silently skips these, so leaving them in the `examples.total` denominator inflates gaps.
     examples_invalid: int = 0
+    # Uncovered-keyword entries dropped because they belong to operations the loader couldn't
+    # build (e.g. unresolvable $ref). Lets the live view treat error-only schemas as complete.
+    excluded_by_errors: int = 0
+    # Per-operation RSS delta in bytes (Linux only). `None` means the sampler was unavailable —
+    # an empty list means we sampled but no Ok operation was driven. Values can be negative.
+    rss_jumps: list[dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)
@@ -196,6 +225,27 @@ def _strip_invalid_examples(node: Any) -> int:
 
 def _is_response_keyword(entry: dict[str, Any]) -> bool:
     return "/responses/" in (entry.get("schema_path") or "")
+
+
+def _operation_pointer_prefix(method: str, path: str) -> str:
+    """JSON-pointer prefix that all schema paths under (METHOD, path) start with."""
+    encoded = path.replace("~", "~0").replace("/", "~1")
+    return f"/paths/{encoded}/{method.lower()}/"
+
+
+def _errored_operation_keys(errors: list[AuditError]) -> set[tuple[str, str]]:
+    """(method_lower, path) pairs for every error whose origin operation is known."""
+    return {(error.method.lower(), error.path) for error in errors if error.path and error.method}
+
+
+def _entry_under_errored_op(entry: dict[str, Any], keys: set[tuple[str, str]], prefixes: list[str]) -> bool:
+    """Match either by (method, path) on direct gap fields, or by schema_path prefix."""
+    method = entry.get("method")
+    path = entry.get("path")
+    if isinstance(method, str) and isinstance(path, str) and (method.lower(), path) in keys:
+        return True
+    schema_path = entry.get("schema_path") or ""
+    return any(schema_path.startswith(prefix) for prefix in prefixes)
 
 
 def _attach_query(url: str, params: Any) -> str:
@@ -378,6 +428,7 @@ def audit_schema(
         return AuditOutcome(result=result, coverage_map=None)
 
     generation_config = GenerationConfig()
+    rss_jumps: list[dict[str, Any]] | None = [] if _STATM_AVAILABLE else None
     for operation_result in schema.get_all_operations():
         if not isinstance(operation_result, Ok):
             err = operation_result.err()
@@ -386,17 +437,26 @@ def audit_schema(
         operation = operation_result.ok()
         result.operations += 1
         unsatisfiable: list[GenerationMode] = []
+        op_method = operation.method.upper()
+        op_path = operation.full_path
+        rss_before = _rss_bytes()
         try:
             for case in _cases_for_phase(
                 phase, operation, generation_config, generation_modes, fuzzing_max_examples, unsatisfiable
             ):
                 interaction = _case_to_interaction(case)
-                coverage_map.record_schemathesis_interactions(case.method, operation.full_path, [interaction])
+                coverage_map.record_schemathesis_interactions(case.method, op_path, [interaction])
                 result.cases_generated += 1
         except Exception as exc:
-            result.errors.append(error_from_exc(f"{operation.method.upper()} {operation.full_path}", exc))
+            result.errors.append(error_from_exc(f"{op_method} {op_path}", exc, path=op_path, method=op_method))
         for mode in unsatisfiable:
-            result.unsatisfiable.append((f"{operation.method.upper()} {operation.full_path}", mode.value))
+            result.unsatisfiable.append((f"{op_method} {op_path}", mode.value))
+        if rss_jumps is not None and rss_before is not None:
+            rss_after = _rss_bytes()
+            if rss_after is not None:
+                rss_jumps.append({"method": op_method, "path": op_path, "delta_bytes": rss_after - rss_before})
+
+    result.rss_jumps = rss_jumps
 
     try:
         statistic = coverage_map.statistic()
@@ -409,6 +469,19 @@ def audit_schema(
         ]
     except Exception as exc:
         result.errors.append(error_from_exc("stats_failed", exc))
+
+    keys = _errored_operation_keys(result.errors)
+    if keys:
+        prefixes = [_operation_pointer_prefix(method, path) for method, path in keys]
+        kept_keywords = [
+            entry for entry in result.uncovered_keywords if not _entry_under_errored_op(entry, keys, prefixes)
+        ]
+        kept_gaps = [gap for gap in result.gaps if not _entry_under_errored_op(gap, keys, prefixes)]
+        result.excluded_by_errors = (
+            len(result.uncovered_keywords) - len(kept_keywords) + len(result.gaps) - len(kept_gaps)
+        )
+        result.uncovered_keywords = kept_keywords
+        result.gaps = kept_gaps
 
     result.duration_seconds = time.monotonic() - started
     return AuditOutcome(result=result, coverage_map=coverage_map)
