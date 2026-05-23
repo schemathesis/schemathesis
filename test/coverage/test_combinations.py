@@ -454,48 +454,6 @@ def test_negative_maxlength_above_buffer(nctx, max_length):
     assert len(above_max[0]) == max_length + 1
 
 
-@pytest.mark.parametrize(
-    ("format", "expected"),
-    [
-        ("int32", {2**31, -(2**31) - 1}),
-        ("int64", {2**63, -(2**63) - 1}),
-    ],
-)
-def test_negative_integer_format_overflow(nctx, format, expected):
-    schema = {"type": "integer", "format": format}
-    overflow = {
-        value.value
-        for value in cover_schema_iter(nctx, schema)
-        if isinstance(value, GeneratedValue) and value.scenario is CoverageScenario.INVALID_FORMAT
-    }
-    assert overflow == expected
-
-
-def test_negative_integer_format_with_explicit_bounds(nctx):
-    # Explicit bounds tighter than the format do not suppress format-overflow negatives.
-    schema = {"type": "integer", "format": "int32", "minimum": -100, "maximum": 100}
-    values = {
-        value.value
-        for value in cover_schema_iter(nctx, schema)
-        if isinstance(value, GeneratedValue)
-        and value.scenario
-        in (CoverageScenario.INVALID_FORMAT, CoverageScenario.VALUE_ABOVE_MAXIMUM, CoverageScenario.VALUE_BELOW_MINIMUM)
-    }
-    assert {101, -101, 2**31, -(2**31) - 1}.issubset(values)
-
-
-@pytest.mark.parametrize("format", ["int16", "uint32", "weird", "binary"])
-def test_negative_integer_format_unknown_no_emission(nctx, format):
-    # Only OpenAPI-standard integer formats produce overflow negatives.
-    schema = {"type": "integer", "format": format}
-    overflow = [
-        value
-        for value in cover_schema_iter(nctx, schema)
-        if isinstance(value, GeneratedValue) and value.scenario is CoverageScenario.INVALID_FORMAT
-    ]
-    assert overflow == []
-
-
 @pytest.mark.parametrize("multiple_of", [None, 2])
 @pytest.mark.parametrize(
     ("schema", "values", "with_multiple_of"),

@@ -87,12 +87,6 @@ VALIDATED_FORMATS = frozenset(
     }
 )
 
-# Signed-integer format ranges (OpenAPI). Used to emit out-of-range values as negative cases.
-INTEGER_FORMAT_BOUNDS: dict[str, tuple[int, int]] = {
-    "int32": (-(2**31), 2**31 - 1),
-    "int64": (-(2**63), 2**63 - 1),
-}
-
 _FORMAT_VALIDATORS: dict[tuple[str, type], jsonschema_rs.Validator] = {}
 
 
@@ -1254,8 +1248,6 @@ def cover_schema_iter(
                     # Binary formats accept any bytes - no meaningful format violations
                     if value not in ("binary", "byte"):
                         yield from _negative_format(ctx, schema, value)
-                elif key == "format" and "integer" in types and value in INTEGER_FORMAT_BOUNDS:
-                    yield from _negative_integer_format(ctx, value, seen)
                 elif key == "maximum":
                     next = value + 1
                     if seen.insert(next):
@@ -2758,18 +2750,6 @@ def _negative_format(
         description=f"Value not matching the '{format}' format",
         location=ctx.current_path,
     )
-
-
-def _negative_integer_format(ctx: CoverageContext, format: str, seen: HashSet) -> Generator[GeneratedValue, None, None]:
-    lower, upper = INTEGER_FORMAT_BOUNDS[format]
-    for value, side in ((upper + 1, "upper"), (lower - 1, "lower")):
-        if seen.insert(value):
-            yield NegativeValue(
-                value,
-                scenario=CoverageScenario.INVALID_FORMAT,
-                description=f"Value outside '{format}' {side} bound",
-                location=ctx.current_path,
-            )
 
 
 def _is_non_integer_float(x: float) -> bool:
