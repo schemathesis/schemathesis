@@ -839,8 +839,9 @@ def _generate_oversized_string(
         try:
             return ctx.generate_from_schema(new_schema)
         except (InvalidArgument, Unsatisfiable):
-            # Format may forbid the requested length (e.g. uuid is fixed at 36).
-            if target_length <= NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN + 1:
+            # Format constrains the length (e.g. uuid is fixed at 36); synthesize a plain
+            # string that violates maxLength regardless.
+            if target_length < NEGATIVE_MODE_MAX_LENGTH_CAP:
                 return "a" * target_length
             return None
     min_length = max_length = target_length
