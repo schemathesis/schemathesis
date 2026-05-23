@@ -830,7 +830,13 @@ def _generate_oversized_string(
 ) -> str | None:
     pattern = new_schema.get("pattern")
     if not isinstance(pattern, str):
-        return ctx.generate_from_schema(new_schema)
+        try:
+            return ctx.generate_from_schema(new_schema)
+        except (InvalidArgument, Unsatisfiable):
+            # Format may forbid the requested length (e.g. uuid is fixed at 36).
+            if target_length <= NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN + 1:
+                return "a" * target_length
+            return None
     min_length = max_length = target_length
     try:
         if target_length - 1 > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
@@ -1305,16 +1311,16 @@ def cover_schema_iter(
                                 try:
                                     value = ctx.generate_from_schema(new_schema)
                                 except Unsatisfiable:
-                                    # Pattern's minimum match length exceeds maxLength; drop the bounds,
-                                    # keep the pattern, generate a full-length match, then truncate.
-                                    # The truncated value violates `pattern` (and minLength), which is
-                                    # acceptable: the case is a negative one anyway.
-                                    if "pattern" not in new_schema:
+                                    # Format or pattern may forbid the truncated length (e.g. no valid email of length 5).
+                                    fallback = {k: v for k, v in new_schema.items() if k != "format"}
+                                    if "pattern" in fallback:
+                                        del fallback["minLength"]
+                                        del fallback["maxLength"]
+                                        value = ctx.generate_from_schema(fallback)[:max_length]
+                                    elif fallback != new_schema:
+                                        value = ctx.generate_from_schema(fallback)
+                                    else:
                                         raise
-                                    fallback = {**new_schema}
-                                    del fallback["minLength"]
-                                    del fallback["maxLength"]
-                                    value = ctx.generate_from_schema(fallback)[:max_length]
                                 if ctx.is_valid_for_location(value) and seen.insert(value):
                                     yield NegativeValue(
                                         value,
