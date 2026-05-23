@@ -399,6 +399,37 @@ def test_negative_maxlength_emitted_with_unsatisfiable_pattern(nctx):
     assert all(len(s) == 91 for s in above_max)
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string", "format": "email", "minLength": 6},
+        {"type": "string", "format": "uuid", "minLength": 50},
+    ],
+    ids=["email", "uuid"],
+)
+def test_negative_minlength_emitted_with_constraining_format(nctx, schema):
+    # No valid email of length 5; the minLength violation must still be emitted.
+    below_min = [
+        v.value
+        for v in cover_schema_iter(nctx, schema)
+        if isinstance(v, GeneratedValue) and v.scenario is CoverageScenario.STRING_BELOW_MIN_LENGTH
+    ]
+    assert below_min, "Expected a below-minLength negative case"
+    assert all(isinstance(s, str) and len(s) == schema["minLength"] - 1 for s in below_min)
+
+
+def test_negative_maxlength_emitted_with_constraining_format(nctx):
+    # uuid is fixed at 36 chars; the 11-char maxLength violation must still be emitted.
+    schema = {"type": "string", "format": "uuid", "maxLength": 10}
+    above_max = [
+        v.value
+        for v in cover_schema_iter(nctx, schema)
+        if isinstance(v, GeneratedValue) and v.scenario is CoverageScenario.STRING_ABOVE_MAX_LENGTH
+    ]
+    assert above_max, "Expected an above-maxLength negative case"
+    assert all(isinstance(s, str) and len(s) == 11 for s in above_max)
+
+
 @pytest.mark.parametrize("max_length", [65536, 350000])
 def test_negative_maxlength_above_buffer(nctx, max_length):
     schema = {"type": "string", "maxLength": max_length}
@@ -1471,7 +1502,8 @@ def test_positive_multiple_types(pctx):
                     },
                 ]
             },
-            ["00000000000", AnyNumber(), AnyNumber()],
+            # `aaaaaaaaaaa` is the synthesized maxLength violation when the merged allOf can't satisfy length-11.
+            ["00000000000", "aaaaaaaaaaa", AnyNumber(), AnyNumber()],
         ),
         (
             {
