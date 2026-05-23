@@ -163,8 +163,8 @@ class AnyNumber:
         # canonicalish drops `type` when `enum` is present; infer it from the values so type
         # violations still appear alongside the enum violation. The enum-negative "AAA"
         # collides with the type-negative "AAA" and dedupes to one entry.
-        ({"enum": [1, 2]}, ["AAA", "false", "null", ["null", "null"]]),
-        ({"enum": [1, 2, {}]}, ["AAA", "false", "null", ["null", "null"]]),
+        ({"enum": [1, 2]}, ["AAA", AnyNumber(), "false", "null", ["null", "null"]]),
+        ({"enum": [1, 2, {}]}, ["AAA", AnyNumber(), "false", "null", ["null", "null"]]),
         ({"enum": ["a", "b"]}, ["AAA", 0, "false", "null", ["null", "null"]]),
         ({"const": 42}, ["AAA"]),
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
