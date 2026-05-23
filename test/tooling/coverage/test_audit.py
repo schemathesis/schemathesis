@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 
 from schemathesis.generation import GenerationMode
+from schemathesis.generation import hypothesis as hypothesis_internals
+from schemathesis.specs.openapi.coverage import _schema as coverage_internals
 from tools.coverage.audit import (
     _KNOWN_UNSUPPORTED_MEDIA_TYPES,
     _KNOWN_UNSUPPORTED_PREFIXES,
@@ -10,6 +12,7 @@ from tools.coverage.audit import (
     _strip_known_unsupported_media_types,
     audit_schema,
 )
+from tools.coverage.caches import clear_internal_caches
 
 _PATHS = {
     "/users/{id}": {
@@ -62,7 +65,7 @@ def test_audit_schema_records_load_failure_on_invalid_schema():
     outcome = audit_schema({"not": "valid"}, api="t", corpus="external", phase=PhaseName.COVERAGE)
     assert outcome.coverage_map is None
     assert outcome.result.operations == 0
-    assert outcome.result.errors and outcome.result.errors[0].startswith("load_failed:")
+    assert outcome.result.errors and outcome.result.errors[0].stage == "load_failed"
 
 
 def test_audit_schema_records_unsatisfiable_modes_for_no_input_operation(ctx):
@@ -163,7 +166,7 @@ def test_audit_schema_preserves_error_message_for_malformed_media_type(ctx):
     )
     outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
     assert outcome.result.errors
-    assert "form-data" in outcome.result.errors[0]
+    assert "form-data" in outcome.result.errors[0].message
 
 
 def test_audit_schema_fuzzing_uses_only_requested_generation_modes(ctx):
@@ -310,6 +313,68 @@ def test_strip_known_unsupported_swagger2_global_consumes(ctx):
     filtered, unknown = _strip_known_unsupported_media_types(schema)
     assert filtered["consumes"] == ["application/json", "text/csv"]
     assert unknown == ["text/csv"]
+
+
+def test_audit_schema_filters_uncovered_keywords_under_errored_operations(ctx):
+    raw = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+            "/broken": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    assert outcome.result.errors, "the broken op should produce an operation_build_failed error"
+    broken_errors = [
+        error for error in outcome.result.errors if error.path == "/broken" and (error.method or "").lower() == "post"
+    ]
+    assert broken_errors, outcome.result.errors
+    assert all("/broken" not in (u.get("schema_path") or "") for u in outcome.result.uncovered_keywords)
+    assert all("/broken" not in (g.get("schema_path") or "") for g in outcome.result.gaps)
+    assert outcome.result.excluded_by_errors > 0
+
+
+def test_audit_schema_records_rss_jumps_per_operation(ctx):
+    raw = ctx.openapi.build_schema(_PATHS)
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    if outcome.result.rss_jumps is None:
+        pytest.skip("RSS sampling unavailable on this platform")
+    assert len(outcome.result.rss_jumps) == 2
+    seen = {(jump["method"], jump["path"]) for jump in outcome.result.rss_jumps}
+    assert seen == {("GET", "/users/{id}"), ("POST", "/users")}
+    assert all(isinstance(jump["delta_bytes"], int) for jump in outcome.result.rss_jumps)
+
+
+def test_clear_internal_caches_drains_known_caches(ctx):
+    # An audit pass populates the schemathesis internal caches; the shared helper must
+    # empty them so audit workers don't carry per-schema state forward to the next task.
+    raw = ctx.openapi.build_schema(_PATHS)
+    audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    populated_caches = [
+        len(coverage_internals._FORMAT_VALIDATORS),
+        len(coverage_internals._REMOVE_EXAMPLES_CACHE._data),
+        len(hypothesis_internals.schema_generation_cache._data),
+        len(hypothesis_internals._canonicalish_result_cache._data),
+    ]
+    assert any(populated_caches), populated_caches
+    clear_internal_caches()
+    assert coverage_internals._FORMAT_VALIDATORS == {}
+    assert coverage_internals._REMOVE_EXAMPLES_CACHE._data == {}
+    assert hypothesis_internals.schema_generation_cache._data == {}
+    assert hypothesis_internals.custom_formats_cache._data == {}
+    assert hypothesis_internals._resolve_result_cache._data == {}
+    assert hypothesis_internals._merged_result_cache._data == {}
+    assert hypothesis_internals._canonicalish_result_cache._data == {}
+    assert hypothesis_internals._from_schema_result_cache._data == {}
+    assert hypothesis_internals._merged_as_strategies_result_cache._data == {}
 
 
 def test_audit_schema_records_unknown_unsupported(ctx):

@@ -7,6 +7,7 @@ from tools.coverage.audit import SchemaResult
 
 TOP_UNCOVERED_PATHS = 30
 WORST_APIS = 10
+TOP_RSS_JUMPS = 10
 
 
 def _bucket_full_partial(statistic: dict[str, Any], key: str) -> tuple[int, int]:
@@ -39,6 +40,7 @@ def aggregate(results: list[SchemaResult], *, wall_seconds: float = 0.0) -> dict
     uncovered_path_counts: Counter[str] = Counter()
     uncovered_states: dict[str, Counter[str]] = {}
     keyword_pcts: list[tuple[float, str, str]] = []
+    rss_jumps: list[tuple[int, str, str, str]] = []
 
     for result in results:
         if result.errors:
@@ -83,7 +85,13 @@ def aggregate(results: list[SchemaResult], *, wall_seconds: float = 0.0) -> dict
             uncovered_path_counts[schema_path] += 1
             uncovered_states.setdefault(schema_path, Counter())[entry.get("state") or "unknown"] += 1
 
+        for jump in result.rss_jumps or ():
+            rss_jumps.append((int(jump["delta_bytes"]), result.corpus, result.api, f"{jump['method']} {jump['path']}"))
+
     keyword_pcts.sort()
+    # Sort by absolute delta so memory drops (negative) also surface — they can flag noisy
+    # operations that free a lot mid-run, useful when triaging RSS noise.
+    rss_jumps.sort(key=lambda entry: abs(entry[0]), reverse=True)
     return {
         "phase": results[0].phase if results else None,
         "apis_total": len(results),
@@ -133,6 +141,10 @@ def aggregate(results: list[SchemaResult], *, wall_seconds: float = 0.0) -> dict
             {"corpus": corpus, "api": api, "keyword_pct": round(pct, 2)}
             for pct, corpus, api in keyword_pcts[:WORST_APIS]
             if pct < 100
+        ],
+        "top_rss_jumps": [
+            {"corpus": corpus, "api": api, "operation": operation, "delta_bytes": delta}
+            for delta, corpus, api, operation in rss_jumps[:TOP_RSS_JUMPS]
         ],
     }
 
