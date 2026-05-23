@@ -348,8 +348,12 @@ class XdistReportingPlugin:
     def pytest_testnodedown(self, node: WorkerController, error: object) -> None:
         # Accumulate per schema_id; writing is deferred to pytest_sessionfinish
         # so we know the full set of schemas before opening any files.
+        # Workers that exit abnormally don't deliver results; skip them instead of crashing the whole controller.
+        workeroutput = getattr(node, "workeroutput", None)
+        if workeroutput is None:
+            return
         stash = node.config.stash.setdefault(_XDIST_WRITERS_KEY, {})
-        for schema_id, payload in node.workeroutput.get(SCHEMATHESIS_RECORDERS_KEY, {}).items():
+        for schema_id, payload in workeroutput.get(SCHEMATHESIS_RECORDERS_KEY, {}).items():
             if schema_id not in stash:
                 stash[schema_id] = {"writer_config": payload["writer_config"], "records": []}
             stash[schema_id]["records"].extend(payload["records"])

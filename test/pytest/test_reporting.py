@@ -388,6 +388,26 @@ def test_api(case):
     result.assert_outcomes(passed=1)
 
 
+def test_xdist_worker_crash_does_not_break_controller(testdir, ctx):
+    # Crashed workers don't report results; the hook must skip them, not raise.
+    api = ctx.openapi.apps.success()
+    _make_xdist_test(
+        ctx,
+        testdir,
+        """
+import os
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    os._exit(1)
+""",
+        base_url=f"{api.base_url}/api",
+    )
+    result = testdir.runpytest("-n", "1")
+    assert "INTERNALERROR" not in "\n".join(result.outlines + result.errlines)
+
+
 def test_vcr_report_multiple_operations_via_xdist(testdir, ctx):
     # two operations share the same schema_id; the second pytest_testnodedown call
     # must reuse already-opened writers rather than opening new ones
