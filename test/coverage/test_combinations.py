@@ -430,6 +430,18 @@ def test_negative_maxlength_emitted_with_constraining_format(nctx):
     assert all(isinstance(s, str) and len(s) == 11 for s in above_max)
 
 
+def test_negative_maxlength_emitted_with_constraining_format_large_limit(nctx):
+    # unknown format can't produce a 2001-char string; the violation must still be emitted.
+    schema = {"type": "string", "format": "duration", "maxLength": 2000, "minLength": 1}
+    above_max = [
+        v.value
+        for v in cover_schema_iter(nctx, schema)
+        if isinstance(v, GeneratedValue) and v.scenario is CoverageScenario.STRING_ABOVE_MAX_LENGTH
+    ]
+    assert above_max, "Expected an above-maxLength negative case"
+    assert all(isinstance(s, str) and len(s) == 2001 for s in above_max)
+
+
 @pytest.mark.parametrize("max_length", [65536, 350000])
 def test_negative_maxlength_above_buffer(nctx, max_length):
     schema = {"type": "string", "maxLength": max_length}
