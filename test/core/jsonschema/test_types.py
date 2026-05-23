@@ -25,7 +25,7 @@ def test_get_type(schema, expected):
         (True, "boolean"),
         ({}, "object"),
         ([], "array"),
-        (1, "number"),
+        (1, "integer"),
         (1.5, "number"),
         ("s", "string"),
         (b"bytes", "bytes"),

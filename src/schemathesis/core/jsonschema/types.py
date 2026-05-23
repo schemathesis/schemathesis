@@ -36,7 +36,9 @@ def to_json_type_name(v: object) -> str:
         return "object"
     if isinstance(v, list):
         return "array"
-    if isinstance(v, int | float):
+    if isinstance(v, int):
+        return "integer"
+    if isinstance(v, float):
         return "number"
     if isinstance(v, str):
         return "string"

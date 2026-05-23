@@ -5786,6 +5786,51 @@ def test_negative_enum_emits_entries_with_type_mismatch_for_keyword_coverage(ctx
     assert {2, 4, 6, 8, 10}.issubset(emitted), f"Expected each enum entry as a negative; got: {emitted}"
 
 
+@pytest.mark.parametrize(
+    "property_schema",
+    [
+        {"type": "integer", "enum": [1, 2]},
+        {"type": ["integer", "null"], "enum": [None, 301, 302, 307, 308]},
+        {"type": "number", "enum": [1, 2, 3.5]},
+    ],
+    ids=["integer", "integer-or-null", "number-with-int-entries"],
+)
+def test_negative_enum_does_not_flag_integer_entries_matching_declared_type(ctx, property_schema):
+    # Integer enum entries are valid under `type: integer` (and `type: number`); the
+    # "Enum value with type mismatching" fallback must skip them, not emit them as negatives.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"value": property_schema},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = loaded["/foo"]["POST"]
+    validator = _body_validator(operation)
+    for case in _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation):
+        if case.body is None or case.meta is None:
+            continue
+        body_info = case.meta.components.get(ParameterLocation.BODY)
+        if body_info is None or body_info.mode != GenerationMode.NEGATIVE:
+            continue
+        assert not validator.is_valid(case.body), (
+            f"NEGATIVE body is schema-valid (mutation had no effect): {case.body!r}"
+        )
+
+
 def test_negative_const_emits_value_with_type_mismatch_for_keyword_coverage(ctx):
     # Positive path skips the const value as `type`-invalid, so only the negative can exercise `const` here.
     loaded = ctx.openapi.load_schema(

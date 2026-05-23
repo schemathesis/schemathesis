@@ -2427,7 +2427,11 @@ def _negative_enum(
         declared_types = set(get_type(schema))
         if declared_types:
             for entry in value:
-                if to_json_type_name(entry) in declared_types:
+                entry_type = to_json_type_name(entry)
+                if entry_type in declared_types:
+                    continue
+                # Integer values satisfy `type: number` in JSON Schema.
+                if entry_type == "integer" and "number" in declared_types:
                     continue
                 if not ctx.is_valid_for_location(entry) or not seen.insert(entry):
                     continue

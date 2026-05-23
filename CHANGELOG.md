@@ -26,6 +26,7 @@
 - Skip report aggregation for crashed xdist workers instead of failing the whole controller with `AttributeError`.
 - Out-of-range negatives for integer fields with `format: int32` / `int64` during the coverage phase.
 - Emit `maxLength` negatives for string schemas whose `format` makes the exact length unsatisfiable when `maxLength` exceeds 100.
+- False positive `negative_data_rejection` for integer `enum` entries under `type: integer` / `type: number`.
 
 ## [4.19.0](https://github.com/schemathesis/schemathesis/compare/v4.18.5...v4.19.0) - 2026-05-19
 
