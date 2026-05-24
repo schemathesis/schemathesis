@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Override server variable defaults via `[servers.variables]` in config. [#4166](https://github.com/schemathesis/schemathesis/issues/4166)
 - Form-encoded payloads for dynamic auth via `payload_content_type`. [#4167](https://github.com/schemathesis/schemathesis/issues/4167)
 
 ### :racing_car: Performance

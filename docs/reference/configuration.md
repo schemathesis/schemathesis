@@ -464,6 +464,23 @@ These settings can only be applied at the project level.
     base-url = "https://api.example.com"
     ```
 
+#### `servers.variables`
+
+!!! note ""
+
+    **Type:** `Object (string values)`  
+    **Default:** `{}`  
+
+    Overrides server variable defaults declared in OpenAPI `servers[].url` templates. Use this to retarget environments without `--url`.
+
+    ```toml
+    [servers.variables]
+    hostname = "staging.example.com"
+    version = "v2"
+    ```
+
+    Given a schema with `servers[0].url = "https://{hostname}/{version}"`, requests will target `https://staging.example.com/v2/...` instead of the spec defaults.
+
 #### `hooks`
 
 !!! note ""

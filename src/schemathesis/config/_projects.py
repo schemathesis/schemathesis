@@ -20,6 +20,7 @@ from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.config._report import ReportsConfig
+from schemathesis.config._servers import ServersConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, NOT_SET, NotSet, hooks
 from schemathesis.core.validation import validate_base_url
@@ -65,6 +66,7 @@ class ProjectConfig(DiffBase):
     parameters: dict[str, Any]
     warnings: WarningsConfig
     auth: AuthConfig
+    servers: ServersConfig
     checks: ChecksConfig
     phases: PhasesConfig
     fuzz: FuzzConfig
@@ -90,6 +92,7 @@ class ProjectConfig(DiffBase):
         "parameters",
         "warnings",
         "auth",
+        "servers",
         "checks",
         "phases",
         "fuzz",
@@ -117,6 +120,7 @@ class ProjectConfig(DiffBase):
         parameters: dict[str, Any] | None = None,
         warnings: WarningsConfig | None = None,
         auth: AuthConfig | None = None,
+        servers: ServersConfig | None = None,
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,
         fuzz: FuzzConfig | None = None,
@@ -153,6 +157,7 @@ class ProjectConfig(DiffBase):
         self.parameters = parameters or {}
         self.warnings = warnings or WarningsConfig.from_value(None)
         self.auth = auth or AuthConfig()
+        self.servers = servers or ServersConfig()
         self.checks = checks or ChecksConfig()
         self.phases = phases or PhasesConfig()
         self.fuzz = fuzz or FuzzConfig()
@@ -185,6 +190,7 @@ class ProjectConfig(DiffBase):
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data, dictionaries=dictionaries),
             auth=AuthConfig.from_dict(data.get("auth", {})),
+            servers=ServersConfig.from_dict(data.get("servers", {})),
             warnings=WarningsConfig.from_value(data.get("warnings")),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             phases=PhasesConfig.from_dict(data.get("phases", {}), dictionaries=dictionaries),

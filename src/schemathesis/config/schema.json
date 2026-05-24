@@ -76,6 +76,9 @@
     "base-url": {
       "type": "string"
     },
+    "servers": {
+      "$ref": "#/$defs/ServersConfig"
+    },
     "parameters": {
       "$ref": "#/$defs/ParametersConfig"
     },
@@ -191,6 +194,18 @@
         },
         "path": {
           "type": "string"
+        }
+      }
+    },
+    "ServersConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "variables": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -770,6 +785,9 @@
         "base-url": {
           "type": "string"
         },
+        "servers": {
+          "$ref": "#/$defs/ServersConfig"
+        },
         "parameters": {
           "$ref": "#/$defs/ParametersConfig"
         },
@@ -929,6 +947,9 @@
         },
         "auth": {
           "$ref": "#/$defs/OperationAuthConfig"
+        },
+        "servers": {
+          "$ref": "#/$defs/ServersConfig"
         },
         "headers": {
           "additionalProperties": {

@@ -209,3 +209,68 @@ def test_engine_routes_per_path(ctx, cli, snapshot_cli):
     assert api.calls_under("/zone-a/api/admin"), "Engine did not route /api/admin to its per-path server"
     assert api.calls_under("/zone-b/api/public"), "Engine did not route /api/public to its per-path server"
     assert not api.calls_to("/api/admin") and not api.calls_to("/api/public"), "Engine misrouted to schema paths"
+
+
+def _templated_schema(ctx):
+    return ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "servers": [
+                        {
+                            "url": "https://{host}.example.com/{version}",
+                            "variables": {
+                                "host": {"default": "api"},
+                                "version": {"default": "v1"},
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+
+def test_project_scope_variables_override_defaults(ctx):
+    config = SchemathesisConfig.from_dict({"servers": {"variables": {"host": "staging", "version": "v2"}}})
+    schema = schemathesis.openapi.from_dict(_templated_schema(ctx), config=config)
+    assert schema["/items"]["GET"].base_url == "https://staging.example.com/v2"
+
+
+def test_unknown_variable_name_silently_ignored(ctx):
+    config = SchemathesisConfig.from_dict({"servers": {"variables": {"host": "staging", "nonexistent": "whatever"}}})
+    schema = schemathesis.openapi.from_dict(_templated_schema(ctx), config=config)
+    assert schema["/items"]["GET"].base_url == "https://staging.example.com/v1"
+
+
+def test_config_variable_fills_missing_default(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "servers": [
+                        {
+                            "url": "https://{host}.example.com",
+                            "variables": {"host": {}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    config = SchemathesisConfig.from_dict({"servers": {"variables": {"host": "provided"}}})
+    schema = schemathesis.openapi.from_dict(schema_dict, config=config)
+    assert schema["/items"]["GET"].base_url == "https://provided.example.com"
+
+
+def test_base_url_override_ignores_variables(ctx):
+    config = SchemathesisConfig.from_dict(
+        {
+            "base-url": "https://override.example.com",
+            "servers": {"variables": {"host": "staging"}},
+        }
+    )
+    schema = schemathesis.openapi.from_dict(_templated_schema(ctx), config=config)
+    assert schema["/items"]["GET"].base_url == "https://override.example.com"
