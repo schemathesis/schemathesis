@@ -16,6 +16,7 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
+from schemathesis.config._servers import ServersConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.filters import FilterSet, HasAPIOperation, expression_to_filter_function, is_deprecated
@@ -225,6 +226,7 @@ class OperationConfig(DiffBase):
     parameters: dict[str, Any]
     warnings: WarningsConfig | None
     auth: AuthConfig
+    servers: ServersConfig
     checks: ChecksConfig
     phases: PhasesConfig
     generation: GenerationConfig
@@ -246,6 +248,7 @@ class OperationConfig(DiffBase):
         "parameters",
         "warnings",
         "auth",
+        "servers",
         "checks",
         "phases",
         "generation",
@@ -269,6 +272,7 @@ class OperationConfig(DiffBase):
         parameters: dict[str, Any] | None = None,
         warnings: WarningsConfig | None = None,
         auth: AuthConfig | None = None,
+        servers: ServersConfig | None = None,
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,
         generation: GenerationConfig | None = None,
@@ -292,6 +296,7 @@ class OperationConfig(DiffBase):
         self.parameters = parameters or {}
         self.warnings = warnings
         self.auth = auth or AuthConfig()
+        self.servers = servers or ServersConfig()
         self.checks = checks or ChecksConfig()
         self.phases = phases or PhasesConfig()
         self.generation = generation or GenerationConfig()
@@ -355,6 +360,7 @@ class OperationConfig(DiffBase):
             parameters=load_parameters(data, dictionaries=dictionaries or {}),
             warnings=warnings,
             auth=AuthConfig.from_dict(data.get("auth", {})),
+            servers=ServersConfig.from_dict(data.get("servers", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             phases=PhasesConfig.from_dict(data.get("phases", {}), dictionaries=dictionaries),
             generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),

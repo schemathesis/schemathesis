@@ -307,11 +307,13 @@ class OperationLoader:
         if schema.config.base_url is not None:
             base_url = schema.get_base_url()
         else:
+            variables = schema.config.servers.variables or None
             base_url = resolve_operation_base_url(
                 operation=definition,
                 path_item=path_item,
                 fallback_base_url=schema.get_base_url(),
                 location=schema.location,
+                variables=variables,
             )
         responses = self._parse_responses(definition, scope, resolver=resolver)
         security = self._parse_security(definition)
