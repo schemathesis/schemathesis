@@ -45,7 +45,6 @@ import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
-from hypothesis_jsonschema._canonicalise import canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
@@ -479,6 +478,15 @@ class CoverageContext:
             if cached is not MISSING:
                 return deepclone(cached) if isinstance(cached, (dict, list)) else cached
         try:
+            if not jsonschema_rs.canonicalize(_upgrade_exclusive_bounds(schema)).is_satisfiable():
+                raise Unsatisfiable
+        except Unsatisfiable:
+            if cache_key is not None:
+                schema_generation_cache[cache_key] = UNSATISFIABLE_RESULT
+            raise
+        except ValueError:
+            pass
+        try:
             value = self._generate_from_schema_inner(schema)
         except Unsatisfiable:
             if cache_key is not None:
@@ -629,7 +637,16 @@ class CoverageContext:
                 for item in schema["allOf"]
             ]
             schema = {**schema, "allOf": resolved_all_of}
-            schema = canonicalish(schema)
+            try:
+                canonical = jsonschema_rs.canonicalize(_upgrade_exclusive_bounds(schema))
+                if not canonical.is_satisfiable():
+                    raise Unsatisfiable
+                merged = canonical.to_json_schema()
+                schema = {} if merged is True else {"not": {}} if merged is False else merged
+            except Unsatisfiable:
+                raise
+            except ValueError:
+                pass
             if isinstance(schema, dict) and "allOf" not in schema:
                 return self.generate_from_schema(schema)
 
@@ -785,6 +802,59 @@ def _with_effective_required(schema: JsonSchemaObject) -> JsonSchemaObject:
     return schema
 
 
+def _upgrade_exclusive_bounds(schema: JsonSchema) -> JsonSchema:
+    # Rewrite draft-4 boolean `exclusiveMinimum`/`exclusiveMaximum` to numeric so `canonicalize` accepts it.
+    # Copy-on-write: unchanged input is returned as-is.
+    if not isinstance(schema, dict):
+        return schema
+    result = schema
+    for key, value in schema.items():
+        if isinstance(value, dict):
+            upgraded = _upgrade_exclusive_bounds(value)
+            if upgraded is not value:
+                if result is schema:
+                    result = dict(schema)
+                result[key] = upgraded
+        elif isinstance(value, list):
+            items = [_upgrade_exclusive_bounds(item) if isinstance(item, dict) else item for item in value]
+            if any(a is not b for a, b in zip(items, value, strict=True)):
+                if result is schema:
+                    result = dict(schema)
+                result[key] = items
+    for exclusive_key, bound_key in (("exclusiveMinimum", "minimum"), ("exclusiveMaximum", "maximum")):
+        exclusive = result.get(exclusive_key)
+        if not isinstance(exclusive, bool):
+            continue
+        if result is schema:
+            result = dict(schema)
+        bound = result.get(bound_key)
+        if exclusive and isinstance(bound, (int, float)) and not isinstance(bound, bool):
+            result[exclusive_key] = bound
+            result.pop(bound_key, None)
+        else:
+            result.pop(exclusive_key, None)
+    return result
+
+
+def _recover_one_of_from_canonical(schema: JsonSchemaObject) -> JsonSchemaObject:
+    # `canonicalize` turns an overlapping `oneOf` into an `anyOf` of `allOf`s each carrying a
+    # mutual-exclusion `not`. Recover the per-branch positives and route via `oneOf` (its uniqueness
+    # gate re-establishes exactly-one); the `not`s would otherwise block per-branch generation.
+    any_of = schema.get("anyOf")
+    if not isinstance(any_of, list) or len(any_of) < 2 or "oneOf" in schema:
+        return schema
+    positive_parts: list[JsonSchema] = []
+    for branch in any_of:
+        if not (isinstance(branch, dict) and isinstance(branch.get("allOf"), list)):
+            return schema
+        members = branch["allOf"]
+        kept = [member for member in members if not (isinstance(member, dict) and set(member) == {"not"})]
+        if len(kept) == len(members) or not kept:
+            return schema
+        positive_parts.append(kept[0] if len(kept) == 1 else {"allOf": kept})
+    return {**{key: value for key, value in schema.items() if key != "anyOf"}, "oneOf": positive_parts}
+
+
 def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
     """Resolve a $ref sub-schema to its concrete content before merging."""
     if not isinstance(sub, dict) or "$ref" not in sub:
@@ -912,8 +982,9 @@ def _cover_positive_for_type(
         ctx = ctx.with_positive()
         enum = schema.get("enum", NOT_SET)
         const = schema.get("const", NOT_SET)
+        recovered = _recover_one_of_from_canonical(schema)
         for key in ("anyOf", "oneOf"):
-            sub_schemas = schema.get(key)
+            sub_schemas = recovered.get(key)
             if sub_schemas is not None:
                 if key == "oneOf":
                     resolved_schemas = [
@@ -1019,11 +1090,13 @@ def _cover_positive_for_type(
             if len(all_of) == 1 and not outer_has_properties:
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
-                with suppress(jsonschema_rs.ValidationError):
+                with suppress(jsonschema_rs.ValidationError, ValueError):
                     _inline_allof_refs(schema, ctx)
-                    canonical = canonicalish(schema)
-                    if "allOf" not in canonical:
-                        yield from cover_schema_iter(ctx, canonical)
+                    canonical = jsonschema_rs.canonicalize(_upgrade_exclusive_bounds(schema))
+                    if canonical.is_satisfiable():
+                        canonical_value = canonical.to_json_schema()
+                        if isinstance(canonical_value, dict) and "allOf" not in canonical_value:
+                            yield from cover_schema_iter(ctx, canonical_value)
                 allof_handles_all = True
         if not allof_handles_all:
             if enum is not NOT_SET:
@@ -1109,7 +1182,7 @@ def _ignore_unfixable(
 ) -> Generator:
     try:
         yield
-    except (Unsatisfiable, ref_error, jsonschema_rs.ValidationError):
+    except (Unsatisfiable, ValueError, ref_error, jsonschema_rs.ValidationError):
         pass
     except InvalidArgument as exc:
         message = str(exc)
@@ -1563,15 +1636,15 @@ def cover_schema_iter(
                             yield from cover_schema_iter(nctx, value[0], seen)
                     else:
                         with _ignore_unfixable():
-                            canonical = canonicalish(schema)
-                            # When canonicalish keeps `allOf`, recursing on the canonical
-                            # form would loop; iterate sub-schemas instead.
-                            if isinstance(canonical, dict) and "allOf" in canonical:
+                            canonical_value = jsonschema_rs.canonicalize(
+                                _upgrade_exclusive_bounds(schema)
+                            ).to_json_schema()
+                            if isinstance(canonical_value, dict) and "allOf" in canonical_value:
                                 for idx, sub in enumerate(value):
                                     with nctx.at(idx):
                                         yield from cover_schema_iter(nctx, sub, seen)
                             else:
-                                yield from cover_schema_iter(nctx, canonical, seen)
+                                yield from cover_schema_iter(nctx, canonical_value, seen)
                 elif key == "anyOf":
                     nctx = ctx.with_negative()
                     resolved_schemas = [

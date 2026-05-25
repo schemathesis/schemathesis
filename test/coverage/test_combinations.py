@@ -1524,8 +1524,7 @@ def test_positive_multiple_types(pctx):
                     },
                 ]
             },
-            # `aaaaaaaaaaa` is the synthesized maxLength violation when the merged allOf can't satisfy length-11.
-            ["00000000000", "aaaaaaaaaaa", AnyNumber(), AnyNumber()],
+            ["00000000000", AnyNumber(), AnyNumber()],
         ),
         (
             {
