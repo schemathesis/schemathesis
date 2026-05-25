@@ -61,6 +61,7 @@ from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
+from schemathesis.specs.openapi.patterns import pattern_length_bounds
 from schemathesis.transport.serialization import contains_binary
 
 VALIDATED_FORMATS = frozenset(
@@ -561,8 +562,14 @@ class CoverageContext:
                 raise Unsatisfiable from None
             min_length = schema.get("minLength")
             max_length = schema.get("maxLength")
-            if (min_length is not None or max_length is not None) and self.update_pattern is not None:
-                pattern = self.update_pattern(pattern, min_length, max_length)
+            if min_length is not None or max_length is not None:
+                pattern_min, pattern_max = pattern_length_bounds(pattern)
+                if max_length is not None and max_length < pattern_min:
+                    raise Unsatisfiable
+                if min_length is not None and pattern_max is not None and min_length > pattern_max:
+                    raise Unsatisfiable
+                if self.update_pattern is not None:
+                    pattern = self.update_pattern(pattern, min_length, max_length)
             strategy = st.from_regex(pattern, fullmatch=True)
             if min_length is not None and max_length is not None:
                 strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)

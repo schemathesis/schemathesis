@@ -2344,6 +2344,43 @@ def test_generate_from_schema_serves_cached_value(pctx):
     assert pctx.generate_from_schema({"type": "string"}) == pctx.generate_from_schema({"type": "string"})
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        # maxLength shorter than the pattern's minimum match (30 chars)
+        {
+            "type": "string",
+            "pattern": "arn:aws:kinesisvideo:[a-z0-9-]+:[0-9]+:[a-z]+/[a-zA-Z0-9_.-]+/[0-9]+",
+            "minLength": 1,
+            "maxLength": 5,
+        },
+        # minLength exceeds a fixed-length pattern's max (34 chars)
+        {"type": "string", "pattern": "^AC[0-9a-fA-F]{32}$", "minLength": 50, "maxLength": 100},
+        # maxLength below a fixed-length pattern's min
+        {"type": "string", "pattern": "^AC[0-9a-fA-F]{32}$", "maxLength": 10},
+    ],
+)
+def test_generate_from_schema_pattern_length_incompatible(pctx, schema):
+    # Pattern bounds make the length constraint structurally impossible.
+    with pytest.raises(Unsatisfiable):
+        pctx.generate_from_schema(schema)
+
+
+def test_positive_string_skips_infeasible_boundary_lengths(pctx):
+    # Pattern minimum match is ~30 chars; minLength=1 boundary variant (exact len=1) is
+    # structurally impossible and must be skipped instead of timing out in Hypothesis.
+    schema = {
+        "type": "string",
+        "pattern": "arn:aws:kinesisvideo:[a-z0-9-]+:[0-9]+:[a-z]+/[a-zA-Z0-9_.-]+/[0-9]+",
+        "minLength": 1,
+        "maxLength": 1024,
+    }
+    covered = list(_positive_string(pctx, schema))
+    for value in covered:
+        assert isinstance(value.value, str)
+    assert_conform(covered, schema)
+
+
 def test_items_false_with_prefix_items(pctx):
     schema = {
         "type": "array",
