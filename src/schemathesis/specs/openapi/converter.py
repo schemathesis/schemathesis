@@ -105,7 +105,7 @@ def _to_json_schema(
             schema[nullable_keyword] = nullable
 
     if upgrade_legacy_exclusive_bounds:
-        _upgrade_legacy_exclusive_bounds(schema)
+        rewrite_legacy_exclusive_bounds(schema)
 
     if schema.get(nullable_keyword):
         del schema[nullable_keyword]
@@ -404,7 +404,7 @@ def _rewrite_if_then_else(schema: dict[str, Any]) -> None:
         schema["anyOf"] = new_anyof
 
 
-def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
+def rewrite_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
     for exclusive_key, bound_key in (("exclusiveMinimum", "minimum"), ("exclusiveMaximum", "maximum")):
         exclusive = schema.get(exclusive_key)
         if not isinstance(exclusive, bool):
@@ -414,7 +414,7 @@ def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
             continue
 
         bound = schema.get(bound_key)
-        if isinstance(bound, bool) or not isinstance(bound, int | float):
+        if isinstance(bound, bool) or not isinstance(bound, (int, float)):
             # `exclusive* = true` without a numeric bound can't be represented in modern drafts.
             schema.pop(exclusive_key, None)
             continue

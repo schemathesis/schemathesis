@@ -93,6 +93,7 @@ This usually means:
 
 
 def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParameter | None:
+    import jsonschema_rs
     from hypothesis_jsonschema import from_schema
 
     for location, container in (
@@ -103,14 +104,23 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
         (ParameterLocation.BODY, operation.body),
     ):
         for parameter in container:
+            schema = parameter.optimized_schema
             try:
-                generate_one(from_schema(parameter.optimized_schema))
-            except Unsatisfiable:
+                is_sat = jsonschema_rs.canonicalize(schema).is_satisfiable()
+            except Exception:
+                is_sat = True
+            if is_sat:
+                try:
+                    generate_one(from_schema(schema))
+                    is_sat = True
+                except Unsatisfiable:
+                    is_sat = False
+            if not is_sat:
                 if location == ParameterLocation.BODY:
                     name = parameter.media_type
                 else:
                     name = parameter.name
-                schema = unbundle(parameter.optimized_schema, parameter.name_to_uri)
+                schema = unbundle(schema, parameter.name_to_uri)
                 return UnsatisfiableParameter(location=location, name=name, schema=schema)
     return None
 

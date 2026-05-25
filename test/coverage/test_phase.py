@@ -934,8 +934,8 @@ def test_negative_type_violations_for_enum_property_under_allof(ctx):
             {"body": {"color": False}},
             {"body": {"color": 0}},
             {"body": {"color": "AAA"}},
-            {"body": {"color": "blue"}},
             {"body": {"color": "red"}},
+            {"body": {"color": "blue"}},
         ],
     )
 

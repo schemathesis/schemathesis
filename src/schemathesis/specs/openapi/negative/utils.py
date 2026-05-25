@@ -1,13 +1,17 @@
 from collections.abc import Mapping
 from typing import Any, TypeGuard
 
-from hypothesis_jsonschema._canonicalise import canonicalish
+import jsonschema_rs
 
 from schemathesis.specs.openapi.negative.types import Schema
 
 
 def can_negate(schema: Schema) -> bool:
-    return canonicalish(schema) != {}
+    # A schema that accepts everything canonicalizes to the universal schema (`True`/`{}`) and has no negatives.
+    try:
+        return jsonschema_rs.canonicalize(schema).to_json_schema() not in (True, {})
+    except ValueError:
+        return True
 
 
 def is_binary_format(schema: object) -> TypeGuard[Mapping[str, Any]]:
