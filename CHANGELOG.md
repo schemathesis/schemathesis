@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.20.0...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.20.1...HEAD) - TBD
+
+## [4.20.1](https://github.com/schemathesis/schemathesis/compare/v4.20.0...v4.20.1) - 2026-05-26
 
 ### :racing_car: Performance
 
