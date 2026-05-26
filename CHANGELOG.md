@@ -6,6 +6,10 @@
 
 - Skip coverage boundary-length variants that are structurally impossible for the declared `pattern`.
 
+### :bug: Fixed
+
+- Apply `tls-verify` and `tls-cert` to dynamic auth token requests. [#4199](https://github.com/schemathesis/schemathesis/issues/4199)
+
 ## [4.20.0](https://github.com/schemathesis/schemathesis/compare/v4.19.0...v4.20.0) - 2026-05-24
 
 ### :rocket: Added
