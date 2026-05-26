@@ -3,6 +3,7 @@ from __future__ import annotations
 import socket
 
 import pytest
+import requests
 from flask import Response as FlaskResponse
 from flask import jsonify, request
 
@@ -107,6 +108,29 @@ def test_get_raises_on_error(auth_operation, path, extract_from, extract_selecto
     )
     with pytest.raises(AuthenticationError, match=match):
         provider.get(auth_operation.Case(), ctx)
+
+
+def test_fetch_http_forwards_tls_config(ctx, app_runner, mocker):
+    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth():
+        return jsonify({"access_token": "test-token"})
+
+    spy = mocker.patch("requests.request", wraps=requests.request)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.tls_verify = False
+    operation = schema["/data"]["GET"]
+    provider = DynamicTokenAuthProvider(
+        path="/api/auth",
+        method="post",
+        payload=None,
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    assert provider.get(operation.Case(), AuthContext(operation=operation, app=None)) == "test-token"
+    assert spy.call_args[1]["verify"] is False
 
 
 def test_get_raises_on_connection_error(ctx, cli, app_runner):

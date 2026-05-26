@@ -136,10 +136,18 @@ class DynamicTokenAuthProvider:
 
     def _fetch_http(self, ctx: AuthContext) -> str:
         url = get_full_path(ctx.operation.schema.get_base_url() + "/", self.path)
-        timeout = ctx.operation.schema.config.request_timeout_for(operation=ctx.operation)
+        config = ctx.operation.schema.config
+        timeout = config.request_timeout_for(operation=ctx.operation)
+        verify = config.tls_verify_for(operation=ctx.operation)
+        cert = config.request_cert_for(operation=ctx.operation)
         body, headers = self._build_body()
+        kwargs: dict[str, Any] = {}
+        if verify is not None:
+            kwargs["verify"] = verify
+        if cert is not None:
+            kwargs["cert"] = cert
         try:
-            response = requests.request(self.method, url, data=body, headers=headers, timeout=timeout)
+            response = requests.request(self.method, url, data=body, headers=headers, timeout=timeout, **kwargs)
         except requests.exceptions.RequestException as exc:
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
