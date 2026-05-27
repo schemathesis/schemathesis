@@ -358,6 +358,37 @@ def pattern_length_bounds(pattern: str) -> tuple[int, int | None]:
 
 
 @lru_cache
+def pattern_requires_literal(pattern: str, chars: str) -> bool:
+    """Return True if every string matching `pattern` must contain at least one char from `chars`."""
+    try:
+        parsed = list(sre_parse.parse(pattern))
+    except (re.error, InternalError):
+        return False
+    charcodes = frozenset(ord(ch) for ch in chars)
+    return _nodes_require_literal(parsed, charcodes)
+
+
+def _nodes_require_literal(nodes: list[_Node], charcodes: frozenset[int]) -> bool:
+    """Return True if the concatenation of `nodes` guarantees at least one of `charcodes` appears."""
+    for op, value in nodes:
+        if op == LITERAL and value in charcodes:
+            return True
+        if op == sre.SUBPATTERN:
+            _, _, _, inner = value
+            if _nodes_require_literal(list(inner), charcodes):
+                return True
+        elif op in REPEATS:
+            min_repeat, _, inner = value
+            if min_repeat >= 1 and _nodes_require_literal(list(inner), charcodes):
+                return True
+        elif op == sre.BRANCH:
+            _, alternatives = value
+            if all(_nodes_require_literal(list(alt), charcodes) for alt in alternatives):
+                return True
+    return False
+
+
+@lru_cache
 def update_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
     """Update the quantifier of a regular expression based on given min and max lengths."""
     if not pattern or (min_length in (None, 0) and max_length is None):

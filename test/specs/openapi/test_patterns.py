@@ -15,7 +15,7 @@ except ImportError:
 
 from schemathesis.core.errors import InternalError
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
-from schemathesis.specs.openapi.patterns import _serialize, normalize_regex, update_quantifier
+from schemathesis.specs.openapi.patterns import _serialize, normalize_regex, pattern_requires_literal, update_quantifier
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="Possessive repeat is only available in Python 3.11+"
@@ -920,3 +920,74 @@ def test_unicode_surrogate_pattern_in_request_body(cli, ctx, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    ("pattern", "chars", "expected"),
+    [
+        # Literal / outside brackets — every match must contain /
+        ("arn:aws:[a-z]+/[a-z]+", "/", True),
+        # Multiple literal slashes
+        ("arn:aws:[a-z]+/[a-z]+/[0-9]+", "/", True),
+        # Slash inside character class — optional, not required
+        ("[a-z/]+", "/", False),
+        # No slash at all
+        ("^[a-zA-Z0-9_-]+$", "/", False),
+        # Slash in branch — only required if ALL branches contain it
+        ("(foo/bar|baz/qux)", "/", True),
+        # Slash in only one branch — not required (the other branch can match without it)
+        ("(foo/bar|baz)", "/", False),
+        # Slash after quantifier (required: the literal is not quantified)
+        ("[a-z]+/[0-9]+", "/", True),
+        # Pattern with anchors and literal slash
+        ("^arn:aws:appsync:[A-Za-z0-9_/.-]+/apis/[0-9A-Za-z_-]+$", "/", True),
+        # Slash in zero-or-more quantified group — not required (0 repetitions possible)
+        ("(a/b)*", "/", False),
+        # Slash in one-or-more quantified group — required (at least 1 repetition)
+        ("(a/b)+", "/", True),
+        # Slash in optional group — not required
+        ("(a/b)?", "/", False),
+        # Slash in fixed repetition — required
+        ("(a/b){2}", "/", True),
+        # Slash in {0,n} repetition — not required
+        ("(a/b){0,3}", "/", False),
+        # Deeply nested: branch inside group with slash
+        ("((foo/bar|baz/qux))+", "/", True),
+        # Only one nested branch has slash
+        ("((foo/bar|baz))+", "/", False),
+        # Detect literal { outside brackets
+        ("prefix{suffix", "{", True),
+        # Detect literal } outside brackets
+        ("prefix}suffix", "}", True),
+        # { inside character class
+        ("[{abc}]+", "{", False),
+        # Empty pattern
+        ("", "/", False),
+        # Slash is the entire pattern
+        ("/", "/", True),
+        # Invalid regex — return False (caller handles separately)
+        (r"\P{C}*", "/", False),
+        # Real AWS ARN pattern
+        (
+            "arn:aws:kinesisvideo:[a-z0-9-]+:[0-9]+:[a-z]+/[a-zA-Z0-9_.-]+/[0-9]+",
+            "/",
+            True,
+        ),
+        # Real AWS pattern where / only appears inside a character class — not required
+        (
+            "arn:(aws[a-zA-Z-]*)?:[a-z]+:([a-z]{2}((-gov)|(-iso(b?)))?-[a-z]+-\\d{1})?:(\\d{12})?:[a-zA-Z0-9-_/:.]+",
+            "/",
+            False,
+        ),
+        # Pattern where / is only inside [...] — NOT required
+        ("[a-zA-Z0-9/._-]+", "/", False),
+        # Multiple chars: pattern with / matches against "/{}
+        ("arn:aws:[a-z]+/[a-z]+", "/{}", True),
+        # Multiple chars: pattern with { matches against "/{}
+        ("prefix{suffix", "/{}", True),
+        # Multiple chars: none present
+        ("^[a-zA-Z0-9_-]+$", "/{}", False),
+    ],
+)
+def test_pattern_requires_literal(pattern, chars, expected):
+    assert pattern_requires_literal(pattern, chars) == expected

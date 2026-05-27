@@ -2381,6 +2381,19 @@ def test_positive_string_skips_infeasible_boundary_lengths(pctx):
     assert_conform(covered, schema)
 
 
+def test_path_pattern_with_literal_slash_is_unsatisfiable(ctx_factory):
+    # Pattern's literal / conflicts with the path-parameter transport constraint.
+    path_ctx = ctx_factory(location=ParameterLocation.PATH, generation_modes=[GenerationMode.POSITIVE])
+    schema = {
+        "type": "string",
+        "pattern": "arn:aws:kinesisvideo:[a-z0-9-]+:[0-9]+:[a-z]+/[a-zA-Z0-9_.-]+/[0-9]+",
+        "minLength": 1,
+        "maxLength": 1024,
+    }
+    with pytest.raises(Unsatisfiable):
+        path_ctx.generate_from_schema(schema)
+
+
 def test_items_false_with_prefix_items(pctx):
     schema = {
         "type": "array",
