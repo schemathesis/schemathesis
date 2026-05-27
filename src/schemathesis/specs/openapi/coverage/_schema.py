@@ -2902,7 +2902,7 @@ def _negative_type(
     if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and ("integer" in types or "number" in types):
         if "string" in strategies:
             strategies["string"] = strategies["string"].filter(_is_not_numeric_string)
-    if ctx.location == ParameterLocation.QUERY:
+    if ctx.location in (ParameterLocation.QUERY, ParameterLocation.PATH):
         strategies.pop("object", None)
     # Form-urlencoded property-level mutations with null/array/object serialize to empty
     if ctx.location == ParameterLocation.BODY and ctx.media_type == ("application", "x-www-form-urlencoded"):

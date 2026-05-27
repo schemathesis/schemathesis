@@ -5,14 +5,17 @@ import re
 from math import inf, nextafter
 from unittest.mock import ANY
 
+import hypothesis.strategies as st
 import jsonschema_rs
 import pytest
+from hypothesis import given, settings
 from hypothesis.errors import Unsatisfiable
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import transform
 from schemathesis.generation import GenerationMode
+from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
@@ -214,6 +217,13 @@ def test_unbounded_array_positive_baseline_is_non_empty(pctx):
     covered = cover_schema(pctx, {"type": "array", "items": {"type": "integer", "format": "int32"}})
     assert covered
     assert covered[0], covered
+
+
+@given(value=st.dictionaries(st.text(), st.text() | st.integers() | st.booleans() | st.none(), max_size=5))
+@settings(max_examples=50)
+def test_dicts_always_invalid_as_path_parameters(value):
+    # dict.__repr__ always contains `{` and `}`, making all dicts invalid path parameters.
+    assert is_invalid_path_parameter(value)
 
 
 @pytest.mark.parametrize(

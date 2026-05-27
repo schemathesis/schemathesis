@@ -5,6 +5,7 @@
 ### :racing_car: Performance
 
 - Skip coverage generation for path parameters whose `pattern` requires `/`, `{`, or `}`.
+- Skip unsatisfiable object-type coverage variants for path parameters.
 
 ## [4.20.1](https://github.com/schemathesis/schemathesis/compare/v4.20.0...v4.20.1) - 2026-05-26
 
