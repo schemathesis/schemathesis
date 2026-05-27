@@ -240,10 +240,7 @@ def crud_asgi() -> OpenAPIApp:
         if user_id not in users:
             raise HTTPException(status_code=404, detail="Not found")
         user = users[user_id]
-        try:
-            full_name = user["first_name"] + " " + user["last_name"]
-        except TypeError as exc:
-            raise HTTPException(status_code=500, detail="We got a problem!") from exc
+        full_name = user["first_name"] + " " + user["last_name"]
         return {"id": user["id"], "full_name": full_name}
 
     @app.patch("/users/{user_id}")

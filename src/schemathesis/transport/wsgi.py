@@ -105,10 +105,18 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
 
         config = case.operation.schema.config
         rate_limit = config.rate_limit_for(operation=case.operation)
-        with cookie_handler(client, cookies), ratelimit(rate_limit, config.base_url):
+
+        with (
+            _capture_server_exception(application) as captured,
+            cookie_handler(client, cookies),
+            ratelimit(rate_limit, config.base_url),
+        ):
             start = time.monotonic()
             response = client.open(**data)
             elapsed = time.monotonic() - start
+
+        if captured.exception is not None:
+            raise captured.exception
 
         requests_kwargs = REQUESTS_TRANSPORT.serialize_case(
             case,
@@ -135,6 +143,39 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
                 body={},
             ),
         )
+
+
+class _CapturedServerException:
+    """Container for a server-side exception captured via Flask signal."""
+
+    __slots__ = ("exception",)
+
+    def __init__(self) -> None:
+        self.exception: BaseException | None = None
+
+
+@contextmanager
+def _capture_server_exception(application: object) -> Generator[_CapturedServerException, None, None]:
+    """Capture unhandled exceptions from Flask apps."""
+    captured = _CapturedServerException()
+    try:
+        from flask import Flask, got_request_exception
+    except ImportError:
+        yield captured
+        return
+
+    if not isinstance(application, Flask):
+        yield captured
+        return
+
+    def _on_exception(sender: Flask, exception: BaseException, **_: object) -> None:
+        captured.exception = exception
+
+    got_request_exception.connect(_on_exception, application)
+    try:
+        yield captured
+    finally:
+        got_request_exception.disconnect(_on_exception, application)
 
 
 @contextmanager

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.20.1...HEAD) - TBD
 
+### :wrench: Changed
+
+- Re-raise original server exceptions in WSGI apps for distinct error deduplication. [#1289](https://github.com/schemathesis/schemathesis/issues/1289)
+
 ### :racing_car: Performance
 
 - Skip coverage generation for path parameters whose `pattern` requires `/`, `{`, or `}`.
