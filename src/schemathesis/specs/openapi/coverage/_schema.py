@@ -61,7 +61,7 @@ from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
-from schemathesis.specs.openapi.patterns import pattern_length_bounds
+from schemathesis.specs.openapi.patterns import pattern_length_bounds, pattern_requires_literal
 from schemathesis.transport.serialization import contains_binary
 
 VALIDATED_FORMATS = frozenset(
@@ -560,6 +560,8 @@ class CoverageContext:
                 re.compile(pattern)
             except re.error:
                 raise Unsatisfiable from None
+            if self.location == ParameterLocation.PATH and pattern_requires_literal(pattern, "/{}"):
+                raise Unsatisfiable
             min_length = schema.get("minLength")
             max_length = schema.get("maxLength")
             if min_length is not None or max_length is not None:
