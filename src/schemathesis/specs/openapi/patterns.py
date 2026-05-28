@@ -719,6 +719,14 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
         case ("anchored_multi", leading, parts, trailing):
             return _transform_anchored_multi(leading, parts, trailing, min_length, max_length)
 
+        case ("unanchored_multi", parts):
+            distributed = _distribute_multi(parts, min_length, max_length)
+            if distributed is None:
+                return None
+            if max_length is not None:
+                return [_AT_BEGINNING, *distributed, _AT_END]
+            return distributed
+
         case _:
             return None
 
@@ -730,6 +738,7 @@ _Structure: TypeAlias = (
     | tuple[Literal["trailing_anchor"], _Node, _Node]
     | tuple[Literal["both_anchors"], _Node, _Node, _Node]
     | tuple[Literal["anchored_multi"], _Node, list[_Node], _Node]
+    | tuple[Literal["unanchored_multi"], list[_Node]]
     | tuple[Literal["unknown"]]
 )
 
@@ -748,6 +757,8 @@ def _classify_structure(nodes: list[_Node]) -> _Structure:
             return ("both_anchors", leading, content, trailing)
         case [(sre.AT, _) as leading, *parts, (sre.AT, _) as trailing] if all(op in _CONTENT_OPS for op, _ in parts):
             return ("anchored_multi", leading, parts, trailing)
+        case [*parts] if len(parts) >= 2 and all(op in _CONTENT_OPS for op, _ in parts):
+            return ("unanchored_multi", parts)
         case _:
             return ("unknown",)
 
@@ -845,6 +856,14 @@ def _transform_anchored_multi(
     max_l: int | None,
 ) -> list[_Node] | None:
     """^part1 part2 ... partN$ — multiple quantified/fixed parts."""
+    new_parts = _distribute_multi(parts, min_l, max_l)
+    if new_parts is None:
+        return None
+    return [leading] + new_parts + [trailing]
+
+
+def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) -> list[_Node] | None:
+    """Distribute a length budget across the quantified parts; the caller adds any anchors."""
     fixed_length = 0
     quantifier_bounds = []
     repetition_lengths = []
@@ -979,7 +998,7 @@ def _transform_anchored_multi(
         _, _, subpattern = value
         new_parts[part_idx] = (sre.MAX_REPEAT, (new_min, new_max, subpattern))
 
-    return [leading] + new_parts + [trailing]
+    return new_parts
 
 
 def _matches_anything(value: list[_Node]) -> bool:

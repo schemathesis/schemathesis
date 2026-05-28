@@ -18,6 +18,7 @@ from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import (
     _serialize,
     normalize_regex,
+    pattern_length_bounds,
     pattern_requires_char_outside,
     pattern_requires_literal,
     update_quantifier,
@@ -263,6 +264,42 @@ def test_update_quantifier(pattern, min_length, max_length, expected):
 
 def test_update_quantifier_invalid_pattern():
     assert update_quantifier("*", 1, 3) == "*"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "min_length", "max_length", "expected"),
+    [
+        ("[a-z][a-z]*", 1, 5, "^[a-z][a-z]{0,4}$"),
+        ("[a-z][0-9]+", 3, 6, "^[a-z][0-9]{2,5}$"),
+        ("[a-z][0-9]*", 4, 4, "^[a-z][0-9]{3}$"),
+        ("[a-z][a-z0-9]*", 4, 4, "^[a-z][a-z0-9]{3}$"),
+        ("foo[a-z]+", 4, 8, "^foo[a-z]{1,5}$"),
+        ("[a-z][0-9]+", 5, None, "[a-z][0-9]{4,}"),
+        ("abc*def*", 1, 3, "abc*def*"),
+        ("[bc]*[de]*", 1, 3, "[bc]*[de]*"),
+        ("[bc]3", 1, 3, "[bc]3"),
+    ],
+)
+def test_update_quantifier_unanchored_multi(pattern, min_length, max_length, expected):
+    assert update_quantifier(pattern, min_length, max_length) == expected
+    re.compile(expected)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "min_length", "max_length"),
+    [
+        ("[A-Za-z][A-Za-z0-9_.-]*", 1, 255),
+        ("[a-z0-9_][a-z0-9_-]+[a-z0-9_]", 3, 63),
+        ("[a-z]+[0-9]+", 4, 8),
+        ("[a-z][0-9]*", 4, 4),
+    ],
+)
+def test_update_quantifier_unanchored_multi_enforces_min(pattern, min_length, max_length):
+    # The rewrite must bake the lower bound so generation produces long-enough strings.
+    rewritten = update_quantifier(pattern, min_length, max_length)
+    assert rewritten != pattern
+    re.compile(rewritten)
+    assert pattern_length_bounds(rewritten)[0] >= min_length
 
 
 @pytest.mark.parametrize(

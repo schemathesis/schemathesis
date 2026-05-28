@@ -2391,6 +2391,21 @@ def test_positive_string_skips_infeasible_boundary_lengths(pctx):
     assert_conform(covered, schema)
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        # Boundary-length variants only generate quickly once the bound is baked into the quantifier.
+        {"type": "string", "pattern": "[A-Za-z][A-Za-z0-9_.-]*", "minLength": 1, "maxLength": 255},
+        {"type": "string", "pattern": "[a-z0-9_][a-z0-9_-]+[a-z0-9_]", "minLength": 3, "maxLength": 63},
+        {"type": "string", "pattern": "[a-z][0-9]+", "minLength": 4, "maxLength": 12},
+    ],
+)
+def test_unanchored_pattern_boundary_lengths_conform(pctx, schema):
+    covered = list(_positive_string(pctx, schema))
+    assert covered
+    assert_conform(covered, schema)
+
+
 def test_path_pattern_with_literal_slash_is_unsatisfiable(ctx_factory):
     # Pattern's literal / conflicts with the path-parameter transport constraint.
     path_ctx = ctx_factory(location=ParameterLocation.PATH, generation_modes=[GenerationMode.POSITIVE])
