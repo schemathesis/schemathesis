@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, Literal, TypeAlias, TypeGuard
 
@@ -345,12 +346,43 @@ _SubpatternValue: TypeAlias = tuple[int | None, int, int, list[_Node]]
 _BranchValue: TypeAlias = tuple[None, list[list[_Node]]]
 
 
+@lru_cache(maxsize=256)
+def _parse_regex(pattern: str) -> list[_Node] | None:
+    """Parse `pattern` to an sre AST node list (None if invalid); the cached result must not be mutated."""
+    try:
+        return list(sre_parse.parse(pattern))
+    except (re.error, InternalError):
+        return None
+
+
+def _nodes_guarantee(nodes: list[_Node], forces: Callable[[int, Any], bool]) -> bool:
+    """Return True if every match of `nodes` contains a char that `forces` flags.
+
+    Structural nodes (SUBPATTERN/REPEATS/BRANCH) are walked here, so `forces` only sees leaves.
+    """
+    for op, value in nodes:
+        if op == sre.SUBPATTERN:
+            _, _, _, inner = value
+            if _nodes_guarantee(list(inner), forces):
+                return True
+        elif op in REPEATS:
+            min_repeat, _, inner = value
+            if min_repeat >= 1 and _nodes_guarantee(list(inner), forces):
+                return True
+        elif op == sre.BRANCH:
+            _, alternatives = value
+            if all(_nodes_guarantee(list(alt), forces) for alt in alternatives):
+                return True
+        elif forces(op, value):
+            return True
+    return False
+
+
 @lru_cache
 def pattern_length_bounds(pattern: str) -> tuple[int, int | None]:
     """Return min and max string length the pattern matches; `max` is `None` when unbounded."""
-    try:
-        parsed = list(sre_parse.parse(pattern))
-    except (re.error, InternalError):
+    parsed = _parse_regex(pattern)
+    if parsed is None:
         return (0, None)
     min_length = _calculate_min_repetition_length(parsed)
     max_length = _calculate_max_repetition_length(parsed)
@@ -360,32 +392,50 @@ def pattern_length_bounds(pattern: str) -> tuple[int, int | None]:
 @lru_cache
 def pattern_requires_literal(pattern: str, chars: str) -> bool:
     """Return True if every string matching `pattern` must contain at least one char from `chars`."""
-    try:
-        parsed = list(sre_parse.parse(pattern))
-    except (re.error, InternalError):
+    parsed = _parse_regex(pattern)
+    if parsed is None:
         return False
     charcodes = frozenset(ord(ch) for ch in chars)
-    return _nodes_require_literal(parsed, charcodes)
+    return _nodes_guarantee(parsed, lambda op, value: op == LITERAL and value in charcodes)
 
 
-def _nodes_require_literal(nodes: list[_Node], charcodes: frozenset[int]) -> bool:
-    """Return True if the concatenation of `nodes` guarantees at least one of `charcodes` appears."""
-    for op, value in nodes:
-        if op == LITERAL and value in charcodes:
-            return True
-        if op == sre.SUBPATTERN:
-            _, _, _, inner = value
-            if _nodes_require_literal(list(inner), charcodes):
-                return True
-        elif op in REPEATS:
-            min_repeat, _, inner = value
-            if min_repeat >= 1 and _nodes_require_literal(list(inner), charcodes):
-                return True
-        elif op == sre.BRANCH:
-            _, alternatives = value
-            if all(_nodes_require_literal(list(alt), charcodes) for alt in alternatives):
-                return True
-    return False
+@lru_cache
+def pattern_requires_char_outside(pattern: str, allowed: str) -> bool:
+    """Return True if every string matching `pattern` must contain at least one char outside `allowed`."""
+    parsed = _parse_regex(pattern)
+    if parsed is None:
+        return False
+    allowed_codes = frozenset(ord(ch) for ch in allowed)
+
+    def forces(op: int, value: Any) -> bool:
+        if op == LITERAL:
+            return value not in allowed_codes
+        if op == IN:
+            return _char_class_excludes_all(value, allowed_codes)
+        return False
+
+    return _nodes_guarantee(parsed, forces)
+
+
+def _char_class_excludes_all(items: list[_Node], allowed_codes: frozenset[int]) -> bool:
+    """Return True if every char matched by the class `[...]` lies outside `allowed_codes`."""
+    if not items:
+        return False
+    # Negated classes (`[^...]`) match almost anything, including allowed chars.
+    if items[0][0] == sre.NEGATE:
+        return False
+    for op, value in items:
+        if op == LITERAL:
+            if value in allowed_codes:
+                return False
+        elif op == sre.RANGE:
+            lo, hi = value
+            if any(lo <= code <= hi for code in allowed_codes):
+                return False
+        else:
+            # Categories like `\d` / `\w` overlap with the allowed set — assume they can match it.
+            return False
+    return True
 
 
 @lru_cache

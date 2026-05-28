@@ -2404,6 +2404,44 @@ def test_path_pattern_with_literal_slash_is_unsatisfiable(ctx_factory):
         path_ctx.generate_from_schema(schema)
 
 
+@pytest.mark.parametrize("location", [ParameterLocation.HEADER, ParameterLocation.COOKIE])
+def test_header_pattern_requiring_non_alnum_skips_positive_string(ctx_factory, location):
+    # Header/cookie values are alphanumeric-only; an ARN's literal `:` can't satisfy that, so nothing is emitted.
+    ctx = ctx_factory(location=location, generation_modes=[GenerationMode.POSITIVE])
+    schema = {
+        "type": "string",
+        "pattern": "arn:[a-z0-9-\\.]{1,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}",
+        "minLength": 1,
+        "maxLength": 1024,
+    }
+    assert list(_positive_string(ctx, schema)) == []
+
+
+def test_header_alnum_pattern_still_generates(ctx_factory):
+    # A purely alphanumeric pattern is compatible with the header restriction — values must still be produced.
+    ctx = ctx_factory(location=ParameterLocation.HEADER, generation_modes=[GenerationMode.POSITIVE])
+    schema = {"type": "string", "pattern": "[A-Za-z0-9]+", "minLength": 1, "maxLength": 16}
+    covered = list(_positive_string(ctx, schema))
+    assert covered
+    compiled = re.compile(schema["pattern"])
+    for value in covered:
+        assert isinstance(value.value, str)
+        assert compiled.fullmatch(value.value)
+
+
+def test_query_pattern_requiring_non_alnum_not_skipped(ctx_factory):
+    # Query parameters carry no alphanumeric-only restriction, so the ARN pattern is satisfiable there.
+    ctx = ctx_factory(location=ParameterLocation.QUERY, generation_modes=[GenerationMode.POSITIVE])
+    schema = {
+        "type": "string",
+        "pattern": "arn:[a-z0-9-\\.]{1,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}",
+        "minLength": 1,
+        "maxLength": 1024,
+    }
+    covered = list(_positive_string(ctx, schema))
+    assert covered
+
+
 def test_items_false_with_prefix_items(pctx):
     schema = {
         "type": "array",
