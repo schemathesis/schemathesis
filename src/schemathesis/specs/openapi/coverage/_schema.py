@@ -7,6 +7,7 @@ Produces positive and negative coverage values for individual schema constructs
 from __future__ import annotations
 
 import re
+import string
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from decimal import Decimal
@@ -61,7 +62,11 @@ from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
-from schemathesis.specs.openapi.patterns import pattern_length_bounds, pattern_requires_literal
+from schemathesis.specs.openapi.patterns import (
+    pattern_length_bounds,
+    pattern_requires_char_outside,
+    pattern_requires_literal,
+)
 from schemathesis.transport.serialization import contains_binary
 
 VALIDATED_FORMATS = frozenset(
@@ -1903,6 +1908,10 @@ def _ensure_valid_path_parameter_schema(schema: JsonSchemaObject) -> JsonSchemaO
     return {**schema, "minLength": min_length, "not": not_}
 
 
+# Characters `_ensure_valid_headers_schema` keeps; a pattern requiring anything else is unsatisfiable for headers.
+HEADER_ALLOWED_CHARS = string.ascii_letters + string.digits
+
+
 def _ensure_valid_headers_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
     # Reject any character that is not A-Z, a-z, or 0-9 for simplicity
     not_ = _get_not_schema(schema)
@@ -1924,6 +1933,9 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     elif ctx.location in ("header", "cookie") and not (
         "format" in schema and (schema["format"] in ctx.custom_formats or schema["format"] in BUILT_IN_STRING_FORMATS)
     ):
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str) and pattern_requires_char_outside(pattern, HEADER_ALLOWED_CHARS):
+            return
         # Don't apply it for known formats - they will insure the correct format during generation
         schema = _ensure_valid_headers_schema(schema)
     elif _xml_string_needs_non_empty(ctx, schema):

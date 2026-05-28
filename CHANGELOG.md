@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.20.2...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Skip coverage generation for header and cookie parameters whose `pattern` requires a non-alphanumeric character.
+
 ## [4.20.2](https://github.com/schemathesis/schemathesis/compare/v4.20.1...v4.20.2) - 2026-05-28
 
 ### :wrench: Changed

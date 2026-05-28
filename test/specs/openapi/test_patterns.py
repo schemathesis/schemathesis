@@ -15,7 +15,13 @@ except ImportError:
 
 from schemathesis.core.errors import InternalError
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
-from schemathesis.specs.openapi.patterns import _serialize, normalize_regex, pattern_requires_literal, update_quantifier
+from schemathesis.specs.openapi.patterns import (
+    _serialize,
+    normalize_regex,
+    pattern_requires_char_outside,
+    pattern_requires_literal,
+    update_quantifier,
+)
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="Possessive repeat is only available in Python 3.11+"
@@ -991,3 +997,44 @@ def test_unicode_surrogate_pattern_in_request_body(cli, ctx, snapshot_cli):
 )
 def test_pattern_requires_literal(pattern, chars, expected):
     assert pattern_requires_literal(pattern, chars) == expected
+
+
+ALNUM = string.ascii_letters + string.digits
+
+
+@pytest.mark.parametrize(
+    ("pattern", "allowed", "expected"),
+    [
+        ("abc123", ALNUM, False),
+        ("abc-123", ALNUM, True),
+        ("arn:aws:s3:::bucket", ALNUM, True),
+        # Real corpus case: ARN in a header parameter
+        ("arn:[a-z0-9-\\.]{1,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}:[a-z0-9-\\.]{0,63}", ALNUM, True),
+        ("[a-z0-9]+", ALNUM, False),
+        ("[._-]+", ALNUM, True),
+        ("[a._-]+", ALNUM, False),
+        ("[!-/]", ALNUM, True),
+        ("[0-9]", ALNUM, False),
+        ("[^:]", ALNUM, False),
+        ("[^a]", ALNUM, False),
+        ("[-]*", ALNUM, False),
+        ("[-]+", ALNUM, True),
+        ("[-]?", ALNUM, False),
+        (":{2}", ALNUM, True),
+        ("[-]{0,3}", ALNUM, False),
+        ("(foo-bar|baz-qux)", ALNUM, True),
+        ("(foo-bar|baz)", ALNUM, False),
+        ("((foo:bar|baz:qux))+", ALNUM, True),
+        ("((foo:bar|baz))+", ALNUM, False),
+        (".", ALNUM, False),
+        ("\\d+", ALNUM, False),
+        ("\\w+", ALNUM, False),
+        (":", ALNUM, True),
+        ("", ALNUM, False),
+        ("[", ALNUM, False),
+        ("abc", "abc", False),
+        ("abcd", "abc", True),
+    ],
+)
+def test_pattern_requires_char_outside(pattern, allowed, expected):
+    assert pattern_requires_char_outside(pattern, allowed) == expected
