@@ -5,6 +5,7 @@
 ### :racing_car: Performance
 
 - Skip coverage generation for header and cookie parameters whose `pattern` requires a non-alphanumeric character.
+- Faster operation ordering and case traversal in stateful testing for schemas with many operations.
 
 ### :bug: Fixed
 

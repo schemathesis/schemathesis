@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import time
+from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
@@ -124,15 +125,20 @@ class ScenarioRecorder:
                 break
             current_id = current_node.parent_id
 
+        # Index children by parent so traversal does not rescan every case per node
+        children: dict[str, list[str]] = defaultdict(list)
+        for child_id, node in self.cases.items():
+            if node.parent_id is not None:
+                children[node.parent_id].append(child_id)
+
         # Then traverse the whole tree from root
         def traverse(node_id: str) -> Iterator[Case]:
-            # Get all children
-            for case_id, node in self.cases.items():
-                if node.parent_id == node_id and case_id not in seen:
-                    seen.add(case_id)
-                    yield node.value
+            for child_id in children.get(node_id, ()):
+                if child_id not in seen:
+                    seen.add(child_id)
+                    yield self.cases[child_id].value
                     # Recurse into children
-                    yield from traverse(case_id)
+                    yield from traverse(child_id)
 
         # Start traversal from root
         root_node = self.cases.get(root_id)
