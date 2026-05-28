@@ -35,7 +35,7 @@ ________________________________ GET /api/slow _________________________________
 
 - Response time limit exceeded
 
-    Actual: 105.00ms
+    Actual: 500.00ms
     Limit: 50.00ms
 
 [200] OK:

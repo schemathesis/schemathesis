@@ -154,7 +154,7 @@ def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool
     if elapsed > limit:
         raise ResponseTimeExceeded(
             operation=case.operation.label,
-            message=f"Actual: {elapsed:.2f}ms\nLimit: {limit * 1000:.2f}ms",
+            message=f"Actual: {elapsed * 1000:.2f}ms\nLimit: {limit * 1000:.2f}ms",
             elapsed=elapsed,
             deadline=limit,
         )

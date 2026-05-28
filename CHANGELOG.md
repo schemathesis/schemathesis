@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - Generate maximum-length boundary cases for unanchored multi-part `pattern`s with `maxLength`.
+- Display the actual response time in milliseconds in `max_response_time` failures.
 
 ## [4.20.2](https://github.com/schemathesis/schemathesis/compare/v4.20.1...v4.20.2) - 2026-05-28
 
