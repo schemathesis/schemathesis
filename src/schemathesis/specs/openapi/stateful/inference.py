@@ -224,7 +224,7 @@ class LinkInferencer:
 
             matches = self._find_matches_from_normalized_location(location)
             if matches is None:
-                # Skip locations that don't match any API apiration
+                # Skip locations that don't match any API operation
                 continue
 
             key = (matches.exact.method, matches.exact.path, entry.status_code, tuple(sorted(matches.parameters)))

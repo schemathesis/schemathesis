@@ -192,7 +192,11 @@ class CliSnapshotConfig:
         if self.replace_uuid:
             data = re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
         if self.replace_response_time:
-            data = re.sub(r"Actual: \d+\.\d+ms", "Actual: 105.00ms", data)
+            data = re.sub(
+                r"Actual: (\d+\.\d+)ms",
+                lambda match: "Actual: 500.00ms" if float(match.group(1)) >= 500 else match.group(0),
+                data,
+            )
         if self.replace_seed:
             data = re.sub(r"--seed=\d+", "--seed=42", data)
             data = re.sub(r"Seed: \d+", "Seed: 42", data)
