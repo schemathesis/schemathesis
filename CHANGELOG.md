@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.20.3...HEAD) - TBD
 
+### :wrench: Changed
+
+- Update `hypothesis-graphql` to `0.13.0` that brings up to 180x performance improvements for deeply nested GraphQL schemas.
+
 ## [4.20.3](https://github.com/schemathesis/schemathesis/compare/v4.20.2...v4.20.3) - 2026-05-29
 
 ### :racing_car: Performance
