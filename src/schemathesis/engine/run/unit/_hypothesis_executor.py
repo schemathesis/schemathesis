@@ -156,7 +156,10 @@ def run_test(
                 status = Status.ERROR
                 yield non_fatal_error(unrecoverable.error, code_sample=unrecoverable.code_sample)
             else:
-                status = Status.FAILURE
+                # Hypothesis could not reproduce the result on replay. Real check failures are
+                # recorded when they happen and decide the status below; an unreproducible result
+                # with no observed failure is generation noise, not a failure.
+                status = Status.SUCCESS
     except BaseExceptionGroup as exc:
         status = Status.ERROR
         # Check for errors in the exception group
@@ -254,10 +257,8 @@ def run_test(
         else:
             code_sample = state.get_code_sample_for(exc)
             yield non_fatal_error(exc, code_sample=code_sample)
-    if (
-        status == Status.SUCCESS
-        and continue_on_failure
-        and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
+    if status == Status.SUCCESS and any(
+        check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks
     ):
         status = Status.FAILURE
 

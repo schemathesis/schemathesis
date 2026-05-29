@@ -9,6 +9,7 @@
 
 ### :bug: Fixed
 
+- `Fuzzing` phase marked as failed without any reported failure. [#4209](https://github.com/schemathesis/schemathesis/issues/4209)
 - Generate maximum-length boundary cases for unanchored multi-part `pattern`s with `maxLength`.
 - Display the actual response time in milliseconds in `max_response_time` failures.
 

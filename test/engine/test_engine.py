@@ -521,6 +521,24 @@ def test_internal_exceptions(ctx, mocker):
     assert len(exceptions) == 1
 
 
+def test_fuzzing_phase_failure_requires_a_surfaced_failure(ctx):
+    # DELETE mutates server state that later feeds case generation, so Hypothesis reports
+    # inconsistent data generation; the phase must not be marked failed without a real failure.
+    api = ctx.openapi.apps.stateful_users()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    for seed in range(10):
+        stream = EventStream(
+            schema, max_examples=15, phases=[PhaseName.FUZZING], seed=seed, deterministic=True
+        ).execute()
+        phase = stream.find(events.PhaseFinished, phase=lambda value: value.name == PhaseName.FUZZING)
+        if phase.status != Status.FAILURE:
+            continue
+        scenarios = stream.find_all(events.ScenarioFinished)
+        has_failed_check = any(check.status == Status.FAILURE for s in scenarios for check in _scenario_checks(s))
+        has_error = bool(stream.find_all(events.NonFatalError))
+        assert has_failed_check or has_error, f"seed={seed}: fuzzing failed with no surfaced failure"
+
+
 def test_payload_explicit_example(ctx):
     api = ctx.openapi.apps.payload()
     schema = schemathesis.openapi.from_url(api.schema_url)
