@@ -27,6 +27,7 @@ class ObservationKind(str, Enum):
     ENUM = "enum"
     REQUIRES_AUTHENTICATION = "requires_authentication"
     UNEXPECTED_PROPERTY = "unexpected_property"
+    FORBIDS_ADDITIONAL_PROPERTIES = "forbids_additional_properties"
 
 
 @dataclass(frozen=True, slots=True)

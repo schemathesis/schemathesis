@@ -600,3 +600,34 @@ class UnexpectedPropertyAdjustment:
                             target.pop("required", None)
 
         return schema
+
+
+@ADJUSTMENTS.register
+class AdditionalPropertiesAdjustment:
+    """Set `additionalProperties: false` on objects that rejected unknown keys.
+
+    Empty path targets the body object; a path targets a nested one.
+    """
+
+    handles = frozenset({ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES})
+
+    def apply(
+        self,
+        *,
+        operation: OpenApiOperation,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        for observation in observations:
+            path = observation.parameter_path
+            root = schema if not path else _walk_to_property(schema, path)
+            if not isinstance(root, dict):
+                continue
+            for target in _collect_object_targets(root):
+                target["additionalProperties"] = False
+
+        return schema

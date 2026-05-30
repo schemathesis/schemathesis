@@ -176,19 +176,28 @@ _TYPE_CODE_HANDLERS: dict[str, Handler] = {
 }
 
 
+def _detail_entries(body: object) -> list | None:
+    # Entries live under `detail` (FastAPI) or `exception_detail` (some apps); same shape.
+    if not isinstance(body, dict):
+        return None
+    for key in ("detail", "exception_detail"):
+        entries = body.get(key)
+        if isinstance(entries, list) and entries:
+            return entries
+    return None
+
+
 @PARSERS.register
 class PydanticParser:
-    """Parser for Pydantic `ValidationError` envelopes — `{"detail": [{type, loc, ctx}, ...]}`."""
+    """Parser for Pydantic `ValidationError` envelopes — `{"detail"|"exception_detail": [{type, loc, ctx}, ...]}`."""
 
     priority = 7
 
     def can_parse(self, *, body: object) -> bool:
-        if not isinstance(body, dict):
+        entries = _detail_entries(body)
+        if entries is None:
             return False
-        detail = body.get("detail")
-        if not isinstance(detail, list) or not detail:
-            return False
-        first = detail[0]
+        first = entries[0]
         return isinstance(first, dict) and isinstance(first.get("type"), str) and isinstance(first.get("loc"), list)
 
     def parse(
@@ -198,18 +207,31 @@ class PydanticParser:
         body: object,
         case: Case,
     ) -> tuple[Observation, ...]:
-        if not isinstance(body, dict):
-            return ()
-        detail = body.get("detail")
-        if not isinstance(detail, list):
+        entries = _detail_entries(body)
+        if entries is None:
             return ()
         observations: list[Observation] = []
-        for entry in detail:
+        for entry in entries:
             if not isinstance(entry, dict):
                 continue
             type_code = entry.get("type")
             loc = entry.get("loc")
             if not isinstance(type_code, str) or not isinstance(loc, list):
+                continue
+            if type_code == "extra_forbidden":
+                # Rejected key is the last `loc` segment; forbid extras on its parent.
+                location, parent_path = _split_loc(loc[:-1])
+                raw_message = entry.get("msg")
+                observations.append(
+                    Observation(
+                        operation_label=operation.label,
+                        location=location,
+                        parameter_path=parent_path,
+                        kind=ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES,
+                        raw_message=raw_message if isinstance(raw_message, str) else "",
+                        payload=None,
+                    )
+                )
                 continue
             handler = _TYPE_CODE_HANDLERS.get(type_code)
             if handler is None:
