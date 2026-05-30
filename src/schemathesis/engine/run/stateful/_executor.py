@@ -89,6 +89,17 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
     return kwargs
 
 
+def _network_nonfatal_error(stored: UnrecoverableNetworkError) -> events.NonFatalError:
+    error = UnhealthyAPIError(stored.reason) if stored.reason is not None else stored.error
+    return events.NonFatalError(
+        error=error,
+        phase=PhaseName.STATEFUL_TESTING,
+        label=STATEFUL_TESTS_LABEL,
+        related_to_operation=False,
+        code_sample=stored.code_sample,
+    )
+
+
 def execute_state_machine_loop(
     *,
     state_machine: type[APIStateMachine],
@@ -362,6 +373,13 @@ def execute_state_machine_loop(
             # Ignore flakiness
             if engine.has_reached_the_failure_limit:
                 break
+            stored = state.unrecoverable_network_error
+            if stored is not None:
+                # Flakiness caused by a transient transport failure: surface it and stop rather than
+                # restarting the whole suite — a replayed drop won't reproduce, so re-running is wasted.
+                suite_status = Status.ERROR
+                event_queue.put(_network_nonfatal_error(stored))
+                break
             # Mark all failures in this suite as seen to prevent them being re-discovered
             ctx.mark_current_suite_as_seen_in_run()
             continue
@@ -376,23 +394,19 @@ def execute_state_machine_loop(
             clear_hypothesis_notes(exc)
             # Any other exception is an inner error and the test run should be stopped
             suite_status = Status.ERROR
-            code_sample: str | None = None
             stored = state.unrecoverable_network_error
             if stored is not None:
-                if stored.reason is not None:
-                    exc = UnhealthyAPIError(stored.reason)
-                else:
-                    exc = stored.error
-                code_sample = stored.code_sample
-            event_queue.put(
-                events.NonFatalError(
-                    error=exc,
-                    phase=PhaseName.STATEFUL_TESTING,
-                    label=STATEFUL_TESTS_LABEL,
-                    related_to_operation=False,
-                    code_sample=code_sample,
+                event_queue.put(_network_nonfatal_error(stored))
+            else:
+                event_queue.put(
+                    events.NonFatalError(
+                        error=exc,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        label=STATEFUL_TESTS_LABEL,
+                        related_to_operation=False,
+                        code_sample=None,
+                    )
                 )
-            )
             break
         finally:
             # Drain this suite's recorders into the pool before the next iteration's strategies
