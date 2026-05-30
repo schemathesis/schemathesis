@@ -16,6 +16,7 @@ def clear_internal_caches() -> None:
     hypothesis_internals.custom_formats_cache.clear()
     hypothesis_internals._resolve_result_cache.clear()
     hypothesis_internals._merged_result_cache.clear()
+    hypothesis_internals._first_param_cache.clear()
     hypothesis_internals._canonicalish_result_cache.clear()
     hypothesis_internals._from_schema_result_cache.clear()
     hypothesis_internals._merged_as_strategies_result_cache.clear()

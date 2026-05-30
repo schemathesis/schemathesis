@@ -18,6 +18,8 @@ _merged_result_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
 _canonicalish_result_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)
 _from_schema_result_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
 _merged_as_strategies_result_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
+# `is_first_param_referenced_in_function` re-parses a function's AST per call; cache by code object.
+_first_param_cache: Final[BoundedCache] = BoundedCache(maxsize=1024)
 
 
 def setup() -> None:
@@ -59,11 +61,17 @@ def setup() -> None:
     _canonicalise.encode_canonical_json = jsonschema_rs.canonical.json.to_string
     _from_schema.encode_canonical_json = jsonschema_rs.canonical.json.to_string
 
-    # This one is used a lot, and under the hood it re-parses the AST of the same function
     def _is_first_param_referenced_in_function(f: Callable) -> bool:
         if f.__name__ == "from_object_schema" and f.__module__ == "hypothesis_jsonschema._from_schema":
             return True
-        return is_first_param_referenced_in_function(f)
+        code = getattr(f, "__code__", None)
+        if code is None:
+            return is_first_param_referenced_in_function(f)
+        cached = _first_param_cache.get(code)
+        if cached is MISSING:
+            cached = is_first_param_referenced_in_function(f)
+            _first_param_cache[code] = cached
+        return cached
 
     core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function
 
