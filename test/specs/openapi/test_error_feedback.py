@@ -66,6 +66,7 @@ from schemathesis.generation.meta import (
 from schemathesis.specs.openapi._hypothesis import _body_required_per_feedback
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.error_feedback import (
+    AdditionalPropertiesAdjustment,
     EnumAdjustment,
     FormatAdjustment,
     NumericBoundAdjustment,
@@ -276,8 +277,9 @@ def test_parsers_registry_contains_pydantic_parser():
     [
         {"detail": [{"type": "missing", "loc": ["body", "x"], "msg": "Field required"}]},
         {"detail": [{"type": "string_too_short", "loc": ["body", "x"], "msg": "...", "ctx": {"min_length": 3}}]},
+        {"exception_detail": [{"type": "missing", "loc": ["body", "x"], "msg": "Field required"}]},
     ],
-    ids=["missing", "string-too-short"],
+    ids=["missing", "string-too-short", "exception-detail-envelope"],
 )
 def test_pydantic_parser_can_parse_recognises_envelope(body):
     assert PydanticParser().can_parse(body=body) is True
@@ -9352,6 +9354,96 @@ def test_pydantic_parser_coerces_decimal_numeric_bounds(make_operation, case_fac
             payload=NumericBoundPayload(bound=0.01, direction=BoundDirection.MIN, exclusive=True),
         ),
     )
+
+
+def test_pydantic_parser_reads_exception_detail_envelope(make_operation, case_factory):
+    # Both envelopes must yield identical observations.
+    entry = {"type": "missing", "loc": ["body", "x"], "msg": "Field required"}
+    standard = parse_observations(PydanticParser(), {"detail": [entry]}, make_operation, case_factory)
+    wrapped = parse_observations(PydanticParser(), {"exception_detail": [entry]}, make_operation, case_factory)
+    assert wrapped == standard
+    assert wrapped != ()
+
+
+@pytest.mark.parametrize(
+    "loc, expected_path",
+    [
+        (["body", "extra"], ()),
+        (["body", "address", "extra"], ("address",)),
+        (["extra"], ()),
+    ],
+    ids=["top-level", "nested", "no-location-prefix"],
+)
+def test_pydantic_parser_extracts_extra_forbidden(loc, expected_path, make_operation, case_factory):
+    body = {"detail": [{"type": "extra_forbidden", "loc": loc, "msg": "Extra inputs are not permitted"}]}
+    obs = parse_observations(PydanticParser(), body, make_operation, case_factory)
+    assert obs == (
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=expected_path,
+            kind=ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES,
+            raw_message="Extra inputs are not permitted",
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "input_schema, path, expected",
+    [
+        pytest.param(
+            {"type": "object", "properties": {"a": {}}},
+            (),
+            {"type": "object", "properties": {"a": {}}, "additionalProperties": False},
+            id="top-level-object",
+        ),
+        pytest.param(
+            {"oneOf": [{"type": "object", "properties": {"a": {}}}, {"type": "object", "properties": {"b": {}}}]},
+            (),
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"a": {}}, "additionalProperties": False},
+                    {"type": "object", "properties": {"b": {}}, "additionalProperties": False},
+                ]
+            },
+            id="oneof-branches",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"address": {"type": "object", "properties": {"city": {}}}}},
+            ("address",),
+            {
+                "type": "object",
+                "properties": {
+                    "address": {"type": "object", "properties": {"city": {}}, "additionalProperties": False}
+                },
+            },
+            id="nested-object",
+        ),
+        pytest.param(
+            {"type": "integer"},
+            (),
+            {"type": "integer"},
+            id="non-object-noop",
+        ),
+    ],
+)
+def test_additional_properties_adjustment_forbids_extras(input_schema, path, expected, case_factory):
+    out = AdditionalPropertiesAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=(
+            Observation(
+                operation_label="POST /api/users",
+                location=ParameterLocation.BODY,
+                parameter_path=path,
+                kind=ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES,
+                raw_message="Extra inputs are not permitted",
+            ),
+        ),
+    )
+    _assert_valid_schema_object(input_schema, out)
+    assert out == expected
 
 
 class _PydanticStrings(BaseModel):
