@@ -374,6 +374,33 @@ def test_consumer_walker_yields_descriptor_per_primitive_property():
     assert {d.path for d in iter_consumer_leaves(schema)} == {("email",), ("name",)}
 
 
+def test_consumer_walker_skips_const_and_enum_leaves():
+    # Fixed-domain leaves are not substitutable slots: a pool value would violate the constraint
+    # (e.g. a `type` discriminator), producing data the API rejects.
+    schema = {
+        "type": "object",
+        "properties": {
+            "type": {"type": "string", "const": "do-nothing"},
+            "status": {"type": "string", "enum": ["active", "paused"]},
+            "name": {"type": "string"},
+        },
+    }
+    assert [d.path for d in iter_consumer_leaves(schema)] == [("name",)]
+
+
+def test_walker_skips_const_and_enum_values():
+    schema = {
+        "type": "object",
+        "properties": {
+            "type": {"type": "string", "const": "do-nothing"},
+            "status": {"type": "string", "enum": ["active", "paused"]},
+            "name": {"type": "string"},
+        },
+    }
+    body = {"type": "do-nothing", "status": "active", "name": "alice"}
+    assert list(iter_ingestion_leaves(schema, body)) == [IngestionLeaf("string", None, None, "name", "alice")]
+
+
 def test_consumer_walker_records_path_for_nested_property():
     schema = {
         "type": "object",

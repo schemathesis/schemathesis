@@ -12,6 +12,7 @@
 
 - Excessive re-runs in stateful testing against APIs with mutable state.
 - Stateful testing restarting on a single transient transport failure (e.g. dropped connection).
+- Semantic value substitution overwriting `const` / `enum` fields with invalid data.
 
 ## [4.20.3](https://github.com/schemathesis/schemathesis/compare/v4.20.2...v4.20.3) - 2026-05-29
 

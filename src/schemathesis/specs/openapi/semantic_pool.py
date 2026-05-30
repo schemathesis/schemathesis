@@ -385,6 +385,9 @@ def _walk_ingestion(
                 return
             if type_token in ("integer", "number") and not _is_numeric_bounded(schema):
                 return
+            # Don't pool fixed-domain values (`const`/`enum`) — they're not reusable resource refs.
+            if "const" in schema or "enum" in schema:
+                return
             format_token = schema.get("format") if isinstance(schema.get("format"), str) else None
             if format_token in _INTERNAL_FORMATS:
                 format_token = None
@@ -500,6 +503,10 @@ def _walk_consumer(
         return
     if type_token in ("string", "integer", "number") and name is not None:
         if type_token in ("integer", "number") and not _is_numeric_bounded(schema):
+            return
+        # Fixed-domain leaves (`const`, `enum`) aren't free slots — substituting a pool value
+        # would violate the constraint (e.g. a `type` discriminator), so skip them.
+        if "const" in schema or "enum" in schema:
             return
         format_token = schema.get("format") if isinstance(schema.get("format"), str) else None
         if format_token in _INTERNAL_FORMATS:
