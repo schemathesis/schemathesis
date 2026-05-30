@@ -27,39 +27,6 @@ def test_use_probability(completed, transport_failures, expected):
     assert OperationHealth(completed=completed, transport_failures=transport_failures).use_probability == expected
 
 
-def test_unknown_operation_returns_optimistic_probability():
-    state = HealthState()
-    assert state.use_probability("never-seen") == DEFAULT_USE_PROBABILITY
-
-
-@pytest.mark.parametrize(
-    ("completions", "failures", "expected"),
-    [
-        (5, 0, DEFAULT_USE_PROBABILITY),
-        (8, 2, pytest.approx(0.8)),
-        (0, 10, MIN_USE_PROBABILITY),
-    ],
-    ids=["pure-completion", "mixed", "pure-failure-floor"],
-)
-def test_health_state_use_probability(completions, failures, expected):
-    state = HealthState()
-    for _ in range(completions):
-        state.record_completion(operation_label="op")
-    for index in range(failures):
-        state.record_transport_failure(operation_label="op", now=float(index))
-    assert state.use_probability("op") == expected
-
-
-def test_completions_lift_operation_above_floor_after_recovery():
-    state = HealthState()
-    for i in range(5):
-        state.record_transport_failure(operation_label="op", now=float(i))
-    assert state.use_probability("op") == MIN_USE_PROBABILITY
-    for _ in range(95):
-        state.record_completion(operation_label="op")
-    assert state.use_probability("op") == pytest.approx(0.95)
-
-
 def test_timeout_override_none_for_unknown_operation():
     state = HealthState()
     assert state.timeout_override("never-seen") is None
@@ -149,3 +116,29 @@ def test_abort_reason_message_format():
         "  - POST /b (last failure 3.5s ago)\n"
         "  - POST /c (last failure 0.5s ago)"
     )
+
+
+def test_frozen_use_probability_defaults_until_snapshot():
+    state = HealthState()
+    for index in range(10):
+        state.record_transport_failure(operation_label="op", now=float(index))
+    # Live counters reflect the failures, but generation reads the empty snapshot until a boundary.
+    assert state.operations["op"].use_probability == MIN_USE_PROBABILITY
+    assert state.frozen_use_probability("op") == DEFAULT_USE_PROBABILITY
+
+
+def test_frozen_use_probability_stable_until_next_begin_iteration():
+    state = HealthState()
+    for _ in range(8):
+        state.record_completion(operation_label="op")
+    for index in range(2):
+        state.record_transport_failure(operation_label="op", now=float(index))
+    state.begin_iteration()
+    assert state.frozen_use_probability("op") == pytest.approx(0.8)
+    # Live updates within a run must not shift the frozen constraint (keeps generation deterministic).
+    for index in range(50):
+        state.record_transport_failure(operation_label="op", now=100.0 + index)
+    assert state.frozen_use_probability("op") == pytest.approx(0.8)
+    # Refreshed only at the next boundary (now reflects the 50 extra failures: 8 / 60).
+    state.begin_iteration()
+    assert state.frozen_use_probability("op") == pytest.approx(8 / 60)

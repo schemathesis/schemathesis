@@ -8,6 +8,10 @@
 - Update `harfile` to `0.5.0` for slightly better performance.
 - Lower memory usage in long stateful runs.
 
+### :bug: Fixed
+
+- Excessive re-runs in stateful testing against APIs with mutable state.
+
 ## [4.20.3](https://github.com/schemathesis/schemathesis/compare/v4.20.2...v4.20.3) - 2026-05-29
 
 ### :racing_car: Performance

@@ -155,7 +155,7 @@ def execute_state_machine_loop(
                 raise KeyboardInterrupt
 
             operation_label = input.case.operation.label
-            use_probability = engine.health.use_probability(operation_label)
+            use_probability = engine.health.frozen_use_probability(operation_label)
             # Always draw — keeps data-tree topology stable across replays as `use_probability` transitions from 1.0 to <1.0.
             if not current_build_context().data.draw_boolean(p=use_probability):
                 reject()
@@ -309,6 +309,7 @@ def execute_state_machine_loop(
         # Promote observations from the previous run into the stable read state.
         if engine.link_calibration is not None:
             engine.link_calibration.begin_iteration()
+        engine.health.begin_iteration()
         suite_recorders.clear()
         # This loop is running until no new failures are found in a single iteration
         if engine.error_feedback is not None:
