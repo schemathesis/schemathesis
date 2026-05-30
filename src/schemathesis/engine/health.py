@@ -42,11 +42,19 @@ class HealthState:
     and may observe slightly stale snapshots but never torn state.
     """
 
-    __slots__ = ("operations", "_lock")
+    __slots__ = ("operations", "_frozen_use_probability", "_lock")
 
     def __init__(self) -> None:
         self.operations: dict[str, OperationHealth] = {}
+        # Per-run snapshot of use-probabilities; stays stable across a Hypothesis replay so generation
+        # is reproducible. Refreshed at suite boundaries by `begin_iteration`; `operations` stays live.
+        self._frozen_use_probability: dict[str, float] = {}
         self._lock = threading.Lock()
+
+    def begin_iteration(self) -> None:
+        """Refresh the per-run use-probability snapshot at a suite boundary."""
+        with self._lock:
+            self._frozen_use_probability = {label: h.use_probability for label, h in self.operations.items()}
 
     def record_completion(self, *, operation_label: str) -> None:
         with self._lock:
@@ -62,11 +70,8 @@ class HealthState:
             health.consecutive_failures += 1
             health.last_failure_time = now
 
-    def use_probability(self, operation_label: str) -> float:
-        health = self.operations.get(operation_label)
-        if health is None:
-            return DEFAULT_USE_PROBABILITY
-        return health.use_probability
+    def frozen_use_probability(self, operation_label: str) -> float:
+        return self._frozen_use_probability.get(operation_label, DEFAULT_USE_PROBABILITY)
 
     def timeout_override(self, operation_label: str) -> float | None:
         health = self.operations.get(operation_label)
