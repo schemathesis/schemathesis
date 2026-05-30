@@ -372,6 +372,7 @@ def test_clear_internal_caches_drains_known_caches(ctx):
     assert hypothesis_internals.custom_formats_cache._data == {}
     assert hypothesis_internals._resolve_result_cache._data == {}
     assert hypothesis_internals._merged_result_cache._data == {}
+    assert hypothesis_internals._first_param_cache._data == {}
     assert hypothesis_internals._canonicalish_result_cache._data == {}
     assert hypothesis_internals._from_schema_result_cache._data == {}
     assert hypothesis_internals._merged_as_strategies_result_cache._data == {}
