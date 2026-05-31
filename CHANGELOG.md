@@ -8,6 +8,7 @@
 
 ### :racing_car: Performance
 
+- Much lower peak memory and faster validation for schemas with very large `maxLength` / `maxItems`.
 - Cache failed validator builds to avoid recompiling invalid patterns from large `maxLength` / `maxItems` values.
 - Update `hypothesis-graphql` to `0.13.0` that brings up to 180x performance improvements for deeply nested GraphQL schemas.
 - Update `harfile` to `0.5.0` for slightly better performance.

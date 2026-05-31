@@ -20,9 +20,9 @@ from schemathesis.core.jsonschema.bundler import (
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 
-# Support lookahead/lookbehind assertions common in ECMA-262 patterns,
-# with a large size limit to handle schemas with large quantifiers (e.g., {1,51200})
-FANCY_REGEX_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=1_000_000_000)
+# Support ECMA-262 lookahead/lookbehind. The limit fits legit large quantifiers but fast-fails
+# degenerate ones (e.g. `{0,10000000}` from a huge `maxLength`) instead of burning seconds + ~1GB.
+FANCY_REGEX_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=150_000_000)
 
 
 def _is_valid_uuid(value: object) -> bool:

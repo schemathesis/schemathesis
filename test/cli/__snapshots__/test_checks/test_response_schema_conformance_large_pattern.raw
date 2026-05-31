@@ -21,59 +21,52 @@ Schemathesis dev
 
      ⏭  1 skipped
 
- ❌  Coverage (in 0.00s)
+ 🚫  Coverage (in 0.00s)
 
-     ❌ 1 failed
+     🚫 1 error
 
- ❌  Fuzzing (in 0.00s)
+ 🚫  Fuzzing (in 0.00s)
 
-     ❌ 1 failed
+     🚫 1 error
 
-=================================== FAILURES ===================================
+==================================== ERRORS ====================================
 __________________________________ GET /data ___________________________________
-1. Test Case ID: <PLACEHOLDER>
+Schema Error
 
-- Response violates schema
+Invalid Schema Object in response definition
 
-    Regex engine failed to evaluate pattern '^.{0,404600}$'
+Location:
+    [root]
 
-    Schema:
+Problematic definition:
+    "^.{0,404600}$"
 
-        {
-            "pattern": "^.{0,404600}$",
-            "type": "string"
-        }
+Error details:
+    "^.{0,404600}$" is not a "regex"
 
-    Value:
+See: https://spec.openapis.org/oas/v3.0.2#schema-object
 
-        ""
-
-[200] OK:
-
-    `""`
-
-Reproduce with:
-
-    <PLACEHOLDER>
-
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Errored: 1
 
 Test Phases:
   ⏭  Examples
-  ❌ Coverage
-  ❌ Fuzzing
+  🚫 Coverage
+  🚫 Fuzzing
   ⏭  Stateful (not applicable)
 
-Failures:
-  ❌ Response violates schema: 1
+Errors:
+  🚫 Schema Error: 1
 
 Test cases:
-  N generated, N found N unique failures
+  N generated
 
 Seed: 42
 
-============================== 1 failure in 1.00s ==============================
+=============================== 1 error in 1.00s ===============================
