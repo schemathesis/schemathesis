@@ -8,7 +8,7 @@ from schemathesis.cli.commands import run as run_command
 from schemathesis.cli.ext.groups import GROUPS, GroupedOption
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
-from schemathesis.core.jsonschema import validator_cache
+from schemathesis.core.jsonschema import _validator_failure_cache, validator_cache
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.generation.hypothesis import custom_formats_cache, schema_generation_cache
 from schemathesis.specs.openapi import media_types
@@ -60,4 +60,5 @@ def reset_hooks():
     schema_generation_cache.clear()
     custom_formats_cache.clear()
     validator_cache.clear()
+    _validator_failure_cache.clear()
     _REMOVE_EXAMPLES_CACHE.clear()
