@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import resource
 import sys
 import time
 import webbrowser
@@ -457,6 +458,50 @@ def coverage(
         )
 
 
+@click.command("stateful")  # type: ignore[untyped-decorator]
+@click.argument("schema_path")  # type: ignore[untyped-decorator]
+@click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)")  # type: ignore[untyped-decorator]
+@click.option(  # type: ignore[untyped-decorator]
+    "--output",
+    "output_file",
+    default="profiles/profile_stateful.html",
+    show_default=True,
+    help="Output HTML file path (time profile).",
+)
+@click.option("--open", "open_result", is_flag=True, default=False, help="Open the result file after profiling.")  # type: ignore[untyped-decorator]
+def stateful(schema_path: str, base_url: str | None, output_file: str, open_result: bool) -> None:
+    """Profile stateful state-machine construction (link inference + transition collection).
+
+        python scripts/profile.py stateful corpus://openapi-3.0/googleapis.com/compute/alpha.json
+
+    For memory, run under memray: memray run -o out.bin scripts/profile.py stateful corpus://...
+    """
+    _install_call_mock()
+    profiler = _get_profiler()
+
+    from schemathesis.generation import hypothesis
+
+    hypothesis.setup()
+
+    schema = _load_schema(schema_path, base_url or _MOCK_BASE_URL)
+
+    click.echo(f"Profiling: {schema_path}")
+    t0 = time.perf_counter()
+    with profiler:
+        schema.as_state_machine()
+    elapsed = time.perf_counter() - t0
+    peak_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(profiler.output_html(), encoding="utf-8")
+
+    click.echo(f"  build={elapsed:7.2f}s  peak_rss={peak_rss_mb:.0f}MB")
+    click.echo(f"Profile written to: {output_path}")
+    if open_result:
+        webbrowser.open(output_path.resolve().as_uri())
+
+
 @click.group()  # type: ignore[untyped-decorator]
 def main() -> None:
     """Schemathesis performance profiler."""
@@ -465,6 +510,7 @@ def main() -> None:
 main.add_command(cli, name="cli")
 main.add_command(fuzzing, name="fuzzing")
 main.add_command(coverage, name="coverage")
+main.add_command(stateful, name="stateful")
 
 if __name__ == "__main__":
     main()

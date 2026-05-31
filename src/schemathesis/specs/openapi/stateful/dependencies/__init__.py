@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -38,6 +37,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
 )
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
 from schemathesis.specs.openapi.stateful.dependencies.resources import remove_unused_resources
+from schemathesis.specs.openapi.stateful.links import find_link_target
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -154,14 +154,16 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
 def inject_links(schema: OpenApiSchema) -> int:
     injected = 0
+    # Shared by producers and targets; the same operations recur across thousands of links.
+    operation_cache: dict[str, APIOperation] = {}
     for response_links in schema.analysis.dependency_graph.iter_links():
-        operation = schema.find_operation_by_reference(response_links.producer_operation_ref)
+        operation = _find_operation_by_reference(schema, response_links.producer_operation_ref, operation_cache)
         response = operation.responses.get(response_links.status_code)
         links = response.definition.setdefault(schema.adapter.links_keyword, {})
 
         # Normalize existing links once
         if links:
-            normalized_existing = [_normalize_link(link, schema) for link in links.values()]
+            normalized_existing = [_normalize_link(link, schema, operation_cache) for link in links.values()]
         else:
             normalized_existing = []
 
@@ -170,7 +172,7 @@ def inject_links(schema: OpenApiSchema) -> int:
 
             # Check if duplicate / subsets exists
             if normalized_existing:
-                normalized = _normalize_link(inferred_link, schema)
+                normalized = _normalize_link(inferred_link, schema, operation_cache)
                 if any(_is_subset_link(normalized, existing) for existing in normalized_existing):
                     continue
 
@@ -181,10 +183,19 @@ def inject_links(schema: OpenApiSchema) -> int:
     return injected
 
 
-def _normalize_link(link: Mapping[str, Any], schema: OpenApiSchema) -> NormalizedLink:
+def _find_operation_by_reference(schema: OpenApiSchema, reference: str, cache: dict[str, APIOperation]) -> APIOperation:
+    key = f"ref:{reference}"
+    operation = cache.get(key)
+    if operation is None:
+        operation = schema.find_operation_by_reference(reference)
+        cache[key] = operation
+    return operation
+
+
+def _normalize_link(link: Mapping[str, Any], schema: OpenApiSchema, cache: dict[str, APIOperation]) -> NormalizedLink:
     """Normalize a link definition for comparison."""
     _, link = maybe_resolve_with_resolver(link, schema.root_resolver)
-    operation = _resolve_link_operation(link, schema)
+    operation = find_link_target(schema, link, cache)
 
     normalized_params = _normalize_parameter_keys(link.get("parameters", {}), operation)
 
@@ -213,18 +224,6 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
                 break
 
     return normalized
-
-
-def _resolve_link_operation(link: Mapping[str, Any], schema: OpenApiSchema) -> APIOperation:
-    """Resolve link to operation."""
-    if "operationRef" in link:
-        return schema.find_operation_by_reference(link["operationRef"])
-    if "operationId" in link:
-        return schema.find_operation_by_id(link["operationId"])
-    raise InvalidSchema(
-        "Link definition is missing both 'operationRef' and 'operationId'. "
-        "At least one of these fields must be present to identify the target operation."
-    )
 
 
 def _resolve_link_name_collision(proposed_name: str, existing_links: dict[str, Any]) -> str:

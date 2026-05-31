@@ -7,6 +7,7 @@
 - Update `hypothesis-graphql` to `0.13.0` that brings up to 180x performance improvements for deeply nested GraphQL schemas.
 - Update `harfile` to `0.5.0` for slightly better performance.
 - Lower memory usage in long stateful runs.
+- Faster, lower-memory stateful state machine construction for large schemas.
 
 ### :bug: Fixed
 

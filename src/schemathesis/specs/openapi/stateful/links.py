@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError, format_transition
+from schemathesis.core.errors import (
+    InvalidSchema,
+    InvalidTransition,
+    OperationNotFound,
+    TransitionValidationError,
+    format_transition,
+)
 from schemathesis.core.parameters import ContainerName, ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
@@ -14,9 +20,33 @@ from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import expressions
 
 if TYPE_CHECKING:
-    from schemathesis.specs.openapi.schemas import OpenApiOperation
+    from schemathesis.specs.openapi.schemas import OpenApiOperation, OpenApiSchema
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
+
+
+def find_link_target(
+    schema: OpenApiSchema, definition: Mapping[str, Any], cache: dict[str, APIOperation]
+) -> APIOperation:
+    """Resolve a link's target operation, memoized per pass (resolving rebuilds it; the result is read-only)."""
+    operation_id = definition.get("operationId")
+    if operation_id is not None:
+        key = f"id:{operation_id}"
+    elif "operationRef" in definition:
+        key = f"ref:{definition['operationRef']}"
+    else:
+        raise InvalidSchema(
+            "Link definition is missing both 'operationRef' and 'operationId'. "
+            "At least one of these fields must be present to identify the target operation."
+        )
+    operation = cache.get(key)
+    if operation is None:
+        if operation_id is not None:
+            operation = schema.find_operation_by_id(operation_id)
+        else:
+            operation = schema.find_operation_by_reference(definition["operationRef"])
+        cache[key] = operation
+    return operation
 
 
 @dataclass(slots=True)
@@ -55,26 +85,26 @@ class OpenApiLink:
         "_cached_extract",
     )
 
-    def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: OpenApiOperation):
+    def __init__(
+        self,
+        name: str,
+        status_code: str,
+        definition: dict[str, Any],
+        source: OpenApiOperation,
+        operation_cache: dict[str, APIOperation] | None = None,
+    ):
         self.name = name
         self.status_code = status_code
         self.source = source
         errors = []
 
-        get_operation: Callable[[str], APIOperation]
-        if "operationId" in definition:
-            operation_reference = definition["operationId"]
-            get_operation = source.schema.find_operation_by_id
-        else:
-            operation_reference = definition["operationRef"]
-            get_operation = source.schema.find_operation_by_reference
-
+        cache = operation_cache if operation_cache is not None else {}
         try:
-            self.target = get_operation(operation_reference)
+            self.target = find_link_target(source.schema, definition, cache)
             target = self.target.label
         except OperationNotFound:
-            target = operation_reference
-            errors.append(TransitionValidationError(f"Operation '{operation_reference}' not found"))
+            target = definition["operationId"] if "operationId" in definition else definition["operationRef"]
+            errors.append(TransitionValidationError(f"Operation '{target}' not found"))
 
         extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
         self.parameters = self._normalize_parameters(definition.get("parameters", {}), errors)
