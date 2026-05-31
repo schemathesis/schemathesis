@@ -134,12 +134,13 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     transitions = ApiTransitions()
 
     selected_labels = {operation.label for operation in operations}
+    operation_cache: dict[str, APIOperation] = {}
     errors = []
     for operation in operations:
         for status_code, response in operation.responses.items():
             for name, link in response.iter_links():
                 try:
-                    link = OpenApiLink(name, status_code, link, operation)
+                    link = OpenApiLink(name, status_code, link, operation, operation_cache)
                     if link.target.label in selected_labels:
                         transitions.add_outgoing(operation.label, link)
                 except InvalidTransition as exc:
