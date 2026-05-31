@@ -1,0 +1,67 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/graphql (in 0.00s)
+
+     Base URL:         http://127.0.0.1/graphql
+     Specification:    GraphQL
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ✅ 1 passed  ❌ 1 failed
+
+ ❌  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total (1 inferred)
+
+     ✅ N passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+______________________________ Mutation.moveIssue ______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- GraphQL server error
+
+    planted: move-issue-to-real-project
+
+[200] OK:
+
+    `{"data": null, "errors": [{"message": "planted: move-issue-to-real-project", "locations": [{"line": 2, "column": 3}], "path": ["moveIssue"]}]}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ❌ Fuzzing
+  ❌ Stateful
+
+Failures:
+  ❌ GraphQL server error: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

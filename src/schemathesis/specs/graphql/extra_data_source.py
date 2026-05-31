@@ -11,7 +11,9 @@ import graphql
 
 from schemathesis.resources import PoolPick
 from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
+from schemathesis.specs.graphql.handles import Handle
 from schemathesis.specs.graphql.inference import OperationRole, classify_operation
+from schemathesis.specs.graphql.stateful._bundles import collect_id_typed_object_types
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values
 
 if TYPE_CHECKING:
@@ -47,19 +49,25 @@ def _is_cleanup(operation: APIOperation) -> bool:
 class GraphQLResourcePool:
     """Cross-test-case pool of GraphQL identifier values."""
 
-    __slots__ = ("_data", "_lock", "_max_per_key", "_schema", "_tombstoned")
+    __slots__ = ("_capture_fields", "_data", "_lock", "_max_per_key", "_schema", "_tombstoned")
 
     def __init__(
         self,
         *,
         client_schema: graphql.GraphQLSchema,
         max_per_key: int = DEFAULT_MAX_PER_KEY,
+        handles: set[Handle] | None = None,
     ) -> None:
         self._schema = client_schema
         self._max_per_key = max_per_key
-        self._data: dict[str, deque[str]] = {}
-        self._tombstoned: set[tuple[str, str]] = set()
+        self._data: dict[Handle, deque[str]] = {}
+        self._tombstoned: set[tuple[Handle, str]] = set()
         self._lock = threading.RLock()
+        if handles is None:
+            handles = {Handle(name, "id") for name in collect_id_typed_object_types(client_schema)}
+        self._capture_fields: dict[str, set[str]] = {}
+        for handle in handles:
+            self._capture_fields.setdefault(handle.type_name, set()).add(handle.field_name)
 
     def should_record(self, *, operation: str) -> bool:
         return True
@@ -92,8 +100,8 @@ class GraphQLResourcePool:
             return
         self.capture(operation_node=operation_node, response_data=data)
         if _is_cleanup(operation):
-            for parent_type_name, value in iter_operation_pool_values(operation_node, self._schema):
-                self.tombstone(parent_type_name=parent_type_name, value=value)
+            for handle, value in iter_operation_pool_values(operation_node, self._schema):
+                self.tombstone(handle=handle, value=value)
 
     def record_request(self, *, operation: APIOperation, case: Case, status_code: int) -> None:
         return None  # pragma: no cover
@@ -141,20 +149,20 @@ class GraphQLResourcePool:
         if data is not None:
             self.capture(operation_node=operation_node, response_data=data)
 
-    def draw(self, *, parent_type_name: str, random: Random) -> str | None:
+    def draw(self, *, handle: Handle, random: Random) -> str | None:
         with self._lock:
-            entries = self._data.get(parent_type_name)
+            entries = self._data.get(handle)
             if not entries:
                 return None
             return random.choice(list(entries))
 
-    def tombstone(self, *, parent_type_name: str, value: str) -> None:
+    def tombstone(self, *, handle: Handle, value: str) -> None:
         """Mark a value as deleted: evict it from the pool and prevent re-capture."""
         with self._lock:
-            self._tombstoned.add((parent_type_name, value))
-            entries = self._data.get(parent_type_name)
+            self._tombstoned.add((handle, value))
+            entries = self._data.get(handle)
             if entries is not None and value in entries:
-                self._data[parent_type_name] = deque((v for v in entries if v != value), maxlen=self._max_per_key)
+                self._data[handle] = deque((v for v in entries if v != value), maxlen=self._max_per_key)
 
     def _walk_selection(
         self,
@@ -185,8 +193,8 @@ class GraphQLResourcePool:
         unwrapped = _unwrap(field_def.type)
 
         if isinstance(unwrapped, graphql.GraphQLScalarType):
-            if real_name == "id" and isinstance(value, str):
-                self._store(parent_type.name, value)
+            if isinstance(value, str) and real_name in self._capture_fields.get(parent_type.name, ()):
+                self._store(Handle(parent_type.name, real_name), value)
             return
 
         if isinstance(unwrapped, graphql.GraphQLObjectType):
@@ -196,12 +204,12 @@ class GraphQLResourcePool:
             else:
                 self._walk_selection(field.selection_set, unwrapped, value)
 
-    def _store(self, parent_type_name: str, value: str) -> None:
+    def _store(self, handle: Handle, value: str) -> None:
         with self._lock:
-            if (parent_type_name, value) in self._tombstoned:
+            if (handle, value) in self._tombstoned:
                 return
-            entries = self._data.get(parent_type_name)
+            entries = self._data.get(handle)
             if entries is None:
                 entries = deque(maxlen=self._max_per_key)
-                self._data[parent_type_name] = entries
+                self._data[handle] = entries
             entries.append(value)

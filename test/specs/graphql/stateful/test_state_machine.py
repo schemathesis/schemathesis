@@ -37,6 +37,21 @@ def full_state_machine(ctx) -> type[GraphQLStateMachine]:
     return create_state_machine(ctx.graphql.load_sdl(_FULL_SCHEMA_SDL))
 
 
+def test_non_id_cleanup_does_not_require_deleted_bundle(ctx):
+    # A delete op keyed on a non-id handle has no deleted bundle; building the machine must not demand one.
+    machine = create_state_machine(
+        ctx.graphql.load_sdl("""
+            type Project { fullPath: String! }
+            type Query { projects: [Project!]! }
+            type Mutation {
+                moveIssue(projectPath: String!, title: String!): Boolean
+                deleteProject(projectPath: String!): Boolean
+            }
+        """)
+    )
+    assert issubclass(machine, GraphQLStateMachine)
+
+
 def test_create_state_machine_returns_a_subclass(ctx):
     cls = create_state_machine(
         ctx.graphql.load_sdl("""

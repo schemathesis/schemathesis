@@ -7,6 +7,7 @@ import graphql
 import pytest
 
 from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
+from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values, substitute_pool_values
 
 
@@ -43,7 +44,7 @@ def test_capture_id_field(gql_schema, rng):
     pool = GraphQLResourcePool(client_schema=gql_schema)
     operation = _parse('mutation { addBook(title: "x", authorId: "1") { id title } }')
     pool.capture(operation_node=operation, response_data={"addBook": {"id": "abc-1", "title": "x"}})
-    assert pool.draw(parent_type_name="Book", random=rng) == "abc-1"
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) == "abc-1"
 
 
 def test_capture_skips_when_errors_present(gql_schema, rng):
@@ -51,7 +52,7 @@ def test_capture_skips_when_errors_present(gql_schema, rng):
     operation = _parse('mutation { addBook(title: "x", authorId: "1") { id } }')
     body = json.dumps({"data": {"addBook": {"id": "abc-2"}}, "errors": [{"message": "boom"}]}).encode("utf-8")
     pool.capture_response(response_body=body, operation_node=operation)
-    assert pool.draw(parent_type_name="Book", random=rng) is None
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
 
 
 def test_capture_walks_lists(gql_schema, rng):
@@ -59,7 +60,7 @@ def test_capture_walks_lists(gql_schema, rng):
     operation = _parse("query { authors { id name } }")
     data = {"authors": [{"id": "1", "name": "a"}, {"id": "2", "name": "b"}]}
     pool.capture(operation_node=operation, response_data=data)
-    drawn = {pool.draw(parent_type_name="Author", random=rng) for _ in range(20)}
+    drawn = {pool.draw(handle=Handle("Author", "id"), random=rng) for _ in range(20)}
     assert drawn == {"1", "2"}
 
 
@@ -67,7 +68,7 @@ def test_capture_uses_real_field_name_for_aliased_selections(gql_schema, rng):
     pool = GraphQLResourcePool(client_schema=gql_schema)
     operation = _parse('query { my: book(id: "1") { id } }')
     pool.capture(operation_node=operation, response_data={"my": {"id": "real-id"}})
-    assert pool.draw(parent_type_name="Book", random=rng) == "real-id"
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) == "real-id"
 
 
 def test_per_key_cap_evicts_oldest(gql_schema, rng):
@@ -77,7 +78,7 @@ def test_per_key_cap_evicts_oldest(gql_schema, rng):
         pool.capture(operation_node=operation, response_data={"authors": [{"id": v} for v in chunk]})
     drawn = set()
     for _ in range(50):
-        v = pool.draw(parent_type_name="Author", random=rng)
+        v = pool.draw(handle=Handle("Author", "id"), random=rng)
         if v is not None:
             drawn.add(v)
     assert "1" not in drawn and "2" not in drawn
@@ -227,7 +228,7 @@ def test_capture_response_skips_unusable_payloads(gql_schema, rng, body):
     pool = GraphQLResourcePool(client_schema=gql_schema)
     operation = _parse('mutation { addBook(title: "x", authorId: "1") { id } }')
     pool.capture_response(response_body=body, operation_node=operation)
-    assert pool.draw(parent_type_name="Book", random=rng) is None
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
 
 
 def test_capture_skips_subscription_operations(rng):
@@ -239,21 +240,21 @@ def test_capture_skips_subscription_operations(rng):
     pool = GraphQLResourcePool(client_schema=schema)
     operation = _parse("subscription { event }")
     pool.capture(operation_node=operation, response_data={"event": "hello"})
-    assert pool.draw(parent_type_name="Subscription", random=rng) is None
+    assert pool.draw(handle=Handle("Subscription", "id"), random=rng) is None
 
 
 def test_capture_skips_missing_response_keys(gql_schema, rng):
     pool = GraphQLResourcePool(client_schema=gql_schema)
     operation = _parse("query { authors { id } }")
     pool.capture(operation_node=operation, response_data={})
-    assert pool.draw(parent_type_name="Author", random=rng) is None
+    assert pool.draw(handle=Handle("Author", "id"), random=rng) is None
 
 
 def test_capture_skips_fragment_spreads_in_selection_set(gql_schema, rng):
     pool = GraphQLResourcePool(client_schema=gql_schema)
     operation = _parse("query { authors { ...AuthorFields id } } fragment AuthorFields on Author { name }")
     pool.capture(operation_node=operation, response_data={"authors": [{"id": "captured"}]})
-    assert pool.draw(parent_type_name="Author", random=rng) == "captured"
+    assert pool.draw(handle=Handle("Author", "id"), random=rng) == "captured"
 
 
 def test_capture_skips_enum_typed_fields(rng):
@@ -271,7 +272,7 @@ def test_capture_skips_enum_typed_fields(rng):
         response_data={"authors": [{"id": "a-1", "status": "ACTIVE"}]},
     )
     # Enum field is silently skipped; only the scalar `id` is captured.
-    assert pool.draw(parent_type_name="Author", random=rng) == "a-1"
+    assert pool.draw(handle=Handle("Author", "id"), random=rng) == "a-1"
 
 
 def test_substitution_skips_subscription_operations(rng):
@@ -550,18 +551,18 @@ def test_tombstone_evicts_value_from_pool(gql_schema, rng):
         operation_node=_parse('mutation { addBook(title: "x", authorId: "1") { id } }'),
         response_data={"addBook": {"id": "abc"}},
     )
-    pool.tombstone(parent_type_name="Book", value="abc")
-    assert pool.draw(parent_type_name="Book", random=rng) is None
+    pool.tombstone(handle=Handle("Book", "id"), value="abc")
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
 
 
 def test_tombstone_blocks_subsequent_capture(gql_schema, rng):
     pool = GraphQLResourcePool(client_schema=gql_schema)
-    pool.tombstone(parent_type_name="Book", value="abc")
+    pool.tombstone(handle=Handle("Book", "id"), value="abc")
     pool.capture(
         operation_node=_parse('mutation { addBook(title: "x", authorId: "1") { id } }'),
         response_data={"addBook": {"id": "abc"}},
     )
-    assert pool.draw(parent_type_name="Book", random=rng) is None
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
 
 
 def test_tombstone_preserves_other_values(gql_schema, rng):
@@ -571,8 +572,8 @@ def test_tombstone_preserves_other_values(gql_schema, rng):
         operation_node=operation,
         response_data={"authors": [{"id": "a-1"}, {"id": "a-2"}, {"id": "a-3"}]},
     )
-    pool.tombstone(parent_type_name="Author", value="a-2")
-    drawn = {pool.draw(parent_type_name="Author", random=rng) for _ in range(20)}
+    pool.tombstone(handle=Handle("Author", "id"), value="a-2")
+    drawn = {pool.draw(handle=Handle("Author", "id"), random=rng) for _ in range(20)}
     assert drawn == {"a-1", "a-3"}
 
 
@@ -608,28 +609,32 @@ type Subscription { event(id: ID!): String! }
 @pytest.mark.parametrize(
     ("sdl", "query", "expected"),
     [
-        (_TOMBSTONE_SDL, 'mutation { deleteBook(id: "abc") }', [("Book", "abc")]),
-        (_TOMBSTONE_SDL, 'mutation { deleteBooks(ids: ["a", "b"]) }', [("Book", "a"), ("Book", "b")]),
-        (_TOMBSTONE_SDL, 'mutation { deleteBookByRef(ref: {id: "abc"}) }', [("Book", "abc")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteBook(id: "abc") }', [(Handle("Book", "id"), "abc")]),
+        (
+            _TOMBSTONE_SDL,
+            'mutation { deleteBooks(ids: ["a", "b"]) }',
+            [(Handle("Book", "id"), "a"), (Handle("Book", "id"), "b")],
+        ),
+        (_TOMBSTONE_SDL, 'mutation { deleteBookByRef(ref: {id: "abc"}) }', [(Handle("Book", "id"), "abc")]),
         (_TOMBSTONE_SDL, 'mutation { deleteByName(name: "foo") }', []),
         (_TOMBSTONE_SDL, "mutation { deleteBook(id: $var) }", []),
-        (_TOMBSTONE_SDL, 'mutation { deleteBook(unknownArg: "noise", id: "x") }', [("Book", "x")]),
-        (_TOMBSTONE_SDL, 'mutation { deleteBookByRef(ref: {id: "x", noise: "y"}) }', [("Book", "x")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteBook(unknownArg: "noise", id: "x") }', [(Handle("Book", "id"), "x")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteBookByRef(ref: {id: "x", noise: "y"}) }', [(Handle("Book", "id"), "x")]),
         (_TOMBSTONE_SDL, 'mutation { unknownTopLevelField(id: "x") }', []),
         (
             _TOMBSTONE_NESTED_SDL,
             'mutation { deleteBook(id: "x") { relatedAuthor(authorId: "y") { id } } }',
-            [("Book", "x"), ("Author", "y")],
+            [(Handle("Book", "id"), "x"), (Handle("Author", "id"), "y")],
         ),
         (
             _TOMBSTONE_NESTED_SDL,
             'mutation { deleteBook(id: "x") { ...Frag } } fragment Frag on Book { id }',
-            [("Book", "x")],
+            [(Handle("Book", "id"), "x")],
         ),
         (
             _TOMBSTONE_NESTED_SDL,
             'mutation { deleteBook(id: "x") { unknownNestedField } }',
-            [("Book", "x")],
+            [(Handle("Book", "id"), "x")],
         ),
         (_TOMBSTONE_SUBSCRIPTION_SDL, 'subscription { event(id: "abc") }', []),
     ],
@@ -652,3 +657,37 @@ def test_iter_operation_pool_values(sdl, query, expected):
     schema = graphql.build_schema(sdl)
     operation = _parse(query)
     assert list(iter_operation_pool_values(operation, schema)) == expected
+
+
+def test_capture_and_draw_non_id_handle(rng):
+    schema = graphql.build_schema(
+        "type Project { id: ID! fullPath: String! }"
+        " type Query { projects: [Project!]! }"
+        " type Mutation { moveIssue(projectPath: String!, title: String!): Boolean }"
+    )
+    pool = GraphQLResourcePool(client_schema=schema, handles={Handle("Project", "fullPath")})
+    pool.capture(
+        operation_node=_parse("query { projects { id fullPath } }"),
+        response_data={"projects": [{"id": "1", "fullPath": "acme/web"}]},
+    )
+    assert pool.draw(handle=Handle("Project", "fullPath"), random=rng) == "acme/web"
+    # `id` is not in the active handle set, so it is not captured.
+    assert pool.draw(handle=Handle("Project", "id"), random=rng) is None
+
+
+def test_pool_substitutes_non_id_argument(rng):
+    schema = graphql.build_schema(
+        "type Project { id: ID! fullPath: String! }"
+        " type Query { projects: [Project!]! }"
+        " type Mutation { moveIssue(projectPath: String!, title: String!): Boolean }"
+    )
+    pool = GraphQLResourcePool(client_schema=schema, handles={Handle("Project", "fullPath")})
+    pool.capture(
+        operation_node=_parse("query { projects { id fullPath } }"),
+        response_data={"projects": [{"id": "1", "fullPath": "acme/web"}]},
+    )
+    op = _parse('mutation { moveIssue(projectPath: "RANDOM", title: "x") }')
+    substitute_pool_values(
+        operation_node=op, client_schema=schema, pool=pool, random=rng, schema_index=SchemaIndex(schema)
+    )
+    assert 'projectPath: "acme/web"' in graphql.print_ast(op)

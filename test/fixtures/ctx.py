@@ -434,6 +434,15 @@ class GraphQLApps:
     def list_argument_pool(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.list_argument_pool())
 
+    def non_id_pool(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.non_id_pool())
+
+    def bare_slug(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.bare_slug())
+
+    def relay_connection(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.relay_connection())
+
     def tombstone_pool(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.tombstone_pool())
 

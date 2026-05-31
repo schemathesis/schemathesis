@@ -43,6 +43,49 @@ def test_stateful_finds_chained_planted_bug(ctx, cli, snapshot_cli, filter_arg):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_finds_non_id_chain_bug(ctx, cli, snapshot_cli):
+    # A query seeds Project.fullPath; the consuming mutation errors only on a real captured path.
+    api = ctx.graphql.apps.non_id_pool()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--no-shrink",
+            "--max-examples=30",
+            "--phases=stateful",
+            "-m",
+            "positive",
+            "-c",
+            "not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.parametrize(
+    "make_api",
+    [lambda apps: apps.bare_slug(), lambda apps: apps.relay_connection()],
+    ids=["bare-slug-arg", "relay-connection-producer"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_finds_non_id_lookup_bug(ctx, cli, snapshot_cli, make_api):
+    # Bare `slug` resolves via the enclosing return type; the producer may be a Relay connection.
+    api = make_api(ctx.graphql.apps)
+    assert (
+        cli.run(
+            api.schema_url,
+            "--no-shrink",
+            "--max-examples=30",
+            "--phases=stateful",
+            "-m",
+            "positive",
+            "-c",
+            "not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
 def _use_after_delete(apps):
     return apps.use_after_delete()
 

@@ -9,10 +9,11 @@ from typing import Any, TypeAlias
 
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.text import to_pascal_case
 from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
-from schemathesis.specs.openapi.stateful.dependencies.naming import from_path, strip_version_prefix, to_pascal_case
+from schemathesis.specs.openapi.stateful.dependencies.naming import from_path, strip_version_prefix
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 

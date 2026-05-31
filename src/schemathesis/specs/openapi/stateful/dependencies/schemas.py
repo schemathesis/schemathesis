@@ -8,6 +8,7 @@ from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle_for_generation
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
+from schemathesis.core.text import to_snake_case
 from schemathesis.core.transforms import encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -366,8 +367,8 @@ def _is_pagination_wrapper(
         if resource_name_from_path is None:
             return None
 
-        plural = naming.to_plural(naming.to_snake_case(resource_name_from_path))
-        singular = naming.to_snake_case(resource_name_from_path).lower()
+        plural = naming.to_plural(to_snake_case(resource_name_from_path))
+        singular = to_snake_case(resource_name_from_path).lower()
         af = array_field.lower()
         # Exact match (plural or singular) handles `compliance` for Compliance (uncountable / domain noun);
         # suffix match handles compound keys like `source_fields` for the `Field` resource on `/.../fields`.
@@ -472,13 +473,13 @@ def _detect_externally_tagged_pattern(
         # `datarequests`
         naming.to_plural(resource_name.lower()),
         # `data_request`
-        naming.to_snake_case(resource_name),
+        to_snake_case(resource_name),
     }
     parent_names = set()
     if parent_ref is not None:
         maybe_resource_name = resource_name_from_ref(parent_ref)
         parent_names.add(naming.to_plural(maybe_resource_name.lower()))
-        parent_names.add(naming.to_snake_case(maybe_resource_name))
+        parent_names.add(to_snake_case(maybe_resource_name))
         possible_names = possible_names.union(parent_names)
 
     for name, subschema in properties.items():

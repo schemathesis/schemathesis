@@ -16,7 +16,9 @@ from typing import TYPE_CHECKING, Final
 
 import graphql
 
+from schemathesis.core.text import to_pascal_case, to_snake_case
 from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
+from schemathesis.specs.graphql.handles import HANDLE_SCALARS, Handle, SchemaIndex
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -27,8 +29,8 @@ if TYPE_CHECKING:
 # the remaining 0.3 leaves Hypothesis room to explore fresh values.
 SUBSTITUTION_PROBABILITY: Final = 0.7
 
-# Returns a substitution value for the given parent-type name, or None to keep the original.
-ValueProvider = Callable[[str, Random], str | None]
+# Returns a substitution value for the given handle, or None to keep the original.
+ValueProvider = Callable[[Handle, Random], str | None]
 
 
 def substitute_pool_values(
@@ -37,36 +39,38 @@ def substitute_pool_values(
     client_schema: graphql.GraphQLSchema,
     pool: GraphQLResourcePool,
     random: Random,
+    schema_index: SchemaIndex | None = None,
 ) -> None:
     """Replace matching argument literals with captured pool values."""
 
-    def provider(parent_type_name: str, random: Random) -> str | None:
-        return pool.draw(parent_type_name=parent_type_name, random=random)
+    def provider(handle: Handle, random: Random) -> str | None:
+        return pool.draw(handle=handle, random=random)
 
-    _substitute(operation_node, client_schema, provider, random)
+    _substitute(operation_node, client_schema, provider, random, schema_index)
 
 
 def substitute_bundle_values(
     *,
     operation_node: graphql.OperationDefinitionNode,
     client_schema: graphql.GraphQLSchema,
-    bundle_values: dict[str, str],
+    bundle_values: dict[Handle, str],
     random: Random,
     exploration_rate: float = 0.0,
+    schema_index: SchemaIndex | None = None,
 ) -> None:
-    """Replace id-typed argument literals with values from the given type to id mapping.
+    """Replace handle-typed argument literals with values from the given handle to value mapping.
 
     `exploration_rate` is the per-argument probability of leaving the
     strategy-generated value in place, forcing discovery of bugs reachable only
     via unknown ids.
     """
 
-    def provider(parent_type_name: str, random: Random) -> str | None:
+    def provider(handle: Handle, random: Random) -> str | None:
         if exploration_rate > 0.0 and random.random() < exploration_rate:
             return None
-        return bundle_values.get(parent_type_name)
+        return bundle_values.get(handle)
 
-    _substitute(operation_node, client_schema, provider, random)
+    _substitute(operation_node, client_schema, provider, random, schema_index)
 
 
 def _substitute(
@@ -74,11 +78,12 @@ def _substitute(
     client_schema: graphql.GraphQLSchema,
     provider: ValueProvider,
     random: Random,
+    index: SchemaIndex | None,
 ) -> None:
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return
-    _walk(operation_node.selection_set, root, provider, random)
+    _walk(operation_node.selection_set, root, provider, random, index)
 
 
 def _walk(
@@ -86,6 +91,7 @@ def _walk(
     parent_type: graphql.GraphQLObjectType,
     provider: ValueProvider,
     random: Random,
+    index: SchemaIndex | None,
 ) -> None:
     if selection_set is None:
         return
@@ -100,16 +106,22 @@ def _walk(
             unwrapped_return.name if isinstance(unwrapped_return, graphql.GraphQLObjectType) else None
         )
         for argument in selection.arguments:
-            arg_def = field_def.args.get(argument.name.value)
-            if arg_def is None:
+            argument_definition = field_def.args.get(argument.name.value)
+            if argument_definition is None:
                 continue
             new_value = _substitute_value(
-                argument.value, arg_def.type, argument.name.value, enclosing_field_type, provider, random
+                argument.value,
+                argument_definition.type,
+                argument.name.value,
+                enclosing_field_type,
+                provider,
+                random,
+                index,
             )
             if new_value is not None:
                 argument.value = new_value
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
-            _walk(selection.selection_set, unwrapped_return, provider, random)
+            _walk(selection.selection_set, unwrapped_return, provider, random, index)
 
 
 def _substitute_value(
@@ -119,6 +131,7 @@ def _substitute_value(
     enclosing_field_type: str | None,
     provider: ValueProvider,
     random: Random,
+    index: SchemaIndex | None,
 ) -> graphql.ValueNode | None:
     """Return a substituted value if the provider returns a candidate; otherwise None."""
     inner = value_type
@@ -127,36 +140,37 @@ def _substitute_value(
     if isinstance(inner, graphql.GraphQLList) and isinstance(value, graphql.ListValueNode):
         new_values = list(value.values)
         replaced_any = False
-        for index, element in enumerate(new_values):
-            replaced = _substitute_value(element, inner.of_type, name, enclosing_field_type, provider, random)
+        for list_index, element in enumerate(new_values):
+            replaced = _substitute_value(element, inner.of_type, name, enclosing_field_type, provider, random, index)
             if replaced is not None:
-                new_values[index] = replaced
+                new_values[list_index] = replaced
                 replaced_any = True
         return graphql.ListValueNode(values=tuple(new_values)) if replaced_any else None
     if isinstance(inner, graphql.GraphQLScalarType):
-        parent_type_name = _candidate_parent_type(
+        handle = candidate_handle(
             scalar_name=inner.name,
             argument_name=name,
             enclosing_field_type=enclosing_field_type,
+            index=index,
         )
-        if parent_type_name is None:
+        if handle is None:
             return None
-        candidate = provider(parent_type_name, random)
+        candidate = provider(handle, random)
         if candidate is None:
             return None
         return graphql.StringValueNode(value=candidate)
     if isinstance(inner, graphql.GraphQLInputObjectType) and isinstance(value, graphql.ObjectValueNode):
         new_fields = list(value.fields)
         replaced_any = False
-        for index, field_node in enumerate(new_fields):
+        for field_index, field_node in enumerate(new_fields):
             field_def = inner.fields.get(field_node.name.value)
             if field_def is None:
                 continue
             replaced = _substitute_value(
-                field_node.value, field_def.type, field_node.name.value, None, provider, random
+                field_node.value, field_def.type, field_node.name.value, None, provider, random, index
             )
             if replaced is not None:
-                new_fields[index] = graphql.ObjectFieldNode(name=field_node.name, value=replaced)
+                new_fields[field_index] = graphql.ObjectFieldNode(name=field_node.name, value=replaced)
                 replaced_any = True
         return graphql.ObjectValueNode(fields=tuple(new_fields)) if replaced_any else None
     return None
@@ -173,30 +187,105 @@ def _strip_id_suffix(name: str) -> str | None:
     return None
 
 
-def _candidate_parent_type(
+# Identifier-bearing suffixes a non-id handle field may carry (precision gate).
+IDENTIFIER_SUFFIXES: Final = ("Id", "Uuid", "Guid", "Path", "Slug", "Key", "Code", "Ref", "Name", "Arn")
+# Free-text fields are never eligible handles even with an identifier suffix.
+FREE_TEXT_FIELDS: Final = frozenset({"description", "comment", "body", "content", "text", "message", "summary", "note"})
+# Leading role qualifiers stripped before naming the candidate type (`targetProject` -> `Project`).
+ROLE_PREFIXES: Final = ("target", "source", "new", "old", "parent", "child")
+# Bare argument names that identify a record by a non-id field of the enclosing return type
+# (`product(slug:): Product`). Deliberately excludes `name` to favor precision.
+BARE_IDENTIFIER_NAMES: Final = frozenset(
+    {"slug", "sku", "code", "key", "token", "uuid", "guid", "arn", "handle", "externalreference"}
+)
+
+
+def candidate_handle(
     *,
     scalar_name: str,
     argument_name: str,
     enclosing_field_type: str | None,
-) -> str | None:
-    # Bespoke `<Type>ID` scalar names the parent type directly.
+    index: SchemaIndex | None = None,
+) -> Handle | None:
+    """Resolve a scalar argument to the producer Handle it should be filled from."""
     if scalar_name != "ID":
-        return _strip_id_suffix(scalar_name)
-    # Generic `ID!`: the argument-name token (`userId` -> `User`) names the parent.
-    stripped = _strip_id_suffix(argument_name)
-    if stripped is not None:
-        return stripped[:1].upper() + stripped[1:]
-    # Bare `id`/`ids` falls back to the enclosing field's return type.
-    if argument_name in ("id", "ids"):
-        return enclosing_field_type
+        stripped = _strip_id_suffix(scalar_name)
+        if stripped is not None:
+            return Handle(stripped, "id")
+    else:
+        stripped = _strip_id_suffix(argument_name)
+        if stripped is not None:
+            return Handle(stripped[:1].upper() + stripped[1:], "id")
+        if argument_name in ("id", "ids") and enclosing_field_type is not None:
+            return Handle(enclosing_field_type, "id")
+    if index is None or scalar_name not in HANDLE_SCALARS:
+        return None
+    if enclosing_field_type is not None and argument_name.lower() in BARE_IDENTIFIER_NAMES:
+        bare = _bare_field_handle(argument_name, enclosing_field_type, index)
+        if bare is not None:
+            return bare
+    return _lexical_handle(argument_name, index)
+
+
+def _bare_field_handle(argument_name: str, enclosing_field_type: str, index: SchemaIndex) -> Handle | None:
+    cue = argument_name.lower()
+    best: tuple[int, int, str] | None = None
+    chosen: str | None = None
+    for field in index.leaf_string_id_fields(enclosing_field_type):
+        rank = _field_rank(field, cue)
+        if rank is None:
+            continue
+        key = (rank, len(field), field)
+        if best is None or key < best:
+            best, chosen = key, field
+    return Handle(enclosing_field_type, chosen) if chosen is not None else None
+
+
+def _lexical_handle(argument_name: str, index: SchemaIndex) -> Handle | None:
+    tokens = [token for token in to_snake_case(argument_name).split("_") if token]
+    if tokens and tokens[0] in ROLE_PREFIXES:
+        tokens = tokens[1:]
+    if len(tokens) < 2:
+        return None
+    type_name = to_pascal_case(tokens[0])
+    if not index.has_object_type(type_name):
+        return None
+    cue = "".join(tokens[1:]).lower()
+    best: tuple[int, int, str] | None = None
+    chosen: str | None = None
+    for field in index.leaf_string_id_fields(type_name):
+        rank = _field_rank(field, cue)
+        if rank is None:
+            continue
+        key = (rank, len(field), field)
+        if best is None or key < best:
+            best, chosen = key, field
+    return Handle(type_name, chosen) if chosen is not None else None
+
+
+def _field_rank(field: str, cue: str) -> int | None:
+    """Precision-gated rank of a candidate field against the cue; lower is better, None means ineligible."""
+    lower = field.lower()
+    if lower in FREE_TEXT_FIELDS:
+        return None
+    has_identifier_suffix = any(field.endswith(suffix) for suffix in IDENTIFIER_SUFFIXES)
+    if lower == cue:
+        return 0
+    if not has_identifier_suffix:
+        return None
+    for suffix in IDENTIFIER_SUFFIXES:
+        if field.endswith(suffix) and suffix.lower() == cue:
+            return 1
+    if cue.endswith(lower):
+        return 2
     return None
 
 
 def iter_operation_pool_values(
     operation_node: graphql.OperationDefinitionNode,
     client_schema: graphql.GraphQLSchema,
-) -> Iterator[tuple[str, str]]:
-    """Yield `(parent_type_name, value)` tuples for id-typed scalar literals in an operation's arguments."""
+) -> Iterator[tuple[Handle, str]]:
+    """Yield `(handle, value)` tuples for id-typed scalar literals in an operation's arguments."""
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return
@@ -206,7 +295,7 @@ def iter_operation_pool_values(
 def _iter_walk(
     selection_set: graphql.SelectionSetNode | None,
     parent_type: graphql.GraphQLObjectType,
-) -> Iterator[tuple[str, str]]:
+) -> Iterator[tuple[Handle, str]]:
     if selection_set is None:
         return
     for selection in selection_set.selections:
@@ -220,10 +309,10 @@ def _iter_walk(
             unwrapped_return.name if isinstance(unwrapped_return, graphql.GraphQLObjectType) else None
         )
         for argument in selection.arguments:
-            arg_def = field_def.args.get(argument.name.value)
-            if arg_def is None:
+            argument_definition = field_def.args.get(argument.name.value)
+            if argument_definition is None:
                 continue
-            yield from _iter_value(argument.value, arg_def.type, argument.name.value, enclosing_field_type)
+            yield from _iter_value(argument.value, argument_definition.type, argument.name.value, enclosing_field_type)
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
             yield from _iter_walk(selection.selection_set, unwrapped_return)
 
@@ -233,7 +322,7 @@ def _iter_value(
     value_type: graphql.GraphQLType,
     name: str,
     enclosing_field_type: str | None,
-) -> Iterator[tuple[str, str]]:
+) -> Iterator[tuple[Handle, str]]:
     inner = value_type
     while isinstance(inner, graphql.GraphQLNonNull):
         inner = inner.of_type
@@ -242,13 +331,14 @@ def _iter_value(
             yield from _iter_value(element, inner.of_type, name, enclosing_field_type)
         return
     if isinstance(inner, graphql.GraphQLScalarType) and isinstance(value, graphql.StringValueNode):
-        parent_type_name = _candidate_parent_type(
+        handle = candidate_handle(
             scalar_name=inner.name,
             argument_name=name,
             enclosing_field_type=enclosing_field_type,
+            index=None,
         )
-        if parent_type_name is not None:
-            yield parent_type_name, value.value
+        if handle is not None:
+            yield handle, value.value
         return
     if isinstance(inner, graphql.GraphQLInputObjectType) and isinstance(value, graphql.ObjectValueNode):
         for field_node in value.fields:

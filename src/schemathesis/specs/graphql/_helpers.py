@@ -12,6 +12,20 @@ def _unwrap(t: graphql.GraphQLType) -> graphql.GraphQLNamedType:
     return t
 
 
+def relay_node_type(type_: graphql.GraphQLNamedType) -> graphql.GraphQLObjectType | None:
+    """Return the node type of a Relay connection (`edges { node }`), or None if not a connection."""
+    if not isinstance(type_, graphql.GraphQLObjectType):
+        return None
+    edges = type_.fields.get("edges")
+    if edges is None:
+        return None
+    edge = _unwrap(edges.type)
+    if not isinstance(edge, graphql.GraphQLObjectType) or "node" not in edge.fields:
+        return None
+    node = _unwrap(edge.fields["node"].type)
+    return node if isinstance(node, graphql.GraphQLObjectType) else None
+
+
 def _root_type_for(schema: graphql.GraphQLSchema, operation: graphql.OperationType) -> graphql.GraphQLObjectType | None:
     if operation == graphql.OperationType.QUERY:
         return schema.query_type
