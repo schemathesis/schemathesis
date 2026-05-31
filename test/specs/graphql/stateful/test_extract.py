@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from schemathesis.specs.graphql.stateful._extract import iter_ids_from_response
+from schemathesis.specs.graphql.stateful._extract import iter_handle_values
 
 
 def _body(payload: dict) -> bytes:
@@ -60,5 +60,8 @@ def _body(payload: dict) -> bytes:
         "empty-bytes",
     ],
 )
-def test_iter_ids_from_response(body, field_name, expected):
-    assert list(iter_ids_from_response(body, field_name=field_name)) == expected
+def test_iter_handle_values(body, field_name, expected):
+    values = [
+        value for _field, value in iter_handle_values(body, field_name=field_name, handle_fields=frozenset({"id"}))
+    ]
+    assert values == expected

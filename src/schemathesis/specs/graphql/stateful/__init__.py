@@ -19,6 +19,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
     Transition,
 )
+from schemathesis.specs.graphql.handles import Handle, bundle_name, deleted_bundle_name
 from schemathesis.specs.graphql.stateful._rules import generate_rules_for
 
 if TYPE_CHECKING:
@@ -42,8 +43,8 @@ class GraphQLStateMachine(APIStateMachine):
                 "(a mutation returning an Object type with an `id` field)."
             )
         self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL)
-        self._id_origins: dict[tuple[str, str], str] = {}
-        self._deleted_id_origins: dict[tuple[str, str], str] = {}
+        self._id_origins: dict[tuple[Handle, str], str] = {}
+        self._deleted_id_origins: dict[tuple[Handle, str], str] = {}
         self.control = TransitionController(self._transitions)
         super().__init__()
 
@@ -117,10 +118,11 @@ def create_state_machine(schema: GraphQLSchema) -> type[GraphQLStateMachine]:
     """Build a `GraphQLStateMachine` subclass with one bundle per id-typed object type and per-operation rules."""
     analysis = schema.analysis
     attrs: dict[str, Any] = {"schema": schema, "_transitions": analysis.transitions}
-    for type_name in analysis.bundle_types:
-        attrs[f"{type_name}_ids"] = Bundle(f"{type_name}_ids")
-        attrs[f"deleted_{type_name}_ids"] = Bundle(f"deleted_{type_name}_ids")
-    rule_set = generate_rules_for(analysis.summaries, attrs)
+    for handle in analysis.handles:
+        attrs[bundle_name(handle)] = Bundle(bundle_name(handle))
+        if handle.field_name == "id":
+            attrs[deleted_bundle_name(handle)] = Bundle(deleted_bundle_name(handle))
+    rule_set = generate_rules_for(analysis.summaries, attrs, analysis.handles, analysis.schema_index)
     for name, decorated in rule_set.rules:
         attrs[name] = decorated
     attrs["_producer_rule_names"] = rule_set.producer_names

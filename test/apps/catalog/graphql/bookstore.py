@@ -400,6 +400,34 @@ def _make_list_argument() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation)
 
 
+def _make_non_id_pool() -> strawberry.Schema:
+    @strawberry.type
+    class Project:
+        id: strawberry.ID
+        fullPath: str
+
+    projects = {
+        "acme/web": Project(id=strawberry.ID("1"), fullPath="acme/web"),
+        "acme/api": Project(id=strawberry.ID("2"), fullPath="acme/api"),
+    }
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def projects(self) -> list[Project]:
+            return list(projects.values())
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def moveIssue(self, projectPath: str, title: str) -> bool:
+            if projectPath in projects:
+                raise RuntimeError("planted: move-issue-to-real-project")
+            return False
+
+    return strawberry.Schema(Query, Mutation)
+
+
 def books(*, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask") -> GraphQLApp:
     return _wrap(_make_default(), endpoint, framework)
 
@@ -443,3 +471,71 @@ def input_object_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
 
 def list_argument_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
     return _wrap(_make_list_argument(), endpoint, "flask")
+
+
+def non_id_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_non_id_pool(), endpoint, "flask")
+
+
+def _make_bare_slug() -> strawberry.Schema:
+    @strawberry.type
+    class Project:
+        id: strawberry.ID
+        slug: str
+
+    seeded = {"acme-web": Project(id=strawberry.ID("1"), slug="acme-web")}
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def projects(self) -> list[Project]:
+            return list(seeded.values())
+
+        @strawberry.field
+        def project(self, slug: str) -> Project | None:
+            if slug in seeded:
+                raise RuntimeError("planted: project-by-real-slug")
+            return None
+
+    return strawberry.Schema(Query)
+
+
+def bare_slug(*, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_bare_slug(), endpoint, "flask")
+
+
+def _make_relay_connection() -> strawberry.Schema:
+    @strawberry.type
+    class Product:
+        id: strawberry.ID
+        slug: str
+
+    @strawberry.type
+    class ProductEdge:
+        node: Product
+
+    @strawberry.type
+    class ProductConnection:
+        edges: list[ProductEdge]
+
+    seeded = {f"chair-{n:02d}": Product(id=strawberry.ID(str(n)), slug=f"chair-{n:02d}") for n in range(1, 6)}
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def products(self) -> ProductConnection:
+            return ProductConnection(edges=[ProductEdge(node=p) for p in seeded.values()])
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def archiveProduct(self, productSlug: str) -> bool:
+            if productSlug in seeded:
+                raise RuntimeError("planted: archive-product-by-real-slug")
+            return False
+
+    return strawberry.Schema(Query, Mutation)
+
+
+def relay_connection(*, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_relay_connection(), endpoint, "flask")

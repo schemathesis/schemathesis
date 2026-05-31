@@ -197,7 +197,7 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def create_extra_data_source(self) -> GraphQLResourcePool:
-        return GraphQLResourcePool(client_schema=self.client_schema)
+        return GraphQLResourcePool(client_schema=self.client_schema, handles=self.analysis.handles)
 
     @override
     def build_request_url(self, case: Case, base_url: str) -> str:
@@ -546,6 +546,7 @@ def graphql_cases(
                     client_schema=operation.schema.client_schema,
                     pool=extra_data_source,
                     random=random_source,
+                    schema_index=operation.schema.analysis.schema_index,
                 )
         if mutate_ast is not None:
             mutate_ast(operation_node, draw(st.randoms()))

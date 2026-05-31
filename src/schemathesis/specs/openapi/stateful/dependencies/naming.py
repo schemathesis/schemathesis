@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from schemathesis.core.text import to_pascal_case
+
 # Generic parameter prefixes that don't identify a specific resource type.
 # When a parameter like "item_id" or "resource_uuid" is detected, the prefix
 # is not meaningful for resource identification, so we fall back to path-based naming.
@@ -445,27 +447,6 @@ def to_plural(word: str) -> str:
         return word + "es"
     # just add 's' (car -> cars)
     return word + "s"
-
-
-def to_pascal_case(text: str) -> str:
-    # snake_case/kebab-case - split and capitalize each word
-    if "_" in text or "-" in text:
-        parts = text.replace("-", "_").split("_")
-        return "".join(word.capitalize() for word in parts if word)
-    # camelCase - just uppercase first letter, preserve the rest
-    return text[0].upper() + text[1:] if text else text
-
-
-def to_snake_case(text: str) -> str:
-    text = text.replace("-", "_")
-    # Insert underscores before uppercase letters
-    result = []
-    for i, char in enumerate(text):
-        # Add underscore before uppercase (except at start)
-        if i > 0 and char.isupper():
-            result.append("_")
-        result.append(char.lower())
-    return "".join(result)
 
 
 def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> str | None:

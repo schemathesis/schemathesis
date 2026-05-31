@@ -4,31 +4,40 @@ import json
 from collections.abc import Iterator
 
 
-def iter_ids_from_response(response_body: bytes, *, field_name: str) -> Iterator[str]:
-    """Yield string `id` values found at `data[field_name]` in a GraphQL response.
+def iter_handle_values(
+    response_body: bytes, *, field_name: str, handle_fields: frozenset[str]
+) -> Iterator[tuple[str, str]]:
+    """Yield `(handle_field, value)` pairs found at `data[field_name]` in a GraphQL response.
 
-    Handles both single-object (`{"id": ...}`) and list (`[{"id": ...}, ...]`) shapes.
+    Handles single-object, list, and Relay connection (`edges { node }`) shapes.
     Yields nothing if the body is malformed, contains errors, or the path is missing.
     """
     try:
         payload = json.loads(response_body)
     except (ValueError, TypeError):
         return
-    if not isinstance(payload, dict):
-        return
-    if payload.get("errors"):
+    if not isinstance(payload, dict) or payload.get("errors"):
         return
     data = payload.get("data")
     if not isinstance(data, dict):
         return
-    field_value = data.get(field_name)
+    for record in _records(data.get(field_name)):
+        for handle_field in handle_fields:
+            candidate = record.get(handle_field)
+            if isinstance(candidate, str):
+                yield handle_field, candidate
+
+
+def _records(field_value: object) -> Iterator[dict]:
     if isinstance(field_value, dict):
-        candidate = field_value.get("id")
-        if isinstance(candidate, str):
-            yield candidate
+        edges = field_value.get("edges")
+        if isinstance(edges, list):
+            for edge in edges:
+                if isinstance(edge, dict) and isinstance(edge.get("node"), dict):
+                    yield edge["node"]
+        else:
+            yield field_value
     elif isinstance(field_value, list):
         for item in field_value:
             if isinstance(item, dict):
-                candidate = item.get("id")
-                if isinstance(candidate, str):
-                    yield candidate
+                yield item
