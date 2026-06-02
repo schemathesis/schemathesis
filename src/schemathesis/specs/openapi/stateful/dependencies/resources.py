@@ -4,8 +4,6 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-import jsonschema_rs
-
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.resolver import Resolver
@@ -157,9 +155,6 @@ def iter_resources_from_response(
                     cast(dict, resolved),
                     current_resolver,
                     nullable_keyword=response.adapter.nullable_keyword,
-                    upgrade_legacy_exclusive_bounds=(
-                        response.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
-                    ),
                 )
             except (InfiniteRecursiveReference, BundleError):
                 canonicalized = resolved
