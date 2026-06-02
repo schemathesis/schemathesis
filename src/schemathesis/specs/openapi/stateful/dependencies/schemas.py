@@ -97,29 +97,49 @@ def canonicalize(
     resolver: Resolver,
     *,
     nullable_keyword: str = "nullable",
-    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> Mapping[str, Any]:
-    """Transform the input schema into its canonical-ish form."""
-    from hypothesis_jsonschema._canonicalise import canonicalish
-
+    """Flatten the schema for resource discovery, preserving every property name."""
     from schemathesis.specs.openapi.converter import to_json_schema
 
-    # Canonicalisation in `hypothesis_jsonschema` requires all references to be resovable and non-recursive
-    # On the Schemathesis side bundling solves this problem
+    # Discovery needs all references resolvable and non-recursive; bundling solves that.
     bundled = bundle_for_generation(schema, resolver).schema
-    # Translate PCRE patterns (e.g., \p{L}) to Python-compatible equivalents before hypothesis_jsonschema processes them
-    bundled = to_json_schema(
-        bundled,
-        nullable_keyword,
-        update_quantifiers=False,
-        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
-    )
-    canonicalized = canonicalish(bundled)
-    resolved = resolve_all_refs(canonicalized)
+    # Translate PCRE patterns (e.g. `\p{L}`) to Python-compatible equivalents.
+    bundled = to_json_schema(bundled, nullable_keyword, update_quantifiers=False)
+    if not isinstance(bundled, dict):
+        return {} if bundled is True else {"not": {}}
+    resolved = resolve_all_refs(bundled)
     resolved.pop(BUNDLE_STORAGE_KEY, None)
-    if "allOf" in resolved or "anyOf" in resolved or "oneOf" in resolved:
-        return canonicalish(resolved)
-    return resolved
+    return _flatten_all_of(resolved)
+
+
+def _flatten_all_of(schema: JsonSchemaObject) -> JsonSchemaObject:
+    # Merge `allOf` structurally: union `properties` and `required` across branches so every property name
+    # survives for FK discovery.
+    all_of = schema.get("allOf")
+    if not isinstance(all_of, list):
+        return schema
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    rest: dict[str, Any] = {}
+    for branch in ({key: value for key, value in schema.items() if key != "allOf"}, *all_of):
+        if not isinstance(branch, dict):
+            continue
+        for key, value in _flatten_all_of(branch).items():
+            if key == "properties" and isinstance(value, dict):
+                for name, sub in value.items():
+                    properties.setdefault(name, sub)
+            elif key == "required" and isinstance(value, list):
+                for name in value:
+                    if name not in required:
+                        required.append(name)
+            else:
+                rest.setdefault(key, value)
+    result = dict(rest)
+    if properties:
+        result["properties"] = properties
+    if required:
+        result["required"] = required
+    return result
 
 
 def try_unwrap_composition(schema: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
