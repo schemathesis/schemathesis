@@ -1263,7 +1263,8 @@ def cover_schema_iter(
                     if value not in ("binary", "byte"):
                         yield from _negative_format(ctx, schema, value)
                 elif key == "maximum":
-                    next = value + 1
+                    # Legacy draft-4 `exclusiveMaximum: true` makes `maximum` itself the excluded boundary.
+                    next = value if schema.get("exclusiveMaximum") is True else value + 1
                     if seen.insert(next):
                         yield NegativeValue(
                             next,
@@ -1272,7 +1273,8 @@ def cover_schema_iter(
                             location=ctx.current_path,
                         )
                 elif key == "minimum":
-                    next = value - 1
+                    # Legacy draft-4 `exclusiveMinimum: true` makes `minimum` itself the excluded boundary.
+                    next = value if schema.get("exclusiveMinimum") is True else value - 1
                     if seen.insert(next):
                         yield NegativeValue(
                             next,
