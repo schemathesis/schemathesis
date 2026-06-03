@@ -3976,6 +3976,115 @@ def test_body_fk_inside_all_of_with_one_of_branches(ctx):
     assert bindings.get(("body", "brand_id")) == ("Brand", "id"), bindings
 
 
+def test_list_items_behind_nested_all_of_keep_their_fields(ctx):
+    # A list response whose array items are an `allOf` composition must still expose the item's
+    # fields, otherwise the resource degrades to a bare path-parameter stub.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/volumes": {
+                "get": {
+                    "operationId": "listVolumes",
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "volumes": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "allOf": [
+                                                                {
+                                                                    "type": "object",
+                                                                    "properties": {
+                                                                        "id": {"type": "string"},
+                                                                        "name": {"type": "string"},
+                                                                    },
+                                                                },
+                                                                {
+                                                                    "type": "object",
+                                                                    "properties": {"region": {"type": "string"}},
+                                                                },
+                                                            ]
+                                                        },
+                                                    }
+                                                },
+                                            },
+                                            {"type": "object", "properties": {"meta": {"type": "object"}}},
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/volumes/{volume_id}": {
+                "get": {
+                    "operationId": "getVolume",
+                    "parameters": [path_param("volume_id")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+    )
+
+    assert graph.resources["Volume"].fields == ["id", "name", "region"]
+
+
+def test_all_of_branches_merge_same_named_object_property(ctx):
+    # When `allOf` branches each define the same object property, the merged property must union
+    # both branches' sub-fields so a FK hidden in the overriding branch is still discovered.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/videos/{id}": {
+                "get": {
+                    "operationId": "getVideo",
+                    "parameters": [path_param("id")],
+                    "responses": {"200": {"content": {"application/json": {"schema": component_ref("VideoDetails")}}}},
+                }
+            },
+            "/users/{id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [path_param("id")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "AccountSummary": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                },
+                "Account": {
+                    "type": "object",
+                    "properties": {"displayName": {"type": "string"}, "userId": {"type": "string"}},
+                },
+                "Video": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "account": component_ref("AccountSummary")},
+                },
+                "VideoDetails": {
+                    "allOf": [
+                        component_ref("Video"),
+                        {"type": "object", "properties": {"account": component_ref("Account")}},
+                    ]
+                },
+            }
+        },
+    )
+
+    nested = [(fk.pointer, fk.target_resource) for fk in graph.resources["VideoDetails"].nested_fk_fields]
+    assert ("/account/userId", "User") in nested, nested
+
+
 def test_body_composition_with_boolean_branch_does_not_crash(ctx):
     # Boolean schemas (`true`/`false`) inside allOf are spec-legal and must not break traversal.
     _, graph = analyze_dependencies(

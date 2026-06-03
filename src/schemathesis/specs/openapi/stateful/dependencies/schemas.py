@@ -107,38 +107,53 @@ def canonicalize(
     bundled = to_json_schema(bundled, nullable_keyword, update_quantifiers=False)
     if not isinstance(bundled, dict):
         return {} if bundled is True else {"not": {}}
-    resolved = resolve_all_refs(bundled)
+    # Flatten before resolving so sibling `$ref` branches collapse to the first one;
+    # resolving first would inline every branch and over-merge unrelated definitions.
+    flattened = _flatten_all_of(bundled)
+    resolved = resolve_all_refs(flattened)
     resolved.pop(BUNDLE_STORAGE_KEY, None)
-    return _flatten_all_of(resolved)
+    if isinstance(resolved, dict) and ("allOf" in resolved or "anyOf" in resolved or "oneOf" in resolved):
+        return _flatten_all_of(resolved)
+    return resolved
 
 
 def _flatten_all_of(schema: JsonSchemaObject) -> JsonSchemaObject:
     # Merge `allOf` structurally: union `properties` and `required` across branches so every property name
     # survives for FK discovery.
     all_of = schema.get("allOf")
-    if not isinstance(all_of, list):
-        return schema
-    properties: dict[str, Any] = {}
-    required: list[str] = []
-    rest: dict[str, Any] = {}
-    for branch in ({key: value for key, value in schema.items() if key != "allOf"}, *all_of):
-        if not isinstance(branch, dict):
-            continue
-        for key, value in _flatten_all_of(branch).items():
-            if key == "properties" and isinstance(value, dict):
-                for name, sub in value.items():
-                    properties.setdefault(name, sub)
-            elif key == "required" and isinstance(value, list):
-                for name in value:
-                    if name not in required:
-                        required.append(name)
-            else:
-                rest.setdefault(key, value)
-    result = dict(rest)
-    if properties:
-        result["properties"] = properties
-    if required:
-        result["required"] = required
+    if isinstance(all_of, list):
+        properties: dict[str, Any] = {}
+        required: list[str] = []
+        rest: dict[str, Any] = {}
+        for branch in ({key: value for key, value in schema.items() if key != "allOf"}, *all_of):
+            if not isinstance(branch, dict):
+                continue
+            for key, value in _flatten_all_of(branch).items():
+                if key == "properties" and isinstance(value, dict):
+                    for name, sub in value.items():
+                        properties.setdefault(name, sub)
+                elif key == "required" and isinstance(value, list):
+                    for name in value:
+                        if name not in required:
+                            required.append(name)
+                else:
+                    rest.setdefault(key, value)
+        result = dict(rest)
+        if properties:
+            result["properties"] = properties
+        if required:
+            result["required"] = required
+    else:
+        result = schema
+    # Recurse into nested schemas so `allOf` wrapped inside properties or array items is flattened too.
+    for key, value in result.items():
+        if key in SCHEMA_KEYS:
+            if isinstance(value, list):
+                result[key] = [_flatten_all_of(item) if isinstance(item, dict) else item for item in value]
+            elif isinstance(value, dict):
+                result[key] = _flatten_all_of(value)
+        elif key in SCHEMA_OBJECT_KEYS and isinstance(value, dict):
+            result[key] = {name: _flatten_all_of(sub) if isinstance(sub, dict) else sub for name, sub in value.items()}
     return result
 
 
