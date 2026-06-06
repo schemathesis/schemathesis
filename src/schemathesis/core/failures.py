@@ -11,7 +11,7 @@ from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.compat import BaseExceptionGroup
-from schemathesis.core.output import prepare_response_payload
+from schemathesis.core.output import escape_surrogates, prepare_response_payload
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
@@ -366,4 +366,4 @@ def format_failures(
     _curl = "\n".join(f"    {line}" for line in curl.splitlines())
     output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with:\n\n{_curl}")
 
-    return output
+    return escape_surrogates(output)
