@@ -26,8 +26,6 @@ Real-world defects uncovered by Schemathesis’ property-based testing engine.
 
 ## Discoveries
 
-<div align="center" markdown>
-
-*Submit the first trophy!* 🏆
-
-</div>
+| Project | Type | What Schemathesis found |
+| --- | --- | --- |
+| [Huma](https://github.com/danielgtaylor/huma/issues/1042) | 💥 Server Crashes | `uniqueItems` validation ran before type casting, crashing the server thread on certain primitive inputs. |
