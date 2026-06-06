@@ -9,6 +9,12 @@ if TYPE_CHECKING:
 TRUNCATED = "// Output truncated..."
 
 
+def escape_surrogates(text: str) -> str:
+    # Lone surrogates (e.g. echoed back by a server) are valid `str` but cannot be UTF-8 encoded
+    # for terminal or report output; escape them instead of letting the write crash.
+    return text.encode("utf-8", "backslashreplace").decode("utf-8")
+
+
 def truncate_json(data: Any, *, config: OutputConfig, max_lines: int | None = None) -> str:
     # Convert JSON to string with indentation
     indent = 4

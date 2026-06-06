@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Missing boundary negative in the coverage phase for boolean `exclusiveMinimum` / `exclusiveMaximum`.
+- `UnicodeEncodeError` when failure or error output contains lone Unicode surrogate characters. [#4229](https://github.com/schemathesis/schemathesis/issues/4229)
 
 ## [4.21.0](https://github.com/schemathesis/schemathesis/compare/v4.20.3...v4.21.0) - 2026-06-01
 

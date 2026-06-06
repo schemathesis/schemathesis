@@ -26,6 +26,7 @@ from schemathesis.core.errors import (
     get_request_error_message,
     split_traceback,
 )
+from schemathesis.core.output import escape_surrogates
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -212,7 +213,7 @@ class EngineErrorInfo:
         if suggestion is not None:
             message.append(f"\nTip: {suggestion}")
 
-        return "\n".join(message)
+        return escape_surrogates("\n".join(message))
 
 
 def scalar_name_from_error(exception: hypothesis.errors.InvalidArgument) -> str:
