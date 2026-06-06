@@ -8,8 +8,6 @@ from _pytest.main import ExitCode
 from flask import jsonify
 from hypothesis import HealthCheck, given, seed, settings
 from hypothesis import strategies as st
-from hypothesis_jsonschema import from_schema
-from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 
 import schemathesis
 from schemathesis.config import GenerationConfig
@@ -18,9 +16,12 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.jsonschema import StrategyContext
+from schemathesis.generation.jsonschema.strategy import from_schema
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
+from schemathesis.specs.openapi.converter import normalize_for_canonicalize
 from schemathesis.specs.openapi.negative import mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
     MutationContext,
@@ -35,6 +36,16 @@ from test.utils import assert_requests_call
 
 MAX_EXAMPLES = 15
 SUPPRESSED_HEALTH_CHECKS = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]
+
+
+def _draw_instance(data, schema):
+    return data.draw(from_schema(jsonschema_rs.canonicalize(normalize_for_canonicalize(schema)), StrategyContext()))
+
+
+def _is_satisfiable(schema):
+    return jsonschema_rs.canonicalize(normalize_for_canonicalize(schema)).is_satisfiable()
+
+
 OBJECT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -212,7 +223,7 @@ def test_successful_mutations(data, mutation, schema):
     # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
     # And instances valid for this schema are not valid for the original one
-    new_instance = data.draw(from_schema(schema))
+    new_instance = _draw_instance(data, schema)
     assert not validator.is_valid(new_instance)
 
 
@@ -261,7 +272,7 @@ def test_path_parameters_are_string(data, schema):
     # Then mutated schema is a valid JSON Schema
     validate_schema(new_schema)
     # And parameters remain primitive types
-    new_instance = data.draw(from_schema(new_schema))
+    new_instance = _draw_instance(data, new_schema)
     assert not isinstance(new_instance["foo"], (list | dict))
     # And there should be no additional parameters
     assert len(new_instance) == 1
@@ -360,7 +371,7 @@ def test_no_unsatisfiable_schemas(data):
             target_descriptors=compute_mutation_targets(schema),
         )
     )
-    assert canonicalish(mutated_schema) != FALSEY
+    assert _is_satisfiable(mutated_schema)
 
 
 @given(data=st.data())
@@ -674,7 +685,7 @@ def test_negative_query_respects_allow_extra_parameter_toggle(data):
 )
 def test_prevent_unsatisfiable_schema(schema, new_type):
     prevent_unsatisfiable_schema(schema, new_type)
-    assert canonicalish(schema) != FALSEY
+    assert _is_satisfiable(schema)
 
 
 ARRAY_PARAMETER = {"type": "array", "minItems": 1, "items": {"type": "string", "format": "ipv4"}}

@@ -5,7 +5,7 @@ import unittest
 import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
-from warnings import WarningMessage, catch_warnings
+from warnings import catch_warnings
 
 from hypothesis.errors import InvalidArgument
 from jsonschema_rs import ValidationError
@@ -111,7 +111,7 @@ def run_test(
 
     try:
         setup_hypothesis_database_key(test_function, operation, generation=generation)
-        with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
+        with catch_warnings(record=True), ignore_hypothesis_output():
             test_function(
                 ctx=ctx,
                 state=state,
@@ -189,7 +189,7 @@ def run_test(
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
         return
-    except AssertionError as exc:  # May come from `hypothesis-jsonschema` or `hypothesis`
+    except AssertionError as exc:  # May be raised inside Hypothesis
         status = Status.ERROR
         try:
             operation.schema.validate()
@@ -223,16 +223,8 @@ def run_test(
             )
     except InvalidArgument as exc:
         status = Status.ERROR
-        message = get_invalid_regular_expression_message(warnings)
-        if message:
-            # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
-            yield non_fatal_error(InvalidRegexPattern.from_hypothesis_jsonschema_message(message))
-        else:
-            health_check = build_health_check_error(operation, exc, with_tip=False)
-            if isinstance(health_check, hypothesis.errors.FailedHealthCheck):
-                yield non_fatal_error(health_check)
-            else:
-                yield non_fatal_error(exc)
+        # Returns a `FailedHealthCheck` with a pinpointed message, or `exc` unchanged.
+        yield non_fatal_error(build_health_check_error(operation, exc, with_tip=False))
     except hypothesis.errors.DeadlineExceeded as exc:
         status = Status.ERROR
         yield non_fatal_error(DeadlineExceeded.from_exc(exc))
@@ -288,11 +280,3 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation, gener
         test._hypothesis_internal_database_key = None  # type: ignore[attr-defined]
         return
     test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore[attr-defined]
-
-
-def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> str | None:
-    for warning in warnings:
-        message = str(warning.message)
-        if "is not valid syntax for a Python regular expression" in message:
-            return message
-    return None

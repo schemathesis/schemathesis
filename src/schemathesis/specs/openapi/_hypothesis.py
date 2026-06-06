@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, cast
 import jsonschema_rs
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
-from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
@@ -20,10 +19,12 @@ from schemathesis.core.control import SkipTest
 from schemathesis.core.error_feedback import ErrorFeedbackStore, ObservationKind
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
+    InvalidRegexPattern,
     InvalidSchema,
     MalformedMediaType,
     SerializationNotPossible,
 )
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, GENERATION_INLINE_BUDGET
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import ParameterLocation
@@ -46,6 +47,7 @@ from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.resources import ExtraDataSource, PoolDraw, SemanticDraw
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
+from schemathesis.specs.openapi.converter import normalize_for_canonicalize
 from schemathesis.specs.openapi.formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
     HEADER_FORMAT,
@@ -993,13 +995,41 @@ def make_positive_strategy(
     target_descriptors: tuple | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
+    from schemathesis.generation.jsonschema import Alphabet, FormatRegistry, StrategyContext
+    from schemathesis.generation.jsonschema.strategy import from_schema
+
     custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
-    return from_schema(
-        schema,
-        custom_formats=custom_formats,
-        allow_x00=generation_config.allow_x00,
-        codec=generation_config.codec,
+    # Drop alphabet-taking function entries (e.g. h-js `json-pointer`); the in-tree registry covers those.
+    formats = {name: value for name, value in custom_formats.items() if isinstance(value, st.SearchStrategy)}
+    context = StrategyContext(
+        formats=FormatRegistry(formats),
+        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
     )
+
+    def build() -> st.SearchStrategy:
+        if isinstance(schema, dict) and schema.get("$schema") == "http://json-schema.org/draft-03/schema#":
+            # `canonicalize` keeps unknown meta-schemas opaque (`Raw`); Draft-03 is unsupported here.
+            raise InvalidSchema("Draft-03 JSON Schema is not supported")
+        # Upgrade legacy draft constructs (tuple `items`, boolean exclusive bounds, `\A`/`\Z` anchors)
+        # `canonicalize` rejects; a no-op for schemas already run through `to_json_schema`.
+        normalized = normalize_for_canonicalize(schema)
+        try:
+            if isinstance(normalized, dict) and BUNDLE_STORAGE_KEY in normalized:
+                # Bundled definitions live under an `x-` key `canonicalize` keeps opaque, so meta-validation
+                # skips them; validate them as `$defs` to surface malformed referenced subschemas.
+                jsonschema_rs.canonicalize({"$defs": normalized[BUNDLE_STORAGE_KEY]}, inline_budget=0)
+            canonical = jsonschema_rs.canonicalize(normalized, inline_budget=GENERATION_INLINE_BUDGET)
+        except jsonschema_rs.ValidationError:
+            # Located meta-validation failure; `_draw` turns it into `InvalidSchema` with a path.
+            raise
+        except jsonschema_rs.canonical.InvalidPattern as exc:
+            raise InvalidRegexPattern(str(exc)) from exc
+        except jsonschema_rs.canonical.CanonicalizationError as exc:
+            raise InvalidSchema(str(exc)) from exc
+        return from_schema(canonical, context)
+
+    # Defer canonicalize so invalid-schema errors surface at draw time, classified as schema errors.
+    return st.deferred(build)
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:

@@ -3426,7 +3426,8 @@ def test_negative_type_drops_false_negatives_against_loose_ref_target(ctx):
         definitions={"Loose": {"properties": {"x": {"type": "string"}}, "required": ["x"]}},
     )
     operation = schema["/foo"]["POST"]
-    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+    # The optimized schema is canonicalized as Draft 2020-12; validate against that draft.
+    validator = jsonschema_rs.validator_for(_optimized_body_schema(operation))
 
     false_negatives = [
         case.body
@@ -3472,7 +3473,8 @@ def test_negative_required_drops_false_negatives_at_body_root_with_ref_sibling(c
         },
     )
     operation = schema["/foo"]["POST"]
-    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+    # The optimized schema is canonicalized as Draft 2020-12; validate against that draft.
+    validator = jsonschema_rs.validator_for(_optimized_body_schema(operation))
 
     false_negatives = [
         case.body
@@ -3726,7 +3728,8 @@ def test_positive_number_near_boundary_respects_multiple_of(ctx):
         version="2.0",
     )
     operation = schema["/foo"]["POST"]
-    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+    # The optimized schema is canonicalized as Draft 2020-12; validate against that draft.
+    validator = jsonschema_rs.validator_for(_optimized_body_schema(operation))
 
     invalid = [
         case.body
@@ -3771,7 +3774,8 @@ def test_positive_number_boundary_respects_exclusive_bounds(ctx):
         version="2.0",
     )
     operation = schema["/foo"]["POST"]
-    validator = operation.schema.adapter.jsonschema_validator_cls(_optimized_body_schema(operation))
+    # The optimized schema is canonicalized as Draft 2020-12; validate against that draft.
+    validator = jsonschema_rs.validator_for(_optimized_body_schema(operation))
 
     invalid = [
         case.body
@@ -4775,7 +4779,8 @@ def test_duration_format_generates_required_query_positive_cases(ctx, version):
 def test_hostname_negative_format_respects_validator_draft(monkeypatch, validator_cls, should_generate):
     # `XN--9krT00a` is valid in Draft 4 but invalid in Draft 2020-12.
     monkeypatch.setattr(
-        "schemathesis.specs.openapi.coverage._schema.from_schema", lambda *_args, **_kwargs: st.just("XN--9krT00a")
+        "schemathesis.specs.openapi.coverage._schema._in_tree_strategy",
+        lambda *_args, **_kwargs: st.just("XN--9krT00a"),
     )
     ctx = CoverageContext(
         root_schema={"type": "string", "format": "hostname"},

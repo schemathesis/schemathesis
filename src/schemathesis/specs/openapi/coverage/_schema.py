@@ -44,8 +44,6 @@ from urllib.parse import quote_plus
 import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
-from hypothesis_jsonschema import from_schema
-from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.cache import MISSING, BoundedCache
@@ -59,9 +57,11 @@ from schemathesis.core.validation import contains_unicode_surrogate_pair, has_in
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
+from schemathesis.generation.jsonschema import Alphabet, FormatRegistry, StrategyContext
+from schemathesis.generation.jsonschema.strategy import from_schema
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
-from schemathesis.specs.openapi.converter import rewrite_legacy_exclusive_bounds
+from schemathesis.specs.openapi.converter import normalize_for_canonicalize
 from schemathesis.specs.openapi.patterns import (
     pattern_length_bounds,
     pattern_requires_char_outside,
@@ -232,7 +232,7 @@ def _generate_additional_property_key(existing_keys: set[str]) -> str:
 
 
 def _supports_format_generation(format: str, custom_formats: dict[str, st.SearchStrategy]) -> bool:
-    return format in BUILT_IN_STRING_FORMATS or format in custom_formats
+    return _coverage_format_registry(custom_formats).get(format) is not None
 
 
 @dataclass
@@ -479,7 +479,7 @@ class CoverageContext:
             if cached is not MISSING:
                 return deepclone(cached) if isinstance(cached, (dict, list)) else cached
         try:
-            if not jsonschema_rs.canonicalize(_upgrade_exclusive_bounds(schema)).is_satisfiable():
+            if not jsonschema_rs.canonicalize(normalize_for_canonicalize(schema)).is_satisfiable():
                 raise Unsatisfiable
         except Unsatisfiable:
             if cache_key is not None:
@@ -525,10 +525,9 @@ class CoverageContext:
             if schema["type"] != "string":
                 return cached_draw(get_strategy_for_type(schema["type"]))
             fmt = schema["format"]
-            if fmt in self.custom_formats:
-                return cached_draw(self.custom_formats[fmt])
-            if fmt in BUILT_IN_STRING_FORMATS:
-                return cached_draw(BUILT_IN_STRING_FORMATS[fmt])
+            format_strategy = _coverage_format_registry(self.custom_formats).get(fmt)
+            if format_strategy is not None:
+                return cached_draw(format_strategy)
         if (keys == ["maxLength", "minLength", "type"] or keys == ["maxLength", "type"]) and schema["type"] == "string":
             return cached_draw(st.text(min_size=schema.get("minLength", 0), max_size=schema["maxLength"]))
         if (
@@ -622,7 +621,7 @@ class CoverageContext:
                     st.lists(
                         st.fixed_dictionaries(
                             {
-                                key: from_schema(sub_schema, custom_formats=self.custom_formats)
+                                key: _in_tree_strategy(sub_schema, self.custom_formats)
                                 for key, sub_schema in items["properties"].items()
                             }
                         ),
@@ -639,7 +638,7 @@ class CoverageContext:
             ]
             schema = {**schema, "allOf": resolved_all_of}
             try:
-                canonical = jsonschema_rs.canonicalize(_upgrade_exclusive_bounds(schema))
+                canonical = jsonschema_rs.canonicalize(normalize_for_canonicalize(schema))
                 if not canonical.is_satisfiable():
                     raise Unsatisfiable
                 merged = canonical.to_json_schema()
@@ -652,7 +651,7 @@ class CoverageContext:
                 return self.generate_from_schema(schema)
 
         if isinstance(schema, dict) and "examples" in schema:
-            # Examples may contain binary data which will fail the canonicalisation process in `hypothesis-jsonschema`
+            # Examples may contain binary data that canonicalization can't process.
             schema = {key: value for key, value in schema.items() if key != "examples"}
         # Prevent some hard to satisfy schemas
         if isinstance(schema, dict) and schema.get("additionalProperties") is False and "required" in schema:
@@ -667,11 +666,12 @@ class CoverageContext:
             schema = dict(schema)
             schema[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
 
-        # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
-        cloned = deepclone(schema)
-        if isinstance(cloned, dict) and BUNDLE_STORAGE_KEY in cloned:
-            _apply_pattern_optimizations(cloned[BUNDLE_STORAGE_KEY], self.update_pattern)
-        strategy = from_schema(cloned, custom_formats=self.custom_formats)
+        if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in schema:
+            # `_apply_pattern_optimizations` rewrites the bundle in place; clone so the root bundle (shared
+            # by reference above) stays intact. Generation itself never mutates, so other shapes need no copy.
+            schema = deepclone(schema)
+            _apply_pattern_optimizations(schema[BUNDLE_STORAGE_KEY], self.update_pattern)
+        strategy = _in_tree_strategy(schema, self.custom_formats)
         # Keep generation consistent with the validator draft semantics used by this operation.
         # This avoids producing positive values that the validator for the same schema would reject.
         if (
@@ -803,30 +803,29 @@ def _with_effective_required(schema: JsonSchemaObject) -> JsonSchemaObject:
     return schema
 
 
-def _upgrade_exclusive_bounds(schema: JsonSchema) -> JsonSchema:
-    # Rewrite draft-4 boolean `exclusiveMinimum`/`exclusiveMaximum` to numeric so `canonicalize` accepts it.
-    # Copy-on-write: unchanged input is returned as-is.
-    if not isinstance(schema, dict):
-        return schema
-    result = schema
-    for key, value in schema.items():
-        if isinstance(value, dict):
-            upgraded = _upgrade_exclusive_bounds(value)
-            if upgraded is not value:
-                if result is schema:
-                    result = dict(schema)
-                result[key] = upgraded
-        elif isinstance(value, list):
-            items = [_upgrade_exclusive_bounds(item) if isinstance(item, dict) else item for item in value]
-            if any(a is not b for a, b in zip(items, value, strict=True)):
-                if result is schema:
-                    result = dict(schema)
-                result[key] = items
-    if isinstance(result.get("exclusiveMinimum"), bool) or isinstance(result.get("exclusiveMaximum"), bool):
-        if result is schema:
-            result = dict(schema)
-        rewrite_legacy_exclusive_bounds(result)
-    return result
+# Coverage draws one value per construct; the default alphabet allows U+0000 and full UTF-8.
+_COVERAGE_ALPHABET = Alphabet()
+_format_registry_cache: BoundedCache = BoundedCache(maxsize=64)
+
+
+def _coverage_format_registry(custom_formats: dict[str, st.SearchStrategy]) -> FormatRegistry:
+    key = id(custom_formats)
+    cached = _format_registry_cache.get(key)
+    if cached is not MISSING:
+        return cached
+    strategies = {name: value for name, value in custom_formats.items() if isinstance(value, st.SearchStrategy)}
+    registry = FormatRegistry(strategies)
+    _format_registry_cache[key] = registry
+    return registry
+
+
+def _in_tree_strategy(schema: JsonSchema, custom_formats: dict[str, st.SearchStrategy]) -> st.SearchStrategy:
+    # Default (unbounded) inlining keeps refs resolved into self-contained nodes — matching the
+    # `canonicalize` satisfiability check above. Coverage walks one construct at a time, so the
+    # whole-operation memory pressure that forces `inline_budget=0` in the fuzzing path is absent.
+    canonical = jsonschema_rs.canonicalize(normalize_for_canonicalize(schema))
+    context = StrategyContext(formats=_coverage_format_registry(custom_formats), alphabet=_COVERAGE_ALPHABET)
+    return from_schema(canonical, context)
 
 
 def _recover_one_of_from_canonical(schema: JsonSchemaObject) -> JsonSchemaObject:
@@ -1084,11 +1083,20 @@ def _cover_positive_for_type(
             else:
                 with suppress(jsonschema_rs.ValidationError, ValueError):
                     _inline_allof_refs(schema, ctx)
-                    canonical = jsonschema_rs.canonicalize(_upgrade_exclusive_bounds(schema))
+                    canonical = jsonschema_rs.canonicalize(normalize_for_canonicalize(schema))
                     if canonical.is_satisfiable():
                         canonical_value = canonical.to_json_schema()
                         if isinstance(canonical_value, dict) and "allOf" not in canonical_value:
                             yield from cover_schema_iter(ctx, canonical_value)
+                        elif not canonical.definitions():
+                            # Conjunction the canonicaliser can't flatten (e.g. `allOf` with `not`): synthesize
+                            # one value so the branch is covered. Skipped for cyclic schemas (symbolic refs remain).
+                            with suppress(Unsatisfiable):
+                                yield PositiveValue(
+                                    ctx.generate_from_schema(schema),
+                                    scenario=CoverageScenario.VALID_OBJECT,
+                                    description="Valid object",
+                                )
                 allof_handles_all = True
         if not allof_handles_all:
             if enum is not NOT_SET:
@@ -1629,7 +1637,7 @@ def cover_schema_iter(
                     else:
                         with _ignore_unfixable():
                             canonical_value = jsonschema_rs.canonicalize(
-                                _upgrade_exclusive_bounds(schema)
+                                normalize_for_canonicalize(schema)
                             ).to_json_schema()
                             if isinstance(canonical_value, dict) and "allOf" in canonical_value:
                                 for idx, sub in enumerate(value):
@@ -1826,7 +1834,7 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
         _schema = deepclone(schema)
         if ctx.update_pattern is not None:
             _update_schema_pattern(_schema, ctx.update_pattern)
-        # Strip format-invalid hints so hypothesis-jsonschema does not use them as generation seeds.
+        # Strip format-invalid hints so they are not used as generation seeds.
         if "default" in _schema and not _is_valid_with_formats(_schema["default"], _schema, ctx):
             del _schema["default"]
         if "example" in _schema and not _is_valid_with_formats(_schema["example"], _schema, ctx):
@@ -1998,7 +2006,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if ctx.location == "path" and not ("format" in schema and schema["format"] in ctx.custom_formats):
         schema = _ensure_valid_path_parameter_schema(schema)
     elif ctx.location in ("header", "cookie") and not (
-        "format" in schema and (schema["format"] in ctx.custom_formats or schema["format"] in BUILT_IN_STRING_FORMATS)
+        "format" in schema and _coverage_format_registry(ctx.custom_formats).get(schema["format"]) is not None
     ):
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and pattern_requires_char_outside(pattern, HEADER_ALLOWED_CHARS):
@@ -2799,7 +2807,7 @@ def _negative_format(
     validator_cls = ctx.validator_cls
     if format not in VALIDATED_FORMATS_BY_DRAFT.get(validator_cls, frozenset()):
         return
-    # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
+    # Drop `format` and draw a plain string so the value won't satisfy the original format.
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format["type"] = "string"
     if ctx.location == "path":
@@ -2827,7 +2835,7 @@ def _negative_format(
         filter_fn = partial(_violates_hostname, validator_cls=validator_cls)
     else:
         filter_fn = partial(_violates_format, format=format, validator_cls=validator_cls)
-    strategy = from_schema(without_format).filter(filter_fn)
+    strategy = _in_tree_strategy(without_format, {}).filter(filter_fn)
     try:
         value: str = examples.generate_one(strategy)
     except Unsatisfiable:

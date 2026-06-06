@@ -24,6 +24,10 @@ from schemathesis.core.jsonschema.types import JsonSchema, get_type
 # degenerate ones (e.g. `{0,10000000}` from a huge `maxLength`) instead of burning seconds + ~1GB.
 FANCY_REGEX_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=150_000_000)
 
+# Inline acyclic `$ref` targets up to this canonical node count so `intersect` can merge them
+# (e.g. `allOf` of object refs, discriminator pins); larger and cyclic targets stay symbolic.
+GENERATION_INLINE_BUDGET = 64
+
 
 def _is_valid_uuid(value: object) -> bool:
     if not isinstance(value, str):
@@ -239,6 +243,7 @@ __all__ = [
     "DRAFT4_SUPPLEMENTAL_FORMATS",
     "VALIDATED_FORMATS_BY_DRAFT",
     "FANCY_REGEX_OPTIONS",
+    "GENERATION_INLINE_BUDGET",
     "is_valid",
     "make_validator",
     "make_validator_for",

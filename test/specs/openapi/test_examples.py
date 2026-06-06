@@ -10,6 +10,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.config import GenerationConfig
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
@@ -19,6 +20,7 @@ from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_sch
 from schemathesis.specs.openapi.examples import (
     BodyExample,
     ParameterExample,
+    _generate_single_example,
     _get_pool_combos,
     extract_from_schemas,
     extract_inner_examples,
@@ -3653,3 +3655,20 @@ def test_pool_injected_body_with_multiple_media_types_does_not_crash(ctx):
     assert strategies
     for strategy in strategies:
         examples.generate_one(strategy)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "integer", "minimum": 0, "exclusiveMinimum": True},
+        {"type": "array", "items": [{"type": "integer"}, {"type": "string"}], "minItems": 2},
+    ],
+    ids=["bool-exclusive-minimum", "tuple-items"],
+)
+def test_generate_single_example_handles_legacy_draft4_forms(schema):
+    # OpenAPI 3.0 / Swagger parameter schemas carry draft-4 forms `canonicalize` rejects; they
+    # must still produce a fill-in value, not be silently skipped.
+    from schemathesis.specs.openapi.converter import normalize_for_canonicalize
+
+    value = _generate_single_example(schema, GenerationConfig())
+    assert jsonschema_rs.is_valid(normalize_for_canonicalize(schema), value)

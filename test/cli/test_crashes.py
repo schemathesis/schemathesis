@@ -1,10 +1,10 @@
 from unittest import mock
 
+import jsonschema_rs
 import pytest
 from hypothesis import HealthCheck, Phase, Verbosity, example, given, settings
 from hypothesis import strategies as st
 from hypothesis.provisional import urls
-from hypothesis_jsonschema import from_schema
 from requests import Response
 
 from schemathesis import GenerationMode
@@ -12,6 +12,8 @@ from schemathesis.checks import CHECKS
 from schemathesis.cli.output import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.transforms import deepclone
+from schemathesis.generation.jsonschema import StrategyContext
+from schemathesis.generation.jsonschema.strategy import from_schema
 from schemathesis.generation.metrics import METRICS
 
 
@@ -232,7 +234,7 @@ def remove_nones(value):
     return value
 
 
-@given(config=from_schema(deepclone(CONFIG_SCHEMA)).map(remove_nones))
+@given(config=from_schema(jsonschema_rs.canonicalize(deepclone(CONFIG_SCHEMA)), StrategyContext()).map(remove_nones))
 @settings(
     phases=[Phase.generate],
     suppress_health_check=list(HealthCheck),

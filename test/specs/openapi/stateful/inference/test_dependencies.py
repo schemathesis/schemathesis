@@ -6028,3 +6028,26 @@ def test_content_wrapper_unwrapped_around_single_object(ctx):
     )
     [output] = graph.operations["POST /albums"].outputs
     assert (output.resource.name, output.pointer, output.cardinality.value) == ("Album", "/content", "ONE")
+
+
+def test_resolve_all_refs_unions_ref_siblings():
+    # A `$ref` alongside sibling `properties`/`required` must keep both sets so every field name
+    # survives for foreign-key discovery.
+    from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+    from schemathesis.specs.openapi.stateful.dependencies.schemas import resolve_all_refs
+
+    schema = {
+        "$ref": "#/x-bundled/Resource",
+        "required": ["sibling_id"],
+        "properties": {"sibling_id": {"type": "string"}},
+        BUNDLE_STORAGE_KEY: {
+            "Resource": {
+                "type": "object",
+                "properties": {"resource_id": {"type": "string"}},
+                "required": ["resource_id"],
+            },
+        },
+    }
+    result = resolve_all_refs(schema)
+    assert set(result["properties"]) == {"resource_id", "sibling_id"}
+    assert set(result["required"]) == {"resource_id", "sibling_id"}

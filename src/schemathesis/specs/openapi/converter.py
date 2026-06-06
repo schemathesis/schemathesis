@@ -162,7 +162,11 @@ def _to_json_schema(
 
     ensure_required_properties(schema)
 
-    # Convert prefixItems -> items[array] for hypothesis-jsonschema (Draft 4/7-only).
+    if schema_type == "array":
+        # Produces `prefixItems`; must run before the `convert_prefix_items` downgrade below.
+        _rewrite_allof_of_contains_consts(schema)
+
+    # Convert prefixItems -> items[array] (the Draft 4/7 tuple form).
     # Skipped when the consumer needs `prefixItems` to stay intact (e.g. for Draft 2020-12 validators).
     if convert_prefix_items and "prefixItems" in schema:
         prefix_items = schema.pop("prefixItems")
@@ -175,9 +179,6 @@ def _to_json_schema(
     # Skipped when the consumer needs the originals to stay intact (e.g. for Draft 2020-12 validators).
     if convert_if_then_else:
         _rewrite_if_then_else(schema)
-
-    if schema_type == "array":
-        _rewrite_allof_of_contains_consts(schema)
 
     if not is_response_schema:
         _pin_discriminator_property(schema, name_to_uri, bundle)
@@ -261,7 +262,7 @@ def _pin_discriminator_property(
 
     When a schema has a `discriminator`, each branch in oneOf/anyOf is wrapped in
     `allOf` with an `enum` constraint on the discriminator property. This ensures
-    hypothesis-jsonschema generates the correct discriminator value for each branch.
+    each branch generates its correct discriminator value.
     """
     discriminator = schema.get("discriminator")
     if not isinstance(discriminator, dict):
@@ -333,9 +334,9 @@ def _branch_is_polymorphic(ref: str, bundle: dict[str, Any] | None) -> bool:
 
 
 def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
-    # `allOf: [{contains: {const: A}}, {contains: {const: B}}, ...]` can't be merged by
-    # hypothesis-jsonschema, so it falls back to filtering and exhausts. Rewriting the
-    # required consts as a positional `items` prefix forces them into the array up front.
+    # `allOf: [{contains: {const: A}}, {contains: {const: B}}, ...]` is rewritten so the
+    # required consts become a positional `items` prefix, forcing them into the array up front
+    # instead of relying on filtering to satisfy every `contains`.
     all_of = schema.get("allOf")
     if not isinstance(all_of, list) or len(all_of) < 2:
         return
@@ -355,10 +356,9 @@ def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
             keep.append(entry)
     if len(consts) < 2:
         return
-    original_items = schema.get("items")
-    if isinstance(original_items, dict):
-        schema["additionalItems"] = original_items
-    schema["items"] = consts
+    # Emit the 2020-12 `prefixItems` tuple; the `convert_prefix_items` pass downgrades it to the
+    # Draft 4/7 `items` array when the consumer needs that form. The original `items` stays as the tail.
+    schema["prefixItems"] = consts
     if keep:
         schema["allOf"] = keep
     else:
@@ -420,6 +420,50 @@ def rewrite_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
             continue
         schema[exclusive_key] = bound
         schema.pop(bound_key, None)
+
+
+def normalize_for_canonicalize(schema: JsonSchema) -> JsonSchema:
+    # Rewrite legacy draft constructs `canonicalize` (Draft 2020-12) rejects (boolean exclusive bounds ->
+    # numeric, tuple `items: [..]` -> `prefixItems`) and translate Python/PCRE regex anchors (`\A`/`\Z`)
+    # to ECMA equivalents; copy-on-write returns unchanged input as-is.
+    if not isinstance(schema, dict):
+        return schema
+    result = schema
+    for key, value in schema.items():
+        if isinstance(value, dict):
+            upgraded = normalize_for_canonicalize(value)
+            if upgraded is not value:
+                if result is schema:
+                    result = dict(schema)
+                result[key] = upgraded
+        elif isinstance(value, list):
+            items = [normalize_for_canonicalize(item) if isinstance(item, dict) else item for item in value]
+            if any(a is not b for a, b in zip(items, value, strict=True)):
+                if result is schema:
+                    result = dict(schema)
+                result[key] = items
+    if isinstance(result.get("items"), list):
+        if result is schema:
+            result = dict(schema)
+        result["prefixItems"] = result.pop("items")
+        if "additionalItems" in result:
+            result["items"] = result.pop("additionalItems")
+    if isinstance(result.get("exclusiveMinimum"), bool) or isinstance(result.get("exclusiveMaximum"), bool):
+        if result is schema:
+            result = dict(schema)
+        rewrite_legacy_exclusive_bounds(result)
+    pattern = result.get("pattern")
+    if isinstance(pattern, str) and (
+        not is_valid_python_regex(pattern) or pattern.startswith(r"\A") or pattern.endswith(r"\Z")
+    ):
+        # Translate PCRE/POSIX constructs and `\A`/`\Z` anchors. A genuinely invalid pattern
+        # (no translation) is left as-is so `canonicalize` surfaces it as an error.
+        translated = normalize_regex(pattern)
+        if translated is not None:
+            if result is schema:
+                result = dict(schema)
+            result["pattern"] = translated
+    return result
 
 
 def ensure_required_properties(schema: dict[str, Any]) -> None:

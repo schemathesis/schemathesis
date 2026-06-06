@@ -9,15 +9,20 @@ from urllib.parse import urlencode
 
 import jsonschema_rs
 from hypothesis import strategies as st
-from hypothesis.errors import InvalidArgument
-from hypothesis_jsonschema import from_schema
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core.jsonschema import ALL_KEYWORDS, DRAFT4_SUPPLEMENTAL_FORMATS, FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema import (
+    ALL_KEYWORDS,
+    DRAFT4_SUPPLEMENTAL_FORMATS,
+    FANCY_REGEX_OPTIONS,
+    GENERATION_INLINE_BUDGET,
+)
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.jsonschema import Alphabet, FormatRegistry, StrategyContext
+from schemathesis.generation.jsonschema.strategy import from_schema
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
@@ -243,8 +248,8 @@ def negative_schema(
     `validation_schema`, when provided, keeps `prefixItems` intact and is used only to build the
     runtime validator; falls back to `schema`.
     """
-    # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
-    # the original schema.
+    # Each mutated schema is generated from and guarded against producing instances valid against the
+    # original schema.
     cache_key = CacheKey(operation_name, location, schema, validator_cls, frozenset(custom_formats))
     # Build the validator from the form with `prefixItems` intact so meta-validation accepts it.
     validator_cache_key = (
@@ -272,18 +277,22 @@ def negative_schema(
         def filter_values(value: Any) -> bool:
             return skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
 
+    # Drop alphabet-taking function entries (e.g. h-js `json-pointer`); the in-tree registry covers those.
+    format_strategies = {name: value for name, value in custom_formats.items() if isinstance(value, st.SearchStrategy)}
+    formats = FormatRegistry(format_strategies)
+    alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
+
+    def in_tree_strategy(target_schema: JsonSchema) -> st.SearchStrategy:
+        # Canonicalization failures (unsatisfiable / malformed mutations) yield no values.
+        try:
+            canonical = jsonschema_rs.canonicalize(target_schema, inline_budget=GENERATION_INLINE_BUDGET)
+        except (jsonschema_rs.canonical.CanonicalizationError, jsonschema_rs.ValidationError):
+            return st.nothing()
+        return from_schema(canonical, StrategyContext(formats=formats, alphabet=alphabet))
+
     def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
         schema, metadata = value
-        return (
-            from_schema(
-                schema,
-                custom_formats=custom_formats,
-                allow_x00=generation_config.allow_x00,
-                codec=generation_config.codec,
-            )
-            .filter(filter_values)
-            .map(lambda value: GeneratedValue(value, metadata))
-        )
+        return in_tree_strategy(schema).filter(filter_values).map(lambda value: GeneratedValue(value, metadata))
 
     if target_descriptors is None:
         target_descriptors = compute_mutation_targets(schema)
@@ -300,19 +309,12 @@ def negative_schema(
 
     positive_strategy: st.SearchStrategy | None = None
     if location == ParameterLocation.BODY:
-        _candidate = from_schema(
-            schema,
-            custom_formats=custom_formats,
-            allow_x00=generation_config.allow_x00,
-            codec=generation_config.codec,
-        )
         try:
-            _candidate.validate()
-        except InvalidArgument:
-            pass
-        else:
-            if not _candidate.is_empty:
-                positive_strategy = _candidate
+            candidate_canonical = jsonschema_rs.canonicalize(schema, inline_budget=GENERATION_INLINE_BUDGET)
+        except (jsonschema_rs.canonical.CanonicalizationError, jsonschema_rs.ValidationError):
+            candidate_canonical = None
+        if candidate_canonical is not None and candidate_canonical.is_satisfiable():
+            positive_strategy = from_schema(candidate_canonical, StrategyContext(formats=formats, alphabet=alphabet))
     if positive_strategy is not None:
         body_schema: JsonSchemaObject = schema if isinstance(schema, dict) else {}
         inner_mutated_strategy = mutated_strategy

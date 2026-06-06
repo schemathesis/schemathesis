@@ -183,10 +183,10 @@ def test_proxy_error(ctx, cli, snapshot_cli):
 
 
 def test_generation_config(ctx, cli, mocker):
-    from schemathesis.specs.openapi import _hypothesis
+    from schemathesis.generation.jsonschema import strategy
 
     api = ctx.openapi.apps.users_crud()
-    mocked = mocker.spy(_hypothesis, "from_schema")
+    mocked = mocker.spy(strategy, "from_schema")
     cli.run(
         api.schema_url,
         "--phases=stateful",
@@ -196,9 +196,10 @@ def test_generation_config(ctx, cli, mocker):
         "--generation-with-security-parameters=false",
         "-c not_a_server_error",
     )
-    from_schema_kwargs = mocked.call_args_list[0].kwargs
-    assert from_schema_kwargs["allow_x00"] is False
-    assert from_schema_kwargs["codec"] == "ascii"
+    # Generation config reaches the strategy through `StrategyContext.alphabet`.
+    context = mocked.call_args_list[0].args[1]
+    assert context.alphabet.allow_x00 is False
+    assert context.alphabet.codec == "ascii"
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

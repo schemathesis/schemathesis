@@ -340,13 +340,6 @@ class InvalidRegexPattern(InvalidSchema):
     """Raised when a string pattern is not a valid regular expression."""
 
     @classmethod
-    def from_hypothesis_jsonschema_message(cls, message: str) -> InvalidRegexPattern:
-        match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
-        if match:
-            message = f"Invalid regular expression. Pattern `{match.group(1)}` is not recognized - `{match.group(2)}`"
-        return cls(message)
-
-    @classmethod
     def from_jsonschema_rs_error(cls, error: ValidationError) -> InvalidRegexPattern:
         return cls(
             "Failed to generate test cases for this API operation because of "

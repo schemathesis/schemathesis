@@ -18,6 +18,9 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis.examples import generate_one
 
 if TYPE_CHECKING:
+    import jsonschema_rs
+    from hypothesis.strategies import SearchStrategy
+
     from schemathesis.schemas import APIOperation
 
 
@@ -92,9 +95,17 @@ This usually means:
 {UNSATISFIABILITY_CAUSE}"""
 
 
+def _parameter_strategy(canonical: jsonschema_rs.CanonicalSchema) -> SearchStrategy:
+    from schemathesis.generation.jsonschema import StrategyContext
+    from schemathesis.generation.jsonschema.strategy import from_schema
+
+    return from_schema(canonical, StrategyContext())
+
+
 def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParameter | None:
     import jsonschema_rs
-    from hypothesis_jsonschema import from_schema
+
+    from schemathesis.specs.openapi.converter import normalize_for_canonicalize
 
     for location, container in (
         (ParameterLocation.QUERY, operation.query),
@@ -106,13 +117,13 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
         for parameter in container:
             schema = parameter.optimized_schema
             try:
-                is_sat = jsonschema_rs.canonicalize(schema).is_satisfiable()
+                canonical = jsonschema_rs.canonicalize(normalize_for_canonicalize(schema))
             except Exception:
-                is_sat = True
+                continue
+            is_sat = canonical.is_satisfiable()
             if is_sat:
                 try:
-                    generate_one(from_schema(schema))
-                    is_sat = True
+                    generate_one(_parameter_strategy(canonical))
                 except Unsatisfiable:
                     is_sat = False
             if not is_sat:
@@ -225,8 +236,10 @@ def _extract_health_check_reason(exc: FailedHealthCheck | InvalidArgument) -> He
 
 
 def find_slow_parameter(operation: APIOperation, reason: HealthCheck) -> SlowParameter | None:
+    import jsonschema_rs
     from hypothesis.errors import FailedHealthCheck
-    from hypothesis_jsonschema import from_schema
+
+    from schemathesis.specs.openapi.converter import normalize_for_canonicalize
 
     for location, container in (
         (ParameterLocation.QUERY, operation.query),
@@ -237,7 +250,11 @@ def find_slow_parameter(operation: APIOperation, reason: HealthCheck) -> SlowPar
     ):
         for parameter in container:
             try:
-                generate_one(from_schema(parameter.optimized_schema), suppress_health_check=[])
+                canonical = jsonschema_rs.canonicalize(normalize_for_canonicalize(parameter.optimized_schema))
+            except Exception:
+                continue
+            try:
+                generate_one(_parameter_strategy(canonical), suppress_health_check=[])
             except (FailedHealthCheck, Unsatisfiable, InvalidArgument):
                 if location == ParameterLocation.BODY:
                     name = parameter.media_type

@@ -570,9 +570,11 @@ class OpenApiComponent(ABC):
             self.raw_schema,
             nullable_keyword=self.adapter.nullable_keyword,
             update_quantifiers=optimize,
-            upgrade_legacy_exclusive_bounds=(
-                self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
-            ),
+            # The generator canonicalizes as Draft 2020-12, so the schema must be in that form: numeric
+            # exclusive bounds (not the Draft 4 boolean) and `prefixItems` (not the Draft 4/7 `items` array
+            # tuple) -- 2020-12 meta-validation rejects the legacy forms.
+            upgrade_legacy_exclusive_bounds=True,
+            convert_prefix_items=False,
             name_to_uri=self.name_to_uri,
             merge_ref_siblings=self.adapter.ref_siblings,
         )
@@ -906,6 +908,8 @@ class OpenApiBody(OpenApiComponent):
             generation_config,
             operation.schema.adapter.jsonschema_validator_cls,
             self.name_to_uri,
+            # The spec-draft validator runs against the draft-native form, not the 2020-12 optimized schema.
+            validation_schema=self.validation_schema,
             target_descriptors=target_descriptors,
         )
 

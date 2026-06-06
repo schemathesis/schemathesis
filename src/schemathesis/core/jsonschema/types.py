@@ -9,22 +9,15 @@ ANY_TYPE = ["null", "boolean", "number", "string", "array", "object"]
 ALL_TYPES = ["null", "boolean", "integer", "number", "string", "array", "object"]
 
 
-def get_type(schema: JsonSchema, *, _check_type: bool = False) -> list[str]:
+def get_type(schema: JsonSchema) -> list[str]:
     if isinstance(schema, bool):
         return ANY_TYPE
     ty = schema.get("type", ANY_TYPE)
     if isinstance(ty, str):
-        if _check_type and ty not in ALL_TYPES:
-            raise AssertionError(f"Unknown type: `{ty}`. Should be one of {', '.join(ALL_TYPES)}")
         return [ty]
     if ty is ANY_TYPE:
         return list(ty)
     return [t for t in ALL_TYPES if t in ty]
-
-
-def _get_type(schema: JsonSchema) -> list[str]:
-    # Special version to patch `hypothesis-jsonschema`
-    return get_type(schema, _check_type=True)
 
 
 def to_json_type_name(v: object) -> str:

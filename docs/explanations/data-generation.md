@@ -4,12 +4,12 @@ This document explains how Schemathesis generates test data for your API, from r
 
 ## The Generation Hierarchy
 
-Schemathesis is structured as four phases (Examples, Coverage, Fuzzing, Stateful), plus a feedback loop on OpenAPI that learns from server responses and influences subsequent test cases. Every phase uses Hypothesis with schema-based generators (`hypothesis-jsonschema` for OpenAPI, `hypothesis-graphql` for GraphQL) to drive values from the schema; what differs between phases is how each one chooses inputs and which validity mode it targets.
+Schemathesis is structured as four phases (Examples, Coverage, Fuzzing, Stateful), plus a feedback loop on OpenAPI that learns from server responses and influences subsequent test cases. Every phase uses Hypothesis with schema-based generators (a built-in JSON Schema generator for OpenAPI, `hypothesis-graphql` for GraphQL) to drive values from the schema; what differs between phases is how each one chooses inputs and which validity mode it targets.
 
 What each layer contributes:
 
 1. **Hypothesis** — primitive strategies (strings, integers, objects), shrinking, and the example database.
-2. **hypothesis-jsonschema / hypothesis-graphql** — translate JSON Schema / GraphQL fragments into Hypothesis strategies. Used by every phase as the schema-driven value source; the validity mode (positive, negative, mixed) is set by the calling phase.
+2. **JSON Schema generator / hypothesis-graphql** — translate JSON Schema / GraphQL fragments into Hypothesis strategies. Used by every phase as the schema-driven value source; the validity mode (positive, negative, mixed) is set by the calling phase.
 3. **Schemathesis** — the four-phase pipeline, HTTP transport, response checks, and a feedback loop that learns from what the server returns. See [Adaptive Testing](adaptive-testing.md).
 
 Schemathesis inherits Hypothesis's shrinking and example database; the feedback loop is what lets it learn server-side validation (OpenAPI) and reuse real values across operations.
