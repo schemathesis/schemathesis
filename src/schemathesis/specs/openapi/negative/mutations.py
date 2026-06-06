@@ -934,8 +934,8 @@ def negate_constraints(
             if key in candidates or enabled_keywords.is_enabled(key):
                 is_negated = True
                 negated_keys.append(key)
-                # `format` is dropped rather than wrapped in `not:` — hypothesis-jsonschema treats format as
-                # annotation-only, so removing it lets us generate values that won't match without validator help.
+                # `format` is dropped rather than wrapped in `not:` — format is annotation-only, so removing it
+                # lets us generate values that won't match without validator help.
                 if key != "format":
                     negated = schema.setdefault("not", {})
                     negated[key] = value

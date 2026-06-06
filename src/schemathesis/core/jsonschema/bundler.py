@@ -151,18 +151,9 @@ class Bundler:
                     is_recursive_reference = resolved_uri in scope_stack
                     has_recursive_references |= is_recursive_reference
                     if inline_recursive and is_recursive_reference:
-                        # This is a recursive reference! As of Sep 2025, `hypothesis-jsonschema` does not support
-                        # recursive references and Schemathesis has to remove them if possible.
-                        #
-                        # Cutting them of immediately would limit the quality of generated data, since it would have
-                        # just a single level of recursion. Currently, the only way to generate recursive data is to
-                        # inline definitions directly, which can lead to schema size explosion.
-                        #
-                        # To balance it, Schemathesis inlines one level, that avoids exponential blowup of O(B ^ L)
-                        # in worst case, where B is branching factor (number of recursive references per schema), and
-                        # L is the number of levels. Even quadratic growth can be unacceptable for large schemas.
-                        #
-                        # In the future, it **should** be handled by `hypothesis-jsonschema` instead.
+                        # Inline a recursive reference one level deep: full inlining risks O(B ^ L) schema
+                        # blowup (B = recursive refs per schema, L = depth), so one level balances data
+                        # quality against schema size.
                         if resolved_uri in inlining_for_recursion:
                             # Check if we're already trying to inline this schema
                             # If yes, it means we have an unbreakable cycle

@@ -7,15 +7,12 @@ from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
 from hypothesis.database import InMemoryExampleDatabase
 from hypothesis.internal.observability import with_observability_callback
-from hypothesis_jsonschema import _canonicalise as canonicalise
-from hypothesis_jsonschema import from_schema
 
 import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.hypothesis import examples, setup
+from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
@@ -41,83 +38,6 @@ def make_operation(schema, **kwargs) -> APIOperation:
         security=schema._parse_security({}),
         **kwargs,
     )
-
-
-def test_canonicalish_keeps_bundle_when_bundled_ref_present():
-    setup()
-    schema = {
-        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 1,
-        BUNDLE_STORAGE_KEY: {"schema1": {"type": "integer"}},
-    }
-
-    assert canonicalise.canonicalish(schema) == {"const": 1, BUNDLE_STORAGE_KEY: schema[BUNDLE_STORAGE_KEY]}
-
-
-def test_from_schema_reflects_bundle_mutations():
-    setup()
-    schema = {
-        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
-        BUNDLE_STORAGE_KEY: {"schema1": {"type": "integer"}},
-    }
-
-    assert isinstance(find(from_schema(schema), lambda _: True), int)
-
-    schema[BUNDLE_STORAGE_KEY]["schema1"] = {"type": "string"}
-
-    assert isinstance(find(from_schema(schema), lambda _: True), str)
-
-
-@pytest.mark.parametrize(
-    ("left", "right"),
-    [
-        ({}, {"type": "integer", "minimum": 1, "maximum": 1}),
-        ({"type": "integer", "minimum": 1, "maximum": 1}, {}),
-        (True, {"type": "integer", "minimum": 1, "maximum": 1}),
-        ({"type": "integer", "minimum": 1, "maximum": 1}, True),
-    ],
-    ids=["empty-left", "empty-right", "true-left", "true-right"],
-)
-def test_merged_truthy_identity(left, right):
-    setup()
-
-    expected = canonicalise.canonicalish(right if left in ({}, True) else left)
-
-    assert canonicalise.merged([left, right]) == expected
-
-
-@pytest.mark.parametrize(
-    ("left", "right", "mutation_path"),
-    [
-        (
-            {"type": "object", "properties": {"a": {"type": "integer"}}},
-            {"required": ["a"]},
-            ("properties", "a", "type"),
-        ),
-        (
-            {"type": "array", "items": {"type": "integer"}},
-            {"minItems": 1},
-            ("items", "type"),
-        ),
-    ],
-    ids=["object-property", "array-items"],
-)
-def test_merged_cache_returns_fresh_copy(left, right, mutation_path):
-    setup()
-
-    first = canonicalise.merged([left, right])
-    assert isinstance(first, dict)
-
-    target = first
-    for key in mutation_path[:-1]:
-        target = target[key]
-    target[mutation_path[-1]] = "string"
-
-    second = canonicalise.merged([left, right])
-
-    assert second != first
 
 
 def test_ref_with_sibling_anyof_against_anyof_target(ctx):
@@ -170,46 +90,6 @@ def test_ref_with_sibling_anyof_against_anyof_target(ctx):
     test()
 
 
-@pytest.mark.parametrize(
-    ("schema", "expected_module"),
-    [
-        ({"type": "string", "pattern": r"([\u0009-\u00FF]){1,51200}"}, "jsonschema_rs"),
-        ({"type": "string", "pattern": r"[\uD800-\uDBFF]"}, "jsonschema.validators"),
-        ({"type": "array", "items": [{"type": "string"}]}, "jsonschema_rs"),
-    ],
-    ids=["large-quantifier-rust", "surrogate-range-python-fallback", "tuple-items-rust-draft7"],
-)
-def test_make_validator_regex_backend_selection(schema, expected_module):
-    setup()
-
-    validator = canonicalise.make_validator(schema)
-
-    assert validator._validator.__class__.__module__.startswith(expected_module)
-
-
-@pytest.mark.parametrize(
-    "schema",
-    [
-        {"type": 1},
-        {"type": "object", "properties": []},
-    ],
-    ids=["invalid-type-keyword", "invalid-properties-keyword"],
-)
-def test_get_validator_class_does_not_downgrade_non_regex_schema_errors(schema):
-    setup()
-
-    with pytest.raises(jsonschema_rs.ValidationError):
-        canonicalise._get_validator_class(schema)
-
-
-def test_get_validator_class_falls_back_to_older_drafts_for_tuple_items():
-    setup()
-
-    schema = {"type": "array", "items": [{"type": "string"}]}
-
-    assert canonicalise._get_validator_class(schema) is jsonschema_rs.Draft7Validator
-
-
 def test_draft_03_raises_invalid_schema(ctx):
     body = {
         "$schema": "http://json-schema.org/draft-03/schema#",
@@ -237,58 +117,6 @@ def test_draft_03_raises_invalid_schema(ctx):
 
     with pytest.raises(InvalidSchema, match="Draft-03"):
         test()
-
-
-def test_canonicalise_constants_restored_after_polluting_schema(ctx):
-    # hypothesis-jsonschema's FALSEY/TRUTHY are shared mutable globals that get
-    # clobbered during generation; schemathesis must restore them.
-    setup()
-    schema = ctx.openapi.load_schema(
-        {
-            "/probe": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "routes": {
-                                            "type": "array",
-                                            "items": {"$ref": "#/components/schemas/staticRoutes"},
-                                        }
-                                    },
-                                }
-                            }
-                        }
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        components={
-            "schemas": {
-                "staticRoutes": {
-                    "type": "object",
-                    "if": {"properties": {"type": {"const": "uri"}}},
-                    "then": {"properties": {"source": {"type": "string"}}, "required": ["source"]},
-                    "else": {"properties": {"content": {"type": "string"}}, "required": ["content"]},
-                    "required": ["route", "type"],
-                    "additionalProperties": False,
-                }
-            }
-        },
-    )
-
-    @given(schema["/probe"]["POST"].as_strategy())
-    @settings(max_examples=1, deadline=None, database=InMemoryExampleDatabase())
-    def test(case):
-        pass
-
-    test()
-
-    assert canonicalise.FALSEY == {"not": {}}
-    assert canonicalise.TRUTHY == {}
 
 
 @pytest.mark.parametrize("location", sorted(set(ParameterLocation) - {ParameterLocation.UNKNOWN}))

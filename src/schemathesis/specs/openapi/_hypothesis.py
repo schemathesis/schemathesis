@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, cast
 import jsonschema_rs
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
-from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
@@ -20,6 +19,7 @@ from schemathesis.core.control import SkipTest
 from schemathesis.core.error_feedback import ErrorFeedbackStore, ObservationKind
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
+    InvalidRegexPattern,
     InvalidSchema,
     MalformedMediaType,
     SerializationNotPossible,
@@ -993,13 +993,31 @@ def make_positive_strategy(
     target_descriptors: tuple | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
+    from schemathesis.generation.jsonschema import Alphabet, FormatRegistry, StrategyContext
+    from schemathesis.generation.jsonschema.strategy import from_schema
+
     custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
-    return from_schema(
-        schema,
-        custom_formats=custom_formats,
-        allow_x00=generation_config.allow_x00,
-        codec=generation_config.codec,
+    # Drop alphabet-taking function entries (e.g. h-js `json-pointer`); the in-tree registry covers those.
+    formats = {name: value for name, value in custom_formats.items() if isinstance(value, st.SearchStrategy)}
+    context = StrategyContext(
+        formats=FormatRegistry(formats),
+        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
     )
+
+    def build() -> st.SearchStrategy:
+        try:
+            canonical = jsonschema_rs.canonicalize(schema, inline_budget=0)
+        except jsonschema_rs.ValidationError:
+            # Located meta-validation failure; `_draw` turns it into `InvalidSchema` with a path.
+            raise
+        except jsonschema_rs.canonical.InvalidPattern as exc:
+            raise InvalidRegexPattern(str(exc)) from exc
+        except jsonschema_rs.canonical.CanonicalizationError as exc:
+            raise InvalidSchema(str(exc)) from exc
+        return from_schema(canonical, context)
+
+    # Defer canonicalize so invalid-schema errors surface at draw time, classified as schema errors.
+    return st.deferred(build)
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:

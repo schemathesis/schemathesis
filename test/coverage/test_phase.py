@@ -4775,7 +4775,8 @@ def test_duration_format_generates_required_query_positive_cases(ctx, version):
 def test_hostname_negative_format_respects_validator_draft(monkeypatch, validator_cls, should_generate):
     # `XN--9krT00a` is valid in Draft 4 but invalid in Draft 2020-12.
     monkeypatch.setattr(
-        "schemathesis.specs.openapi.coverage._schema.from_schema", lambda *_args, **_kwargs: st.just("XN--9krT00a")
+        "schemathesis.specs.openapi.coverage._schema._in_tree_strategy",
+        lambda *_args, **_kwargs: st.just("XN--9krT00a"),
     )
     ctx = CoverageContext(
         root_schema={"type": "string", "format": "hostname"},

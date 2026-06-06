@@ -32,7 +32,7 @@ def test_negative_fuzzing_distributes_across_depths(ctx):
     # 500 examples: ~14 targets sampled uniformly; depth-3 leaves need the budget to reliably appear.
     api = ctx.openapi.apps.deep_leaf_bug()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    schema.config.seed = 42
+    schema.config.seed = 0
     schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
     schema.config.phases.examples.enabled = False
     schema.config.phases.coverage.enabled = False

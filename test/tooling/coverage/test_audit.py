@@ -362,7 +362,6 @@ def test_clear_internal_caches_drains_known_caches(ctx):
         len(coverage_internals._FORMAT_VALIDATORS),
         len(coverage_internals._REMOVE_EXAMPLES_CACHE._data),
         len(hypothesis_internals.schema_generation_cache._data),
-        len(hypothesis_internals._canonicalish_result_cache._data),
     ]
     assert any(populated_caches), populated_caches
     clear_internal_caches()
@@ -370,12 +369,6 @@ def test_clear_internal_caches_drains_known_caches(ctx):
     assert coverage_internals._REMOVE_EXAMPLES_CACHE._data == {}
     assert hypothesis_internals.schema_generation_cache._data == {}
     assert hypothesis_internals.custom_formats_cache._data == {}
-    assert hypothesis_internals._resolve_result_cache._data == {}
-    assert hypothesis_internals._merged_result_cache._data == {}
-    assert hypothesis_internals._first_param_cache._data == {}
-    assert hypothesis_internals._canonicalish_result_cache._data == {}
-    assert hypothesis_internals._from_schema_result_cache._data == {}
-    assert hypothesis_internals._merged_as_strategies_result_cache._data == {}
 
 
 def test_audit_schema_records_unknown_unsupported(ctx):

@@ -339,8 +339,7 @@ def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
     @given(schema["/data"]["GET"].as_strategy())
     @settings(max_examples=1)
     def test(case):
-        # Then the referenced schema should be accessible by `hypothesis-jsonschema` and the right value should be
-        # generated
+        # Then the referenced schema should be resolved and the right value generated.
         assert check(case.query["key"])
 
     test()

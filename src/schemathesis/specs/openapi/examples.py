@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, cast, overload
 import jsonschema_rs
 import requests
 from hypothesis.errors import InvalidArgument, Unsatisfiable
-from hypothesis_jsonschema import from_schema
+from hypothesis.strategies import SearchStrategy
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core.compat import RefResolutionError
@@ -31,8 +31,6 @@ from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiPa
 from schemathesis.specs.openapi.formats import STRING_FORMATS
 
 if TYPE_CHECKING:
-    from hypothesis.strategies import SearchStrategy
-
     from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
     from schemathesis.specs.openapi.schemas import OpenApiOperation, OpenApiSchema
 
@@ -678,7 +676,13 @@ def _yield_examples_from_properties(
                 subschema[BUNDLE_STORAGE_KEY] = bundle_storage
             try:
                 generated = _generate_single_example(subschema, config)
-            except (InvalidArgument, Unsatisfiable, jsonschema_rs.ValidationError, jsonschema_rs.ReferencingError):
+            except (
+                InvalidArgument,
+                Unsatisfiable,
+                jsonschema_rs.ValidationError,
+                jsonschema_rs.ReferencingError,
+                jsonschema_rs.canonical.CanonicalizationError,
+            ):
                 continue
             if not is_valid(generated, subschema):
                 continue
@@ -848,12 +852,17 @@ def _generate_single_example(
     schema: dict[str, Any],
     generation_config: GenerationConfig,
 ) -> Any:
-    strategy = from_schema(
-        schema,
-        custom_formats={**get_default_format_strategies(), **STRING_FORMATS},
-        allow_x00=generation_config.allow_x00,
-        codec=generation_config.codec,
+    from schemathesis.generation.jsonschema import Alphabet, FormatRegistry, StrategyContext
+    from schemathesis.generation.jsonschema.strategy import from_schema
+    from schemathesis.specs.openapi.converter import normalize_for_canonicalize
+
+    custom = {**get_default_format_strategies(), **STRING_FORMATS}
+    formats = FormatRegistry({name: value for name, value in custom.items() if isinstance(value, SearchStrategy)})
+    context = StrategyContext(
+        formats=formats,
+        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
     )
+    strategy = from_schema(jsonschema_rs.canonicalize(normalize_for_canonicalize(schema)), context)
     return examples.generate_one(strategy)
 
 
