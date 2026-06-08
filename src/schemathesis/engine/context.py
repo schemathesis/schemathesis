@@ -190,9 +190,9 @@ class EngineContext:
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:
     """Build a `requests.Session` configured from project config."""
-    import requests
+    from schemathesis.transport.requests import ManagedCookiesSession
 
-    session = requests.Session()
+    session = ManagedCookiesSession()
     session.headers = {}
     session.verify = config.tls_verify_for(operation=operation)
     auth = config.auth_for(operation=operation)

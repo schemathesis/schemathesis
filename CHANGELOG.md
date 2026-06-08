@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Response cookies leaking between generated test cases, causing false authentication failures.
+
 ## [4.21.1](https://github.com/schemathesis/schemathesis/compare/v4.21.0...v4.21.1) - 2026-06-06
 
 ### :bug: Fixed
