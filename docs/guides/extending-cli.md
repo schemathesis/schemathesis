@@ -135,10 +135,10 @@ schemathesis run \
 
 **Output:**
 ```
-Starting test case #1
-✓ Test case #1 passed
-Starting test case #2
-✗ Test case #2 failed
+Starting test #1
+✓ Test #1 passed
+Starting test #2
+✗ Test #2 failed
 
 Counter Summary:
   Total events: 125
