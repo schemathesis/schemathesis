@@ -9,6 +9,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlencode, urlparse
 
+import requests
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import override
 
@@ -25,9 +26,11 @@ from schemathesis.transport.prepare import get_exclude_headers, prepare_body, pr
 from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
-    import requests
-
     from schemathesis.generation.case import Case
+
+
+class ManagedCookiesSession(requests.Session):
+    """`requests.Session` whose response cookies are dropped between generated requests."""
 
 
 def _normalize_query_component(params: Any) -> str:
@@ -130,8 +133,6 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
     @override
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
-        import requests
-
         config = case.operation.schema.config
 
         max_redirects = kwargs.pop("max_redirects", None) or config.max_redirects_for(operation=case.operation)
@@ -179,8 +180,6 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 if "Authorization" in excluded_headers:
                     current_session_auth = session.auth
                     session.auth = None
-            if getattr(session, "_schemathesis_managed_cookies", False):
-                current_session_cookies = session.cookies.copy()
             close_session = False
         if max_redirects is not None:
             session.max_redirects = max_redirects
@@ -219,9 +218,8 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 session.auth = current_session_auth
             if close_session:
                 session.close()
-            if current_session_cookies is not None:
+            elif isinstance(session, ManagedCookiesSession):
                 session.cookies.clear()
-                session.cookies.update(current_session_cookies)
 
 
 def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:

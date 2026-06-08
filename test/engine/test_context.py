@@ -3,8 +3,9 @@ from __future__ import annotations
 import threading
 
 import pytest
-import requests
+from flask import make_response, request
 
+import schemathesis
 from schemathesis.core.result import Ok
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.health import TIGHTENED_TIMEOUT_SECONDS
@@ -69,18 +70,25 @@ def test_get_transport_kwargs_override_reverts_after_completion(ctx):
     assert engine.get_transport_kwargs(operation=operation)["timeout"] == 5.0
 
 
-def test_managed_session_does_not_keep_response_cookies(ctx, mocker, response_factory):
-    schema, operation = _build_schema_and_operation(ctx)
+def test_managed_session_does_not_leak_response_cookies(ctx, app_runner):
+    received_cookies = []
+
+    app, _ = ctx.openapi.make_flask_app({"/cookie": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/cookie")
+    def cookie():
+        received_cookies.append(request.cookies.get("session"))
+        response = make_response("")
+        response.set_cookie("session", "leaked")
+        return response
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = next(result.ok() for result in schema.get_all_operations() if isinstance(result, Ok))
     engine = EngineContext(schema=schema, stop_event=threading.Event())
     kwargs = engine.get_transport_kwargs(operation=operation)
-    session = kwargs["session"]
 
-    def request(self, **_: object) -> requests.Response:
-        self.cookies.set("session", "abc", domain="127.0.0.1", path="/")
-        return response_factory.requests()
+    operation.Case().call(**kwargs)
+    operation.Case().call(**kwargs)
 
-    mocker.patch("requests.Session.request", request)
-
-    operation.Case().call(base_url="http://127.0.0.1", **kwargs)
-
-    assert not session.cookies
+    # The cookie set by the first response must not be replayed on the second request.
+    assert received_cookies == [None, None]

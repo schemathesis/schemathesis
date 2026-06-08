@@ -190,10 +190,7 @@ class EngineContext:
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:
     """Build a `requests.Session` configured from project config."""
-    import requests
-
-    class ManagedCookiesSession(requests.Session):
-        _schemathesis_managed_cookies = True
+    from schemathesis.transport.requests import ManagedCookiesSession
 
     session = ManagedCookiesSession()
     session.headers = {}
