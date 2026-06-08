@@ -179,6 +179,8 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 if "Authorization" in excluded_headers:
                     current_session_auth = session.auth
                     session.auth = None
+            if getattr(session, "_schemathesis_managed_cookies", False):
+                current_session_cookies = session.cookies.copy()
             close_session = False
         if max_redirects is not None:
             session.max_redirects = max_redirects
@@ -217,6 +219,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 session.auth = current_session_auth
             if close_session:
                 session.close()
+            if current_session_cookies is not None:
+                session.cookies.clear()
+                session.cookies.update(current_session_cookies)
 
 
 def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:

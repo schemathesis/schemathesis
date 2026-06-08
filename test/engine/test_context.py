@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 
 import pytest
+import requests
 
 from schemathesis.core.result import Ok
 from schemathesis.engine.context import EngineContext
@@ -66,3 +67,20 @@ def test_get_transport_kwargs_override_reverts_after_completion(ctx):
     assert engine.get_transport_kwargs(operation=operation)["timeout"] == TIGHTENED_TIMEOUT_SECONDS
     engine.health.record_completion(operation_label=operation.label)
     assert engine.get_transport_kwargs(operation=operation)["timeout"] == 5.0
+
+
+def test_managed_session_does_not_keep_response_cookies(ctx, mocker, response_factory):
+    schema, operation = _build_schema_and_operation(ctx)
+    engine = EngineContext(schema=schema, stop_event=threading.Event())
+    kwargs = engine.get_transport_kwargs(operation=operation)
+    session = kwargs["session"]
+
+    def request(self, **_: object) -> requests.Response:
+        self.cookies.set("session", "abc", domain="127.0.0.1", path="/")
+        return response_factory.requests()
+
+    mocker.patch("requests.Session.request", request)
+
+    operation.Case().call(base_url="http://127.0.0.1", **kwargs)
+
+    assert not session.cookies

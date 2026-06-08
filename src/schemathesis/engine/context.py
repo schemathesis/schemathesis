@@ -192,7 +192,10 @@ def make_session(config: ProjectConfig, *, operation: APIOperation | None = None
     """Build a `requests.Session` configured from project config."""
     import requests
 
-    session = requests.Session()
+    class ManagedCookiesSession(requests.Session):
+        _schemathesis_managed_cookies = True
+
+    session = ManagedCookiesSession()
     session.headers = {}
     session.verify = config.tls_verify_for(operation=operation)
     auth = config.auth_for(operation=operation)
