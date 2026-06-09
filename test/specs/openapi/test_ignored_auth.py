@@ -241,6 +241,24 @@ def test_remove_auth_from_case(ctx, key, parameters):
     assert not getattr(case, key)
 
 
+@pytest.mark.parametrize(
+    ("cookie_header", "param_name", "expected_cookie_header"),
+    [
+        # Single cookie that is the security param — Cookie header removed entirely.
+        ("session=abc", "session", None),
+        # Multiple cookies — only the security param is stripped; others remain.
+        ("session=abc; other=xyz", "session", "other=xyz"),
+    ],
+    ids=["only-param", "mixed"],
+)
+def test_remove_auth_strips_cookie_from_headers(ctx, case_factory, cookie_header, param_name, expected_cookie_header):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    case = case_factory(operation=schema["/api/success"]["GET"], headers={"Cookie": cookie_header})
+    result = remove_auth(case, [{"name": param_name, "in": "cookie"}])
+    assert result.headers.get("Cookie") == expected_cookie_header
+
+
 @pytest.mark.parametrize("ignores_auth", [True, False])
 def test_proper_session(ignores_auth):
     app = FastAPI()

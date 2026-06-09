@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` when using `@schemathesis.auth` with a cookie security scheme. [#4236](https://github.com/schemathesis/schemathesis/issues/4236)
+- False positive `ignored_auth` when a custom auth handler sets cookies via request headers. [#4236](https://github.com/schemathesis/schemathesis/issues/4236)
 
 ## [4.21.2](https://github.com/schemathesis/schemathesis/compare/v4.21.1...v4.21.2) - 2026-06-09
 
