@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.generation.case import Case
@@ -60,8 +61,16 @@ def remove_auth(case: Case, security_parameters: list[Mapping[str, Any]]) -> Cas
             headers.pop(name, None)
         if parameter["in"] == "query" and query:
             query.pop(name, None)
-        if parameter["in"] == "cookie" and cookies:
-            cookies.pop(name, None)
+        if parameter["in"] == "cookie":
+            if cookies:
+                cookies.pop(name, None)
+            if headers and "Cookie" in headers:
+                parsed: SimpleCookie = SimpleCookie(headers["Cookie"])
+                parsed.pop(name, None)
+                if parsed:
+                    headers["Cookie"] = "; ".join(f"{k}={v.coded_value}" for k, v in parsed.items())
+                else:
+                    del headers["Cookie"]
     return Case(
         operation=case.operation,
         method=case.method,
