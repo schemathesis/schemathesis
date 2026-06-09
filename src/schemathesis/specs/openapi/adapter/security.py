@@ -93,6 +93,23 @@ class OpenApiSecurity:
             self._auth_provider_cache[scheme] = build_auth_provider(config, definition)
         return self._auth_provider_cache[scheme]
 
+    def is_security_param_negated(self, case: Case) -> bool:
+        """Return True if this case is in negative mode targeting one of the schema's security parameters."""
+        meta = case.meta
+        if not meta or not meta.generation.mode.is_negative:
+            return False
+        phase_data = meta.phase.data
+        if not isinstance(phase_data, (FuzzingPhaseData, CoveragePhaseData, StatefulPhaseData)):
+            return False
+        mutated_param = phase_data.parameter
+        mutated_location = phase_data.parameter_location
+        if not mutated_param or not mutated_location:
+            return False
+        for definition in self.security_definitions.values():
+            if _matches_security_parameter(definition, mutated_param, mutated_location):
+                return True
+        return False
+
     def apply_auth(
         self,
         case: Case,
@@ -110,19 +127,8 @@ class OpenApiSecurity:
 
         """
         # Check if a security parameter was intentionally removed during negative testing
-        meta = case.meta
-        if meta and meta.generation.mode.is_negative:
-            phase_data = meta.phase.data
-            if isinstance(phase_data, FuzzingPhaseData | CoveragePhaseData | StatefulPhaseData):
-                mutated_param = phase_data.parameter
-                mutated_location = phase_data.parameter_location
-                if mutated_param and mutated_location:
-                    # Check if any security scheme would set this parameter
-                    security_definitions = self.security_definitions
-                    for definition in security_definitions.values():
-                        if _matches_security_parameter(definition, mutated_param, mutated_location):
-                            # Don't re-apply auth that was intentionally removed for testing
-                            return False
+        if self.is_security_param_negated(case):
+            return False
 
         # Security requirements: OR semantics (first match wins), AND semantics (all in requirement).
         # Auth-inference may attach a runtime overlay; that takes precedence over the raw spec.
