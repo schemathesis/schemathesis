@@ -491,7 +491,8 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
     __tracebackhide__ = True
     # 1. Programmatic auth (highest priority)
     if auth_storage is not None:
-        auth_storage.set(case, context)
+        if not case.operation.schema.is_security_param_negated(case):
+            auth_storage.set(case, context)
         return
 
     # 2. Generic auth (CLI overrides or config - applies to all operations)
@@ -503,7 +504,8 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
         return
 
     if case.operation.schema.auth.is_defined:
-        case.operation.schema.auth.set(case, context)
+        if not case.operation.schema.is_security_param_negated(case):
+            case.operation.schema.auth.set(case, context)
         return
 
     # 3. Spec-specific auth (OpenAPI-aware, more targeted)

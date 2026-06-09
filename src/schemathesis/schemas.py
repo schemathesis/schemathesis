@@ -102,6 +102,9 @@ class BaseSchema(Mapping):
     def transport(self) -> transport.BaseTransport:
         return transport.get(self.app)
 
+    def is_security_param_negated(self, case: Case) -> bool:
+        return False
+
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         """Apply spec-specific authentication to a test case.
 

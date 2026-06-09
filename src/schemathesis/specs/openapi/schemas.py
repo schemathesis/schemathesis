@@ -139,6 +139,10 @@ class OpenApiSchema(BaseSchema):
         return OpenApiSecurity(raw_schema=self.raw_schema, adapter=self.adapter, resolver=self.root_resolver)
 
     @override
+    def is_security_param_negated(self, case: Case) -> bool:
+        return self.security.is_security_param_negated(case)
+
+    @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         """Apply OpenAPI-aware authentication to a test case.
 

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import pytest
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
 from schemathesis.core.errors import IncorrectUsage
-from schemathesis.engine import from_schema
+from schemathesis.engine import Status, from_schema
+from schemathesis.engine.events import ScenarioFinished
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation.case import Case
+from schemathesis.specs.openapi.checks import negative_data_rejection
+from test.utils import EventStream
 
 TOKEN = "EXAMPLE-TOKEN"
 
@@ -225,3 +230,45 @@ def test_auth_cache_with_scopes(ctx):
     list(from_schema(schema).execute())
     assert counts["list"] == 1
     assert counts["create"] == 1
+
+
+def test_negative_data_rejection_no_false_positive_with_cookie_security_scheme(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/secure": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "401": {"description": "Unauthorized"},
+                    },
+                    "security": [{"session_cookie": []}],
+                }
+            }
+        },
+        components={"securitySchemes": {"session_cookie": {"type": "apiKey", "in": "cookie", "name": "session"}}},
+    )
+
+    @app.route("/api/secure")
+    def secure():
+        if not request.cookies.get("session"):
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({}), 200
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+
+    @schema.auth(refresh_interval=None)
+    class CookieAuth:
+        def get(self, case, context):
+            return "token123"
+
+        def set(self, case, data, context):
+            case.headers = case.headers or {}
+            case.headers["Cookie"] = f"session={data}"
+
+    stream = EventStream(
+        schema,
+        phases=[PhaseName.COVERAGE],
+        checks=[negative_data_rejection],
+    ).execute()
+
+    assert stream.find(ScenarioFinished, status=Status.FAILURE) is None
