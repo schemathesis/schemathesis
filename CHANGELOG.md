@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` with a globally-registered `@schemathesis.auth` handler setting a cookie. [#4236](https://github.com/schemathesis/schemathesis/issues/4236)
+
 ## [4.21.3](https://github.com/schemathesis/schemathesis/compare/v4.21.2...v4.21.3) - 2026-06-09
 
 ### :bug: Fixed

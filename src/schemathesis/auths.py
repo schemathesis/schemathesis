@@ -514,7 +514,8 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
 
     # 4. Global auth (fallback)
     if GLOBAL_AUTH_STORAGE.is_defined:
-        GLOBAL_AUTH_STORAGE.set(case, context)
+        if not case.operation.schema.is_security_param_negated(case):
+            GLOBAL_AUTH_STORAGE.set(case, context)
 
 
 # Global auth API
