@@ -1281,3 +1281,55 @@ def test_negative_data_rejection_array_path_param_no_false_positive(ctx, cli, ap
         "--phases=examples",
         exit_code=ExitCode.OK,
     )
+
+
+def test_negative_data_rejection_array_path_param_hook_rewrite_no_false_positive(ctx, cli, app_runner):
+    # A `before_call` hook rewriting an array path param to a valid wire value must not trip the check.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/get/{projects}": {
+                "parameters": [
+                    {
+                        "name": "projects",
+                        "in": "path",
+                        "required": True,
+                        "schema": {
+                            "type": "array",
+                            "examples": ["hello", "world", "hello,world"],
+                            "items": {"type": "string", "enum": ["hello", "world"]},
+                            "minItems": 1,
+                            "uniqueItems": True,
+                        },
+                    }
+                ],
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "422": {"description": "Error"},
+                    }
+                },
+            }
+        }
+    )
+
+    @app.route("/get/<projects>")
+    def get_projects(projects):
+        items = projects.split(",")
+        valid = {"hello", "world"}
+        if not items or any(i not in valid for i in items) or len(items) != len(set(items)):
+            return jsonify({"error": "invalid"}), 422
+        return jsonify({"ok": True}), 200
+
+    with ctx.restore_hooks():
+
+        @schemathesis.hook
+        def before_call(context, case, kwargs):
+            case.path_parameters = {"projects": "hello"}
+
+        cli.run_and_assert(
+            app_runner.openapi_url(app),
+            "--checks=negative_data_rejection",
+            "--mode=all",
+            "--phases=examples",
+            exit_code=ExitCode.OK,
+        )
