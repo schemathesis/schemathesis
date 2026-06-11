@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.4...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for array path parameters serializing to a valid comma-joined value. [#4240](https://github.com/schemathesis/schemathesis/issues/4240)
+
 ## [4.21.4](https://github.com/schemathesis/schemathesis/compare/v4.21.3...v4.21.4) - 2026-06-09
 
 ### :bug: Fixed
