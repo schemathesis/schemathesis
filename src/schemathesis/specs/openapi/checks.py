@@ -13,7 +13,7 @@ import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type, maybe_resolve_bundled
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type, make_validator, maybe_resolve_bundled
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
@@ -498,6 +498,56 @@ def _string_type_mutation_becomes_valid_after_serialization(case: Case, location
     return False
 
 
+def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
+    """Check if a negative array path parameter reaches the server as a valid value.
+
+    Array path parameters serialize comma-joined (`simple` style). A negative value, whether a
+    string-typed example like `"hello,world"` or a fuzzing type mutation, whose comma-split form
+    validates against the original array schema is wire-identical to a valid array, so the server
+    may accept it.
+    """
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
+
+    meta = case.meta
+    if meta is None:
+        return False
+
+    component = meta.components.get(ParameterLocation.PATH)
+    if component is None or not component.mode.is_negative:
+        return False
+
+    # If other locations are also negative, the acceptance can't be attributed to the path round-trip.
+    for other_location in (
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+        ParameterLocation.BODY,
+    ):
+        other = meta.components.get(other_location)
+        if other is not None and other.mode.is_negative:
+            return False
+
+    container = case.path_parameters or {}
+    operation_container = case.operation.path_parameters
+    for param_name, value in container.items():
+        if param_name not in operation_container or not isinstance(value, str):
+            continue
+        parameter = operation_container.get(param_name)
+        if not isinstance(parameter, OpenApiParameter):
+            continue
+        schema = parameter.definition.get("schema", {})
+        if "array" not in get_type(schema) or parameter.definition.get("style", "simple") != "simple":
+            continue
+        try:
+            validator = make_validator(schema, parameter.adapter.jsonschema_validator_cls)
+        except Exception:
+            return True
+        if validator.is_valid(unquote(value).split(",")):
+            return True
+
+    return False
+
+
 def _has_unverifiable_mutations(case: Case) -> bool:
     """Skip the check when the case applied multiple mutations on disjoint sites.
 
@@ -582,6 +632,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not _single_element_array_becomes_valid_after_serialization(case)
         and not _string_type_mutation_becomes_valid_after_serialization(case, ParameterLocation.PATH)
         and not _string_type_mutation_becomes_valid_after_serialization(case, ParameterLocation.QUERY)
+        and not _path_array_becomes_valid_after_serialization(case)
         and not _has_unverifiable_mutations(case)
         and not _non_body_negative_values_match_schema(case)
     ):
