@@ -97,7 +97,8 @@ def display_final_line(
         message = f"No issues found in {running_time:.2f}s"
         color = "green"
 
-    display_section_name(message, fg=color)
+    banner = format_summary_banner(message, width=get_terminal_width())
+    click.echo(_style(banner, bold=True, fg=color))
 
 
 def display_header(version: str) -> None:
@@ -108,9 +109,38 @@ def display_header(version: str) -> None:
     click.echo()
 
 
+def format_summary_banner(message: str, *, width: int) -> str:
+    inner = f" {message} "
+    pad_total = max(0, width - len(inner))
+    pad_left = pad_total // 2
+    pad_right = pad_total - pad_left
+    return f"{'=' * pad_left}{inner}{'=' * pad_right}"
+
+
 def format_duration(duration_ms: int) -> str:
     """Format duration in milliseconds to seconds with 2 decimal places."""
     return f"{duration_ms / 1000:.2f}s"
+
+
+def format_duration_compact(duration_ms: int) -> str:
+    if duration_ms < 1000:
+        return f"{duration_ms}ms"
+    if duration_ms < 10_000:
+        return f"{duration_ms / 1000:.1f}s"
+    return f"{duration_ms // 1000}s"
+
+
+def make_progress_bar(console: Console, *, indent: str = "", transient: bool = True) -> Progress:
+    from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+
+    return Progress(
+        TextColumn(indent),
+        TimeElapsedColumn(),
+        BarColumn(bar_width=None),
+        TextColumn("{task.percentage:.0f}% ({task.completed}/{task.total})"),
+        console=console,
+        transient=transient,
+    )
 
 
 def make_console(**kwargs: Any) -> Console:
@@ -241,12 +271,15 @@ def display_failures_for_single_test(config: OutputConfig, label: str, checks: I
     """Display failures for a single operation."""
     display_section_name(label, "_", fg="red")
     for idx, group in enumerate(checks, 1):
+        reproduce = group.code_sample
+        if group.case_id:
+            reproduce += f"\nst replay {group.case_id}"
         click.echo(
             format_failures(
                 case_id=f"{idx}. Test Case ID: {group.case_id}",
                 response=group.response,
                 failures=group.failures,
-                curl=group.code_sample,
+                curl=reproduce,
                 formatter=failure_formatter,
                 config=config,
             )

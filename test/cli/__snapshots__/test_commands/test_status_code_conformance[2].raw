@@ -45,6 +45,7 @@ _______________________________ POST /api/teapot _______________________________
 Reproduce with:
 
     curl -X POST http://127.0.0.1/api/teapot
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

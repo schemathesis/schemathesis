@@ -174,6 +174,7 @@ class CliSnapshotConfig:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
             data = re.sub(r"\(in [0-9]+\.[0-9]{2}s\)", "(in 0.00s)", data)
             data = re.sub(r"after [0-9]+\.[0-9]{2}s", "after 0.00s", data).strip()
+            data = re.sub(r"(?<=\.{3} .{11}  ) *\d+(?:\.\d)?(?:ms|s)\s*$", "  100ms", data, flags=re.MULTILINE)
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
             if "in 1.00s" in lines[-1]:
@@ -188,6 +189,8 @@ class CliSnapshotConfig:
                 if re.match(r".*\d+\. Test Case ID", line):
                     sequential_id = line.split(".")[0]
                     lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
+                elif re.match(r"\s+st replay \S+", line):
+                    lines[idx] = "    st replay <PLACEHOLDER>"
             data = "\n".join(lines) + "\n"
         if self.replace_uuid:
             data = re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
@@ -234,7 +237,7 @@ class CliSnapshotConfig:
             lines = []
             seen = False
             for line in data.splitlines():
-                if "curl" in line:
+                if "curl" in line or "st replay " in line:
                     if not seen:
                         lines.append("    <PLACEHOLDER>")
                         seen = True

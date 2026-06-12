@@ -56,6 +56,7 @@ Reproduce with:
     curl -X GET -H 'X-Custom;' -H 'Content-Type: text/plain' -d $'data\x1f' http://127.0.0.1/api/failure
 
     ⚠️  Request body contains non-printable characters. Actual value: b'data\x1f'
+    st replay <PLACEHOLDER>
 
 =================================== WARNINGS ===================================
 

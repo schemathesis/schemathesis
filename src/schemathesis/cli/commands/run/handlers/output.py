@@ -29,6 +29,7 @@ from schemathesis.cli.output import (
     display_test_cases,
     format_duration,
     make_console,
+    make_progress_bar,
     print_lines,
 )
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
@@ -255,7 +256,6 @@ class UnitTestProgressManager:
         total: int,
     ) -> None:
         from rich.progress import (
-            BarColumn,
             Progress,
             SpinnerColumn,
             TextColumn,
@@ -278,13 +278,7 @@ class UnitTestProgressManager:
         )
         self.title_task_id = None
 
-        self.progress_bar = Progress(
-            TextColumn("    "),
-            TimeElapsedColumn(),
-            BarColumn(bar_width=None),
-            TextColumn("{task.percentage:.0f}% ({task.completed}/{task.total})"),
-            console=self.console,
-        )
+        self.progress_bar = make_progress_bar(self.console, indent="    ", transient=False)
         self.progress_task_id = None
 
         self.operations_progress = Progress(

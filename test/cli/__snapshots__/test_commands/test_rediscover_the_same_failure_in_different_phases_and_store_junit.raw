@@ -51,6 +51,7 @@ _____________________________ GET /users/{user_id} _____________________________
 Reproduce with:
 
     curl -X GET 'http://127.0.0.1/users/0?user_id=test-id&code=0&common=0'
+    st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 

@@ -40,6 +40,14 @@ def truncate_json(data: Any, *, config: OutputConfig, max_lines: int | None = No
     return "\n".join(truncated_lines)
 
 
+def truncate_text(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    if limit <= 5:
+        return text[:limit]
+    return text[: limit - 4] + " ..."
+
+
 def prepare_response_payload(payload: str, *, config: OutputConfig) -> str:
     if payload.endswith("\r\n"):
         payload = payload[:-2]
