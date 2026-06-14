@@ -83,6 +83,14 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         # But version prefixes followed by a real collection still work
         ("username", "/v1/users/{username}", "User"),
         ("name", "/api/v2/users/{name}", "User"),
+        # Path parameter named after its parent collection (route-model-binding style)
+        ("session", "/sessions/{session}", "Session"),
+        ("session", "/api/v1/sessions/{session}", "Session"),
+        ("session", "/sessions/{session}/quiz", "Session"),
+        ("quiz", "/quizzes/{quiz}", "Quiz"),
+        ("user", "/users/{user}", "User"),
+        # Param name unrelated to its parent collection - must stay None
+        ("session", "/users/{session}", None),
     ],
 )
 def test_from_parameter(parameter, path, expected):

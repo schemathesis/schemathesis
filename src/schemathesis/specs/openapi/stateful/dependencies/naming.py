@@ -121,6 +121,14 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
                         return path_resource
                 break
 
+    # Path parameter named after its parent collection (`/sessions/{session}` -> Session).
+    # Common route-model-binding convention; bind only when the name equals the singularized
+    # owning segment so unrelated params (`/users/{session}`) stay unmatched.
+    if f"{{{parameter}}}" in path:
+        path_resource = from_path(strip_version_prefix(path), parameter_name=parameter)
+        if path_resource is not None and normalize_for_matching(path_resource) == normalize_for_matching(parameter):
+            return path_resource
+
     return None
 
 

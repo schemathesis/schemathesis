@@ -816,7 +816,7 @@ def test_record_successful_delete_uses_only_resource_linked_params(ctx):
                 }
             },
             # DELETE has two path params: itemId (resource-linked) and version (not resource-linked)
-            "/items/{itemId}/versions/{version}": {
+            "/items/{itemId}/history/{version}": {
                 "delete": {
                     "operationId": "deleteItem",
                     "parameters": [
@@ -832,7 +832,7 @@ def test_record_successful_delete_uses_only_resource_linked_params(ctx):
 
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "item-123"})
 
-    delete_operation = schema["/items/{itemId}/versions/{version}"]["DELETE"]
+    delete_operation = schema["/items/{itemId}/history/{version}"]["DELETE"]
     case = delete_operation.Case(path_parameters={"itemId": "item-123", "version": "v1"})
 
     data_source.record_successful_delete(operation=delete_operation, case=case)
