@@ -1,7 +1,15 @@
 {
   "operations": {
     "GET /v2/PhoneNumbers/{PhoneNumber}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "PhoneNumber",
+          "resource": "PhoneNumber",
+          "resource_field": "PhoneNumber"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -14,7 +22,15 @@
       ]
     },
     "GET /v2/SipDomains/{SipDomain}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "SipDomain",
+          "resource": "SipDomain",
+          "resource_field": "SipDomain"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -40,7 +56,15 @@
       ]
     },
     "POST /v2/PhoneNumbers/{PhoneNumber}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "PhoneNumber",
+          "resource": "PhoneNumber",
+          "resource_field": "PhoneNumber"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -49,11 +73,28 @@
           "pointer": "/",
           "resource": "routes.v2.phone_number",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "path_parameter": "PhoneNumber",
+          "pointer": "",
+          "resource": "PhoneNumber",
+          "status_code": "200"
         }
       ]
     },
     "POST /v2/SipDomains/{SipDomain}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "SipDomain",
+          "resource": "SipDomain",
+          "resource_field": "SipDomain"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -61,6 +102,15 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "routes.v2.sip_domain",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "path_parameter": "SipDomain",
+          "pointer": "",
+          "resource": "SipDomain",
           "status_code": "200"
         }
       ]
@@ -80,6 +130,18 @@
     }
   },
   "resources": {
+    "PhoneNumber": {
+      "fields": [
+        "PhoneNumber"
+      ],
+      "types": {}
+    },
+    "SipDomain": {
+      "fields": [
+        "SipDomain"
+      ],
+      "types": {}
+    },
     "routes.v2.phone_number": {
       "fields": [
         "account_sid",

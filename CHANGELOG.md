@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.5...HEAD) - TBD
 
+### :bug: Fixed
+
+- Infer stateful links for path parameters named after their collection (e.g. `/sessions/{session}`).
+
 ## [4.21.5](https://github.com/schemathesis/schemathesis/compare/v4.21.4...v4.21.5) - 2026-06-11
 
 ### :bug: Fixed

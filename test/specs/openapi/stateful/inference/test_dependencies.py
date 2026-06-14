@@ -3185,6 +3185,47 @@ def test_dependency_graph(request, ctx, paths, components, snapshot_json):
     )
 
 
+def test_path_param_named_after_collection_links_create_to_read(ctx):
+    # `/sessions/{session}` names its path param after the singular collection (route-model-binding
+    # style); the create operation must still link into read.
+    session_response = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+    }
+    paths = {
+        "/sessions": {
+            "post": {
+                "operationId": "createSession",
+                "responses": {"201": {"content": {"application/json": {"schema": session_response}}}},
+            }
+        },
+        "/sessions/{session}": {
+            "get": {
+                "operationId": "getSession",
+                "parameters": [{"name": "session", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"content": {"application/json": {"schema": session_response}}}},
+            }
+        },
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ] == [
+        [
+            "#/paths/~1sessions/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1sessions~1{session}/get",
+                "parameters": {"path.session": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
 def test_nested_fk_inference_independent_of_path_order(ctx):
     # Inference must register a nested-body FK input slot regardless of whether the consumer
     # appears before or after its producer in the spec's `paths` order.
