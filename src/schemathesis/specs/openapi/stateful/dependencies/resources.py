@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.bundler import BundleError
@@ -75,6 +75,38 @@ def extract_resources_from_responses(
             canonicalization_cache=canonicalization_cache,
         ):
             yield response, extracted
+
+
+ResponseResourceCache: TypeAlias = dict[str, list[tuple["OpenApiResponse", ExtractedResource]]]
+
+
+def cached_resources_from_responses(
+    *,
+    operation: APIOperation,
+    resources: ResourceMap,
+    updated_resources: set[str],
+    resolver: Resolver,
+    canonicalization_cache: CanonicalizationCache,
+    cache: ResponseResourceCache,
+) -> list[tuple[OpenApiResponse, ExtractedResource]]:
+    """Materialize an operation's response resources once; replay on repeat scans.
+
+    Both input resolution and output extraction scan the same responses within one
+    operation's analysis pass; the first call registers resources, the rest reuse the list.
+    """
+    cached = cache.get(operation.label)
+    if cached is None:
+        cached = list(
+            extract_resources_from_responses(
+                operation=operation,
+                resources=resources,
+                updated_resources=updated_resources,
+                resolver=resolver,
+                canonicalization_cache=canonicalization_cache,
+            )
+        )
+        cache[operation.label] = cached
+    return cached
 
 
 def iter_resources_from_response(

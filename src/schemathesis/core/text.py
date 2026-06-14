@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from functools import lru_cache
 
+
+@lru_cache(maxsize=2048)
 def to_pascal_case(text: str) -> str:
     # snake_case/kebab-case - split and capitalize each word
     if "_" in text or "-" in text:
@@ -10,6 +13,7 @@ def to_pascal_case(text: str) -> str:
     return text[0].upper() + text[1:] if text else text
 
 
+@lru_cache(maxsize=2048)
 def to_snake_case(text: str) -> str:
     text = text.replace("-", "_")
     # Insert underscores before uppercase letters

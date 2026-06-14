@@ -36,7 +36,10 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     ResourceMap,
 )
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
-from schemathesis.specs.openapi.stateful.dependencies.resources import remove_unused_resources
+from schemathesis.specs.openapi.stateful.dependencies.resources import (
+    ResponseResourceCache,
+    remove_unused_resources,
+)
 from schemathesis.specs.openapi.stateful.links import find_link_target
 
 if TYPE_CHECKING:
@@ -64,6 +67,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     updated_resources: set[str] = set()
     # Cache for expensive canonicalize() calls - same schemas are often processed multiple times
     canonicalization_cache: CanonicalizationCache = {}
+    # Per-operation response resources, materialized once and replayed by input + output extraction
+    response_resource_cache: ResponseResourceCache = {}
 
     # Nested-body FK lookups whose target resource wasn't yet registered when the consumer
     # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
@@ -84,6 +89,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                         updated_resources=updated_resources,
                         resolver=schema.root_resolver,
                         canonicalization_cache=canonicalization_cache,
+                        response_resource_cache=response_resource_cache,
                         deferred_nested_fks=pending,
                         candidate_resource_names=candidate_resource_names,
                     )
@@ -95,6 +101,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     updated_resources=updated_resources,
                     resolver=schema.root_resolver,
                     canonicalization_cache=canonicalization_cache,
+                    response_resource_cache=response_resource_cache,
                 )
                 operations[operation.label] = OperationNode(
                     method=operation.method,
