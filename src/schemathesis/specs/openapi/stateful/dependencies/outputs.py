@@ -13,7 +13,10 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     OutputSlot,
     ResourceMap,
 )
-from schemathesis.specs.openapi.stateful.dependencies.resources import extract_resources_from_responses
+from schemathesis.specs.openapi.stateful.dependencies.resources import (
+    ResponseResourceCache,
+    cached_resources_from_responses,
+)
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import APIOperation
@@ -34,15 +37,17 @@ def extract_outputs(
     updated_resources: set[str],
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
+    response_resource_cache: ResponseResourceCache,
 ) -> Iterator[OutputSlot]:
     """Extract resources from API operation's responses."""
     extracted_resource_names: set[str] = set()
-    for response, extracted in extract_resources_from_responses(
+    for response, extracted in cached_resources_from_responses(
         operation=operation,
         resources=resources,
         updated_resources=updated_resources,
         resolver=resolver,
         canonicalization_cache=canonicalization_cache,
+        cache=response_resource_cache,
     ):
         extracted_resource_names.add(extracted.resource.name)
         yield OutputSlot(

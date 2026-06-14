@@ -5,6 +5,7 @@ import enum
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from typing import Any, TypeAlias
 
 from schemathesis.core.jsonschema.resolver import Resolver
@@ -390,6 +391,7 @@ _CAMEL_FK_SUFFIXES: tuple[tuple[str, str, bool], ...] = (
 _CAMEL_FK_MIN_BASE_LEN = 3
 
 
+@lru_cache(maxsize=2048)
 def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
     """Extract target resource name and field from a FK field name.
 

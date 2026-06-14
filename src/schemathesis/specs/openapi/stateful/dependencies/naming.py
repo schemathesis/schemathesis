@@ -390,6 +390,7 @@ UNCOUNTABLE = frozenset(
 )
 
 
+@lru_cache(maxsize=2048)
 def _is_word_like(s: str) -> bool:
     """Check if string looks like a word (not a path, technical term, etc)."""
     # Skip empty or very short
@@ -402,6 +403,7 @@ def _is_word_like(s: str) -> bool:
     return not any(c.isdigit() for c in s)
 
 
+@lru_cache(maxsize=2048)
 def to_singular(word: str) -> str:
     if not _is_word_like(word):
         return word
@@ -431,6 +433,7 @@ def to_singular(word: str) -> str:
     return word
 
 
+@lru_cache(maxsize=2048)
 def to_plural(word: str) -> str:
     if not _is_word_like(word):
         return word
@@ -548,6 +551,7 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
     return None
 
 
+@lru_cache(maxsize=4096)
 def normalize_for_matching(text: str) -> str:
     """Normalize text for case-insensitive, separator-insensitive matching.
 
@@ -625,6 +629,7 @@ _PASCALCASE_SCHEMA_SUFFIXES = ("Output", "Input", "Out", "In", "DTO", "Dto")
 _MIN_BASE_LENGTH = 2
 
 
+@lru_cache(maxsize=2048)
 def normalize_schema_name(name: str) -> str:
     """Normalize schema name by removing common suffixes (-Output, Out, DTO, etc.)."""
     if not name or len(name) < _MIN_BASE_LENGTH + 2:

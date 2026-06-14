@@ -21,7 +21,10 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     ResourceMap,
     infer_fk_target,
 )
-from schemathesis.specs.openapi.stateful.dependencies.resources import extract_resources_from_responses
+from schemathesis.specs.openapi.stateful.dependencies.resources import (
+    ResponseResourceCache,
+    cached_resources_from_responses,
+)
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
@@ -35,6 +38,7 @@ def extract_inputs(
     updated_resources: set[str],
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
+    response_resource_cache: ResponseResourceCache,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
@@ -61,6 +65,7 @@ def extract_inputs(
             updated_resources=updated_resources,
             resolver=resolver,
             canonicalization_cache=canonicalization_cache,
+            response_resource_cache=response_resource_cache,
         )
         if input_slot is not None:
             if input_slot.resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES:
@@ -91,6 +96,7 @@ def _resolve_parameter_dependency(
     updated_resources: set[str],
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
+    response_resource_cache: ResponseResourceCache,
 ) -> InputSlot | None:
     """Connect a parameter to its resource definition, creating placeholder if needed.
 
@@ -117,6 +123,7 @@ def _resolve_parameter_dependency(
             updated_resources=updated_resources,
             resolver=resolver,
             canonicalization_cache=canonicalization_cache,
+            response_resource_cache=response_resource_cache,
         )
         if resource is not None:
             resources[resource_name] = resource
@@ -189,18 +196,20 @@ def _find_resource_in_responses(
     updated_resources: set[str],
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
+    response_resource_cache: ResponseResourceCache,
 ) -> ResourceDefinition | None:
     """Search operation's successful responses for a specific resource definition.
 
     Used when a parameter references a resource not yet discovered. Scans this
     operation's response schemas hoping to find the resource definition.
     """
-    for _, extracted in extract_resources_from_responses(
+    for _, extracted in cached_resources_from_responses(
         operation=operation,
         resources=resources,
         updated_resources=updated_resources,
         resolver=resolver,
         canonicalization_cache=canonicalization_cache,
+        cache=response_resource_cache,
     ):
         if extracted.resource.name == resource_name:
             return extracted.resource
