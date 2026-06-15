@@ -12,7 +12,7 @@ from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.types import JsonSchema
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
@@ -784,7 +784,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if not resource_params:
             resource_params = dict(case.path_parameters)
 
-        variant_key = jsonschema_rs.canonical.json.to_string(resource_params)
+        variant_key = jsonschema_rs.canonical.json.to_string(plain_str_values(resource_params))
         self.usage_tracker.record_successful_delete(variant_key)
 
         # Tombstone + evict the deleted resource: subsequent pool draws skip it, and the

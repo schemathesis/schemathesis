@@ -15,7 +15,7 @@ from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type, make_validator, maybe_resolve_bundled
 from schemathesis.core.mutations import OperatorKind
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData
@@ -601,6 +601,8 @@ def _non_body_negative_values_match_schema(case: Case) -> bool:
         if not container:
             continue
         v = dict(value) if location == ParameterLocation.HEADER else value
+        if isinstance(v, dict):
+            v = plain_str_values(v)
         try:
             if not container.get_strict_validator().is_valid(v):
                 # At least one parameter is invalid

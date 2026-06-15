@@ -296,10 +296,10 @@ def test_cookie_serialization_styles_openapi3(ctx, testdir, schema, explode, exp
 @pytest.mark.parametrize(
     ("schema", "style", "explode", "expected"),
     [
-        (ARRAY_SCHEMA, "simple", False, {"color": quote("blue,black,brown")}),
-        (NULLABLE_ARRAY_SCHEMA, "simple", False, {"color": quote("blue,black,brown")}),
-        (ARRAY_SCHEMA, "simple", True, {"color": quote("blue,black,brown")}),
-        (NULLABLE_ARRAY_SCHEMA, "simple", True, {"color": quote("blue,black,brown")}),
+        (ARRAY_SCHEMA, "simple", False, {"color": "blue,black,brown"}),
+        (NULLABLE_ARRAY_SCHEMA, "simple", False, {"color": "blue,black,brown"}),
+        (ARRAY_SCHEMA, "simple", True, {"color": "blue,black,brown"}),
+        (NULLABLE_ARRAY_SCHEMA, "simple", True, {"color": "blue,black,brown"}),
         (OBJECT_SCHEMA, "simple", False, {"color": CommaDelimitedObject("r,100,g,200,b,150")}),
         (NULLABLE_OBJECT_SCHEMA, "simple", False, {"color": CommaDelimitedObject("r,100,g,200,b,150")}),
         (OBJECT_SCHEMA, "simple", True, {"color": DelimitedObject("r=100,g=200,b=150")}),
@@ -642,6 +642,87 @@ def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
     decoded = json.loads(unquote(kwargs["params"]))
     assert decoded == {"numbers": [1, 2], "flag": None}
+
+
+DELIMITED_ARRAY_SCHEMA = {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string", "enum": ["a,b"]}}
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("paths", "version", "operation_path", "expected_url"),
+    [
+        (
+            {
+                "/teapot": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "tags",
+                                "in": "query",
+                                "required": True,
+                                "explode": False,
+                                "schema": DELIMITED_ARRAY_SCHEMA,
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "3.0.2",
+            "/teapot",
+            "http://127.0.0.1:1/teapot?tags=a%2Cb,a%2Cb",
+        ),
+        (
+            {
+                "/teapot/{tags}": {
+                    "get": {
+                        "parameters": [
+                            {"name": "tags", "in": "path", "required": True, "schema": DELIMITED_ARRAY_SCHEMA}
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "3.0.2",
+            "/teapot/{tags}",
+            "http://127.0.0.1:1/teapot/a%2Cb,a%2Cb",
+        ),
+        (
+            {
+                "/teapot": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "tags",
+                                "in": "query",
+                                "required": True,
+                                "collectionFormat": "csv",
+                                **DELIMITED_ARRAY_SCHEMA,
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "2.0",
+            "/teapot",
+            "http://127.0.0.1:1/teapot?tags=a%2Cb,a%2Cb",
+        ),
+    ],
+    ids=["openapi-form", "openapi-simple-path", "swagger-csv"],
+)
+def test_array_parameter_keeps_delimiter_literal(ctx, paths, version, operation_path, expected_url):
+    # Items are percent-encoded but the separator stays literal, so a server can split the array back.
+    schema = ctx.openapi.load_schema(paths, version=version)
+
+    @given(case=schema[operation_path]["GET"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
+        prepared = requests.Request("GET", kwargs["url"], params=kwargs["params"]).prepare()
+        assert prepared.url == expected_url
+
+    test()
 
 
 def make_array_schema(location, style):

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.6...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `positive_data_acceptance` for array parameters with a percent-encoded `,`/`|` separator. [#4246](https://github.com/schemathesis/schemathesis/issues/4246)
+
 ### :racing_car: Performance
 
 - Faster stateful dependency analysis on large schemas.

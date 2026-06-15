@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import quote
 
 from schemathesis.core.jsonschema import maybe_resolve_bundled
-from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, DelimitedValue, RawQueryString
 from schemathesis.specs.openapi.checks import _COLLECTION_FORMAT_DELIMITERS
 
 Generated = dict[str, Any]
@@ -181,7 +181,7 @@ def _serialize_path_openapi3(
             if explode:
                 yield delimited_object(name)
         if type_ == "array":
-            yield delimited(name, delimiter=",")
+            yield delimited_encoded(name, delimiter=",")
     if style == "label":
         if type_ == "object":
             yield label_object(name, explode=explode)
@@ -227,11 +227,11 @@ def _serialize_query_openapi3(
                     yield extracted_object(name)
     elif type_ == "array" and explode is False:
         if style == "pipeDelimited":
-            yield delimited(name, delimiter="|")
+            yield delimited_encoded(name, delimiter="|")
         if style == "spaceDelimited":
-            yield delimited(name, delimiter=" ")
+            yield delimited_encoded(name, delimiter=" ")
         if style is None or style == "form":  # "form" is the default style
-            yield delimited(name, delimiter=",")
+            yield delimited_encoded(name, delimiter=",")
 
 
 def _schema_has_nested_object_properties(schema: dict[str, Any] | None) -> bool:
@@ -298,9 +298,10 @@ def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | Non
     """Different collection formats for Open API 2.0."""
     for definition in definitions:
         name = definition["name"]
+        location = definition["in"]
         collection_format = definition.get("collectionFormat", "csv")
         type_ = definition.get("type")
-        if definition["in"] == "header":
+        if location == "header":
             # Headers should be coerced to a string so we can check it for validity later
             yield to_string(name)
         if type_ in ("array", "object"):
@@ -312,6 +313,8 @@ def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | Non
                 inner_format = items.get("collectionFormat", "csv")
                 inner = _COLLECTION_FORMAT_DELIMITERS.get(inner_format, ",")
                 yield delimited_nested(name, outer=outer, inner=inner)
+            elif location in ("query", "path"):
+                yield delimited_encoded(name, delimiter=outer)
             else:
                 yield delimited(name, delimiter=outer)
 
@@ -365,6 +368,21 @@ def to_json(item: Generated, name: str) -> None:
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
     item[name] = delimiter.join(map(str, force_iterable(item[name] if item[name] is not None else ())))
+
+
+# Wire form of each delimiter. Comma and pipe are valid query/path characters and stay literal;
+# whitespace delimiters must be percent-encoded to survive in a URL.
+_WIRE_DELIMITERS = {",": ",", "|": "|", " ": "%20", "\t": "%09"}
+
+
+@conversion
+def delimited_encoded(item: Generated, name: str, delimiter: str) -> None:
+    """Join query/path items, percent-encoding each but keeping the delimiter literal and splittable."""
+    values = list(map(str, force_iterable(item[name] if item[name] is not None else ())))
+    logical = delimiter.join(values)
+    wire = _WIRE_DELIMITERS.get(delimiter, quote(delimiter, safe=""))
+    encoded = wire.join(quote(value, safe="") for value in values)
+    item[name] = DelimitedValue(logical, encoded)
 
 
 @conversion

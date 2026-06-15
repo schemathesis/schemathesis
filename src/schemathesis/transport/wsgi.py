@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 from schemathesis.core import Body, NotSet
-from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
@@ -56,9 +56,14 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         query_string: dict[str, Any] | str | None = case.query
         if isinstance(query_string, dict):
             query_string = dict(query_string)
+            raw_query = None
             marker_value = query_string.get(RAW_QUERY_STRING_KEY)
             if isinstance(marker_value, RawQueryString):
                 raw_query = str(query_string.pop(RAW_QUERY_STRING_KEY))
+            delimited_raw, query_string = split_delimited_query(query_string)
+            if delimited_raw:
+                raw_query = delimited_raw if raw_query is None else _merge_query_components(raw_query, delimited_raw)
+            if raw_query is not None:
                 query_string = _merge_query_components(raw_query, query_string)
 
         data = {
