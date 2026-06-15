@@ -36,6 +36,7 @@ def strip_version_prefix(path: str) -> str:
     return "/" + "/".join(segments[start:])
 
 
+@lru_cache(maxsize=2048)
 def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> str | None:
     parameter = parameter.strip()
     lower = parameter.lower()
@@ -565,6 +566,7 @@ def normalize_for_matching(text: str) -> str:
     return text.lower().replace("_", "").replace("-", "")
 
 
+@lru_cache(maxsize=2048)
 def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
     """Split parameter into (prefix, suffix) components.
 

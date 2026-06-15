@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.6...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Faster stateful dependency analysis on large schemas.
+
 ## [4.21.6](https://github.com/schemathesis/schemathesis/compare/v4.21.5...v4.21.6) - 2026-06-14
 
 ### :bug: Fixed
