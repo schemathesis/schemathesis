@@ -13,7 +13,7 @@ from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotS
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.jsonschema import make_validator
-from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
+from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation, plain_str_values
 from schemathesis.core.transport import HttpMethod, Response, prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.engine import Status
@@ -265,6 +265,8 @@ class Case(Generic[OperationT]):
         container = getattr(self.operation, location.container_name)
         if isinstance(value, CaseInsensitiveDict):
             value = dict(value)
+        if isinstance(value, dict):
+            value = plain_str_values(value)
         return make_validator(container.validation_schema, validator_cls).is_valid(value)
 
     def _hash_container(self, value: object) -> int:

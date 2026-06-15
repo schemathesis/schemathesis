@@ -10,6 +10,7 @@ from schemathesis.core import Body
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonValue
+from schemathesis.core.parameters import DelimitedValue, EncodedPath
 from schemathesis.core.transforms import transform
 
 
@@ -22,7 +23,13 @@ def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
     # Which is not desired as we need to test precisely the original path structure.
 
     for key, value in parameters.items():
-        if isinstance(value, str):
+        if isinstance(value, EncodedPath):
+            # Already fully encoded by a prior pass; re-quoting would collapse delimiters.
+            continue
+        if isinstance(value, DelimitedValue):
+            # Items are already percent-encoded; the delimiter must stay literal.
+            parameters[key] = EncodedPath(value.encoded)
+        elif isinstance(value, str):
             # Unquote first to keep quoting idempotent for already-escaped inputs.
             # E.g. "%2E" should stay escaped and not become a raw "."
             decoded = unquote(value)
