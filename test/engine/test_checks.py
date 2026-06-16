@@ -500,6 +500,25 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_31, response_fac
     assert case.operation.is_valid_response(response)
 
 
+def test_response_schema_conformance_nullable_type_array_enum(openapi_31, response_factory):
+    # Regression for #4249: a `type: [string, "null"]` enum inside additionalProperties/anyOf accepts null.
+    schema = {
+        "type": "object",
+        "additionalProperties": {
+            "anyOf": [
+                {"type": "array", "items": {"type": ["number", "null"], "minimum": 0, "maximum": 360}},
+                {"type": "array", "items": {"type": ["string", "null"], "enum": ["N", "E", "S", "W"]}},
+            ]
+        },
+    }
+    response = Response.from_requests(
+        response_factory.requests(content=b'{"direction": ["N", "E", "S", "W", null]}'), True
+    )
+    case = make_case(openapi_31, _oas3_definition(schema, status="200"))
+    assert response_schema_conformance(CTX, response, case) is None
+    assert case.operation.is_valid_response(response)
+
+
 def test_response_schema_conformance_invalid_properties(openapi_30, response_factory):
     response = Response.from_requests(response_factory.requests(content=b'{"success": true}'), True)
     case = make_case(

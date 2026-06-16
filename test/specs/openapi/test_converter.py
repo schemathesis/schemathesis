@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.jsonschema import make_validator, make_validator_for
 from schemathesis.core.transforms import transform
 from schemathesis.specs.openapi import converter
 from schemathesis.specs.openapi.converter import is_read_only, is_write_only, rewrite_properties, to_json_schema
@@ -643,6 +643,30 @@ def test_nested_object_required_array_not_duplicated():
 )
 def test_discriminator_property_pinned(schema, expected):
     assert to_json_schema(schema, nullable_keyword="nullable") == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        ["N", "E", None],
+        [None],
+    ],
+)
+def test_nullable_type_array_enum_accepts_null(value):
+    # `type: [string, "null"]` with an `enum` accepts null, matching `nullable: true`.
+    converted = to_json_schema(
+        {"type": "array", "items": {"type": ["string", "null"], "enum": ["N", "E", "S", "W"]}},
+        nullable_keyword="nullable",
+    )
+    validator = make_validator_for(converted)
+    assert validator.is_valid(value)
+    assert not validator.is_valid(["unknown"])
+
+
+def test_non_nullable_type_enum_still_rejects_null():
+    converted = to_json_schema({"type": "string", "enum": ["N", "E"]}, nullable_keyword="nullable")
+    validator = make_validator_for(converted)
+    assert not validator.is_valid(None)
 
 
 def test_discriminator_pin_skipped_for_polymorphic_branch_target(ctx):

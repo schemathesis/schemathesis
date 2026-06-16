@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.7...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive response schema validation for nullable enums (`type: [..., "null"]` with `enum`). [#4249](https://github.com/schemathesis/schemathesis/issues/4249)
+
 ## [4.21.7](https://github.com/schemathesis/schemathesis/compare/v4.21.6...v4.21.7) - 2026-06-15
 
 ### :bug: Fixed
