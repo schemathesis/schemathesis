@@ -4,7 +4,7 @@ import re
 from io import StringIO
 from typing import TYPE_CHECKING, Any
 from unicodedata import normalize
-from urllib.parse import quote_plus, unquote
+from urllib.parse import quote, unquote
 
 from schemathesis.core import Body
 from schemathesis.core.errors import UnboundPrefix
@@ -38,7 +38,8 @@ def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
             elif decoded == "..":
                 parameters[key] = "%2E%2E"
             else:
-                parameters[key] = quote_plus(decoded)
+                # Percent-encode for path segments (space -> "%20"); "+" is literal in a path, not a space.
+                parameters[key] = quote(decoded, safe="")
     return parameters
 
 

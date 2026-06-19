@@ -892,11 +892,25 @@ def test_optional_form_data(ctx):
         ("%2e", "%2E"),
         ("%2E%2E", "%2E%2E"),
         ("%2e%2e", "%2E%2E"),
+        # Spaces in path segments must percent-encode, not form-encode (GH-4252)
+        ("2 m above gnd", "2%20m%20above%20gnd"),
+        ("a+b", "a%2Bb"),
     ],
 )
 def test_path_parameters_quotation(value, expected):
     # See GH-1036
     assert quote_all({"foo": value})["foo"] == expected
+
+
+def test_path_parameter_space_encoded_in_url(ctx):
+    # GH-4252: a space in a path segment must reach the wire as "%20", never "+"
+    schema = ctx.openapi.load_schema(
+        {"/forecast/{level}": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="3.1.0",
+    )
+    operation = schema["/forecast/{level}"]["GET"]
+    case = operation.Case(path_parameters=quote_all({"level": "2 m above gnd"}))
+    assert schema.build_request_url(case, "http://127.0.0.1") == "http://127.0.0.1/forecast/2%20m%20above%20gnd"
 
 
 @pytest.mark.parametrize("expected", ["null", "true", "false"])

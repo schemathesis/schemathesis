@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.8...HEAD) - TBD
 
+### :bug: Fixed
+
+- Encode spaces in path parameters as `%20` instead of `+`. [#4252](https://github.com/schemathesis/schemathesis/issues/4252)
+
 ## [4.21.8](https://github.com/schemathesis/schemathesis/compare/v4.21.7...v4.21.8) - 2026-06-16
 
 ### :bug: Fixed

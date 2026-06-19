@@ -35,7 +35,12 @@ from schemathesis.generation.meta import CoverageScenario, TestPhase
 from schemathesis.resources import PoolDraw, PoolPick
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
-from schemathesis.specs.openapi.coverage._schema import CoverageContext, _negative_format, cover_schema_iter
+from schemathesis.specs.openapi.coverage._schema import (
+    CoverageContext,
+    _negative_format,
+    cover_schema_iter,
+    quote_path_parameter,
+)
 from schemathesis.transport.prepare import prepare_request
 from test.utils import assert_requests_call
 
@@ -1486,6 +1491,20 @@ def test_path_parameters_without_schema(ctx, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2 m above gnd", "2%20m%20above%20gnd"),
+        (".", "%2E"),
+        ("..", "%2E%2E"),
+        ("a+b", "a%2Bb"),
+    ],
+)
+def test_quote_path_parameter_space(value, expected):
+    # GH-4252: coverage-phase path values must percent-encode spaces, not form-encode them
+    assert quote_path_parameter(value) == expected
 
 
 def test_path_parameter_dots(ctx):
