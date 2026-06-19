@@ -233,11 +233,16 @@ class OpenApiSchema(BaseSchema):
         for location in list(meta._dirty):
             value = getattr(case, location.container_name)
             current_hash = case._hash_container(value)
+            raw = meta.raw_containers.get(location)
             # When the container still equals its generated form, validate the typed
             # snapshot — coverage stringifies query/path values for the wire and the
             # validation schema is expressed in the typed form.
-            if current_hash == meta._initial_hashes.get(location) and location in meta.raw_containers:
-                validation_value = meta.raw_containers[location]
+            if current_hash == meta._initial_hashes.get(location) and raw is not None:
+                validation_value = raw
+            elif isinstance(value, Mapping) and isinstance(raw, Mapping):
+                # Auth/overrides add keys after generation; validate generated keys against the typed
+                # snapshot (query/path serialize to strings) and only added keys against the live value.
+                validation_value = {key: raw[key] if key in raw else current for key, current in value.items()}
             else:
                 validation_value = value
             is_valid = case._validate_component(location, validation_value, validator_cls)
