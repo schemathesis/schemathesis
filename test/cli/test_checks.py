@@ -434,6 +434,48 @@ def test_negative_data_rejection_query_integer_param_accepts_numeric_string_no_f
     )
 
 
+def test_negative_data_rejection_boolean_query_param_with_api_key_query_auth_no_false_positive(ctx, cli, app_runner):
+    # See GH-4254. An API key in the query must not flip a valid parameter to a schema violation.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/check": {
+                "get": {
+                    "parameters": [{"name": "flag", "in": "query", "required": False, "schema": {"type": "boolean"}}],
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "401": {"description": "Unauthorized"},
+                        "422": {"description": "Bad Request"},
+                    },
+                }
+            }
+        },
+        security=[{"apikey": []}],
+        components={"securitySchemes": {"apikey": {"type": "apiKey", "name": "apikey", "in": "query"}}},
+    )
+
+    @app.route("/check")
+    def check():
+        if request.args.get("apikey") != "valid-key":
+            return jsonify({"error": "unauthorized"}), 401
+        values = request.args.getlist("flag")
+        if len(values) > 1:
+            return jsonify({"error": "too many flag values"}), 422
+        if values and values[0].lower() not in {"true", "false", "1", "0"}:
+            return jsonify({"error": "invalid flag"}), 422
+        return jsonify({"ok": True}), 200
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--phases=coverage",
+        exit_code=ExitCode.OK,
+        config={
+            "generation": {"allow-extra-parameters": False, "unique-inputs": True},
+            "phases": {"coverage": {"unexpected-methods": []}},
+            "auth": {"openapi": {"apikey": {"api_key": "valid-key"}}},
+        },
+    )
+
+
 def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, cli, snapshot_cli):
     # See GH-2913
     app, raw_schema = ctx.openapi.make_flask_app(
