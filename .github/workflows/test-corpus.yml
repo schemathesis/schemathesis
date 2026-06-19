@@ -12,7 +12,7 @@ jobs:
     name: Default corpus tests
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: true
@@ -34,7 +34,7 @@ jobs:
       matrix:
         mode: [positive, negative]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: true
@@ -53,7 +53,7 @@ jobs:
     name: Corpus tests for dependency inference
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: true
@@ -72,7 +72,7 @@ jobs:
     name: Corpus tests for stateful testing
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: true
@@ -91,7 +91,7 @@ jobs:
     name: Corpus tests for the examples phase
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: true
@@ -110,7 +110,7 @@ jobs:
     name: GraphQL corpus tests
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: true
@@ -129,7 +129,7 @@ jobs:
     name: Schemastore conformance probe
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
           submodules: true
