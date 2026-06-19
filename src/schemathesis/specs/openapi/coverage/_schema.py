@@ -2791,6 +2791,14 @@ def _is_not_numeric_string(x: str) -> bool:
         return True
 
 
+# Wire values that lenient query/path parsers coerce to a boolean.
+BOOLEAN_WIRE_VALUES = frozenset({"0", "1", "true", "false"})
+
+
+def _is_not_boolean_coercible(x: Any) -> bool:
+    return str(x).strip().lower() not in BOOLEAN_WIRE_VALUES
+
+
 def is_valid_header_value(value: object) -> bool:
     value = str(value)
     if not is_latin_1_encodable(value):
@@ -2917,6 +2925,12 @@ def _negative_type(
     if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and ("integer" in types or "number" in types):
         if "string" in strategies:
             strategies["string"] = strategies["string"].filter(_is_not_numeric_string)
+    # For path/query parameters, 0/1/true/false serialize to wire values lenient parsers
+    # accept as booleans, making them indistinguishable from a valid boolean.
+    if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and "boolean" in types:
+        for ty in ("integer", "number", "string"):
+            if ty in strategies:
+                strategies[ty] = strategies[ty].filter(_is_not_boolean_coercible)
     if ctx.location in (ParameterLocation.QUERY, ParameterLocation.PATH):
         strategies.pop("object", None)
     # Form-urlencoded property-level mutations with null/array/object serialize to empty

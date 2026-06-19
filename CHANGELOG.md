@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.21.9...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for boolean query/path parameters in the coverage phase. [#4254](https://github.com/schemathesis/schemathesis/issues/4254)
+
 ## [4.21.9](https://github.com/schemathesis/schemathesis/compare/v4.21.8...v4.21.9) - 2026-06-19
 
 ### :bug: Fixed
