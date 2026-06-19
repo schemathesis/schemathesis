@@ -161,8 +161,10 @@ class AnyNumber:
         (True, []),
         ({}, []),
         ({"type": "null"}, [0, "false", "AAA", ["null", "null"]]),
-        ({"type": "boolean"}, [0, "null", "AAA", ["null", "null"]]),
-        ({"type": ["boolean", "null"]}, [0, "AAA", ["null", "null"]]),
+        # 0/1 coerce to booleans in lenient query/path parsers, so the numeric type violations
+        # are non-coercible values instead.
+        ({"type": "boolean"}, [AnyNumber(), AnyNumber(), "null", "AAA", ["null", "null"]]),
+        ({"type": ["boolean", "null"]}, [AnyNumber(), AnyNumber(), "AAA", ["null", "null"]]),
         # canonicalish drops `type` when `enum` is present; infer it from the values so type
         # violations still appear alongside the enum violation. The enum-negative "AAA"
         # collides with the type-negative "AAA" and dedupes to one entry.
