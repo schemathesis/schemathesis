@@ -783,6 +783,7 @@ def change_type(
         schema["type"] = new_type
         _ensure_query_serializes_to_non_empty(ctx, schema)
         _ensure_path_string_not_numeric(ctx, schema, old_types)
+        _ensure_boolean_not_coercible(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
     else:
         candidate = draw(st.sampled_from(sorted(candidates)))
@@ -796,6 +797,7 @@ def change_type(
         schema["type"] = new_type
         _ensure_query_serializes_to_non_empty(ctx, schema)
         _ensure_path_string_not_numeric(ctx, schema, old_types)
+        _ensure_boolean_not_coercible(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
 
     mutation = Mutation(
@@ -834,6 +836,23 @@ def _ensure_path_string_not_numeric(ctx: MutationContext, schema: Schema, old_ty
     schema["not"] = {"pattern": r"^-?\d+\.?\d*$"}
 
 
+def _ensure_boolean_not_coercible(ctx: MutationContext, schema: Schema, old_types: list[str]) -> None:
+    """Exclude wire-coercible values when mutating a boolean query/path parameter.
+
+    Lenient parsers read 0/1/true/false as booleans, so those serialize to a value the server
+    accepts as valid, making the mutation indistinguishable from the original boolean.
+    """
+    if not (ctx.is_query_location or ctx.is_path_location):
+        return
+    if "boolean" not in old_types:
+        return
+    new_type = schema.get("type")
+    if new_type in ("integer", "number"):
+        schema["not"] = {"enum": [0, 1]}
+    elif new_type == "string":
+        schema["not"] = {"pattern": r"(?i)^(?:true|false|0|1)$"}
+
+
 def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
     types = set(get_type(schema))
     if ctx.is_path_location:
@@ -842,6 +861,10 @@ def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
         candidates = {"string", "integer", "number"} - types
     else:
         candidates = {"string", "integer", "number", "object", "array", "boolean", "null"} - types
+    # A single-element array serializes to the same query value as a scalar (`[0]` -> `flag=0`),
+    # so an array mutation of a boolean can still read as a coercible boolean — drop it.
+    if "boolean" in types and ctx.is_query_location:
+        candidates.discard("array")
     # Every integer is a number and vice versa from the validator's perspective —
     # neither swap produces values the original schema rejects.
     if "integer" in types and "number" in candidates:

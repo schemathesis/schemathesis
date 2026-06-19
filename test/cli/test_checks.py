@@ -476,6 +476,40 @@ def test_negative_data_rejection_boolean_query_param_with_api_key_query_auth_no_
     )
 
 
+def test_negative_data_rejection_boolean_query_param_accepts_coercible_no_false_positive(ctx, cli, app_runner):
+    # See GH-4254. Lenient parsers read 0/1/true/false as booleans, so those wire values are
+    # not type violations for a boolean parameter and must not be generated as negatives.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [{"name": "active", "in": "query", "required": False, "schema": {"type": "boolean"}}],
+                    "responses": {"200": {"description": "OK"}, "422": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/users")
+    def users():
+        values = request.args.getlist("active")
+        if len(values) > 1:
+            return jsonify({"error": "too many active values"}), 422
+        if values and values[0].lower() not in {"true", "false", "1", "0"}:
+            return jsonify({"error": "invalid active"}), 422
+        return jsonify({"results": []}), 200
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=fuzzing",
+        "--max-examples=200",
+        exit_code=ExitCode.OK,
+        config={"generation": {"allow-extra-parameters": False}},
+    )
+
+
 def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, cli, snapshot_cli):
     # See GH-2913
     app, raw_schema = ctx.openapi.make_flask_app(
