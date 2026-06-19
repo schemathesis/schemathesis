@@ -39,7 +39,7 @@ except ImportError:
 from collections.abc import Callable, Generator, Iterator
 from json.encoder import JSONEncoder, encode_basestring_ascii
 from typing import Any, TypeGuard, TypeVar, cast
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 import jsonschema_rs
 from hypothesis import strategies as st
@@ -2837,7 +2837,8 @@ def quote_path_parameter(value: Any) -> str:
         elif value == "..":
             return "%2E%2E"
         else:
-            return quote_plus(value)
+            # Percent-encode for path segments (space -> "%20"); "+" is literal in a path, not a space.
+            return quote(value, safe="")
     if isinstance(value, list):
         return ",".join(map(str, value))
     return str(value)
