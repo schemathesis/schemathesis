@@ -334,6 +334,7 @@ def _run_forever_thread(
         scenario_id = active.scenario_id
         start_time = active.started_at
         status = Status.SUCCESS
+        response_checks = ctx.checks.for_responses()
         try:
             # Run all checks against every recorded response in the scenario.
             for case_id, node in recorder.cases.items():
@@ -349,6 +350,7 @@ def _run_forever_thread(
                     config=cached.config,
                     transport_kwargs=cached.transport_kwargs,
                     recorder=recorder,
+                    response_checks=response_checks,
                 )
                 continue_on_failure = continue_on_failure_by_label[case.operation.label]
                 validate_response(

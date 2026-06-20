@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
+from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
 from schemathesis.engine.events import FuzzScenarioFinished
 
@@ -26,6 +27,11 @@ class FuzzExecutionContext(BaseExecutionContext):
         elif isinstance(event, FuzzScenarioFinished):
             self.statistic.on_scenario_finished(event.recorder, failure_label=lambda case: case.operation.label)
             if event.status in (Status.FAILURE, Status.ERROR):
+                self.exit_code = 1
+        elif isinstance(event, events.EngineFinished):
+            # after_run failures arrive here.
+            if event.failures:
+                self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
                 self.exit_code = 1
         elif isinstance(event, events.NonFatalError):
             self.errors.add(event)

@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput
+from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
+from schemathesis.engine.statistic import GroupedFailures
 from schemathesis.reporting.junitxml import JunitXmlWriter
 
 if TYPE_CHECKING:
@@ -65,6 +67,16 @@ class JunitXMLHandler(EventHandler):
                 )
         elif isinstance(event, events.NonFatalError):
             self.writer.record_error(label=event.label, message=event.info.format())
+        elif isinstance(event, events.EngineFinished):
+            if event.failures:
+                group = GroupedFailures(case_id=None, code_sample=None, failures=event.failures, response=None)
+                self.writer.record_scenario(
+                    label=RUN_CHECKS_LABEL,
+                    elapsed_sec=0.0,
+                    failures=[group],
+                    skip_reason=None,
+                    config=ctx.config.output,
+                )
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         for label, test_case in self.writer._test_cases.items():

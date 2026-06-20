@@ -126,3 +126,22 @@ def test_allure_layer_label(ctx, cli, tmp_path):
 def test_allure_path_with_null_byte_reports_clean_error(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert cli.run(api.schema_url, config={"reports": {"allure": {"path": "d\x00"}}}) == snapshot_cli
+
+
+def test_after_run_failure_in_allure(ctx, cli, ensure_reachability_module, tmp_path):
+    api = ctx.openapi.apps.success_and_failure()
+    allure_dir = tmp_path / "allure-results"
+    cli.main(
+        "run",
+        api.schema_url,
+        "-c",
+        "EnsureReachability",
+        "--max-examples=5",
+        "--phases=fuzzing",
+        f"--report-allure-path={allure_dir}",
+        hooks=ensure_reachability_module,
+    )
+    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    run_check_results = [r for r in results if r.get("name") == "Run checks"]
+    assert run_check_results, [r.get("name") for r in results]
+    assert run_check_results[0]["status"] == "failed"

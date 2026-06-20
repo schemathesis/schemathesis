@@ -134,6 +134,8 @@ class ChecksConfig(DiffBase):
     unsupported_method: SimpleCheckConfig
     max_response_time: MaxResponseTimeConfig
     _unknown: dict[str, SimpleCheckConfig]
+    # Kwargs forwarded to __init__ of class-based checks, keyed by check class name.
+    _custom_kwargs: dict[str, dict[str, Any]]
 
     def __init__(
         self,
@@ -166,6 +168,11 @@ class ChecksConfig(DiffBase):
         self.unsupported_method = unsupported_method or SimpleCheckConfig()
         self.max_response_time = max_response_time or MaxResponseTimeConfig()
         self._unknown = {}
+        self._custom_kwargs = {}
+
+    @property
+    def custom_kwargs(self) -> dict[str, dict[str, Any]]:
+        return self._custom_kwargs
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ChecksConfig:
@@ -178,7 +185,9 @@ class ChecksConfig(DiffBase):
                 return {"enabled": default_enabled, **sub}
             return sub
 
-        return cls(
+        _known_field_names = {f.name for f in fields(cls) if not f.name.startswith("_")}
+
+        config = cls(
             not_a_server_error=NotAServerErrorConfig.from_dict(
                 merge(data.get("not_a_server_error", {})),
             ),
@@ -205,12 +214,44 @@ class ChecksConfig(DiffBase):
             unsupported_method=SimpleCheckConfig.from_dict(merge(data.get("unsupported_method", {}))),
             max_response_time=MaxResponseTimeConfig(limit=data.get("max_response_time")),
         )
+        for name, value in data.items():
+            if name in _known_field_names:
+                continue
+            if not isinstance(value, dict):
+                # Top-level non-dict values (e.g. `enabled = true`) are not custom check sections.
+                continue
+            enabled = value.get("enabled", True)
+            kwargs = {k: v for k, v in value.items() if k != "enabled"}
+            config._unknown[name] = SimpleCheckConfig(enabled=enabled)
+            if kwargs:
+                config._custom_kwargs[name] = kwargs
+        return config
+
+    @classmethod
+    def from_hierarchy(cls, configs: list[ChecksConfig]) -> ChecksConfig:  # type: ignore[override]
+        # Bare `super()` breaks under `@dataclass(slots=True)` on Python < 3.13.
+        merged: ChecksConfig = DiffBase.from_hierarchy.__func__(cls, configs)  # type: ignore[attr-defined]
+        names: set[str] = set()
+        for config in configs:
+            names.update(config._unknown)
+            names.update(config._custom_kwargs)
+        for name in names:
+            sub_configs = [config._unknown.get(name, SimpleCheckConfig()) for config in configs]
+            merged._unknown[name] = SimpleCheckConfig.from_hierarchy(sub_configs)
+        custom_kwargs: dict[str, dict[str, Any]] = {}
+        for config in reversed(configs):
+            for name, kwargs in config._custom_kwargs.items():
+                custom_kwargs.setdefault(name, {}).update(kwargs)
+        merged._custom_kwargs = custom_kwargs
+        return merged
 
     def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:
         try:
             return getattr(self, name)
         except AttributeError:
-            return self._unknown.setdefault(name, SimpleCheckConfig())
+            # Read-only: don't record unconfigured names, so `_unknown` stays user-declared.
+            existing = self._unknown.get(name)
+            return existing if existing is not None else SimpleCheckConfig()
 
     def update(
         self,

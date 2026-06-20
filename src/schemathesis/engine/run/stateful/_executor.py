@@ -281,6 +281,8 @@ def execute_state_machine_loop(
                 config=cached.config,
                 transport_kwargs=cached.transport_kwargs,
                 recorder=self.recorder,
+                response_checks=engine.checks.for_responses(),
+                phase=PhaseName.STATEFUL_TESTING,
             )
             validate_response(
                 response=response,

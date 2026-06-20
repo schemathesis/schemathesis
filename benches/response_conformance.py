@@ -242,7 +242,9 @@ COMPLEX_HEADERS_RESPONSE = schemathesis.Response(
     verify=False,
 )
 
-CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+CTX = CheckContext(
+    override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+)
 
 assert response_schema_conformance(CTX, SIMPLE_RESPONSE, SIMPLE_CASE) is None
 assert response_schema_conformance(CTX, MEDIUM_RESPONSE, MEDIUM_CASE) is None

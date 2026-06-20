@@ -1,0 +1,36 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ N scenarios
+
+=================================== FAILURES ===================================
+__________________________________ Run checks __________________________________
+
+- Custom check failed: `NoServerErrors`
+
+    after_run fired in fuzz
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+
+Stop reason: Completed
+
+Failures:
+  ❌ Custom check failed: `NoServerErrors`: 1
+
+Test cases:
+  N generated
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

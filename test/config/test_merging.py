@@ -69,3 +69,13 @@ from schemathesis.config import (
 )
 def test_checks_config_from_hierarchy(configs, expected):
     assert ChecksConfig.from_hierarchy(configs) == expected
+
+
+def test_checks_config_from_hierarchy_preserves_custom_check_config():
+    file_config = ChecksConfig.from_dict({"CustomCheck": {"enabled": False, "threshold": 0.9}})
+    cli_override = ChecksConfig()
+
+    merged = ChecksConfig.from_hierarchy([cli_override, file_config])
+
+    assert merged.get_by_name(name="CustomCheck").enabled is False
+    assert merged.custom_kwargs["CustomCheck"] == {"threshold": 0.9}

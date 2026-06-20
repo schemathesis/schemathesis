@@ -6719,7 +6719,9 @@ def test_negative_data_rejection_no_crash_with_large_dfa_pattern(ctx, response_f
     cases = _generate_cases(operation, GenerationMode.NEGATIVE)
 
     response = response_factory.requests(status_code=200)
-    ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    ctx_check = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     for case in cases:
         try:
@@ -6768,7 +6770,9 @@ def test_negative_data_rejection_no_false_positive_for_nullable_binary_multipart
     cases = _generate_cases(operation, GenerationMode.NEGATIVE)
 
     response = response_factory.requests(status_code=200)
-    ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    ctx_check = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     for case in cases:
         body = case.body
@@ -6822,7 +6826,9 @@ def test_negative_data_rejection_no_false_positive_for_multipart_body_type_mutat
     cases = _generate_cases(operation, GenerationMode.NEGATIVE)
 
     response = response_factory.requests(status_code=200)
-    ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    ctx_check = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     for case in cases:
         if isinstance(case.body, dict):

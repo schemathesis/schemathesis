@@ -43,6 +43,20 @@ def test_fuzz_basic(cli, app_runner, ctx, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_after_run_check_failure(cli, app_runner, ctx, snapshot_cli, restore_checks):
+    url = _make_fuzz_app(ctx, app_runner)
+    module = ctx.write_pymodule(
+        """
+@schemathesis.check
+class NoServerErrors:
+    def after_run(self, ctx):
+        raise AssertionError("after_run fired in fuzz")
+        """
+    )
+    assert_cli_snapshot(cli.main("fuzz", url, "-c", "NoServerErrors", "--max-time=2", hooks=module), snapshot_cli)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_with_failure(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_failure_app(ctx, app_runner)
     assert_cli_snapshot(cli.main("fuzz", url, "--max-time=3"), snapshot_cli)

@@ -560,6 +560,37 @@ def test_fuzz_interrupted_by_keyboard_interrupt(ctx):
         pass
 
 
+@pytest.mark.usefixtures("restore_checks")
+def test_fuzz_runs_class_based_checks(ctx):
+    seen = []
+
+    @schemathesis.check
+    class Recorder:
+        def after_response(self, ctx, response, case):
+            seen.append(case.operation.label)
+
+        def after_run(self, ctx):
+            raise AssertionError("after_run fired")
+
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.checks.update(included_check_names=["Recorder"])
+
+    stream = from_schema(schema).fuzz(FuzzConfig())
+    collected: list[events.EngineEvent] = []
+    stopped = False
+    for event in stream:
+        collected.append(event)
+        if isinstance(event, events.FuzzScenarioFinished) and not stopped:
+            stream.stop()
+            stopped = True
+
+    finished = collected[-1]
+    assert isinstance(finished, events.EngineFinished)
+    assert seen, "after_response did not run during fuzzing"
+    assert [f.message for f in finished.failures] == ["after_run fired"]
+
+
 def _build_schema_with_link(ctx):
     return ctx.openapi.load_schema(
         {

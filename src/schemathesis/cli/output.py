@@ -14,7 +14,7 @@ import click
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.core.errors import LoaderErrorKind
-from schemathesis.core.failures import MessageBlock, Severity, format_failures
+from schemathesis.core.failures import RUN_CHECKS_LABEL, MessageBlock, Severity, format_failures
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -241,9 +241,10 @@ def display_failures_for_single_test(config: OutputConfig, label: str, checks: I
     """Display failures for a single operation."""
     display_section_name(label, "_", fg="red")
     for idx, group in enumerate(checks, 1):
+        case_id = f"{idx}. Test Case ID: {group.case_id}" if group.case_id is not None else None
         click.echo(
             format_failures(
-                case_id=f"{idx}. Test Case ID: {group.case_id}",
+                case_id=case_id,
                 response=group.response,
                 failures=group.failures,
                 curl=group.code_sample,
@@ -305,7 +306,13 @@ def display_test_cases(statistic: Statistic) -> None:
         click.echo("  No test cases were generated\n")
         return
 
-    unique_failures = sum(len(group.failures) for grouped in statistic.failures.values() for group in grouped.values())
+    # `after_run` checks are not tied to cases, so they are counted in the "Failures" block, not here.
+    unique_failures = sum(
+        len(group.failures)
+        for label, grouped in statistic.failures.items()
+        if label != RUN_CHECKS_LABEL
+        for group in grouped.values()
+    )
     click.echo(_style("Test cases:", bold=True))
     parts = [f"  {click.style(str(statistic.total_cases), bold=True)} generated"]
 

@@ -17,6 +17,9 @@ from schemathesis.core.transport import Response
 if TYPE_CHECKING:
     from schemathesis.config import OutputConfig
 
+# Display label for failures produced by class-based checks' `after_run` (not tied to a case).
+RUN_CHECKS_LABEL = "Run checks"
+
 # Python 3.12 renamed several HTTP phrases per RFC 9110. Use the new names
 # consistently across all Python versions so snapshots don't vary by version.
 _RFC9110_PHRASES: dict[int, str] = {
@@ -51,7 +54,7 @@ class Failure(AssertionError):
     def __init__(
         self,
         *,
-        operation: str,
+        operation: str | None,
         title: str,
         message: str,
         case_id: str | None = None,
@@ -124,7 +127,7 @@ class CustomFailure(Failure):
     def __init__(
         self,
         *,
-        operation: str,
+        operation: str | None,
         title: str,
         message: str,
         exception: AssertionError,
@@ -141,7 +144,8 @@ class CustomFailure(Failure):
 
     @property
     def _unique_key(self) -> Any:
-        return self.origin
+        # Include `title` (the check) so distinct checks raising at the same line don't collapse.
+        return (self.title, self.origin)
 
 
 class ResponseTimeExceeded(Failure):
@@ -320,7 +324,7 @@ def format_failures(
     case_id: str | None,
     response: Response | None,
     failures: Sequence[Failure],
-    curl: str,
+    curl: str | None,
     formatter: BlockFormatter | None = None,
     config: OutputConfig,
 ) -> str:
@@ -359,11 +363,9 @@ def format_failures(
                 output += textwrap.indent(f"\n`{payload}`", prefix="    ")
             except UnicodeDecodeError:
                 output += "\n    <BINARY>"
-    else:
-        output += "\n    <NO RESPONSE>"
+    # `response`/`curl` are None for failures not tied to a case (e.g. after_run): nothing to show.
+    if curl is not None:
+        _curl = "\n".join(f"    {line}" for line in curl.splitlines())
+        output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with:\n\n{_curl}")
 
-    # cURL
-    _curl = "\n".join(f"    {line}" for line in curl.splitlines())
-    output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with:\n\n{_curl}")
-
-    return escape_surrogates(output)
+    return escape_surrogates(output.rstrip("\n"))

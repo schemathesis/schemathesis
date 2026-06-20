@@ -67,13 +67,16 @@ def run_driver(
     auth = ctx.config.auth_for(operation=operation)
     headers = ctx.config.headers_for(operation=operation)
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
+    checks_config = ctx.config.checks_config_for(operation=operation, phase=phase.value.lower())
     check_ctx = CheckContext(
         override=override,
         auth=auth,
         headers=CaseInsensitiveDict(headers) if headers else None,
-        config=ctx.config.checks_config_for(operation=operation, phase=phase.value.lower()),
+        config=checks_config,
         transport_kwargs=transport_kwargs,
         recorder=recorder,
+        response_checks=ctx.checks.for_responses(),
+        phase=phase,
     )
 
     if ctx.error_feedback is not None:

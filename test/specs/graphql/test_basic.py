@@ -123,6 +123,7 @@ def test_response_validation(ctx, response_factory, kwargs, expected):
                 headers=None,
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             response,
             case,
@@ -501,7 +502,9 @@ def test_not_a_server_error_graphql_negative_mode_accepted_invalid_data(ctx):
     schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
-    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     with pytest.raises(AcceptedNegativeData, match="Invalid data should have been rejected"):
         not_a_server_error(check_ctx, response, case)
@@ -513,7 +516,9 @@ def test_not_a_server_error_graphql_negative_mode_client_error_passes(ctx):
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
     )
-    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     result = not_a_server_error(check_ctx, response, case)
     assert result is None
@@ -525,7 +530,9 @@ def test_not_a_server_error_graphql_positive_mode_client_error_raises(ctx):
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
     )
-    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     with pytest.raises(GraphQLClientError, match="Field 'addBook' argument 'title' is required"):
         not_a_server_error(check_ctx, response, case)
@@ -537,7 +544,9 @@ def test_not_a_server_error_graphql_negative_mode_server_error_raises(ctx):
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Internal error in resolver", "path": ["addBook"]}]}
     )
-    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     with pytest.raises(GraphQLServerError, match="Internal error in resolver"):
         not_a_server_error(check_ctx, response, case)
@@ -547,7 +556,9 @@ def test_not_a_server_error_graphql_negative_mode_includes_description(ctx):
     schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
-    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     with pytest.raises(AcceptedNegativeData) as exc_info:
         not_a_server_error(check_ctx, response, case)
@@ -561,7 +572,9 @@ def test_not_a_server_error_graphql_no_meta_falls_through_to_validation(ctx):
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
     )
-    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
 
     # Without meta, should fall through to normal validation and raise GraphQLClientError
     with pytest.raises(GraphQLClientError):

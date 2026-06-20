@@ -6,6 +6,7 @@ from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.failures import Failure
 from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.core.warnings import SchemathesisWarning
@@ -348,12 +349,22 @@ class EngineFinished(EngineEvent):
     running_time: float
     stop_reason: StopReason
     payload: RunSummary | None
+    # Failures from class-based `after_run`.
+    failures: list[Failure]
 
-    __slots__ = ("id", "timestamp", "running_time", "stop_reason", "payload")
+    __slots__ = ("id", "timestamp", "running_time", "stop_reason", "payload", "failures")
 
-    def __init__(self, *, running_time: float, stop_reason: StopReason, payload: RunSummary | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        running_time: float,
+        stop_reason: StopReason,
+        payload: RunSummary | None = None,
+        failures: list[Failure] | None = None,
+    ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.running_time = running_time
         self.stop_reason = stop_reason
         self.payload = payload
+        self.failures = failures if failures is not None else []

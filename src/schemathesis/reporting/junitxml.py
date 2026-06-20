@@ -45,7 +45,7 @@ class JunitXmlWriter:
         if failures:
             messages = [
                 format_failures(
-                    case_id=f"{idx}. Test Case ID: {group.case_id}",
+                    case_id=f"{idx}. Test Case ID: {group.case_id}" if group.case_id is not None else None,
                     response=group.response,
                     failures=group.failures,
                     curl=group.code_sample,

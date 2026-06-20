@@ -155,9 +155,11 @@ class AllureWriter:
 
         for group in failures:
             seen = self._seen_curls.setdefault(label, set())
-            if group.code_sample in seen:
-                continue
-            seen.add(group.code_sample)
+            # Run-level failures have no curl to dedup on; keep each.
+            if group.code_sample is not None:
+                if group.code_sample in seen:
+                    continue
+                seen.add(group.code_sample)
             self._failures.setdefault(label, []).append(group)
 
             for failure in group.failures:
@@ -217,7 +219,7 @@ class AllureWriter:
             if groups:
                 for group in groups:
                     step = TestStepResult(
-                        name=f"Test Case: {group.case_id}",
+                        name=f"Test Case: {group.case_id}" if group.case_id is not None else "Run check",
                         status="failed",
                         statusDetails=StatusDetails(
                             message=format_failures(

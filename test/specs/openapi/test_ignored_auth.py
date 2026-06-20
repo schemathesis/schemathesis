@@ -131,6 +131,7 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
                 headers=None,
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
@@ -143,6 +144,7 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
                 headers={"Foo": "Bar"},
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
@@ -155,31 +157,40 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
                 headers={"A": "V"},
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+            ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+            ),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+            ),
             {"url": "https://example.com?A=V"},
             [{"name": "B", "in": "query"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+            ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
@@ -191,6 +202,7 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
                 headers={"Cookie": "A=v;"},
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
@@ -203,13 +215,16 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
                 headers={"Cookie": "B=v;"},
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+            ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,

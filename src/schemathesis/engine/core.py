@@ -4,10 +4,11 @@ import threading
 from dataclasses import dataclass
 
 from schemathesis import auths
-from schemathesis.config import FuzzConfig
+from schemathesis.config import ConfigError, FuzzConfig
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError
-from schemathesis.engine import Status, events, fuzz, run
+from schemathesis.engine import Status, StopReason, events, fuzz, run
+from schemathesis.engine._check_context import run_after_run_checks
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
@@ -132,6 +133,13 @@ class ExecutionPlan:
         """Execute all phases in sequence."""
         yield events.EngineStarted()
         try:
+            # Build checks up front: config errors surface here, not in a worker thread mid-run.
+            _ = engine.checks
+        except ConfigError as exc:
+            yield events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="checks", related_to_operation=False)
+            yield events.EngineFinished(running_time=engine.running_time, stop_reason=engine.stop_reason)
+            return
+        try:
             if engine.is_interrupted:
                 yield from self._finish(engine)
                 return
@@ -175,7 +183,14 @@ class ExecutionPlan:
                 observations_total=store.distinct_observations() if store is not None else 0,
             ),
         )
-        yield events.EngineFinished(running_time=ctx.running_time, stop_reason=ctx.stop_reason, payload=summary)
+        # Skip after_run on a partial run (interrupt/abort); the fuzz path runs them on stop.
+        failures = run_after_run_checks(ctx) if ctx.stop_reason == StopReason.COMPLETED else []
+        yield events.EngineFinished(
+            running_time=ctx.running_time,
+            stop_reason=ctx.stop_reason,
+            payload=summary,
+            failures=failures,
+        )
 
     def _adapt_execution(self, engine: EngineContext, phase: Phase) -> StatefulPhasePayload | None:
         if engine.has_reached_the_failure_limit:

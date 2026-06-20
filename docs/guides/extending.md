@@ -116,6 +116,10 @@ The subcategory choices are determined by the generated `category` - that depend
 
 ## Custom Validation Checks
 
+### Function-based checks
+
+A function check receives `ctx`, `response`, and `case`, and raises `AssertionError` when the response violates an invariant:
+
 ```python
 @schemathesis.check
 def check_user_permissions(ctx, response, case):
@@ -133,6 +137,83 @@ def check_audit_trail(ctx, response, case):
     if case.method in ("POST", "PUT", "DELETE") and response.status_code < 400:
         if "X-Audit-ID" not in response.headers:
             raise AssertionError("Data modification missing audit trail")
+```
+
+### Class-based checks
+
+When a per-response invariant is not enough, use a class. A class-based check may define:
+
+- `after_response(self, ctx, response, case)` - called once per response, same signature as a function check.
+- `after_run(self, ctx)` - called once after all test phases complete; use it to assert invariants that only make sense across the whole run.
+
+The class is instantiated **once per run**, so state accumulated in `after_response` is available in `after_run`.
+
+!!! warning
+    `after_response` may be re-invoked during Hypothesis shrinking and replay. Keep accumulation idempotent - prefer sets and `min`/`max` over counters.
+
+!!! warning "pytest-xdist not supported"
+    `after_run` does not work correctly when tests run with `pytest-xdist` (`-n`). Each worker process has its own check instance and sees only its slice of traffic. There is no aggregation across workers, so `after_run` will observe partial data and may produce false passes or false failures. Avoid `after_run` checks when using `-n`.
+
+The built-in `not_a_server_error` check fails when *any* response is a 5xx. Sometimes you want a softer invariant: it is acceptable for an endpoint to return occasional errors, but it must succeed at least once during the run:
+
+```python
+@schemathesis.check
+class EnsureReachability:
+    """Fail if any tested operation never returned a 2xx response during the run."""
+
+    def __init__(self):
+        self.reached = set()
+        self.tested = set()
+
+    def after_response(self, ctx, response, case):
+        label = case.operation.label
+        self.tested.add(label)
+        if 200 <= response.status_code < 300:
+            self.reached.add(label)
+
+    def after_run(self, ctx):
+        unreachable = self.tested - self.reached
+        if unreachable:
+            raise AssertionError("never returned 2xx: " + ", ".join(sorted(unreachable)))
+```
+
+### Configuring class-based checks
+
+If the check class defines `__init__` keyword arguments, Schemathesis forwards matching values from the config file automatically. This lets you tune behaviour per project without changing code:
+
+```python
+@schemathesis.check
+class EnsureReachability:
+    def __init__(self, *, ignore_operations: list[str] | None = None):
+        self.ignored = set(ignore_operations or [])
+        self.reached = set()
+        self.tested = set()
+
+    def after_response(self, ctx, response, case):
+        label = case.operation.label
+        if label not in self.ignored:
+            self.tested.add(label)
+            if 200 <= response.status_code < 300:
+                self.reached.add(label)
+
+    def after_run(self, ctx):
+        unreachable = self.tested - self.reached
+        if unreachable:
+            raise AssertionError("never returned 2xx: " + ", ".join(sorted(unreachable)))
+```
+
+`schemathesis.toml`:
+
+```toml
+[checks.EnsureReachability]
+ignore_operations = ["DELETE /health", "GET /ping"]
+```
+
+Any key under `[checks.<ClassName>]` that matches an `__init__` keyword argument is forwarded. Any registered check can also be disabled in the config file:
+
+```toml
+[checks.EnsureReachability]
+enabled = false
 ```
 
 ## Custom Data Formats
