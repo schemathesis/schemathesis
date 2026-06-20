@@ -282,3 +282,25 @@ def test_coverage_unspecified_method_in_junit(cli, ctx, tmp_path):
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
     assert int(root.attrib.get("failures", 0)) > 0
+
+
+def test_after_run_failure_in_junit(ctx, cli, ensure_reachability_module, tmp_path):
+    api = ctx.openapi.apps.success_and_failure()
+    xml_path = tmp_path / "junit.xml"
+    cli.main(
+        "run",
+        api.schema_url,
+        "-c",
+        "EnsureReachability",
+        "--max-examples=5",
+        "--phases=fuzzing",
+        f"--report-junit-path={xml_path}",
+        hooks=ensure_reachability_module,
+    )
+    tree = ElementTree.parse(xml_path)
+    testsuite = tree.getroot()[0]
+    testcases_by_name = {tc.attrib["name"]: tc for tc in testsuite}
+    run_checks = testcases_by_name.get("Run checks")
+    assert run_checks is not None, list(testcases_by_name)
+    assert run_checks[0].tag == "failure"
+    assert "never returned 2xx" in (run_checks[0].text or run_checks[0].attrib.get("message", ""))

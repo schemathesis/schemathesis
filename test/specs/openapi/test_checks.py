@@ -420,6 +420,7 @@ def test_negative_data_rejection_passes_for_rejection_status_codes(
         headers=None,
         config=ChecksConfig(),
         transport_kwargs=None,
+        response_checks=None,
     )
     if should_raise:
         with pytest.raises(AcceptedNegativeData):
@@ -447,6 +448,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
                 headers=None,
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             response,
             case,
@@ -542,6 +544,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
             headers=None,
             config=ChecksConfig(),
             transport_kwargs=None,
+            response_checks=None,
         ),
         response,
         case,
@@ -594,6 +597,7 @@ def test_positive_data_acceptance(
         headers=None,
         config=ChecksConfig.from_dict({"positive_data_acceptance": {"expected-statuses": expected_statuses}}),
         transport_kwargs=None,
+        response_checks=None,
     )
 
     if should_raise:
@@ -812,6 +816,7 @@ def test_missing_required_header_default_statuses(ctx, response_factory, status_
         headers=None,
         config=ChecksConfig(),
         transport_kwargs=None,
+        response_checks=None,
     )
     if should_raise:
         with pytest.raises(Failure):
@@ -895,6 +900,7 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
             headers=None,
             config=ChecksConfig(),
             transport_kwargs=None,
+            response_checks=None,
         ),
         response,
         case,
@@ -952,6 +958,7 @@ def test_negative_data_rejection_multi_element_array_with_valid_element(ctx, res
             headers=None,
             config=ChecksConfig(),
             transport_kwargs=None,
+            response_checks=None,
         ),
         response,
         case,
@@ -1015,6 +1022,7 @@ def test_negative_data_rejection_multi_element_array_string_numeric_element(ctx,
             headers=None,
             config=ChecksConfig(),
             transport_kwargs=None,
+            response_checks=None,
         ),
         response,
         case,
@@ -1060,6 +1068,7 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
                 headers=None,
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             response,
             case,
@@ -1103,6 +1112,7 @@ def test_negative_data_rejection_path_string_numeric_serialization(ctx, response
                 headers=None,
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             response,
             case,
@@ -1150,6 +1160,7 @@ def test_negative_data_rejection_path_string_numeric_serialization_with_other_ne
                 headers=None,
                 config=ChecksConfig(),
                 transport_kwargs=None,
+                response_checks=None,
             ),
             response,
             case,
@@ -1181,7 +1192,14 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
 
     with pytest.raises(MalformedJson) as exc_info:
         response_schema_conformance(
-            CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None),
+            CheckContext(
+                override=None,
+                auth=None,
+                headers=None,
+                config=ChecksConfig(),
+                transport_kwargs=None,
+                response_checks=None,
+            ),
             response,
             case,
         )
@@ -1194,7 +1212,9 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     assert failure.colno == 2
 
 
-_CHECK_CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+_CHECK_CTX = CheckContext(
+    override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+)
 
 
 def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
@@ -1399,6 +1419,7 @@ def _build_user_profile_chain(ctx, response_factory, *, delete_status: int):
         config=ChecksConfig(),
         transport_kwargs=None,
         recorder=recorder,
+        response_checks=None,
     )
     return check_context, get_case, get_response
 

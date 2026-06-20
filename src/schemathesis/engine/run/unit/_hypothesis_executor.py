@@ -97,13 +97,16 @@ def run_test(
     auth = ctx.config.auth_for(operation=operation)
     headers = ctx.config.headers_for(operation=operation)
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
+    checks_config = ctx.config.checks_config_for(operation=operation, phase=phase_name)
     check_ctx = CheckContext(
         override=override,
         auth=auth,
         headers=CaseInsensitiveDict(headers) if headers else None,
-        config=ctx.config.checks_config_for(operation=operation, phase=phase_name),
+        config=checks_config,
         transport_kwargs=transport_kwargs,
         recorder=recorder,
+        response_checks=ctx.checks.for_responses(),
+        phase=phase,
     )
 
     if ctx.error_feedback is not None:
@@ -257,6 +260,7 @@ def run_test(
         else:
             code_sample = state.get_code_sample_for(exc)
             yield non_fatal_error(exc, code_sample=code_sample)
+
     if status == Status.SUCCESS and any(
         check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks
     ):

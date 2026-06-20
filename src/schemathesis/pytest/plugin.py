@@ -15,6 +15,7 @@ from _pytest.subtests import SubtestReport
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from pluggy import Result as PluggyResult
 
+from schemathesis.checks import collect_after_run_failures, run_checks_for
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
@@ -27,7 +28,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
     format_exception,
 )
-from schemathesis.core.failures import FailureGroup, get_origin
+from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, format_failures, get_origin
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.generation import overrides
@@ -45,6 +46,7 @@ from schemathesis.generation.hypothesis.reporting import (
     ignore_hypothesis_output,
 )
 from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
+from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_openapi_auth_warnings
 from schemathesis.schemas import APIOperation
@@ -52,6 +54,7 @@ from schemathesis.schemas import APIOperation
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
 
+    from schemathesis.config import OutputConfig
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.pytest.reporting import PytestReportDispatcher
@@ -282,6 +285,7 @@ class SchemathesisCase(PyCollector):
     def collect(self) -> list[Function]:  # type: ignore[return]
         """Generate different test items for all API operations available in the given schema."""
         try:
+            track_schema(self.config, self.schema)
             emit_openapi_auth_warnings(self.schema)
             items = [item for operation in self.schema.get_all_operations() for item in self._gen_items(operation)]
             if not items:
@@ -714,3 +718,36 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         dispatcher.unregister()
         for writer in writers:
             writer.close()
+    _run_after_run_checks(session)
+
+
+def _run_after_run_checks(session: pytest.Session) -> None:
+    # No after_run when nothing ran (`--collect-only` or all items deselected).
+    if session.config.getoption("collectonly", False) or not session.testscollected:
+        return
+    schemas = session.config.stash.get(_PYTEST_SCHEMAS_KEY, {})
+    for schema in schemas.values():
+        failures = _fire_after_run(schema)
+        if failures:
+            _report_after_run_failures(session, failures, schema.config.output)
+            if session.exitstatus == pytest.ExitCode.OK:
+                session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+def _fire_after_run(schema: BaseSchema) -> list:
+    checks = run_checks_for(schema).for_run()
+    if not checks:
+        return []
+    return collect_after_run_failures(schema.config, checks)
+
+
+def _report_after_run_failures(session: pytest.Session, failures: list, output_config: OutputConfig) -> None:
+    output = format_failures(case_id=None, response=None, failures=failures, curl=None, config=output_config)
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        reporter.write_sep("=", RUN_CHECKS_LABEL, red=True)
+        reporter.write_line(output, red=True)
+    else:
+        # No terminal reporter (`-p no:terminal`): surface on stderr so the exit code is explainable.
+        print(RUN_CHECKS_LABEL, file=sys.stderr)  # noqa: T201
+        print(output, file=sys.stderr)  # noqa: T201

@@ -8,7 +8,14 @@ import jsonschema_rs
 from jsonschema_rs import Validator
 
 from schemathesis import hooks, transport
-from schemathesis.checks import CHECKS, CheckContext, CheckFunction, CheckResult, load_all_checks, run_checks
+from schemathesis.checks import (
+    CheckContext,
+    CheckFunction,
+    CheckResult,
+    load_all_checks,
+    run_checks,
+    run_checks_for,
+)
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, Body, NotSet, curl, media_types
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
@@ -17,6 +24,7 @@ from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocatio
 from schemathesis.core.transport import HttpMethod, Response, prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.engine import Status
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation import generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, store_components
@@ -449,20 +457,11 @@ class Case(Generic[OperationT]):
 
         response = Response.from_any(response)
 
+        phase = PhaseName.from_str(self.meta.phase.name.value) if self.meta is not None else None
         config = self.operation.schema.config.checks_config_for(
-            operation=self.operation, phase=self.meta.phase.name.value if self.meta is not None else None
+            operation=self.operation, phase=phase.name if phase is not None else None
         )
-        if not checks:
-            # Checks are not specified explicitly, derive from the config
-            checks = []
-            for check in CHECKS.get_all():
-                name = check.__name__
-                if config.get_by_name(name=name).enabled:
-                    checks.append(check)
-        checks = [
-            check for check in list(checks) + list(additional_checks or []) if check not in set(excluded_checks or [])
-        ]
-
+        response_checks = run_checks_for(self.operation.schema).for_responses()
         ctx = CheckContext(
             override=self._override,
             auth=transport_kwargs.get("auth") if transport_kwargs else None,
@@ -470,7 +469,15 @@ class Case(Generic[OperationT]):
             config=config,
             transport_kwargs=transport_kwargs,
             recorder=recorder,
+            response_checks=response_checks,
+            phase=phase,
         )
+        if not checks:
+            # Default set: built-ins enabled in config + max_response_time + response checks.
+            checks = list(ctx._checks)
+        checks = [
+            check for check in list(checks) + list(additional_checks or []) if check not in set(excluded_checks or [])
+        ]
         has_after_validate = hooks.defines("after_validate") or self.operation.schema.hooks.defines("after_validate")
         check_results: list[CheckResult] = []
         _on_success: Callable[[str, Case], None] | None

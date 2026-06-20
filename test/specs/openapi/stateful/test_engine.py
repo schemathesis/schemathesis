@@ -1002,6 +1002,7 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
         config=ChecksConfig(),
         transport_kwargs=None,
         recorder=recorder,
+        response_checks=None,
     )
 
     # Should not raise — the DELETE that explains the 404 is in A's subtree.

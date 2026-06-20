@@ -29,7 +29,9 @@ from schemathesis.specs.openapi.checks import (
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+CTX = CheckContext(
+    override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+)
 
 
 def _oas3_response(schema, *, description="text", media_type="application/json"):
@@ -1313,6 +1315,7 @@ def test_use_after_free_no_false_positive_on_idempotent_delete(ctx, response_fac
         config=ChecksConfig(),
         transport_kwargs=None,
         recorder=recorder,
+        response_checks=None,
     )
 
     assert use_after_free(check_ctx, second_response, second_delete) is None
@@ -1369,6 +1372,7 @@ def test_use_after_free_failure_references_prior_delete(ctx, response_factory):
         config=ChecksConfig(),
         transport_kwargs=None,
         recorder=recorder,
+        response_checks=None,
     )
 
     with pytest.raises(UseAfterFree) as exc_info:
@@ -1422,6 +1426,7 @@ def test_use_after_free_no_false_positive_on_collection_delete(ctx, response_fac
         config=ChecksConfig(),
         transport_kwargs=None,
         recorder=recorder,
+        response_checks=None,
     )
 
     assert use_after_free(check_ctx, get_response, current_get) is None

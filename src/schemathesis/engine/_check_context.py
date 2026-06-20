@@ -5,13 +5,22 @@ from typing import TYPE_CHECKING
 
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.checks import ChecksConfig
+from schemathesis.checks import ChecksConfig, collect_after_run_failures
 from schemathesis.generation import overrides
 from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
+    from schemathesis.core.failures import Failure
     from schemathesis.engine.context import EngineContext
     from schemathesis.schemas import APIOperation
+
+
+def run_after_run_checks(ctx: EngineContext) -> list[Failure]:
+    """Run class-based checks' `after_run` once all testing is done and collect their failures."""
+    checks = ctx.checks.for_run()
+    if not checks:
+        return []
+    return collect_after_run_failures(ctx.config, checks, ctx.get_transport_kwargs())
 
 
 @dataclass(slots=True)

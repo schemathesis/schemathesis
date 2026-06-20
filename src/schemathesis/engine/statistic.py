@@ -21,8 +21,9 @@ if TYPE_CHECKING:
 class GroupedFailures:
     """Represents failures grouped by case ID."""
 
-    case_id: str
-    code_sample: str
+    # `None` for run-level checks (not tied to a case).
+    case_id: str | None
+    code_sample: str | None
     failures: list[Failure]
     response: Response | None
 
@@ -197,3 +198,14 @@ class Statistic:
 
         if extraction_failures:
             self.extraction_failures.update(extraction_failures)
+
+    def record_run_check_failures(self, failures: list[Failure], *, label: str) -> None:
+        """Store failures from class-based checks' `after_run`, which are not tied to any case."""
+        for failure in failures:
+            self.unique_failures_map[failure] = label
+        self.failures.setdefault(label, {})[label] = GroupedFailures(
+            case_id=None,
+            code_sample=None,
+            failures=sorted(set(failures)),
+            response=None,
+        )

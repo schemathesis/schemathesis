@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.checks import RunChecks
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
@@ -55,6 +56,8 @@ class EngineContext:
         "_supervisor_lock",
         "_cache",
         "_cache_lock",
+        "_checks",
+        "_checks_lock",
     )
 
     def __init__(
@@ -87,6 +90,8 @@ class EngineContext:
         self._supervisor_lock = threading.Lock()
         self._cache = LazyInit.UNSET
         self._cache_lock = threading.Lock()
+        self._checks = LazyInit.UNSET
+        self._checks_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -186,6 +191,9 @@ class EngineContext:
 
     # Runtime cache controller -- replay during probing, persist at end of run.
     cache: LazyInit[Cache] = LazyInit(lambda ctx: Cache(ctx))
+
+    # Per-run class-based check instances, shared across worker threads.
+    checks: LazyInit[RunChecks] = LazyInit(lambda ctx: RunChecks.from_registry(config=ctx.config.checks_config_for()))
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:
