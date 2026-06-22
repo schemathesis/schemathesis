@@ -113,6 +113,19 @@ def format_duration(duration_ms: int) -> str:
     return f"{duration_ms / 1000:.2f}s"
 
 
+def make_progress_bar(console: Console, *, indent: str = "", transient: bool = True) -> Progress:
+    from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
+
+    return Progress(
+        TextColumn(indent),
+        TimeElapsedColumn(),
+        BarColumn(bar_width=None),
+        TextColumn("{task.percentage:.0f}% ({task.completed}/{task.total})"),
+        console=console,
+        transient=transient,
+    )
+
+
 def make_console(**kwargs: Any) -> Console:
     """Create a Rich console, using a fixed width in test environments."""
     from rich.console import Console

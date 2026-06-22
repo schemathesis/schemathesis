@@ -1,6 +1,9 @@
+from collections.abc import Iterator, Mapping
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeVar
 from urllib.parse import quote
+
+T = TypeVar("T")
 
 # Attribute name on `Case` / `APIOperation` holding generated values for a parameter location.
 ContainerName: TypeAlias = Literal["path_parameters", "query", "headers", "cookies", "body"]
@@ -111,3 +114,11 @@ CONTAINER_TO_LOCATION: dict[ContainerName, ParameterLocation] = {
     "cookies": ParameterLocation.COOKIE,
     "body": ParameterLocation.BODY,
 }
+
+
+def iter_path_parameters(parameters: Mapping[str, T]) -> Iterator[tuple[str, T]]:
+    """Yield `(name, value)` for entries keyed `path.<name>` (the OpenAPI link parameter convention)."""
+    prefix = f"{ParameterLocation.PATH.value}."
+    for key, value in parameters.items():
+        if key.startswith(prefix):
+            yield key[len(prefix) :], value

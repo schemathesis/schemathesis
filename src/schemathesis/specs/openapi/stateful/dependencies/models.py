@@ -9,7 +9,7 @@ from functools import lru_cache
 from typing import Any, TypeAlias
 
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import ParameterLocation, iter_path_parameters
 from schemathesis.core.text import to_pascal_case
 from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
@@ -185,9 +185,7 @@ class DependencyGraph:
 
                         for link_def in links.values():
                             # Find which path parameters are already mapped
-                            mapped_params = {
-                                key.split(".", 1)[1] for key in link_def.parameters if key.startswith("path.")
-                            }
+                            mapped_params = {name for name, _ in iter_path_parameters(link_def.parameters)}
                             # Add $request.path.X for shared params not already mapped
                             for param in shared_params - mapped_params:
                                 link_def.parameters[f"path.{param}"] = f"$request.path.{param}"

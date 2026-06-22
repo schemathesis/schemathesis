@@ -30,6 +30,11 @@ _RFC9110_PHRASES: dict[int, str] = {
 }
 
 
+def reason_phrase(status_code: int) -> str:
+    """HTTP reason phrase, preferring RFC 9110 wording over the stdlib default."""
+    return _RFC9110_PHRASES.get(status_code) or http.client.responses.get(status_code, "Unknown")
+
+
 class Severity(Enum):
     # For server errors, security issues like ignored auth
     CRITICAL = auto()
@@ -350,9 +355,7 @@ def format_failures(
 
     # Response status
     if isinstance(response, Response):
-        reason = _RFC9110_PHRASES.get(response.status_code) or http.client.responses.get(
-            response.status_code, "Unknown"
-        )
+        reason = reason_phrase(response.status_code)
         output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
         # Response payload
         if response.content is None or not response.content:
