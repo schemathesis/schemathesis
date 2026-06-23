@@ -9,6 +9,7 @@
 ### :wrench: Changed
 
 - Drop the `junit-xml` dependency; generate JUnit reports with the standard library.
+- Drop the `tenacity` dependency in favor of the standard library.
 
 ## [4.21.10](https://github.com/schemathesis/schemathesis/compare/v4.21.9...v4.21.10) - 2026-06-20
 

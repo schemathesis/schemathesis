@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import http.client
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, NoReturn
 
@@ -94,25 +95,24 @@ def load_from_url(
     prepare_request_kwargs(kwargs)
 
     if wait_for_schema is not None:
-        from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_fixed
+        max_wait = wait_for_schema
 
-        def _func(url_: str, **kw: Any) -> requests.Response:
-            response = func(url_, **kw)
-            if response.status_code == 503:
-                raise _ServiceUnavailableError
-            return response
-
-        retried = retry(
-            wait=wait_fixed(WAIT_FOR_SCHEMA_INTERVAL),
-            stop=stop_after_delay(wait_for_schema),
-            retry=retry_if_exception_type(
-                (requests.exceptions.ConnectionError, requests.exceptions.Timeout, _ServiceUnavailableError)
-            ),
-            reraise=True,
-        )(_func)
+        def _retried(url_: str, **kw: Any) -> requests.Response:
+            # Poll at a fixed interval until the schema loads or the wait budget elapses.
+            start = time.monotonic()
+            while True:
+                try:
+                    response = func(url_, **kw)
+                    if response.status_code == 503:
+                        raise _ServiceUnavailableError
+                    return response
+                except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, _ServiceUnavailableError):
+                    if time.monotonic() - start >= max_wait:
+                        raise
+                    time.sleep(WAIT_FOR_SCHEMA_INTERVAL)
 
         try:
-            return make_request(retried, url, **kwargs)
+            return make_request(_retried, url, **kwargs)
         except _ServiceUnavailableError:
             raise LoaderError(
                 message="Failed to load schema due to server error (HTTP 503 Service Unavailable)",

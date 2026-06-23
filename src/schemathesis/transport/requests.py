@@ -4,13 +4,13 @@ import binascii
 import inspect
 import json
 import os
+import time
 from collections.abc import Mapping, MutableMapping
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlencode, urlparse
 
 import requests
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from typing_extensions import override
 
 from schemathesis.core import Body, NotSet, media_types
@@ -193,17 +193,8 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         try:
             rate_limit = config.rate_limit_for(operation=case.operation)
             retries = config.request_retries_for(operation=case.operation) or 0
-            if retries > 0:
-                _request = retry(
-                    retry=retry_if_exception_type((requests.exceptions.ConnectionError, requests.exceptions.Timeout)),
-                    stop=stop_after_attempt(retries + 1),
-                    wait=wait_exponential(multiplier=1, max=10),
-                    reraise=True,
-                )(session.request)
-            else:
-                _request = session.request
             with ratelimit(rate_limit, config.base_url):
-                response = _request(**data)
+                response = _request_with_retries(session, data, retries)
             return Response.from_requests(
                 response,
                 verify=verify,
@@ -223,6 +214,19 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 session.close()
             elif isinstance(session, ManagedCookiesSession):
                 session.cookies.clear()
+
+
+def _request_with_retries(session: requests.Session, data: dict[str, Any], retries: int) -> requests.Response:
+    # Retry transient network failures with exponential backoff capped at 10s.
+    attempt = 0
+    while True:
+        try:
+            return session.request(**data)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+            if attempt >= retries:
+                raise
+            time.sleep(min(2**attempt, 10))
+            attempt += 1
 
 
 def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
