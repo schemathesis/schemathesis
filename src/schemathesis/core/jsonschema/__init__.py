@@ -11,7 +11,6 @@ from schemathesis.core.jsonschema.bundler import (
     BundleCache,
     BundleError,
     Bundler,
-    bundle,
     bundle_for_generation,
     bundle_for_validation,
     unbundle,
@@ -232,7 +231,6 @@ def is_valid(value: object, schema: JsonSchema) -> bool:
 
 __all__ = [
     "ALL_KEYWORDS",
-    "bundle",
     "BundleCache",
     "Bundler",
     "BundleError",

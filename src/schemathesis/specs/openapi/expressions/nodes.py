@@ -14,7 +14,7 @@ from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 if TYPE_CHECKING:
-    from .extractors import Extractor
+    from .extractors import RegexExtractor
 
 
 @dataclass
@@ -85,9 +85,9 @@ class NonBodyRequest(Node):
 
     location: str
     parameter: str
-    extractor: Extractor | None
+    extractor: RegexExtractor | None
 
-    def __init__(self, location: str, parameter: str, extractor: Extractor | None = None) -> None:
+    def __init__(self, location: str, parameter: str, extractor: RegexExtractor | None = None) -> None:
         self.location = location
         self.parameter = parameter
         self.extractor = extractor
@@ -129,9 +129,9 @@ class HeaderResponse(Node):
     """A node for `$response.header` expressions."""
 
     parameter: str
-    extractor: Extractor | None
+    extractor: RegexExtractor | None
 
-    def __init__(self, parameter: str, extractor: Extractor | None = None) -> None:
+    def __init__(self, parameter: str, extractor: RegexExtractor | None = None) -> None:
         self.parameter = parameter
         self.extractor = extractor
 

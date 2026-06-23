@@ -14,7 +14,7 @@ from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Response, expand_status_code
 from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCalibrationState
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
@@ -32,7 +32,6 @@ from schemathesis.generation.stateful.state_machine import (
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.expressions import MultiMatch
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
-from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore

@@ -68,17 +68,9 @@ def detect_shell() -> ShellType:
 def _parse_shell_name(name: str) -> ShellType:
     """Parse shell name string to ShellType."""
     name_lower = name.lower()
-
-    # Check exact matches first
-    for shell_type in (ShellType.BASH, ShellType.ZSH, ShellType.FISH):
-        if shell_type.value == name_lower:
-            return shell_type
-
-    # Check substring matches
     for shell_type in (ShellType.BASH, ShellType.ZSH, ShellType.FISH):
         if shell_type.value in name_lower:
             return shell_type
-
     return ShellType.UNKNOWN
 
 

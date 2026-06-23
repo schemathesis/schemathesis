@@ -19,20 +19,19 @@ def find_matching_in_responses(examples: list[tuple[str, object]], param: str) -
         if not isinstance(example, dict):
             continue
         # Unwrapping example from `{"item": [{...}]}`
-        if isinstance(example, dict):
-            inner = next((value for key, value in example.items() if key.lower() == schema_name.lower()), None)
-            if inner is not None:
-                if isinstance(inner, list):
-                    for sub_example in inner:
-                        if isinstance(sub_example, dict):
-                            for found in _find_matching_in_responses(
-                                sub_example, schema_name, param, normalized, is_id_param
-                            ):
-                                if found is not NOT_FOUND:
-                                    yield found
-                    continue
-                if isinstance(inner, dict):
-                    example = inner
+        inner = next((value for key, value in example.items() if key.lower() == schema_name.lower()), None)
+        if inner is not None:
+            if isinstance(inner, list):
+                for sub_example in inner:
+                    if isinstance(sub_example, dict):
+                        for found in _find_matching_in_responses(
+                            sub_example, schema_name, param, normalized, is_id_param
+                        ):
+                            if found is not NOT_FOUND:
+                                yield found
+                continue
+            if isinstance(inner, dict):
+                example = inner
         for found in _find_matching_in_responses(example, schema_name, param, normalized, is_id_param):
             if found is not NOT_FOUND:
                 yield found

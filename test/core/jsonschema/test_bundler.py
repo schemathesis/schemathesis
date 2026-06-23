@@ -4,7 +4,7 @@ import pytest
 
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle, bundle_for_generation, bundle_for_validation
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler, bundle_for_generation, bundle_for_validation
 from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
@@ -409,19 +409,19 @@ DEFINITIONS = {
 )
 def test_bundle(schema, store, expected):
     resolver = make_root_resolver(store)
-    assert bundle(schema, resolver, inline_recursive=True).schema == expected
+    assert Bundler().bundle(schema, resolver, inline_recursive=True).schema == expected
 
 
 def test_unresolvable_pointer():
     resolver = make_root_resolver({})
     with pytest.raises(RefResolutionError):
-        bundle({"$ref": "#/definitions/NonExistent"}, resolver, inline_recursive=True)
+        Bundler().bundle({"$ref": "#/definitions/NonExistent"}, resolver, inline_recursive=True)
 
 
 def test_bundle_ref_resolves_to_none_error_message():
     resolver = make_root_resolver({"definitions": {"User": None}})
     with pytest.raises(BundleError) as exc:
-        bundle({"$ref": "#/definitions/User"}, resolver, inline_recursive=True)
+        Bundler().bundle({"$ref": "#/definitions/User"}, resolver, inline_recursive=True)
     assert str(exc.value) == "Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got null"
 
 
@@ -441,7 +441,7 @@ def test_bundle_recursive_not_inlined():
 
     resolver = make_root_resolver(store)
 
-    assert bundle(schema, resolver, inline_recursive=False).schema == {
+    assert Bundler().bundle(schema, resolver, inline_recursive=False).schema == {
         "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
         BUNDLE_STORAGE_KEY: {
             "schema1": {
@@ -519,7 +519,7 @@ def test_bundle_non_recursive_inlined():
 
     resolver = make_root_resolver(store)
 
-    assert bundle(schema, resolver, inline_recursive=False).schema == {"type": "object"}
+    assert Bundler().bundle(schema, resolver, inline_recursive=False).schema == {"type": "object"}
 
 
 def _strip_remote_refs(value: Any) -> Any:
@@ -539,7 +539,7 @@ def test_bundles_open_api_schemas(schema):
     # so the test stays offline.
     schema = _strip_remote_refs(schema)
     resolver = make_root_resolver(schema)
-    bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver, inline_recursive=True)
 
 
 def test_bundle_infinite_recursive_required_cycle_message():
@@ -567,7 +567,7 @@ def test_bundle_infinite_recursive_required_cycle_message():
     resolver = make_root_resolver(store)
 
     with pytest.raises(InfiniteRecursiveReference) as exc:
-        bundle(schema, resolver, inline_recursive=True)
+        Bundler().bundle(schema, resolver, inline_recursive=True)
 
     assert (
         str(exc.value)
@@ -596,7 +596,7 @@ def test_bundle_self_recursion_through_pattern_properties_is_breakable():
 
     resolver = make_root_resolver(store)
 
-    bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver, inline_recursive=True)
 
 
 def test_bundle_self_cycle_through_dead_definitions_block():
@@ -624,7 +624,7 @@ def test_bundle_self_cycle_through_dead_definitions_block():
 
     resolver = make_root_resolver(store)
 
-    bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver, inline_recursive=True)
 
 
 def test_bundle_oneof_with_indirectly_recursive_branch_skips_it():
@@ -656,7 +656,7 @@ def test_bundle_oneof_with_indirectly_recursive_branch_skips_it():
 
     resolver = make_root_resolver(store)
 
-    bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver, inline_recursive=True)
 
 
 def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
@@ -682,7 +682,7 @@ def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
 
     resolver = make_root_resolver(store)
 
-    bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver, inline_recursive=True)
 
 
 def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
@@ -703,7 +703,7 @@ def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
 
     resolver = make_root_resolver(store)
 
-    bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver, inline_recursive=True)
 
 
 def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
@@ -740,7 +740,7 @@ def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
 
     resolver = make_root_resolver(store)
 
-    bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver, inline_recursive=True)
 
 
 def test_unbundle_decodes_pointer_escaping_in_definition_names():

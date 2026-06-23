@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.specs.openapi.utils import expand_status_code
+from schemathesis.core.transport import expand_status_code
 
 
 @pytest.mark.parametrize(
@@ -13,4 +13,4 @@ from schemathesis.specs.openapi.utils import expand_status_code
     ],
 )
 def test_expand_status_code(value, expected):
-    assert list(expand_status_code(value)) == expected
+    assert expand_status_code(value) == expected

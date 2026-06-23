@@ -3,7 +3,6 @@ import sys
 
 import pytest
 
-from schemathesis.core.jsonschema import bundle
 from schemathesis.core.jsonschema.bundler import Bundler
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver
 
@@ -33,7 +32,7 @@ def test_bundle_many_flat_references(benchmark):
 
     resolver = make_root_resolver({"definitions": definitions})
 
-    benchmark(bundle, schema, resolver, inline_recursive=True)
+    benchmark(lambda: Bundler().bundle(schema, resolver, inline_recursive=True))
 
 
 @pytest.mark.benchmark(group="bundle-deep-nested-references")
@@ -52,7 +51,7 @@ def test_bundle_deep_nested_references(benchmark):
 
     resolver = make_root_resolver({"definitions": definitions})
 
-    benchmark(bundle, schema, resolver, inline_recursive=True)
+    benchmark(lambda: Bundler().bundle(schema, resolver, inline_recursive=True))
 
 
 @pytest.mark.benchmark(group="bundle-duplicate-references")
@@ -77,7 +76,7 @@ def test_bundle_duplicate_references(benchmark):
 
     resolver = make_root_resolver({"definitions": definitions})
 
-    benchmark(bundle, schema, resolver, inline_recursive=True)
+    benchmark(lambda: Bundler().bundle(schema, resolver, inline_recursive=True))
 
 
 def _bundle_many(schemas: list, resolver: Resolver) -> None:

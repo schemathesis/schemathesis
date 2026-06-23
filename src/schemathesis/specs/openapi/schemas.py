@@ -381,7 +381,9 @@ class OpenApiSchema(BaseSchema):
             header_values,
         )
 
-        formats.register(HEADER_FORMAT, header_values(exclude_characters=DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00"))
+        formats.register_string_format(
+            HEADER_FORMAT, header_values(exclude_characters=DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00")
+        )
 
     @override
     def get_custom_format_strategies(

@@ -4,14 +4,8 @@ import re
 from dataclasses import dataclass
 
 
-@dataclass
-class Extractor:
-    def extract(self, value: str) -> str | None:
-        raise NotImplementedError
-
-
 @dataclass(slots=True)
-class RegexExtractor(Extractor):
+class RegexExtractor:
     """Extract value via a regex."""
 
     value: re.Pattern

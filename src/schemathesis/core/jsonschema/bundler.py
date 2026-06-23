@@ -295,11 +295,6 @@ class Bundler:
         return self.bundle(schema, resolver, inline_recursive=False)
 
 
-def bundle(schema: JsonSchema, resolver: Resolver, *, inline_recursive: bool) -> Bundle:
-    """Bundle a JSON Schema by embedding all references."""
-    return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)
-
-
 def bundle_for_generation(schema: JsonSchema, resolver: Resolver) -> Bundle:
     """Prepare schema for data generation by inlining recursive references."""
     return Bundler().bundle_for_generation(schema, resolver)
