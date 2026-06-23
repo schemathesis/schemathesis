@@ -136,16 +136,25 @@ class Response:
     def from_any(cls, response: httpx.Response | requests.Response | TestResponse) -> Response: ...
     @classmethod
     def from_any(cls, response: Response | httpx.Response | requests.Response | TestResponse) -> Response:
-        import httpx
+        # Fast path for already-converted responses; avoids importing the optional transports.
+        if isinstance(response, Response):
+            return response
+
         import requests
         from werkzeug.test import TestResponse
 
         if isinstance(response, requests.Response):
             return Response.from_requests(response, verify=True)
-        elif isinstance(response, httpx.Response):
-            return Response.from_httpx(response, verify=True)
-        elif isinstance(response, TestResponse):
+        if isinstance(response, TestResponse):
             return Response.from_wsgi(response)
+        # `httpx` is optional; it is only needed to recognize its own response type.
+        try:
+            import httpx
+        except ImportError:
+            pass
+        else:
+            if isinstance(response, httpx.Response):
+                return Response.from_httpx(response, verify=True)
         return response
 
     @classmethod
