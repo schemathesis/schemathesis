@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections.abc import Callable, Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 from typing import Any
@@ -56,32 +56,12 @@ class HypothesisTestMode(str, Enum):
 class HypothesisTestConfig:
     project: ProjectConfig
     modes: list[HypothesisTestMode]
-    settings: hypothesis.settings | None
-    explicit_settings: hypothesis.settings | None
-    seed: int | None
-    as_strategy_kwargs: dict[str, Any]
-    given_args: tuple[GivenInput, ...]
-    given_kwargs: dict[str, GivenInput]
-
-    def __init__(
-        self,
-        project: ProjectConfig,
-        modes: list[HypothesisTestMode],
-        settings: hypothesis.settings | None = None,
-        explicit_settings: hypothesis.settings | None = None,
-        seed: int | None = None,
-        as_strategy_kwargs: dict[str, Any] | None = None,
-        given_args: tuple[GivenInput, ...] = (),
-        given_kwargs: dict[str, GivenInput] | None = None,
-    ) -> None:
-        self.project = project
-        self.modes = modes
-        self.settings = settings
-        self.explicit_settings = explicit_settings
-        self.seed = seed
-        self.as_strategy_kwargs = as_strategy_kwargs or {}
-        self.given_args = given_args
-        self.given_kwargs = given_kwargs or {}
+    settings: hypothesis.settings | None = None
+    explicit_settings: hypothesis.settings | None = None
+    seed: int | None = None
+    as_strategy_kwargs: dict[str, Any] = field(default_factory=dict)
+    given_args: tuple[GivenInput, ...] = ()
+    given_kwargs: dict[str, GivenInput] = field(default_factory=dict)
 
 
 def create_test(

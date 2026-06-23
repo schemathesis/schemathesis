@@ -47,12 +47,8 @@ Schemathesis generated test data, but every case was rejected by your hook."""
 
 @dataclass(slots=True)
 class FilterCaseTracker:
-    total: int
-    rejected: int
-
-    def __init__(self) -> None:
-        self.total = 0
-        self.rejected = 0
+    total: int = 0
+    rejected: int = 0
 
     def record(self, accepted: bool) -> None:
         self.total += 1
