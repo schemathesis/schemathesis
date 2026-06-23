@@ -61,13 +61,6 @@ def prune_optional_refs(schema: JsonSchema, *, is_recursive_ref: Callable[[str],
                         stack.append(item)
 
 
-def collect_all_references(schema: JsonSchema | list[JsonSchema]) -> set[str]:
-    """Return every `$ref` value found anywhere in `schema`."""
-    remaining: set[str] = set()
-    _collect_all_references(schema, remaining)
-    return remaining
-
-
 def _drop_recursive_top_level_allof(schema: JsonSchemaObject, is_recursive_ref: Callable[[str], bool]) -> None:
     all_of = schema.get("allOf")
     if not isinstance(all_of, list):
@@ -274,16 +267,3 @@ def _has_ref(schema: object) -> bool:
                     return True
 
     return False
-
-
-def _collect_all_references(schema: JsonSchema | list[JsonSchema], remaining: set[str]) -> None:
-    """Collect all remaining $ref."""
-    if isinstance(schema, dict):
-        ref = schema.get("$ref")
-        if isinstance(ref, str):
-            remaining.add(ref)
-        for value in schema.values():
-            _collect_all_references(value, remaining)
-    elif isinstance(schema, list):
-        for item in schema:
-            _collect_all_references(item, remaining)

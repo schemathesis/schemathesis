@@ -630,7 +630,7 @@ def test_external_link(ctx):
     schema.config.generation.update(max_examples=75, database="none", modes=[GenerationMode.POSITIVE])
     engine = stateful.execute(
         engine=EngineContext(schema=schema, stop_event=threading.Event()),
-        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
+        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
     )
     result = collect_result(engine)
     assert result.events[-1].status == Status.FAILURE
@@ -772,7 +772,7 @@ def test_negative_changing_to_positive(app_runner):
     schema.config.generation.update(database="none")
     engine = stateful.execute(
         engine=EngineContext(schema=schema, stop_event=threading.Event()),
-        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
+        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
     )
     result = collect_result(engine)
     assert result.events[-1].status == Status.SUCCESS
@@ -833,7 +833,7 @@ def test_explicit_auth_header_does_not_trigger_negative_data_rejection(app_runne
     schema = schemathesis.openapi.from_dict(schema, config=config)
     engine = stateful.execute(
         engine=EngineContext(schema=schema, stop_event=threading.Event()),
-        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
+        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
     )
     result = collect_result(engine)
     assert result.events[-1].status == Status.SUCCESS

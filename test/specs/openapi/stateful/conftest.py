@@ -71,7 +71,7 @@ def _build_stateful_engine_ctx(
 
 
 def _stateful_phase() -> Phase:
-    return Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True)
+    return Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)
 
 
 @pytest.fixture

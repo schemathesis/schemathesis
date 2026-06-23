@@ -203,7 +203,7 @@ class FuzzProgressManager:
 
         return f"{icon}  Fuzzing (in {duration})\n\n    {stats_line}"
 
-    def update(self, event: FuzzScenarioFinished, unique_failures: int) -> None:
+    def update(self, unique_failures: int) -> None:
         self.total_scenarios += 1
         if unique_failures > self.unique_failures:
             self.last_failure_time = time.monotonic()
@@ -246,7 +246,7 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         elif isinstance(event, EngineStarted):
             self.progress_manager.start()
         elif isinstance(event, FuzzScenarioFinished):
-            self.progress_manager.update(event, unique_failures=len(ctx.statistic.unique_failures_map))
+            self.progress_manager.update(unique_failures=len(ctx.statistic.unique_failures_map))
         elif isinstance(event, NonFatalError):
             self.progress_manager.update_error_count(len(ctx.errors))
         elif isinstance(event, FatalError):

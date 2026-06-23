@@ -193,11 +193,6 @@ class OpenAPIAnalysis:
         self._links_injected = True
         return injected
 
-    @property
-    def links_injected(self) -> bool:
-        """Check if links have been injected into the schema."""
-        return self._links_injected
-
     def iter_warnings(self) -> Iterator[SchemaWarning]:
         """Iterate over all cached schema warnings."""
         # Operation-level warnings

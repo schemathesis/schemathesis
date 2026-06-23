@@ -89,7 +89,6 @@ class Engine:
         if not is_supported:
             return Phase(
                 name=phase_name,
-                is_supported=False,
                 is_enabled=False,
                 skip_reason=PhaseSkipReason.NOT_SUPPORTED,
             )
@@ -101,7 +100,6 @@ class Engine:
         ):
             return Phase(
                 name=phase_name,
-                is_supported=True,
                 is_enabled=False,
                 skip_reason=PhaseSkipReason.DISABLED,
             )
@@ -109,15 +107,12 @@ class Engine:
         if requires_transitions and self.schema.statistic.transitions.total == 0:
             return Phase(
                 name=phase_name,
-                is_supported=True,
                 is_enabled=False,
                 skip_reason=PhaseSkipReason.NOT_APPLICABLE,
             )
 
-        # Phase can be executed
         return Phase(
             name=phase_name,
-            is_supported=True,
             is_enabled=True,
             skip_reason=None,
         )
@@ -142,9 +137,6 @@ class ExecutionPlan:
         try:
             if engine.is_interrupted:
                 yield from self._finish(engine)
-                return
-            if engine.is_interrupted:
-                yield from self._finish(engine)  # type: ignore[unreachable]
                 return
 
             # Run main phases
