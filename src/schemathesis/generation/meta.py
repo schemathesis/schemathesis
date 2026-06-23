@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -192,71 +192,33 @@ class GenerationInfo:
     __slots__ = ("time", "mode")
 
 
-@dataclass
+@dataclass(slots=True)
 class CaseMetadata:
     """Complete metadata for generated cases."""
 
     generation: GenerationInfo
     components: dict[ParameterLocation, ComponentInfo]
     phase: PhaseInfo
-    pool_draws: tuple[PoolDraw, ...]
+    pool_draws: tuple[PoolDraw, ...] = ()
     # Resource-bound (location, parameter_name) slots the engine wanted to fill from the pool
     # but couldn't (no captured instance). Lets the analyzer compute chain rate.
-    pool_misses: tuple[tuple[str, str], ...]
+    pool_misses: tuple[tuple[str, str], ...] = ()
     # Semantic value index substitutions applied by the overlay (one entry per leaf substituted).
-    semantic_draws: tuple[SemanticDraw, ...]
+    semantic_draws: tuple[SemanticDraw, ...] = ()
     # Configured fuzz-dictionary draws applied to named parameters at generation time.
-    dictionary_draws: tuple[DictionaryDraw, ...]
+    dictionary_draws: tuple[DictionaryDraw, ...] = ()
     # Typed (pre-serialization) container snapshots captured at generation time.
     # Coverage stringifies query/path values for the wire; this preserves the
     # original typed form so revalidation matches the schema's abstraction level.
-    raw_containers: dict[ParameterLocation, Any]
+    raw_containers: dict[ParameterLocation, Any] = field(default_factory=dict)
 
     # Dirty tracking for revalidation
-    _dirty: set[ParameterLocation]
-    _last_validated_hashes: dict[ParameterLocation, int]
+    _dirty: set[ParameterLocation] = field(default_factory=set, init=False)
+    _last_validated_hashes: dict[ParameterLocation, int] = field(default_factory=dict, init=False)
     # Initial container hashes captured once after generation; never updated.
     # Lets revalidation detect whether a container still matches its wire-form
     # snapshot (so the typed `raw_containers` value remains authoritative).
-    _initial_hashes: dict[ParameterLocation, int]
-
-    __slots__ = (
-        "generation",
-        "components",
-        "phase",
-        "pool_draws",
-        "pool_misses",
-        "semantic_draws",
-        "dictionary_draws",
-        "raw_containers",
-        "_dirty",
-        "_last_validated_hashes",
-        "_initial_hashes",
-    )
-
-    def __init__(
-        self,
-        generation: GenerationInfo,
-        components: dict[ParameterLocation, ComponentInfo],
-        phase: PhaseInfo,
-        pool_draws: tuple[PoolDraw, ...] = (),
-        pool_misses: tuple[tuple[str, str], ...] = (),
-        semantic_draws: tuple[SemanticDraw, ...] = (),
-        dictionary_draws: tuple[DictionaryDraw, ...] = (),
-        raw_containers: dict[ParameterLocation, Any] | None = None,
-    ) -> None:
-        self.generation = generation
-        self.components = components
-        self.phase = phase
-        self.pool_draws = pool_draws
-        self.pool_misses = pool_misses
-        self.semantic_draws = semantic_draws
-        self.dictionary_draws = dictionary_draws
-        self.raw_containers = raw_containers if raw_containers is not None else {}
-        # Initialize dirty tracking
-        self._dirty = set()
-        self._last_validated_hashes = {}
-        self._initial_hashes = {}
+    _initial_hashes: dict[ParameterLocation, int] = field(default_factory=dict, init=False)
 
     def mark_dirty(self, location: ParameterLocation) -> None:
         """Mark a component as modified and needing revalidation."""
