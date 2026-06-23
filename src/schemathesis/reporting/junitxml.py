@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import platform
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
 from types import TracebackType
 from typing import IO, TYPE_CHECKING
-
-from junit_xml import TestCase, TestSuite, to_xml_report_file
+from xml.etree import ElementTree
 
 from schemathesis.core.failures import format_failures
 
@@ -22,13 +22,22 @@ if TYPE_CHECKING:
 TextOutput = IO[str] | StringIO | Path
 
 
+@dataclass
+class _TestCase:
+    name: str
+    elapsed_sec: float = 0.0
+    failures: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
+
+
 class JunitXmlWriter:
     """Accumulates test results and writes JUnit XML on close."""
 
     def __init__(self, output: TextOutput, config: OutputConfig | None = None) -> None:
         self._output = output
         self._config = config
-        self._test_cases: dict[str, TestCase] = {}
+        self._test_cases: dict[str, _TestCase] = {}
 
     def record_scenario(
         self,
@@ -53,9 +62,9 @@ class JunitXmlWriter:
                 )
                 for idx, group in enumerate(failures, 1)
             ]
-            test_case.add_failure_info(message="\n\n".join(messages))
+            test_case.failures.append("\n\n".join(messages))
         elif skip_reason is not None:
-            test_case.add_skipped_info(output=skip_reason)
+            test_case.skipped.append(skip_reason)
 
     def write(self, recorder: ScenarioRecorder, elapsed_sec: float = 0.0) -> None:
         """Write all interactions from a ScenarioRecorder as a JUnit test case."""
@@ -86,21 +95,19 @@ class JunitXmlWriter:
 
     def record_error(self, label: str, message: str) -> None:
         """Record a non-fatal error for a label."""
-        self._get_or_create(label).add_error_info(output=message)
+        self._get_or_create(label).errors.append(message)
 
     def close(self) -> None:
         """Write the JUnit XML report and close the output."""
-        test_suites = [TestSuite("schemathesis", test_cases=list(self._test_cases.values()), hostname=platform.node())]
+        document = _render(list(self._test_cases.values()))
         if isinstance(self._output, Path):
             with open(self._output, "w", encoding="utf-8") as fd:
-                to_xml_report_file(file_descriptor=fd, test_suites=test_suites, prettyprint=True, encoding="utf-8")
+                fd.write(document)
         else:
-            to_xml_report_file(
-                file_descriptor=self._output, test_suites=test_suites, prettyprint=True, encoding="utf-8"
-            )
+            self._output.write(document)
 
-    def _get_or_create(self, label: str) -> TestCase:
-        return self._test_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
+    def _get_or_create(self, label: str) -> _TestCase:
+        return self._test_cases.setdefault(label, _TestCase(name=label))
 
     def __enter__(self) -> Self:
         return self
@@ -112,3 +119,29 @@ class JunitXmlWriter:
         exc_tb: TracebackType | None,
     ) -> None:
         self.close()
+
+
+def _render(test_cases: list[_TestCase]) -> str:
+    total = len(test_cases)
+    failures = sum(1 for case in test_cases if case.failures)
+    errors = sum(1 for case in test_cases if case.errors)
+    skipped = sum(1 for case in test_cases if case.skipped)
+    time = f"{sum(case.elapsed_sec for case in test_cases):.6f}"
+    counts = {"errors": str(errors), "failures": str(failures), "skipped": str(skipped), "tests": str(total)}
+
+    suites = ElementTree.Element("testsuites", {**counts, "time": time})
+    suite = ElementTree.SubElement(
+        suites, "testsuite", {"name": "schemathesis", "hostname": platform.node(), **counts, "time": time}
+    )
+    for case in test_cases:
+        element = ElementTree.SubElement(suite, "testcase", {"name": case.name, "time": f"{case.elapsed_sec:.6f}"})
+        for message in case.failures:
+            ElementTree.SubElement(element, "failure", {"type": "failure"}).text = message
+        for message in case.errors:
+            ElementTree.SubElement(element, "error", {"type": "error"}).text = message
+        for message in case.skipped:
+            ElementTree.SubElement(element, "skipped", {"type": "skipped"}).text = message
+
+    ElementTree.indent(suites)
+    body = ElementTree.tostring(suites, encoding="unicode")
+    return f'<?xml version="1.0" encoding="utf-8"?>\n{body}'
