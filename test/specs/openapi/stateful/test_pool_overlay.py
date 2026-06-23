@@ -13,7 +13,7 @@ from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 
 
 def _stateful_phase() -> Phase:
-    return Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True)
+    return Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)
 
 
 def _run_stateful(ctx, stop_event, *, max_examples=10):

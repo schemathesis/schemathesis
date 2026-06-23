@@ -172,4 +172,3 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
 
 
 register = register_string_format
-unregister = unregister_string_format

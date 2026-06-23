@@ -104,10 +104,6 @@ class EngineContext:
         return time.monotonic() - self.start_time
 
     @property
-    def has_reached_time_limit(self) -> bool:
-        return self.control.has_reached_time_limit
-
-    @property
     def has_to_stop(self) -> bool:
         """Check if execution should stop."""
         return self.control.is_stopped

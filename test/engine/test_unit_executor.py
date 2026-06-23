@@ -47,7 +47,7 @@ def test_unit_executor_drains_pending_events_after_worker_exit(ctx, monkeypatch)
     api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_url(api.schema_url)
     engine = EngineContext(schema=schema, stop_event=threading.Event())
-    phase = Phase(name=PhaseName.FUZZING, is_supported=True, is_enabled=True)
+    phase = Phase(name=PhaseName.FUZZING, is_enabled=True)
 
     monkeypatch.setattr(unit, "WorkerPool", _RacyPool)
 

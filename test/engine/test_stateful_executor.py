@@ -34,7 +34,7 @@ def test_stateful_executor_drains_pending_events_after_thread_exit(ctx, monkeypa
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
     engine = EngineContext(schema=schema, stop_event=threading.Event())
-    phase = Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True)
+    phase = Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)
 
     monkeypatch.setattr(stateful.threading, "Thread", _RacyThread)
 

@@ -2,7 +2,21 @@ from typing import Any
 
 import pytest
 
-from schemathesis.core.jsonschema.references import collect_all_references, prune_optional_refs
+from schemathesis.core.jsonschema.references import prune_optional_refs
+
+
+def collect_all_references(schema: Any) -> set[str]:
+    refs: set[str] = set()
+    if isinstance(schema, dict):
+        ref = schema.get("$ref")
+        if isinstance(ref, str):
+            refs.add(ref)
+        for value in schema.values():
+            refs |= collect_all_references(value)
+    elif isinstance(schema, list):
+        for item in schema:
+            refs |= collect_all_references(item)
+    return refs
 
 
 def ref_schema(ref: str) -> dict[str, Any]:

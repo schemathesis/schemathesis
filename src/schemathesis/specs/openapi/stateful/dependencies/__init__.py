@@ -24,15 +24,11 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
 )
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
-    Cardinality,
-    DefinitionSource,
     DependencyGraph,
     InputSlot,
     NormalizedLink,
     OperationMap,
     OperationNode,
-    OutputSlot,
-    ResourceDefinition,
     ResourceMap,
 )
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
@@ -51,10 +47,6 @@ __all__ = [
     "inject_links",
     "DependencyGraph",
     "InputSlot",
-    "OutputSlot",
-    "Cardinality",
-    "ResourceDefinition",
-    "DefinitionSource",
 ]
 
 

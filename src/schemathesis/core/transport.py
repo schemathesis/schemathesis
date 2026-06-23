@@ -16,9 +16,6 @@ Headers: TypeAlias = dict[str, list[str]]
 
 # Wire-form HTTP method (uppercase). `Case.method` and user-facing API surfaces use this.
 HttpMethod: TypeAlias = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "QUERY"]
-_HTTP_METHODS: frozenset[str] = frozenset(
-    {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "TRACE", "QUERY"}
-)
 
 # Schema-form HTTP method (lowercase). OpenAPI declares operations under lowercase verb keys,
 # so `APIOperation.method` carries this form; the wire `HttpMethod` is its uppercase counterpart.

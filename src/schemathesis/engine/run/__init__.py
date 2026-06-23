@@ -62,15 +62,11 @@ class Phase:
     """A logically separate engine execution phase."""
 
     name: PhaseName
-    is_supported: bool
     is_enabled: bool
     skip_reason: PhaseSkipReason | None
 
-    def __init__(
-        self, name: PhaseName, is_supported: bool, is_enabled: bool = True, skip_reason: PhaseSkipReason | None = None
-    ) -> None:
+    def __init__(self, name: PhaseName, is_enabled: bool = True, skip_reason: PhaseSkipReason | None = None) -> None:
         self.name = name
-        self.is_supported = is_supported
         self.is_enabled = is_enabled
         self.skip_reason = skip_reason
 

@@ -610,7 +610,7 @@ def test_create_scheduler_respects_layer_order_for_single_layer(ctx):
     )
 
     engine = EngineContext(schema=loaded, stop_event=threading.Event())
-    phase = Phase(name=PhaseName.FUZZING, is_supported=True, is_enabled=True)
+    phase = Phase(name=PhaseName.FUZZING, is_enabled=True)
 
     scheduler = _create_scheduler(engine, phase)
 
