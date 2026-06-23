@@ -6,6 +6,10 @@
 
 - Class-based checks that run per response and once after the whole run. [#1147](https://github.com/schemathesis/schemathesis/issues/1147), [#1689](https://github.com/schemathesis/schemathesis/issues/1689)
 
+### :wrench: Changed
+
+- Drop the `junit-xml` dependency; generate JUnit reports with the standard library.
+
 ## [4.21.10](https://github.com/schemathesis/schemathesis/compare/v4.21.9...v4.21.10) - 2026-06-20
 
 ### :bug: Fixed
