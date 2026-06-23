@@ -247,7 +247,7 @@ def run(
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
 
-    config: SchemathesisConfig = ctx.obj.config
+    config: SchemathesisConfig = ctx.obj
 
     # First, set the right color
     color = resolve_color(force_color, no_color, config.color)

@@ -235,7 +235,7 @@ def fuzz(
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
 
-    config: SchemathesisConfig = ctx.obj.config
+    config: SchemathesisConfig = ctx.obj
 
     color = resolve_color(force_color, no_color, config.color)
     ensure_color(ctx, color)

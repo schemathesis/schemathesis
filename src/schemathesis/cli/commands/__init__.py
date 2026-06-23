@@ -6,7 +6,6 @@ from typing import Any
 
 import click
 
-from schemathesis.cli.commands.data import Data
 from schemathesis.cli.commands.fuzz import fuzz as fuzz_command
 from schemathesis.cli.commands.run import run as run_command
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
@@ -123,7 +122,7 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
             click.secho(f"\n{message}", fg="red")
         click.echo(f"\nFor more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
         ctx.exit(1)
-    ctx.obj = Data(config=config)
+    ctx.obj = config
 
 
 @dataclass(slots=True)

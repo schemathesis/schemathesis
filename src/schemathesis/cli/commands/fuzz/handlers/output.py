@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from itertools import groupby
 from typing import TYPE_CHECKING
 
@@ -53,66 +54,18 @@ _STOP_REASON_LABELS = {
 }
 
 
-class _ThroughputRenderable:
-    """Renders elapsed time and scenario rate; recomputed on every Rich refresh."""
+class _LiveText:
+    """Renderable recomputed from a callback on every Rich refresh."""
 
-    __slots__ = ("_manager",)
+    __slots__ = ("_render",)
 
-    def __init__(self, manager: FuzzProgressManager) -> None:
-        self._manager = manager
-
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        from rich.text import Text
-
-        m = self._manager
-        elapsed_secs = time.monotonic() - m.start_time
-        h, rem = divmod(int(elapsed_secs), 3600)
-        mins, secs = divmod(rem, 60)
-        elapsed_str = f"{h}:{mins:02d}:{secs:02d}"
-        rate = m.total_scenarios / elapsed_secs if elapsed_secs > 0 else 0.0
-        yield Text(f"{_INDENT}{elapsed_str}{SEPARATOR}{rate:.1f}/s{SEPARATOR}{m.total_scenarios} scenarios")
-
-
-class _CountersRenderable:
-    """Renders scenario counters; recomputed on every Rich refresh."""
-
-    __slots__ = ("_manager",)
-
-    def __init__(self, manager: FuzzProgressManager) -> None:
-        self._manager = manager
+    def __init__(self, render: Callable[[], str]) -> None:
+        self._render = render
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         from rich.text import Text
 
-        m = self._manager
-        errors = m.stats[Status.ERROR]
-        parts = []
-        if m.unique_failures:
-            parts.append(f"❌ {m.unique_failures} unique failures")
-        if errors:
-            parts.append(f"🚫 {errors} errors")
-        text = SEPARATOR.join(parts) if parts else "No issues found yet"
-        yield Text(f"{_INDENT}{text}")
-
-
-class _LastFailureRenderable:
-    """Renders time since last new unique failure; recomputed on every Rich refresh."""
-
-    __slots__ = ("_manager",)
-
-    def __init__(self, manager: FuzzProgressManager) -> None:
-        self._manager = manager
-
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        from rich.text import Text
-
-        m = self._manager
-        if m.last_failure_time is None:
-            text = "Last new failure: none yet"
-        else:
-            secs = time.monotonic() - m.last_failure_time
-            text = f"Last new failure: {secs:.2f}s ago"
-        yield Text(f"{_INDENT}{text}")
+        yield Text(self._render())
 
 
 class FuzzProgressManager:
@@ -160,6 +113,34 @@ class FuzzProgressManager:
         )
         self.title_task_id = self.title_progress.add_task("  Fuzzing")
 
+    def _throughput_line(self) -> str:
+        elapsed = time.monotonic() - self.start_time
+        hours, rem = divmod(int(elapsed), 3600)
+        minutes, seconds = divmod(rem, 60)
+        rate = self.total_scenarios / elapsed if elapsed > 0 else 0.0
+        return (
+            f"{_INDENT}{hours}:{minutes:02d}:{seconds:02d}"
+            f"{SEPARATOR}{rate:.1f}/s{SEPARATOR}{self.total_scenarios} scenarios"
+        )
+
+    def _counters_line(self) -> str:
+        errors = self.stats[Status.ERROR]
+        parts = []
+        if self.unique_failures:
+            parts.append(f"❌ {self.unique_failures} unique failures")
+        if errors:
+            parts.append(f"🚫 {errors} errors")
+        text = SEPARATOR.join(parts) if parts else "No issues found yet"
+        return f"{_INDENT}{text}"
+
+    def _last_failure_line(self) -> str:
+        if self.last_failure_time is None:
+            text = "Last new failure: none yet"
+        else:
+            seconds = time.monotonic() - self.last_failure_time
+            text = f"Last new failure: {seconds:.2f}s ago"
+        return f"{_INDENT}{text}"
+
     def start(self) -> None:
         from rich.console import Group
         from rich.live import Live
@@ -168,10 +149,10 @@ class FuzzProgressManager:
         group = Group(
             self.title_progress,
             Text(),
-            _ThroughputRenderable(self),
+            _LiveText(self._throughput_line),
             Text(),
-            _CountersRenderable(self),
-            _LastFailureRenderable(self),
+            _LiveText(self._counters_line),
+            _LiveText(self._last_failure_line),
         )
         self.live = Live(group, refresh_per_second=10, console=self.console, transient=True)
         self.live.start()

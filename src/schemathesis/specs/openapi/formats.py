@@ -141,9 +141,6 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     from hypothesis import strategies as st
     from requests.auth import _basic_auth_str
 
-    def make_basic_auth_str(item: tuple[str, str]) -> str:
-        return _basic_auth_str(*item)
-
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
 
     # Exclude RFC 9110 invalid chars so generated header values always pass `is_valid_header`
@@ -166,9 +163,6 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
             min_size=1, alphabet=st.sampled_from("!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters)
         ),
         HEADER_FORMAT: header_value,
-        "_basic_auth": st.tuples(latin1_text, latin1_text).map(make_basic_auth_str),
+        "_basic_auth": st.tuples(latin1_text, latin1_text).map(lambda item: _basic_auth_str(*item)),
         "_bearer_auth": header_value.map("Bearer {}".format),
     }
-
-
-register = register_string_format

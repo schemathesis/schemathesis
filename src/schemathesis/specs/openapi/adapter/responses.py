@@ -13,11 +13,11 @@ from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.bundler import Bundle, bundle_for_validation
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.transport import expand_status_code
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.converter import to_json_schema
-from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.content_keywords import SseValidator

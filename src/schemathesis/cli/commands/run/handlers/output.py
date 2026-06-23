@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 
 import click
 
-from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
 from schemathesis.cli.context import BaseExecutionContext
+from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     BLOCK_PADDING,
     LoadingProgressManager,

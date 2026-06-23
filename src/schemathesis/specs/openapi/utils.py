@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-import string
-from collections.abc import Generator
-from itertools import chain, product
+from itertools import chain
 from typing import TYPE_CHECKING
+
+from schemathesis.core.transport import expand_status_code
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import StatusCodePattern
-
-
-def expand_status_code(status_code: StatusCodePattern | int) -> Generator[int, None, None]:
-    chars = [list(string.digits) if digit == "X" else [digit] for digit in str(status_code).upper()]
-    for expanded in product(*chars):
-        yield int("".join(expanded))
 
 
 def expand_status_codes(status_codes: list[StatusCodePattern]) -> set[int]:

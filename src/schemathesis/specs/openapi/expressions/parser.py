@@ -98,7 +98,7 @@ def take_string(tokens: lexer.TokenGenerator, expr: str) -> lexer.Token:
     return parameter
 
 
-def take_extractor(tokens: lexer.TokenGenerator, expr: str, current_end: int) -> extractors.Extractor | None:
+def take_extractor(tokens: lexer.TokenGenerator, expr: str, current_end: int) -> extractors.RegexExtractor | None:
     rest = expr[current_end + 1 :]
     if not rest or rest.startswith("}"):
         return None
