@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
@@ -17,6 +16,7 @@ from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Result
+from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 
@@ -203,7 +203,7 @@ class APIStateMachine(RuleBasedStateMachine):
                     # via schema-scoped hooks.
                     class _Capturing(cls):  # type: ignore[valid-type, misc]
                         def __init__(self) -> None:
-                            self._start_time = time.monotonic()
+                            self._started_at = Instant()
                             super().__init__()
                             _recorder = self.recorder
 
@@ -234,7 +234,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
                         def teardown(self) -> None:
                             self.schema.hooks.unregister(self._on_after_validate)
-                            elapsed = time.monotonic() - self._start_time
+                            elapsed = self._started_at.elapsed
                             # Hand the completed recorder to the pytest-level callback
                             _callback(self.recorder, elapsed)
                             super().teardown()

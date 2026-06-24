@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 import unittest
 import uuid
 from collections.abc import Callable
@@ -26,6 +25,7 @@ from schemathesis.core.errors import (
     is_regex_validation_error,
 )
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.errors import (
@@ -65,7 +65,7 @@ def run_test(
     errors: list[Exception] = []
     skip_reason = None
     error: Exception
-    test_start_time = time.monotonic()
+    started_at = Instant()
     recorder = ScenarioRecorder(label=operation.label)
     state = TestingState()
 
@@ -82,7 +82,7 @@ def run_test(
             label=operation.label,
             recorder=recorder,
             status=status,
-            elapsed_time=time.monotonic() - test_start_time,
+            elapsed_time=started_at.elapsed,
             skip_reason=skip_reason,
             is_final=False,
         )

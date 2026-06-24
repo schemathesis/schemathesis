@@ -19,6 +19,7 @@ from schemathesis.core.cache import Kind, request_from_case
 from schemathesis.core.error_feedback import observation_fingerprint
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine._check_context import CheckContextCache
@@ -136,7 +137,7 @@ def execute_state_machine_loop(
         def setup(self) -> None:
             self._current_input: StepInput | None = None
             scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
-            self._start_time = time.monotonic()
+            self._started_at = Instant()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
 
@@ -305,7 +306,7 @@ def execute_state_machine_loop(
                     label=None,
                     status=ctx.current_scenario_status or Status.SKIP,
                     recorder=self.recorder,
-                    elapsed_time=time.monotonic() - self._start_time,
+                    elapsed_time=self._started_at.elapsed,
                     skip_reason=None,
                     is_final=build_ctx.is_final,
                 )

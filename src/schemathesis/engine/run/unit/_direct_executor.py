@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 import uuid
 from typing import TYPE_CHECKING
 
@@ -9,6 +8,7 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.checks import CheckContext
 from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, events
 from schemathesis.engine.errors import TestingState, UnexpectedError, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -38,7 +38,7 @@ def run_driver(
     operation = generator.operation
     errors: list[Exception] = []
     skip_reason: str | None = None
-    test_start_time = time.monotonic()
+    started_at = Instant()
     recorder = ScenarioRecorder(label=operation.label)
     state = TestingState()
 
@@ -55,7 +55,7 @@ def run_driver(
             label=operation.label,
             recorder=recorder,
             status=status,
-            elapsed_time=time.monotonic() - test_start_time,
+            elapsed_time=started_at.elapsed,
             skip_reason=skip_reason,
             is_final=False,
         )

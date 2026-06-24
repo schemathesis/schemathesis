@@ -24,6 +24,7 @@ from schemathesis.cli.output import (
     make_console,
     print_lines,
 )
+from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason
 from schemathesis.engine.events import (
@@ -72,7 +73,7 @@ class FuzzProgressManager:
     """Live progress display for st fuzz."""
 
     console: Console
-    start_time: float
+    started_at: Instant
     title_progress: Progress
     title_task_id: TaskID
     live: Live | None
@@ -83,7 +84,7 @@ class FuzzProgressManager:
 
     __slots__ = (
         "console",
-        "start_time",
+        "started_at",
         "title_progress",
         "title_task_id",
         "live",
@@ -98,7 +99,7 @@ class FuzzProgressManager:
         from rich.style import Style
 
         self.console = console
-        self.start_time = time.monotonic()
+        self.started_at = Instant()
         self.total_scenarios = 0
         self.stats: dict[Status, int] = {Status.ERROR: 0}
         self.last_failure_time = None
@@ -114,7 +115,7 @@ class FuzzProgressManager:
         self.title_task_id = self.title_progress.add_task("  Fuzzing")
 
     def _throughput_line(self) -> str:
-        elapsed = time.monotonic() - self.start_time
+        elapsed = self.started_at.elapsed
         hours, rem = divmod(int(elapsed), 3600)
         minutes, seconds = divmod(rem, 60)
         rate = self.total_scenarios / elapsed if elapsed > 0 else 0.0
@@ -162,7 +163,7 @@ class FuzzProgressManager:
             self.live.stop()
 
     def get_completion_message(self) -> str:
-        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+        duration = format_duration(self.started_at.elapsed_ms)
         errors = self.stats[Status.ERROR]
 
         if self.unique_failures > 0 or errors > 0:

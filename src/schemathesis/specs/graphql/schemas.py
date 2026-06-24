@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass
 from difflib import get_close_matches
@@ -26,6 +25,7 @@ from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.timing import Instant
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
@@ -490,7 +490,7 @@ def graphql_cases(
     from hypothesis_graphql import Mode as GqlMode
     from hypothesis_graphql import strategies as gql_st
 
-    start = time.monotonic()
+    started_at = Instant()
     definition = cast(GraphQLOperationDefinition, operation.definition)
     strategy_factory = {
         RootType.QUERY: gql_st.queries,
@@ -589,7 +589,7 @@ def graphql_cases(
         body=body,
         _meta=CaseMetadata(
             generation=GenerationInfo(
-                time=time.monotonic() - start,
+                time=started_at.elapsed,
                 mode=effective_mode,
             ),
             phase=PhaseInfo(name=phase, data=phase_data),
