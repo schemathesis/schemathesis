@@ -133,6 +133,11 @@ def execute_event_loop(
     output_handler: EventHandler,
     context_factory: Callable[[ProjectConfig], ExecutionContext],
 ) -> None:
+    from rich.text import Text
+
+    # Warm Rich's lazy emoji-codes import on the main thread; it is not concurrency-safe.
+    Text.from_markup("")
+
     handlers = [*initialize_report_handlers(config=config, args=args, params=params), output_handler]
     ctx: ExecutionContext | None = None
 
