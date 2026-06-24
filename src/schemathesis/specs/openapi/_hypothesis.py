@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
@@ -27,6 +26,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.timing import Instant
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import custom_formats_cache
@@ -132,7 +132,7 @@ def openapi_cases(
     The primary purpose of this behavior is to prevent sending incomplete explicit examples by generating missing parts
     as it works with `body`.
     """
-    start = time.monotonic()
+    started_at = Instant()
 
     generation_config = operation.schema.config.generation_for(operation=operation, phase=phase.value)
 
@@ -464,7 +464,7 @@ def openapi_cases(
         multipart_content_types=multipart_content_types,
         _meta=CaseMetadata(
             generation=GenerationInfo(
-                time=time.monotonic() - start,
+                time=started_at.elapsed,
                 mode=effective_generation_mode,
             ),
             phase=PhaseInfo(name=phase, data=phase_data),

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from types import GeneratorType
@@ -21,6 +20,7 @@ from schemathesis.core.failures import (
     format_failures,
     is_reproducible_failure,
 )
+from schemathesis.core.timing import Instant
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -162,7 +162,7 @@ class LoadingProgressManager:
 
     console: Console
     location: str
-    start_time: float
+    started_at: Instant
     progress: Progress
     progress_task_id: TaskID | None
     is_interrupted: bool
@@ -174,7 +174,7 @@ class LoadingProgressManager:
 
         self.console = console
         self.location = location
-        self.start_time = time.monotonic()
+        self.started_at = Instant()
         progress_message = Text.assemble(
             ("Loading specification from ", Style(color="white")),
             (location, Style(color="cyan")),
@@ -210,7 +210,7 @@ class LoadingProgressManager:
         from rich.style import Style
         from rich.text import Text
 
-        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+        duration = format_duration(self.started_at.elapsed_ms)
         if self.is_interrupted:
             return Text.assemble(
                 ("⚡  ", Style(color="yellow")),
@@ -229,7 +229,7 @@ class LoadingProgressManager:
         from rich.style import Style
         from rich.text import Text
 
-        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+        duration = format_duration(self.started_at.elapsed_ms)
 
         attempted = Text.assemble(
             ("❌  ", Style(color="red")),

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -10,6 +9,7 @@ from typing_extensions import override
 from schemathesis.core import Body, NotSet
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
+from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -116,9 +116,9 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             cookie_handler(client, cookies),
             ratelimit(rate_limit, config.base_url),
         ):
-            start = time.monotonic()
+            started_at = Instant()
             response = client.open(**data)
-            elapsed = time.monotonic() - start
+            elapsed = started_at.elapsed
 
         if captured.exception is not None:
             raise captured.exception

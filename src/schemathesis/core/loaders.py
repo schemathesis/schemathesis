@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, get_request_error_extras, get_request_error_message
+from schemathesis.core.timing import Instant
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 
 if TYPE_CHECKING:
@@ -99,7 +100,7 @@ def load_from_url(
 
         def _retried(url_: str, **kw: Any) -> requests.Response:
             # Poll at a fixed interval until the schema loads or the wait budget elapses.
-            start = time.monotonic()
+            started_at = Instant()
             while True:
                 try:
                     response = func(url_, **kw)
@@ -107,7 +108,7 @@ def load_from_url(
                         raise _ServiceUnavailableError
                     return response
                 except (requests.exceptions.ConnectionError, requests.exceptions.Timeout, _ServiceUnavailableError):
-                    if time.monotonic() - start >= max_wait:
+                    if started_at.elapsed >= max_wait:
                         raise
                     time.sleep(WAIT_FOR_SCHEMA_INTERVAL)
 

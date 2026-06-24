@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sys
-import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,6 +11,7 @@ import click
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import make_console, make_progress_bar
 from schemathesis.core import storage
+from schemathesis.core.timing import Instant
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -24,7 +24,6 @@ if TYPE_CHECKING:
 @click.command(  # type: ignore[untyped-decorator]
     name="replay",
     short_help="Replay stored crash files",
-    # The root group disables help options; re-enable them like the other subcommands do.
     context_settings={"terminal_width": get_terminal_width(), "help_option_names": ["-h", "--help"]},
 )
 @click.argument("path", default=None, required=False, type=click.Path())  # type: ignore[untyped-decorator]
@@ -138,7 +137,7 @@ def _replay_directory(
     # One case that failed several checks is stored as one file per check; replay it once and verify all checks.
     units = _merge_by_case(crashes, crash_files)
 
-    start = time.monotonic()
+    started_at = Instant()
     outcomes: list[ReplayOutcome] = []
     interrupted = False
     progress = make_progress_bar(console)
@@ -156,7 +155,7 @@ def _replay_directory(
         interrupted = True
         units = units[: len(outcomes)]
 
-    duration_ms = int((time.monotonic() - start) * 1000)
+    duration_ms = started_at.elapsed_ms
 
     merged_crashes = [unit.crash for unit in units]
 
