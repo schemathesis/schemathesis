@@ -5,6 +5,7 @@ import sys
 from dataclasses import asdict
 from unittest.mock import ANY
 
+import flask
 import pytest
 from fastapi import FastAPI
 
@@ -20,6 +21,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
+    positive_data_acceptance,
     response_schema_conformance,
     status_code_conformance,
 )
@@ -519,6 +521,54 @@ def test_internal_exceptions(ctx, mocker):
     exceptions = [error.value.__class__.__name__ for error in stream.find_all(events.NonFatalError)]
     assert "ValueError" in exceptions
     assert len(exceptions) == 1
+
+
+def test_positive_data_acceptance_multipart_binary(ctx, app_runner):
+    # `format: binary` fields hold raw bytes the JSON Schema validator cannot accept.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "put": {
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "immagineFile": {"type": "string", "format": "binary"},
+                                        "librettoFile": {"type": "string", "format": "binary"},
+                                    },
+                                    "required": ["immagineFile"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "422": {"description": "Unprocessable Entity"},
+                    },
+                }
+            }
+        }
+    )
+
+    @app.route("/upload", methods=["PUT"])
+    def upload():
+        allowed = {"immagineFile", "librettoFile"}
+        if (set(flask.request.form.keys()) | set(flask.request.files.keys())) - allowed:
+            return flask.jsonify({"error": "Unexpected fields"}), 422
+        return flask.jsonify({"ok": True}), 200
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = EventStream(
+        schema,
+        checks=[positive_data_acceptance],
+        phases=[PhaseName.FUZZING],
+        max_examples=50,
+        deterministic=True,
+        seed=1,
+    ).execute()
+    stream.assert_no_errors()
 
 
 def test_fuzzing_phase_failure_requires_a_surfaced_failure(ctx):

@@ -12,6 +12,10 @@
 - Drop the `tenacity` dependency in favor of the standard library.
 - Drop the unnecessary `httpx` dependency.
 
+### :bug: Fixed
+
+- Crash for multipart `format: binary` bodies in `positive_data_acceptance`. [#4268](https://github.com/schemathesis/schemathesis/issues/4268)
+
 ## [4.21.10](https://github.com/schemathesis/schemathesis/compare/v4.21.9...v4.21.10) - 2026-06-20
 
 ### :bug: Fixed
