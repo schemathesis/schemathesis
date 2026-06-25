@@ -28,7 +28,7 @@ from schemathesis.specs.openapi.examples import (
 )
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, to_float32
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -231,6 +231,52 @@ def example_to_dict(example):
     if isinstance(example, ParameterExample):
         return {"container": example.container, "name": example.name, "value": example.value}
     return {"value": example.value, "media_type": example.media_type}
+
+
+@pytest.mark.parametrize("location", ["query", "body"])
+def test_examples_phase_drops_float32_collapsing(ctx, location):
+    # A spec example valid as float64 but collapsing to 0 in float32 must not become a positive example case.
+    inner = {"type": "number", "format": "float", "exclusiveMinimum": 0, "example": 5e-324, "examples": [5e-324]}
+    if location == "query":
+        endpoint = {
+            "get": {
+                "parameters": [{"name": "f", "in": "query", "required": True, "schema": inner}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+        method = "GET"
+    else:
+        endpoint = {
+            "post": {
+                "requestBody": {"required": True, "content": {"application/json": {"schema": inner}}},
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+        method = "POST"
+    operation = ctx.openapi.load_schema({"/r": endpoint}, version="3.1.0")["/r"][method]
+    values = [example.value for example in (*extract_top_level(operation), *extract_from_schemas(operation))]
+    for value in values:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            assert to_float32(float(value)) > 0, value
+
+
+def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx):
+    # A schema too broken to compile a validator (invalid `pattern`) must keep its examples rather than
+    # have float32 narrowing silently drop them.
+    inner = {"type": "number", "format": "float", "exclusiveMinimum": 0, "pattern": "(", "examples": [5e-324]}
+    operation = ctx.openapi.load_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": inner}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )["/r"]["POST"]
+    values = [example.value for example in (*extract_top_level(operation), *extract_from_schemas(operation))]
+    assert 5e-324 in values
 
 
 def test_extract_top_level(operation):

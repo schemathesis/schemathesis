@@ -407,8 +407,11 @@ def filter_schema_valid_examples(examples: list[JsonValue], schema: JsonSchema, 
     """Drop examples that don't conform to the given schema; real-world specs often disagree."""
     if not examples:
         return examples
+    from schemathesis.specs.openapi._hypothesis import snapped_float32_clone
     from schemathesis.specs.openapi.examples import _example_is_valid
 
+    # Snap `format: float` bounds so examples that collapse to an out-of-range value once narrowed are evicted.
+    schema = snapped_float32_clone(schema)
     try:
         validator = make_validator(schema, validator_cls)
     except Exception:

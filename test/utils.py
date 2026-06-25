@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import struct
 from collections.abc import Callable
 from functools import lru_cache, wraps
 from pathlib import Path
@@ -29,6 +30,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 def get_schema_path(schema_name: str) -> str:
     return os.path.join(HERE, "data", schema_name)
+
+
+def to_float32(value: float) -> float:
+    """Narrow a double to single precision, mirroring how a server stores a `format: float` value."""
+    try:
+        return struct.unpack("<f", struct.pack("<f", value))[0]
+    except OverflowError:
+        return float("inf") if value > 0 else float("-inf")
 
 
 SIMPLE_PATH = get_schema_path("simple_swagger.yaml")

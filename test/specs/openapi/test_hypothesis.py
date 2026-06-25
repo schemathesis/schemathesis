@@ -19,7 +19,7 @@ from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, to_float32
 
 
 @pytest.fixture
@@ -838,3 +838,268 @@ def test_path_string_sanitized_when_decoder_strict(ctx):
         assert not any(f"%{i:02X}" in upper for i in range(0x20)), value
 
     inner()
+
+
+@pytest.mark.hypothesis_nested
+def test_float_format_snapping_preserves_literal_const(ctx):
+    # A literal value that happens to be shaped like a float schema must not be rewritten as if it were one.
+    literal = {"format": "float", "exclusiveMinimum": 0}
+    schema = ctx.openapi.load_schema(
+        {
+            "/route": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"const": literal}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/route"]["POST"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        assert case.body == literal, case.body
+
+    inner()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("bound", [1e39, 10**1000], ids=["float", "integer"])
+def test_float_format_bound_outside_single_precision_range(ctx, bound):
+    # An exclusive bound beyond the float32 range must clamp to a representable value, not crash strategy preparation.
+    schema = ctx.openapi.load_schema(
+        {
+            "/route": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "f",
+                            "in": "query",
+                            "schema": {"type": "number", "format": "float", "exclusiveMaximum": bound},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/route"]["GET"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        value = case.query.get("f")
+        if value is not None:
+            assert to_float32(float(value)) < 1e39, value
+
+    inner()
+
+
+def test_float_format_snapping_skips_negation():
+    # Tightening a `not` subschema weakens the negation, so the walker must leave it untouched.
+    schema = {"not": {"type": "number", "format": "float", "exclusiveMinimum": 0}}
+    _hypothesis.snap_float32_bounds(schema)
+    assert schema == {"not": {"type": "number", "format": "float", "exclusiveMinimum": 0}}
+
+
+def test_float_format_snapping_number_integer_union():
+    # The number branch of a union still needs float32 bounds; only integer-only schemas are skipped.
+    schema = {"type": ["number", "integer"], "format": "float", "exclusiveMinimum": 0}
+    _hypothesis.snap_float32_bounds(schema)
+    assert "exclusiveMinimum" not in schema
+    assert schema["minimum"] > 0
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("schema", "sign"),
+    [
+        ({"type": "number", "format": "float", "minimum": 0, "exclusiveMinimum": True}, 1),
+        ({"type": "number", "format": "float", "maximum": 0, "exclusiveMaximum": True}, -1),
+        ({"type": "number", "format": "float", "exclusiveMinimum": True}, 0),
+        ({"type": "number", "format": "float", "exclusiveMaximum": True}, 0),
+    ],
+    ids=["min", "max", "min-without-companion-bound", "max-without-companion-bound"],
+)
+def test_float_format_openapi_30_boolean_exclusive_bounds(ctx, schema, sign):
+    # OpenAPI 3.0 spells exclusive bounds as a boolean modifier: a `true` on a `format: float` bound must
+    # hold after float32 narrowing, and a `true` with no companion `minimum`/`maximum` must still generate.
+    operation = ctx.openapi.load_schema(
+        {
+            "/route": {
+                "get": {
+                    "parameters": [{"name": "f", "in": "query", "required": True, "schema": schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/route"]["GET"]
+    produced = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=15, deadline=None, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        value = case.query.get("f")
+        if value is None:
+            return
+        produced.append(value)
+        narrowed = to_float32(float(value))
+        if sign > 0:
+            assert narrowed > 0, value
+        elif sign < 0:
+            assert narrowed < 0, value
+
+    inner()
+    assert produced
+
+
+@pytest.mark.hypothesis_nested
+def test_float_format_on_integer_type_keeps_bound(ctx):
+    # `format: float` on an integer schema is contradictory; snapping must not erase its bound and let
+    # generation drift below it.
+    schema = ctx.openapi.load_schema(
+        {
+            "/route": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "f",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "format": "float", "exclusiveMinimum": 1000},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/route"]["GET"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        value = case.query.get("f")
+        if value is not None:
+            assert int(value) > 1000, value
+
+    inner()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("key", ["example", "examples"])
+def test_float_format_collapsing_example_not_mixed_into_strategy(ctx, key):
+    # A spec example valid as float64 but collapsing to 0 in float32 must not be mixed into positive generation.
+    value = [5e-324] if key == "examples" else 5e-324
+    schema = ctx.openapi.load_schema(
+        {
+            "/route": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "f",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "number", "format": "float", "exclusiveMinimum": 0, key: value},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/route"]["GET"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=50, deadline=None, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        value = case.query.get("f")
+        if value is not None:
+            assert to_float32(float(value)) > 0, value
+
+    inner()
+
+
+@pytest.mark.parametrize("name", ["const", "enum", "default", "example", "examples", "if", "not"])
+def test_float_format_snapping_property_named_like_keyword(name):
+    # Under `properties` the keys are names, not keywords; a property named like a keyword still needs snapping.
+    schema = {"type": "object", "properties": {name: {"type": "number", "format": "float", "exclusiveMinimum": 0}}}
+    _hypothesis.snap_float32_bounds(schema)
+    prop = schema["properties"][name]
+    assert "exclusiveMinimum" not in prop, prop
+    assert prop["minimum"] > 0
+
+
+def test_float_format_snapping_skips_conditional_but_not_branches():
+    # `if` desugars to `not if` in the else-branch, so snapping it weakens that negation; `then`/`else` are safe.
+    schema = {
+        "if": {"type": "number", "format": "float", "exclusiveMinimum": 0},
+        "then": {"type": "number", "format": "float", "exclusiveMinimum": 0},
+    }
+    _hypothesis.snap_float32_bounds(schema)
+    assert schema["if"] == {"type": "number", "format": "float", "exclusiveMinimum": 0}
+    assert "exclusiveMinimum" not in schema["then"]
+    assert schema["then"]["minimum"] > 0
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "number", "format": "float", "exclusiveMinimum": 10**1000},
+        {"type": "number", "format": "float", "exclusiveMaximum": -(10**1000)},
+    ],
+    ids=["minimum", "maximum"],
+)
+def test_float_format_snapping_unsatisfiable_bound(schema):
+    # No finite float32 lies past the bound, so the node must become unsatisfiable, not gain an infinite bound.
+    _hypothesis.snap_float32_bounds(schema)
+    assert schema == {"not": {}}
+
+
+@pytest.mark.parametrize(
+    ("schema", "valid", "invalid"),
+    [
+        ({"type": ["number", "null"], "format": "float", "exclusiveMinimum": 10**1000}, [None], [5.0]),
+        ({"format": "float", "exclusiveMinimum": 10**1000}, ["text"], [5.0]),
+        ({"format": "float", "exclusiveMinimum": 10**1000, "enum": ["ok"]}, ["ok"], [None, 5.0]),
+    ],
+    ids=["union", "typeless", "typeless-enum"],
+)
+def test_float_format_unsatisfiable_bound_keeps_non_numeric(schema, valid, invalid):
+    # Forbidding the empty numeric branch keeps non-numeric values and sibling constraints (e.g. `enum`) valid.
+    _hypothesis.snap_float32_bounds(schema)
+    for value in valid:
+        assert jsonschema_rs.is_valid(schema, value), value
+    for value in invalid:
+        assert not jsonschema_rs.is_valid(schema, value), value
+
+
+def test_float_format_invalid_exclusive_bound_left_for_validation():
+    # A non-bool/non-numeric exclusive bound is an invalid schema; don't silently drop it into a valid one.
+    schema = {"type": "number", "format": "float", "exclusiveMinimum": "bad"}
+    _hypothesis.snap_float32_bounds(schema)
+    assert schema["exclusiveMinimum"] == "bad"
+
+
+def test_float_format_invalid_exclusive_bound_kept_when_other_bound_unsatisfiable():
+    # An unsatisfiable resolvable bound must not erase a second invalid bound via the empty-branch rewrite.
+    schema = {"type": "number", "format": "float", "exclusiveMinimum": 10**1000, "exclusiveMaximum": "bad"}
+    _hypothesis.snap_float32_bounds(schema)
+    assert schema["exclusiveMaximum"] == "bad"
+
+
+def test_float_format_snapping_dependency_named_like_keyword():
+    # `dependencies` maps property names to subschemas; a dependency named like a keyword still needs snapping.
+    schema = {"type": "object", "dependencies": {"not": {"type": "number", "format": "float", "exclusiveMinimum": 0}}}
+    _hypothesis.snap_float32_bounds(schema)
+    dependency = schema["dependencies"]["not"]
+    assert "exclusiveMinimum" not in dependency
+    assert dependency["minimum"] > 0

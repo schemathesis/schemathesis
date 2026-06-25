@@ -110,8 +110,8 @@ def test_(request, case):
             r"test_invalid_operation.py::test_ PASSED +\[100%\]",
         ]
     )
-    # 100 for /valid, 1 for /users
-    hypothesis_calls = (hypothesis_max_examples or 100) + 4
+    # 100 for /valid, 1 for /users; /invalid yields no positive case (required `id` has no valid value)
+    hypothesis_calls = (hypothesis_max_examples or 100) + 3
     result.stdout.re_match_lines([rf"Hypothesis calls: {hypothesis_calls}$"])
 
 

@@ -15,6 +15,7 @@
 
 ### :bug: Fixed
 
+- False positive `positive_data_acceptance` for `format: float` numbers near `exclusiveMinimum`/`exclusiveMaximum`. [#4267](https://github.com/schemathesis/schemathesis/issues/4267)
 - Crash for multipart `format: binary` bodies in `positive_data_acceptance`. [#4268](https://github.com/schemathesis/schemathesis/issues/4268)
 - Sporadic `Internal Error` crash during schema loading.
 
