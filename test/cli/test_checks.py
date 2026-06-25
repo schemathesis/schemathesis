@@ -7,6 +7,7 @@ from flask import jsonify, request
 
 import schemathesis
 from schemathesis.checks import CHECKS
+from test.utils import to_float32
 
 
 @pytest.fixture
@@ -1231,6 +1232,50 @@ def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, cli,
         if not request.data and not request.form:
             return jsonify({"error": "Request body is required"}), 400
         return jsonify({"result": "ok"}), 200
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=positive_data_acceptance",
+            "--phases=coverage",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_positive_data_acceptance_float_format_exclusive_minimum_no_false_positive(ctx, cli, snapshot_cli):
+    # `format: float` is single precision; values valid as float64 (e.g. 5e-324) collapse to 0 once narrowed.
+    app, raw_schema = ctx.openapi.make_flask_app(
+        {
+            "/route": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "f",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "number", "format": "float", "exclusiveMinimum": 0},
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @app.route("/route", methods=["GET"])
+    def route():
+        raw = request.args.get("f")
+        if raw is None:
+            return jsonify({"ok": True}), 200
+        if to_float32(float(raw)) <= 0:
+            return jsonify({"error": "must be > 0 after float32 narrowing"}), 400
+        return jsonify({"ok": True}), 200
 
     assert (
         cli.run_openapi_app(

@@ -26,7 +26,7 @@ from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, openapi_cases
+from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, openapi_cases, snapped_float32_clone
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.formats import STRING_FORMATS
 
@@ -232,13 +232,7 @@ def extract_top_level(
             ]
         else:
             definitions = [parameter.definition]
-        try:
-            param_schema = parameter.validation_schema
-            param_validator: jsonschema_rs.Validator | None = (
-                None if isinstance(param_schema, bool) else make_validator_for(param_schema)
-            )
-        except jsonschema_rs.ValidationError:
-            param_validator = None
+        param_validator: jsonschema_rs.Validator | None = _make_example_validator(parameter.validation_schema)
         for definition in definitions:
             if definition is parameter.definition:
                 validator = param_validator
@@ -248,10 +242,7 @@ def extract_top_level(
                 # - A schema-level `example` that violates the schema's own pattern is rejected.
                 # - A oneOf/anyOf branch example is validated against the branch (not the full
                 #   combined schema, which would reject strings valid for multiple branches).
-                try:
-                    validator = make_validator_for(definition) if isinstance(definition, dict) else None
-                except jsonschema_rs.ValidationError:
-                    validator = None
+                validator = _make_example_validator(definition)
             # Open API 2 also supports `example`
             for example_keyword in {"example", parameter.adapter.example_keyword}:
                 if isinstance(definition, dict) and example_keyword in definition:
@@ -285,21 +276,16 @@ def extract_top_level(
                     and parameter.adapter.examples_container_keyword in expanded_schema
                 ):
                     for value in expanded_schema[parameter.adapter.examples_container_keyword]:
-                        yield ParameterExample(
-                            container=parameter.location.container_name, name=parameter.name, value=value
-                        )
+                        if _example_survives_float32(value, expanded_schema):
+                            yield ParameterExample(
+                                container=parameter.location.container_name, name=parameter.name, value=value
+                            )
         for value in find_matching_in_responses(responses, parameter.name):
             if _example_is_valid(value, param_validator):
                 yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
-        try:
-            body_schema = body.validation_schema
-            body_validator: jsonschema_rs.Validator | None = (
-                None if isinstance(body_schema, bool) else make_validator_for(body_schema)
-            )
-        except jsonschema_rs.ValidationError:
-            body_validator = None
+        body_validator: jsonschema_rs.Validator | None = _make_example_validator(body.validation_schema)
 
         if "schema" in body.definition:
             schema = body.definition["schema"]
@@ -320,12 +306,15 @@ def extract_top_level(
         else:
             definitions = [body.definition]
         for definition in definitions:
-            validator = body_validator if definition is body.definition else None
             # Open API 2 also supports `example`
             for example_keyword in {"example", body.adapter.example_keyword}:
                 if isinstance(definition, dict) and example_keyword in definition:
                     value = definition[example_keyword]
-                    if _example_is_valid(value, validator):
+                    if (
+                        _example_is_valid(value, body_validator)
+                        if definition is body.definition
+                        else _example_survives_float32(value, definition)
+                    ):
                         yield BodyExample(value=value, media_type=body.media_type)
         if body.adapter.examples_container_keyword in body.definition:
             for value in extract_inner_examples(
@@ -345,7 +334,8 @@ def extract_top_level(
             ):
                 if isinstance(expanded_schema, dict) and body.adapter.examples_container_keyword in expanded_schema:
                     for value in expanded_schema[body.adapter.examples_container_keyword]:
-                        yield BodyExample(value=value, media_type=body.media_type)
+                        if _example_survives_float32(value, expanded_schema):
+                            yield BodyExample(value=value, media_type=body.media_type)
 
 
 @overload
@@ -595,6 +585,29 @@ def extract_from_schemas(
             ):
                 if _example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
+
+
+def _make_example_validator(schema: Any) -> jsonschema_rs.Validator | None:
+    # Float32-snap so spec examples that collapse once narrowed (e.g. `5e-324` under `exclusiveMinimum: 0`) are evicted.
+    if not isinstance(schema, dict):
+        return None
+    try:
+        return make_validator_for(snapped_float32_clone(schema))
+    except jsonschema_rs.ValidationError:
+        return None
+
+
+def _example_survives_float32(value: object, schema: Any) -> bool:
+    """Drop a value only when float32 narrowing is what invalidates it; otherwise keep emitting as before."""
+    snapped = snapped_float32_clone(schema)
+    if snapped is schema:
+        return True
+    try:
+        snapped_validator = make_validator_for(snapped)
+        declared_validator = make_validator_for(schema)
+    except jsonschema_rs.ValidationError:
+        return True
+    return _example_is_valid(value, snapped_validator) or not _example_is_valid(value, declared_validator)
 
 
 def _example_is_valid(value: object, validator: jsonschema_rs.Validator | None) -> bool:

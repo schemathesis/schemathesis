@@ -23,10 +23,17 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
 )
+from schemathesis.core.jsonschema.numeric import (
+    bounds_are_unsatisfiable,
+    is_numeric_bound,
+    next_float32,
+    resolve_inclusive_bounds,
+)
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import custom_formats_cache
@@ -981,6 +988,106 @@ def _build_custom_formats_uncached(
     return custom_formats
 
 
+# Don't descend: these hold literal data or negate, where snapping corrupts the value or weakens the negation.
+_NO_SNAP_KEYWORDS = frozenset({"const", "default", "enum", "example", "examples", "if", "not"})
+# Keywords whose value maps names to subschemas; descend into the values, never the keys.
+_SCHEMA_MAP_KEYWORDS = frozenset(
+    {"properties", "patternProperties", "dependentSchemas", "dependencies", "$defs", "definitions"}
+)
+
+
+def snap_float32_bounds(schema: object) -> None:
+    """Pin exclusive `format: float` bounds throughout `schema` to float32-representable values, in place."""
+    if not isinstance(schema, dict):
+        return
+    _snap_float32_node(schema)
+    for key, value in schema.items():
+        if key in _NO_SNAP_KEYWORDS:
+            continue
+        if key in _SCHEMA_MAP_KEYWORDS and isinstance(value, dict):
+            for subschema in value.values():
+                snap_float32_bounds(subschema)
+        elif isinstance(value, list):
+            for item in value:
+                snap_float32_bounds(item)
+        elif isinstance(value, dict):
+            snap_float32_bounds(value)
+
+
+def _snap_float32_node(schema: dict[str, Any]) -> None:
+    # `format: float` is single precision; pin exclusive bounds so narrowed values can't collapse past them.
+    if schema.get("format") != "float":
+        return
+    declared = schema.get("type")
+    # Skip integer-only schemas; a number (or number union) still has a float branch to snap.
+    if declared is not None and "number" not in (declared if isinstance(declared, list) else [declared]):
+        return
+    if "exclusiveMinimum" not in schema and "exclusiveMaximum" not in schema:
+        return
+    exclusive_minimum = schema.get("exclusiveMinimum")
+    exclusive_maximum = schema.get("exclusiveMaximum")
+    # A present exclusive bound that isn't bool/numeric is an invalid schema; leave it for the validator to reject.
+    if "exclusiveMinimum" in schema and not _is_resolvable_bound(exclusive_minimum):
+        return
+    if "exclusiveMaximum" in schema and not _is_resolvable_bound(exclusive_maximum):
+        return
+    minimum, maximum = resolve_inclusive_bounds(
+        schema, step=lambda value, going_up: next_float32(value, going_up=going_up)
+    )
+    if bounds_are_unsatisfiable(minimum, maximum):
+        _drop_empty_float_branch(schema)
+        return
+    declared_minimum = schema.get("minimum")
+    declared_maximum = schema.get("maximum")
+    if _is_resolvable_bound(exclusive_minimum):
+        if is_numeric_bound(minimum):
+            # A separate inclusive `minimum` may be tighter than the stepped exclusive bound; keep the stricter one.
+            schema["minimum"] = max(minimum, declared_minimum) if is_numeric_bound(declared_minimum) else minimum
+        schema.pop("exclusiveMinimum", None)
+    if _is_resolvable_bound(exclusive_maximum):
+        if is_numeric_bound(maximum):
+            schema["maximum"] = min(maximum, declared_maximum) if is_numeric_bound(declared_maximum) else maximum
+        schema.pop("exclusiveMaximum", None)
+
+
+def _is_resolvable_bound(value: object) -> bool:
+    return isinstance(value, bool) or is_numeric_bound(value)
+
+
+def _drop_empty_float_branch(schema: dict[str, Any]) -> None:
+    # No finite float32 lies past the bound, so the `number` branch is empty; other type branches stay valid.
+    declared = schema.get("type")
+    if declared is None:
+        # No declared type: pin the surviving non-numeric types so sibling constraints keep applying.
+        schema["type"] = ["null", "boolean", "string", "array", "object"]
+        schema.pop("format", None)
+        return
+    survivors = [kind for kind in (declared if isinstance(declared, list) else [declared]) if kind != "number"]
+    if survivors:
+        schema["type"] = survivors if len(survivors) > 1 else survivors[0]
+        schema.pop("format", None)
+    else:
+        schema.clear()
+        schema["not"] = {}
+
+
+def _schema_has_float_format(node: object) -> bool:
+    if isinstance(node, dict):
+        return node.get("format") == "float" or any(_schema_has_float_format(value) for value in node.values())
+    if isinstance(node, list):
+        return any(_schema_has_float_format(item) for item in node)
+    return False
+
+
+def snapped_float32_clone(schema: JsonSchema) -> JsonSchema:
+    """Return a float32-snapped deep clone of `schema`, or `schema` unchanged when it has no `format: float` to snap."""
+    if not _schema_has_float_format(schema):
+        return schema
+    clone = deepclone(schema)
+    snap_float32_bounds(clone)
+    return clone
+
+
 def make_positive_strategy(
     schema: JsonSchema,
     operation_name: str,
@@ -994,6 +1101,7 @@ def make_positive_strategy(
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
+    schema = snapped_float32_clone(schema)
     return from_schema(
         schema,
         custom_formats=custom_formats,

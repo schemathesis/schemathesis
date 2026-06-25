@@ -43,7 +43,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     quote_path_parameter,
 )
 from schemathesis.transport.prepare import prepare_request
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, to_float32
 
 
 @dataclass
@@ -297,11 +297,11 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
     return cases
 
 
-def _iter_cases(operation, generation_mode, *, generation_config=None):
+def _iter_cases(operation, *generation_modes, generation_config=None):
     return list(
         iter_coverage_cases(
             operation=operation,
-            generation_modes=[generation_mode],
+            generation_modes=list(generation_modes),
             generate_duplicate_query_parameters=False,
             unexpected_methods=set(),
             generation_config=generation_config or operation.schema.config.generation,
@@ -4868,6 +4868,149 @@ def test_multi_type_union_yields_numeric_branch(types, expected_kind):
     )
     values = [v.value for v in cover_schema_iter(ctx, {"type": types})]
     assert any(isinstance(v, expected_kind) and not isinstance(v, bool) for v in values), values
+
+
+@pytest.mark.parametrize(
+    ("keyword", "bound"),
+    [
+        ("exclusiveMinimum", 0),
+        ("exclusiveMinimum", 1.0),
+        ("exclusiveMaximum", 1.0),
+        ("exclusiveMinimum", 0.1),
+        ("exclusiveMaximum", 16777217),
+    ],
+    ids=["min-zero", "min-representable", "max-representable", "min-rounds-up", "max-rounds-down"],
+)
+def test_float_format_boundary_strictly_satisfies_bound(pctx, keyword, bound):
+    # The emitted boundary value must still satisfy the exclusive bound after a server narrows it to float32.
+    schema = {"type": "number", "format": "float", keyword: bound}
+    values = [v.value for v in cover_schema_iter(pctx, schema, HashSet())]
+    assert values, schema
+    for value in values:
+        narrowed = to_float32(float(value))
+        if keyword == "exclusiveMinimum":
+            assert narrowed > bound, (value, narrowed)
+        else:
+            assert narrowed < bound, (value, narrowed)
+
+
+@pytest.mark.parametrize("bound", [1e39, 10**1000], ids=["float", "integer"])
+def test_float_format_bound_outside_single_precision_range_does_not_crash(pctx, bound):
+    schema = {"type": "number", "format": "float", "exclusiveMaximum": bound}
+    values = [v.value for v in cover_schema_iter(pctx, schema, HashSet())]
+    for value in values:
+        assert to_float32(float(value)) < 1e39, value
+
+
+def test_float_format_unsatisfiable_bound_emits_nothing(pctx):
+    # No finite float32 exceeds 10**1000, so there is no representable positive value to emit.
+    schema = {"type": "number", "format": "float", "exclusiveMinimum": 10**1000}
+    assert [v.value for v in cover_schema_iter(pctx, schema, HashSet())] == []
+
+
+@pytest.mark.parametrize("key", ["example", "examples", "default"])
+def test_float_format_collapsing_example_not_emitted(pctx, key):
+    # A user value valid as float64 but collapsing to 0 in float32 must not be emitted as positive.
+    value = [5e-324] if key == "examples" else 5e-324
+    schema = {"type": "number", "format": "float", "exclusiveMinimum": 0, key: value}
+    values = [v.value for v in cover_schema_iter(pctx, schema, HashSet())]
+    assert values and all(to_float32(float(v)) > 0 for v in values), values
+
+
+def test_float_format_representable_example_still_emitted(pctx):
+    schema = {"type": "number", "format": "float", "exclusiveMinimum": 0, "example": 1000}
+    assert 1000 in [v.value for v in cover_schema_iter(pctx, schema, HashSet())]
+
+
+@pytest.mark.parametrize(
+    "modes",
+    [[GenerationMode.POSITIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],
+    ids=["positive", "mixed"],
+)
+def test_unsatisfiable_required_param_emits_no_positive_case(ctx, modes):
+    # An unsatisfiable required parameter leaves no valid positive request, even when mixed mode seeds the
+    # template with a negative value.
+    schema = ctx.openapi.load_schema(
+        {
+            "/route": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "f",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "number", "format": "float", "exclusiveMinimum": 10**1000},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/route"]["GET"]
+    cases = _iter_cases(operation, *modes)
+    positive = [case.query for case in cases if case.meta.generation.mode == GenerationMode.POSITIVE]
+    assert positive == [], positive
+
+
+def test_unsatisfiable_required_path_param_emits_no_positive_case(ctx):
+    # A required path parameter falls back to a negative sample when nothing is representable; the positive
+    # default case must still be suppressed rather than shipping that sample as positive.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{f}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "f",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "number", "format": "float", "exclusiveMinimum": 10**1000},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/items/{f}"]["GET"]
+    cases = _iter_cases(operation, GenerationMode.POSITIVE)
+    assert cases == [], [case.path_parameters for case in cases]
+
+
+def test_unsatisfiable_required_param_suppresses_positive_from_other_params(ctx):
+    # A second, satisfiable parameter must not produce any positive case while a sibling required
+    # parameter is unsatisfiable: the whole operation has no valid positive request.
+    schema = ctx.openapi.load_schema(
+        {
+            "/route": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "f",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "number", "format": "float", "exclusiveMinimum": 10**1000},
+                        },
+                        {
+                            "name": "h",
+                            "in": "header",
+                            "required": False,
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 100},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/route"]["GET"]
+    cases = _iter_cases(operation, GenerationMode.POSITIVE)
+    positive = [case for case in cases if case.meta.generation.mode == GenerationMode.POSITIVE]
+    assert positive == [], [(case.query, case.headers) for case in positive]
 
 
 def test_missing_required_header_case_uses_invalid_template_body(ctx):

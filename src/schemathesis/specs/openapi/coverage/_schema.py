@@ -25,6 +25,7 @@ from schemathesis.core.jsonschema import (
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
+from schemathesis.core.jsonschema.numeric import bounds_are_unsatisfiable, next_float32, resolve_inclusive_bounds
 
 try:
     from json.encoder import _make_iterencode  # type: ignore[attr-defined]
@@ -38,7 +39,7 @@ except ImportError:
 
 from collections.abc import Callable, Generator, Iterator
 from json.encoder import JSONEncoder, encode_basestring_ascii
-from typing import Any, TypeGuard, TypeVar, cast
+from typing import Any, TypeVar, cast
 from urllib.parse import quote
 
 import jsonschema_rs
@@ -2052,7 +2053,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
                     )
 
 
-def closest_multiple_greater_than(y: int, x: int) -> int:
+def closest_multiple_greater_than(y: int | float, x: int | float) -> int | float:
     """Find the closest multiple of X that is greater than Y."""
     quotient, remainder = divmod(y, x)
     if remainder == 0:
@@ -2076,14 +2077,14 @@ def _largest_multiple_within(value: int | float, step: int | float) -> int | flo
     return float(Decimal(str(value)) - (Decimal(str(value)) % decimal_step))
 
 
-def _is_numeric_bound(value: Any) -> TypeGuard[int | float]:
-    return isinstance(value, int | float) and not isinstance(value, bool)
-
-
-def _adjust_numeric_bound(value: int | float, *, is_integer: bool, direction: int) -> int | float:
+def _adjust_numeric_bound(
+    value: int | float, *, is_integer: bool, going_up: bool, is_float32: bool = False
+) -> int | float:
     if is_integer:
-        return value + direction
-    return nextafter(float(value), inf if direction > 0 else -inf)
+        return value + (1 if going_up else -1)
+    if is_float32:
+        return next_float32(value, going_up=going_up)
+    return nextafter(float(value), inf if going_up else -inf)
 
 
 def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
@@ -2096,20 +2097,16 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     pinned = "integer" if "integer" in declared_types else "number"
     schema = {**schema, "type": pinned}
     is_integer = pinned == "integer"
-    minimum = schema.get("minimum")
-    maximum = schema.get("maximum")
-    exclusive_minimum = schema.get("exclusiveMinimum")
-    exclusive_maximum = schema.get("exclusiveMaximum")
-    if isinstance(exclusive_minimum, bool):
-        if exclusive_minimum and _is_numeric_bound(minimum):
-            minimum = _adjust_numeric_bound(minimum, is_integer=is_integer, direction=1)
-    elif _is_numeric_bound(exclusive_minimum):
-        minimum = _adjust_numeric_bound(exclusive_minimum, is_integer=is_integer, direction=1)
-    if isinstance(exclusive_maximum, bool):
-        if exclusive_maximum and _is_numeric_bound(maximum):
-            maximum = _adjust_numeric_bound(maximum, is_integer=is_integer, direction=-1)
-    elif _is_numeric_bound(exclusive_maximum):
-        maximum = _adjust_numeric_bound(exclusive_maximum, is_integer=is_integer, direction=-1)
+    is_float32 = not is_integer and schema.get("format") == "float"
+    minimum, maximum = resolve_inclusive_bounds(
+        schema,
+        step=lambda value, going_up: _adjust_numeric_bound(
+            value, is_integer=is_integer, going_up=going_up, is_float32=is_float32
+        ),
+    )
+    if bounds_are_unsatisfiable(minimum, maximum):
+        # Nothing representable past the bound, so emit no value.
+        return
     multiple_of = schema.get("multipleOf")
     example = schema.get("example", NOT_SET)
     examples = schema.get("examples")
@@ -2122,12 +2119,21 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
     if example is not NOT_SET or examples or default is not NOT_SET:
         has_valid_example = False
-        if example is not NOT_SET and _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
+        if (
+            example is not NOT_SET
+            and _is_valid_with_formats(example, schema, ctx)
+            and _within_adjusted_bounds(example)
+            and seen.insert(example)
+        ):
             has_valid_example = True
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
+                if (
+                    _is_valid_with_formats(example, schema, ctx)
+                    and _within_adjusted_bounds(example)
+                    and seen.insert(example)
+                ):
                     has_valid_example = True
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
@@ -2135,6 +2141,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             and not (example is not NOT_SET and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
             and _is_valid_with_formats(default, schema, ctx)
+            and _within_adjusted_bounds(default)
             and seen.insert(default)
         ):
             has_valid_example = True

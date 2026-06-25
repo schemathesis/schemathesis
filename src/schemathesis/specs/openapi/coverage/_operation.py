@@ -461,6 +461,9 @@ def iter_coverage_cases(
         inferred_properties_per_location[target_location] = result
         return result
 
+    # Set when a required parameter has no representable positive value; the operation then has no valid
+    # positive request, so positive cases are skipped.
+    has_unsatisfiable_required_parameter = False
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
@@ -550,9 +553,18 @@ def iter_coverage_cases(
                         location="/",
                     ),
                 )
+                # A negative fallback means the required path parameter has no representable positive value.
+                if value.generation_mode == GenerationMode.NEGATIVE:
+                    has_unsatisfiable_required_parameter = True
                 template.add_parameter(location, name, value)
                 continue
+            if parameter.is_required:
+                has_unsatisfiable_required_parameter = True
             continue
+        # Positive values precede negative ones, so a negative seed means the required parameter has no
+        # positive value; the positive case built from this template would be invalid.
+        if parameter.is_required and value.generation_mode == GenerationMode.NEGATIVE:
+            has_unsatisfiable_required_parameter = True
         template.add_parameter(location, name, value)
         generators[(location, name)] = gen
     template_time = instant.elapsed
@@ -766,7 +778,11 @@ def iter_coverage_cases(
                     )
                 except StopIteration:
                     break
-    elif GenerationMode.POSITIVE in generation_modes and (not has_required_body or has_generated_required_body):
+    elif (
+        GenerationMode.POSITIVE in generation_modes
+        and (not has_required_body or has_generated_required_body)
+        and not has_unsatisfiable_required_parameter
+    ):
         data = template.unmodified()
         seen_positive.insert(data.kwargs)
         yield operation.Case(
@@ -810,6 +826,9 @@ def iter_coverage_cases(
                 seen_negative.insert(kwargs)
             elif value.generation_mode == GenerationMode.POSITIVE:
                 if has_required_body and not has_generated_required_body and not is_content_type_mutation:
+                    continue
+                if has_unsatisfiable_required_parameter:
+                    # A required parameter has no positive value, so no positive case is valid.
                     continue
                 if not seen_positive.insert(kwargs):
                     continue
