@@ -18,7 +18,13 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchemaObject
     from schemathesis.core.result import Result
     from schemathesis.core.schema_analysis import SchemaWarning
+    from schemathesis.core.statistic import ApiStatistic
     from schemathesis.core.transport import HttpMethod, Response
+    from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.link_calibration import LinkCalibrationState
+    from schemathesis.engine.run import Phase
+    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
+    from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation import GenerationMode
     from schemathesis.generation.case import Case
     from schemathesis.generation.meta import CaseMetadata
@@ -67,7 +73,10 @@ class SchemaWarnings(Protocol):
 
 
 class OperationsProvider(Protocol):
-    """Operation enumeration and lookup."""
+    """Operation enumeration, lookup, statistics, and unit-phase scheduling."""
+
+    @property
+    def statistic(self) -> ApiStatistic: ...  # pragma: no cover
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]: ...  # pragma: no cover
 
@@ -76,6 +85,12 @@ class OperationsProvider(Protocol):
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn: ...  # pragma: no cover
 
     def get_tags(self, operation: APIOperation) -> list[str] | None: ...  # pragma: no cover
+
+    def get_unit_scheduler(
+        self,
+        operations: list[Result[APIOperation, InvalidSchema]],
+        phase: Phase,
+    ) -> DefaultScheduler | LayeredScheduler: ...  # pragma: no cover
 
 
 class CaseFactory(Protocol):
@@ -139,6 +154,16 @@ class StatefulBackend(Protocol):
     """Stateful-phase surface: state machine, link candidates, fuzz weights."""
 
     def as_state_machine(self) -> type[APIStateMachine]: ...  # pragma: no cover
+
+    def _build_state_machine(
+        self,
+        *,
+        error_feedback: ErrorFeedbackStore | None,
+        link_calibration: LinkCalibrationState | None,
+        extra_data_source: ExtraDataSource | None,
+    ) -> type[APIStateMachine]: ...  # pragma: no cover
+
+    def apply_stateful_inference(self, ctx: EngineContext) -> int: ...  # pragma: no cover
 
     def iter_link_candidates(
         self,

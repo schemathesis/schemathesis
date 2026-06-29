@@ -422,7 +422,7 @@ class BaseSchema(Mapping):
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
-    ) -> SearchStrategy:
+    ) -> SearchStrategy[Case]:
         raise NotImplementedError
 
     def as_state_machine(self) -> type[APIStateMachine]:
@@ -687,11 +687,10 @@ class PayloadAlternatives(ParameterSet[P]):
 R = TypeVar("R", bound=ResponsesContainer)
 S = TypeVar("S")
 SchemaT = TypeVar("SchemaT", bound="BaseSchema")
-D = TypeVar("D", bound=dict)
 
 
 @dataclass(repr=False)
-class OperationDefinition(Generic[D]):
+class OperationDefinition:
     """A wrapper to store not resolved API operation definitions.
 
     To prevent recursion errors we need to store definitions without resolving references. But operation definitions
@@ -699,7 +698,7 @@ class OperationDefinition(Generic[D]):
     scope change to have a proper reference resolving later.
     """
 
-    raw: D
+    raw: Any
 
     __slots__ = ("raw",)
 
@@ -719,7 +718,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     schema: SchemaT
     responses: R
     security: S
-    label: str = None  # type: ignore[assignment]
+    label: str = ""
     app: Any = None
     base_url: str | None = None
     path_parameters: ParameterSet[P] = field(default_factory=ParameterSet)
@@ -730,8 +729,8 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     filter_case_tracker: FilterCaseTracker | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self.label is None:
-            self.label = f"{self.method.upper()} {self.path}"  # type: ignore[unreachable]
+        if not self.label:
+            self.label = f"{self.method.upper()} {self.path}"
 
     def __repr__(self) -> str:
         return f"<APIOperation label={self.label!r}>"
