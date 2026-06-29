@@ -346,7 +346,7 @@ class GraphQLSchema(BaseSchema):
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
-    ) -> SearchStrategy:
+    ) -> SearchStrategy[Case]:
         return graphql_cases(
             operation=operation,
             hooks=hooks,

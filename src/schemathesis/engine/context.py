@@ -17,11 +17,12 @@ from schemathesis.engine.observations import Observations
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
-from schemathesis.schemas import APIOperation, BaseSchema
+from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.core.spec import ApiSchema
     from schemathesis.engine import StopReason
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.resources import ExtraDataSource
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 class EngineContext:
     """Holds context shared for a test run."""
 
-    schema: BaseSchema
+    schema: ApiSchema
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
     start_time: float
@@ -63,7 +64,7 @@ class EngineContext:
     def __init__(
         self,
         *,
-        schema: BaseSchema,
+        schema: ApiSchema,
         stop_event: threading.Event,
         observations: Observations | None = None,
         max_time: int | None = None,

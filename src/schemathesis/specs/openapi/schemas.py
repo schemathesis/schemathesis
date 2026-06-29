@@ -588,7 +588,7 @@ class OpenApiSchema(BaseSchema):
         extra_data_source: ExtraDataSource | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
         **kwargs: Any,
-    ) -> SearchStrategy:
+    ) -> SearchStrategy[Case]:
         return openapi_cases(
             operation=operation,
             hooks=hooks,

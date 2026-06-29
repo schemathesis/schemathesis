@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.checks import CheckResult
+    from schemathesis.core import Body
     from schemathesis.core.jsonschema.types import JsonSchemaObject
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
@@ -21,93 +22,111 @@ all_scopes = HookDispatcher.register_spec(list(HookScope))
 
 
 @all_scopes
-def filter_path_parameters(context: HookContext, path_parameters: Any) -> Any:
+def filter_path_parameters(context: HookContext, path_parameters: dict[str, Any]) -> bool:
     """Drop generated `path_parameters` values that fail the predicate."""
+    raise NotImplementedError
 
 
 @all_scopes
-def filter_query(context: HookContext, query: Any) -> Any:
+def filter_query(context: HookContext, query: dict[str, Any]) -> bool:
     """Drop generated `query` values that fail the predicate."""
+    raise NotImplementedError
 
 
 @all_scopes
-def filter_headers(context: HookContext, headers: Any) -> Any:
+def filter_headers(context: HookContext, headers: dict[str, Any]) -> bool:
     """Drop generated `headers` values that fail the predicate."""
+    raise NotImplementedError
 
 
 @all_scopes
-def filter_cookies(context: HookContext, cookies: Any) -> Any:
+def filter_cookies(context: HookContext, cookies: dict[str, Any]) -> bool:
     """Drop generated `cookies` values that fail the predicate."""
+    raise NotImplementedError
 
 
 @all_scopes
-def filter_body(context: HookContext, body: Any) -> Any:
+def filter_body(context: HookContext, body: Body) -> bool:
     """Drop generated `body` values that fail the predicate."""
+    raise NotImplementedError
 
 
 @all_scopes
-def filter_case(context: HookContext, case: Any) -> Any:
+def filter_case(context: HookContext, case: Case) -> bool:
     """Drop generated `Case` instances that fail the predicate."""
+    raise NotImplementedError
 
 
 @all_scopes
-def map_path_parameters(context: HookContext, path_parameters: Any) -> Any:
+def map_path_parameters(context: HookContext, path_parameters: dict[str, Any]) -> dict[str, Any]:
     """Transform each generated `path_parameters` value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def map_query(context: HookContext, query: Any) -> Any:
+def map_query(context: HookContext, query: dict[str, Any]) -> dict[str, Any]:
     """Transform each generated `query` value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def map_headers(context: HookContext, headers: Any) -> Any:
+def map_headers(context: HookContext, headers: dict[str, Any]) -> dict[str, Any]:
     """Transform each generated `headers` value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def map_cookies(context: HookContext, cookies: Any) -> Any:
+def map_cookies(context: HookContext, cookies: dict[str, Any]) -> dict[str, Any]:
     """Transform each generated `cookies` value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def map_body(context: HookContext, body: Any) -> Any:
+def map_body(context: HookContext, body: Body) -> Body:
     """Transform each generated `body` value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def map_case(context: HookContext, case: Any) -> Any:
+def map_case(context: HookContext, case: Case) -> Case:
     """Transform each generated `Case` instance."""
+    raise NotImplementedError
 
 
 @all_scopes
-def flatmap_path_parameters(context: HookContext, path_parameters: Any) -> Any:
+def flatmap_path_parameters(context: HookContext, path_parameters: dict[str, Any]) -> SearchStrategy:
     """Replace the strategy for `path_parameters` with another strategy derived from each value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def flatmap_query(context: HookContext, query: Any) -> Any:
+def flatmap_query(context: HookContext, query: dict[str, Any]) -> SearchStrategy:
     """Replace the strategy for `query` with another strategy derived from each value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def flatmap_headers(context: HookContext, headers: Any) -> Any:
+def flatmap_headers(context: HookContext, headers: dict[str, Any]) -> SearchStrategy:
     """Replace the strategy for `headers` with another strategy derived from each value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def flatmap_cookies(context: HookContext, cookies: Any) -> Any:
+def flatmap_cookies(context: HookContext, cookies: dict[str, Any]) -> SearchStrategy:
     """Replace the strategy for `cookies` with another strategy derived from each value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def flatmap_body(context: HookContext, body: Any) -> Any:
+def flatmap_body(context: HookContext, body: Body) -> SearchStrategy:
     """Replace the strategy for `body` with another strategy derived from each value."""
+    raise NotImplementedError
 
 
 @all_scopes
-def flatmap_case(context: HookContext, case: Any) -> Any:
+def flatmap_case(context: HookContext, case: Case) -> SearchStrategy:
     """Replace the strategy for `Case` with another strategy derived from each instance."""
+    raise NotImplementedError
 
 
 @all_scopes

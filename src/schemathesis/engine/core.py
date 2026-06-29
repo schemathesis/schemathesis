@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from schemathesis import auths
 from schemathesis.config import ConfigError, FuzzConfig
@@ -13,12 +14,14 @@ from schemathesis.engine.context import EngineContext
 from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
 from schemathesis.engine.run import Phase, PhaseName, PhaseSkipReason
-from schemathesis.schemas import BaseSchema
+
+if TYPE_CHECKING:
+    from schemathesis.core.spec import ApiSchema
 
 
 @dataclass(slots=True)
 class Engine:
-    schema: BaseSchema
+    schema: ApiSchema
 
     def execute(self) -> EventStream:
         """Execute all test phases."""
