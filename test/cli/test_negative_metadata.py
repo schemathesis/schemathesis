@@ -218,3 +218,70 @@ def test_removed_auth_parameter_not_reapplied_with_credentials(ctx):
     auth_removed = [r for r in api.requests if "Authorization" not in r.headers]
     assert auth_removed, "no auth-removal mutation fired in 50 examples"
     assert not failures, f"unexpected negative_data_rejection failures: {failures}"
+
+
+def test_hook_modified_path_parameter_no_false_positive(ctx, cli):
+    # GH-4277: a before_call hook clamps an out-of-range path param to a valid value;
+    # that valid value must not be reported as schema-violating.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/{z}/{x}/{y}.png": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "z",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 2, "maximum": 6},
+                        },
+                        {
+                            "name": "x",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 0, "maximum": 63},
+                        },
+                        {
+                            "name": "y",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 0, "maximum": 63},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}, "422": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/<z>/<x>/<y>")
+    def tile(z, x, y):
+        return jsonify({"ok": True})
+
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, **kwargs):
+    pp = case.path_parameters
+    for name in ("x", "y"):
+        try:
+            pp[name] = min(max(int(pp[name]), 0), 63)
+        except (KeyError, TypeError, ValueError):
+            pp[name] = 0
+    try:
+        z = int(pp["z"])
+    except (KeyError, TypeError, ValueError):
+        z = None
+    if z is None or not 2 <= z <= 6:
+        pp["z"] = 2
+        """
+    )
+
+    result = cli.run_openapi_app(
+        app,
+        "--checks=negative_data_rejection",
+        "--phases=coverage",
+        "--continue-on-failure",
+        hooks=module,
+    )
+    assert "API accepted schema-violating request" not in result.stdout, result.stdout
+    assert result.exit_code == ExitCode.OK, result.stdout

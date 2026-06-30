@@ -240,9 +240,13 @@ class OpenApiSchema(BaseSchema):
             if current_hash == meta._initial_hashes.get(location) and raw is not None:
                 validation_value = raw
             elif isinstance(value, Mapping) and isinstance(raw, Mapping):
-                # Auth/overrides add keys after generation; validate generated keys against the typed
-                # snapshot (query/path serialize to strings) and only added keys against the live value.
-                validation_value = {key: raw[key] if key in raw else current for key, current in value.items()}
+                # A key still equal to its generated wire form validates against the typed snapshot;
+                # a key a hook overwrote (or one auth/overrides added) validates against its live value.
+                original = meta._initial_containers.get(location, {})
+                validation_value = {
+                    key: raw[key] if key in raw and key in original and original[key] == current else current
+                    for key, current in value.items()
+                }
             else:
                 validation_value = value
             is_valid = case._validate_component(location, validation_value, validator_cls)
