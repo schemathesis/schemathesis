@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.22.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` when a `before_call` hook overwrites an invalid parameter with a valid value. [#4277](https://github.com/schemathesis/schemathesis/issues/4277)
+
 ## [4.22.0](https://github.com/schemathesis/schemathesis/compare/v4.21.10...v4.22.0) - 2026-06-30
 
 ### :rocket: Added

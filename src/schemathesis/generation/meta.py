@@ -219,6 +219,10 @@ class CaseMetadata:
     # Lets revalidation detect whether a container still matches its wire-form
     # snapshot (so the typed `raw_containers` value remains authoritative).
     _initial_hashes: dict[ParameterLocation, int] = field(default_factory=dict, init=False)
+    # Initial wire-form container snapshots captured once after generation; never updated.
+    # Lets revalidation tell, per key, whether a value still equals its generated wire
+    # form (use the typed snapshot) or was overwritten by a hook (validate the live value).
+    _initial_containers: dict[ParameterLocation, Any] = field(default_factory=dict, init=False)
 
     def mark_dirty(self, location: ParameterLocation) -> None:
         """Mark a component as modified and needing revalidation."""

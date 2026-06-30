@@ -230,6 +230,10 @@ class Case(Generic[OperationT]):
             # Snapshot the wire-form hash so revalidation can tell whether the
             # container is still the unmodified value produced by generation.
             self._meta._initial_hashes[location] = hash_value
+            # Snapshot the wire-form values so revalidation can tell, per key, which
+            # ones a hook overwrote and validate those against their live values.
+            if isinstance(value, Mapping):
+                self._meta._initial_containers[location] = dict(value)
 
     def _check_modifications(self) -> None:
         """Detect in-place modifications by comparing container hashes."""
@@ -366,11 +370,17 @@ class Case(Generic[OperationT]):
 
         """
         hook_context = HookContext(operation=self.operation)
+        # Sync the modification baseline to the current container state so revalidation reacts
+        # only to edits a `before_call` hook makes, not to auth/overrides applied earlier in place.
+        if self._meta is not None:
+            for location in self._meta.components:
+                self._meta.update_validated_hash(location, self._hash_container(getattr(self, location.container_name)))
         dispatch_before_call(GLOBAL_HOOK_DISPATCHER, context=hook_context, case=self, kwargs=kwargs)
 
-        # Revalidate metadata if dirty before freezing (captures user modifications)
+        # Detect in-place container edits the hook made, then revalidate before freezing so
+        # stale generation-time metadata reflects the values actually sent.
+        self._check_modifications()
         if self._meta and self._meta.is_dirty():
-            self._check_modifications()
             self._revalidate_metadata()
 
         # Freeze metadata to prevent revalidation after request preparation transforms the body
