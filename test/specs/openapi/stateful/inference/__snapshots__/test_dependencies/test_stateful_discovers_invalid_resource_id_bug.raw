@@ -31,6 +31,8 @@ ________________________________ Stateful tests ________________________________
 
     "customer_id" is a required property
 
+    Validated against the response schema for status code 201.
+
     Schema:
 
         {

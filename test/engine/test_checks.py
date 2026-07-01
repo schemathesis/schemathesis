@@ -366,6 +366,8 @@ def test_response_schema_conformance_type_after_large_required(openapi_30, respo
 
 "not an object" is not of type "object"
 
+Validated against the response schema for status code 200.
+
 Schema:
 
     {
@@ -631,6 +633,8 @@ The following media types are documented in the schema:
         == """Response violates schema
 
 "success" is a required property
+
+Validated against the `default` response schema (status code 200).
 
 Schema:
 

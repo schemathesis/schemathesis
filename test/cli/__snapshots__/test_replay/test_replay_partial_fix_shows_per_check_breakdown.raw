@@ -17,6 +17,8 @@ __________________________________ GET /data ___________________________________
 
     "value" is a required property
 
+    Validated against the response schema for status code 200.
+
     Schema:
 
         {

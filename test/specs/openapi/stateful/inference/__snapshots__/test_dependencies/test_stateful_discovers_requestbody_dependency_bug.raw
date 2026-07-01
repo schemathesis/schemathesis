@@ -31,6 +31,8 @@ ________________________________ Stateful tests ________________________________
 
     "0" is not of type "number"
 
+    Validated against the response schema for status code 201.
+
     Schema at /properties/total:
 
         {

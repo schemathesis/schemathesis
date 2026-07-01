@@ -31,6 +31,8 @@ ________________________________ Stateful tests ________________________________
 
     null is not of type "number"
 
+    Validated against the response schema for status code 200.
+
     Schema at /properties/price:
 
         {

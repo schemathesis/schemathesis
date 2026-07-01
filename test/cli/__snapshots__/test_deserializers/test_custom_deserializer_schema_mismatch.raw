@@ -37,6 +37,8 @@ __________________________________ GET /data ___________________________________
 
     "notanumber" is not of type "integer"
 
+    Validated against the response schema for status code 200.
+
     Schema at /properties/count:
 
         {

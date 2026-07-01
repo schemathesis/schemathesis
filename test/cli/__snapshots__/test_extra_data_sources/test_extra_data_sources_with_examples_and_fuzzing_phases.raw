@@ -34,6 +34,8 @@ _____________________________ GET /users/{user_id} _____________________________
 
     "email" is a required property
 
+    Validated against the response schema for status code 200.
+
     Schema:
 
         {

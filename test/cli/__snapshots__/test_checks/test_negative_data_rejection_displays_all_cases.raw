@@ -48,6 +48,8 @@ Reproduce with:
 
     "message" is a required property
 
+    Validated against the `default` response schema (status code 200).
+
     Schema:
 
         {

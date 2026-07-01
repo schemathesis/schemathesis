@@ -129,6 +129,7 @@ class JsonSchemaError(Failure):
         root_schema: dict[str, Any] | bool,
         config: OutputConfig | None = None,
         name_to_uri: dict[str, str] | None = None,
+        context: str | None = None,
     ) -> JsonSchemaError:
         if exc.schema_path:
             parent_path = exc.schema_path[:-1]
@@ -164,7 +165,8 @@ class JsonSchemaError(Failure):
                 schema_title += f"/{segment}"
         else:
             schema_title = "Schema"
-        full_message = f"{exc.message}\n\n{schema_title}:\n\n{schema_str}\n\nValue:\n\n{value}"
+        prefix = f"{exc.message}\n\n{context}" if context else exc.message
+        full_message = f"{prefix}\n\n{schema_title}:\n\n{schema_str}\n\nValue:\n\n{value}"
         return cls(
             operation=operation,
             title=title,

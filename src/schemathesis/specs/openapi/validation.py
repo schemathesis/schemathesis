@@ -165,6 +165,7 @@ class ResponseValidator:
                             failures.append(failure)
         elif validator is not None:
             try:
+                response_context = _response_schema_context(definition.status_code, response.status_code)
                 for err in validator.iter_errors(data):
                     failure = JsonSchemaError.from_exception(
                         operation=operation.label,
@@ -172,6 +173,7 @@ class ResponseValidator:
                         root_schema=resolved.schema,
                         config=operation.schema.config.output,
                         name_to_uri=resolved.name_to_uri,
+                        context=response_context,
                     )
                     if failure not in failures:
                         failures.append(failure)
@@ -262,6 +264,15 @@ def _check_discriminator(
             f"which does not match any of the known schema values: {known}"
         ),
     )
+
+
+def _response_schema_context(matched_key: str, status_code: int) -> str:
+    """Explain which response definition supplied the schema used for validation."""
+    if matched_key == str(status_code):
+        return f"Validated against the response schema for status code {status_code}."
+    if matched_key == "default":
+        return f"Validated against the `default` response schema (status code {status_code})."
+    return f"Validated against the response schema for `{matched_key}` (status code {status_code})."
 
 
 def _maybe_raise_one_or_more(failures: list[Failure]) -> None:

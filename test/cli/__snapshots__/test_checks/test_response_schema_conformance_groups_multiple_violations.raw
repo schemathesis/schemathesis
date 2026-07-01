@@ -37,6 +37,8 @@ ________________________________ GET /api/user _________________________________
 
     "" is shorter than 1 character
 
+    Validated against the response schema for status code 200.
+
     Schema at /properties/name:
 
         {
@@ -50,6 +52,8 @@ ________________________________ GET /api/user _________________________________
 
     "abc" is not a "email"
 
+    Validated against the response schema for status code 200.
+
     Schema at /properties/email:
 
         {
@@ -62,6 +66,8 @@ ________________________________ GET /api/user _________________________________
         "abc"
 
     "pending" is not one of "active" or "inactive"
+
+    Validated against the response schema for status code 200.
 
     Schema at /properties/status:
 
@@ -78,6 +84,8 @@ ________________________________ GET /api/user _________________________________
         "pending"
 
     -1 is less than the minimum of 0
+
+    Validated against the response schema for status code 200.
 
     Schema at /properties/age:
 

@@ -372,6 +372,8 @@ def test_response_conformance_invalid(ctx):
         check.failure_info.failure.message
         == """"success" is a required property
 
+Validated against the response schema for status code 200.
+
 Schema:
 
     {

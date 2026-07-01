@@ -30,6 +30,8 @@ _______________________________ GET /items/{id} ________________________________
 
     "name" is a required property
 
+    Validated against the response schema for status code 200.
+
     Schema:
 
         {

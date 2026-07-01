@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.22.1...HEAD) - TBD
 
+### :wrench: Changed
+
+- Response schema conformance failures name the matched response status code. [#4272](https://github.com/schemathesis/schemathesis/issues/4272)
+
 ## [4.22.1](https://github.com/schemathesis/schemathesis/compare/v4.22.0...v4.22.1) - 2026-07-01
 
 ### :bug: Fixed
