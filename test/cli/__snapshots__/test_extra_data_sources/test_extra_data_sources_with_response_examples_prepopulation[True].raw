@@ -30,6 +30,8 @@ _____________________________ GET /users/{user_id} _____________________________
 
     "name" is a required property
 
+    Validated against the response schema for status code 200.
+
     Schema:
 
         {

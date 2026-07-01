@@ -29,6 +29,8 @@ __________________________ GET /sessions/{sessionId} ___________________________
 
     null is not of type "string"
 
+    Validated against the response schema for status code 200.
+
     Schema at /properties/name:
 
         {

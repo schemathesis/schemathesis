@@ -30,6 +30,8 @@ _________________________________ POST /tasks __________________________________
 
     "title" is a required property
 
+    Validated against the response schema for status code 201.
+
     Schema:
 
         {

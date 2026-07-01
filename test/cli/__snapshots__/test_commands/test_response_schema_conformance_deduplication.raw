@@ -37,6 +37,8 @@ _____________________________ GET /api/conformance _____________________________
 
     "e32ab85ed4634c38a320eb0b22460da9" is not one of "foo"
 
+    Validated against the response schema for status code 200.
+
     Schema at /properties/value:
 
         {

@@ -37,6 +37,8 @@ __________________________________ GET /items __________________________________
 
     "not an array" is not of type "array"
 
+    Validated against the response schema for status code 200.
+
     Schema:
 
         {

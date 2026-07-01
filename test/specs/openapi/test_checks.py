@@ -1212,6 +1212,45 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     assert failure.colno == 2
 
 
+@pytest.mark.parametrize(
+    ("response_key", "expected_note"),
+    [
+        ("404", "Validated against the response schema for status code 404."),
+        ("4XX", "Validated against the response schema for `4XX` (status code 404)."),
+        ("default", "Validated against the `default` response schema (status code 404)."),
+    ],
+    ids=["exact", "wildcard", "default"],
+)
+def test_response_schema_conformance_names_matched_response(ctx, response_factory, response_key, expected_note):
+    # Two definitions share a `code` field with different types; the note must state which response schema was used.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"properties": {"code": {"type": "string"}}}}},
+                        },
+                        response_key: {
+                            "description": "Error",
+                            "content": {"application/json": {"schema": {"properties": {"code": {"type": "integer"}}}}},
+                        },
+                    }
+                }
+            }
+        }
+    )
+    operation = schema["/test"]["GET"]
+    case = operation.Case()
+    response = response_factory.requests(status_code=404, content=b'{"code": "213"}')
+    response = Response.from_requests(response, True)
+
+    with pytest.raises(Failure) as exc_info:
+        response_schema_conformance(_CHECK_CTX, response, case)
+    assert expected_note in exc_info.value.message
+
+
 _CHECK_CTX = CheckContext(
     override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
 )

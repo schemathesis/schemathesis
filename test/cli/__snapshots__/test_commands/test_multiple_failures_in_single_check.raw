@@ -37,6 +37,8 @@ _________________________________ GET /success _________________________________
 
     {} is not of type "integer"
 
+    Validated against the `default` response schema (status code 200).
+
     Schema:
 
         {
