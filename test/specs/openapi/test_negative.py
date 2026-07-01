@@ -998,6 +998,34 @@ def test_path_boolean_param_is_not_coerced_to_int_alongside_integer_param(ctx):
     test()
 
 
+def test_negative_boolean_query_not_mutated_to_object(ctx):
+    # See GH-4254. An object serializes to its key on the wire (`{"false": ...}` -> `active=false`),
+    # which lenient parsers coerce back to a boolean, so the request is not a type violation.
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {"name": "active", "in": "query", "required": False, "schema": {"type": "boolean"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.config.generation.update(allow_extra_parameters=False)
+    operation = schema["/users"]["GET"]
+
+    # High count: ~1 in 4 boolean negatives is an object; enough draws to surface it reliably.
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, max_examples=50, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        value = (case.query or {}).get("active")
+        assert not isinstance(value, dict), f"boolean query mutated to coercible object: {value!r}"
+
+    test()
+
+
 @pytest.mark.hypothesis_nested
 def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_examples(ctx):
     schema = ctx.openapi.load_schema(

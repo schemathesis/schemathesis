@@ -6,6 +6,10 @@
 
 - Response schema conformance failures name the matched response status code. [#4272](https://github.com/schemathesis/schemathesis/issues/4272)
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for boolean query parameters mutated to coercible objects. [#4254](https://github.com/schemathesis/schemathesis/issues/4254)
+
 ## [4.22.1](https://github.com/schemathesis/schemathesis/compare/v4.22.0...v4.22.1) - 2026-07-01
 
 ### :bug: Fixed

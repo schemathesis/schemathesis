@@ -861,10 +861,11 @@ def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
         candidates = {"string", "integer", "number"} - types
     else:
         candidates = {"string", "integer", "number", "object", "array", "boolean", "null"} - types
-    # A single-element array serializes to the same query value as a scalar (`[0]` -> `flag=0`),
-    # so an array mutation of a boolean can still read as a coercible boolean — drop it.
+    # A single-element array (`[0]` -> `flag=0`) or single-key object (`{"0": ...}` -> `flag=0`)
+    # serializes to a scalar query value that can still read as a coercible boolean — drop both.
     if "boolean" in types and ctx.is_query_location:
         candidates.discard("array")
+        candidates.discard("object")
     # Every integer is a number and vice versa from the validator's perspective —
     # neither swap produces values the original schema rejects.
     if "integer" in types and "number" in candidates:
