@@ -1276,7 +1276,11 @@ def test_max_response_time_invalid(ctx, cli, workers, snapshot_cli):
     # And the given operation should be displayed as a failure
     # And the proper error message should be displayed
     api = ctx.openapi.apps.slow()
-    assert cli.run(api.schema_url, "--max-response-time=0.05", f"--workers={workers}") == snapshot_cli
+    # Only fuzz the declared GET: undeclared-method probes can exceed the tight limit under load, so their
+    # competing failures would make the reported case's method non-deterministic.
+    assert (
+        cli.run(api.schema_url, "--max-response-time=0.05", "--phases=fuzzing", f"--workers={workers}") == snapshot_cli
+    )
 
 
 def test_max_response_time_valid(ctx, cli):

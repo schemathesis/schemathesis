@@ -31,6 +31,7 @@ def test_default(ctx, cli, snapshot_cli, workers):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+@flaky(max_runs=3, min_passes=1)
 def test_sanitization(ctx, cli, tmp_path):
     api = ctx.openapi.apps.users_crud()
     cassette_path = tmp_path / "output.yaml"

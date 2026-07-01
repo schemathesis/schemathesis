@@ -17,14 +17,6 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
- ⏭   Examples (in 0.00s)
-
-     ⏭  1 skipped
-
- ❌  Coverage (in 0.00s)
-
-     ❌ 1 failed
-
  ❌  Fuzzing (in 0.00s)
 
      ❌ 1 failed
@@ -53,10 +45,10 @@ API Operations:
   Tested: 1
 
 Test Phases:
-  ⏭  Examples
-  ❌ Coverage
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   ❌ Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Failures:
   ❌ Response time limit exceeded: 1
