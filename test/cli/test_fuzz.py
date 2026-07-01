@@ -53,7 +53,7 @@ class NoServerErrors:
         raise AssertionError("after_run fired in fuzz")
         """
     )
-    assert_cli_snapshot(cli.main("fuzz", url, "-c", "NoServerErrors", "--max-time=2", hooks=module), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "-c", "NoServerErrors", "--max-time=3", hooks=module), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

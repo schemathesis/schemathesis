@@ -70,12 +70,13 @@ def test_stateful_finds_non_id_chain_bug(ctx, cli, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_finds_non_id_lookup_bug(ctx, cli, snapshot_cli, make_api):
     # Bare `slug` resolves via the enclosing return type; the producer may be a Relay connection.
+    # High budget: the state machine needs many iterations to feed a captured slug into the lookup.
     api = make_api(ctx.graphql.apps)
     assert (
         cli.run(
             api.schema_url,
             "--no-shrink",
-            "--max-examples=30",
+            "--max-examples=90",
             "--phases=stateful",
             "-m",
             "positive",

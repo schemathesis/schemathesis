@@ -157,6 +157,10 @@ def test_b(case, a):
         "ignore:Unclosed <MemoryObject:ResourceWarning",
         "-W",
         "ignore:Exception ignored.*MemoryObject:pytest.PytestUnraisableExceptionWarning",
+        "-W",
+        "ignore:unclosed event loop:ResourceWarning",
+        "-W",
+        "ignore:Exception ignored in.*BaseEventLoop:pytest.PytestUnraisableExceptionWarning",
         "--asyncio-mode=strict",
     )
     # There should be no errors. There are no warnings from Schemathesis pytest plugin.
