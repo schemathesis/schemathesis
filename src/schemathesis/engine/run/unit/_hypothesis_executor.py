@@ -44,6 +44,7 @@ from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
     build_unsatisfiable_error,
     ignore_hypothesis_output,
+    is_empty_strategy_error,
 )
 
 if TYPE_CHECKING:
@@ -230,6 +231,8 @@ def run_test(
         if message:
             # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
             yield non_fatal_error(InvalidRegexPattern.from_hypothesis_jsonschema_message(message))
+        elif is_empty_strategy_error(exc):
+            yield non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
         else:
             health_check = build_health_check_error(operation, exc, with_tip=False)
             if isinstance(health_check, hypothesis.errors.FailedHealthCheck):

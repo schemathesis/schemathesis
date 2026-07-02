@@ -88,6 +88,16 @@ This usually means:
 {UNSATISFIABILITY_CAUSE}"""
 
 
+def is_empty_strategy_error(exc: InvalidArgument) -> bool:
+    """Whether `exc` reports a required strategy that can never produce a value.
+
+    Hypothesis raises this when a non-empty collection is built from an empty element
+    strategy - e.g. an array with `minItems` >= 1 whose items schema is unsatisfiable.
+    """
+    message = str(exc)
+    return "because it has no values" in message or "no elements can be drawn from the element strategy" in message
+
+
 def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParameter | None:
     from hypothesis_jsonschema import from_schema
 
@@ -101,7 +111,7 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
         for parameter in container:
             try:
                 generate_one(from_schema(parameter.optimized_schema))
-            except Unsatisfiable:
+            except (Unsatisfiable, InvalidArgument):
                 if location == ParameterLocation.BODY:
                     name = parameter.media_type
                 else:
