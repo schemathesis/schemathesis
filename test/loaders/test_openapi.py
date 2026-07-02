@@ -111,6 +111,19 @@ def test_split_file_schema_with_uri_reserved_path_chars(tmp_path):
     assert [(p.name, p.location) for p in operation.iter_parameters()] == [("id", "path")]
 
 
+def test_xquik_openapi_fixture():
+    schema = schemathesis.openapi.from_path("test/data/xquik_openapi.yaml")
+    operation = schema["/api/v1/x/tweets/search"]["GET"]
+
+    assert operation.label == "GET /api/v1/x/tweets/search"
+    assert operation.definition.raw["operationId"] == "searchTweets"
+    assert [(p.name, p.location.value) for p in operation.iter_parameters()] == [
+        ("x-api-key", "header"),
+        ("q", "query"),
+        ("limit", "query"),
+    ]
+
+
 def test_unsupported_type():
     # When Schemathesis can't detect the Open API spec version
     with pytest.raises(
