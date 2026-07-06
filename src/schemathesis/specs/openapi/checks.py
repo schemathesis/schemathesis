@@ -943,6 +943,11 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
     if case.operation.method.lower() == "delete":
         return None
 
+    # PUT, POST, and other creation-capable verbs re-create the resource at the target URI,
+    # so a successful response is a re-creation, not a use-after-free.
+    if case.operation.method.lower() not in _NON_CREATION_METHODS:
+        return None
+
     for related_case in ctx._find_related(case_id=case.id):
         parent = ctx._find_parent(case_id=related_case.id)
         if not parent:

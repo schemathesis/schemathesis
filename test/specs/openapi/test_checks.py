@@ -1477,3 +1477,62 @@ def test_use_after_free_fires_when_delete_succeeded(ctx, response_factory):
     check_context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=204)
     with pytest.raises(UseAfterFree):
         use_after_free(check_context, get_response, get_case)
+
+
+_NESTED_RESOURCE_SCHEMA = {
+    "/foos": {
+        "get": {"responses": {"200": {"description": "OK"}}},
+    },
+    "/foos/{fooId}/bars/{barId}": {
+        "delete": {
+            "parameters": [
+                {"in": "path", "name": "fooId", "required": True, "schema": {"type": "string"}},
+                {"in": "path", "name": "barId", "required": True, "schema": {"type": "string"}},
+            ],
+            "responses": {"204": {"description": "Deleted"}},
+        },
+        "put": {
+            "parameters": [
+                {"in": "path", "name": "fooId", "required": True, "schema": {"type": "string"}},
+                {"in": "path", "name": "barId", "required": True, "schema": {"type": "string"}},
+            ],
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "object"}}},
+            },
+            "responses": {"201": {"description": "Created"}, "200": {"description": "Replaced"}},
+        },
+    },
+}
+
+
+@pytest.mark.parametrize("put_status", [201, 200], ids=["created", "replaced"])
+def test_use_after_free_skips_recreation_via_put(ctx, response_factory, put_status):
+    # PUT re-creates a resource at the target URI, so a success after DELETE is a re-creation, not a use-after-free.
+    schema = ctx.openapi.load_schema(_NESTED_RESOURCE_SCHEMA)
+    get_case = schema["/foos"]["GET"].Case()
+    delete_case = schema["/foos/{fooId}/bars/{barId}"]["DELETE"].Case(path_parameters={"fooId": "1", "barId": "2"})
+    put_case = schema["/foos/{fooId}/bars/{barId}"]["PUT"].Case(path_parameters={"fooId": "1", "barId": "2"}, body={})
+
+    get_response = Response.from_requests(response_factory.requests(status_code=200), True)
+    delete_response = Response.from_requests(response_factory.requests(status_code=204), True)
+    put_response = Response.from_requests(response_factory.requests(status_code=put_status), True)
+
+    recorder = ScenarioRecorder(label="use-after-free-put")
+    recorder.record_case(parent_id=None, case=get_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=get_case.id, response=get_response)
+    recorder.record_case(parent_id=get_case.id, case=delete_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=delete_case.id, response=delete_response)
+    recorder.record_case(parent_id=delete_case.id, case=put_case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=put_case.id, response=put_response)
+
+    check_context = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+        response_checks=None,
+    )
+    assert use_after_free(check_context, put_response, put_case) is None
