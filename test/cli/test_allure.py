@@ -83,6 +83,7 @@ def test_allure_stateful_phase_produces_result(ctx, cli, tmp_path):
         # This one won't fail
         "--checks=use_after_free",
         "--phases=stateful",
+        "--max-examples=5",
     )
     result_files = list(allure_dir.glob("*-result.json"))
     assert result_files

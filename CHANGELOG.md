@@ -6,6 +6,10 @@
 
 - False positive `use_after_free` when `PUT` re-creates a resource after `DELETE`. [#4286](https://github.com/schemathesis/schemathesis/issues/4286)
 
+### :rocket: Performance
+
+- `jsonschema-rs` upgraded to 0.47.0 with better validator build performance.
+
 ## [4.22.3](https://github.com/schemathesis/schemathesis/compare/v4.22.2...v4.22.3) - 2026-07-02
 
 ### :bug: Fixed
