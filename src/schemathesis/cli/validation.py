@@ -83,6 +83,8 @@ def validate_generation_codec(
 def validate_rate_limit(ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None) -> str | None:
     if raw_value is None:
         return raw_value
+    if raw_value == "auto":
+        return raw_value
     try:
         rate_limit.parse_units(raw_value)
         return raw_value

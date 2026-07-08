@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from schemathesis.config._auth import AuthConfig
 from schemathesis.config._checks import ChecksConfig
@@ -217,7 +217,7 @@ class OperationConfig(DiffBase):
     proxy: str | None
     continue_on_failure: bool | None
     tls_verify: bool | str | None
-    rate_limit: Limiter | None
+    rate_limit: Limiter | Literal["auto"] | None
     max_redirects: int | None
     request_timeout: float | int | None
     request_retries: int | None
@@ -283,7 +283,7 @@ class OperationConfig(DiffBase):
         self.proxy = proxy
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
-        if rate_limit is not None:
+        if rate_limit is not None and rate_limit != "auto":
             self.rate_limit = build_limiter(rate_limit)
         else:
             self.rate_limit = rate_limit

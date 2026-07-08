@@ -113,6 +113,7 @@ def run_test(
     if ctx.error_feedback is not None:
         ctx.error_feedback.checkpoint()
 
+    pending_events: list[events.EngineEvent] = []
     try:
         setup_hypothesis_database_key(test_function, operation, generation=generation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
@@ -125,6 +126,7 @@ def run_test(
                 generation=generation,
                 transport_kwargs=transport_kwargs,
                 continue_on_failure=continue_on_failure,
+                pending_events=pending_events,
             )
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         status = Status.SUCCESS
@@ -277,6 +279,8 @@ def run_test(
     ):
         status = Status.ERROR
         yield event
+
+    yield from pending_events
 
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)

@@ -368,3 +368,21 @@ class EngineFinished(EngineEvent):
         self.stop_reason = stop_reason
         self.payload = payload
         self.failures = failures if failures is not None else []
+
+
+@dataclass
+class RateLimitRetry(EngineEvent):
+    """Emitted when a 429 response triggers an automatic retry wait."""
+
+    operation: str
+    delay: float
+    retries_left: int
+
+    __slots__ = ("id", "timestamp", "operation", "delay", "retries_left")
+
+    def __init__(self, *, operation: str, delay: float, retries_left: int) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.operation = operation
+        self.delay = delay
+        self.retries_left = retries_left

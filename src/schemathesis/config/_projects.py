@@ -144,7 +144,7 @@ class ProjectConfig(DiffBase):
         self.proxy = proxy
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
-        if rate_limit is not None:
+        if rate_limit is not None and rate_limit != "auto":
             self.rate_limit = build_limiter(rate_limit)
         else:
             self.rate_limit = rate_limit
@@ -246,7 +246,10 @@ class ProjectConfig(DiffBase):
             self.continue_on_failure = continue_on_failure
 
         if rate_limit is not None:
-            self.rate_limit = build_limiter(rate_limit)
+            if rate_limit != "auto":
+                self.rate_limit = build_limiter(rate_limit)
+            else:
+                self.rate_limit = rate_limit
 
         if max_redirects is not None:
             self.max_redirects = max_redirects
@@ -365,7 +368,7 @@ class ProjectConfig(DiffBase):
             return self.proxy
         return None
 
-    def rate_limit_for(self, *, operation: APIOperation | None = None) -> Limiter | None:
+    def rate_limit_for(self, *, operation: APIOperation | None = None) -> Limiter | Literal["auto"] | None:
         if operation is not None:
             config = self.operations.get_for_operation(operation=operation)
             if config.rate_limit is not None:

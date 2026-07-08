@@ -618,6 +618,8 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             self._on_fatal_error(ctx, event)
         elif isinstance(event, events.NonFatalError):
             self.errors.add(event)
+        elif isinstance(event, events.RateLimitRetry):
+            self._on_rate_limit_retry(event)
         elif isinstance(event, LoadingStarted):
             self._on_loading_started(event)
         elif isinstance(event, LoadingFinished):
@@ -925,6 +927,21 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.warnings.validation_mismatch.add(event.recorder.label),
                 )
+
+    def _on_rate_limit_retry(self, event: events.RateLimitRetry) -> None:
+        from rich.padding import Padding
+        from rich.text import Text
+
+        retry_word = "retry" if event.retries_left == 1 else "retries"
+        message = Text.assemble(
+            ("⏳  ", "yellow"),
+            (
+                f"Rate limited — waiting {event.delay:.1f}s before retrying "
+                f"{event.operation} ({event.retries_left} {retry_word} left)",
+                "white",
+            ),
+        )
+        self.console.print(Padding(message, BLOCK_PADDING))
 
     def _handle_warning(
         self, ctx: BaseExecutionContext, kind: SchemathesisWarning, record_callback: Callable[[], None]

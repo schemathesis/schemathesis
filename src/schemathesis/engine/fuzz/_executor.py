@@ -17,8 +17,10 @@ from urllib3.exceptions import InsecureRequestWarning
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.result import Ok
+from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine._check_context import CheckContextCache
+from schemathesis.engine._rate_limit_retry import call_with_retry
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
@@ -302,8 +304,28 @@ def _run_forever_thread(
                 transition=None,
                 is_transition_applied=False,
             )
+            auto_mode = ctx.config.rate_limit_for(operation=operation) == "auto"
+            transport_kwargs = ctx.get_transport_kwargs(operation=operation)
+            operation_label = operation.label
+
+            def _call(_case: Case = case, _kwargs: dict[str, Any] = transport_kwargs) -> Response:
+                return _case.call(**_kwargs)
+
+            def _on_delay(delay: float, retries_left: int, _label: str = operation_label) -> None:
+                event_queue.put(
+                    events.RateLimitRetry(
+                        operation=_label,
+                        delay=delay,
+                        retries_left=retries_left,
+                    )
+                )
+
             try:
-                response = case.call(**ctx.get_transport_kwargs(operation=operation))
+                _, response = call_with_retry(
+                    call_fn=_call,
+                    auto_mode=auto_mode,
+                    on_delay=_on_delay,
+                )
             except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
                 if operation.label not in seen_error_labels:
                     seen_error_labels.add(operation.label)
