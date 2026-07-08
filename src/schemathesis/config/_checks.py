@@ -69,6 +69,20 @@ class SimpleCheckConfig(DiffBase):
 
 
 @dataclass(repr=False, slots=True)
+class ResponseSchemaConformanceConfig(DiffBase):
+    enabled: bool
+    validate_formats: bool
+
+    def __init__(self, *, enabled: bool = True, validate_formats: bool = True) -> None:
+        self.enabled = enabled
+        self.validate_formats = validate_formats
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ResponseSchemaConformanceConfig:
+        return cls(enabled=data.get("enabled", True), validate_formats=data.get("validate-formats", True))
+
+
+@dataclass(repr=False, slots=True)
 class MaxResponseTimeConfig(DiffBase):
     enabled: bool
     limit: float | None
@@ -123,7 +137,7 @@ class ChecksConfig(DiffBase):
     not_a_server_error: NotAServerErrorConfig
     status_code_conformance: SimpleCheckConfig
     content_type_conformance: SimpleCheckConfig
-    response_schema_conformance: SimpleCheckConfig
+    response_schema_conformance: ResponseSchemaConformanceConfig
     response_headers_conformance: SimpleCheckConfig
     positive_data_acceptance: PositiveDataAcceptanceConfig
     negative_data_rejection: NegativeDataRejectionConfig
@@ -143,7 +157,7 @@ class ChecksConfig(DiffBase):
         not_a_server_error: NotAServerErrorConfig | None = None,
         status_code_conformance: SimpleCheckConfig | None = None,
         content_type_conformance: SimpleCheckConfig | None = None,
-        response_schema_conformance: SimpleCheckConfig | None = None,
+        response_schema_conformance: ResponseSchemaConformanceConfig | None = None,
         response_headers_conformance: SimpleCheckConfig | None = None,
         positive_data_acceptance: PositiveDataAcceptanceConfig | None = None,
         negative_data_rejection: NegativeDataRejectionConfig | None = None,
@@ -157,7 +171,7 @@ class ChecksConfig(DiffBase):
         self.not_a_server_error = not_a_server_error or NotAServerErrorConfig()
         self.status_code_conformance = status_code_conformance or SimpleCheckConfig()
         self.content_type_conformance = content_type_conformance or SimpleCheckConfig()
-        self.response_schema_conformance = response_schema_conformance or SimpleCheckConfig()
+        self.response_schema_conformance = response_schema_conformance or ResponseSchemaConformanceConfig()
         self.response_headers_conformance = response_headers_conformance or SimpleCheckConfig()
         self.positive_data_acceptance = positive_data_acceptance or PositiveDataAcceptanceConfig()
         self.negative_data_rejection = negative_data_rejection or NegativeDataRejectionConfig()
@@ -193,7 +207,9 @@ class ChecksConfig(DiffBase):
             ),
             status_code_conformance=SimpleCheckConfig.from_dict(merge(data.get("status_code_conformance", {}))),
             content_type_conformance=SimpleCheckConfig.from_dict(merge(data.get("content_type_conformance", {}))),
-            response_schema_conformance=SimpleCheckConfig.from_dict(merge(data.get("response_schema_conformance", {}))),
+            response_schema_conformance=ResponseSchemaConformanceConfig.from_dict(
+                merge(data.get("response_schema_conformance", {}))
+            ),
             response_headers_conformance=SimpleCheckConfig.from_dict(
                 merge(data.get("response_headers_conformance", {}))
             ),

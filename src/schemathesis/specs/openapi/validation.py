@@ -75,8 +75,13 @@ class ResponseValidator:
                 location=SchemaLocation.response_schema(schema.specification.version),
             ) from exc
         if sse_validator is None:
+            validate_formats = schema.config.checks_config_for(
+                operation=operation
+            ).response_schema_conformance.validate_formats
             try:
-                validator = definition.get_validator(resolved.media_type, resolved.schema)
+                validator = definition.get_validator(
+                    resolved.media_type, resolved.schema, validate_formats=validate_formats
+                )
             except jsonschema_rs.ValidationError as exc:
                 raise InvalidSchema.from_jsonschema_error(
                     exc,

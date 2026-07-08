@@ -911,6 +911,20 @@ These settings can only be applied at the project level.
     response_schema_conformance.enabled = false
     ```
 
+#### `checks.response_schema_conformance.validate-formats`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+    Validates `format` keywords (`date-time`, `uuid`, `email`, ...) while checking a response against its schema. Set to `false` to accept values that match the schema type but not its declared format — for example a `date-time` field returning `2018-03-26 14:43:59+00:00` (a space instead of the RFC 3339 `T`).
+
+    ```toml
+    [checks]
+    response_schema_conformance.validate-formats = false
+    ```
+
 #### `checks.<check>.expected-statuses`
 
 !!! note ""

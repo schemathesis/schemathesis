@@ -5,6 +5,7 @@ import yaml
 
 import schemathesis
 from schemathesis.checks import CheckContext
+from schemathesis.config import SchemathesisConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
 from schemathesis.core.mutations import OperatorKind
@@ -22,7 +23,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
-from schemathesis.openapi.checks import UseAfterFree
+from schemathesis.openapi.checks import JsonSchemaError, UseAfterFree
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _additional_properties_hint,
@@ -1254,6 +1255,39 @@ def test_response_schema_conformance_names_matched_response(ctx, response_factor
 _CHECK_CTX = CheckContext(
     override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
 )
+
+_DATE_TIME_PATHS = {
+    "/test": {
+        "get": {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {"application/json": {"schema": {"type": "string", "format": "date-time"}}},
+                }
+            }
+        }
+    }
+}
+# `str(datetime)` renders a space separator, not the RFC 3339 `T`.
+_STR_DATETIME_RESPONSE = b'"2018-03-26 14:43:59.004000+00:00"'
+
+
+def test_response_schema_conformance_invalid_format_fails_by_default(ctx, response_factory):
+    schema = ctx.openapi.load_schema(_DATE_TIME_PATHS)
+    case = schema["/test"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(content=_STR_DATETIME_RESPONSE), True)
+
+    with pytest.raises(JsonSchemaError, match='is not a "date-time"'):
+        response_schema_conformance(_CHECK_CTX, response, case)
+
+
+def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
+    config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
+    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(_DATE_TIME_PATHS), config=config)
+    case = schema["/test"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(content=_STR_DATETIME_RESPONSE), True)
+
+    assert response_schema_conformance(_CHECK_CTX, response, case) is None
 
 
 def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
