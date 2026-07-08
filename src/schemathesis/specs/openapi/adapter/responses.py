@@ -102,10 +102,14 @@ class OpenApiResponse:
         cached = self._validation_cache[cache_key]
         return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type, name_to_uri=cached.name_to_uri)
 
-    def _build_validator(self, schema: JsonSchema) -> jsonschema_rs.Validator:
-        return self.adapter.jsonschema_validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS)
+    def _build_validator(self, schema: JsonSchema, validate_formats: bool) -> jsonschema_rs.Validator:
+        return self.adapter.jsonschema_validator_cls(
+            schema, validate_formats=validate_formats, pattern_options=FANCY_REGEX_OPTIONS
+        )
 
-    def get_validator(self, resolved_media_type: str | None, schema: JsonSchema) -> jsonschema_rs.Validator | None:
+    def get_validator(
+        self, resolved_media_type: str | None, schema: JsonSchema, *, validate_formats: bool = True
+    ) -> jsonschema_rs.Validator | None:
         """Get or build a cached JSON Schema validator for a non-SSE media type."""
         cache_key = self._get_cache_key(resolved_media_type)
 
@@ -115,7 +119,7 @@ class OpenApiResponse:
         cached = self._validation_cache[cache_key]
 
         if cached.validator is None and cached.schema is not None:
-            cached.validator = self._build_validator(cached.schema)
+            cached.validator = self._build_validator(cached.schema, validate_formats)
 
         return cached.validator
 

@@ -408,7 +408,7 @@
           "$ref": "#/$defs/SimpleCheckConfig"
         },
         "response_schema_conformance": {
-          "$ref": "#/$defs/SimpleCheckConfig"
+          "$ref": "#/$defs/ResponseSchemaConformanceConfig"
         },
         "response_headers_conformance": {
           "$ref": "#/$defs/SimpleCheckConfig"
@@ -444,6 +444,18 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ResponseSchemaConformanceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "validate-formats": {
           "type": "boolean"
         }
       }
