@@ -170,7 +170,8 @@ TLS_VERIFY = OptionSpec(
 RATE_LIMIT = OptionSpec(
     "--rate-limit",
     help=(
-        "Specify a rate limit for test requests in '<limit>/<duration>' format. "
+        "Specify a rate limit for test requests in '<limit>/<duration>' format "
+        "or 'auto' to automatically respect 'Retry-After' headers on 429 responses. "
         "Example - `100/m` for 100 requests per minute"
     ),
     type=str,

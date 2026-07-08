@@ -81,8 +81,10 @@ Network requests options:
   --tls-verify TEXT               Path to CA bundle for TLS verification, or
                                   'false' to disable
   --rate-limit TEXT               Specify a rate limit for test requests in
-                                  '<limit>/<duration>' format. Example - `100/m`
-                                  for 100 requests per minute
+                                  '<limit>/<duration>' format or 'auto' to
+                                  automatically respect 'Retry-After' headers on
+                                  429 responses. Example - `100/m` for 100
+                                  requests per minute
   --max-redirects INTEGER RANGE   Maximum number of redirects to follow for each
                                   request  [x>=0]
   --request-timeout FLOAT RANGE   Timeout limit, in seconds, for each network

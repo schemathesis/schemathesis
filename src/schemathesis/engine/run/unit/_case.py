@@ -10,6 +10,8 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
+from schemathesis.engine import events
+from schemathesis.engine._rate_limit_retry import call_with_retry
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.errors import (
     TestingState,
@@ -23,6 +25,7 @@ from schemathesis.generation import metrics
 from schemathesis.generation.case import Case
 
 if TYPE_CHECKING:
+    from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
     from schemathesis.schemas import APIOperation
 
@@ -49,6 +52,7 @@ def run_one_case(
     continue_on_failure: bool,
     state: TestingState,
     errors: list[Exception],
+    pending_events: list[events.EngineEvent],
 ) -> None:
     """Run one case end-to-end: call, record, validate, classify."""
     try:
@@ -76,6 +80,7 @@ def run_one_case(
                     generation=generation,
                     transport_kwargs=transport_kwargs,
                     continue_on_failure=continue_on_failure,
+                    pending_events=pending_events,
                 )
             except BaseException as exc:
                 ctx.cache_outcome(case, exc)
@@ -91,6 +96,7 @@ def run_one_case(
                 generation=generation,
                 transport_kwargs=transport_kwargs,
                 continue_on_failure=continue_on_failure,
+                pending_events=pending_events,
             )
     except (KeyboardInterrupt, Failure):
         raise
@@ -125,10 +131,21 @@ def _do_call_and_validate(
     generation: GenerationConfig,
     transport_kwargs: dict[str, Any],
     continue_on_failure: bool,
+    pending_events: list[events.EngineEvent],
 ) -> None:
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
+    auto_mode = ctx.config.rate_limit_for(operation=case.operation) == "auto"
+
+    def _call() -> Response:
+        return case.call(**transport_kwargs)
+
+    def _on_delay(delay: float, retries_left: int) -> None:
+        pending_events.append(
+            events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left)
+        )
+
     try:
-        response = case.call(**transport_kwargs)
+        _, response = call_with_retry(call_fn=_call, auto_mode=auto_mode, on_delay=_on_delay)
     except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
         if isinstance(error.request, requests.Request):
             recorder.record_request(case_id=case.id, request=error.request.prepare())

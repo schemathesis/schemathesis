@@ -85,6 +85,7 @@ def run_driver(
     status = Status.SUCCESS
     any_case_ran = False
     any_case_errored = False
+    pending_events: list[events.EngineEvent] = []
     try:
         # Silence Hypothesis stderr chatter so it doesn't leak into the engine's event stream.
         with ignore_hypothesis_output():
@@ -105,6 +106,7 @@ def run_driver(
                         continue_on_failure=continue_on_failure,
                         state=state,
                         errors=errors,
+                        pending_events=pending_events,
                     )
                 except UnexpectedError:
                     # Per-case runtime error — already appended to `errors`. Continue iterating so
@@ -147,6 +149,8 @@ def run_driver(
     ):
         status = Status.ERROR
         yield event
+
+    yield from pending_events
 
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)

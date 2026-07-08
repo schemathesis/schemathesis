@@ -33,6 +33,7 @@ from schemathesis.engine.errors import (
     is_unrecoverable_network_error,
 )
 from schemathesis.engine.run import PhaseName
+from schemathesis.engine._rate_limit_retry import call_and_validate_with_retry
 from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
@@ -179,7 +180,28 @@ def execute_state_machine_loop(
                         raise cached
                     elif cached is None:
                         return None
-                result = super().step(input)
+                self.before_call(input.case)
+                kwargs = self.get_call_kwargs(input.case)
+                auto_mode = engine.config.rate_limit_for(operation=input.case.operation) == "auto"
+
+                def call_fn() -> Response:
+                    r = self.call(input.case, **kwargs)
+                    self.after_call(r, input.case)
+                    return r
+
+                final_response = call_and_validate_with_retry(
+                    call_fn=call_fn,
+                    validate_fn=lambda r: self.validate_response(r, input.case),
+                    auto_mode=auto_mode,
+                    on_delay=lambda delay, retries_left: event_queue.put(
+                        events.RateLimitRetry(
+                            operation=input.case.operation.label,
+                            delay=delay,
+                            retries_left=retries_left,
+                        )
+                    ),
+                )
+                result = StepOutput(final_response, input.case)
                 ctx.step_succeeded()
                 engine.health.record_completion(operation_label=operation_label)
             except UnsatisfiedAssumption:
