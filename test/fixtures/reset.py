@@ -12,7 +12,6 @@ from schemathesis.core.jsonschema import _validator_failure_cache, validator_cac
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.generation.hypothesis import custom_formats_cache, schema_generation_cache
 from schemathesis.specs.openapi import media_types
-from schemathesis.specs.openapi.coverage._schema import _REMOVE_EXAMPLES_CACHE
 from schemathesis.specs.openapi.formats import STRING_FORMATS
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
@@ -61,4 +60,6 @@ def reset_hooks():
     custom_formats_cache.clear()
     validator_cache.clear()
     _validator_failure_cache.clear()
+    from schemathesis.specs.openapi.coverage._schema import _REMOVE_EXAMPLES_CACHE
+
     _REMOVE_EXAMPLES_CACHE.clear()
