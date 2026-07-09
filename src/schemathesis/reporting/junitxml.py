@@ -10,6 +10,7 @@ from typing import IO, TYPE_CHECKING
 from xml.etree import ElementTree
 
 from schemathesis.core.failures import format_failures
+from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -68,27 +69,11 @@ class JunitXmlWriter:
 
     def write(self, recorder: ScenarioRecorder, elapsed_sec: float = 0.0) -> None:
         """Write all interactions from a ScenarioRecorder as a JUnit test case."""
-        from schemathesis.engine.statistic import GroupedFailures
-
         assert self._config is not None
-        grouped = []
-        for case_id, checks in recorder.checks.items():
-            failed = [c.failure_info for c in checks if c.failure_info is not None]
-            if not failed:
-                continue
-            interaction = recorder.interactions.get(case_id)
-            grouped.append(
-                GroupedFailures(
-                    case_id=case_id,
-                    code_sample=failed[0].code_sample,
-                    failures=[f.failure for f in failed],
-                    response=interaction.response if interaction is not None else None,
-                )
-            )
         self.record_scenario(
             label=recorder.label,
             elapsed_sec=elapsed_sec,
-            failures=grouped,
+            failures=grouped_failures_from_recorder(recorder),
             skip_reason=None,
             config=self._config,
         )
