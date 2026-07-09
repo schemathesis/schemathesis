@@ -13,6 +13,7 @@ from allure_commons.model2 import Attachment, Label, Link, StatusDetails, TestRe
 
 from schemathesis.core.failures import format_failures
 from schemathesis.engine import Status
+from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
 if TYPE_CHECKING:
     from schemathesis.config import OutputConfig
@@ -50,26 +51,6 @@ def _to_allure_status(status: Status) -> str:
         Status.ERROR: "broken",
         Status.SKIP: "skipped",
     }[status]
-
-
-def _grouped_failures_from_recorder(recorder: ScenarioRecorder) -> list[GroupedFailures]:
-    from schemathesis.engine.statistic import GroupedFailures
-
-    grouped = []
-    for case_id, checks in recorder.checks.items():
-        failed = [c.failure_info for c in checks if c.failure_info is not None]
-        if not failed:
-            continue
-        interaction = recorder.interactions.get(case_id)
-        grouped.append(
-            GroupedFailures(
-                case_id=case_id,
-                code_sample=failed[0].code_sample,
-                failures=[f.failure for f in failed],
-                response=interaction.response if interaction is not None else None,
-            )
-        )
-    return grouped
 
 
 class AllureWriter:
@@ -179,7 +160,7 @@ class AllureWriter:
     def write(self, recorder: ScenarioRecorder, elapsed_sec: float = 0.0, tags: list[str] | None = None) -> None:
         assert self._config is not None
 
-        grouped = _grouped_failures_from_recorder(recorder)
+        grouped = grouped_failures_from_recorder(recorder)
         status = Status.FAILURE if grouped else Status.SUCCESS
         self.record_scenario(
             label=recorder.label,
