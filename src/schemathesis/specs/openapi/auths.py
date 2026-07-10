@@ -13,6 +13,7 @@ import requests
 from schemathesis.core.errors import AuthenticationError, MalformedMediaType
 from schemathesis.core.media_types import is_form_urlencoded, is_json
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
+from schemathesis.core.transport import decode_lossy, load_json_lossy
 from schemathesis.schemas import get_full_path
 
 if TYPE_CHECKING:
@@ -156,8 +157,8 @@ class DynamicTokenAuthProvider:
             ) from exc
         return self._extract_token(
             status_code=response.status_code,
-            text=response.text,
-            get_json=response.json,
+            text=decode_lossy(response.content, response.encoding),
+            get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
         )
 
@@ -208,8 +209,8 @@ class DynamicTokenAuthProvider:
             ) from exc
         return self._extract_token(
             status_code=response.status_code,
-            text=response.text,
-            get_json=response.json,
+            text=decode_lossy(response.content, response.encoding),
+            get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
         )
 

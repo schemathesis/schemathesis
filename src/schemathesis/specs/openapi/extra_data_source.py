@@ -714,7 +714,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         context = deserialization.DeserializationContext(operation=operation, case=case)
         try:
             payload = deserialization.deserialize_response(response, content_type, context=context)
-        except (TypeError, ValueError, json.JSONDecodeError, NotImplementedError):
+        except (TypeError, ValueError, LookupError, json.JSONDecodeError, NotImplementedError):
             return
         if has_descriptors:
             self.repository.record_response(

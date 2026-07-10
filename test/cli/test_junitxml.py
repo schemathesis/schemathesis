@@ -5,7 +5,7 @@ from xml.etree import ElementTree
 
 import pytest
 from _pytest.main import ExitCode
-from flask import jsonify
+from flask import Response, jsonify
 
 
 def test_junitxml_option(ctx, cli, hypothesis_max_examples, tmp_path):
@@ -179,6 +179,33 @@ def test_binary_response(ctx, cli, app_runner, tmp_path):
     assert (
         extract_message(testcases[0][0], base_url.removeprefix("http://"))
         == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      <BINARY>  Reproduce with:      curl -X GET http://localhost/api/binary"
+    )
+
+
+@pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])
+def test_bad_charset_response(ctx, cli, app_runner, tmp_path, charset):
+    xml_path = tmp_path / "junit.xml"
+    app, _ = ctx.openapi.make_flask_app({"/boom": {"get": {"responses": {"500": {"description": "Error"}}}}})
+
+    @app.route("/api/boom")
+    def boom():
+        return Response(b"boom", content_type=f"text/plain; charset={charset}", status=500)
+
+    base_url = app_runner.openapi_url(app, path="")
+    cli.run(
+        f"{base_url}/openapi.json",
+        f"--url={base_url}/api",
+        "--checks=not_a_server_error",
+        f"--report-junit-path={xml_path}",
+    )
+    tree = ElementTree.parse(xml_path)
+    testsuite = tree.getroot()[0]
+    testcases = list(testsuite)
+    assert testcases[0].tag == "testcase"
+    assert testcases[0][0].tag == "failure"
+    assert (
+        extract_message(testcases[0][0], base_url.removeprefix("http://"))
+        == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      `boom`  Reproduce with:      curl -X GET http://localhost/api/boom"
     )
 
 

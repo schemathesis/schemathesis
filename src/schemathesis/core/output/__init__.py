@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from schemathesis.config import OutputConfig
+    from schemathesis.core.transport import Response
 
 TRUNCATED = "// Output truncated..."
 
@@ -44,6 +45,21 @@ def truncate_text(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 4] + " ..."
+
+
+def decode_response_text(response: Response) -> str | None:
+    """Decode a response body for display.
+
+    Returns `None` when the body is binary (undecodable under its own or the default encoding);
+    a response declaring an unknown or broken charset is decoded lossily instead of raising.
+    """
+    try:
+        return response.text
+    except UnicodeDecodeError:
+        return None
+    except (LookupError, ValueError):
+        # Unknown or broken codec names (including embedded NULs) — decode lossily instead of raising.
+        return response.text_lossy()
 
 
 def prepare_response_payload(payload: str, *, config: OutputConfig) -> str:

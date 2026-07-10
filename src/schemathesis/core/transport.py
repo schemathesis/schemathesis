@@ -46,6 +46,24 @@ USER_AGENT = f"schemathesis/{SCHEMATHESIS_VERSION}"
 DEFAULT_RESPONSE_TIMEOUT = 10
 
 
+def decode_lossy(content: bytes, encoding: str | None) -> str:
+    """Decode bytes as text, never raising: replace undecodable bytes, fall back to UTF-8 on an unknown or broken codec."""
+    try:
+        return content.decode(encoding or "utf-8", errors="replace")
+    except (LookupError, ValueError):
+        # `LookupError`: unknown codec; `ValueError`: broken codec name (e.g. embedded NUL) or a codec
+        # like `undefined` that raises even with errors="replace" (`UnicodeError` is a `ValueError`).
+        return content.decode("utf-8", errors="replace")
+
+
+def load_json_lossy(content: bytes, encoding: str | None) -> Any:
+    """Parse JSON from raw bytes, keeping stdlib BOM/UTF-16/32 detection; a lying charset falls back to lossy text."""
+    try:
+        return json.loads(content)
+    except UnicodeDecodeError:
+        return json.loads(decode_lossy(content, encoding))
+
+
 def prepare_urlencoded(data: Any) -> Any:
     if isinstance(data, list):
         output = []
@@ -242,10 +260,7 @@ class Response:
 
     def text_lossy(self) -> str:
         """Decode like `text` but never raise: replace undecodable bytes, fall back to UTF-8 on an unknown charset."""
-        try:
-            return self.content.decode(self.encoding or "utf-8", errors="replace")
-        except LookupError:
-            return self.content.decode("utf-8", errors="replace")
+        return decode_lossy(self.content, self.encoding)
 
     def json(self) -> Any:
         """Parse response content as JSON.

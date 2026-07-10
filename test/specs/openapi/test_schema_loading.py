@@ -3,6 +3,7 @@ import platform
 import jsonschema_rs
 import pytest
 import requests
+from flask import Flask, jsonify
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
@@ -615,3 +616,19 @@ def test_ssl_error(ctx):
             "[SSL: RECORD_LAYER_FAILURE] record layer failure",
         )
     )
+
+
+@pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"])
+def test_from_url_survives_bad_charset(ctx, app_runner, charset):
+    # A server lying about its charset over a valid UTF-8 JSON body must still load.
+    schema_dict = ctx.openapi.build_schema({"/foo": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        response = jsonify(schema_dict)
+        response.headers["Content-Type"] = f"application/json; charset={charset}"
+        return response
+
+    loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    assert loaded.raw_schema == schema_dict

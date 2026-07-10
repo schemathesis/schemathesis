@@ -296,6 +296,40 @@ def test_wfc_asgi_login_applies_token():
     assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
 
 
+@pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])
+def test_wfc_http_login_bad_charset(ctx, app_runner, charset):
+    # A login endpoint declaring an unknown or broken charset must not crash the login request.
+    app, _ = ctx.openapi.make_flask_app({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> tuple[str, int, dict]:
+        return json.dumps({"access_token": WFC_TOKEN}), 200, {"Content-Type": f"application/json; charset={charset}"}
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/api/protected"]["GET"]
+    provider = _provider_for(_login(token=_token()))
+    context = AuthContext(operation=operation, app=None)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
+
+
+def test_wfc_http_login_bom_json(ctx, app_runner):
+    # UTF-8-BOM JSON login responses (common for .NET services) must still yield the token.
+    app, _ = ctx.openapi.make_flask_app({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> tuple[bytes, int, dict]:
+        body = b"\xef\xbb\xbf" + json.dumps({"access_token": WFC_TOKEN}).encode("utf-8")
+        return body, 200, {"Content-Type": "application/json"}
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/api/protected"]["GET"]
+    provider = _provider_for(_login(token=_token()))
+    context = AuthContext(operation=operation, app=None)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
+
+
 _SPEC = {
     "openapi": "3.0.0",
     "info": {"title": "t", "version": "1"},

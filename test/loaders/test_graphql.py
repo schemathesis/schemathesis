@@ -5,6 +5,7 @@ from io import StringIO
 
 import graphql
 import pytest
+from flask import Flask, Response
 from hypothesis import given, settings
 
 from schemathesis.core.errors import LoaderError
@@ -103,3 +104,18 @@ def test_from_invalid_json_file(tmp_path, data):
     path.write_text(data)
     with pytest.raises(LoaderError, match="The provided API schema does not appear to be a valid GraphQL schema"):
         loaders.from_path(str(path))
+
+
+@pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"])
+def test_from_url_survives_bad_charset(app_runner, charset):
+    # An introspection response lying about its charset over valid UTF-8 JSON must still load.
+    document = graphql.build_schema(RAW_SCHEMA)
+    result = graphql.execute(document, loaders.get_introspection_query_ast())
+    payload = json.dumps({"data": result.data})
+    app = Flask(__name__)
+
+    @app.route("/graphql", methods=["POST"])
+    def graphql_endpoint():
+        return Response(payload, content_type=f"application/json; charset={charset}")
+
+    assert_schema(loaders.from_url(app_runner.openapi_url(app, path="/graphql")))
