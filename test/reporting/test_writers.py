@@ -1,13 +1,41 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
 
 import pytest
 
-from schemathesis.config import ProjectConfig
+from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.reporting import HarWriter, JunitXmlWriter, NdjsonWriter, VcrWriter
+from schemathesis.reporting._command import get_command_representation
+
+
+def test_command_representation_sanitizes_credentials(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["st", "run", "schema.yaml", "--auth", "user:secret", "--header", "Authorization: Bearer token"],
+    )
+
+    command = get_command_representation(sanitization=SanitizationConfig())
+
+    assert command == "st run schema.yaml --auth [Filtered] --header Authorization: [Filtered]"
+
+
+def test_command_representation_sanitizes_glued_short_options(monkeypatch):
+    # Click accepts a short option glued to its value (`-aVALUE`); that form must be redacted too.
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["st", "run", "schema.yaml", "-auser:secret", "-HAuthorization: Bearer token"],
+    )
+
+    command = get_command_representation(sanitization=SanitizationConfig())
+
+    assert "user:secret" not in command
+    assert "Bearer token" not in command
 
 
 def test_ndjson_writer_context_manager():

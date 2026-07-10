@@ -54,6 +54,9 @@
         },
         "allure": {
           "$ref": "#/$defs/ReportConfig"
+        },
+        "html": {
+          "$ref": "#/$defs/ReportConfig"
         }
       }
     },

@@ -455,6 +455,13 @@ REPORT_ALLURE_PATH = OptionSpec(
     is_eager=True,
 )
 
+REPORT_HTML_PATH = OptionSpec(
+    "--report-html-path",
+    help="Directory for the HTML report",
+    type=click.Path(file_okay=False),
+    is_eager=True,
+)
+
 REPORT_PRESERVE_BYTES = OptionSpec(
     "--report-preserve-bytes",
     help="Retain exact byte sequence of payloads in cassettes, encoded as base64",

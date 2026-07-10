@@ -18,6 +18,28 @@ def scenario_failures(statistic: Statistic, recorder: ScenarioRecorder, label: s
     return [group for case_id, group in statistic.failures.get(label, {}).items() if case_id in case_ids]
 
 
+def scenario_failures_by_case(statistic: Statistic, recorder: ScenarioRecorder) -> list[GroupedFailures]:
+    """Failures for a scenario's cases, matched by case id across every label the scenario can produce.
+
+    Some coverage scenarios (e.g. UNSPECIFIED_HTTP_METHOD, GH-3322) store failures under the actual
+    method+path tested rather than the recorder label, so restrict the scan to those labels instead of
+    walking the whole run-global failure map for every scenario.
+    """
+    case_ids = set(recorder.cases.keys())
+    labels = {recorder.label}
+    for node in recorder.cases.values():
+        case = node.value
+        labels.add(case.operation.label)
+        labels.add(f"{case.method} {case.path}")
+    return [
+        group
+        for label, groups in statistic.failures.items()
+        if label in labels
+        for case_id, group in groups.items()
+        if case_id in case_ids
+    ]
+
+
 def scenario_has_failures(recorder: ScenarioRecorder, label: str) -> bool:
     """Whether any case for a specific operation label within a multi-operation scenario failed a check."""
     return any(

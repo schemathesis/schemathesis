@@ -47,6 +47,7 @@ from schemathesis.cli.options import (
     REPORT_ALLURE_PATH,
     REPORT_DIR,
     REPORT_HAR_PATH,
+    REPORT_HTML_PATH,
     REPORT_JUNIT_PATH,
     REPORT_NDJSON_PATH,
     REPORT_PRESERVE_BYTES,
@@ -131,6 +132,7 @@ load_all_checks()
 @grouped_option(*REPORT_HAR_PATH.args, **REPORT_HAR_PATH.kwargs)
 @grouped_option(*REPORT_NDJSON_PATH.args, **REPORT_NDJSON_PATH.kwargs)
 @grouped_option(*REPORT_ALLURE_PATH.args, **REPORT_ALLURE_PATH.kwargs)
+@grouped_option(*REPORT_HTML_PATH.args, **REPORT_HTML_PATH.kwargs)
 @grouped_option(*REPORT_PRESERVE_BYTES.args, **REPORT_PRESERVE_BYTES.kwargs)
 @grouped_option(*OUTPUT_SANITIZE.args, **OUTPUT_SANITIZE.kwargs)
 @grouped_option(*OUTPUT_TRUNCATE.args, **OUTPUT_TRUNCATE.kwargs)
@@ -204,6 +206,7 @@ def fuzz(
     report_har_path: LazyFile | None = None,
     report_ndjson_path: LazyFile | None = None,
     report_allure_path: str | None = None,
+    report_html_path: str | None = None,
     report_preserve_bytes: bool | None = None,
     output_sanitize: bool | None = None,
     output_truncate: bool | None = None,
@@ -258,6 +261,7 @@ def fuzz(
         har_path=report_har_path.name if report_har_path else None,
         ndjson_path=report_ndjson_path.name if report_ndjson_path else None,
         allure_path=report_allure_path,
+        html_path=report_html_path,
         directory=Path(report_directory),
         preserve_bytes=report_preserve_bytes,
     )

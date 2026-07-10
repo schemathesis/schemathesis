@@ -20,6 +20,7 @@ class ReportFormat(str, Enum):
     HAR = "har"
     NDJSON = "ndjson"
     ALLURE = "allure"
+    HTML = "html"
 
     @property
     def extension(self) -> str:
@@ -29,9 +30,15 @@ class ReportFormat(str, Enum):
             self.VCR: "yaml",
             self.HAR: "json",
             self.NDJSON: "ndjson",
-            # directory output — no file extension
+            # directory outputs — no file extension
             self.ALLURE: "",
+            self.HTML: "",
         }[self]
+
+    @property
+    def is_directory(self) -> bool:
+        """Whether this format produces a directory rather than a single file."""
+        return self in (ReportFormat.ALLURE, ReportFormat.HTML)
 
 
 @dataclass(repr=False, slots=True)
@@ -61,6 +68,7 @@ class ReportsConfig(DiffBase):
     har: ReportConfig
     ndjson: ReportConfig
     allure: ReportConfig
+    html: ReportConfig
     _timestamp: str
 
     def __init__(
@@ -73,6 +81,7 @@ class ReportsConfig(DiffBase):
         har: ReportConfig | None = None,
         ndjson: ReportConfig | None = None,
         allure: ReportConfig | None = None,
+        html: ReportConfig | None = None,
     ) -> None:
         self.directory = Path(resolve(directory) or DEFAULT_REPORT_DIRECTORY)
         self.preserve_bytes = preserve_bytes
@@ -81,6 +90,7 @@ class ReportsConfig(DiffBase):
         self.har = har or ReportConfig()
         self.ndjson = ndjson or ReportConfig()
         self.allure = allure or ReportConfig()
+        self.html = html or ReportConfig()
         self._timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
     @classmethod
@@ -93,6 +103,7 @@ class ReportsConfig(DiffBase):
             har=ReportConfig.from_dict(data.get("har", {})),
             ndjson=ReportConfig.from_dict(data.get("ndjson", {})),
             allure=ReportConfig.from_dict(data.get("allure", {})),
+            html=ReportConfig.from_dict(data.get("html", {})),
         )
 
     def update(
@@ -104,6 +115,7 @@ class ReportsConfig(DiffBase):
         har_path: str | None = None,
         ndjson_path: str | None = None,
         allure_path: str | None = None,
+        html_path: str | None = None,
         directory: Path = DEFAULT_REPORT_DIRECTORY,
         preserve_bytes: bool | None = None,
     ) -> None:
@@ -123,6 +135,9 @@ class ReportsConfig(DiffBase):
         if allure_path is not None or ReportFormat.ALLURE in formats:
             self.allure.enabled = True
             self.allure.path = Path(allure_path) if allure_path is not None else allure_path
+        if html_path is not None or ReportFormat.HTML in formats:
+            self.html.enabled = True
+            self.html.path = Path(html_path) if html_path is not None else html_path
         if directory != DEFAULT_REPORT_DIRECTORY:
             self.directory = directory
         if preserve_bytes:
@@ -134,7 +149,7 @@ class ReportsConfig(DiffBase):
         if report.path is not None:
             return report.path
 
-        if format == ReportFormat.ALLURE:
+        if format.is_directory:
             return self.directory / f"{format.value}-{self._timestamp}"
 
         return self.directory / f"{format.value}-{self._timestamp}.{format.extension}"
@@ -149,7 +164,7 @@ class ReportsConfig(DiffBase):
         report: ReportConfig = getattr(self, format.value)
         if report.path is not None:
             return report.path
-        if format == ReportFormat.ALLURE:
+        if format.is_directory:
             name = f"{format.value}-{suffix}" if suffix else format.value
             return self.directory / name
         path = self.directory / f"{format.value}.{format.extension}"

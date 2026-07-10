@@ -272,7 +272,7 @@ Rules:
     **Type**: `Boolean`  
     **Default**: `false`  
 
-    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, or `allure`.
+    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `allure`, or `html`.
 
     ```toml
     [reports.junit]
@@ -286,7 +286,7 @@ Rules:
     **Type**: `String`  
     **Default**: `null`  
 
-    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, `har`, or `allure`. For `allure`, this is a directory path.
+    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `allure`, or `html`. For `allure` and `html`, this is a directory path.
 
     Setting this path automatically enables report generation without requiring `enabled = true`.
 
