@@ -488,11 +488,13 @@ def _make_graphql_case_with_mode(schema, mode):
     )
 
 
-def _make_mock_response(content, status_code=200):
+def _make_mock_response(content, status_code=200, content_type="application/json"):
     response = requests.Response()
     response._content = json.dumps(content).encode("utf-8")
     response.status_code = status_code
-    response.headers["Content-Type"] = "application/json"
+    response.headers["Content-Type"] = content_type
+    # Derive `encoding` from headers exactly like requests' adapter does for real responses.
+    response.encoding = requests.utils.get_encoding_from_headers(response.headers)
     response.request = requests.PreparedRequest()
     response.request.prepare(method="POST", url="http://127.0.0.1/graphql")
     return Response.from_requests(response, True)
@@ -579,3 +581,20 @@ def test_not_a_server_error_graphql_no_meta_falls_through_to_validation(ctx):
     # Without meta, should fall through to normal validation and raise GraphQLClientError
     with pytest.raises(GraphQLClientError):
         not_a_server_error(check_ctx, response, case)
+
+
+@pytest.mark.parametrize(
+    "charset", ["bogus-xyz", "undefined", "ab\x00cd"], ids=["unknown-charset", "undefined-codec", "nul-in-charset"]
+)
+def test_not_a_server_error_graphql_bad_charset(ctx, charset):
+    # A response lying about its charset over valid GraphQL JSON must validate normally, not crash.
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = schema["Mutation"]["addBook"].Case()
+    response = _make_mock_response(
+        {"data": {"addBook": {"id": "1"}}}, content_type=f"application/json; charset={charset}"
+    )
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
+
+    assert not_a_server_error(check_ctx, response, case) is None

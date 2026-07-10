@@ -2,6 +2,11 @@ import platform
 from textwrap import indent
 
 import pytest
+from flask import Flask, jsonify
+
+import schemathesis
+from schemathesis.config import SchemathesisConfig
+from schemathesis.core.errors import LoaderError
 
 
 def _schema_setup_from_project_config(update, *, is_lazy):
@@ -92,26 +97,31 @@ def test_timeout(case):
     result.assert_outcomes(passed=1)
 
 
-def test_wait_for_schema_is_used(mocker):
-    import schemathesis
+def test_wait_for_schema_is_used(ctx, app_runner):
+    # `wait_for_schema` from config must drive schema-load retries when the argument is omitted.
+    schema = ctx.openapi.build_schema({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
-    # Mock requests.get to track wait_for_schema parameter
-    mock_load_from_url = mocker.patch("schemathesis.openapi.loaders.load_from_url")
-    mock_response = mocker.Mock()
-    mock_response.headers = {"Content-Type": "application/json"}
-    mock_response.text = '{"openapi": "3.0.0", "info": {"title": "Test", "version": "1.0.0"}, "paths": {}}'
-    mock_load_from_url.return_value = mock_response
+    def make_flaky_app():
+        app = Flask(__name__)
+        attempts = []
 
-    wait_for_schema_value = 42.5
-    config = schemathesis.config.SchemathesisConfig(wait_for_schema=wait_for_schema_value)
+        @app.route("/openapi.json")
+        def openapi_spec():
+            attempts.append(1)
+            if len(attempts) == 1:
+                return jsonify({"detail": "not ready"}), 503
+            return jsonify(schema)
 
-    # Call from_url without explicit wait_for_schema - should use config
-    schemathesis.openapi.from_url("http://example.com/openapi.json", config=config)
+        return app
 
-    # Verify wait_for_schema from config was passed to load_from_url
-    assert mock_load_from_url.called
-    call_kwargs = mock_load_from_url.call_args[1]
-    assert call_kwargs.get("wait_for_schema") == wait_for_schema_value
+    loaded = schemathesis.openapi.from_url(
+        app_runner.openapi_url(make_flaky_app()), config=SchemathesisConfig(wait_for_schema=5)
+    )
+    assert loaded.raw_schema == schema
+
+    # Without the config value there is no retry budget: the first 503 fails the load.
+    with pytest.raises(LoaderError, match="HTTP 503"):
+        schemathesis.openapi.from_url(app_runner.openapi_url(make_flaky_app()), config=SchemathesisConfig())
 
 
 @pytest.mark.parametrize("is_lazy", [False, True])

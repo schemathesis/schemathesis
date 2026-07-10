@@ -400,12 +400,18 @@ class GraphQLSchema(BaseSchema):
     @override
     def evaluate_server_error(self, case: Case, response: Response) -> None:
         from schemathesis.core.failures import AcceptedNegativeData, MalformedJson
+        from schemathesis.core.transport import load_json_lossy
         from schemathesis.graphql.checks import GraphQLClientError
         from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
 
         is_negative_mode = case.meta is not None and case.meta.generation.mode.is_negative
         try:
-            data = response.json()
+            try:
+                data = response.json()
+            except (LookupError, ValueError):
+                # A response lying about its charset must not abort the check; re-parse from raw bytes.
+                # Malformed JSON lands here too and re-raises from the lossy re-parse below.
+                data = load_json_lossy(response.content, response.encoding)
             if is_negative_mode:
                 errors = data.get("errors")
                 if errors is None or len(errors) == 0:

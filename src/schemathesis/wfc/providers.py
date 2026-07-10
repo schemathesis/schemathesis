@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import requests
 
+from schemathesis.core.transport import decode_lossy, load_json_lossy
 from schemathesis.python import asgi, wsgi
 from schemathesis.schemas import get_full_path
 from schemathesis.transport import is_asgi_app
@@ -112,8 +113,8 @@ class LoginEndpointAuthProvider:
             raise WFCLoginError(f"Login endpoint call failed: {exc}") from exc
         return _LoginResponse(
             status_code=response.status_code,
-            text=response.text,
-            get_json=response.json,
+            text=decode_lossy(response.content, response.encoding),
+            get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
             cookies=response.cookies.get_dict(),
         )
@@ -145,8 +146,8 @@ class LoginEndpointAuthProvider:
             raise WFCLoginError(f"ASGI login request failed: {exc}") from exc
         return _LoginResponse(
             status_code=response.status_code,
-            text=response.text,
-            get_json=response.json,
+            text=decode_lossy(response.content, response.encoding),
+            get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
             cookies=dict(response.cookies),
         )

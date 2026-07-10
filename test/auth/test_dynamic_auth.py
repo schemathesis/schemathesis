@@ -61,6 +61,20 @@ def auth_operation(ctx, cli, app_runner):
     def wrong_type():
         return jsonify({"token": 42})
 
+    @app.route("/api/bad-charset-auth/<charset>", methods=["POST"])
+    def bad_charset_auth(charset):
+        return FlaskResponse('{"access_token": "test-token"}', content_type=f"application/json; charset={charset}")
+
+    @app.route("/api/bom-auth", methods=["POST"])
+    def bom_auth():
+        return FlaskResponse(b'\xef\xbb\xbf{"access_token": "test-token"}', content_type="application/json")
+
+    @app.route("/api/latin1-auth", methods=["POST"])
+    def latin1_auth():
+        return FlaskResponse(
+            '{"access_token": "café-token"}'.encode("latin-1"), content_type="application/json; charset=latin-1"
+        )
+
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     return schema["/data"]["GET"]
 
@@ -71,6 +85,11 @@ def auth_operation(ctx, cli, app_runner):
         ("/api/body-auth", "body", "/access_token", "test-token"),
         ("/api/nested-auth", "body", "/data/token", "test-token"),
         ("/api/header-auth", "header", "X-Auth-Token", "test-token"),
+        ("/api/bad-charset-auth/bogus-xyz", "body", "/access_token", "test-token"),
+        ("/api/bad-charset-auth/undefined", "body", "/access_token", "test-token"),
+        ("/api/bom-auth", "body", "/access_token", "test-token"),
+        # Non-UTF-8 body with a truthfully declared legacy charset: `é` must survive, not become U+FFFD.
+        ("/api/latin1-auth", "body", "/access_token", "café-token"),
     ],
 )
 def test_get_extracts_token(auth_operation, path, extract_from, extract_selector, expected):

@@ -33,7 +33,7 @@ from schemathesis.cli.output import (
     print_lines,
 )
 from schemathesis.config import ProjectConfig, ReportFormat
-from schemathesis.core.output import prepare_response_payload
+from schemathesis.core.output import decode_response_text, prepare_response_payload
 from schemathesis.core.result import Ok
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.timing import Instant
@@ -1024,11 +1024,12 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 if response.content is None or not response.content:
                     click.echo(f"\n{indent}<EMPTY>")
                 else:
-                    try:
-                        payload = prepare_response_payload(response.text, config=ctx.config.output)
-                        click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
-                    except UnicodeDecodeError:
+                    text = decode_response_text(response)
+                    if text is None:
                         click.echo(f"\n{indent}<BINARY>")
+                    else:
+                        payload = prepare_response_payload(text, config=ctx.config.output)
+                        click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
 
         click.echo()
 

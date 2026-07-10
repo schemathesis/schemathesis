@@ -13,6 +13,7 @@ from schemathesis.core import media_types
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
+from schemathesis.core.transport import decode_lossy
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -48,7 +49,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     client = asgi.get_client(app)
     response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
-    schema = load_content(response.text, content_type)
+    schema = load_content(decode_lossy(response.content, response.encoding), content_type)
     loaded = from_dict(schema=schema, config=config)
     loaded.app = app
     loaded.location = path
@@ -80,7 +81,8 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     response = client.get(path=path, **kwargs)
     raise_for_status(response)
     content_type = detect_content_type(headers=response.headers, path=path)
-    schema = load_content(response.text, content_type)
+    encoding = response.mimetype_params.get("charset", "utf-8")
+    schema = load_content(decode_lossy(response.get_data(), encoding), content_type)
     loaded = from_dict(schema=schema, config=config)
     loaded.app = app
     loaded.location = path
@@ -124,7 +126,7 @@ def from_url(
 
     response = load_from_url(requests.get, url=url, wait_for_schema=wait_for_schema, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=url)
-    schema = load_content(response.text, content_type)
+    schema = load_content(decode_lossy(response.content, response.encoding), content_type)
     loaded = from_dict(schema=schema, config=config)
     loaded.location = url
     return loaded

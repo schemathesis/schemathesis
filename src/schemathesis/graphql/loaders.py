@@ -10,6 +10,7 @@ from typing import IO, TYPE_CHECKING, Any, NoReturn, TypeVar, cast
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
+from schemathesis.core.transport import load_json_lossy
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -47,7 +48,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     kwargs.setdefault("json", {"query": get_introspection_query()})
     client = asgi.get_client(app)
     response = load_from_url(client.post, url=path, **kwargs)
-    schema = extract_schema_from_response(response, lambda r: r.json())
+    schema = extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
     loaded = from_dict(schema=schema, config=config)
     loaded.app = app
     loaded.location = path
@@ -79,7 +80,9 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     client = wsgi.get_client(app)
     response = client.post(path=path, **kwargs)
     raise_for_status(response)
-    schema = extract_schema_from_response(response, lambda r: r.json)
+    schema = extract_schema_from_response(
+        response, lambda r: load_json_lossy(r.get_data(), r.mimetype_params.get("charset", "utf-8"))
+    )
     loaded = from_dict(schema=schema, config=config)
     loaded.app = app
     loaded.location = path
@@ -118,7 +121,7 @@ def from_url(
 
     kwargs.setdefault("json", {"query": get_introspection_query()})
     response = load_from_url(requests.post, url=url, wait_for_schema=wait_for_schema, **kwargs)
-    schema = extract_schema_from_response(response, lambda r: r.json())
+    schema = extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
     loaded = from_dict(schema, config=config)
     loaded.location = url
     return loaded

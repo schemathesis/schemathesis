@@ -11,7 +11,7 @@ from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.compat import BaseExceptionGroup
-from schemathesis.core.output import escape_surrogates, prepare_response_payload
+from schemathesis.core.output import decode_response_text, escape_surrogates, prepare_response_payload
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
@@ -366,11 +366,12 @@ def format_failures(
         if response.content is None or not response.content:
             output += "\n    <EMPTY>"
         else:
-            try:
-                payload = prepare_response_payload(response.text, config=config)
-                output += textwrap.indent(f"\n`{payload}`", prefix="    ")
-            except UnicodeDecodeError:
+            text = decode_response_text(response)
+            if text is None:
                 output += "\n    <BINARY>"
+            else:
+                payload = prepare_response_payload(text, config=config)
+                output += textwrap.indent(f"\n`{payload}`", prefix="    ")
     # `response`/`curl` are None for failures not tied to a case (e.g. after_run): nothing to show.
     if curl is not None:
         _curl = "\n".join(f"    {line}" for line in curl.splitlines())
