@@ -8,10 +8,10 @@ from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
 from schemathesis.engine.statistic import GroupedFailures
 from schemathesis.reporting.junitxml import JunitXmlWriter
+from schemathesis.reporting.recorders import scenario_elapsed, scenario_failures, unique_labels
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.engine.recorder import ScenarioRecorder
 
 
 @dataclass(slots=True)
@@ -48,11 +48,15 @@ class JunitXMLHandler(EventHandler):
             )
         elif isinstance(event, events.FuzzScenarioFinished):
             if event.status in (Status.SUCCESS, Status.FAILURE):
-                for label in _fuzz_labels(event.recorder):
-                    failures = _scenario_failures(ctx, event.recorder, label) if event.status == Status.FAILURE else []
+                for label in unique_labels(event.recorder):
+                    failures = (
+                        scenario_failures(ctx.statistic, event.recorder, label)
+                        if event.status == Status.FAILURE
+                        else []
+                    )
                     self.writer.record_scenario(
                         label=label,
-                        elapsed_sec=_scenario_elapsed(event.recorder, label),
+                        elapsed_sec=scenario_elapsed(event.recorder, label),
                         failures=failures,
                         skip_reason=None,
                         config=ctx.config.output,
@@ -83,22 +87,3 @@ class JunitXMLHandler(EventHandler):
             if label in ctx.statistic.tested_operations:
                 test_case.skipped = []
         self.writer.close()
-
-
-def _fuzz_labels(recorder: ScenarioRecorder) -> list[str]:
-    return list(dict.fromkeys(node.value.operation.label for node in recorder.cases.values()))
-
-
-def _scenario_failures(ctx: BaseExecutionContext, recorder: ScenarioRecorder, label: str) -> list:
-    case_ids = {case_id for case_id, node in recorder.cases.items() if node.value.operation.label == label}
-    return [group for case_id, group in ctx.statistic.failures.get(label, {}).items() if case_id in case_ids]
-
-
-def _scenario_elapsed(recorder: ScenarioRecorder, label: str) -> float:
-    return sum(
-        interaction.response.elapsed
-        for case_id, node in recorder.cases.items()
-        if node.value.operation.label == label
-        for interaction in [recorder.interactions.get(case_id)]
-        if interaction is not None and interaction.response is not None
-    )
