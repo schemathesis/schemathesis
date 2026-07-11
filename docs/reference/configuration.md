@@ -1247,7 +1247,7 @@ The following settings control how Schemathesis generates test data for your API
     **Type:** `Boolean`  
     **Default:** `true`  
 
-Controls whether Schemathesis produces unexpected query, header, cookie, or body parameters. Leave it enabled (default) to exercise `additionalProperties: false`; set it to `false` to skip generating those extras entirely.
+    Controls whether Schemathesis produces unexpected query, header, cookie, or body parameters. Leave it enabled (default) to exercise `additionalProperties: false`; set it to `false` to skip generating those extras entirely.
 
     ```toml
     [generation]
