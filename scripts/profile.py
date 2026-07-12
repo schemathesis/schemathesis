@@ -393,6 +393,7 @@ def coverage(
 
     from schemathesis.generation import hypothesis
     from schemathesis.generation.drivers import CoverageGenerator
+    from schemathesis.generation.feedback import FeedbackSources
 
     hypothesis.setup()
 
@@ -425,6 +426,7 @@ def coverage(
                         generation_modes=[gen_mode],
                         auth_storage=None,
                         as_strategy_kwargs={},
+                        feedback=FeedbackSources(),
                         generation_config=config.generation,
                     )
                 )

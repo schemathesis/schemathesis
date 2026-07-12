@@ -31,6 +31,7 @@ from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case, adjust_urlencoded_payload, find_invalid_headers
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
@@ -60,6 +61,7 @@ class HypothesisTestConfig:
     explicit_settings: hypothesis.settings | None = None
     seed: int | None = None
     as_strategy_kwargs: dict[str, Any] = field(default_factory=dict)
+    feedback: FeedbackSources = field(default_factory=FeedbackSources)
     given_args: tuple[GivenInput, ...] = ()
     given_kwargs: dict[str, GivenInput] = field(default_factory=dict)
 
@@ -77,6 +79,8 @@ def create_test(
     strategy_kwargs = {
         "hooks": hook_dispatcher,
         "auth_storage": auth_storage,
+        "extra_data_source": config.feedback.extra_data_source,
+        "error_feedback": config.feedback.error_feedback,
         **config.as_strategy_kwargs,
     }
     generation = config.project.generation_for(operation=operation)
@@ -190,6 +194,7 @@ def create_test(
             generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
+            feedback=config.feedback,
             generation_config=generation,
         )
 
@@ -325,6 +330,7 @@ def add_coverage(
     generation_modes: list[GenerationMode],
     auth_storage: AuthStorage | None,
     as_strategy_kwargs: dict[str, Any],
+    feedback: FeedbackSources,
     generation_config: GenerationConfig,
 ) -> Callable:
     from schemathesis.generation.drivers import CoverageGenerator
@@ -335,6 +341,7 @@ def add_coverage(
         generation_config=generation_config,
         auth_storage=auth_storage,
         as_strategy_kwargs=as_strategy_kwargs,
+        feedback=feedback,
     )
     for case in generator:
         test = hypothesis.example(case=case)(test)

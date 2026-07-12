@@ -36,6 +36,7 @@ from schemathesis.hooks import (
 if TYPE_CHECKING:
     from schemathesis.auths import AuthStorage
     from schemathesis.generation.case import Case
+    from schemathesis.generation.feedback import FeedbackSources
     from schemathesis.schemas import APIOperation
 
 
@@ -94,12 +95,14 @@ class CoverageGenerator:
         generation_config: GenerationConfig,
         auth_storage: AuthStorage | None,
         as_strategy_kwargs: dict[str, Any],
+        feedback: FeedbackSources,
     ) -> None:
         self._operation = operation
         self._generation_modes = generation_modes
         self._generation_config = generation_config
         self._auth_storage = auth_storage
         self._as_strategy_kwargs = as_strategy_kwargs
+        self._feedback = feedback
         self._controller = Controller()
         _capture_missing_path_parameters(operation, self._controller)
 
@@ -115,8 +118,8 @@ class CoverageGenerator:
         operation = self._operation
         as_strategy_kwargs = self._as_strategy_kwargs
         auth_context = auths.AuthContext(operation=operation, app=operation.app)
-        extra_data_source = as_strategy_kwargs.get("extra_data_source")
-        error_feedback = as_strategy_kwargs.get("error_feedback")
+        extra_data_source = self._feedback.extra_data_source
+        error_feedback = self._feedback.error_feedback
         overrides = {
             container: as_strategy_kwargs[container]
             for container in LOCATION_TO_CONTAINER.values()
@@ -166,10 +169,12 @@ class ExamplesGenerator:
         *,
         operation: APIOperation,
         as_strategy_kwargs: dict[str, Any],
+        feedback: FeedbackSources,
         fill_missing: bool,
     ) -> None:
         self._operation = operation
         self._as_strategy_kwargs = as_strategy_kwargs
+        self._feedback = feedback
         self._fill_missing = fill_missing
         self._controller = Controller()
         _capture_missing_path_parameters(operation, self._controller)
@@ -189,6 +194,8 @@ class ExamplesGenerator:
                 generate_one(strategy)
                 for strategy in operation.get_strategies_from_examples(
                     fill_missing_from_pool=self._fill_missing,
+                    extra_data_source=self._feedback.extra_data_source,
+                    error_feedback=self._feedback.error_feedback,
                     **self._as_strategy_kwargs,
                 )
             ]

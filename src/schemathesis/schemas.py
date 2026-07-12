@@ -791,7 +791,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     def get_bodies_for_media_type(self, media_type: str) -> Iterator[P]:
         main_target, sub_target = media_types.parse(media_type)
         for body in self.body:
-            main, sub = media_types.parse(body.media_type)  # type:ignore[attr-defined]
+            main, sub = media_types.parse(body.media_type)
             if main in ("*", main_target) and sub in ("*", sub_target):
                 yield body
 

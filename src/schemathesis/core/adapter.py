@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from schemathesis.core.parameters import ParameterLocation
+
+if TYPE_CHECKING:
+    from schemathesis.core.jsonschema.types import JsonSchemaObject
 
 T = TypeVar("T", covariant=True)
 
@@ -15,8 +18,15 @@ class ResponsesContainer(Protocol[T]):
 class OperationParameter(Protocol):
     """API parameter at a specific location (query, header, body, etc.)."""
 
-    definition: Any
-    """Raw parameter definition from the API spec."""
+    @property
+    def definition(self) -> JsonSchemaObject:
+        """Raw parameter definition from the API spec."""
+        ...  # pragma: no cover
+
+    @property
+    def media_type(self) -> str | None:
+        """Media type for body parameters; `None` for parameters at other locations."""
+        ...  # pragma: no cover
 
     @property
     def location(self) -> ParameterLocation:
