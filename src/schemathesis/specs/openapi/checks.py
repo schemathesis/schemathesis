@@ -369,8 +369,8 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
             continue
 
         # Get the container (query, headers, cookies)
-        value = getattr(case, location.container_name)
-        if value is None:
+        value = case.get_container(location)
+        if not isinstance(value, Mapping):
             continue
 
         # Get the parameter definitions
@@ -469,8 +469,8 @@ def _string_type_mutation_becomes_valid_after_serialization(case: Case, location
         return False
 
     container_name = location.container_name
-    case_container = getattr(case, container_name)
-    if not case_container:
+    case_container = case.get_container(location)
+    if not isinstance(case_container, Mapping) or not case_container:
         return False
 
     operation_container = getattr(case.operation, container_name)
@@ -593,8 +593,8 @@ def _non_body_negative_values_match_schema(case: Case) -> bool:
         if component is None or not component.mode.is_negative:
             continue
 
-        value = getattr(case, location.container_name)
-        if value is None:
+        value = case.get_container(location)
+        if not isinstance(value, Mapping):
             continue
 
         has_negative = True
@@ -841,8 +841,8 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
     for location in (ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE):
         meta_for_location = meta.components.get(location)
-        value = getattr(case, location.container_name)
-        if value is not None and meta_for_location is not None and meta_for_location.mode.is_negative:
+        value = case.get_container(location)
+        if isinstance(value, Mapping) and meta_for_location is not None and meta_for_location.mode.is_negative:
             container = getattr(case.operation, location.container_name)
             schema = container.schema
 

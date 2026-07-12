@@ -219,12 +219,27 @@ class Case(Generic[OperationT]):
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
+    def get_container(self, location: ParameterLocation) -> dict[str, Any] | CaseInsensitiveDict | Body | None:
+        """Return the value container for a parameter location; `None` for unknown locations."""
+        # Hand-rolled chain — queried per parameter in hot check / generation paths.
+        if location == ParameterLocation.QUERY:
+            return self.query
+        if location == ParameterLocation.HEADER:
+            return self.headers
+        if location == ParameterLocation.PATH:
+            return self.path_parameters
+        if location == ParameterLocation.COOKIE:
+            return self.cookies
+        if location == ParameterLocation.BODY:
+            return self.body
+        return None
+
     def _init_hashes(self) -> None:
         """Initialize hash tracking in metadata for generated components only."""
         assert self._meta is not None
         # Only track components that were actually generated
         for location in self._meta.components.keys():
-            value = getattr(self, location.container_name)
+            value = self.get_container(location)
             hash_value = self._hash_container(value)
             self._meta.update_validated_hash(location, hash_value)
             # Snapshot the wire-form hash so revalidation can tell whether the
@@ -243,7 +258,7 @@ class Case(Generic[OperationT]):
         # Only check components that were actually generated
         for location in self._meta.components.keys():
             last_hash = self._meta._last_validated_hashes[location]
-            value = getattr(self, location.container_name)
+            value = self.get_container(location)
             current_hash = self._hash_container(value)
 
             if current_hash != last_hash:
@@ -374,7 +389,7 @@ class Case(Generic[OperationT]):
         # only to edits a `before_call` hook makes, not to auth/overrides applied earlier in place.
         if self._meta is not None:
             for location in self._meta.components:
-                self._meta.update_validated_hash(location, self._hash_container(getattr(self, location.container_name)))
+                self._meta.update_validated_hash(location, self._hash_container(self.get_container(location)))
         dispatch_before_call(GLOBAL_HOOK_DISPATCHER, context=hook_context, case=self, kwargs=kwargs)
 
         # Detect in-place container edits the hook made, then revalidate before freezing so
