@@ -485,7 +485,7 @@ def build_parameter_example_aware_strategy(
 
 @dataclass
 class OpenApiComponent(ABC):
-    definition: Mapping[str, Any]
+    definition: JsonSchemaObject
     is_required: bool
     name_to_uri: dict[str, str]
     adapter: SpecificationAdapter
@@ -691,10 +691,15 @@ class OpenApiParameter(OpenApiComponent):
 
     @classmethod
     def from_definition(
-        cls, *, definition: Mapping[str, Any], name_to_uri: dict[str, str], adapter: SpecificationAdapter
+        cls, *, definition: JsonSchemaObject, name_to_uri: dict[str, str], adapter: SpecificationAdapter
     ) -> OpenApiParameter:
         is_required = definition.get("required", False)
         return cls(definition=definition, is_required=is_required, name_to_uri=name_to_uri, adapter=adapter)
+
+    @property
+    def media_type(self) -> None:
+        """Non-body parameters have no media type."""
+        return None
 
     @property
     def name(self) -> str:
@@ -752,7 +757,7 @@ class OpenApiBody(OpenApiComponent):
     def from_definition(
         cls,
         *,
-        definition: Mapping[str, Any],
+        definition: JsonSchemaObject,
         is_required: bool,
         media_type: str,
         resource_name: str | None,
@@ -772,7 +777,7 @@ class OpenApiBody(OpenApiComponent):
     def from_form_parameters(
         cls,
         *,
-        definition: Mapping[str, Any],
+        definition: JsonSchemaObject,
         media_type: str,
         name_to_uri: dict[str, str],
         adapter: SpecificationAdapter,

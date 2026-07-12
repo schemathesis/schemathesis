@@ -354,7 +354,7 @@ class OperationLoader:
                 ):
                     continue
                 operation.add_parameter(
-                    OpenApiParameter.from_definition(definition=param, name_to_uri={}, adapter=schema.adapter)
+                    OpenApiParameter.from_definition(definition=dict(param), name_to_uri={}, adapter=schema.adapter)
                 )
         dispatch_before_init_operation(schema, HookContext(operation=operation), operation)
         return operation

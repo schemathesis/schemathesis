@@ -26,6 +26,7 @@ from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocatio
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.drivers import CoverageGenerator
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import (
     HypothesisTestConfig,
     HypothesisTestMode,
@@ -327,6 +328,7 @@ def _generate_cases(operation, generation_mode, *, project_config=None, generati
             generation_modes=[generation_mode],
             auth_storage=None,
             as_strategy_kwargs={},
+            feedback=FeedbackSources(),
             generation_config=generation_config,
         )
     )

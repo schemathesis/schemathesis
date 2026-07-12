@@ -36,6 +36,7 @@ from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import overrides
 from schemathesis.generation.drivers import CoverageGenerator, ExamplesGenerator
+from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
@@ -48,7 +49,7 @@ WORKER_TIMEOUT = 0.1
 
 
 def _build_coverage_generator(
-    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any]
+    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any], feedback: FeedbackSources
 ) -> CoverageGenerator:
     generation = ctx.config.generation_for(operation=operation)
     return CoverageGenerator(
@@ -57,16 +58,18 @@ def _build_coverage_generator(
         generation_config=generation,
         auth_storage=as_strategy_kwargs.get("auth_storage"),
         as_strategy_kwargs=as_strategy_kwargs,
+        feedback=feedback,
     )
 
 
 def _build_examples_generator(
-    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any]
+    operation: APIOperation, ctx: EngineContext, as_strategy_kwargs: dict[str, Any], feedback: FeedbackSources
 ) -> ExamplesGenerator:
     phases_config = ctx.config.phases_for(operation=operation)
     return ExamplesGenerator(
         operation=operation,
         as_strategy_kwargs=as_strategy_kwargs,
+        feedback=feedback,
         fill_missing=phases_config.examples.fill_missing,
     )
 
@@ -250,10 +253,11 @@ def worker_task(
                         )
                         continue
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation, phase=phase)
+                    feedback = build_feedback_sources(ctx, operation=operation, phase=phase)
                     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
 
                     if phase == PhaseName.COVERAGE:
-                        generator = _build_coverage_generator(operation, ctx, as_strategy_kwargs)
+                        generator = _build_coverage_generator(operation, ctx, as_strategy_kwargs, feedback)
                         events_queue.put(scenario_started)
                         for event in run_driver(
                             generator=generator,
@@ -264,7 +268,7 @@ def worker_task(
                         ):
                             events_queue.put(event)
                     elif phase == PhaseName.EXAMPLES:
-                        examples_generator = _build_examples_generator(operation, ctx, as_strategy_kwargs)
+                        examples_generator = _build_examples_generator(operation, ctx, as_strategy_kwargs, feedback)
                         events_queue.put(scenario_started)
                         for event in run_driver(
                             generator=examples_generator,
@@ -285,6 +289,7 @@ def worker_task(
                                     seed=ctx.config.seed,
                                     project=ctx.config,
                                     as_strategy_kwargs=as_strategy_kwargs,
+                                    feedback=feedback,
                                 ),
                             )
                         except (InvalidSchema, InvalidArgument, AuthenticationError, ValidationError) as exc:
@@ -324,13 +329,14 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
     if headers:
         kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
 
-    # If extra data sources are enabled, pass them to augment data generation
+    return kwargs
+
+
+def build_feedback_sources(ctx: EngineContext, *, operation: APIOperation, phase: PhaseName) -> FeedbackSources:
+    extra_data_source = None
+    # Extra data sources augment generation only when enabled for this phase.
     phase_config = ctx.config.phases_for(operation=operation).get_by_name(name=phase.name)
     if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)):
         if phase_config.extra_data_sources.is_enabled and ctx.extra_data_source is not None:
-            kwargs["extra_data_source"] = ctx.extra_data_source
-
-    if ctx.error_feedback is not None:
-        kwargs["error_feedback"] = ctx.error_feedback
-
-    return kwargs
+            extra_data_source = ctx.extra_data_source
+    return FeedbackSources(extra_data_source=extra_data_source, error_feedback=ctx.error_feedback)
