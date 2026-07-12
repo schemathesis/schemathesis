@@ -20,14 +20,14 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Start containers
         run: docker compose up -d --build
         working-directory: "./examples/booking"
 
       # Runs positive Schemathesis tests
-      - uses: schemathesis/action@v3
+      - uses: schemathesis/action@806cace2053cbbac93188e1281ff7da415643160 # v3.0.0
         continue-on-error: true
         with:
           # A local API schema location
