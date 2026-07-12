@@ -38,7 +38,7 @@ class Override:
     def from_components(cls, components: dict[ParameterLocation, StoredValue], case: Case) -> Override:
         return Override(
             **{
-                kind.container_name: get_component_diff(stored=stored, current=getattr(case, kind.container_name))
+                kind.container_name: get_component_diff(stored=stored, current=case.get_container(kind))
                 for kind, stored in components.items()
             }
         )
@@ -110,7 +110,7 @@ def store_components(case: Case) -> dict[ParameterLocation, StoredValue]:
     """Store original component states for a test case."""
     return {
         kind: StoredValue(
-            value=store_original_state(getattr(case, kind.container_name)),
+            value=store_original_state(case.get_container(kind)),
             is_generated=bool(case._meta and kind in case._meta.components),
         )
         for kind in [

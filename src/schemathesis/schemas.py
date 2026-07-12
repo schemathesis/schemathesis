@@ -571,7 +571,7 @@ class BaseSchema(Mapping):
         self,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
-    ) -> SearchStrategy:
+    ) -> SearchStrategy[Case]:
         """Create a Hypothesis strategy that generates test cases for all schema operations.
 
         Use with `@given` in non-Schemathesis tests.
@@ -617,7 +617,7 @@ class APIOperationMap(Mapping):
         self,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
-    ) -> SearchStrategy:
+    ) -> SearchStrategy[Case]:
         """Create a Hypothesis strategy that generates test cases for all schema operations in this subset.
 
         Use with `@given` in non-Schemathesis tests.

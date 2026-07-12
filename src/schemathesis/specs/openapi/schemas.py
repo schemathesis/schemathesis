@@ -231,7 +231,7 @@ class OpenApiSchema(BaseSchema):
             return
         validator_cls = self.adapter.jsonschema_validator_cls
         for location in list(meta._dirty):
-            value = getattr(case, location.container_name)
+            value = case.get_container(location)
             current_hash = case._hash_container(value)
             raw = meta.raw_containers.get(location)
             # When the container still equals its generated form, validate the typed
