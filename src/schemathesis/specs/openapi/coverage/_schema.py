@@ -485,6 +485,8 @@ class CoverageContext:
             if cache_key is not None:
                 schema_generation_cache[cache_key] = UNSATISFIABLE_RESULT
             raise
+        if isinstance(value, list) and isinstance(schema, dict) and "contains" in schema:
+            value = _ensure_min_contains(self, value, schema)
         if cache_key is not None:
             schema_generation_cache[cache_key] = deepclone(value) if isinstance(value, (dict, list)) else value
         return value
@@ -888,6 +890,29 @@ def _generate_template_with_deflation_fallback(
         properties = template_schema.get("properties", {}) if isinstance(template_schema, dict) else {}
         deflated = {**template_schema, "required": [k for k in original_required if k in properties]}
         return ctx.generate_from_schema(deflated)
+
+
+def _ensure_min_contains(ctx: CoverageContext, value: list, schema: JsonSchemaObject) -> list:
+    # Generation satisfies `contains` (>= 1 match) but not `minContains`; raise the match
+    # count to the minimum by overwriting non-matching items, then appending if there is room.
+    min_contains = schema.get("minContains", 1)
+    if min_contains <= 1:
+        return value
+    contains = schema["contains"]
+    matching = sum(1 for item in value if is_valid(item, contains))
+    if matching >= min_contains:
+        return value
+    max_items = schema.get("maxItems")
+    result = list(value)
+    non_matching = [index for index, item in enumerate(result) if not is_valid(item, contains)]
+    while matching < min_contains and (non_matching or max_items is None or len(result) < max_items):
+        candidate = ctx.generate_from_schema(contains)
+        if non_matching:
+            result[non_matching.pop()] = candidate
+        else:
+            result.append(candidate)
+        matching += 1
+    return result
 
 
 def _cover_positive_for_type(
@@ -2235,6 +2260,11 @@ def _positive_array(
     # Boundary and near-boundary sizes
     min_items = schema.get("minItems")
     max_items = schema.get("maxItems")
+    # `minContains` matching items must fit, so the array can never be shorter than it.
+    if "contains" in schema:
+        min_contains = schema.get("minContains", 1)
+        if min_contains > 1:
+            min_items = max(min_items or 0, min_contains)
     if min_items is not None:
         # Do not generate an array with `minItems` length, because it is already covered by `template`
         # One item more than minimum if possible

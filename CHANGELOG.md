@@ -10,6 +10,7 @@
 
 ### :bug: Fixed
 
+- False positive `positive_data_acceptance` for arrays with `minContains` in the coverage phase.
 - Internal error on responses declaring an unknown or invalid charset.
 
 ## [4.22.4](https://github.com/schemathesis/schemathesis/compare/v4.22.3...v4.22.4) - 2026-07-08
