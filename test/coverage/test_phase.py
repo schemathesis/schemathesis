@@ -848,6 +848,41 @@ def test_default_wrong_type_is_not_used(ctx):
     )
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"type": "array", "contains": {"type": "integer"}, "minContains": 5},
+        {"type": "array", "minItems": 1, "contains": {"type": "integer"}, "minContains": 3},
+        {
+            "type": "array",
+            "items": {"type": ["integer", "string"]},
+            "minItems": 6,
+            "maxItems": 6,
+            "contains": {"type": "integer"},
+            "minContains": 4,
+        },
+        {
+            "type": "array",
+            "items": {"type": "integer"},
+            "minItems": 3,
+            "contains": {"type": "integer"},
+            "minContains": 2,
+        },
+        {"type": "array", "contains": {"type": "integer"}},
+    ],
+    ids=[
+        "no-min-items",
+        "min-items-below-min-contains",
+        "at-max-items",
+        "already-satisfied",
+        "no-min-contains",
+    ],
+)
+def test_positive_arrays_honor_contains(ctx, body):
+    # A positive array must carry at least `minContains` items matching `contains`.
+    collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
+
+
 def test_mixed_type_keyword(ctx):
     schema = build_schema(
         ctx,
