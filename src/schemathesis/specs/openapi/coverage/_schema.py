@@ -232,6 +232,29 @@ def _generate_additional_property_key(existing_keys: set[str]) -> str:
     return key
 
 
+_UNEXPECTED_PROPERTY_KEYS = (UNKNOWN_PROPERTY_KEY, "schemathesis-unknown-property", "unknown-property-0")
+
+
+def _pattern_property_regexes(schema: dict) -> list[re.Pattern[str]]:
+    regexes: list[re.Pattern[str]] = []
+    for pattern in schema.get("patternProperties", {}):
+        try:
+            regexes.append(re.compile(pattern))
+        except re.error:
+            continue
+    return regexes
+
+
+def _unexpected_property_key(schema: dict, existing_keys: set[str]) -> str | None:
+    # An additional property must match neither a declared name nor any `patternProperties`
+    # pattern, otherwise it stays valid under `additionalProperties: false`.
+    patterns = _pattern_property_regexes(schema)
+    for candidate in _UNEXPECTED_PROPERTY_KEYS:
+        if candidate not in existing_keys and not any(pattern.search(candidate) for pattern in patterns):
+            return candidate
+    return None
+
+
 def _supports_format_generation(format: str, custom_formats: dict[str, st.SearchStrategy]) -> bool:
     return format in BUILT_IN_STRING_FORMATS or format in custom_formats
 
@@ -1152,24 +1175,29 @@ def _ignore_unfixable(
 
 
 def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageContext) -> str | None:
-    """Return a key valid under propertyNames, or fall back to a synthetic key.
+    """Return an additional-property key: propertyNames-valid, matching no patternProperties, or None."""
+    patterns = _pattern_property_regexes(schema)
 
-    Returns None if a conforming key can't be found or propertyNames forbids all keys.
-    """
+    def is_additional(key: object) -> bool:
+        # A patternProperties match is validated against that pattern's schema, not
+        # `additionalProperties`, so such a key can't carry an additionalProperties violation.
+        return isinstance(key, str) and key not in existing_keys and not any(p.search(key) for p in patterns)
+
     property_names = schema.get("propertyNames")
     if property_names is False:
         # No property name can satisfy `false` — adding any key would be invalid.
         return None
     if isinstance(property_names, dict):
         try:
-            key = ctx.generate_from_schema(property_names)
             # Degenerate schemas (e.g. `{}`) may yield non-strings; skip rather than corrupt.
-            if isinstance(key, str) and key not in existing_keys:
-                return key
-            return None
+            key = ctx.generate_from_schema(property_names)
         except Exception:
             return None
-    return _generate_additional_property_key(existing_keys)
+        return key if is_additional(key) else None
+    fallback = _generate_additional_property_key(existing_keys)
+    if is_additional(fallback):
+        return fallback
+    return next((candidate for candidate in _UNEXPECTED_PROPERTY_KEYS[1:] if is_additional(candidate)), None)
 
 
 def cover_schema_iter(
@@ -1516,8 +1544,13 @@ def cover_schema_iter(
                         template = template or _generate_template_with_deflation_fallback(
                             ctx, schema, _get_template_schema(schema, "object", ctx)
                         )
+                        unexpected_key = _unexpected_property_key(
+                            schema, set(template) | set(schema.get("properties", {}))
+                        )
+                        if unexpected_key is None:
+                            continue
                         yield NegativeValue(
-                            {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
+                            {**template, unexpected_key: UNKNOWN_PROPERTY_VALUE},
                             scenario=CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES,
                             description="Object with unexpected properties",
                             location=ctx.current_path,

@@ -3521,6 +3521,39 @@ def test_additional_properties_with_schema_negative(ctx):
     )
 
 
+def test_negative_unexpected_property_avoids_pattern_properties(ctx):
+    # The injected unexpected key must not match `patternProperties`, else the negative body stays valid.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "patternProperties": {"^x-": {"type": "integer"}},
+            "additionalProperties": False,
+            "properties": {"x-a": {"type": "integer"}},
+            "required": ["x-a"],
+        },
+        positive=False,
+        version="3.1.0",
+    )
+
+
+def test_negative_additional_property_value_avoids_pattern_properties(ctx):
+    # A negative additionalProperties value must land on a key the patternProperties don't validate,
+    # else it is checked against the pattern schema and may stay valid.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "patternProperties": {"^x-": {"type": "integer"}},
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+        },
+        positive=False,
+        version="3.1.0",
+    )
+
+
 def test_negative_type_drops_false_negatives_against_loose_ref_target(ctx):
     # Property's schema is `$ref` + sibling `type: object`. Draft 4 ignores siblings of `$ref`,
     # so the validator only enforces the bare ref target — which has no `type`. Type-mutations
