@@ -2310,6 +2310,8 @@ def _positive_array(
         and "enum" in schema["items"]
         and isinstance(schema["items"]["enum"], list)
         and max_items != 0
+        # These synthesized arrays ignore `contains`; the repaired template covers those schemas.
+        and "contains" not in schema
     ):
         # Ensure there is enough items to pass `minItems` if it is specified
         length = min_items or 1
@@ -2339,6 +2341,7 @@ def _positive_array(
         and isinstance(schema["items"], dict)
         and (min_items is None or min_items <= 1)
         and (max_items is None or max_items >= 1)
+        and "contains" not in schema
     ):
         # Single-item arrays exercise each items-schema branch individually.
         # `maxItems`-sized boundary arrays (above) repeat one shape and miss multi-branch coverage.

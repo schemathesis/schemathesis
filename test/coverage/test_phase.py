@@ -878,6 +878,15 @@ def test_default_wrong_type_is_not_used(ctx):
             "maxContains": 2,
         },
         {"type": "array", "minItems": 5, "maxItems": 5, "contains": {"type": "integer"}, "maxContains": 2},
+        {
+            "type": "array",
+            "items": {"enum": [1, 2, "a", "b"]},
+            "minItems": 4,
+            "maxItems": 4,
+            "contains": {"type": "integer"},
+            "maxContains": 1,
+        },
+        {"type": "array", "items": {"type": "string"}, "contains": {"const": "contains-marker"}},
     ],
     ids=[
         "no-min-items",
@@ -887,6 +896,8 @@ def test_default_wrong_type_is_not_used(ctx):
         "no-min-contains",
         "max-contains-mixed",
         "max-contains-no-items",
+        "enum-items",
+        "single-item-branch",
     ],
 )
 def test_positive_arrays_honor_contains(ctx, body):
