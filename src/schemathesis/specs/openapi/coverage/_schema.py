@@ -486,7 +486,7 @@ class CoverageContext:
                 schema_generation_cache[cache_key] = UNSATISFIABLE_RESULT
             raise
         if isinstance(value, list) and isinstance(schema, dict) and "contains" in schema:
-            value = _ensure_min_contains(self, value, schema)
+            value = _ensure_contains_bounds(self, value, schema)
         if cache_key is not None:
             schema_generation_cache[cache_key] = deepclone(value) if isinstance(value, (dict, list)) else value
         return value
@@ -892,26 +892,31 @@ def _generate_template_with_deflation_fallback(
         return ctx.generate_from_schema(deflated)
 
 
-def _ensure_min_contains(ctx: CoverageContext, value: list, schema: JsonSchemaObject) -> list:
-    # Generation satisfies `contains` (>= 1 match) but not `minContains`; raise the match
-    # count to the minimum by overwriting non-matching items, then appending if there is room.
-    min_contains = schema.get("minContains", 1)
-    if min_contains <= 1:
-        return value
+def _ensure_contains_bounds(ctx: CoverageContext, value: list, schema: JsonSchemaObject) -> list:
+    # Generation honors `contains` (>= 1 match) but not `minContains`/`maxContains`; bring the
+    # match count within bounds by adding matches or replacing surplus ones with non-matching items.
     contains = schema["contains"]
-    matching = sum(1 for item in value if is_valid(item, contains))
-    if matching >= min_contains:
-        return value
-    max_items = schema.get("maxItems")
+    min_contains = schema.get("minContains", 1)
+    max_contains = schema.get("maxContains")
+    matching = [index for index, item in enumerate(value) if is_valid(item, contains)]
     result = list(value)
-    non_matching = [index for index, item in enumerate(result) if not is_valid(item, contains)]
-    while matching < min_contains and (non_matching or max_items is None or len(result) < max_items):
-        candidate = ctx.generate_from_schema(contains)
-        if non_matching:
-            result[non_matching.pop()] = candidate
-        else:
-            result.append(candidate)
-        matching += 1
+    if len(matching) < min_contains:
+        max_items = schema.get("maxItems")
+        non_matching = [index for index, item in enumerate(result) if not is_valid(item, contains)]
+        while len(matching) < min_contains and (non_matching or max_items is None or len(result) < max_items):
+            candidate = ctx.generate_from_schema(contains)
+            if non_matching:
+                index = non_matching.pop()
+                result[index] = candidate
+            else:
+                result.append(candidate)
+                index = len(result) - 1
+            matching.append(index)
+    elif max_contains is not None and len(matching) > max_contains:
+        items = schema.get("items")
+        filler = {"allOf": [items, {"not": contains}]} if isinstance(items, dict) else {"not": contains}
+        for index in matching[max_contains:]:
+            result[index] = ctx.generate_from_schema(filler)
     return result
 
 
