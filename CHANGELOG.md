@@ -15,6 +15,10 @@
 - False positive `negative_data_rejection` for objects combining `additionalProperties` with matching `patternProperties`.
 - Internal error on responses declaring an unknown or invalid charset.
 
+### :rocket: Performance
+
+- Cache for GraphQL schema processing.
+
 ## [4.22.4](https://github.com/schemathesis/schemathesis/compare/v4.22.3...v4.22.4) - 2026-07-08
 
 ### :bug: Fixed
