@@ -905,6 +905,35 @@ def test_positive_arrays_honor_contains(ctx, body):
     collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        {
+            "type": "object",
+            "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
+            "required": ["a"],
+            "dependentRequired": {"a": ["b"]},
+        },
+        {
+            "type": "object",
+            "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
+            "required": ["a"],
+            "dependencies": {"a": ["b"]},
+        },
+        {
+            "type": "object",
+            "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
+            "required": ["a"],
+            "dependentSchemas": {"a": {"required": ["b"]}},
+        },
+    ],
+    ids=["dependent-required", "dependencies", "dependent-schemas"],
+)
+def test_positive_objects_honor_dependencies(ctx, body):
+    # A present property that triggers a dependency must not be emitted without its dependents.
+    collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
+
+
 def test_mixed_type_keyword(ctx):
     schema = build_schema(
         ctx,
