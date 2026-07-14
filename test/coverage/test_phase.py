@@ -869,6 +869,15 @@ def test_default_wrong_type_is_not_used(ctx):
             "minContains": 2,
         },
         {"type": "array", "contains": {"type": "integer"}},
+        {
+            "type": "array",
+            "items": {"type": ["integer", "string"]},
+            "minItems": 6,
+            "maxItems": 6,
+            "contains": {"type": "integer"},
+            "maxContains": 2,
+        },
+        {"type": "array", "minItems": 5, "maxItems": 5, "contains": {"type": "integer"}, "maxContains": 2},
     ],
     ids=[
         "no-min-items",
@@ -876,10 +885,12 @@ def test_default_wrong_type_is_not_used(ctx):
         "at-max-items",
         "already-satisfied",
         "no-min-contains",
+        "max-contains-mixed",
+        "max-contains-no-items",
     ],
 )
 def test_positive_arrays_honor_contains(ctx, body):
-    # A positive array must carry at least `minContains` items matching `contains`.
+    # A positive array must keep its `contains` match count within `minContains`/`maxContains`.
     collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
 
 
