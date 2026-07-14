@@ -2359,6 +2359,17 @@ def _positive_array(
 def _positive_object(
     ctx: CoverageContext, schema: JsonSchemaObject, template: dict
 ) -> Generator[GeneratedValue, None, None]:
+    # Synthesized property combinations ignore `dependentRequired`/`dependencies`/`dependentSchemas`;
+    # drop any candidate the full schema rejects.
+    enforce_dependencies = any(key in schema for key in ("dependentRequired", "dependencies", "dependentSchemas"))
+    for generated in _iter_positive_object(ctx, schema, template):
+        if not enforce_dependencies or is_valid(generated.value, schema):
+            yield generated
+
+
+def _iter_positive_object(
+    ctx: CoverageContext, schema: JsonSchemaObject, template: dict
+) -> Generator[GeneratedValue, None, None]:
     example = schema.get("example", NOT_SET)
     examples = schema.get("examples")
     default = schema.get("default", NOT_SET)
