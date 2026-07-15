@@ -1165,8 +1165,8 @@ def test_negative_data_rejection_enum_path_params_no_false_positive(ctx, cli, ap
             id_int = int(id)
         except ValueError:
             return jsonify({"error": "id must be an integer"}), 400
-        if id_int < 0:
-            return jsonify({"error": "id must be >= 0"}), 400
+        if not (0 <= id_int <= 2**63 - 1):
+            return jsonify({"error": "id out of range"}), 400
         return jsonify({"ok": True}), 200
 
     cli.run_and_assert(
