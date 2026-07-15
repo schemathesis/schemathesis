@@ -19,6 +19,10 @@ class FrameworkAdapter(Protocol):
         """Route handler callables to scan for constants."""
         ...  # pragma: no cover
 
+    def modules(self, app: object) -> Iterable[str]:
+        """Module names to scan in addition to the handler modules."""
+        ...  # pragma: no cover
+
 
 def select_adapter(app: object, *, adapters: Iterable[FrameworkAdapter]) -> FrameworkAdapter | None:
     """First adapter whose `matches(app)` returns True; None if none do."""

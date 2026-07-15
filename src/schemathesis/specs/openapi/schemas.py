@@ -264,13 +264,13 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def as_state_machine(self) -> type[APIStateMachine]:
-        from schemathesis.python._constants.orchestrator import make_registered_constants_value_source
+        from schemathesis.python._constants.orchestrator import make_constants_value_source
 
         return self._build_state_machine(
             error_feedback=None,
             link_calibration=None,
             extra_data_source=None,
-            constants_value_source=make_registered_constants_value_source(),
+            constants_value_source=make_constants_value_source(self),
         )
 
     @override

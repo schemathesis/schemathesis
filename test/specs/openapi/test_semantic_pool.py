@@ -8,6 +8,7 @@ from flask import Response, jsonify, request
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+from schemathesis.config import GenerationConfig
 from schemathesis.core import transport
 from schemathesis.core.deserialization import register_deserializer
 from schemathesis.generation.modes import GenerationMode
@@ -2424,6 +2425,7 @@ def test_semantic_overlay_drops_overwritten_constant_provenance():
         schema_properties={"code": {"type": "string"}},
         validator_cls=jsonschema_rs.Draft202012Validator,
         location="body",
+        generation_config=GenerationConfig(),
         probability=1.0,
     )
     index = SemanticValueIndex()

@@ -17,7 +17,7 @@ from schemathesis.engine.observations import Observations
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
-from schemathesis.python._constants.orchestrator import extract_registered
+from schemathesis.python._constants.orchestrator import build_constants_pool
 from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.schemas import APIOperation
 
@@ -202,8 +202,8 @@ class EngineContext:
     # Per-run class-based check instances, shared across worker threads.
     checks: LazyInit[RunChecks] = LazyInit(lambda ctx: RunChecks.from_registry(config=ctx.config.checks_config_for()))
 
-    # Extracted constants from user-defined sources; lazily computed once per run.
-    constants_extraction: LazyInit[ConstantsPool] = LazyInit(lambda ctx: extract_registered())
+    # Extracted constants from user-defined sources and the loaded app; lazily computed once per run.
+    constants_extraction: LazyInit[ConstantsPool] = LazyInit(lambda ctx: build_constants_pool(ctx.schema))
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:

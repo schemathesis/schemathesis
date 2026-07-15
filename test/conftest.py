@@ -18,6 +18,8 @@ from werkzeug import Request
 from werkzeug.datastructures import Headers
 from werkzeug.test import TestResponse
 
+# Import eagerly: `pytester` drops lazily-imported modules, and the re-created class breaks `isinstance`.
+import schemathesis.generation.value  # noqa: F401
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
 from schemathesis.core.transport import Response

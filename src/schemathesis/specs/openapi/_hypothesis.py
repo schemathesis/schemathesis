@@ -666,6 +666,7 @@ def _build_form_strategy_with_encoding(
                     schema_properties={property_name: subschema},
                     validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                     location="body",
+                    generation_config=generation_config,
                 ).map(lambda value, key=property_name: _form_property_value(value, key))
             property_strategies[property_name] = strategy
 

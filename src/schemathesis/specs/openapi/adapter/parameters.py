@@ -228,6 +228,38 @@ def build_semantic_overlay(
     return overlaid()
 
 
+def _without_security_parameters(
+    schema_properties: dict, operation: OpenApiOperation, location: ParameterLocation
+) -> dict:
+    """Drop auth-carrying properties: a harvested credential would make generated auth valid."""
+    from schemathesis.specs.openapi._auth_retry import get_security_parameters
+
+    names = {
+        parameter["name"] for parameter in get_security_parameters(operation) if parameter.get("in") == location.value
+    }
+    if not names:
+        return schema_properties
+    return {name: schema for name, schema in schema_properties.items() if name not in names}
+
+
+def _is_generatable_constant(value: ConstantValue, generation_config: GenerationConfig, *, header_like: bool) -> bool:
+    """Whether a harvested literal is a value generation was allowed to produce in the first place."""
+    if not isinstance(value, str):
+        return True
+    if not generation_config.allow_x00 and "\x00" in value:
+        return False
+    excluded = generation_config.exclude_header_characters
+    if header_like and excluded and any(char in value for char in excluded):
+        return False
+    codec = generation_config.codec
+    if codec is not None:
+        try:
+            value.encode(codec)
+        except UnicodeEncodeError:
+            return False
+    return True
+
+
 def build_constants_overlay_strategy(
     inner: st.SearchStrategy,
     *,
@@ -235,6 +267,7 @@ def build_constants_overlay_strategy(
     schema_properties: dict,
     validator_cls: type,
     location: str,
+    generation_config: GenerationConfig,
     container_schema: dict | None = None,
     probability: float = CONSTANTS_OVERLAY_PROBABILITY,
 ) -> st.SearchStrategy:
@@ -271,6 +304,8 @@ def build_constants_overlay_strategy(
             if source.has_values_for(key):
                 for entry in source.entries_for(key):
                     value = Binary(entry.value) if isinstance(entry.value, bytes) else entry.value
+                    if not _is_generatable_constant(value, generation_config, header_like=header_like):
+                        continue
                     pool_values.append((value, entry.origins[0] if entry.origins else None))
         if not pool_values:
             continue
@@ -1281,6 +1316,7 @@ class OpenApiBody(OpenApiComponent):
                 schema_properties=body_schema_properties,
                 validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                 location="body",
+                generation_config=generation_config,
                 container_schema=schema if isinstance(schema, dict) else None,
             )
 
@@ -1980,9 +2016,10 @@ class OpenApiParameterSet(ParameterSet):
                 strategy = build_constants_overlay_strategy(
                     strategy,
                     source=constants_value_source,
-                    schema_properties=schema_properties,
+                    schema_properties=_without_security_parameters(schema_properties, operation, self.location),
                     validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                     location=self.location.value,
+                    generation_config=generation_config,
                     container_schema=schema_obj if isinstance(schema_obj, dict) else None,
                 )
 

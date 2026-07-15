@@ -1370,6 +1370,26 @@ The following settings control how Schemathesis generates test data for your API
     unique-inputs = true
     ```
 
+### Application Analysis
+
+Settings that control how Schemathesis inspects the application under test to improve generation. Analysis runs once per run at the project level and is not configurable per operation.
+
+#### `analysis.constants.enabled`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+    Reuse literal values from the application's Python source as candidate test data. When an app is loaded with `openapi.from_asgi`/`from_wsgi` (or a source is registered with `@schemathesis.python.constants`), the request handlers' source is read and the literals found there - identifiers, codes, enum members - are offered to generation, so free-form parameters occasionally receive a value the application recognizes.
+
+    Set to `false` to disable all constant reuse for the project, including any registered sources.
+
+    ```toml
+    [analysis.constants]
+    enabled = false
+    ```
+
 ## Continuous Fuzzing
 
 Settings for `st fuzz`.

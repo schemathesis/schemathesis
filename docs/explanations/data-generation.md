@@ -12,7 +12,7 @@ What each layer contributes:
 2. **hypothesis-jsonschema / hypothesis-graphql** — translate JSON Schema / GraphQL fragments into Hypothesis strategies. Used by every phase as the schema-driven value source; the validity mode (positive, negative, mixed) is set by the calling phase.
 3. **Schemathesis** — the four-phase pipeline, HTTP transport, response checks, and a feedback loop that learns from what the server returns. See [Adaptive Testing](adaptive-testing.md).
 
-Schemathesis inherits Hypothesis's shrinking and example database; the feedback loop is what lets it learn server-side validation (OpenAPI) and reuse real values across operations.
+Schemathesis inherits Hypothesis's shrinking and example database; the feedback loop is what lets it learn server-side validation (OpenAPI) and reuse real values across operations. When a Python app is loaded via `from_asgi`/`from_wsgi`, it also reuses literals read from the application's own source as candidate inputs - see [Testing Python Apps](../guides/python-apps.md#reusing-values-from-your-source).
 
 ## Testing Phases
 

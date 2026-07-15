@@ -9,16 +9,20 @@ from types import ModuleType
 _NON_SEQUENCE_BYTES_TYPES = (bytes, bytearray, memoryview)
 
 
-def resolve_modules(inputs: Iterable[object]) -> set[str]:
-    """Module names from module objects, dotted-name strings, or iterables of either."""
+def resolve_modules(inputs: Iterable[object], *, walk: bool = True) -> set[str]:
+    """Module names from module objects, dotted-name strings, or iterables of either.
+
+    `walk` descends into packages. Only safe for names a source spells out - inferring one from an
+    app imports whatever else happens to live in that package, side effects included.
+    """
     collected: set[str] = set()
-    _resolve_into(inputs, collected)
+    _resolve_into(inputs, collected, walk)
     return collected
 
 
-def _resolve_into(value: object, out: set[str]) -> None:
+def _resolve_into(value: object, out: set[str], walk: bool) -> None:
     if isinstance(value, ModuleType):
-        _add_module(value, out)
+        _add_module(value, out, walk)
         return
     if isinstance(value, str):
         # Importing user code can raise anything, including BaseException (a module calling
@@ -30,19 +34,19 @@ def _resolve_into(value: object, out: set[str]) -> None:
             raise
         except BaseException:
             return
-        _add_module(module, out)
+        _add_module(module, out, walk)
         return
     if isinstance(value, Iterable) and not isinstance(value, _NON_SEQUENCE_BYTES_TYPES):
         for item in value:
-            _resolve_into(item, out)
+            _resolve_into(item, out, walk)
     # Non-module values (e.g. app objects) are resolved upstream by the orchestrator.
 
 
-def _add_module(module: ModuleType, out: set[str]) -> None:
+def _add_module(module: ModuleType, out: set[str], walk: bool) -> None:
     name = module.__name__
     out.add(name)
     path = getattr(module, "__path__", None)
-    if path is None:
+    if path is None or not walk:
         return
     # `walk_packages` imports subpackages to descend; one that `sys.exit()`s raises BaseException.
     try:

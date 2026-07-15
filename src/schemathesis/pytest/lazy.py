@@ -31,7 +31,7 @@ from schemathesis.generation.hypothesis.given import (
 from schemathesis.pytest._keys import track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_openapi_auth_warnings
-from schemathesis.python._constants.orchestrator import make_registered_constants_value_source
+from schemathesis.python._constants.orchestrator import make_constants_value_source
 from schemathesis.schemas import BaseSchema
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ def get_all_tests(
     given_kwargs: dict[str, GivenInput] | None,
 ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
     """Generate all operations and Hypothesis tests for them."""
-    feedback = FeedbackSources(constants_value_source=make_registered_constants_value_source())
+    feedback = FeedbackSources(constants_value_source=make_constants_value_source(schema))
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()

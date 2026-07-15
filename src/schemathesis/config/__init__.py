@@ -7,6 +7,7 @@ from os import PathLike
 from pathlib import Path
 from random import Random
 
+from schemathesis.config._analysis import AnalysisConfig, ConstantsConfig
 from schemathesis.config._auth import (
     ApiKeyAuthConfig,
     DynamicTokenAuthConfig,
@@ -58,6 +59,8 @@ __all__ = [
     "DEFAULT_REPORT_DIRECTORY",
     "CacheConfig",
     "GenerationConfig",
+    "AnalysisConfig",
+    "ConstantsConfig",
     "OutputConfig",
     "SanitizationConfig",
     "TruncationConfig",

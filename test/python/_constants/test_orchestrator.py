@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from flask import Flask, jsonify
 
 from schemathesis.python._constants import orchestrator
 from schemathesis.python._constants.adapters.flask import FlaskAdapter
@@ -80,9 +81,8 @@ def test_orchestrator_isolates_source_errors():
     assert not result.is_empty()
 
 
-def test_orchestrator_falls_back_to_app_top_level_package():
-    # Niche framework: no adapter matches. Orchestrator should walk the top-level
-    # package of `app.__module__` so constants in that package still get harvested.
+def test_orchestrator_falls_back_to_app_module():
+    # Niche framework: no adapter matches. The module defining the app still gets harvested.
     class NicheApp:
         pass
 
@@ -95,6 +95,17 @@ def test_orchestrator_falls_back_to_app_top_level_package():
         return NicheApp()
 
     assert "active" in pool_values(extract_all(registry=registry, adapters=[]), "string")
+
+
+def test_orchestrator_fallback_does_not_walk_the_apps_package():
+    # Walking the package imports modules the app never touches, firing their import side effects.
+    class NicheApp:
+        pass
+
+    NicheApp.__module__ = "test.python._constants.fixtures.dep_pkg.flask_app"
+
+    modules, _ = orchestrator._resolve_with_adapters(NicheApp(), adapters=[])
+    assert "test.python._constants.fixtures.dep_pkg.optional" not in modules
 
 
 def test_orchestrator_isolates_generator_iteration_error():
@@ -228,6 +239,29 @@ def test_orchestrator_follows_handler_module_local_imports():
 
     result = extract_all(registry=registry, adapters=[FlaskAdapter()])
     assert "zx9secreta3f9c1e7" in pool_values(result, "string")
+
+
+def test_orchestrator_does_not_walk_package_named_by_flask_import_name():
+    # Walking the app's whole package imports modules the app never touches, firing their import side effects.
+    modules, _ = orchestrator._resolve_with_adapters(
+        Flask("test.python._constants.fixtures.dep_pkg"), adapters=[FlaskAdapter()]
+    )
+    assert "test.python._constants.fixtures.dep_pkg.optional" not in modules
+
+
+def test_orchestrator_does_not_scan_installed_module_of_a_library_view():
+    # A library-provided view (GraphQL, admin) lives in site-packages; its module is not user code.
+    app = Flask("test.python._constants.fixtures.dep_pkg.flask_app")
+    app.add_url_rule("/x", "x", jsonify)
+
+    modules, _ = orchestrator._resolve_with_adapters(app, adapters=[FlaskAdapter()])
+    assert not [name for name in modules if name == "flask" or name.startswith("flask.")]
+
+
+def test_orchestrator_does_not_scan_installed_package_named_by_flask_import_name():
+    # A library-built app points `import_name` at site-packages, whose constants are third-party anyway.
+    modules, _ = orchestrator._resolve_with_adapters(Flask("hypothesis"), adapters=[FlaskAdapter()])
+    assert not [name for name in modules if name == "hypothesis" or name.startswith("hypothesis.")]
 
 
 def test_orchestrator_merges_origins_for_overlapping_sources():
