@@ -9,12 +9,13 @@ from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 
 import schemathesis
+from schemathesis.config import GenerationConfig, SchemathesisConfig
 from schemathesis.generation.body_overrides import build_body_override_overlay_strategy
 from schemathesis.generation.meta import CaseMetadata, CoverageScenario, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.python._constants.adapters import default_adapters
-from schemathesis.python._constants.orchestrator import extract_all, make_registered_constants_value_source
+from schemathesis.python._constants.orchestrator import extract_all, extract_registered
 from schemathesis.python._constants.pool import ConstantDraw, ConstantEntry, ConstantsPool, Origin
 from schemathesis.python._constants.registry import SourceRegistry, default_registry
 from schemathesis.specs.graphql.substitution import substitute_constants
@@ -170,6 +171,60 @@ def test_constant_applied_to_query_parameter():
     assert case.query["code"] == draw.value
 
 
+def test_constants_respect_allow_x00(ctx):
+    # A NUL harvested from the app's source must not reach data when the user disabled `\x00`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/unlock": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"code": {"type": "string"}},
+                                    "required": ["code"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.config.generation.update(allow_x00=False)
+    operation = schema["/unlock"]["POST"]
+    with pytest.raises(NoSuchExample):
+        find(
+            operation.as_strategy(
+                generation_mode=GenerationMode.POSITIVE, constants_value_source=_source("string", "pre\x00post")
+            ),
+            lambda case: isinstance(case.body, dict) and "\x00" in str(case.body.get("code", "")),
+            settings=_FIND,
+        )
+
+
+def test_constants_not_substituted_into_security_parameters(ctx):
+    # A harvested key makes "generated" auth valid, so `ignored_auth` reports the API accepting it.
+    schema = ctx.openapi.load_schema(
+        {"/data": {"get": {"security": [{"ApiKeyQuery": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"ApiKeyQuery": {"type": "apiKey", "in": "query", "name": "api_key"}}},
+    )
+    operation = schema["/data"]["GET"]
+    with pytest.raises(NoSuchExample):
+        find(
+            operation.as_strategy(
+                generation_mode=GenerationMode.POSITIVE, constants_value_source=_source("string", "42")
+            ),
+            lambda case: (
+                case._meta is not None and any(draw.parameter_name == "api_key" for draw in case._meta.constants_draws)
+            ),
+            settings=_FIND,
+        )
+
+
 def test_constant_applied_to_integer_path_parameter():
     pool = _app_constants(buggy_path_app.app)
     operation = schemathesis.openapi.from_dict(buggy_path_app.SCHEMA)["/item/{item_id}"]["GET"]
@@ -212,6 +267,100 @@ def test_constant_usage_recorded_in_case_metadata():
     assert draw.origin.module == "test.python._constants.fixtures.buggy_app"
 
 
+@pytest.mark.usefixtures("_clean_registry")
+def test_constants_auto_extracted_from_wsgi_app():
+    # No registered source and no explicit pool: loading a WSGI app introspects its modules by default.
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app)["/unlock"]["POST"]
+    case = find(
+        operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
+        lambda case: case._meta is not None and bool(case._meta.constants_draws),
+        settings=_FIND,
+    )
+    assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
+
+
+@pytest.mark.usefixtures("_clean_registry")
+def test_app_constants_are_cached_across_strategy_builds():
+    calls = 0
+
+    @schemathesis.python.constants
+    def source():
+        nonlocal calls
+        calls += 1
+        return graphql_string_pool
+
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app)["/unlock"]["POST"]
+
+    operation.as_strategy()
+    operation.as_strategy()
+
+    assert calls == 1
+
+
+@pytest.mark.usefixtures("_clean_registry")
+def test_app_constants_cache_survives_schema_clone():
+    # `@schema.parametrize()` clones the schema per test function; each clone must not re-import the app.
+    calls = 0
+
+    @schemathesis.python.constants
+    def source():
+        nonlocal calls
+        calls += 1
+        return graphql_string_pool
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app)
+
+    schema["/unlock"]["POST"].as_strategy()
+    schema.clone()["/unlock"]["POST"].as_strategy()
+
+    assert calls == 1
+
+
+@pytest.mark.usefixtures("_clean_registry")
+def test_app_constants_cache_is_invalidated_when_registry_changes():
+    calls = []
+
+    @schemathesis.python.constants
+    def first_source():
+        calls.append("first")
+        return graphql_string_pool
+
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app)["/unlock"]["POST"]
+    operation.as_strategy()
+
+    @schemathesis.python.constants
+    def second_source():
+        calls.append("second")
+        return graphql_string_pool
+
+    operation.as_strategy()
+
+    assert calls == ["first", "first", "second"]
+
+
+@pytest.mark.usefixtures("_clean_registry")
+def test_constants_auto_extracted_from_asgi_app():
+    operation = schemathesis.openapi.from_asgi("/openapi.json", app=buggy_asgi_app.app)["/unlock"]["POST"]
+    case = find(
+        operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
+        lambda case: case._meta is not None and bool(case._meta.constants_draws),
+        settings=_FIND,
+    )
+    assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
+
+
+@pytest.mark.usefixtures("_clean_registry")
+def test_auto_extraction_disabled_by_config():
+    config = SchemathesisConfig.from_str("[analysis.constants]\nenabled = false\n")
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app, config=config)["/unlock"]["POST"]
+    with pytest.raises(NoSuchExample):
+        find(
+            operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
+            lambda case: case._meta is not None and bool(case._meta.constants_draws),
+            settings=_FIND,
+        )
+
+
 def _graphql_operations():
     schema = schemathesis.graphql.from_wsgi("/graphql", app=graphql_app.app)
     return {result.ok().label: result.ok() for result in schema.get_all_operations() if result.ok() is not None}
@@ -240,6 +389,19 @@ def test_constant_applied_to_graphql_argument():
         ),
     )
     assert any(d.value == graphql_app.SECRET_CODE for d in case._meta.constants_draws)
+
+
+@pytest.mark.usefixtures("_clean_registry")
+def test_constants_auto_extracted_from_graphql_wsgi_app():
+    # The strawberry request handler is a library view, but Flask records the app's own module,
+    # so its resolver literals are reached without manual registration.
+    operation = _graphql_operations()["Query.lookup"]
+    case = find(
+        operation.as_strategy(generation_mode=GenerationMode.POSITIVE),
+        lambda case: case._meta is not None and bool(case._meta.constants_draws),
+        settings=_FIND,
+    )
+    assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
 
 
 def test_graphql_constant_usage_recorded_in_case_metadata():
@@ -396,8 +558,8 @@ def test_registered_constants_extracted_once_until_registry_changes():
         calls.append(1)
         return graphql_string_pool
 
-    first = make_registered_constants_value_source()
-    assert make_registered_constants_value_source() is first
+    first = extract_registered()
+    assert extract_registered() is first
     assert calls == [1]
 
     @schemathesis.python.constants
@@ -405,7 +567,7 @@ def test_registered_constants_extracted_once_until_registry_changes():
         calls.append(1)
         return graphql_string_pool
 
-    assert make_registered_constants_value_source() is not first
+    assert extract_registered() is not first
 
 
 def test_map_hook_prunes_only_modified_constant_draw():
@@ -465,6 +627,7 @@ def _draw(data, source, *, schema_properties, container_schema=None):
         validator_cls=jsonschema_rs.Draft4Validator,
         location="body",
         container_schema=container_schema,
+        generation_config=GenerationConfig(),
         probability=1.0,
     )
     produced = data.draw(strategy)
@@ -578,6 +741,7 @@ def test_overlay_substitutes_into_generated_value_keeping_provenance(data):
         schema_properties={"blob": {"type": "string"}},
         validator_cls=jsonschema_rs.Draft4Validator,
         location="body",
+        generation_config=GenerationConfig(),
         probability=1.0,
     )
     produced = data.draw(strategy)
@@ -600,6 +764,7 @@ def test_nested_non_body_parameter_is_not_substituted():
         validator_cls=jsonschema_rs.Draft4Validator,
         location="query",
         container_schema={"type": "object", "properties": schema_properties},
+        generation_config=GenerationConfig(),
         probability=1.0,
     )
 
@@ -619,6 +784,7 @@ def test_binary_constant_not_substituted_into_non_body_parameter():
         validator_cls=jsonschema_rs.Draft4Validator,
         location="query",
         container_schema={"type": "object", "properties": schema_properties},
+        generation_config=GenerationConfig(),
         probability=1.0,
     )
 
@@ -643,6 +809,32 @@ def test_header_string_constant_filtered_by_header_validity(value, expected):
         validator_cls=jsonschema_rs.Draft4Validator,
         location="header",
         container_schema={"type": "object", "properties": schema_properties},
+        generation_config=GenerationConfig(),
+        probability=1.0,
+    )
+
+    produced = find(strategy, lambda v: True)
+
+    result = produced.value if isinstance(produced, GeneratedValue) else produced
+    assert result["X-Token"] == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("safe-token", "safe-token"), ("abc;def", "ORIGINAL")],
+    ids=["allowed", "excluded-character"],
+)
+def test_header_string_constant_filtered_by_excluded_characters(value, expected):
+    # `exclude-header-characters` bounds generated headers; a constant must not smuggle the char back in.
+    schema_properties = {"X-Token": {"type": "string"}}
+    strategy = build_constants_overlay_strategy(
+        st.just({"X-Token": "ORIGINAL"}),
+        source=_source("string", value),
+        schema_properties=schema_properties,
+        validator_cls=jsonschema_rs.Draft4Validator,
+        location="header",
+        container_schema={"type": "object", "properties": schema_properties},
+        generation_config=GenerationConfig(exclude_header_characters=";"),
         probability=1.0,
     )
 

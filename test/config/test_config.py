@@ -45,7 +45,7 @@ def test_warnings_for_without_operations():
 
 
 def test_project_key_config_sync():
-    ignored_in_operations_config = {"operations", "hooks", "workers", "base_url", "fuzz"}
+    ignored_in_operations_config = {"operations", "hooks", "workers", "base_url", "fuzz", "analysis"}
     for key in ProjectConfig.__slots__:
         if key.startswith("_"):
             continue
@@ -59,6 +59,55 @@ def test_project_key_config_sync():
         property_name = key.replace("_", "-")
         assert property_name not in CONFIG_SCHEMA["$defs"]["OperationConfig"]["properties"]
         assert key not in OperationConfig.__slots__
+
+
+@pytest.mark.parametrize(
+    ("project_analysis", "expected"),
+    [
+        ("[project.analysis.constants]\nenabled = true", True),
+        ("", False),
+    ],
+    ids=["explicitly-enabled", "inherited"],
+)
+def test_project_constants_analysis_precedence(project_analysis, expected):
+    config = SchemathesisConfig.from_str(
+        f"""
+        [analysis.constants]
+        enabled = false
+
+        [[project]]
+        title = "Enabled API"
+        {project_analysis}
+        """
+    )
+
+    project = config.projects.get({"info": {"title": "Enabled API"}})
+
+    assert project.analysis.constants.enabled is expected
+
+
+def test_override_can_reenable_constants_analysis():
+    config = SchemathesisConfig.from_str("[analysis.constants]\nenabled = false\n")
+
+    config.projects.override.analysis.constants.enabled = True
+
+    assert config.projects.get_default().analysis.constants.enabled is True
+
+
+def test_resolved_constants_config_does_not_alias_project_config():
+    config = SchemathesisConfig.from_str(
+        """
+        [[project]]
+        title = "Enabled API"
+        [project.analysis.constants]
+        enabled = true
+        """
+    )
+
+    project = config.projects.get({"info": {"title": "Enabled API"}})
+    project.analysis.constants.enabled = False
+
+    assert config.projects.named["Enabled API"].analysis.constants.enabled is True
 
 
 def test_config_path_from_path(tmp_path):

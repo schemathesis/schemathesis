@@ -7,13 +7,17 @@ import os
 import sys
 from collections.abc import Iterable
 from types import ModuleType
+from typing import TYPE_CHECKING
 
 from schemathesis.python._constants.adapters import FrameworkAdapter, default_adapters, select_adapter
 from schemathesis.python._constants.extract import _THIRD_PARTY_ROOTS, extract_from_module, local_imports_of
 from schemathesis.python._constants.filter import is_kept
 from schemathesis.python._constants.pool import DEFAULT_CAP_PER_TYPE, ConstantsPool, Origin
-from schemathesis.python._constants.registry import SourceRegistry, default_registry
+from schemathesis.python._constants.registry import Source, SourceRegistry, default_registry
 from schemathesis.python._constants.walk import _NON_SEQUENCE_BYTES_TYPES, resolve_modules
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import BaseSchema
 
 _extraction_cache: tuple[int, ConstantsPool] | None = None
 
@@ -34,9 +38,38 @@ def extract_registered() -> ConstantsPool:
     return pool
 
 
-def make_registered_constants_value_source() -> ConstantsPool | None:
-    pool = extract_registered()
+def build_constants_pool(schema: BaseSchema) -> ConstantsPool:
+    """Build the run-level constants pool for a loaded schema.
+
+    Combines any `@schemathesis.python.constants` sources with the application loaded via
+    `from_asgi`/`from_wsgi`. Returns an empty pool when analysis is disabled in config.
+    """
+    if not schema.config.analysis.constants.enabled:
+        return ConstantsPool()
+    app = schema.app
+    if app is None:
+        # No app to introspect: registry-only, memoised by `extract_registered`.
+        return extract_registered()
+    registry = default_registry()
+    version = registry.version
+    cached = schema._constants_pool_cache
+    if cached is not None and cached[0] is app and cached[1] == version:
+        return cached[2]
+    pool = extract_all(registry=registry, adapters=default_adapters(), extra_sources=[_application_source(app)])
+    schema._constants_pool_cache = app, version, pool
+    return pool
+
+
+def make_constants_value_source(schema: BaseSchema) -> ConstantsPool | None:
+    pool = build_constants_pool(schema)
     return None if pool.is_empty() else pool
+
+
+def _application_source(app: object) -> Source:
+    def application() -> object:
+        return app
+
+    return application
 
 
 def extract_all(
@@ -44,15 +77,22 @@ def extract_all(
     registry: SourceRegistry,
     adapters: Iterable[FrameworkAdapter],
     cap_per_type: int = DEFAULT_CAP_PER_TYPE,
+    extra_sources: Iterable[Source] = (),
 ) -> ConstantsPool:
     """Run every registered source, walk to modules, extract + filter, build the pool."""
     pool = ConstantsPool(cap_per_type=cap_per_type)
-    _extract_all(registry=registry, adapters=list(adapters), pool=pool)
+    _extract_all(registry=registry, adapters=list(adapters), pool=pool, extra_sources=extra_sources)
     return pool
 
 
-def _extract_all(*, registry: SourceRegistry, adapters: list[FrameworkAdapter], pool: ConstantsPool) -> None:
-    for source in registry.get_all():
+def _extract_all(
+    *,
+    registry: SourceRegistry,
+    adapters: list[FrameworkAdapter],
+    pool: ConstantsPool,
+    extra_sources: Iterable[Source] = (),
+) -> None:
+    for source in [*registry.get_all(), *extra_sources]:
         # A user source may be a `functools.partial` or callable instance with no `__name__`.
         name = getattr(source, "__name__", repr(source))
         # A source callable, or resolving its result, can raise anything - including
@@ -104,17 +144,21 @@ def _resolve_with_adapters(raw: object, *, adapters: list[FrameworkAdapter]) -> 
     if adapter is not None:
         try:
             handlers = list(adapter.handlers(raw))
+            declared = set(adapter.modules(raw))
         except Exception:
             return set(), None
-        return resolve_modules(_expand_with_local_imports(_modules_for_handlers(handlers))), adapter.name
+        # Both are inferred from the app, so neither is known to be user code: a library view or a
+        # library-built app would otherwise harvest its framework's internals.
+        modules = {name for name in _modules_for_handlers(handlers) | declared if _is_likely_user_package(name)}
+        return resolve_modules(_expand_with_local_imports(modules), walk=False), adapter.name
 
-    # Unknown framework: fall back to the object's top-level package, but only when it looks
+    # Unknown framework: fall back to the module defining the app, but only when its package looks
     # like user code -- else a niche framework's instance would harvest its own internals.
     module_name = getattr(raw, "__module__", None)
     if isinstance(module_name, str) and module_name:
         top_level = module_name.partition(".")[0]
         if _is_likely_user_package(top_level):
-            return resolve_modules([top_level]), None
+            return resolve_modules(_expand_with_local_imports({module_name}), walk=False), None
     return set(), None
 
 

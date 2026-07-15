@@ -88,6 +88,10 @@ class BaseSchema(Mapping):
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
     test_function: Callable | None = None
+    # App identity + registry version the cached pool was built from.
+    _constants_pool_cache: tuple[object, int, ConstantsPool] | None = field(
+        init=False, default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
@@ -373,7 +377,7 @@ class BaseSchema(Mapping):
         else:
             _filter_set = filter_set
 
-        return self.__class__(
+        cloned = self.__class__(
             self.raw_schema,
             config=self.config,
             location=self.location,
@@ -383,6 +387,9 @@ class BaseSchema(Mapping):
             test_function=_test_function,
             filter_set=_filter_set,
         )
+        # Extraction imports the app and walks its modules; a clone shares the app, so it shares the result.
+        cloned._constants_pool_cache = self._constants_pool_cache
+        return cloned
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None:
         # It might be not present when it is used without pytest via `APIOperation.as_strategy()`
@@ -816,9 +823,9 @@ class APIOperation(Generic[P, R, S, SchemaT]):
 
         setup()
         if "constants_value_source" not in kwargs:
-            from schemathesis.python._constants.orchestrator import make_registered_constants_value_source
+            from schemathesis.python._constants.orchestrator import make_constants_value_source
 
-            kwargs["constants_value_source"] = make_registered_constants_value_source()
+            kwargs["constants_value_source"] = make_constants_value_source(self.schema)
         if self.schema.config.headers:
             headers = kwargs.setdefault("headers", {})
             headers.update(self.schema.config.headers)

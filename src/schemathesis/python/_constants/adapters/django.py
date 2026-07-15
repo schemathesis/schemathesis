@@ -28,3 +28,6 @@ class DjangoAdapter:
                     yield item.callback
 
         return list(walk(get_resolver()))
+
+    def modules(self, app: object) -> Iterable[str]:
+        return ()

@@ -172,6 +172,9 @@
     },
     "warnings": {
       "$ref": "#/$defs/WarningConfig"
+    },
+    "analysis": {
+      "$ref": "#/$defs/AnalysisConfig"
     }
   },
   "$defs": {
@@ -998,11 +1001,32 @@
         },
         "warnings": {
           "$ref": "#/$defs/WarningConfig"
+        },
+        "analysis": {
+          "$ref": "#/$defs/AnalysisConfig"
         }
       },
       "required": [
         "title"
       ]
+    },
+    "AnalysisConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "constants": {
+          "$ref": "#/$defs/AnalysisConstantsConfig"
+        }
+      }
+    },
+    "AnalysisConstantsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     },
     "WarningConfig": {
       "anyOf": [

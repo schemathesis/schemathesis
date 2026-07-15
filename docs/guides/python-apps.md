@@ -56,6 +56,32 @@ def test_api(case):
 
 Both methods expect the schema endpoint path and your application instance.
 
+## Reusing Values From Your Source
+
+When you load an app with `from_asgi` or `from_wsgi`, Schemathesis reads the request handlers' source code and reuses the literal values it finds - status codes, identifiers, enum members, magic strings - as candidate test data. Free-form parameters that random generation rarely satisfies then occasionally receive a value the application recognizes, reaching code paths behind those checks.
+
+This is on by default. Disable it in the config file:
+
+```toml
+[analysis.constants]
+enabled = false
+```
+
+### Registering additional sources
+
+App inspection reaches the request handlers' modules, plus - for Flask - the module the app is defined in. For literals defined elsewhere, or when the handler is a library view served over ASGI rather than your own code (for example GraphQL resolvers behind a Starlette/FastAPI mount), register the source explicitly:
+
+```python
+import schemathesis
+import myapp.resolvers
+
+@schemathesis.python.constants
+def _constants():
+    return myapp.resolvers
+```
+
+The decorated function returns what to inspect: a module, an application instance, a dotted module name, or an iterable of them. Registered sources are combined with the automatically inspected app; disabling `analysis.constants` turns off both.
+
 ## Custom Test Clients
 
 Use custom test clients for shared configuration, authentication, or application lifecycle management:

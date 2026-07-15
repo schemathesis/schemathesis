@@ -27,3 +27,6 @@ class StarletteAdapter:
                     yield from iter_handlers(route.routes)
 
         return iter_handlers(app.routes)
+
+    def modules(self, app: object) -> Iterable[str]:
+        return ()
