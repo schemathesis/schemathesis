@@ -9121,3 +9121,40 @@ def test_discriminator_explicit_mapping_overrides_branch_const(ctx):
     bodies = _discriminator_positive_bodies(ctx.openapi.from_full_schema(raw)["/r"]["POST"])
     tags = {body["tools"]["type"] for body in bodies if isinstance(body.get("tools"), dict) and "type" in body["tools"]}
     assert tags == {"web_search"}, f"mapping must override branch const; got tags={tags}, bodies={bodies}"
+
+
+def test_negative_coverage_violates_int64_format_bounds(ctx):
+    # The range implied by `format: int64` must reach negative generation as real bounds,
+    # so out-of-range integers stay covered as boundary violations instead of positive data.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"value": {"type": "integer", "format": "int64"}},
+                                    "required": ["value"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    cases = _iter_cases(schema["/x"]["POST"], GenerationMode.NEGATIVE)
+
+    violations = {
+        case.meta.phase.data.scenario: case.body["value"]
+        for case in cases
+        if isinstance(case.body, dict) and isinstance(case.body.get("value"), int)
+    }
+    assert violations[CoverageScenario.VALUE_ABOVE_MAXIMUM] == 2**63
+    assert violations[CoverageScenario.VALUE_BELOW_MINIMUM] == -(2**63) - 1
+    assert all(case.meta.generation.mode == GenerationMode.NEGATIVE for case in cases)

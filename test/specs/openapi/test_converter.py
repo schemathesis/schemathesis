@@ -769,3 +769,74 @@ def test_discriminator_pin_validates_with_openapi_3_0_draft4(ctx):
     body = schema["/rules"]["POST"].body[0]
     validator = make_validator(body.optimized_schema, schema.adapter.jsonschema_validator_cls)
     assert validator.is_valid({"type": "allow"}) is True, "branch-disambiguating pin must work under Draft 4"
+
+
+INT32_MIN, INT32_MAX = -(2**31), 2**31 - 1
+INT64_MIN, INT64_MAX = -(2**63), 2**63 - 1
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        pytest.param(
+            {"type": "integer", "format": "int64"},
+            {"type": "integer", "format": "int64", "minimum": INT64_MIN, "maximum": INT64_MAX},
+            id="int64_unbounded",
+        ),
+        pytest.param(
+            {"type": "integer", "format": "int32"},
+            {"type": "integer", "format": "int32", "minimum": INT32_MIN, "maximum": INT32_MAX},
+            id="int32_unbounded",
+        ),
+        pytest.param(
+            {"type": "integer", "format": "int64", "minimum": 0, "maximum": 100},
+            {"type": "integer", "format": "int64", "minimum": 0, "maximum": 100},
+            id="explicit_tighter_bounds_kept",
+        ),
+        pytest.param(
+            {"type": "integer", "format": "int64", "maximum": 10**30},
+            {"type": "integer", "format": "int64", "minimum": INT64_MIN, "maximum": INT64_MAX},
+            id="explicit_looser_maximum_tightened",
+        ),
+        pytest.param(
+            {"type": "integer", "format": "int32", "minimum": -(10**30)},
+            {"type": "integer", "format": "int32", "minimum": INT32_MIN, "maximum": INT32_MAX},
+            id="explicit_looser_minimum_tightened",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"a": {"type": "integer", "format": "int64"}}},
+            {
+                "type": "object",
+                "properties": {"a": {"type": "integer", "format": "int64", "minimum": INT64_MIN, "maximum": INT64_MAX}},
+            },
+            id="nested_in_properties",
+        ),
+        pytest.param(
+            {"type": "array", "items": {"type": "integer", "format": "int32"}},
+            {
+                "type": "array",
+                "items": {"type": "integer", "format": "int32", "minimum": INT32_MIN, "maximum": INT32_MAX},
+            },
+            id="nested_in_items",
+        ),
+        pytest.param(
+            {"type": ["integer", "null"], "format": "int64"},
+            {"type": ["integer", "null"], "format": "int64", "minimum": INT64_MIN, "maximum": INT64_MAX},
+            id="nullable_type_union",
+        ),
+        pytest.param({"type": "integer"}, {"type": "integer"}, id="no_format_untouched"),
+        pytest.param(
+            {"type": "string", "format": "uuid"}, {"type": "string", "format": "uuid"}, id="string_format_untouched"
+        ),
+        pytest.param(
+            {"type": "string", "format": "int64"}, {"type": "string", "format": "int64"}, id="type_mismatch_untouched"
+        ),
+        pytest.param(
+            {"type": "integer", "format": "unknown"},
+            {"type": "integer", "format": "unknown"},
+            id="unknown_format_untouched",
+        ),
+    ],
+)
+def test_integer_format_bounds(schema, expected):
+    assert transform(schema, converter.to_json_schema, nullable_keyword="x-nullable") == expected

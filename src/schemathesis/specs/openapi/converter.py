@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any, TypeGuard, overload
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
-from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.patterns import (
     is_valid_python_regex,
@@ -123,6 +123,9 @@ def _to_json_schema(
     if schema_type == "file":
         schema["type"] = "string"
         schema["format"] = "binary"
+
+    if not is_response_schema:
+        _restrict_integer_format(schema)
 
     # Handle unsupported regex patterns - try translation first, remove if that fails
     pattern = schema.get("pattern")
@@ -408,6 +411,34 @@ def _rewrite_if_then_else(schema: dict[str, Any]) -> None:
         schema["allOf"].append({"anyOf": new_anyof})
     else:
         schema["anyOf"] = new_anyof
+
+
+_INTEGER_FORMAT_BOUNDS = {
+    "int32": (-(2**31), 2**31 - 1),
+    "int64": (-(2**63), 2**63 - 1),
+}
+
+
+def _restrict_integer_format(schema: dict[str, Any]) -> None:
+    # `format` is annotation-only, so the range it implies has to become real keywords - otherwise
+    # generation draws arbitrary-precision integers that a fixed-width-int server rejects.
+    # Keywords (not clamping) so negative generation can still negate the bound.
+    format = schema.get("format")
+    if not isinstance(format, str):
+        return
+    bounds = _INTEGER_FORMAT_BOUNDS.get(format)
+    if bounds is None or "integer" not in get_type(schema):
+        return
+    minimum, maximum = bounds
+    # A declared bound tighter than the format wins; one looser than the format contradicts it.
+    current = schema.get("minimum")
+    schema["minimum"] = (
+        max(current, minimum) if isinstance(current, int | float) and not isinstance(current, bool) else minimum
+    )
+    current = schema.get("maximum")
+    schema["maximum"] = (
+        min(current, maximum) if isinstance(current, int | float) and not isinstance(current, bool) else maximum
+    )
 
 
 def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:

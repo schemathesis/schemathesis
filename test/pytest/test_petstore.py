@@ -90,7 +90,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore()
+    testdir.assert_petstore(tests_num=9)
 
 
 def test_update_pet(testdir):
@@ -110,7 +110,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore()
+    testdir.assert_petstore(tests_num=9)
 
 
 def test_delete_pet(testdir):
@@ -128,7 +128,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore()
+    testdir.assert_petstore(tests_num=9)
 
 
 def test_get_inventory(testdir):
@@ -159,7 +159,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=15)
+    testdir.assert_petstore(tests_num=24)
 
 
 def test_get_order(testdir):
@@ -191,7 +191,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=7)
+    testdir.assert_petstore(tests_num=9)
 
 
 def test_create_user(testdir):
@@ -205,7 +205,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=14)
+    testdir.assert_petstore(tests_num=20)
 
 
 def test_create_multiple_users(testdir):
@@ -219,7 +219,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(2, 30)
+    testdir.assert_petstore(2, 42)
 
 
 def test_login(testdir):
@@ -279,7 +279,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=14)
+    testdir.assert_petstore(tests_num=20)
 
 
 def test_delete_user(testdir):

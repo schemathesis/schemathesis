@@ -1135,3 +1135,41 @@ def test_apply_exclusions_reachable_via_auth_supplied_required_header():
     out = pset.get_schema_with_exclusions(exclude=["Authorization"])
     assert "required" not in out
     assert out["properties"] == {}
+
+
+@pytest.mark.parametrize(
+    ("format", "minimum", "maximum"),
+    [("int32", -(2**31), 2**31 - 1), ("int64", -(2**63), 2**63 - 1)],
+)
+def test_positive_integers_stay_within_format_range(ctx, format, minimum, maximum):
+    # `format` alone declares the range; without it generation draws arbitrary-precision ints
+    # that a fixed-width-int server rejects, turning a positive case into a false failure.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"value": {"type": "integer", "format": format}},
+                                    "required": ["value"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/x"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=250, suppress_health_check=list(HealthCheck), deadline=None)
+    def test(case):
+        assert minimum <= case.body["value"] <= maximum, f"Out of {format} range: {case.body['value']}"
+
+    test()
