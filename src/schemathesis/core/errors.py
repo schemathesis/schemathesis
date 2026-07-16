@@ -383,18 +383,30 @@ class AuthenticationError(SchemathesisError):
     authentication data via custom auth providers.
     """
 
-    def __init__(self, provider_name: str, method: str, message: str) -> None:
+    def __init__(
+        self,
+        provider_name: str,
+        method: str,
+        message: str,
+        *,
+        include_common_causes: bool = True,
+        show_traceback: bool = False,
+        include_provider_context: bool = False,
+    ) -> None:
         self.provider_name = provider_name
         self.method = method
         self.message = message
-        super().__init__(
-            f"Error in '{provider_name}.{method}()': {message}\n\n"
-            f"Common causes:\n"
-            f"  - Auth endpoint returned an error response\n"
-            f"  - Response format doesn't match expectations (text vs JSON)\n"
-            f"  - Network or connection issues\n"
-            f"  - Logic error in the authentication provider implementation"
-        )
+        self.show_traceback = show_traceback
+        text = f"Error in '{provider_name}.{method}()': {message}" if include_provider_context else message
+        if include_common_causes:
+            text += (
+                "\n\nCommon causes:\n"
+                "  - Auth endpoint returned an error response\n"
+                "  - Response format doesn't match expectations (text vs JSON)\n"
+                "  - Network or connection issues\n"
+                "  - Logic error in the authentication provider implementation"
+            )
+        super().__init__(text)
 
 
 class NoLinksFound(IncorrectUsage):

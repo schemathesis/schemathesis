@@ -861,7 +861,7 @@ These settings can only be applied at the project level.
     | `extract_from` | `"body"` | Source of the token: `"body"` or `"header"` |
     | `extract_selector` | required | [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) when `extract_from = "body"`, or header name when `extract_from = "header"` |
 
-    Supported for `http/bearer` and `apiKey` scheme types in OpenAPI 2.0 and 3.x.
+    Supported for `http/bearer`, `apiKey`, and `oauth2` scheme types in OpenAPI 2.0 and 3.x. `oauth2` tokens are applied as `Authorization: Bearer <token>`.
 
     !!! note
         `auth.dynamic.openapi.*` and `auth.openapi.*` schemes cannot share the same name in the same config.

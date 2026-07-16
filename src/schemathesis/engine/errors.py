@@ -155,6 +155,8 @@ class EngineErrorInfo:
 
     @property
     def has_useful_traceback(self) -> bool:
+        if isinstance(self._error, AuthenticationError):
+            return self._error.show_traceback
         return self._kind not in (
             RuntimeErrorKind.CONFIG_ERROR,
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,

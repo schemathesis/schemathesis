@@ -2,6 +2,15 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.23.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Dynamic token authentication support for OAuth2 and OpenID Connect security schemes.
+
+### :bug: Fixed
+
+- Report dynamic authentication token-fetch failures without duplicated text or an internal traceback.
+- Explain `401`/`403` responses from a dynamic authentication token endpoint as rejected credentials.
+
 ### :wrench: Changed
 
 - Configuration errors shown without a traceback, under a `Configuration Error` heading.

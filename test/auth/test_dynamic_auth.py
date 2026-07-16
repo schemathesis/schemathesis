@@ -8,7 +8,7 @@ from flask import Response as FlaskResponse
 from flask import jsonify, request
 
 import schemathesis.openapi
-from schemathesis.auths import AuthContext
+from schemathesis.auths import AuthContext, CachingAuthProvider
 from schemathesis.config._auth import AuthConfig, DynamicTokenAuthConfig
 from schemathesis.config._error import ConfigError
 from schemathesis.core.errors import AuthenticationError
@@ -127,6 +127,52 @@ def test_get_raises_on_error(auth_operation, path, extract_from, extract_selecto
     )
     with pytest.raises(AuthenticationError, match=match):
         provider.get(auth_operation.Case(), ctx)
+
+
+def test_authentication_error_provider_context():
+    # Built-in provider: no internal class/method name leaked to the user.
+    assert str(AuthenticationError("DynamicTokenAuthProvider", "get", "boom", include_common_causes=False)) == "boom"
+    # Custom provider failures name the provider so the user can find their code.
+    assert (
+        str(AuthenticationError("MyAuth", "get", "boom", include_common_causes=False, include_provider_context=True))
+        == "Error in 'MyAuth.get()': boom"
+    )
+
+
+def test_caching_provider_does_not_double_wrap_auth_error(auth_operation):
+    inner = DynamicTokenAuthProvider(
+        path="/api/fail",
+        method="post",
+        payload=None,
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    ctx = AuthContext(operation=auth_operation, app=None)
+    with pytest.raises(AuthenticationError) as direct:
+        inner.get(auth_operation.Case(), ctx)
+    with pytest.raises(AuthenticationError) as cached:
+        CachingAuthProvider(inner).get(auth_operation.Case(), ctx)
+    # Re-raised as-is: no extra wrapping layer added by the cache.
+    assert str(cached.value) == str(direct.value)
+
+
+def test_get_401_message_is_actionable_without_common_causes(auth_operation):
+    provider = DynamicTokenAuthProvider(
+        path="/api/fail",
+        method="post",
+        payload=None,
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    with pytest.raises(AuthenticationError) as exc:
+        provider.get(auth_operation.Case(), AuthContext(operation=auth_operation, app=None))
+    assert str(exc.value) == (
+        "Auth endpoint rejected the credentials. Check the configured auth credentials.\n"
+        "\n[401] Unauthorized:\n"
+        '\n    `{"error":"unauthorized"}`'
+    )
 
 
 def test_fetch_http_forwards_tls_config(ctx, app_runner, mocker):
@@ -365,13 +411,28 @@ def test_config_rejects_overlapping_schemes(openapi_schemes, dynamic_schemes, ma
     "scheme,match",
     [
         ({"type": "http", "scheme": "basic"}, "http/basic"),
-        ({"type": "oauth2"}, "scheme type"),
     ],
 )
 def test_build_auth_provider_rejects_unsupported_scheme(scheme, match):
     config = DynamicTokenAuthConfig(path="/api/auth", extract_selector="/token")
     with pytest.raises(ConfigError, match=match):
         build_auth_provider(config, scheme)
+
+
+@pytest.mark.parametrize(
+    "scheme",
+    [
+        {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}},
+        {"type": "openIdConnect", "openIdConnectUrl": "https://example.com/.well-known/openid-configuration"},
+    ],
+    ids=["oauth2", "openIdConnect"],
+)
+def test_build_auth_provider_applies_bearer_token_schemes(auth_operation, scheme):
+    config = DynamicTokenAuthConfig(path="/api/auth", extract_selector="/access_token")
+    provider = build_auth_provider(config, scheme)
+    case = auth_operation.Case()
+    provider.set(case, "my-token", None)
+    assert case.headers["Authorization"] == "Bearer my-token"
 
 
 def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
@@ -671,6 +732,61 @@ def test_api(case):
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=1)
     result.stdout.fnmatch_lines(["*ASGI auth request failed*"])
+
+
+def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"OAuth2": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "OAuth2": {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}},
+            }
+        },
+    )
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        return jsonify({"access_token": "dynamic-token"})
+
+    @app.route("/protected")
+    def protected():
+        auth = request.headers.get("Authorization", "")
+        if auth != "Bearer dynamic-token":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"result": "ok"})
+
+    base_url = app_runner.openapi_url(app, path="")
+    assert (
+        cli.run(
+            f"{base_url}/openapi.json",
+            "--include-path=/protected",
+            "--phases=fuzzing",
+            "--mode=positive",
+            "-n 3",
+            config={
+                "base-url": base_url,
+                "auth": {
+                    "dynamic": {
+                        "openapi": {
+                            "OAuth2": {
+                                "path": "/api/auth",
+                                "extract_selector": "/access_token",
+                            }
+                        }
+                    }
+                },
+            },
+        )
+        == snapshot_cli
+    )
 
 
 def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):

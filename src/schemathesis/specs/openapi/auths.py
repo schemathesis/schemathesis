@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import textwrap
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -11,14 +12,23 @@ from urllib.parse import urlencode
 import requests
 
 from schemathesis.core.errors import AuthenticationError, MalformedMediaType
+from schemathesis.core.failures import reason_phrase
 from schemathesis.core.media_types import is_form_urlencoded, is_json
+from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import decode_lossy, load_json_lossy
 from schemathesis.schemas import get_full_path
 
 if TYPE_CHECKING:
     from schemathesis.auths import AuthContext
+    from schemathesis.config import OutputConfig
     from schemathesis.generation.case import Case
+
+
+def _response_block(status_code: int, text: str, config: OutputConfig) -> str:
+    reason = reason_phrase(status_code)
+    payload = prepare_response_payload(text, config=config)
+    return f"\n[{status_code}] {reason}:\n" + textwrap.indent(f"\n`{payload}`", "    ")
 
 
 @dataclass(slots=True)
@@ -160,6 +170,7 @@ class DynamicTokenAuthProvider:
             text=decode_lossy(response.content, response.encoding),
             get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
+            output_config=config.output,
         )
 
     def _fetch_wsgi(self, app: Any, ctx: AuthContext) -> str:
@@ -185,6 +196,7 @@ class DynamicTokenAuthProvider:
             text=response.get_data(as_text=True),
             get_json=lambda: response.get_json(force=True, silent=False),
             headers=response.headers,
+            output_config=ctx.operation.schema.config.output,
         )
 
     def _fetch_asgi(self, app: Any, ctx: AuthContext) -> str:
@@ -212,6 +224,7 @@ class DynamicTokenAuthProvider:
             text=decode_lossy(response.content, response.encoding),
             get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
+            output_config=ctx.operation.schema.config.output,
         )
 
     def _extract_token(
@@ -220,12 +233,21 @@ class DynamicTokenAuthProvider:
         text: str,
         get_json: Callable[[], Any],
         headers: Mapping[str, str],
+        output_config: OutputConfig,
     ) -> str:
+        if status_code in (401, 403):
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                "Auth endpoint rejected the credentials. Check the configured auth credentials.\n"
+                + _response_block(status_code, text, output_config),
+                include_common_causes=False,
+            )
         if status_code >= 400:
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
                 "get",
-                f"Auth endpoint returned {status_code}: {text!r}",
+                "Auth endpoint returned an error response.\n" + _response_block(status_code, text, output_config),
             )
         if self.extract_from == "body":
             try:
