@@ -18,6 +18,7 @@ def ctx_factory():
         generation_modes: list[GenerationMode] | None = None,
         is_required: bool = True,
         allow_extra_parameters: bool = True,
+        validator_cls: type[jsonschema_rs.Validator] = jsonschema_rs.Draft4Validator,
     ) -> CoverageContext:
         return CoverageContext(
             root_schema={},
@@ -26,7 +27,7 @@ def ctx_factory():
             generation_modes=generation_modes,
             is_required=is_required,
             custom_formats=get_default_format_strategies(),
-            validator_cls=jsonschema_rs.Draft4Validator,
+            validator_cls=validator_cls,
             update_pattern=update_quantifier,
             allow_extra_parameters=allow_extra_parameters,
         )

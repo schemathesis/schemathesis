@@ -1200,6 +1200,12 @@ def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageCont
     return next((candidate for candidate in _UNEXPECTED_PROPERTY_KEYS[1:] if is_additional(candidate)), None)
 
 
+def _negation_ignored_by_dialect(ctx: CoverageContext, keyword: str) -> bool:
+    # Draft 4 (Swagger 2.0 / Open API 3.0) predates `const` and `propertyNames`; the dialect's
+    # validator ignores them, so mutating them cannot produce negative test cases.
+    return keyword in ("const", "propertyNames") and ctx.validator_cls is jsonschema_rs.Draft4Validator
+
+
 def cover_schema_iter(
     ctx: CoverageContext, schema: JsonSchema, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -1286,6 +1292,8 @@ def cover_schema_iter(
                 inferred_types = [to_json_type_name(schema["const"])]
         for key, value in schema.items():
             with _ignore_unfixable(), ctx.at(key):
+                if _negation_ignored_by_dialect(ctx, key):
+                    continue
                 if key == "enum":
                     yield from _negative_enum(ctx, value, seen, schema)
                     if inferred_types:

@@ -84,30 +84,6 @@ def assert_not_conform(values: list, schema: dict):
 
 
 @pytest.fixture
-def ctx_factory():
-    def _factory(
-        *,
-        location: ParameterLocation = ParameterLocation.QUERY,
-        generation_modes: list[GenerationMode] | None = None,
-        is_required: bool = True,
-        allow_extra_parameters: bool = True,
-    ) -> CoverageContext:
-        return CoverageContext(
-            root_schema={},
-            location=location,
-            media_type=None,
-            generation_modes=generation_modes,
-            is_required=is_required,
-            custom_formats=get_default_format_strategies(),
-            validator_cls=jsonschema_rs.Draft4Validator,
-            update_pattern=update_quantifier,
-            allow_extra_parameters=allow_extra_parameters,
-        )
-
-    return _factory
-
-
-@pytest.fixture
 def ctx(ctx_factory):
     return ctx_factory()
 
@@ -171,7 +147,6 @@ class AnyNumber:
         ({"enum": [1, 2]}, ["AAA", AnyNumber(), "false", "null", ["null", "null"]]),
         ({"enum": [1, 2, {}]}, ["AAA", AnyNumber(), "false", "null", ["null", "null"]]),
         ({"enum": ["a", "b"]}, ["AAA", 0, "false", "null", ["null", "null"]]),
-        ({"const": 42}, ["AAA"]),
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
         ({"format": "date-time"}, [AnyString()]),
         ({"format": "hostname"}, [AnyString()]),
@@ -198,6 +173,15 @@ def test_negative_primitive_schemas(nctx, schema, expected):
         assert covered == expected
     assert_unique(covered)
     assert_not_conform(covered, schema)
+
+
+def test_negative_const(ctx_factory):
+    # `const` arrived in Draft 6; only dialects whose validator enforces it get the negation.
+    nctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], validator_cls=jsonschema_rs.Draft202012Validator)
+    covered = cover_schema(nctx, {"const": 42})
+    assert covered == ["AAA", AnyNumber(), "false", "null", ["null", "null"]]
+    assert_unique(covered)
+    assert_not_conform(covered, {"const": 42})
 
 
 @pytest.mark.parametrize(
@@ -1388,7 +1372,9 @@ def test_negative_pattern(nctx, schema, expected):
         ),
     ],
 )
-def test_negative_property_names(nctx, schema, expected):
+def test_negative_property_names(ctx_factory, schema, expected):
+    # `propertyNames` arrived in Draft 6; only dialects whose validator enforces it get the negation.
+    nctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], validator_cls=jsonschema_rs.Draft202012Validator)
     covered = cover_schema(nctx, schema)
     assert covered == expected
     assert_unique(covered)
@@ -2940,7 +2926,11 @@ def test_negative_properties_baseline_emission(ctx_factory, schema, expects_base
 def test_negative_object_keyword_baseline_emission(ctx_factory, schema):
     # `_negative_type` already emits `{}` for `type: array`; the new baseline path emits a
     # second `{}`. Counting both guards against a regression in the baseline branch.
-    nctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    nctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
     cases = [value.value for value in cover_schema_iter(nctx, schema)]
     assert cases.count({}) >= 2, f"baseline `{{}}` emission missing: {cases}"
 
