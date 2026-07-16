@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.23.0...HEAD) - TBD
 
+### :wrench: Changed
+
+- Configuration errors shown without a traceback, under a `Configuration Error` heading.
+
 ## [4.23.0](https://github.com/schemathesis/schemathesis/compare/v4.22.4...v4.23.0) - 2026-07-16
 
 ### :rocket: Added
