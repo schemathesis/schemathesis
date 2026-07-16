@@ -130,9 +130,7 @@ def test_get_raises_on_error(auth_operation, path, extract_from, extract_selecto
 
 
 def test_authentication_error_provider_context():
-    # Built-in provider: no internal class/method name leaked to the user.
     assert str(AuthenticationError("DynamicTokenAuthProvider", "get", "boom", include_common_causes=False)) == "boom"
-    # Custom provider failures name the provider so the user can find their code.
     assert (
         str(AuthenticationError("MyAuth", "get", "boom", include_common_causes=False, include_provider_context=True))
         == "Error in 'MyAuth.get()': boom"
@@ -153,7 +151,6 @@ def test_caching_provider_does_not_double_wrap_auth_error(auth_operation):
         inner.get(auth_operation.Case(), ctx)
     with pytest.raises(AuthenticationError) as cached:
         CachingAuthProvider(inner).get(auth_operation.Case(), ctx)
-    # Re-raised as-is: no extra wrapping layer added by the cache.
     assert str(cached.value) == str(direct.value)
 
 

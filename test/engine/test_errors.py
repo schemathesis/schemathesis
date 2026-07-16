@@ -12,8 +12,6 @@ def test_config_error_has_no_useful_traceback():
 
 
 def test_authentication_error_traceback_visibility():
-    # Built-in provider errors (endpoint/config) hide the internal traceback;
-    # custom-provider failures keep it to point at user code.
     assert EngineErrorInfo(AuthenticationError("P", "get", "boom")).has_useful_traceback is False
     assert EngineErrorInfo(AuthenticationError("P", "get", "boom", show_traceback=True)).has_useful_traceback is True
 
