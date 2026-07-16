@@ -352,6 +352,8 @@ def build_auth_provider(
                 )
         elif scheme_type == "apiKey":
             applier = ApiKeyAuthProvider(value="", name=scheme["name"], location=scheme["in"])
+        elif scheme_type in ("oauth2", "openIdConnect"):
+            applier = HttpBearerAuthProvider(bearer="")
         else:
             raise ConfigError(f"Dynamic token fetch is not supported for scheme type {scheme_type!r}.")
         # Deferred to avoid circular import: schemathesis.auths imports from openapi internals

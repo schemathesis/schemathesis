@@ -140,9 +140,13 @@ class CachingAuthProvider(Generic[Auth]):
                 # We know that optional auth is possible only inside a higher-level wrapper
                 try:
                     data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
+                except AuthenticationError:
+                    raise
                 except Exception as exc:
                     provider_name = self.provider.__class__.__name__
-                    raise AuthenticationError(provider_name, "get", str(exc)) from exc
+                    raise AuthenticationError(
+                        provider_name, "get", str(exc), show_traceback=True, include_provider_context=True
+                    ) from exc
                 self._set_cache_entry(data, case, context)
                 return data
         return cache_entry.data
@@ -290,7 +294,9 @@ class SelectiveAuthProvider(Generic[Auth]):
                 while isinstance(provider, CachingAuthProvider | KeyedCachingAuthProvider):
                     provider = provider.provider
                 provider_name = provider.__class__.__name__
-                raise AuthenticationError(provider_name, "get", str(exc)) from exc
+                raise AuthenticationError(
+                    provider_name, "get", str(exc), show_traceback=True, include_provider_context=True
+                ) from exc
         return None
 
     def set(self, case: Case, data: Auth, context: AuthContext) -> None:
