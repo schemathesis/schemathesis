@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core.errors import HookExecutionError
 from schemathesis.engine import Status, events
+from schemathesis.python._constants.warnings import iter_constants_warnings
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -21,10 +22,12 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
         )
         yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
         return
+    # Runs for any loaded app and any `@schemathesis.python.constants` source; records failures for the
+    # latter so a registered source that silently produced nothing is surfaced as a warning.
+    pool = ctx.extract_constants()
+    warnings = [*warnings, *iter_constants_warnings(pool)]
+
     if warnings:
         yield events.SchemaAnalysisWarnings(phase=phase, warnings=warnings)
-
-    # No-op unless a source was registered via `@schemathesis.python.constants`.
-    ctx.extract_constants()
 
     yield events.PhaseFinished(phase=phase, status=Status.SUCCESS, payload=None)

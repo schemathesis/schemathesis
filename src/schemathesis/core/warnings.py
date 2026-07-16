@@ -11,6 +11,7 @@ class SchemathesisWarning(str, enum.Enum):
     UNUSED_OPENAPI_AUTH = "unused_openapi_auth"
     UNSUPPORTED_REGEX = "unsupported_regex"
     METHOD_NOT_ALLOWED = "method_not_allowed"
+    CONSTANTS_EXTRACTION = "constants_extraction"
 
     @classmethod
     def from_str(cls, value: str) -> SchemathesisWarning:
@@ -22,4 +23,5 @@ class SchemathesisWarning(str, enum.Enum):
             "unused_openapi_auth": cls.UNUSED_OPENAPI_AUTH,
             "unsupported_regex": cls.UNSUPPORTED_REGEX,
             "method_not_allowed": cls.METHOD_NOT_ALLOWED,
+            "constants_extraction": cls.CONSTANTS_EXTRACTION,
         }[value.lower()]

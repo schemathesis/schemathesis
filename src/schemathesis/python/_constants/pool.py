@@ -26,6 +26,14 @@ class Origin:
 
 
 @dataclass(slots=True, frozen=True)
+class SourceFailure:
+    """A registered constants source that produced nothing usable."""
+
+    source: str
+    reason: str
+
+
+@dataclass(slots=True, frozen=True)
 class ConstantEntry:
     """A literal value with its provenance."""
 
@@ -51,7 +59,7 @@ class ConstantsPool:
     Filled at engine init, read-only from the draw path's perspective.
     """
 
-    __slots__ = ("_entries", "_cap")
+    __slots__ = ("_entries", "_cap", "_failures")
 
     def __init__(self, *, cap_per_type: int = DEFAULT_CAP_PER_TYPE) -> None:
         self._cap = cap_per_type
@@ -61,6 +69,14 @@ class ConstantsPool:
             "float": OrderedDict(),
             "bytes": OrderedDict(),
         }
+        self._failures: list[SourceFailure] = []
+
+    def record_failure(self, source: str, reason: str) -> None:
+        self._failures.append(SourceFailure(source=source, reason=reason))
+
+    @property
+    def failures(self) -> tuple[SourceFailure, ...]:
+        return tuple(self._failures)
 
     def add(self, entry: ConstantEntry) -> None:
         bucket = self._entries[entry.type]

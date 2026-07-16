@@ -983,6 +983,15 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 tips=["💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html"],
             )
 
+        if self.warnings.constants_extraction:
+            self._display_warning_block(
+                title="Constant reuse skipped",
+                operations=self.warnings.constants_extraction,
+                suffix_text=" could not be scanned for constant reuse",
+                tips=["💡 Check that each @schemathesis.python.constants source returns your app or modules"],
+                entity_name="registered source",
+            )
+
     def display_stateful_failures(self, ctx: BaseExecutionContext) -> None:
         display_section_name("Stateful tests")
 
@@ -1231,6 +1240,16 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 click.echo(
                     _style(
                         f"  ⚠️ Method Not Allowed: {bold(str(count))} operation{suffix} skipped after consistent 405 responses",
+                        fg="yellow",
+                    )
+                )
+
+            if self.warnings.constants_extraction:
+                count = len(self.warnings.constants_extraction)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Constant reuse skipped: {bold(str(count))} registered source{suffix} could not be scanned",
                         fg="yellow",
                     )
                 )

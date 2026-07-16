@@ -136,9 +136,9 @@ class EngineContext:
         """Discover spec-specific stateful transitions; return the number available."""
         return self.schema.apply_stateful_inference(self)
 
-    def extract_constants(self) -> None:
+    def extract_constants(self) -> ConstantsPool:
         """Force one-time constant extraction so later strategy builds hit a ready pool."""
-        self.constants_extraction  # noqa: B018
+        return self.constants_extraction
 
     def stop(self) -> None:
         self.control.stop()

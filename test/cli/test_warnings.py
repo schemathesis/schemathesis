@@ -2,6 +2,9 @@ import pytest
 from _pytest.main import ExitCode
 from flask import Response
 
+import schemathesis
+from schemathesis.python._constants.registry import default_registry
+
 
 def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
     app = ctx.openapi.make_flask_app_from_schema(schema)
@@ -321,3 +324,23 @@ def test_warning_on_many_operations(ctx, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.fixture
+def _clean_registry():
+    default_registry().clear()
+    yield
+    default_registry().clear()
+
+
+@pytest.mark.usefixtures("_clean_registry")
+def test_constants_extraction_warning_displayed(cli, ctx):
+    @schemathesis.python.constants
+    def broken_source():
+        raise RuntimeError("boom in source")
+
+    api = ctx.openapi.apps.success()
+    result = cli.run(api.schema_url, "--max-examples=1")
+
+    assert "WARNINGS" in result.stdout
+    assert "broken_source" in result.stdout
