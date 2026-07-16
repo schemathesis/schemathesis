@@ -6134,7 +6134,8 @@ def test_negative_enum_does_not_flag_integer_entries_matching_declared_type(ctx,
 def test_negative_const_emits_value_with_type_mismatch_for_keyword_coverage(ctx):
     # Positive path skips the const value as `type`-invalid, so only the negative can exercise `const` here.
     loaded = ctx.openapi.load_schema(
-        {
+        version="3.1.0",
+        paths={
             "/foo": {
                 "post": {
                     "requestBody": {
@@ -6153,7 +6154,7 @@ def test_negative_const_emits_value_with_type_mismatch_for_keyword_coverage(ctx)
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
     )
     operation = loaded["/foo"]["POST"]
     cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
@@ -6163,6 +6164,28 @@ def test_negative_const_emits_value_with_type_mismatch_for_keyword_coverage(ctx)
         if isinstance(c.body, dict) and "chunk_size" in c.body and isinstance(c.body["chunk_size"], int)
     }
     assert 42 in emitted, f"Expected const value as a negative; got: {emitted}"
+
+
+DRAFT6_KEYWORD_SCHEMAS = [
+    ({"type": "string", "const": "fixed"}, CoverageScenario.INVALID_ENUM_VALUE),
+    (
+        {"type": "object", "propertyNames": {"pattern": "^[a-z]+$"}, "minProperties": 1},
+        CoverageScenario.OBJECT_INVALID_PROPERTY_NAME,
+    ),
+]
+
+
+@pytest.mark.parametrize(("body_schema", "scenario"), DRAFT6_KEYWORD_SCHEMAS, ids=["const", "propertyNames"])
+def test_negative_draft6_keywords_not_negated_under_draft4(ctx, body_schema, scenario):
+    # OAS 3.0 validates with Draft 4, which predates these keywords — their mutations are valid to the reference validator.
+    cases = collect_coverage_cases(ctx, body_schema)
+    assert scenario not in {c.meta.phase.data.scenario for c in cases}
+
+
+@pytest.mark.parametrize(("body_schema", "scenario"), DRAFT6_KEYWORD_SCHEMAS, ids=["const", "propertyNames"])
+def test_negative_draft6_keywords_negated_under_draft2020(ctx, body_schema, scenario):
+    cases = collect_coverage_cases(ctx, body_schema, version="3.1.0")
+    assert scenario in {c.meta.phase.data.scenario for c in cases}
 
 
 def test_coverage_positive_template_with_enum_and_type_mismatch(ctx):

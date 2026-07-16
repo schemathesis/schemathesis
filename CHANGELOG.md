@@ -18,6 +18,7 @@
 - Integers generated outside the range implied by `format: int32`/`int64`. [#593](https://github.com/schemathesis/schemathesis/issues/593)
 - Internal error on responses declaring an unknown or invalid charset.
 - Generation error for numbers combining `multipleOf` with `minimum` and `maximum` in the coverage phase.
+- False positive `negative_data_rejection` for `const` and `propertyNames` under Open API 3.0 in the coverage phase.
 
 ### :rocket: Performance
 
