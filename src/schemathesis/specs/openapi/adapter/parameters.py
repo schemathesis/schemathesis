@@ -672,15 +672,26 @@ def _deep_merge_overlay(target: dict[str, Any], overlay: dict[str, Any]) -> None
             target[key] = value
 
 
-def _schema_has_integer_properties(schema: JsonSchemaObject) -> bool:
-    """Check if the schema has any integer-type properties."""
-    properties = schema.get("properties")
-    if not isinstance(properties, dict):
-        return False
-    for prop_schema in properties.values():
+def _resolve_inclusive_bound(schema: JsonSchemaObject, inclusive_key: str, exclusive_key: str, step: int) -> int | None:
+    # `bool` is a subclass of `int`; a boolean bound is an invalid schema, so ignore it.
+    value = schema.get(inclusive_key)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    exclusive = schema.get(exclusive_key)
+    if isinstance(exclusive, int) and not isinstance(exclusive, bool):
+        return exclusive + step
+    return None
+
+
+def _integer_property_bounds(schema: JsonSchemaObject) -> dict[str, tuple[int | None, int | None]]:
+    """Per-property inclusive integer bounds, used to keep the positive-ID bias within range."""
+    bounds: dict[str, tuple[int | None, int | None]] = {}
+    for name, prop_schema in schema.get("properties", {}).items():
         if isinstance(prop_schema, dict) and prop_schema.get("type") == "integer":
-            return True
-    return False
+            minimum = _resolve_inclusive_bound(prop_schema, "minimum", "exclusiveMinimum", 1)
+            maximum = _resolve_inclusive_bound(prop_schema, "maximum", "exclusiveMaximum", -1)
+            bounds[name] = (minimum, maximum)
+    return bounds
 
 
 def _has_explicit_slash_example(examples: Sequence[object]) -> bool:
@@ -702,7 +713,9 @@ def _get_explicit_intent_path_names(*, parameters: Sequence[OpenApiParameter]) -
     return frozenset(explicit)
 
 
-def _bias_path_integers_to_positive(params: dict[str, Any], random: Random) -> dict[str, Any]:
+def _bias_path_integers_to_positive(
+    params: dict[str, Any], random: Random, bounds: dict[str, tuple[int | None, int | None]]
+) -> dict[str, Any]:
     """Bias integer path parameters toward positive values.
 
     Most REST APIs use positive integers for resource IDs (1, 2, 3, ...),
@@ -720,13 +733,22 @@ def _bias_path_integers_to_positive(params: dict[str, Any], random: Random) -> d
             and random.random() < PATH_INTEGER_POSITIVE_BIAS
         ):
             # Convert to positive: 0 -> 1, negative -> abs(value) or 1
-            result[key] = max(1, abs(value))
+            candidate = max(1, abs(value))
+            minimum, maximum = bounds.get(key, (None, None))
+            # `abs` can overshoot the declared range (e.g. `abs(int32 min) = int32 max + 1`);
+            # keep the already-valid original value rather than emit out-of-range data.
+            if (maximum is not None and candidate > maximum) or (minimum is not None and candidate < minimum):
+                result[key] = value
+            else:
+                result[key] = candidate
         else:
             result[key] = value
     return result
 
 
-def build_positive_biased_path_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
+def build_positive_biased_path_strategy(
+    strategy: st.SearchStrategy, bounds: dict[str, tuple[int | None, int | None]]
+) -> st.SearchStrategy:
     """Wrap a path parameter strategy to bias integers toward positive values."""
     from hypothesis import strategies as st
 
@@ -740,7 +762,7 @@ def build_positive_biased_path_strategy(strategy: st.SearchStrategy) -> st.Searc
         # `GeneratedValue`. Unwrap, bias, and re-wrap preserving provenance — otherwise
         # `params.items()` would explode for integer path parameters.
         if isinstance(params, GeneratedValue):
-            biased_value = _bias_path_integers_to_positive(params.value, random)
+            biased_value = _bias_path_integers_to_positive(params.value, random, bounds)
             return GeneratedValue(
                 value=biased_value,
                 meta=params.meta,
@@ -749,7 +771,7 @@ def build_positive_biased_path_strategy(strategy: st.SearchStrategy) -> st.Searc
                 dictionary_draws=params.dictionary_draws,
                 constants_draws=params.constants_draws,
             )
-        return _bias_path_integers_to_positive(params, random)
+        return _bias_path_integers_to_positive(params, random, bounds)
 
     return biased()
 
@@ -2001,12 +2023,10 @@ class OpenApiParameterSet(ParameterSet):
 
             # Bias path parameter integers toward positive values BEFORE the constants overlay, so a
             # substituted literal (e.g. a negative sentinel id) is the final value and is never rewritten.
-            if (
-                self.location == ParameterLocation.PATH
-                and not is_negative
-                and _schema_has_integer_properties(schema_obj)
-            ):
-                strategy = build_positive_biased_path_strategy(strategy)
+            if self.location == ParameterLocation.PATH and not is_negative:
+                integer_bounds = _integer_property_bounds(schema_obj)
+                if integer_bounds:
+                    strategy = build_positive_biased_path_strategy(strategy, integer_bounds)
 
             # Apply the constants overlay BEFORE the semantic overlay so live, response-derived
             # values can overwrite a random pool literal for the same field. `build_semantic_overlay`

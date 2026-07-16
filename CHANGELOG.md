@@ -14,6 +14,7 @@
 - False positive `positive_data_acceptance` for arrays with `contains`/`minContains`/`maxContains` in the coverage phase.
 - False positive `positive_data_acceptance` for objects with `dependentRequired`/`dependentSchemas` in the coverage phase.
 - False positive `negative_data_rejection` for objects combining `additionalProperties` with matching `patternProperties`.
+- False positive `positive_data_acceptance` for path integers at the schema minimum. [#4312](https://github.com/schemathesis/schemathesis/issues/4312)
 - Internal error on responses declaring an unknown or invalid charset.
 
 ### :rocket: Performance

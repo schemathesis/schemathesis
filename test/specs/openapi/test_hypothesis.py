@@ -742,6 +742,42 @@ def test_path_parameters_encoded_braces_are_filtered(ctx):
         inner()
 
 
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    "item_schema",
+    [
+        {"type": "integer", "minimum": -2147483648, "maximum": 2147483647},
+        {"type": "integer", "exclusiveMinimum": -2147483649, "exclusiveMaximum": 2147483648},
+    ],
+    ids=["inclusive", "exclusive"],
+)
+def test_positive_bias_keeps_path_integer_within_bounds(ctx, item_schema):
+    # Positive-ID bias flips negatives via abs(); abs(int32 min) = int32 max + 1 must not exceed the declared max.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": item_schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/items/{item_id}"]["GET"]
+    values = []
+
+    @given(case=operation.as_strategy())
+    # High count: the flip only overshoots when the exact int32 minimum is drawn, a rare boundary draw.
+    @settings(max_examples=1000, deadline=None, derandomize=True, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        values.append(int(case.path_parameters["item_id"]))
+
+    inner()
+    out_of_range = [value for value in values if value > 2147483647 or value < -2147483648]
+    assert not out_of_range, f"Out-of-range path integers: {sorted(set(out_of_range))}"
+
+
 def test_custom_format_with_bytes(testdir):
     # See GH-3289: custom formats returning bytes should work
     testdir.make_test(
