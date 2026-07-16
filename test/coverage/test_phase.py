@@ -6166,6 +6166,34 @@ def test_negative_const_emits_value_with_type_mismatch_for_keyword_coverage(ctx)
     assert 42 in emitted, f"Expected const value as a negative; got: {emitted}"
 
 
+def test_negative_int64_boundary_below_minimum_is_invalid(ctx):
+    # Integers just below the implied int64 minimum must be judged invalid, not rounded onto the bound.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "integer", "format": "int64", "maximum": 100}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = loaded["/foo"]["POST"]
+    validator = operation.schema.adapter.jsonschema_validator_cls(operation.body[0].optimized_schema)
+
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
+
+    below_minimum = [case.body for case in cases if isinstance(case.body, int) and case.body < -(2**63)]
+    assert below_minimum, "expected a below-minimum negative case"
+    for body in below_minimum:
+        assert not validator.is_valid(body), f"below-int64 negative judged valid: {body}"
+
+
 DRAFT6_KEYWORD_SCHEMAS = [
     ({"type": "string", "const": "fixed"}, CoverageScenario.INVALID_ENUM_VALUE),
     (
