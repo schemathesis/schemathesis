@@ -17,6 +17,7 @@
 - False positive `positive_data_acceptance` for path integers at the schema minimum. [#4312](https://github.com/schemathesis/schemathesis/issues/4312)
 - Integers generated outside the range implied by `format: int32`/`int64`. [#593](https://github.com/schemathesis/schemathesis/issues/593)
 - Internal error on responses declaring an unknown or invalid charset.
+- Generation error for numbers combining `multipleOf` with `minimum` and `maximum` in the coverage phase.
 
 ### :rocket: Performance
 

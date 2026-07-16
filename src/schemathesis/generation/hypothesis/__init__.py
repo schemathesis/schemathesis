@@ -325,6 +325,12 @@ def setup() -> None:
         return False
 
     def _fast_canonicalish(schema: JsonSchema) -> JsonSchemaObject:
+        if isinstance(schema, dict):
+            # `merged` can emit duplicated `type` entries (integer/number intersection); metaschema
+            # validation rejects such lists, so deduplicate before canonicalization.
+            type_ = schema.get("type")
+            if isinstance(type_, list) and len(type_) != len(set(type_)):
+                schema = {**schema, "type": list(dict.fromkeys(type_))}
         try:
             cache_key = schema_cache_key(schema)
         except (TypeError, ValueError):

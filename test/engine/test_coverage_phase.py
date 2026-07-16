@@ -446,3 +446,29 @@ def test_coverage_phase_handles_keyboard_interrupt_during_iteration(ctx):
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.COVERAGE)
     assert any(event.status == Status.INTERRUPTED for event in finished), [event.status for event in finished]
     assert stream.find_all(events.Interrupted, phase=PhaseName.COVERAGE)
+
+
+def test_coverage_phase_negative_multiple_of_with_float_bounds(ctx, app_runner):
+    # Negating `multipleOf` next to float bounds used to build a schema with a duplicated `type` list.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "number", "multipleOf": 0.1, "minimum": 0.1, "maximum": 1}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+
+    stream = EventStream(schema, phases=[PhaseName.COVERAGE], modes=[schemathesis.GenerationMode.NEGATIVE]).execute()
+
+    assert stream.find_all(events.NonFatalError) == []
