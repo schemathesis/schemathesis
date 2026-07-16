@@ -30,7 +30,7 @@ from schemathesis.generation.hypothesis.given import (
 )
 from schemathesis.pytest._keys import track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
-from schemathesis.pytest.warnings import emit_openapi_auth_warnings
+from schemathesis.pytest.warnings import emit_constants_warnings, emit_openapi_auth_warnings
 from schemathesis.python._constants.orchestrator import make_constants_value_source
 from schemathesis.schemas import BaseSchema
 
@@ -225,6 +225,7 @@ class LazySchema:
                 if self.auth.is_defined:
                     schema.auth = AuthStorage(providers=list(self.auth.providers) + list(schema.auth.providers))
                 emit_openapi_auth_warnings(schema)
+                emit_constants_warnings(schema)
                 track_schema(request.session.config, schema)
                 # Check if test function is a method and inject self from request.instance
                 sig = signature(test_func)

@@ -92,7 +92,10 @@ def _extract_all(
     pool: ConstantsPool,
     extra_sources: Iterable[Source] = (),
 ) -> None:
-    for source in [*registry.get_all(), *extra_sources]:
+    # Registered sources are an explicit user promise, so their silent failures are recorded; the app
+    # source is best-effort auto-extraction and stays quiet when an app simply has no reusable literals.
+    sources = [(source, True) for source in registry.get_all()] + [(source, False) for source in extra_sources]
+    for source, registered in sources:
         # A user source may be a `functools.partial` or callable instance with no `__name__`.
         name = getattr(source, "__name__", repr(source))
         # A source callable, or resolving its result, can raise anything - including
@@ -102,14 +105,26 @@ def _extract_all(
             raw = source()
         except KeyboardInterrupt:
             raise
-        except BaseException:
+        except BaseException as exc:
+            if registered:
+                pool.record_failure(name, _failure_reason(exc))
             continue
 
         try:
             modules, adapter_name = _resolve_with_adapters(raw, adapters=adapters)
         except KeyboardInterrupt:
             raise
-        except BaseException:
+        except BaseException as exc:
+            if registered:
+                pool.record_failure(name, _failure_reason(exc))
+            continue
+
+        if not modules:
+            # A registered source that resolves to nothing scannable is broken or misconfigured (a
+            # typo'd module name, a wrong object). "scanned fine but no keepable literals" is not an
+            # error and stays silent, matching best-effort auto-extraction from an app.
+            if registered:
+                pool.record_failure(name, "resolved to no modules to scan")
             continue
 
         for module_name in sorted(modules):
@@ -117,6 +132,14 @@ def _extract_all(
             for entry in extract_from_module(module_name, origin=origin):
                 if is_kept(entry.value, entry.type):
                     pool.add(entry)
+
+
+def _failure_reason(exc: BaseException) -> str:
+    # First line only: the reason renders as a single warning entry, and multi-line messages would
+    # break the CLI block layout.
+    text = str(exc).strip().splitlines()
+    first = text[0].strip() if text else ""
+    return f"{type(exc).__name__}: {first}" if first else type(exc).__name__
 
 
 def _resolve_with_adapters(raw: object, *, adapters: list[FrameworkAdapter]) -> tuple[set[str], str | None]:

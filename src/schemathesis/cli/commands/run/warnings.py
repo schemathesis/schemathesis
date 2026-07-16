@@ -23,6 +23,7 @@ class WarningData:
     unused_openapi_auth: set[str]
     unsupported_regex: dict[str, set[str]]
     method_not_allowed: set[str]
+    constants_extraction: set[str]
 
     def __init__(
         self,
@@ -33,6 +34,7 @@ class WarningData:
         unused_openapi_auth: set[str] | None = None,
         unsupported_regex: dict[str, set[str]] | None = None,
         method_not_allowed: set[str] | None = None,
+        constants_extraction: set[str] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
@@ -41,6 +43,7 @@ class WarningData:
         self.unused_openapi_auth = unused_openapi_auth or set()
         self.unsupported_regex = unsupported_regex or {}
         self.method_not_allowed = method_not_allowed or set()
+        self.constants_extraction = constants_extraction or set()
 
     @property
     def is_empty(self) -> bool:
@@ -52,6 +55,7 @@ class WarningData:
             or self.unused_openapi_auth
             or self.unsupported_regex
             or self.method_not_allowed
+            or self.constants_extraction
         )
 
     @property
@@ -67,6 +71,7 @@ class WarningData:
                 self.unused_openapi_auth,
                 self.unsupported_regex,
                 self.method_not_allowed,
+                self.constants_extraction,
             )
             if warnings
         )
@@ -193,6 +198,12 @@ class WarningCollector:
                     warning.kind,
                     self._record_unsupported_regex_warning(warning.operation_label, warning.message),
                 )
+            elif warning.kind is SchemathesisWarning.CONSTANTS_EXTRACTION:
+                self._handle_warning(
+                    ctx,
+                    warning.kind,
+                    self._record_constants_extraction_warning(warning.message),
+                )
 
     def _check_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.skip_warning is not None and event.label is not None:
@@ -318,6 +329,14 @@ class WarningCollector:
 
         def record() -> None:
             self.data.unsupported_regex.setdefault(operation_label, set()).add(message)
+
+        return record
+
+    def _record_constants_extraction_warning(self, message: str) -> Callable[[], None]:
+        """Create a callback that records a constants extraction warning."""
+
+        def record() -> None:
+            self.data.constants_extraction.add(message)
 
         return record
 

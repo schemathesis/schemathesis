@@ -5,11 +5,13 @@ from pathlib import Path
 import pytest
 from flask import Flask, jsonify
 
+from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.python._constants import orchestrator
 from schemathesis.python._constants.adapters.flask import FlaskAdapter
 from schemathesis.python._constants.orchestrator import extract_all
 from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.python._constants.registry import SourceRegistry, constants
+from schemathesis.python._constants.warnings import iter_constants_warnings
 from test.python._constants.fixtures.dep_pkg import flask_app, shared
 from test.python._constants.helpers import pool_values
 
@@ -22,7 +24,7 @@ def _on_path():
     yield
     sys.path.remove(str(FIXTURES))
     for name in list(sys.modules):
-        for top in ("sample_pkg", "exit_pkg"):
+        for top in ("sample_pkg", "exit_pkg", "empty_module"):
             if name == top or name.startswith(f"{top}."):
                 sys.modules.pop(name)
 
@@ -79,6 +81,53 @@ def test_orchestrator_isolates_source_errors():
 
     result = extract_all(registry=registry, adapters=[])
     assert not result.is_empty()
+    # The raising source is recorded so its silent failure can be surfaced to the user.
+    assert [(f.source, "intentional" in f.reason) for f in result.failures] == [("boom", True)]
+
+
+def test_registered_source_resolving_to_no_modules_is_recorded():
+    registry = SourceRegistry()
+
+    @registry.register
+    def empty():
+        return []
+
+    result = extract_all(registry=registry, adapters=[])
+    assert [f.source for f in result.failures] == ["empty"]
+
+
+def test_registered_source_scanning_a_literal_free_module_is_not_recorded():
+    # Scanned fine, just no keepable literals: legitimately empty, not an error.
+    registry = SourceRegistry()
+
+    @registry.register
+    def no_literals():
+        return ["empty_module"]
+
+    result = extract_all(registry=registry, adapters=[])
+    assert result.failures == ()
+
+
+def test_app_source_failure_is_not_recorded():
+    # Auto-extraction from an app is best-effort; even a raising app source stays silent.
+    def failing_app():
+        raise RuntimeError("boom")
+
+    result = extract_all(registry=SourceRegistry(), adapters=[], extra_sources=[failing_app])
+    assert result.failures == ()
+
+
+def test_pool_failures_convert_to_schema_warnings():
+    registry = SourceRegistry()
+
+    @registry.register
+    def boom():
+        raise RuntimeError("bad")
+
+    pool = extract_all(registry=registry, adapters=[])
+    warnings = iter_constants_warnings(pool)
+    assert [(w.kind, w.operation_label) for w in warnings] == [(SchemathesisWarning.CONSTANTS_EXTRACTION, None)]
+    assert "boom" in warnings[0].message
 
 
 def test_orchestrator_falls_back_to_app_module():
@@ -127,6 +176,7 @@ def test_orchestrator_isolates_generator_iteration_error():
 
     result = extract_all(registry=registry, adapters=[])
     assert "active" in pool_values(result, "string")
+    assert [f.source for f in result.failures] == ["from_faulty"]
 
 
 def test_source_without_name_is_handled():
@@ -226,6 +276,7 @@ def test_orchestrator_keeps_partial_results_when_source_raises_base_exception():
 
     result = extract_all(registry=registry, adapters=[])
     assert "active" in pool_values(result, "string")
+    assert [f.source for f in result.failures] == ["exits"]
 
 
 def test_orchestrator_follows_handler_module_local_imports():

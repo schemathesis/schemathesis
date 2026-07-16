@@ -49,7 +49,7 @@ from schemathesis.generation.hypothesis.reporting import (
 from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
-from schemathesis.pytest.warnings import emit_openapi_auth_warnings
+from schemathesis.pytest.warnings import emit_constants_warnings, emit_openapi_auth_warnings
 from schemathesis.python._constants.orchestrator import make_constants_value_source
 from schemathesis.schemas import APIOperation
 
@@ -292,6 +292,7 @@ class SchemathesisCase(PyCollector):
         try:
             track_schema(self.config, self.schema)
             emit_openapi_auth_warnings(self.schema)
+            emit_constants_warnings(self.schema)
             feedback = FeedbackSources(constants_value_source=make_constants_value_source(self.schema))
             items = [
                 item for operation in self.schema.get_all_operations() for item in self._gen_items(operation, feedback)

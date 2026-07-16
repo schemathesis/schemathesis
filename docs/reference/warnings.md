@@ -15,6 +15,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `missing_deserializer` | Structured responses lack a registered deserializer | Register one via `@schemathesis.deserializer` or align `content` types with actual formats |
 | `unused_openapi_auth` | Configured OpenAPI auth scheme doesn't exist in schema | Check scheme name matches `securitySchemes` (check for typos) |
 | `method_not_allowed` | Operation consistently returned `405 Method Not Allowed` | Verify the server accepts this method, or remove the operation from the schema |
+| `constants_extraction` | A registered `@schemathesis.python.constants` source could not be scanned | Return your app or importable modules from the source |
 
 ## Available Warnings
 
@@ -125,6 +126,20 @@ Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed` �
 Schemathesis stops scheduling the operation in subsequent phases to free budget for operations that can actually be tested. The streak length required is small — a single non-405 response anywhere cancels the streak, so this fires only when an operation never returns anything else.
 
 Common causes: a typo in the path, a method declared in the schema that the server doesn't implement, or an environment-specific routing layer that 405s for the configured base URL. If `405` is a legitimate documented response for the operation, list it under `responses:` in the schema and the warning will not fire.
+
+### `constants_extraction`
+
+```
+Constant reuse skipped: 1 registered source could not be scanned
+
+  - `my_constants` resolved to no modules to scan
+
+💡 Check that each @schemathesis.python.constants source returns your app or modules
+```
+
+**Trigger**: A source registered with `@schemathesis.python.constants` either raised while running or resolved to nothing importable, so no literals could be harvested from it.
+
+This fires only for explicitly registered sources — automatic extraction from an app loaded via `from_asgi`/`from_wsgi` stays silent when it simply finds no reusable values. Common causes: the source raises at call time, or names a module that fails to import. A source that resolves to real modules with no reusable literals is not reported.
 
 ## Configuring Warnings
 
