@@ -336,6 +336,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
         # Values that have been successfully DELETEd; pool draws skip them.
         self._tombstoned: set[tuple[str, Any]] = set()
 
+    # Opaque repr so Hypothesis' argument rendering never walks the live pool that concurrent workers mutate.
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
+
     def _is_tombstoned(self, resource_name: str, value: Any) -> bool:
         try:
             return (resource_name, value) in self._tombstoned
