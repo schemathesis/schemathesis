@@ -1086,6 +1086,20 @@ class OpenApiParameter(OpenApiComponent):
         # (`EnumType.__call__` → `Enum.__new__`) is the slow path here.
         return _IN_TO_LOCATION.get(self.definition.get("in"), ParameterLocation.UNKNOWN)
 
+    def _build_schema(self, *, optimize: bool) -> JsonSchema:
+        schema = super()._build_schema(optimize=optimize)
+        # A required parameter with an empty array value serializes to nothing (form/simple styles
+        # drop empty arrays), leaving the parameter absent from the request and violating `required`.
+        if (
+            self.is_required
+            and isinstance(schema, dict)
+            and schema.get("type") == "array"
+            and schema.get("minItems", 0) < 1
+            and schema.get("maxItems", 1) >= 1
+        ):
+            schema = {**schema, "minItems": 1}
+        return schema
+
     def _get_raw_schema(self) -> JsonSchema:
         """Get raw parameter schema."""
         return self.adapter.extract_parameter_schema(self.definition)
