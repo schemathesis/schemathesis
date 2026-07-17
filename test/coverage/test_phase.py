@@ -2225,7 +2225,10 @@ def test_query_parameters_with_nested_enum(ctx):
             },
             {
                 "query": {
-                    "q1": [],
+                    "q1": [
+                        "A",
+                        "A",
+                    ],
                 },
             },
             {
@@ -2433,6 +2436,7 @@ def test_query_without_constraints_negative(ctx):
             [
                 "http://127.0.0.1/foo",
                 "http://127.0.0.1/foo?q=0&q=0",
+                "http://127.0.0.1/foo",
                 "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null&q=null",
                 "http://127.0.0.1/foo?q=null",

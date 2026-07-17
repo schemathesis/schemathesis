@@ -125,6 +125,37 @@ def test_missed_ref(ctx, deeply_nested_schema):
     test()
 
 
+@pytest.mark.parametrize("location", ["query", "header"])
+def test_required_array_parameter_is_non_empty(ctx, location):
+    # An empty array for a required parameter serializes to nothing, dropping the parameter
+    # from the wire and violating `required: true`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": location,
+                            "name": "ids",
+                            "required": True,
+                            "schema": {"type": "array", "items": {"type": "integer"}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    container = {"query": "query", "header": "headers"}[location]
+
+    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=15)
+    def test(case):
+        assert getattr(case, container).get("ids"), "Required array parameter generated as empty or absent"
+
+    test()
+
+
 def test_inlined_definitions(deeply_nested_schema):
     # See GH-1162
     # When not resolved references are present in the schema during constructing a strategy
