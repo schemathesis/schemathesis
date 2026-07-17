@@ -725,3 +725,69 @@ def test(case, simple_schema):
     )
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
+
+
+# `call_and_validate()` must recover from a single-use token that goes stale after the first call, like the engine does.
+def test_reactive_reauth_on_pytest_path(testdir):
+    testdir.makefile(".toml", schemathesis='[generation]\nmode = "positive"\n')
+    testdir.make_test(
+        """
+from flask import Flask, request
+app = Flask(__name__)
+
+consumed = set()
+
+@app.route("/users/<int:user_id>")
+def get_user(user_id):
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+    if token and token not in consumed:
+        consumed.add(token)
+        return {"user_id": user_id}
+    return {"error": "Unauthorized"}, 401
+
+@app.route("/openapi.json")
+def openapi():
+    return {
+        "openapi": "3.0.3",
+        "info": {"version": "0.1", "title": "Test API"},
+        "paths": {
+            "/users/{user_id}": {
+                "get": {
+                    "parameters": [
+                        {"name": "user_id", "in": "path", "required": True, "schema": {"type": "integer", "minimum": 0}}
+                    ],
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    },
+                    "security": [{"MyBearer": []}],
+                }
+            }
+        },
+        "components": {"securitySchemes": {"MyBearer": {"type": "http", "scheme": "bearer"}}},
+    }
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+counter = {"n": 0}
+
+@schema.auth(retry_on=[401])
+class TokenAuth:
+    def get(self, case, ctx):
+        counter["n"] += 1
+        return f"t{counter['n']}"
+
+    def set(self, case, data, ctx):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+from schemathesis.specs.openapi.checks import ignored_auth
+
+@schema.parametrize()
+@settings(max_examples=3)
+def test_api(case):
+    # ignored_auth's auth-stripped probes consume the one-use token; exclude it as orthogonal to reauth.
+    assert case.call_and_validate(excluded_checks=[ignored_auth]).status_code == 200
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)

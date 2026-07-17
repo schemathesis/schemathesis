@@ -35,7 +35,7 @@ from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark
 from schemathesis.transport.prepare import prepare_path
 
-from .auths import AuthStorage
+from .auths import AuthStorage, ReauthState, compute_retry_on_statuses
 from .filters import (
     FilterSet,
     FilterValue,
@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
     from werkzeug.test import TestResponse
 
-    from schemathesis.auths import AuthContext
+    from schemathesis.auths import AuthContext, AuthProvider
     from schemathesis.core import Specification
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
@@ -110,6 +110,10 @@ class BaseSchema(Mapping):
     def is_security_param_negated(self, case: Case) -> bool:
         return False
 
+    def _security_auth_providers(self) -> Iterator[AuthProvider]:
+        # Auth providers bound to declared security schemes. Only OpenAPI has them.
+        return iter(())
+
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         """Apply spec-specific authentication to a test case.
 
@@ -117,6 +121,15 @@ class BaseSchema(Mapping):
         Subclasses should implement this to provide spec-specific auth mechanisms.
         """
         raise NotImplementedError
+
+    @cached_property
+    def reauth_retry_statuses(self) -> frozenset[int]:
+        return compute_retry_on_statuses(self)
+
+    @property
+    def reauth_state(self) -> ReauthState:
+        """Fresh per call, so a tripped breaker does not leak into later calls."""
+        return ReauthState(retry_on_statuses=self.reauth_retry_statuses)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 

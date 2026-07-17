@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -16,19 +16,25 @@ from typing import (
     runtime_checkable,
 )
 
+from schemathesis.config._auth import DEFAULT_RETRY_ON
 from schemathesis.core.errors import AuthenticationError, IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
-from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
 
 if TYPE_CHECKING:
     import requests.auth
 
-    from schemathesis.schemas import APIOperation
+    from schemathesis.core.transport import Response
+    from schemathesis.generation.case import Case
+    from schemathesis.schemas import APIOperation, BaseSchema
 
 DEFAULT_REFRESH_INTERVAL = 300
+# Consecutive non-recovering reauth attempts before the breaker trips and disables reauth for the run. Not configurable.
+REAUTH_BREAKER_THRESHOLD = 3
+# Consecutive failed token fetches before a caching provider stops hammering the login endpoint. Not configurable.
+TOKEN_FETCH_BREAKER_THRESHOLD = 3
 AuthStorageMark = Mark["AuthStorage"](attr_name="auth_storage")
 Auth = TypeVar("Auth")
 
@@ -125,7 +131,11 @@ class CachingAuthProvider(Generic[Auth]):
     cache_entry: CacheEntry[Auth] | None = None
     # The timer exists here to simplify testing
     timer: Callable[[], float] = time.monotonic
+    # Status codes that should trigger a cache invalidation + refetch on the next request.
+    retry_on: list[int] = field(default_factory=lambda: list(DEFAULT_RETRY_ON))
     _refresh_lock: threading.Lock = field(default_factory=threading.Lock)
+    _fetch_failures: dict[str | int | None, int] = field(default_factory=dict)
+    _fetch_disabled_keys: set[str | int | None] = field(default_factory=set)
 
     def get(self, case: Case, context: AuthContext) -> Auth | None:
         """Get cached auth value."""
@@ -137,19 +147,39 @@ class CachingAuthProvider(Generic[Auth]):
                 if not (cache_entry is None or self.timer() >= cache_entry.expires):
                     # Another thread updated the cache
                     return cache_entry.data
+                # A dead credential fails every fetch; stop hammering the login endpoint once tripped.
+                key = self._fetch_key(case, context)
+                if key in self._fetch_disabled_keys:
+                    raise AuthenticationError(
+                        self.provider.__class__.__name__,
+                        "get",
+                        f"Token fetch failed {TOKEN_FETCH_BREAKER_THRESHOLD} times in a row; not retrying for this run",
+                    )
                 # We know that optional auth is possible only inside a higher-level wrapper
                 try:
                     data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
                 except AuthenticationError:
+                    self._note_fetch_failure(key)
                     raise
                 except Exception as exc:
+                    self._note_fetch_failure(key)
                     provider_name = self.provider.__class__.__name__
                     raise AuthenticationError(
                         provider_name, "get", str(exc), show_traceback=True, include_provider_context=True
                     ) from exc
+                self._fetch_failures.pop(key, None)
                 self._set_cache_entry(data, case, context)
                 return data
         return cache_entry.data
+
+    def _fetch_key(self, case: Case, context: AuthContext) -> str | int | None:
+        return None
+
+    def _note_fetch_failure(self, key: str | int | None) -> None:
+        count = self._fetch_failures.get(key, 0) + 1
+        self._fetch_failures[key] = count
+        if count >= TOKEN_FETCH_BREAKER_THRESHOLD:
+            self._fetch_disabled_keys.add(key)
 
     def _get_cache_entry(self, case: Case, context: AuthContext) -> CacheEntry[Auth] | None:
         return self.cache_entry
@@ -163,6 +193,9 @@ class CachingAuthProvider(Generic[Auth]):
         This implementation delegates this to the actual provider.
         """
         self.provider.set(case, data, context)
+
+    def invalidate(self) -> None:
+        self.cache_entry = None
 
 
 def _noop_key_function(case: Case, context: AuthContext) -> str:
@@ -182,6 +215,12 @@ class KeyedCachingAuthProvider(CachingAuthProvider[Auth]):
     def _set_cache_entry(self, data: Auth, case: Case, context: AuthContext) -> None:
         key = self.cache_by_key(case, context)
         self.cache_entries[key] = CacheEntry(data=data, expires=self.timer() + self.refresh_interval)
+
+    def _fetch_key(self, case: Case, context: AuthContext) -> str | int | None:
+        return self.cache_by_key(case, context)
+
+    def invalidate(self) -> None:
+        self.cache_entries.clear()
 
 
 class FilterableRegisterAuth(Protocol):
@@ -291,7 +330,7 @@ class SelectiveAuthProvider(Generic[Auth]):
                 # Need to unwrap to get the actual provider class name
                 provider = self.provider
                 # Unwrap caching providers
-                while isinstance(provider, CachingAuthProvider | KeyedCachingAuthProvider):
+                while isinstance(provider, CachingAuthProvider):
                     provider = provider.provider
                 provider_name = provider.__class__.__name__
                 raise AuthenticationError(
@@ -321,6 +360,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
+        retry_on: list[int] | None = None,
     ) -> FilterableRegisterAuth: ...
 
     @overload
@@ -330,6 +370,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
+        retry_on: list[int] | None = None,
     ) -> FilterableApplyAuth: ...
 
     def __call__(
@@ -338,10 +379,13 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
+        retry_on: list[int] | None = None,
     ) -> FilterableRegisterAuth | FilterableApplyAuth:
         if provider_class is not None:
-            return self.apply(provider_class, refresh_interval=refresh_interval, cache_by_key=cache_by_key)
-        return self.auth(refresh_interval=refresh_interval, cache_by_key=cache_by_key)
+            return self.apply(
+                provider_class, refresh_interval=refresh_interval, cache_by_key=cache_by_key, retry_on=retry_on
+            )
+        return self.auth(refresh_interval=refresh_interval, cache_by_key=cache_by_key, retry_on=retry_on)
 
     def set_from_requests(self, auth: requests.auth.AuthBase) -> FilterableRequestsAuth:
         """Use `requests` auth instance as an auth provider."""
@@ -361,6 +405,7 @@ class AuthStorage(Generic[Auth]):
         provider_class: type[AuthProvider],
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
+        retry_on: list[int] | None = None,
         filter_set: FilterSet,
     ) -> None:
         if not issubclass(provider_class, AuthProvider):
@@ -373,11 +418,15 @@ class AuthStorage(Generic[Auth]):
         # Apply caching if desired
         instance = provider_class()
         if refresh_interval is not None:
+            resolved_retry_on = list(DEFAULT_RETRY_ON) if retry_on is None else retry_on
             if cache_by_key is None:
-                provider = CachingAuthProvider(instance, refresh_interval=refresh_interval)
+                provider = CachingAuthProvider(instance, refresh_interval=refresh_interval, retry_on=resolved_retry_on)
             else:
                 provider = KeyedCachingAuthProvider(
-                    instance, refresh_interval=refresh_interval, cache_by_key=cache_by_key
+                    instance,
+                    refresh_interval=refresh_interval,
+                    cache_by_key=cache_by_key,
+                    retry_on=resolved_retry_on,
                 )
         else:
             provider = instance
@@ -391,6 +440,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
+        retry_on: list[int] | None = None,
     ) -> FilterableRegisterAuth:
         filter_set = FilterSet()
 
@@ -400,6 +450,7 @@ class AuthStorage(Generic[Auth]):
                 refresh_interval=refresh_interval,
                 filter_set=filter_set,
                 cache_by_key=cache_by_key,
+                retry_on=retry_on,
             )
             return provider_class
 
@@ -421,6 +472,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
+        retry_on: list[int] | None = None,
     ) -> FilterableApplyAuth:
         filter_set = FilterSet()
 
@@ -434,6 +486,7 @@ class AuthStorage(Generic[Auth]):
                 refresh_interval=refresh_interval,
                 filter_set=filter_set,
                 cache_by_key=cache_by_key,
+                retry_on=retry_on,
             )
             return test
 
@@ -529,16 +582,117 @@ GLOBAL_AUTH_STORAGE: AuthStorage = AuthStorage()
 unregister = GLOBAL_AUTH_STORAGE.unregister
 
 
+def _caching_providers_in(storage: AuthStorage) -> Iterator[CachingAuthProvider]:
+    for provider in storage.providers:
+        if isinstance(provider, SelectiveAuthProvider):
+            provider = provider.provider
+        if isinstance(provider, CachingAuthProvider):
+            yield provider
+
+
+def _iter_caching_providers(case: Case) -> Iterator[CachingAuthProvider]:
+    """Caching auth providers reachable for this case: config dynamic-token, schema-level and global ``@auth``."""
+    for provider in case.operation.schema._security_auth_providers():
+        if isinstance(provider, CachingAuthProvider):
+            yield provider
+    yield from _caching_providers_in(case.operation.schema.auth)
+    yield from _caching_providers_in(GLOBAL_AUTH_STORAGE)
+
+
+def refresh_auth(case: Case) -> None:
+    """Invalidate cached auth for `case` and re-apply it, so the next request carries a fresh token."""
+    # Concurrent callers coalesce onto one refetch via CachingAuthProvider.get's lock; invalidate only clears.
+    for provider in _iter_caching_providers(case):
+        provider.invalidate()
+    set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app), None)
+
+
+@dataclass(slots=True)
+class ReauthState:
+    """Reactive-reauth state shared across worker threads."""
+
+    retry_on_statuses: frozenset[int]
+    reauth_count: int = 0
+    # Breaker tripped: gate that stops further reauth attempts.
+    disabled: bool = False
+    # Breaker tripped at least once (for reporting).
+    broke: bool = False
+    _consecutive_failures: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def should_retry(self, status_code: int) -> bool:
+        return status_code in self.retry_on_statuses and not self.disabled
+
+    def note_refresh_failure(self) -> None:
+        with self._lock:
+            self._record_failure()
+
+    def note_replay(self, status_code: int) -> None:
+        with self._lock:
+            if 200 <= status_code < 300:
+                self._consecutive_failures = 0
+                self.reauth_count += 1
+            elif status_code in self.retry_on_statuses:
+                self._record_failure()
+            # A non-2xx, non-retry status (e.g. 403, 500) is neither recovery nor reauth failure: leave the streak.
+
+    def _record_failure(self) -> None:
+        # Caller holds `_lock`.
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= REAUTH_BREAKER_THRESHOLD:
+            self.disabled = True
+            self.broke = True
+
+
+def compute_retry_on_statuses(schema: BaseSchema) -> frozenset[int]:
+    """Union of `retry_on` across configured dynamic schemes and registered `@auth` providers; empty means off."""
+    statuses: set[int] = set()
+    for scheme in schema.config.auth.dynamic.schemes.values():
+        statuses.update(scheme.retry_on)
+    for provider in (*_caching_providers_in(schema.auth), *_caching_providers_in(GLOBAL_AUTH_STORAGE)):
+        statuses.update(provider.retry_on)
+    return frozenset(statuses)
+
+
+def reauth_and_replay(case: Case, response: Response, state: ReauthState, recall: Callable[[], Response]) -> Response:
+    """Refresh auth and replay the request once if `response` signals an expired token.
+
+    Returns the replay (if a refresh happened) or the original response unchanged. `recall`
+    performs one fresh request. Negated-security cases keep their expected 401 and are skipped.
+    """
+    if not (
+        state.should_retry(response.status_code)
+        and case._has_explicit_auth
+        and not case.operation.schema.is_security_param_negated(case)
+    ):
+        return response
+    try:
+        refresh_auth(case)
+    except AuthenticationError:
+        state.note_refresh_failure()
+        return response
+    try:
+        replay = recall()
+    except Exception:
+        # Replay could not complete (e.g. transport error); keep the response we already have.
+        return response
+    state.note_replay(replay.status_code)
+    return replay
+
+
 def auth(
     *,
     refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
     cache_by_key: CacheKeyFunction | None = None,
+    retry_on: list[int] | None = None,
 ) -> FilterableRegisterAuth:
     """Register a dynamic authentication provider for APIs with expiring tokens.
 
     Args:
         refresh_interval: Seconds between token refreshes. Default is `300`. Use `None` to disable caching
         cache_by_key: Function to generate cache keys for different auth contexts (e.g., OAuth scopes)
+        retry_on: Status codes that trigger a cache invalidation and token refetch. Default is `[401]`.
+            Use `[]` to disable.
 
     Example:
         ```python
@@ -562,7 +716,7 @@ def auth(
         ```
 
     """
-    return GLOBAL_AUTH_STORAGE.auth(refresh_interval=refresh_interval, cache_by_key=cache_by_key)
+    return GLOBAL_AUTH_STORAGE.auth(refresh_interval=refresh_interval, cache_by_key=cache_by_key, retry_on=retry_on)
 
 
 auth.__dict__ = GLOBAL_AUTH_STORAGE.auth.__dict__

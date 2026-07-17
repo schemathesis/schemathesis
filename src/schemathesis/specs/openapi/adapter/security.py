@@ -368,7 +368,8 @@ def build_auth_provider(
                 extract_from=config.extract_from,
                 extract_selector=config.extract_selector,
                 _applier=applier,
-            )
+            ),
+            retry_on=list(config.retry_on),
         )
 
     # Should never reach here due to JSON Schema validation

@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Dynamic token authentication support for OAuth2 and OpenID Connect security schemes.
+- Reactive auth refresh: refetch the token and replay a request on configured statuses (`auth.dynamic.openapi.<scheme>.retry-on`, `@schemathesis.auth(retry_on=[401])`).
 
 ### :bug: Fixed
 
