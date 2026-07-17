@@ -339,6 +339,10 @@ class RunSummary:
     """End-of-run summary carried on `EngineFinished.payload`."""
 
     cache: CacheRunMetrics = field(default_factory=CacheRunMetrics)
+    # Number of successful reactive-auth-refresh recoveries this run.
+    reauth_count: int = 0
+    # Whether the reauth circuit breaker tripped this run.
+    reauth_broke: bool = False
 
 
 @dataclass

@@ -226,6 +226,9 @@ class AuthBackend(Protocol):
 
     def apply_auth(self, case: Case, context: AuthContext) -> bool: ...  # pragma: no cover
 
+    @property
+    def reauth_retry_statuses(self) -> frozenset[int]: ...  # pragma: no cover
+
 
 class ApiSchema(
     SchemaMetadata,

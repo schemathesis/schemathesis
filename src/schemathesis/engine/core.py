@@ -177,6 +177,8 @@ class ExecutionPlan:
             cache=events.CacheRunMetrics(
                 observations_total=store.distinct_observations() if store is not None else 0,
             ),
+            reauth_count=ctx.reauth.reauth_count,
+            reauth_broke=ctx.reauth.broke,
         )
         # Skip after_run on a partial run (interrupt/abort); the fuzz path runs them on stop.
         failures = run_after_run_checks(ctx) if ctx.stop_reason == StopReason.COMPLETED else []

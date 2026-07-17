@@ -204,6 +204,8 @@ class CliSnapshotConfig:
         if self.replace_seed:
             data = re.sub(r"--seed=\d+", "--seed=42", data)
             data = re.sub(r"Seed: \d+", "Seed: 42", data)
+        # Reauth count varies with how many generated cases hit the stale token.
+        data = re.sub(r"Re-authenticated \d+ times?", "Re-authenticated N times", data)
         # Hint: "additional properties not defined in the schema (...)" lists the
         # generated property names verbatim — those names are random Hypothesis output
         # and shift across runs. Collapse the count + names to a placeholder.

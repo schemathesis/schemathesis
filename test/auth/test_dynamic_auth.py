@@ -1,14 +1,23 @@
 from __future__ import annotations
 
+import itertools
 import socket
 
 import pytest
 import requests
-from flask import Response as FlaskResponse
 from flask import jsonify, request
 
 import schemathesis.openapi
-from schemathesis.auths import AuthContext, CachingAuthProvider
+from schemathesis.auths import (
+    REAUTH_BREAKER_THRESHOLD,
+    TOKEN_FETCH_BREAKER_THRESHOLD,
+    AuthContext,
+    CachingAuthProvider,
+    ReauthState,
+    reauth_and_replay,
+    refresh_auth,
+    set_on_case,
+)
 from schemathesis.config._auth import AuthConfig, DynamicTokenAuthConfig
 from schemathesis.config._error import ConfigError
 from schemathesis.core.errors import AuthenticationError
@@ -19,64 +28,32 @@ from schemathesis.specs.openapi.auths import (
     HttpBearerAuthProvider,
 )
 
+OAUTH2_SCHEME = {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}}
 
-@pytest.fixture
-def auth_operation(ctx, cli, app_runner):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/data": {
-                "get": {
-                    "operationId": "getData",
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
 
-    @app.route("/api/body-auth", methods=["POST"])
-    def body_auth():
-        return jsonify({"access_token": "test-token"})
+def _dynamic_auth(scheme, **overrides):
+    return {"dynamic": {"openapi": {scheme: {"path": "/api/auth", "extract_selector": "/access_token", **overrides}}}}
 
-    @app.route("/api/nested-auth", methods=["POST"])
-    def nested_auth():
-        return jsonify({"data": {"token": "test-token"}})
 
-    @app.route("/api/header-auth", methods=["POST"])
-    def header_auth():
-        return jsonify({}), 200, {"X-Auth-Token": "test-token"}
+def _register_single_use_token(app):
+    # Token is valid for exactly one request, so every later call must re-authenticate.
+    state = {"issued": 0, "valid": None}
 
-    @app.route("/api/fail", methods=["POST"])
-    def fail():
-        return jsonify({"error": "unauthorized"}), 401
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        state["issued"] += 1
+        state["valid"] = f"tok{state['issued']}"
+        return jsonify({"access_token": state["valid"]})
 
-    @app.route("/api/missing-key", methods=["POST"])
-    def missing_key():
-        return jsonify({"other": "value"})
+    @app.route("/protected")
+    def protected():
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        if token != state["valid"]:
+            return jsonify({"error": "unauthorized"}), 401
+        state["valid"] = None
+        return jsonify({"result": "ok"})
 
-    @app.route("/api/non-json", methods=["POST"])
-    def non_json():
-        return FlaskResponse("not json", content_type="text/plain")
-
-    @app.route("/api/wrong-type", methods=["POST"])
-    def wrong_type():
-        return jsonify({"token": 42})
-
-    @app.route("/api/bad-charset-auth/<charset>", methods=["POST"])
-    def bad_charset_auth(charset):
-        return FlaskResponse('{"access_token": "test-token"}', content_type=f"application/json; charset={charset}")
-
-    @app.route("/api/bom-auth", methods=["POST"])
-    def bom_auth():
-        return FlaskResponse(b'\xef\xbb\xbf{"access_token": "test-token"}', content_type="application/json")
-
-    @app.route("/api/latin1-auth", methods=["POST"])
-    def latin1_auth():
-        return FlaskResponse(
-            '{"access_token": "café-token"}'.encode("latin-1"), content_type="application/json; charset=latin-1"
-        )
-
-    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-    return schema["/data"]["GET"]
+    return state
 
 
 @pytest.mark.parametrize(
@@ -419,7 +396,7 @@ def test_build_auth_provider_rejects_unsupported_scheme(scheme, match):
 @pytest.mark.parametrize(
     "scheme",
     [
-        {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}},
+        OAUTH2_SCHEME,
         {"type": "openIdConnect", "openIdConnectUrl": "https://example.com/.well-known/openid-configuration"},
     ],
     ids=["oauth2", "openIdConnect"],
@@ -430,6 +407,23 @@ def test_build_auth_provider_applies_bearer_token_schemes(auth_operation, scheme
     case = auth_operation.Case()
     provider.set(case, "my-token", None)
     assert case.headers["Authorization"] == "Bearer my-token"
+
+
+def test_build_auth_provider_carries_configured_retry_on():
+    config = DynamicTokenAuthConfig(path="/api/auth", extract_selector="/access_token", retry_on=[401, 419])
+    provider = build_auth_provider(config, {"type": "http", "scheme": "bearer"})
+    assert provider.retry_on == [401, 419]
+
+
+def test_reauth_state_not_shared_across_calls(ctx):
+    # Each `call_and_validate` gets a fresh breaker; one call tripping the breaker must not
+    # disable reactive refresh for later, independent calls that share the schema.
+    schema = ctx.openapi.load_schema({"/a": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    tripped = schema.reauth_state
+    for _ in range(REAUTH_BREAKER_THRESHOLD):
+        tripped.note_refresh_failure()
+    assert tripped.disabled is True
+    assert schema.reauth_state.disabled is False
 
 
 def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
@@ -458,16 +452,7 @@ def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
             "-n 1",
             config={
                 "base-url": base_url,
-                "auth": {
-                    "dynamic": {
-                        "openapi": {
-                            "NonExistentAuth": {
-                                "path": "/api/auth",
-                                "extract_selector": "/access_token",
-                            }
-                        }
-                    }
-                },
+                "auth": _dynamic_auth("NonExistentAuth"),
             },
         )
         == snapshot_cli
@@ -513,16 +498,7 @@ def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
             "-n 3",
             config={
                 "base-url": base_url,
-                "auth": {
-                    "dynamic": {
-                        "openapi": {
-                            "BearerAuth": {
-                                "path": "/api/auth",
-                                "extract_selector": "/access_token",
-                            }
-                        }
-                    }
-                },
+                "auth": _dynamic_auth("BearerAuth"),
             },
         )
         == snapshot_cli
@@ -744,7 +720,7 @@ def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
         },
         components={
             "securitySchemes": {
-                "OAuth2": {"type": "oauth2", "flows": {"password": {"tokenUrl": "/api/auth", "scopes": {}}}},
+                "OAuth2": OAUTH2_SCHEME,
             }
         },
     )
@@ -770,20 +746,189 @@ def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
             "-n 3",
             config={
                 "base-url": base_url,
-                "auth": {
-                    "dynamic": {
-                        "openapi": {
-                            "OAuth2": {
-                                "path": "/api/auth",
-                                "extract_selector": "/access_token",
-                            }
-                        }
-                    }
-                },
+                "auth": _dynamic_auth("OAuth2"),
             },
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize("cache_by_key", [None, lambda case, ctx: "k"], ids=["unkeyed", "keyed"])
+def test_refresh_auth_refetches(auth_operation, cache_by_key):
+    tokens = iter(["old", "new"])
+
+    @schemathesis.auth(retry_on=[401], cache_by_key=cache_by_key)
+    class Rotating:
+        def get(self, case, ctx):
+            return next(tokens)
+
+        def set(self, case, data, ctx):
+            case.headers = case.headers or {}
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    case = auth_operation.Case()
+    set_on_case(case, AuthContext(operation=auth_operation, app=None), None)
+    assert case.headers["Authorization"] == "Bearer old"
+    refresh_auth(case)
+    assert case.headers["Authorization"] == "Bearer new"
+
+
+def test_refresh_failure_keeps_original_response(auth_operation, response_factory):
+
+    @schemathesis.auth(retry_on=[401])
+    class Dead:
+        def get(self, case, ctx):
+            raise AuthenticationError("Dead", "get", "credentials revoked")
+
+        def set(self, case, data, ctx):
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    case = auth_operation.Case()
+    case._has_explicit_auth = True
+    initial = response_factory.requests(status_code=401)
+    state = ReauthState(retry_on_statuses=frozenset({401}))
+
+    def recall():
+        raise AssertionError("must not replay when the refresh itself failed")
+
+    assert reauth_and_replay(case, initial, state, recall) is initial
+    assert state.reauth_count == 0
+    assert state._consecutive_failures == 1
+
+
+def test_replay_transport_error_keeps_initial_response(auth_operation, response_factory):
+    case = auth_operation.Case()
+    case._has_explicit_auth = True
+    initial = response_factory.requests(status_code=401)
+    state = ReauthState(retry_on_statuses=frozenset({401}))
+
+    def recall():
+        raise requests.ConnectionError("connection dropped on replay")
+
+    assert reauth_and_replay(case, initial, state, recall) is initial
+    assert state.reauth_count == 0
+
+
+# A WSGI-loaded schema must refetch its token through the in-process app, not real outbound HTTP.
+def test_refresh_auth_wsgi_propagates_app(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"BearerAuth": []}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "BearerAuth": {"type": "http", "scheme": "bearer"},
+            }
+        },
+    )
+    tokens = itertools.count(1)
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        return jsonify({"access_token": f"token-{next(tokens)}"})
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    schema.config.auth.dynamic.schemes["BearerAuth"] = DynamicTokenAuthConfig(
+        path="/api/auth", extract_selector="/access_token"
+    )
+    operation = schema["/protected"]["GET"]
+    case = operation.Case()
+    set_on_case(case, AuthContext(operation=operation, app=operation.app), None)
+    assert case.headers["Authorization"] == "Bearer token-1"
+
+    refresh_auth(case)
+
+    assert case.headers["Authorization"] == "Bearer token-2"
+
+
+# Single-use token 401s after first use; the hook re-authenticates and replays so the recorded response is the recovered 2xx.
+def test_reauth_recovers_expired_token(ctx, cli, app_runner, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"OAuth2": []}],
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "OAuth2": OAUTH2_SCHEME,
+            }
+        },
+    )
+    state = _register_single_use_token(app)
+
+    base_url = app_runner.openapi_url(app, path="")
+    result = cli.run(
+        f"{base_url}/openapi.json",
+        "--include-path=/protected",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 4",
+        config={
+            "base-url": base_url,
+            "checks": {"positive_data_acceptance": {"expected-statuses": ["2xx"]}},
+            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
+        },
+    )
+    assert result == snapshot_cli
+    assert state["issued"] >= 2
+
+
+# A negated-security case's 401 is the expected outcome, not an expired token - the hook must not re-authenticate for it.
+def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner, mocker):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"ApiKeyAuth": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"},
+            }
+        },
+    )
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        return jsonify({"access_token": "valid-token"})
+
+    @app.route("/protected")
+    def protected():
+        if request.headers.get("X-API-Key", "") != "valid-token":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"result": "ok"})
+
+    spy = mocker.spy(schemathesis.auths, "refresh_auth")
+
+    base_url = app_runner.openapi_url(app, path="")
+    cli.run(
+        f"{base_url}/openapi.json",
+        "--include-path=/protected",
+        "--phases=coverage",
+        "--mode=all",
+        "-n 15",
+        config={
+            "base-url": base_url,
+            "auth": _dynamic_auth("ApiKeyAuth", retry_on=[401]),
+        },
+    )
+    assert spy.call_count == 0
 
 
 def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):
@@ -825,17 +970,209 @@ def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):
             "-n 3",
             config={
                 "base-url": base_url,
-                "auth": {
-                    "dynamic": {
-                        "openapi": {
-                            "ApiKeyAuth": {
-                                "path": "/api/auth",
-                                "extract_selector": "/access_token",
-                            }
-                        }
-                    }
-                },
+                "auth": _dynamic_auth("ApiKeyAuth"),
             },
         )
         == snapshot_cli
     )
+
+
+# A no-auth operation's incidental 401 must not trigger a re-authentication that invalidates the shared token cache.
+def test_oauth2_case_without_explicit_auth_does_not_reauth(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/public": {
+                "get": {
+                    "operationId": "getPublic",
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            },
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"OAuth2": []}],
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            },
+        },
+        components={
+            "securitySchemes": {
+                "OAuth2": OAUTH2_SCHEME,
+            }
+        },
+    )
+    hits = {"auth": 0}
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        hits["auth"] += 1
+        return jsonify({"access_token": "t"})
+
+    @app.route("/public")
+    def public():
+        return jsonify({"error": "unauthorized"}), 401
+
+    @app.route("/protected")
+    def protected():
+        if request.headers.get("Authorization") == "Bearer t":
+            return jsonify({"result": "ok"})
+        return jsonify({"error": "unauthorized"}), 401
+
+    base_url = app_runner.openapi_url(app, path="")
+    cli.run(
+        f"{base_url}/openapi.json",
+        "--phases=coverage",
+        "--mode=all",
+        "-n 15",
+        config={
+            "base-url": base_url,
+            "checks": {
+                "negative_data_rejection": {"enabled": False},
+                "positive_data_acceptance": {"enabled": False},
+            },
+            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
+        },
+    )
+    assert hits["auth"] <= 2
+
+
+# Dead credentials make every re-authentication fail; the breaker trips after 3 consecutive failures, bounding auth fetches.
+def test_breaker_bounds_login_attempts(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            f"/r{i}": {
+                "get": {
+                    "operationId": f"g{i}",
+                    "security": [{"OAuth2": []}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+            for i in range(6)
+        },
+        components={
+            "securitySchemes": {
+                "OAuth2": OAUTH2_SCHEME,
+            }
+        },
+    )
+    hits = {"auth": 0}
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        hits["auth"] += 1
+        return jsonify({"access_token": "bad"})
+
+    def _unauthorized():
+        return jsonify({"error": "unauthorized"}), 401
+
+    for i in range(6):
+        app.add_url_rule(f"/r{i}", f"r{i}", _unauthorized)
+
+    base_url = app_runner.openapi_url(app, path="")
+    result = cli.run(
+        f"{base_url}/openapi.json",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 1",
+        config={
+            "base-url": base_url,
+            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
+        },
+    )
+    assert hits["auth"] <= 4
+    assert result.stdout.count("⚠️ Authentication stopped working mid-run - credentials likely invalidated") == 1
+
+
+# A dead login endpoint is hit a bounded number of times across the whole run, not once per generated case.
+def test_dead_login_endpoint_does_not_storm(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"OAuth2": []}],
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "OAuth2": OAUTH2_SCHEME,
+            }
+        },
+    )
+    hits = {"auth": 0}
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        hits["auth"] += 1
+        return jsonify({"error": "locked"}), 401
+
+    @app.route("/protected")
+    def protected():
+        return jsonify({"result": "ok"})
+
+    base_url = app_runner.openapi_url(app, path="")
+    cli.run(
+        f"{base_url}/openapi.json",
+        "--include-path=/protected",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 20",
+        config={
+            "base-url": base_url,
+            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
+        },
+    )
+    assert hits["auth"] <= TOKEN_FETCH_BREAKER_THRESHOLD
+
+
+# A programmatic @schemathesis.auth provider with retry_on re-authenticates like a config-dynamic scheme in a full run.
+def test_custom_provider_reauth_recovers_expired_token(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+    )
+    state = _register_single_use_token(app)
+
+    base_url = app_runner.openapi_url(app, path="")
+    module = ctx.write_pymodule(
+        f"""
+import requests
+
+@schemathesis.auth(retry_on=[401])
+class TokenAuth:
+    def get(self, case, context):
+        response = requests.post("{base_url}/api/auth")
+        return response.json()["access_token"]
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {{}}
+        case.headers["Authorization"] = f"Bearer {{data}}"
+"""
+    )
+    result = cli.main(
+        "run",
+        f"{base_url}/openapi.json",
+        "--include-path=/protected",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 4",
+        config={
+            "base-url": base_url,
+            "checks": {"positive_data_acceptance": {"expected-statuses": ["2xx"]}},
+        },
+        hooks=module,
+    )
+    assert result.exit_code == 0, result.stdout
+    assert state["issued"] >= 2

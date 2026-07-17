@@ -1,0 +1,5 @@
+# Dynamic auth with reactive refresh disabled
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_selector = "/access_token"
+retry_on = []

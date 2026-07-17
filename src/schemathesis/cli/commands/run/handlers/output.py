@@ -1256,6 +1256,18 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
             click.echo()
 
+        if event.payload is not None:
+            if event.payload.reauth_count > 0:
+                suffix = "" if event.payload.reauth_count == 1 else "s"
+                ctx.add_summary_line(f"  Re-authenticated {event.payload.reauth_count} time{suffix}")
+            if event.payload.reauth_broke:
+                ctx.add_summary_line(
+                    _style(
+                        "  ⚠️ Authentication stopped working mid-run - credentials likely invalidated",
+                        fg="yellow",
+                    )
+                )
+
         if ctx.summary_lines:
             print_lines(ctx.summary_lines)
             click.echo()

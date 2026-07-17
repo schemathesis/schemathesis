@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 import requests
 from requests.exceptions import ChunkedEncodingError
 
+from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import CheckContext
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.error_feedback.collector import record_response
@@ -144,14 +145,20 @@ def _do_call_and_validate(
             events.RateLimitRetry(operation=case.operation.label, delay=delay, retries_left=retries_left)
         )
 
-    try:
-        _, response = call_with_retry(call_fn=_call, auto_mode=auto_mode, on_delay=_on_delay)
-    except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
-        if isinstance(error.request, requests.Request):
-            recorder.record_request(case_id=case.id, request=error.request.prepare())
-        elif isinstance(error.request, requests.PreparedRequest):
-            recorder.record_request(case_id=case.id, request=error.request)
-        raise
+    def _perform_call() -> Response:
+        try:
+            _, response = call_with_retry(call_fn=_call, auto_mode=auto_mode, on_delay=_on_delay)
+        except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
+            if isinstance(error.request, requests.Request):
+                recorder.record_request(case_id=case.id, request=error.request.prepare())
+            elif isinstance(error.request, requests.PreparedRequest):
+                recorder.record_request(case_id=case.id, request=error.request)
+            raise
+        return response
+
+    response = _perform_call()
+    # Replay through `_perform_call` so it keeps rate-limit and network-error handling.
+    response = reauth_and_replay(case, response, ctx.reauth, _perform_call)
     recorder.record_response(case_id=case.id, response=response)
     if ctx.error_feedback is not None:
         record_response(

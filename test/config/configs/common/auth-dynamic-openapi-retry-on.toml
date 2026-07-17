@@ -1,0 +1,5 @@
+# Dynamic auth with explicit reactive-refresh statuses
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_selector = "/access_token"
+retry_on = [401, 419]

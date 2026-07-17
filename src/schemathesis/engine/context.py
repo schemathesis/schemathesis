@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.auths import ReauthState
 from schemathesis.checks import RunChecks
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
@@ -63,6 +64,7 @@ class EngineContext:
         "_checks_lock",
         "_constants_extraction",
         "_constants_extraction_lock",
+        "reauth",
     )
 
     def __init__(
@@ -99,6 +101,7 @@ class EngineContext:
         self._checks_lock = threading.Lock()
         self._constants_extraction = LazyInit.UNSET
         self._constants_extraction_lock = threading.Lock()
+        self.reauth = ReauthState(retry_on_statuses=schema.reauth_retry_statuses)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 

@@ -8,6 +8,8 @@ from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
 from schemathesis.core.validation import is_latin_1_encodable
 
+DEFAULT_RETRY_ON = (401,)
+
 
 @dataclass(repr=False, slots=True)
 class ApiKeyAuthConfig(DiffBase):
@@ -55,6 +57,7 @@ class DynamicTokenAuthConfig(DiffBase):
     payload_content_type: str
     extract_from: str
     extract_selector: str
+    retry_on: list[int]
 
     def __init__(
         self,
@@ -65,6 +68,7 @@ class DynamicTokenAuthConfig(DiffBase):
         payload_content_type: str = "application/json",
         extract_from: str = "body",
         extract_selector: str = "",
+        retry_on: list[int] | None = None,
     ) -> None:
         if path and not path.startswith("/"):
             raise ConfigError(f"Dynamic auth `path` must start with '/': {path!r}")
@@ -80,6 +84,7 @@ class DynamicTokenAuthConfig(DiffBase):
         self.payload_content_type = payload_content_type
         self.extract_from = extract_from
         self.extract_selector = extract_selector
+        self.retry_on = list(DEFAULT_RETRY_ON) if retry_on is None else retry_on
 
 
 @dataclass(repr=False, slots=True)
@@ -114,7 +119,7 @@ class OpenAPIDynamicAuthConfig(DiffBase):
     schemes: dict[str, DynamicTokenAuthConfig]
 
     def __init__(self, *, schemes: dict[str, dict[str, Any]] | None = None) -> None:
-        self.schemes = {name: DynamicTokenAuthConfig(**cfg) for name, cfg in schemes.items()} if schemes else {}
+        self.schemes = {name: DynamicTokenAuthConfig(**cfg) for name, cfg in (schemes or {}).items()}
 
     @property
     def is_defined(self) -> bool:

@@ -8,6 +8,7 @@ import jsonschema_rs
 from jsonschema_rs import Validator
 
 from schemathesis import hooks, transport
+from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import (
     CheckContext,
     CheckFunction,
@@ -583,6 +584,13 @@ class Case(Generic[OperationT]):
         __tracebackhide__ = True
         call_kwargs = dict(kwargs)
         response = self.call(base_url, session, headers, **call_kwargs)
+        # Replay before validation so checks see the recovered response, not the stale-token 401.
+        response = reauth_and_replay(
+            self,
+            response,
+            self.operation.schema.reauth_state,
+            lambda: self.call(base_url, session, headers, **call_kwargs),
+        )
         transport_kwargs = dict(kwargs)
         if base_url is not None:
             transport_kwargs["base_url"] = base_url

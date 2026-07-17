@@ -860,11 +860,21 @@ These settings can only be applied at the project level.
     | `payload_content_type` | `"application/json"` | Media type for the payload. Accepts `application/json` (and any `+json` variant, optionally with parameters such as `; charset=utf-8`) or `application/x-www-form-urlencoded` |
     | `extract_from` | `"body"` | Source of the token: `"body"` or `"header"` |
     | `extract_selector` | required | [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) when `extract_from = "body"`, or header name when `extract_from = "header"` |
+    | `retry_on` | `[401]` | Status codes that trigger a token refresh and a single request replay. `[]` disables reactive refresh for this scheme. |
 
     Supported for `http/bearer`, `apiKey`, and `oauth2` scheme types in OpenAPI 2.0 and 3.x. `oauth2` tokens are applied as `Authorization: Bearer <token>`.
 
     !!! note
         `auth.dynamic.openapi.*` and `auth.openapi.*` schemes cannot share the same name in the same config.
+
+    !!! note
+        When a response's status is in `retry_on`, Schemathesis fetches a fresh token and replays the request once. If re-authentication fails 3 times in a row, further token refreshes are disabled for the rest of the run.
+
+    !!! note
+        Reactive refresh applies to `schemathesis run` and to `case.call_and_validate()` (the pytest plugin). A raw `case.call()` does not replay, since it performs no validation.
+
+    !!! note
+        Reactive refresh covers tokens from dynamic schemes and from `@schemathesis.auth(retry_on=...)` / `schema.auth(retry_on=...)` registrations. `retry_on` codes are pooled across every configured scheme, and a triggering status refreshes all cached tokens.
 
 ### Checks
 

@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.auths import AuthContext, AuthProvider, AuthStorage
     from schemathesis.config import GenerationConfig
     from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.cache import CacheWriter
@@ -142,6 +142,10 @@ class OpenApiSchema(BaseSchema):
     @override
     def is_security_param_negated(self, case: Case) -> bool:
         return self.security.is_security_param_negated(case)
+
+    @override
+    def _security_auth_providers(self) -> Iterator[AuthProvider]:
+        return iter(self.security._auth_provider_cache.values())
 
     @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:

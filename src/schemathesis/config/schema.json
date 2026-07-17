@@ -409,6 +409,12 @@
         },
         "extract_selector": {
           "type": "string"
+        },
+        "retry_on": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
         }
       }
     },
