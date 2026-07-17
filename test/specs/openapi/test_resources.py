@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import threading
+
 import pytest
 import requests
 from hypothesis import HealthCheck, given, settings
+from hypothesis.vendor.pretty import pretty
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
@@ -20,6 +23,7 @@ from schemathesis.resources.repository import (
 )
 from schemathesis.specs.openapi._hypothesis import openapi_cases
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
+from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 
 USER_RESOURCE = "User"
 POST_USERS = "POST /users"
@@ -61,6 +65,52 @@ def user_schema(user_schema_builder):
 @pytest.fixture
 def user_data_source(user_schema):
     return user_schema.create_extra_data_source()
+
+
+def test_repr_survives_concurrent_semantic_pool_writes(user_data_source):
+    # Hypothesis prints strategy args on rejected inputs; that render must not walk the live pool other workers mutate.
+    index = SemanticValueIndex()
+    for i in range(200):
+        index.add(
+            type_token="string",
+            format_token=f"fmt-{i}",
+            pattern_hash=None,
+            normalized_name=None,
+            value=f"v{i}",
+            source_operation=POST_USERS,
+        )
+    user_data_source.semantic_index = index
+
+    errors: list[Exception] = []
+    stop = threading.Event()
+
+    def record() -> None:
+        i = 200
+        while not stop.is_set():
+            index.add(
+                type_token="string",
+                format_token=f"fmt-{i}",
+                pattern_hash=None,
+                normalized_name=None,
+                value=f"v{i}",
+                source_operation=POST_USERS,
+            )
+            i += 1
+
+    worker = threading.Thread(target=record)
+    worker.start()
+    try:
+        for _ in range(500):
+            try:
+                pretty(user_data_source)
+            except Exception as exc:
+                errors.append(exc)
+                break
+    finally:
+        stop.set()
+        worker.join()
+
+    assert not errors, errors[0]
 
 
 def test_store_single_resource(user_data_source):
