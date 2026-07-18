@@ -951,8 +951,7 @@ def negate_constraints(
         # Pin one keyword as required-to-negate so the case isn't all-pass at low feature mask.
         candidate = draw(st.sampled_from([key for key, value in copied.items() if is_mutation_candidate(key, value)]))
         candidates.append(candidate)
-        if candidate in DEPENDENCIES:
-            candidates.append(DEPENDENCIES[candidate])
+        candidates.extend(DEPENDENCIES.get(candidate, ()))
     for key, value in copied.items():
         if is_mutation_candidate(key, value):
             if key in candidates or enabled_keywords.is_enabled(key):
@@ -963,8 +962,7 @@ def negate_constraints(
                 if key != "format":
                     negated = schema.setdefault("not", {})
                     negated[key] = value
-                    if key in DEPENDENCIES:
-                        dependency = DEPENDENCIES[key]
+                    for dependency in DEPENDENCIES.get(key, ()):
                         if dependency not in negated and dependency in copied:
                             negated[dependency] = copied[dependency]
         else:
@@ -995,7 +993,13 @@ def negate_constraints(
     return MutationResult.FAILURE, None
 
 
-DEPENDENCIES = {"exclusiveMaximum": "maximum", "exclusiveMinimum": "minimum"}
+# Keywords whose meaning depends on siblings, which must travel into `not` alongside them.
+# Stripped of `properties`/`patternProperties`, `additionalProperties` reads as "no properties at all".
+DEPENDENCIES = {
+    "exclusiveMaximum": ("maximum",),
+    "exclusiveMinimum": ("minimum",),
+    "additionalProperties": ("properties", "patternProperties"),
+}
 
 
 def ident(x: T) -> T:

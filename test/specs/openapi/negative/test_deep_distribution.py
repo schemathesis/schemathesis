@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 
+import jsonschema_rs
 import pytest
+from hypothesis import HealthCheck, Phase, given, settings
 
 import schemathesis
 from schemathesis.core.jsonschema import _is_valid_uuid
@@ -117,6 +119,51 @@ def test_value_channel_produces_format_uuid_near_miss(ctx):
             if isinstance(value, str) and len(value) == 36 and value.count("-") == 4 and not _is_valid_uuid(value):
                 return
     pytest.fail("no uuid-shaped near-miss found across runner output")
+
+
+BODY_WITH_NO_ADDITIONAL_PROPERTIES = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["email"],
+    "properties": {"email": {"type": "string", "format": "email"}},
+}
+
+
+@pytest.mark.hypothesis_nested
+def test_additional_properties_negation_stays_invalid(ctx):
+    # See GH-4332. Negating `additionalProperties` drops the `properties` context it is defined
+    # against, so the mutated schema still admits bodies valid against the original.
+    # 500 examples because only a small fraction of draws pick this keyword combination.
+    schema = ctx.openapi.load_schema(
+        {
+            "/reset": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": BODY_WITH_NO_ADDITIONAL_PROPERTIES}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    validator = jsonschema_rs.Draft4Validator(BODY_WITH_NO_ADDITIONAL_PROPERTIES, validate_formats=True)
+
+    @given(case=schema["/reset"]["POST"].as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE))
+    @settings(
+        max_examples=500,
+        deadline=None,
+        derandomize=True,
+        suppress_health_check=list(HealthCheck),
+        phases=[Phase.generate],
+    )
+    def test(case):
+        body = case.body
+        if not isinstance(body, (dict, list, str, int, float, bool)) and body is not None:
+            return
+        assert not validator.is_valid(body), f"False positive: body {body!r} is valid against the schema"
+
+    test()
 
 
 @pytest.mark.parametrize(
