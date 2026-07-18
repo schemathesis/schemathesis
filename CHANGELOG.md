@@ -14,6 +14,7 @@
 - Crash `dictionary changed size during iteration` with multiple workers under free-threaded Python.
 - Crash on schemas embedding a JSON Schema resource that declares its own `$schema` dialect.
 - False positive `positive_data_acceptance` for required array query parameters generated as empty.
+- False positive `negative_data_rejection` for body schemas with `additionalProperties: false`. [#4332](https://github.com/schemathesis/schemathesis/issues/4332)
 - Generation error for request bodies with `prefixItems` in OpenAPI 3.1 schemas.
 - Crash `Cannot sample from a length-zero sequence` for array `items` with an empty `enum`.
 - False positive `positive_data_acceptance` for array `items` with `enum` entries violating the item schema.
