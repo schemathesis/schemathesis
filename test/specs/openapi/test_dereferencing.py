@@ -1417,8 +1417,22 @@ def test_prefix_items_with_ref(ctx):
                 "properties": {"args": {"type": "array", "prefixItems": [{"$ref": "#/components/schemas/Scalar"}]}},
             },
         ),
+        (
+            "3.1.0",
+            {
+                "type": "object",
+                "required": ["filter"],
+                "properties": {
+                    "filter": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "array",
+                        "prefixItems": [{"$ref": "#/components/schemas/Scalar"}],
+                    }
+                },
+            },
+        ),
     ],
-    ids=["draft-2019-09-tuple-items", "draft-2020-12-prefix-items"],
+    ids=["draft-2019-09-tuple-items", "draft-2020-12-prefix-items", "nested-draft-2020-12-prefix-items"],
 )
 def test_embedded_schema_dialect_declaration(ctx, version, body_schema):
     # Generation schemas are rewritten into Draft 4/7 shapes, so a `$schema` left over from an

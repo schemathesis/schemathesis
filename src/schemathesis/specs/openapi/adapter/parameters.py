@@ -16,7 +16,6 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
-    DRAFT_03_DIALECT,
     FANCY_REGEX_OPTIONS,
     VALIDATED_FORMATS_BY_DRAFT,
     BundleError,
@@ -957,11 +956,6 @@ class OpenApiComponent(ABC):
         # Missing the `type` keyword may significantly slowdown data generation, ensure it is set
         default_type = self._get_default_type()
         if isinstance(schema, dict):
-            # Conversion rewrites the schema into Draft 4/7 shapes, so a dialect declared by an embedded
-            # JSON Schema resource no longer describes it and would drive meta-validation to the wrong draft.
-            # Draft 3 is kept so it is still reported as unsupported instead of generating data for it.
-            if schema.get("$schema") != DRAFT_03_DIALECT:
-                schema.pop("$schema", None)
             if default_type is not None:
                 schema.setdefault("type", default_type)
         elif schema is True and default_type is not None:
