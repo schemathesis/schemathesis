@@ -6135,6 +6135,34 @@ def test_negative_enum_does_not_flag_integer_entries_matching_declared_type(ctx,
         )
 
 
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        ({"type": "array", "items": {"type": "string", "enum": []}}, [[]]),
+        ({"type": "array", "minItems": 1, "items": {"type": "string", "enum": []}}, []),
+    ],
+    ids=["empty-enum", "empty-enum-with-min-items"],
+)
+def test_positive_array_items_empty_enum(ctx, body_schema, expected):
+    # An empty array is the only conforming value when no entry is usable; requiring one item leaves nothing.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = loaded["/foo"]["POST"]
+    cases = _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
+    assert [case.body for case in cases] == expected
+
+
 def test_negative_const_emits_value_with_type_mismatch_for_keyword_coverage(ctx):
     # Positive path skips the const value as `type`-invalid, so only the negative can exercise `const` here.
     loaded = ctx.openapi.load_schema(
