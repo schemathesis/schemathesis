@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, TypeGuard, overload
 
+from schemathesis.core.jsonschema import DRAFT_03_DIALECT
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.transforms import deepclone
@@ -92,6 +93,12 @@ def _to_json_schema(
         nested_bundle = schema.get(BUNDLE_STORAGE_KEY)
         if isinstance(nested_bundle, dict):
             bundle = nested_bundle
+
+    # Conversion rewrites the schema into Draft 4/7 shapes, so a dialect declared by an embedded
+    # JSON Schema resource no longer describes it and would drive meta-validation to the wrong draft.
+    # Draft 3 is kept so it is still reported as unsupported instead of generating data for it.
+    if schema.get("$schema", DRAFT_03_DIALECT) != DRAFT_03_DIALECT:
+        del schema["$schema"]
 
     # OpenAPI 3.0 / Swagger 2.0: keys alongside `$ref` are ignored. Drop them so generation and
     # validation observe the same shape; otherwise a sibling like `type: string` next to a `$ref`
