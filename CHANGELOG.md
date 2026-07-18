@@ -14,6 +14,7 @@
 - Crash `dictionary changed size during iteration` with multiple workers under free-threaded Python.
 - False positive `positive_data_acceptance` for required array query parameters generated as empty.
 - Generation error for request bodies with `prefixItems` in OpenAPI 3.1 schemas.
+- Crash `Cannot sample from a length-zero sequence` for array `items` with an empty `enum`.
 
 ### :wrench: Changed
 

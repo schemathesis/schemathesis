@@ -622,6 +622,11 @@ class CoverageContext:
             items = schema["items"]
             min_items = schema.get("minItems", 0)
             if "enum" in items:
+                if not items["enum"]:
+                    # Nothing matches, so only an empty array can conform.
+                    if min_items:
+                        raise Unsatisfiable
+                    return []
                 return cached_draw(st.lists(st.sampled_from(items["enum"]), min_size=min_items))
             # Recurse so `items`-level `example`/`examples`/`default` reach generation.
             if any(k in items for k in ("example", "examples", "default")):
