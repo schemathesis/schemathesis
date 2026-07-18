@@ -49,39 +49,33 @@ fail-on = ["missing_auth"]
     assert "Authentication failed" in result.stdout
 
 
-def test_missing_deserializer_warning_displayed(cli, ctx):
-    # Given a schema with a custom media type that has no deserializer
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_deserializer_warning_grouped_by_media_type(cli, ctx, snapshot_cli):
+    html = {"text/html": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}
+    msgpack = {"application/msgpack": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}}
     schema_path = ctx.openapi.write_schema(
         {
             "/users": {
                 "get": {
                     "responses": {
-                        "200": {
-                            "description": "Success",
-                            "content": {
-                                "application/msgpack": {
-                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
-                                }
-                            },
-                        }
+                        "200": {"description": "Success", "content": html},
+                        "404": {"description": "Not Found", "content": html},
                     }
                 }
-            }
+            },
+            "/orders": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "Success", "content": html},
+                        "404": {"description": "Not Found", "content": {**html, **msgpack}},
+                    }
+                }
+            },
         }
     )
 
     api = ctx.openapi.apps.success()
-    result = cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1")
-
-    # Then the warning should be displayed in both summary and detailed sections
-    assert "⚠️ Schema validation skipped: 1 operation cannot validate responses" in result.stdout
-    assert "WARNINGS" in result.stdout
-    assert (
-        "Schema validation skipped: 1 operation cannot validate responses due to missing deserializers" in result.stdout
-    )
-    assert "GET /users" in result.stdout
-    assert "Cannot validate response 200: no deserializer registered for application/msgpack" in result.stdout
-    assert "💡 Register a deserializer with @schemathesis.deserializer() to enable validation" in result.stdout
+    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1") == snapshot_cli
 
 
 def test_missing_deserializer_warning_with_fail_on(cli, ctx, tmp_path, monkeypatch):

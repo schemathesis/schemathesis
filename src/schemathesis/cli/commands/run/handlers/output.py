@@ -890,6 +890,26 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
         self._print_warning_tips(tips)
 
+    def _display_grouped_detail_block(
+        self,
+        title: str,
+        warnings: dict[str, dict[str, set[str]]],
+        entity_name: str,
+        suffix_text: str,
+        tips: list[str],
+    ) -> None:
+        """Display warnings grouped by a shared cause, with per-operation details."""
+        total = len({label for operations in warnings.values() for label in operations})
+        self._print_warning_header(title, total, entity_name, suffix_text)
+
+        for group, operations in sorted(warnings.items()):
+            count = len(operations)
+            plural = "" if count == 1 else "s"
+            click.echo(_style(f"{group} ({count} {entity_name}{plural}):", fg="yellow"))
+            self._print_items({f"{label} ({', '.join(sorted(details))})" for label, details in operations.items()})
+
+        self._print_warning_tips(tips)
+
     def _display_detailed_warning_block(
         self,
         title: str,
@@ -947,7 +967,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             )
 
         if self.warnings.missing_deserializer:
-            self._display_detailed_warning_block(
+            self._display_grouped_detail_block(
                 title="Schema validation skipped",
                 warnings=self.warnings.missing_deserializer,
                 entity_name="operation",
@@ -1205,7 +1225,9 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 )
 
             if self.warnings.missing_deserializer:
-                count = len(self.warnings.missing_deserializer)
+                count = len(
+                    {label for operations in self.warnings.missing_deserializer.values() for label in operations}
+                )
                 suffix = "" if count == 1 else "s"
                 click.echo(
                     _style(

@@ -39,7 +39,11 @@ class MissingDeserializerWarning:
     @property
     def message(self) -> str:
         """Human-readable description of the warning."""
-        return f"Cannot validate response {self.status_code}: no deserializer registered for {self.content_type}"
+        return self.status_code
+
+    @property
+    def group(self) -> str | None:
+        return self.content_type
 
 
 def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeserializerWarning]:
@@ -102,6 +106,10 @@ class UnusedOpenAPIAuthWarning:
             return f"'{self.scheme_name}' - Did you mean '{self.suggestion}'?"
         return f"'{self.scheme_name}'"
 
+    @property
+    def group(self) -> str | None:
+        return None
+
 
 def detect_unused_openapi_auth(schema: OpenApiSchema) -> list[UnusedOpenAPIAuthWarning]:
     """Detect configured OpenAPI auth schemes that don't exist in the schema."""
@@ -148,6 +156,10 @@ class UnsupportedRegexWarning:
     @property
     def message(self) -> str:
         return f"Unsupported regex `{self.pattern}` was removed"
+
+    @property
+    def group(self) -> str | None:
+        return None
 
 
 def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWarning]:

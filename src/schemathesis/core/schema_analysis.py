@@ -15,3 +15,8 @@ class SchemaWarning(Protocol):
 
     @property
     def message(self) -> str: ...  # pragma: no cover
+
+    @property
+    def group(self) -> str | None:
+        """Key that collapses warnings sharing the same cause into one display block."""
+        ...  # pragma: no cover

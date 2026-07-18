@@ -11,7 +11,8 @@ def test_missing_deserializer_warning_properties():
     )
 
     assert warning.kind == SchemathesisWarning.MISSING_DESERIALIZER
-    assert warning.message == "Cannot validate response 200: no deserializer registered for application/msgpack"
+    assert warning.message == "200"
+    assert warning.group == "application/msgpack"
 
 
 def test_detect_missing_deserializers_with_custom_media_type(ctx):
