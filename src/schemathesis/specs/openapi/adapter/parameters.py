@@ -1303,6 +1303,8 @@ class OpenApiBody(OpenApiComponent):
         target_descriptors = (
             self.mutation_targets if generation_mode.is_negative and schema is self.optimized_schema else None
         )
+        # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
+        validation_schema = self.validation_schema if generation_mode.is_negative else None
         strategy = strategy_factory(
             schema,
             operation.label,
@@ -1311,6 +1313,7 @@ class OpenApiBody(OpenApiComponent):
             generation_config,
             operation.schema.adapter.jsonschema_validator_cls,
             self.name_to_uri,
+            validation_schema=validation_schema,
             target_descriptors=target_descriptors,
         )
 

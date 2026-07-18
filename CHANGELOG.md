@@ -13,6 +13,7 @@
 - Explain `401`/`403` responses from a dynamic authentication token endpoint as rejected credentials.
 - Crash `dictionary changed size during iteration` with multiple workers under free-threaded Python.
 - False positive `positive_data_acceptance` for required array query parameters generated as empty.
+- Generation error for request bodies with `prefixItems` in OpenAPI 3.1 schemas.
 
 ### :wrench: Changed
 

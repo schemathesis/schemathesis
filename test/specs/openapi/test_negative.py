@@ -580,6 +580,44 @@ def test_openapi_31_prefix_items_query_param_negative_generation(ctx):
     test()
 
 
+def test_openapi_31_prefix_items_body_negative_generation(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/box": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "box": {
+                                            "type": "array",
+                                            "prefixItems": [{"type": "integer"}],
+                                            "items": False,
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        version="3.1.0",
+    )
+
+    operation = schema["/box"]["POST"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    def test(case):
+        pass
+
+    test()
+
+
 @pytest.mark.hypothesis_nested
 def test_optional_query_param_negation(ctx):
     # When all query parameters are optional
