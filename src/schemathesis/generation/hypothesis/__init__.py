@@ -40,6 +40,7 @@ def setup() -> None:
     from schemathesis.core.errors import InvalidSchema
     from schemathesis.core.jsonschema import (
         BUNDLE_STORAGE_KEY,
+        DRAFT_03_DIALECT,
         REFERENCE_TO_BUNDLE_PREFIX,
         make_validator,
         make_validator_for,
@@ -209,7 +210,7 @@ def setup() -> None:
             try:
                 strategy = _original_from_schema(schema, alphabet=alphabet, custom_formats=custom_formats)
             except InvalidArgument as exc:
-                if isinstance(schema, dict) and schema.get("$schema") == "http://json-schema.org/draft-03/schema#":
+                if isinstance(schema, dict) and schema.get("$schema") == DRAFT_03_DIALECT:
                     raise InvalidSchema("Draft-03 JSON Schema is not supported") from exc
                 raise
 
