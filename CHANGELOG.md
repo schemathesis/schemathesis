@@ -12,6 +12,7 @@
 - Report dynamic authentication token-fetch failures without duplicated text or an internal traceback.
 - Explain `401`/`403` responses from a dynamic authentication token endpoint as rejected credentials.
 - Crash `dictionary changed size during iteration` with multiple workers under free-threaded Python.
+- Crash on schemas embedding a JSON Schema resource that declares its own `$schema` dialect.
 - False positive `positive_data_acceptance` for required array query parameters generated as empty.
 - Generation error for request bodies with `prefixItems` in OpenAPI 3.1 schemas.
 - Crash `Cannot sample from a length-zero sequence` for array `items` with an empty `enum`.

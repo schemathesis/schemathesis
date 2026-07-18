@@ -23,6 +23,9 @@ from schemathesis.core.jsonschema.types import JsonSchema, get_type
 # degenerate ones (e.g. `{0,10000000}` from a huge `maxLength`) instead of burning seconds + ~1GB.
 FANCY_REGEX_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=150_000_000)
 
+# Draft 3 predates the keyword semantics every conversion here assumes and is rejected outright
+DRAFT_03_DIALECT = "http://json-schema.org/draft-03/schema#"
+
 
 def _is_valid_uuid(value: object) -> bool:
     if not isinstance(value, str):
@@ -235,6 +238,7 @@ __all__ = [
     "Bundler",
     "BundleError",
     "DRAFT4_SUPPLEMENTAL_FORMATS",
+    "DRAFT_03_DIALECT",
     "VALIDATED_FORMATS_BY_DRAFT",
     "FANCY_REGEX_OPTIONS",
     "is_valid",

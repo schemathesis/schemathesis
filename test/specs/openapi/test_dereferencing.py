@@ -1386,3 +1386,62 @@ def test_prefix_items_with_ref(ctx):
             assert isinstance(key[0], str)
 
     test()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("version", "body_schema"),
+    [
+        (
+            "3.0.2",
+            {
+                "$schema": "http://json-schema.org/draft/2019-09/schema",
+                "type": "object",
+                "properties": {"args": {"$ref": "#/components/schemas/Scalar"}},
+                "$defs": {
+                    "inListOperands": {
+                        "type": "array",
+                        "items": [
+                            {"$ref": "#/components/schemas/Scalar"},
+                            {"type": "array", "items": {"$ref": "#/components/schemas/Scalar"}},
+                        ],
+                    }
+                },
+            },
+        ),
+        (
+            "3.1.0",
+            {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {"args": {"type": "array", "prefixItems": [{"$ref": "#/components/schemas/Scalar"}]}},
+            },
+        ),
+    ],
+    ids=["draft-2019-09-tuple-items", "draft-2020-12-prefix-items"],
+)
+def test_embedded_schema_dialect_declaration(ctx, version, body_schema):
+    # Generation schemas are rewritten into Draft 4/7 shapes, so a `$schema` left over from an
+    # embedded JSON Schema resource makes them meta-validate against a dialect they no longer match.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": body_schema}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+        components={"schemas": {"Scalar": {"type": "string"}}},
+    )
+
+    @given(case=schema["/items"]["POST"].as_strategy())
+    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert isinstance(case.body, dict)
+
+    test()
