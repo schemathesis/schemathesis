@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 from requests.structures import CaseInsensitiveDict
 
@@ -10,9 +10,17 @@ from schemathesis.generation import overrides
 from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
+    from schemathesis.config import ProjectConfig
     from schemathesis.core.failures import Failure
     from schemathesis.engine.context import EngineContext
     from schemathesis.schemas import APIOperation
+
+
+class CheckContextSource(Protocol):
+    @property
+    def config(self) -> ProjectConfig: ...
+
+    def get_transport_kwargs(self, operation: APIOperation | None = None) -> dict[str, Any]: ...
 
 
 def run_after_run_checks(ctx: EngineContext) -> list[Failure]:
@@ -42,7 +50,7 @@ class CheckContextCache:
     _cache: dict[str, CachedCheckContextData] = field(default_factory=dict)
 
     def get_or_create(
-        self, *, operation: APIOperation, ctx: EngineContext, phase: str | None
+        self, *, operation: APIOperation, ctx: CheckContextSource, phase: str | None
     ) -> CachedCheckContextData:
         label = operation.label
         cached = self._cache.get(label)
