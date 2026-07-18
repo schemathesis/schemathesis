@@ -6140,10 +6140,11 @@ def test_negative_enum_does_not_flag_integer_entries_matching_declared_type(ctx,
     [
         ({"type": "array", "items": {"type": "string", "enum": []}}, [[]]),
         ({"type": "array", "minItems": 1, "items": {"type": "string", "enum": []}}, []),
+        ({"type": "array", "minItems": 1, "items": {"type": "string", "enum": [1, 2]}}, []),
     ],
-    ids=["empty-enum", "empty-enum-with-min-items"],
+    ids=["empty-enum", "empty-enum-with-min-items", "entries-violating-item-type"],
 )
-def test_positive_array_items_empty_enum(ctx, body_schema, expected):
+def test_positive_array_items_enum_without_usable_entries(ctx, body_schema, expected):
     # An empty array is the only conforming value when no entry is usable; requiring one item leaves nothing.
     loaded = ctx.openapi.load_schema(
         {
@@ -8480,6 +8481,44 @@ def test_coverage_pool_overlay_respects_destination_format(cli, snapshot_cli, ct
 
     @app.route("/sessions/<txn_id>", methods=["GET"])
     def get_session(txn_id):
+        return "", 200
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=coverage",
+            "-c positive_data_acceptance",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_array_items_enum_entries_violating_item_schema(cli, snapshot_cli, ctx):
+    # No `enum` entry is a string, so nothing may be sent as valid data for a server that enforces the schema.
+    paths = {
+        "/tags": {
+            "post": {
+                "operationId": "createTags",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "array", "minItems": 1, "items": {"type": "string", "enum": [1, 2]}}
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad request"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/tags", methods=["POST"])
+    def create_tags():
+        data = request.get_json(silent=True)
+        if not isinstance(data, list) or not data or not all(isinstance(item, str) for item in data):
+            return "", 400
         return "", 200
 
     assert (
