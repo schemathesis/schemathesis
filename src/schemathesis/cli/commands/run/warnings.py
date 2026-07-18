@@ -19,7 +19,7 @@ class WarningData:
     missing_auth: dict[int, set[str]]
     missing_test_data: set[str]
     validation_mismatch: set[str]
-    missing_deserializer: dict[str, set[str]]
+    missing_deserializer: dict[str, dict[str, set[str]]]
     unused_openapi_auth: set[str]
     unsupported_regex: dict[str, set[str]]
     method_not_allowed: set[str]
@@ -30,7 +30,7 @@ class WarningData:
         missing_auth: dict[int, set[str]] | None = None,
         missing_test_data: set[str] | None = None,
         validation_mismatch: set[str] | None = None,
-        missing_deserializer: dict[str, set[str]] | None = None,
+        missing_deserializer: dict[str, dict[str, set[str]]] | None = None,
         unused_openapi_auth: set[str] | None = None,
         unsupported_regex: dict[str, set[str]] | None = None,
         method_not_allowed: set[str] | None = None,
@@ -177,12 +177,13 @@ class WarningCollector:
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
             if warning.kind is SchemathesisWarning.MISSING_DESERIALIZER:
-                # MissingDeserializerWarning always has operation_label
+                # MissingDeserializerWarning always has operation_label and a media type group
                 assert warning.operation_label is not None
+                assert warning.group is not None
                 self._handle_warning(
                     ctx,
                     warning.kind,
-                    self._record_missing_deserializer_warning(warning.operation_label, warning.message),
+                    self._record_missing_deserializer_warning(warning.operation_label, warning.group, warning.message),
                 )
             elif warning.kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:
                 # UnusedOpenAPIAuthWarning has no operation_label (schema-level)
@@ -308,11 +309,15 @@ class WarningCollector:
             if warnings.should_fail(SchemathesisWarning.METHOD_NOT_ALLOWED):
                 ctx.exit_code = 1
 
-    def _record_missing_deserializer_warning(self, operation_label: str, message: str) -> Callable[[], None]:
+    def _record_missing_deserializer_warning(
+        self, operation_label: str, media_type: str, status_code: str
+    ) -> Callable[[], None]:
         """Create a callback that records a missing deserializer warning."""
 
         def record() -> None:
-            self.data.missing_deserializer.setdefault(operation_label, set()).add(message)
+            self.data.missing_deserializer.setdefault(media_type, {}).setdefault(operation_label, set()).add(
+                status_code
+            )
 
         return record
 

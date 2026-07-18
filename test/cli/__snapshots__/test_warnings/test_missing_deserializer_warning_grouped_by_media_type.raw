@@ -1,0 +1,114 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  2 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 2 failed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 2 passed
+
+=================================== FAILURES ===================================
+________________________________ TRACE /orders _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Unsupported methods
+
+    Unsupported method TRACE returned 404, expected 405 Method Not Allowed
+
+    Return 405 for methods not listed in the OpenAPI spec
+
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+_________________________________ TRACE /users _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Unsupported methods
+
+    Unsupported method TRACE returned 404, expected 405 Method Not Allowed
+
+    Return 405 for methods not listed in the OpenAPI spec
+
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== WARNINGS ===================================
+
+Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /orders
+  - GET /users
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
+
+Schema validation skipped: 2 operations cannot validate responses due to missing deserializers
+
+application/msgpack (1 operation):
+  - GET /orders (404)
+text/html (2 operations):
+  - GET /orders (200, 404)
+  - GET /users (200, 404)
+
+💡 Register a deserializer with @schemathesis.deserializer() to enable validation
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ Unsupported methods: 2
+
+Warnings:
+  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
+  ⚠️ Schema validation skipped: 2 operations cannot validate responses
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================= 2 failures, 2 warnings in 1.00s ========================

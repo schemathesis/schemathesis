@@ -33,11 +33,10 @@ Schemathesis dev
 
 Schema validation skipped: 2 operations cannot validate responses due to missing deserializers
 
-  - GET /data1
-    Cannot validate response 200: no deserializer registered for application/vnd.api+custom
-
-  - GET /data2
-    Cannot validate response 200: no deserializer registered for application/vnd.other+custom
+application/vnd.api+custom (1 operation):
+  - GET /data1 (200)
+application/vnd.other+custom (1 operation):
+  - GET /data2 (200)
 
 💡 Register a deserializer with @schemathesis.deserializer() to enable validation
 

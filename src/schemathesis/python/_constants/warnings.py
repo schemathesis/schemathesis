@@ -26,6 +26,10 @@ class ConstantsExtractionWarning:
     def message(self) -> str:
         return f"`{self.source}` {self.reason}"
 
+    @property
+    def group(self) -> str | None:
+        return None
+
 
 def iter_constants_warnings(pool: ConstantsPool) -> list[ConstantsExtractionWarning]:
     return [ConstantsExtractionWarning(source=failure.source, reason=failure.reason) for failure in pool.failures]
