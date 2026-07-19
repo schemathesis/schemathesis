@@ -232,6 +232,21 @@ def worker_task(
                         or (phase == PhaseName.FUZZING and not phases.fuzzing.enabled)
                         or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
                     ):
+                        scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
+                        events_queue.put(scenario_started)
+                        events_queue.put(
+                            events.ScenarioFinished(
+                                id=scenario_started.id,
+                                suite_id=suite_id,
+                                phase=phase,
+                                label=operation.label,
+                                status=Status.SKIP,
+                                recorder=ScenarioRecorder(label=operation.label),
+                                elapsed_time=0.0,
+                                skip_reason="Disabled for this operation",
+                                is_final=True,
+                            )
+                        )
                         continue
                     verdict = ctx.supervisor.verdict(operation.label)
                     if verdict.directive is SchedulingDirective.SKIP:
