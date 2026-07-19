@@ -38,7 +38,7 @@ from schemathesis.core.result import Ok
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.probes import ProbeOutcome
 
@@ -1059,7 +1059,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
         click.echo()
 
-    def display_api_operations(self, ctx: BaseExecutionContext) -> None:
+    def display_api_operations(self, ctx: BaseExecutionContext, stop_reason: StopReason) -> None:
         assert self.statistic is not None
         errored = len(
             {
@@ -1073,20 +1073,34 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         )
         # API operations that are skipped due to fail-fast are counted here as well
         skipped = self.statistic.operations.selected - len(ctx.statistic.tested_operations) - errored
+        # An operation tested in one phase may have been skipped in another; its reason does not explain
+        # the operations counted above, which were never tested at all.
+        explained = {
+            label: reasons
+            for label, reasons in self.skip_reasons.items()
+            if label not in ctx.statistic.tested_operations
+        }
+        reasons = {reason for values in explained.values() for reason in values}
+        # Cases ran, but no selected check applied to them. Operations tested elsewhere are not in the count above.
+        without_checks = ctx.statistic.operations_without_checks - ctx.statistic.tested_operations
+        if without_checks:
+            reasons.add("No checks ran")
+        if skipped > len(explained.keys() | without_checks):
+            if stop_reason.skip_explanation is not None:
+                reasons.add(stop_reason.skip_explanation)
+            elif any(
+                self.phases[phase][0] == Status.ERROR
+                for phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
+            ):
+                reasons.add("Phase errored")
+        skip_reasons = sorted(reasons)
         display_api_operations(
             selected=self.statistic.operations.selected,
             total=self.statistic.operations.total,
             tested=len(ctx.statistic.tested_operations),
             errored=errored,
             skipped=skipped,
-            # An operation tested in one phase may have been skipped in another; its reason does not
-            # explain the operations counted above, which were never tested at all.
-            skip_reasons=[
-                reason
-                for label, reasons in self.skip_reasons.items()
-                if label not in ctx.statistic.tested_operations
-                for reason in reasons
-            ],
+            skip_reasons=skip_reasons,
         )
 
     def display_phases(self) -> None:
@@ -1185,7 +1199,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         click.echo()
 
         if self.statistic:
-            self.display_api_operations(ctx)
+            self.display_api_operations(ctx, event.stop_reason)
 
         self.display_phases()
 

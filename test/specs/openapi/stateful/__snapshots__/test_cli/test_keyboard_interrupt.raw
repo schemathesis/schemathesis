@@ -29,6 +29,8 @@ API Operations:
   Selected: 4/4
   Tested: 0
   Skipped: 4
+    - Interrupted
+    - No checks ran
 
 Test Phases:
   ⏭  Examples (disabled)

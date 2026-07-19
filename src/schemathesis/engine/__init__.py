@@ -30,6 +30,19 @@ class StopReason(str, Enum):
     FAILURE_LIMIT = "failure_limit"
     MAX_TIME = "max_time"
 
+    @property
+    def skip_explanation(self) -> str | None:
+        """Why operations went untested when the run stopped this way; `None` when it ran to completion."""
+        match self:
+            case StopReason.INTERRUPTED:
+                return "Interrupted"
+            case StopReason.FAILURE_LIMIT:
+                return "Failure limit reached"
+            case StopReason.MAX_TIME:
+                return "Time limit reached"
+            case StopReason.COMPLETED:
+                return None
+
 
 def from_schema(schema: BaseSchema) -> Engine:
     from .core import Engine

@@ -27,6 +27,7 @@
 
 - Configuration errors shown without a traceback, under a `Configuration Error` heading.
 - Group the `missing_deserializer` warning by media type, one line per operation.
+- Report why operations were skipped: disabled phases, failure limit, interruption, or time limit.
 
 ## [4.23.0](https://github.com/schemathesis/schemathesis/compare/v4.22.4...v4.23.0) - 2026-07-16
 

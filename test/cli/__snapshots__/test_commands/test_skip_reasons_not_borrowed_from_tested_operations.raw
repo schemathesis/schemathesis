@@ -20,11 +20,11 @@ Schemathesis dev
 
  ⏭   Examples (in 0.00s)
 
-     ⏭  1 skipped
+     ⏭  2 skipped
 
  ✅  Fuzzing (in 0.00s)
 
-     ✅ 1 passed
+     ✅ 1 passed  ⏭  1 skipped
 
 =================================== SUMMARY ====================================
 
@@ -32,6 +32,7 @@ API Operations:
   Selected: 2/2
   Tested: 1
   Skipped: 1
+    - Disabled for this operation
 
 Test Phases:
   ⏭  Examples

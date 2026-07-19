@@ -43,6 +43,7 @@ API Operations:
   Selected: 2/2
   Tested: 1
   Skipped: 1
+    - Failure limit reached
 
 Test Phases:
   ⏭  Examples (disabled)

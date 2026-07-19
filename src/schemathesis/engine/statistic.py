@@ -39,6 +39,8 @@ class Statistic:
     extraction_failures: set[ExtractionFailure]
 
     tested_operations: set[str]
+    # Operations whose cases ran but had no applicable checks.
+    operations_without_checks: set[str]
 
     total_cases: int
     cases_with_failures: int
@@ -49,6 +51,7 @@ class Statistic:
         self.unique_failures_map = {}
         self.extraction_failures = set()
         self.tested_operations = set()
+        self.operations_without_checks = set()
         self.total_cases = 0
         self.cases_with_failures = 0
         self.cases_without_checks = 0
@@ -82,6 +85,7 @@ class Statistic:
 
             if not checks:
                 self.cases_without_checks += 1
+                self.operations_without_checks.add(case.value.operation.label)
                 continue
 
             self.tested_operations.add(case.value.operation.label)
