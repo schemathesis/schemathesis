@@ -2,7 +2,7 @@ Exit code: 0
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_keep_flag0/GET_users_not_a_server_error_testtest.json
+Replaying 1 case from /tmp/GET_users_not_a_server_error_testtest.json
 
   + FIXED  GET /users
 

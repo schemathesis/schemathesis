@@ -2,7 +2,7 @@ Exit code: 1
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_non_utf8_response_0/GET_boom_not_a_server_error_testtest.json
+Replaying 1 case from /tmp/GET_boom_not_a_server_error_testtest.json
 
   x FAILED GET /boom
 

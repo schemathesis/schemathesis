@@ -2,7 +2,7 @@ Exit code: 2
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_corrupt_meta_is_er0/.schemathesis/default/cache/crashes
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
 
   ! ERROR  GET /users
 
