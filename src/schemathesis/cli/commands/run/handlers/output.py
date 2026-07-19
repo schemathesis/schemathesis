@@ -528,7 +528,8 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
     stateful_tests_manager: StatefulProgressManager | None = None
 
     statistic: ApiStatistic | None = None
-    skip_reasons: list[str] = field(default_factory=list)
+    # Keyed by operation label - a reason only applies to the operation it came from.
+    skip_reasons: dict[str, set[str]] = field(default_factory=dict)
     warning_collector: WarningCollector | None = None
     errors: set[events.NonFatalError] = field(default_factory=set)
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
@@ -776,8 +777,8 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 self.unit_tests_manager.finish_operation(event.label)
             self.unit_tests_manager.update_progress()
             self.unit_tests_manager.update_stats(event.status)
-            if event.status == Status.SKIP and event.skip_reason is not None:
-                self.skip_reasons.append(event.skip_reason)
+            if event.status == Status.SKIP and event.skip_reason is not None and event.label:
+                self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
         elif (
             event.phase == PhaseName.STATEFUL_TESTING
             and not event.is_final
@@ -1078,7 +1079,14 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             tested=len(ctx.statistic.tested_operations),
             errored=errored,
             skipped=skipped,
-            skip_reasons=self.skip_reasons,
+            # An operation tested in one phase may have been skipped in another; its reason does not
+            # explain the operations counted above, which were never tested at all.
+            skip_reasons=[
+                reason
+                for label, reasons in self.skip_reasons.items()
+                if label not in ctx.statistic.tested_operations
+                for reason in reasons
+            ],
         )
 
     def display_phases(self) -> None:

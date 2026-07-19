@@ -21,6 +21,7 @@
 - Undercounted stateful link totals for schemas sharing a response definition across operations.
 - Operations with unresolvable `$ref`s silently skipped when dependency ordering applies.
 - False `missing_deserializer` warning for media types whose own schema is unstructured.
+- Skip reasons in the summary borrowed from operations that were tested in another phase.
 
 ### :wrench: Changed
 

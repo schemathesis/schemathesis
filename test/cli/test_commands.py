@@ -2809,3 +2809,39 @@ def test_request_retries_option(cli, ctx, snapshot_cli):
         )
     finally:
         server.shutdown()
+
+
+# `GET /beta` is skipped because its phases are disabled; the examples-phase reason belongs to tested `GET /alpha`.
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_skip_reasons_not_borrowed_from_tested_operations(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/alpha": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/beta": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/alpha")
+    def alpha():
+        return jsonify({})
+
+    @app.route("/beta")
+    def beta():
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=examples,fuzzing",
+            "--max-examples=1",
+            config={
+                "operations": [
+                    {
+                        "include-name": "GET /beta",
+                        "phases": {"examples": {"enabled": False}, "fuzzing": {"enabled": False}},
+                    }
+                ]
+            },
+        )
+        == snapshot_cli
+    )
