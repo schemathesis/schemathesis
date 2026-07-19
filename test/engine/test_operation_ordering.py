@@ -621,3 +621,57 @@ def test_create_scheduler_respects_layer_order_for_single_layer(ctx):
             break
         dispatched.append(result.ok().label)
     assert dispatched == ["POST /products/{productName}", "GET /products/{productName}"]
+
+
+# An operation whose response `$ref` cannot be resolved drops out of the dependency graph, but must still be tested.
+def test_operation_with_unresolvable_ref_is_still_dispatched(ctx):
+    loaded = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"userId": {"type": "string"}},
+                                        "required": ["userId"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [_path_param(name="userId", param_type="string")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/processes": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": "./nonexistent.yaml#/Foo"}}},
+                        }
+                    }
+                }
+            },
+        }
+    )
+
+    engine = EngineContext(schema=loaded, stop_event=threading.Event())
+    scheduler = _create_scheduler(engine, Phase(name=PhaseName.FUZZING, is_enabled=True))
+
+    dispatched = []
+    while True:
+        result = scheduler.next_operation()
+        if result is None:
+            break
+        dispatched.append(result.ok().label)
+
+    assert sorted(dispatched) == sorted(operation.label for operation in _operations(loaded))
