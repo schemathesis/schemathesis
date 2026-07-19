@@ -18,6 +18,7 @@
 - Generation error for request bodies with `prefixItems` in OpenAPI 3.1 schemas.
 - Crash `Cannot sample from a length-zero sequence` for array `items` with an empty `enum`.
 - False positive `positive_data_acceptance` for array `items` with `enum` entries violating the item schema.
+- Undercounted stateful link totals for schemas sharing a response definition across operations.
 
 ### :wrench: Changed
 

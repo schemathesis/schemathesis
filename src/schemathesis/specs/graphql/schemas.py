@@ -24,7 +24,7 @@ from schemathesis.core import NOT_SET, Body, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
-from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -192,10 +192,11 @@ class GraphQLSchema(BaseSchema):
         return self.as_state_machine()
 
     @override
-    def apply_stateful_inference(self, ctx: EngineContext) -> int:
+    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference:
         # All GraphQL transitions are derived from schema structure (no `links` keyword equivalent),
-        # so the entire selected count is reported through the engine's `inferred` channel.
-        return self.analysis.transition_count
+        # so inference accounts for the entire population.
+        count = self.analysis.transition_count
+        return StatefulInference(inferred=count, total=count, selected=count)
 
     @override
     def create_extra_data_source(self) -> GraphQLResourcePool:

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchemaObject
     from schemathesis.core.result import Result
     from schemathesis.core.schema_analysis import SchemaWarning
-    from schemathesis.core.statistic import ApiStatistic
+    from schemathesis.core.statistic import ApiStatistic, StatefulInference
     from schemathesis.core.transport import HttpMethod, Response
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.link_calibration import LinkCalibrationState
@@ -165,7 +165,7 @@ class StatefulBackend(Protocol):
         constants_value_source: ConstantsPool | None = ...,
     ) -> type[APIStateMachine]: ...  # pragma: no cover
 
-    def apply_stateful_inference(self, ctx: EngineContext) -> int: ...  # pragma: no cover
+    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference: ...  # pragma: no cover
 
     def iter_link_candidates(
         self,

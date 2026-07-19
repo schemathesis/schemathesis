@@ -55,6 +55,9 @@ class PhaseEvent(EngineEvent):
 @dataclass(slots=True)
 class StatefulPhasePayload:
     inferred_transitions: int
+    # Transition counts measured after inference, over the same edge population the state machine traverses
+    transitions_total: int
+    transitions_selected: int
 
 
 @dataclass
