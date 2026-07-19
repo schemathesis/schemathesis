@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.23.0...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.0...HEAD) - TBD
+
+## [4.24.0](https://github.com/schemathesis/schemathesis/compare/v4.23.0...v4.24.0) - 2026-07-19
 
 ### :rocket: Added
 
