@@ -2,7 +2,7 @@ Exit code: 0
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_default_finds_name0/.schemathesis/test/cache/crashes
+Replaying 1 case from /tmp/.schemathesis/test/cache/crashes
 
   + FIXED  GET /users
 

@@ -2,7 +2,7 @@ Exit code: 2
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_check_raising_unex0/GET_users_boom_check_testtest.json
+Replaying 1 case from /tmp/GET_users_boom_check_testtest.json
 
   ! ERROR  GET /users
 

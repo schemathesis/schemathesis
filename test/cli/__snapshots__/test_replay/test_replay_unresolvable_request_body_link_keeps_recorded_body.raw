@@ -2,7 +2,7 @@ Exit code: 1
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_unresolvable_reque0/.schemathesis/default/cache/crashes
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
 
   x FAILED POST /target
 

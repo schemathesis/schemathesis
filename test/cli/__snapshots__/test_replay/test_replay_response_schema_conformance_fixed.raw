@@ -2,7 +2,7 @@ Exit code: 0
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_response_schema_co0/GET_data_response_schema_conformance_testtest.json
+Replaying 1 case from /tmp/GET_data_response_schema_conformance_testtest.json
 
   + FIXED  GET /data
 

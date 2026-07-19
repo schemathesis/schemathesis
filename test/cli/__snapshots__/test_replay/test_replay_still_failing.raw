@@ -2,7 +2,7 @@ Exit code: 1
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_still_failing0/GET_broken_not_a_server_error_testtest.json
+Replaying 1 case from /tmp/GET_broken_not_a_server_error_testtest.json
 
   x FAILED GET /broken
 

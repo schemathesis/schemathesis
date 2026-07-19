@@ -2,7 +2,7 @@ Exit code: 0
 ---
 Stdout:
 
-Replaying 1 case from /tmp/test_replay_honors_configured_0/custom_cache/crashes
+Replaying 1 case from /tmp/custom_cache/crashes
 
   + FIXED  GET /users
 
