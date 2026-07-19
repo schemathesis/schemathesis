@@ -16,6 +16,16 @@ class FilteredCount:
 
 
 @dataclass(slots=True)
+class StatefulInference:
+    """Transition counts measured after inference, over the edge population the state machine traverses."""
+
+    # Transitions discovered by inference, as opposed to declared in the schema.
+    inferred: int
+    total: int
+    selected: int
+
+
+@dataclass(slots=True)
 class ResourcePoolInventory:
     """Resource-pool descriptors discovered from the schema.
 

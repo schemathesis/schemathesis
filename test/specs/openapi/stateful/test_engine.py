@@ -16,6 +16,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
+from schemathesis.engine.core import ExecutionPlan
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import Phase, PhaseName, stateful
 from schemathesis.generation import GenerationMode
@@ -890,6 +891,72 @@ def test_multiple_incoming_link_without_override(ctx):
     assert (
         sum(len(operation.outgoing) for operation in state_machine._transitions.operations.values())
         == schema.statistic.transitions.total
+    )
+
+
+SHARED_RESPONSE_SCHEMA = {
+    "openapi": "3.0.2",
+    "info": {"title": "Test", "version": "1.0"},
+    "paths": {
+        "/users": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}}
+                    },
+                },
+                "responses": {"201": {"$ref": "#/components/responses/User"}},
+            }
+        },
+        "/admins": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}}
+                    },
+                },
+                "responses": {"201": {"$ref": "#/components/responses/User"}},
+            }
+        },
+        "/users/{userId}": {
+            "get": {
+                "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    },
+    "components": {
+        "responses": {
+            "User": {
+                "description": "Created",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"userId": {"type": "string"}, "name": {"type": "string"}},
+                            "required": ["userId"],
+                        }
+                    }
+                },
+            }
+        }
+    },
+}
+
+
+# Operations sharing one response definition each get their own transition, so the reported total must not collapse.
+def test_reported_transition_count_with_shared_response_definition(ctx):
+    schema = ctx.openapi.from_full_schema(SHARED_RESPONSE_SCHEMA)
+    # Mirrors the CLI, which reads the load-time statistic before inference runs
+    assert schema.statistic.transitions.total == 0
+    engine = EngineContext(schema=schema, stop_event=threading.Event())
+    phase = Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=False, skip_reason=None)
+    payload = ExecutionPlan(phases=[phase])._adapt_execution(engine, phase)
+    state_machine = schema.as_state_machine()
+    assert payload.transitions_total == sum(
+        len(operation.outgoing) for operation in state_machine._transitions.operations.values()
     )
 
 

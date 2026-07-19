@@ -10,6 +10,7 @@ from schemathesis.checks import RunChecks
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
+from schemathesis.core.statistic import StatefulInference
 from schemathesis.engine._lazy import LazyInit
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.health import HealthState
@@ -135,8 +136,8 @@ class EngineContext:
         if self.observations is not None:
             self.observations.extract_observations_from(recorder)
 
-    def apply_stateful_inference(self) -> int:
-        """Discover spec-specific stateful transitions; return the number available."""
+    def apply_stateful_inference(self) -> StatefulInference:
+        """Discover spec-specific stateful transitions; return the counts available."""
         return self.schema.apply_stateful_inference(self)
 
     def extract_constants(self) -> ConstantsPool:

@@ -194,11 +194,15 @@ class ExecutionPlan:
             phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
         # Phase can be enabled if certain conditions are met
         if phase.name == PhaseName.STATEFUL_TESTING:
-            inferred = engine.apply_stateful_inference()
+            inference = engine.apply_stateful_inference()
             # Enable stateful testing if we successfully inferred any transitions
-            if inferred:
+            if inference.inferred:
                 phase.enable()
-            return StatefulPhasePayload(inferred_transitions=inferred)
+            return StatefulPhasePayload(
+                inferred_transitions=inference.inferred,
+                transitions_total=inference.total,
+                transitions_selected=inference.selected,
+            )
         return None
 
 

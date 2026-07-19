@@ -25,7 +25,7 @@ from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.spec import CoverageCapabilities
-from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -535,9 +535,9 @@ class BaseSchema(Mapping):
 
         return DefaultScheduler(operations=operations)
 
-    def apply_stateful_inference(self, ctx: EngineContext) -> int:
-        """Discover spec-specific stateful transitions; return the number available."""
-        return 0
+    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference:
+        """Discover spec-specific stateful transitions; return the counts available."""
+        return StatefulInference(inferred=0, total=0, selected=0)
 
     def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]:
         """Return per-operation sampling weights for the fuzz phase; default is uniform."""

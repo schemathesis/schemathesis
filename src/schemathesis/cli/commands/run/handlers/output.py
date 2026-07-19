@@ -656,17 +656,13 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         self.unit_tests_manager.start()
 
     def _start_stateful_tests(self, event: events.PhaseStarted) -> None:
-        assert self.statistic is not None
         assert event.payload is not None
-        # Total number of transitions - schema-defined plus those inferred at engine start
-        links_selected = self.statistic.transitions.selected + event.payload.inferred_transitions
-        links_total = self.statistic.transitions.total + event.payload.inferred_transitions
         self.stateful_tests_manager = StatefulProgressManager(
             console=self.console,
             title="Stateful",
-            links_selected=links_selected,
+            links_selected=event.payload.transitions_selected,
             links_inferred=event.payload.inferred_transitions,
-            links_total=links_total,
+            links_total=event.payload.transitions_total,
         )
         self.stateful_tests_manager.start()
 

@@ -27,7 +27,7 @@ from schemathesis.core.jsonschema.bundler import BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
-from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response, restful_method_priority
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
@@ -332,14 +332,17 @@ class OpenApiSchema(BaseSchema):
         return LayeredScheduler(layers, errors=errors)
 
     @override
-    def apply_stateful_inference(self, ctx: EngineContext) -> int:
+    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference:
         injected = 0
         if ctx.observations is not None and ctx.observations.location_headers:
             for operation, entries in ctx.observations.location_headers.items():
                 injected += self.analysis.inferencer.inject_links(operation.responses, entries)
         if self.analysis.should_inject_links():
             injected += self.analysis.inject_links()
-        return injected
+        # Injected links land in the schema, where operations may share a response definition, so one
+        # injection can add several transitions. Re-measure instead of adding the injection count.
+        transitions = self._measure_statistic().transitions if injected else self.statistic.transitions
+        return StatefulInference(inferred=injected, total=transitions.total, selected=transitions.selected)
 
     @override
     def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]:
