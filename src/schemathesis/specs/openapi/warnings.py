@@ -51,19 +51,16 @@ def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeseria
     warnings: list[MissingDeserializerWarning] = []
 
     for status_code, response in operation.responses.items():
-        raw_schema = getattr(response, "get_raw_schema", lambda: None)()
-        if raw_schema is None:
-            continue
+        content = response.definition.get("content", {}) if response.definition else {}
 
-        schema_types = get_type(raw_schema)
-        is_structured = any(t in ("object", "array") for t in schema_types)
+        for content_type, media_type_object in content.items():
+            schema = media_type_object.get("schema")
+            if schema is None:
+                continue
 
-        if not is_structured:
-            continue
+            if not any(t in ("object", "array") for t in get_type(schema)):
+                continue
 
-        content_types = response.definition.get("content", {}).keys() if response.definition else []
-
-        for content_type in content_types:
             try:
                 has_deserializer = deserialization.has_deserializer(content_type)
             except MalformedMediaType:
