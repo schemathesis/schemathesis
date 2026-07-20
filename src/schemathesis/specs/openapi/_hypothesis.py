@@ -29,7 +29,7 @@ from schemathesis.core.jsonschema.numeric import (
     next_float32,
     resolve_inclusive_bounds,
 )
-from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
@@ -37,6 +37,9 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import custom_formats_cache
+from schemathesis.generation.jsonschema import Alphabet, StrategyContext
+from schemathesis.generation.jsonschema.strategy import UnsupportedView
+from schemathesis.generation.jsonschema.strategy import from_schema as canonical_from_schema
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -1180,12 +1183,32 @@ def make_positive_strategy(
     """Strategy for generating values that fit the schema."""
     custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
     schema = snapped_float32_clone(schema)
+    strategy = _canonical_strategy_or_none(schema, generation_config)
+    if strategy is not None:
+        return strategy
     return from_schema(
         schema,
         custom_formats=custom_formats,
         allow_x00=generation_config.allow_x00,
         codec=generation_config.codec,
     )
+
+
+def _canonical_strategy_or_none(
+    schema: JsonSchema, generation_config: GenerationConfig
+) -> st.SearchStrategy[JsonValue] | None:
+    """Strategy for a fully modeled document; `None` routes to hypothesis-jsonschema."""
+    try:
+        canonical = jsonschema_rs.canonicalize(schema)
+    except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
+        return None
+    if canonical.kind == "raw":
+        return None
+    context = StrategyContext(alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec))
+    try:
+        return canonical_from_schema(canonical, context)
+    except UnsupportedView:
+        return None
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:
