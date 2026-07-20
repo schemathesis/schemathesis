@@ -208,7 +208,6 @@ def test_replay_uses_recorded_base_url_without_override(cli, app_runner, ctx, cr
     )
 
     result = cli.main("replay", "--keep")
-
     assert result == snapshot_cli
     assert received == [True], result.output
 
@@ -534,9 +533,7 @@ def test_replay_applies_non_path_link_parameter(cli, app_runner, ctx, tmp_path, 
     )
     writer.write(crash)
 
-    result = cli.main("replay")
-
-    assert result == snapshot_cli
+    assert cli.main("replay") == snapshot_cli
     assert received == ["fresh-123"]
 
 
@@ -591,9 +588,7 @@ def test_replay_re_extracts_request_body_link(cli, app_runner, ctx, tmp_path, cr
     )
     writer.write(crash)
 
-    result = cli.main("replay", "--keep")
-
-    assert result == snapshot_cli
+    assert cli.main("replay", "--keep") == snapshot_cli
     assert received == ["fresh"]
 
 
@@ -1265,9 +1260,7 @@ def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
     )
     writer.write(crash)
 
-    result = cli.main("replay", "--keep")
-
-    assert result == snapshot_cli
+    assert cli.main("replay", "--keep") == snapshot_cli
     assert received == ["recorded"]
 
 
@@ -1441,9 +1434,7 @@ def test_replay_unresolvable_request_body_link_keeps_recorded_body(
     )
     writer.write(crash)
 
-    result = cli.main("replay", "--keep")
-
-    assert result == snapshot_cli
+    assert cli.main("replay", "--keep") == snapshot_cli
     assert received == [{"token": "recorded"}]
 
 
@@ -1495,9 +1486,7 @@ def test_replay_request_body_link_installs_extracted_value_wholesale(
     )
     writer.write(crash)
 
-    result = cli.main("replay", "--keep")
-
-    assert result == snapshot_cli
+    assert cli.main("replay", "--keep") == snapshot_cli
     assert received == [{"token": "fresh"}]
 
 

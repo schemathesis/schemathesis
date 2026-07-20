@@ -35,6 +35,11 @@ def _dynamic_auth(scheme, **overrides):
     return {"dynamic": {"openapi": {scheme: {"path": "/api/auth", "extract_selector": "/access_token", **overrides}}}}
 
 
+def _run_cli(cli, app_runner, app, *flags, config, **kwargs):
+    base_url = app_runner.openapi_url(app, path="")
+    return cli.run(f"{base_url}/openapi.json", *flags, config={"base-url": base_url, **config}, **kwargs)
+
+
 def _register_single_use_token(app):
     # Token is valid for exactly one request, so every later call must re-authenticate.
     state = {"issued": 0, "valid": None}
@@ -443,17 +448,15 @@ def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
             }
         },
     )
-    base_url = app_runner.openapi_url(app, path="")
     assert (
-        cli.run(
-            f"{base_url}/openapi.json",
+        _run_cli(
+            cli,
+            app_runner,
+            app,
             "--phases=fuzzing",
             "--mode=positive",
             "-n 1",
-            config={
-                "base-url": base_url,
-                "auth": _dynamic_auth("NonExistentAuth"),
-            },
+            config={"auth": _dynamic_auth("NonExistentAuth")},
         )
         == snapshot_cli
     )
@@ -488,18 +491,16 @@ def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
             return jsonify({"error": "unauthorized"}), 401
         return jsonify({"result": "ok"})
 
-    base_url = app_runner.openapi_url(app, path="")
     assert (
-        cli.run(
-            f"{base_url}/openapi.json",
+        _run_cli(
+            cli,
+            app_runner,
+            app,
             "--include-path=/protected",
             "--phases=fuzzing",
             "--mode=positive",
             "-n 3",
-            config={
-                "base-url": base_url,
-                "auth": _dynamic_auth("BearerAuth"),
-            },
+            config={"auth": _dynamic_auth("BearerAuth")},
         )
         == snapshot_cli
     )
@@ -736,18 +737,16 @@ def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
             return jsonify({"error": "unauthorized"}), 401
         return jsonify({"result": "ok"})
 
-    base_url = app_runner.openapi_url(app, path="")
     assert (
-        cli.run(
-            f"{base_url}/openapi.json",
+        _run_cli(
+            cli,
+            app_runner,
+            app,
             "--include-path=/protected",
             "--phases=fuzzing",
             "--mode=positive",
             "-n 3",
-            config={
-                "base-url": base_url,
-                "auth": _dynamic_auth("OAuth2"),
-            },
+            config={"auth": _dynamic_auth("OAuth2")},
         )
         == snapshot_cli
     )
@@ -868,15 +867,15 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, snapshot_cli):
     )
     state = _register_single_use_token(app)
 
-    base_url = app_runner.openapi_url(app, path="")
-    result = cli.run(
-        f"{base_url}/openapi.json",
+    result = _run_cli(
+        cli,
+        app_runner,
+        app,
         "--include-path=/protected",
         "--phases=fuzzing",
         "--mode=positive",
         "-n 4",
         config={
-            "base-url": base_url,
             "checks": {"positive_data_acceptance": {"expected-statuses": ["2xx"]}},
             "auth": _dynamic_auth("OAuth2", retry_on=[401]),
         },
@@ -916,17 +915,15 @@ def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner, mocker):
 
     spy = mocker.spy(schemathesis.auths, "refresh_auth")
 
-    base_url = app_runner.openapi_url(app, path="")
-    cli.run(
-        f"{base_url}/openapi.json",
+    _run_cli(
+        cli,
+        app_runner,
+        app,
         "--include-path=/protected",
         "--phases=coverage",
         "--mode=all",
         "-n 15",
-        config={
-            "base-url": base_url,
-            "auth": _dynamic_auth("ApiKeyAuth", retry_on=[401]),
-        },
+        config={"auth": _dynamic_auth("ApiKeyAuth", retry_on=[401])},
     )
     assert spy.call_count == 0
 
@@ -960,18 +957,16 @@ def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):
             return jsonify({"error": "unauthorized"}), 401
         return jsonify({"result": "ok"})
 
-    base_url = app_runner.openapi_url(app, path="")
     assert (
-        cli.run(
-            f"{base_url}/openapi.json",
+        _run_cli(
+            cli,
+            app_runner,
+            app,
             "--include-path=/protected",
             "--phases=fuzzing",
             "--mode=positive",
             "-n 3",
-            config={
-                "base-url": base_url,
-                "auth": _dynamic_auth("ApiKeyAuth"),
-            },
+            config={"auth": _dynamic_auth("ApiKeyAuth")},
         )
         == snapshot_cli
     )
@@ -1020,14 +1015,14 @@ def test_oauth2_case_without_explicit_auth_does_not_reauth(ctx, cli, app_runner)
             return jsonify({"result": "ok"})
         return jsonify({"error": "unauthorized"}), 401
 
-    base_url = app_runner.openapi_url(app, path="")
-    cli.run(
-        f"{base_url}/openapi.json",
+    _run_cli(
+        cli,
+        app_runner,
+        app,
         "--phases=coverage",
         "--mode=all",
         "-n 15",
         config={
-            "base-url": base_url,
             "checks": {
                 "negative_data_rejection": {"enabled": False},
                 "positive_data_acceptance": {"enabled": False},
@@ -1070,16 +1065,14 @@ def test_breaker_bounds_login_attempts(ctx, cli, app_runner):
     for i in range(6):
         app.add_url_rule(f"/r{i}", f"r{i}", _unauthorized)
 
-    base_url = app_runner.openapi_url(app, path="")
-    result = cli.run(
-        f"{base_url}/openapi.json",
+    result = _run_cli(
+        cli,
+        app_runner,
+        app,
         "--phases=fuzzing",
         "--mode=positive",
         "-n 1",
-        config={
-            "base-url": base_url,
-            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
-        },
+        config={"auth": _dynamic_auth("OAuth2", retry_on=[401])},
     )
     assert hits["auth"] <= 4
     assert result.stdout.count("⚠️ Authentication stopped working mid-run - credentials likely invalidated") == 1
@@ -1115,17 +1108,15 @@ def test_dead_login_endpoint_does_not_storm(ctx, cli, app_runner):
     def protected():
         return jsonify({"result": "ok"})
 
-    base_url = app_runner.openapi_url(app, path="")
-    cli.run(
-        f"{base_url}/openapi.json",
+    _run_cli(
+        cli,
+        app_runner,
+        app,
         "--include-path=/protected",
         "--phases=fuzzing",
         "--mode=positive",
         "-n 20",
-        config={
-            "base-url": base_url,
-            "auth": _dynamic_auth("OAuth2", retry_on=[401]),
-        },
+        config={"auth": _dynamic_auth("OAuth2", retry_on=[401])},
     )
     assert hits["auth"] <= TOKEN_FETCH_BREAKER_THRESHOLD
 

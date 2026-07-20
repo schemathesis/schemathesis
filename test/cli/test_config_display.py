@@ -1,6 +1,14 @@
 import click
 
 
+def _serve(ctx, app_runner, paths):
+    schema = ctx.openapi.build_schema(paths)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    base_url = app_runner.openapi_url(app, path="")
+    schema_path = ctx.openapi.write_schema(paths)
+    return base_url, schema_path
+
+
 def test_base_url_not_truncated_on_narrow_terminal(ctx, cli):
     schema_path = ctx.openapi.write_schema({})
     long_url = "https://internal.staging.example.com/api/v3/internal/prefix/of/something-very-long"
@@ -20,10 +28,7 @@ def test_cli_displays_config_path(ctx, cli, app_runner, snapshot_cli):
             }
         }
     }
-    schema = ctx.openapi.build_schema(paths)
-    app = ctx.openapi.make_permissive_flask_app(schema)
-    base_url = app_runner.openapi_url(app, path="")
-    schema_path = ctx.openapi.write_schema(paths)
+    base_url, schema_path = _serve(ctx, app_runner, paths)
 
     # Run with config parameter - cli fixture will write config file
     assert (
@@ -47,10 +52,7 @@ def test_cli_no_config_display_without_file(ctx, cli, app_runner, snapshot_cli):
             }
         }
     }
-    schema = ctx.openapi.build_schema(paths)
-    app = ctx.openapi.make_permissive_flask_app(schema)
-    base_url = app_runner.openapi_url(app, path="")
-    schema_path = ctx.openapi.write_schema(paths)
+    base_url, schema_path = _serve(ctx, app_runner, paths)
 
     # Run without config parameter - no config file used
     assert (
@@ -74,10 +76,7 @@ def test_cli_displays_dictionary_stats(ctx, cli, app_runner, snapshot_cli):
             }
         }
     }
-    schema = ctx.openapi.build_schema(paths)
-    app = ctx.openapi.make_permissive_flask_app(schema)
-    base_url = app_runner.openapi_url(app, path="")
-    schema_path = ctx.openapi.write_schema(paths)
+    base_url, schema_path = _serve(ctx, app_runner, paths)
 
     assert (
         cli.run(
