@@ -48,10 +48,11 @@ def test_find_operation_by_path_match(ctx, method, path, expected_path, expected
     )
 
     operation = schema.find_operation_by_path(method, path)
-    assert operation is not None
-    assert operation.path == expected_path
-    assert operation.method == expected_method
-    assert operation.definition.raw["operationId"] == expected_operation_id
+    assert (operation.path, operation.method, operation.definition.raw["operationId"]) == (
+        expected_path,
+        expected_method,
+        expected_operation_id,
+    )
 
 
 @pytest.mark.parametrize(

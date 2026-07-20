@@ -1,5 +1,3 @@
-"""Tests for common schema loading logic shared by all loaders."""
-
 import time
 from contextlib import suppress
 

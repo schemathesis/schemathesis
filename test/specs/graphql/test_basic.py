@@ -40,19 +40,23 @@ from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.utils import assert_requests_call
 
 
+def _books_schema(ctx):
+    return schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+
+
 def test_raw_schema(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     assert schema.specification.name == "GraphQL"
 
 
 def test_tags(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     assert schema["Query"]["getBooks"].tags is None
 
 
 @pytest.mark.hypothesis_nested
 def test_operation_strategy(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     strategy = schema["Query"]["getBooks"].as_strategy()
 
     @given(case=strategy)
@@ -66,7 +70,7 @@ def test_operation_strategy(ctx):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_as_wsgi_kwargs(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     strategy = schema["Query"]["getBooks"].as_strategy()
     case = strategy.example()
     expected = {
@@ -86,7 +90,7 @@ def test_as_wsgi_kwargs(ctx):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_custom_base_url(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     schema.config.update(base_url="http://0.0.0.0:1234/something")
 
     # Then the base path is changed, in this case it is the only available path
@@ -99,7 +103,7 @@ def test_custom_base_url(ctx):
 
 @pytest.mark.parametrize("kwargs", [{"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}])
 def test_make_case(ctx, kwargs):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = schema["Query"]["getBooks"].Case(**kwargs)
     assert_requests_call(case)
 
@@ -112,7 +116,7 @@ def test_make_case(ctx, kwargs):
     ],
 )
 def test_response_validation(ctx, response_factory, kwargs, expected):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     response = response_factory.requests(status_code=200, **kwargs)
     case = schema["Query"]["getBooks"].Case(body="Q")
     with pytest.raises(Failure, match=expected):
@@ -131,7 +135,7 @@ def test_response_validation(ctx, response_factory, kwargs, expected):
 
 
 def test_client_error(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = schema["Query"]["getBooks"].Case(body="invalid query")
     with pytest.raises(FailureGroup) as exc:
         case.call_and_validate()
@@ -196,7 +200,7 @@ def test_server_error(ctx):
 
 
 def test_multiple_server_error(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = schema["Mutation"]["addBook"].Case()
     payload = {
         "data": None,
@@ -355,7 +359,7 @@ def filter_body(context, body):
 
 
 def test_unknown_type_name(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     with pytest.raises(LookupError, match="`Qwery` type not found. Did you mean `Query`?"):
         schema["Qwery"]["getBooks"]
 
@@ -368,13 +372,13 @@ def test_unknown_type_name(ctx):
     ],
 )
 def test_unknown_field_name(ctx, name, expected):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     with pytest.raises(LookupError, match=expected):
         schema["Query"][name]
 
 
 def test_field_map_operations(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     assert len(schema["Query"]) == 2
     assert list(iter(schema["Query"])) == ["getBooks", "getAuthors"]
     assert schema.find_operation_by_label("Query.getBooks") is not None
@@ -383,13 +387,13 @@ def test_field_map_operations(ctx):
 
 
 def test_repr(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     assert repr(schema) == "<GraphQLSchema>"
 
 
 @pytest.mark.parametrize("type_name", ["Query", "Mutation"])
 def test_type_as_strategy(ctx, type_name):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     operations = schema[type_name]
     strategy = operations.as_strategy()
     for operation in operations.values():
@@ -403,7 +407,7 @@ def test_type_as_strategy(ctx, type_name):
 
 
 def test_schema_as_strategy(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     strategy = schema.as_strategy()
     for operations in schema.values():
         for operation in operations.values():
@@ -421,7 +425,7 @@ def test_schema_as_strategy(ctx):
     [use_after_free, ensure_resource_availability, ignored_auth, positive_data_acceptance, negative_data_rejection],
 )
 def test_ignored_checks(ctx, check):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     # Just in case
     case = schema["Query"]["getBooks"].Case()
     assert check(None, None, case)
@@ -435,7 +439,7 @@ def test_negative_mode_cli(ctx, cli, snapshot_cli):
 
 
 def test_negative_mode_skip_when_impossible(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     operation = schema["Query"]["getBooks"]
     schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
@@ -451,7 +455,7 @@ def test_negative_mode_skip_when_impossible(ctx):
 
 
 def test_negative_mode_fallback_to_positive(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     operation = schema["Query"]["getBooks"]
     schema.config.generation.update(modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
@@ -503,7 +507,7 @@ def _make_mock_response(content, status_code=200, content_type="application/json
 
 
 def test_not_a_server_error_graphql_negative_mode_accepted_invalid_data(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
     check_ctx = CheckContext(
@@ -515,7 +519,7 @@ def test_not_a_server_error_graphql_negative_mode_accepted_invalid_data(ctx):
 
 
 def test_not_a_server_error_graphql_negative_mode_client_error_passes(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
@@ -529,7 +533,7 @@ def test_not_a_server_error_graphql_negative_mode_client_error_passes(ctx):
 
 
 def test_not_a_server_error_graphql_positive_mode_client_error_raises(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = _make_graphql_case_with_mode(schema, GenerationMode.POSITIVE)
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
@@ -543,7 +547,7 @@ def test_not_a_server_error_graphql_positive_mode_client_error_raises(ctx):
 
 
 def test_not_a_server_error_graphql_negative_mode_server_error_raises(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Internal error in resolver", "path": ["addBook"]}]}
@@ -557,7 +561,7 @@ def test_not_a_server_error_graphql_negative_mode_server_error_raises(ctx):
 
 
 def test_not_a_server_error_graphql_negative_mode_includes_description(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
     check_ctx = CheckContext(
@@ -571,7 +575,7 @@ def test_not_a_server_error_graphql_negative_mode_includes_description(ctx):
 
 
 def test_not_a_server_error_graphql_no_meta_falls_through_to_validation(ctx):
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = schema["Mutation"]["addBook"].Case()
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
@@ -590,7 +594,7 @@ def test_not_a_server_error_graphql_no_meta_falls_through_to_validation(ctx):
 )
 def test_not_a_server_error_graphql_bad_charset(ctx, charset):
     # A response lying about its charset over valid GraphQL JSON must validate normally, not crash.
-    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    schema = _books_schema(ctx)
     case = schema["Mutation"]["addBook"].Case()
     response = _make_mock_response(
         {"data": {"addBook": {"id": "1"}}}, content_type=f"application/json; charset={charset}"

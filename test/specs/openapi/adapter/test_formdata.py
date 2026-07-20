@@ -26,14 +26,7 @@ def test_content_type_for_undefined_single_property(ctx):
 
     files, data = prepare_multipart_v3(operation, form_data)
 
-    assert files is not None
-    assert len(files) == 1
-    name, file_tuple = files[0]
-    assert name == "field"
-    assert len(file_tuple) == 3
-    assert file_tuple[0] is None
-    assert file_tuple[1] == "value"
-    assert file_tuple[2] == "text/plain"
+    assert files == [("field", (None, "value", "text/plain"))]
 
 
 def test_content_type_for_undefined_array_property(ctx):
@@ -61,11 +54,7 @@ def test_content_type_for_undefined_array_property(ctx):
 
     files, data = prepare_multipart_v3(operation, form_data)
 
-    assert files is not None
-    assert len(files) == 2
-    for name, file_tuple in files:
-        assert name == "items"
-        assert len(file_tuple) == 3
-        assert file_tuple[0] is None
-        assert file_tuple[1] in ["data1", "data2"]
-        assert file_tuple[2] == "image/jpeg"
+    assert files == [
+        ("items", (None, "data1", "image/jpeg")),
+        ("items", (None, "data2", "image/jpeg")),
+    ]

@@ -6,7 +6,6 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -86,13 +85,10 @@ def simple_operation(ctx, simple_schema):
 def test_direct_assignment_marks_dirty_and_revalidates(simple_operation):
     meta = make_negative_meta(ParameterLocation.BODY, "id", "Missing required property")
 
-    case = Case(
-        operation=simple_operation,
-        method="POST",
-        path="/items",
+    case = simple_operation.Case(
         body={},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
@@ -103,13 +99,10 @@ def test_direct_assignment_marks_dirty_and_revalidates(simple_operation):
 def test_inplace_modification_detected_and_revalidated(simple_operation):
     meta = make_negative_meta(ParameterLocation.BODY, "id", "Missing required property")
 
-    case = Case(
-        operation=simple_operation,
-        method="POST",
-        path="/items",
+    case = simple_operation.Case(
         body={},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
@@ -120,13 +113,10 @@ def test_inplace_modification_detected_and_revalidated(simple_operation):
 def test_making_valid_case_invalid_detected(simple_operation):
     meta = make_positive_meta(ParameterLocation.BODY)
 
-    case = Case(
-        operation=simple_operation,
-        method="POST",
-        path="/items",
+    case = simple_operation.Case(
         body={"id": "valid"},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.POSITIVE
@@ -135,13 +125,10 @@ def test_making_valid_case_invalid_detected(simple_operation):
 
 
 def test_no_metadata_no_crash(simple_operation):
-    case = Case(
-        operation=simple_operation,
-        method="POST",
-        path="/items",
+    case = simple_operation.Case(
         body={"id": "test"},
         media_type="application/json",
-        meta=None,
+        _meta=None,
     )
 
     case.body["name"] = "test-name"
@@ -182,13 +169,10 @@ def test_nested_dict_modification_detected(ctx):
 
     meta = make_positive_meta(ParameterLocation.BODY)
 
-    case = Case(
-        operation=operation,
-        method="POST",
-        path="/items",
+    case = operation.Case(
         body={"config": {"enabled": True}},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     case.body["extra"] = "not allowed"
@@ -226,12 +210,9 @@ def test_hook_modifies_query_with_prefix_items_revalidates(ctx):
     operation = schema["/box"]["GET"]
 
     meta = make_positive_meta(ParameterLocation.QUERY)
-    case = Case(
-        operation=operation,
-        method="GET",
-        path="/box",
+    case = operation.Case(
         query={"box": [0, 0, 1, 1]},
-        meta=meta,
+        _meta=meta,
     )
 
     # Hook-style reassignment marks the container dirty and triggers revalidation.
@@ -268,12 +249,9 @@ def test_hook_self_assigns_stringified_query_keeps_positive(ctx):
 
     meta = make_positive_meta(ParameterLocation.QUERY)
     meta.raw_containers[ParameterLocation.QUERY] = {"lat": 0, "lon": 0}
-    case = Case(
-        operation=operation,
-        method="GET",
-        path="/point",
+    case = operation.Case(
         query={"lat": "0", "lon": "0"},
-        meta=meta,
+        _meta=meta,
     )
 
     case.query = case.query
@@ -322,13 +300,10 @@ def test_hook_adds_required_field_metadata_updates(ctx):
 
     meta = make_negative_meta(ParameterLocation.BODY, "address_id", "Required property removed")
 
-    case = Case(
-        operation=operation,
-        method="POST",
-        path="/locations",
+    case = operation.Case(
         body={"name": "ABCD", "costs": 0, "debt": 0, "revenue": 0, "purpose": ""},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
@@ -452,12 +427,9 @@ def test_query_parameter_modification_revalidates(ctx):
 
     meta = make_negative_meta(ParameterLocation.QUERY, "include_deleted", "Invalid type")
 
-    case = Case(
-        operation=operation,
-        method="GET",
-        path="/users",
+    case = operation.Case(
         query={"include_deleted": "not-a-boolean"},
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
@@ -488,12 +460,9 @@ def test_header_case_insensitive_dict_hash(ctx):
 
     meta = make_positive_meta(ParameterLocation.HEADER)
 
-    case = Case(
-        operation=operation,
-        method="GET",
-        path="/users",
+    case = operation.Case(
         headers=CaseInsensitiveDict({"X-API-Version": "v1"}),
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.POSITIVE
@@ -525,12 +494,9 @@ def test_path_parameter_modification_revalidates(ctx):
 
     meta = make_negative_meta(ParameterLocation.PATH, "user_id", "Invalid pattern")
 
-    case = Case(
-        operation=operation,
-        method="GET",
-        path="/users/{user_id}",
+    case = operation.Case(
         path_parameters={"user_id": "not-a-number"},
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
@@ -586,14 +552,11 @@ def test_multiple_components_modified_all_revalidate(ctx):
         ),
     )
 
-    case = Case(
-        operation=operation,
-        method="POST",
-        path="/users/{user_id}",
+    case = operation.Case(
         path_parameters={"user_id": "abc"},
         body={"extra": "field"},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.NEGATIVE
@@ -610,13 +573,10 @@ def test_multiple_components_modified_all_revalidate(ctx):
 def test_chained_modifications_all_tracked(simple_operation):
     meta = make_positive_meta(ParameterLocation.BODY)
 
-    case = Case(
-        operation=simple_operation,
-        method="POST",
-        path="/items",
+    case = simple_operation.Case(
         body={"id": "test@example.com"},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     assert case.meta.generation.mode == GenerationMode.POSITIVE
@@ -749,13 +709,10 @@ def test_revalidation_with_openapi_30_boolean_exclusive_minimum(ctx):
 
     meta = make_positive_meta(ParameterLocation.BODY)
 
-    case = Case(
-        operation=operation,
-        method="POST",
-        path="/items",
+    case = operation.Case(
         body={"Pitch": 5},
         media_type="application/json",
-        meta=meta,
+        _meta=meta,
     )
 
     case.body = {"Pitch": 10}

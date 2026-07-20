@@ -58,11 +58,20 @@ def _protected_calls(api):
     return calls
 
 
+def _run_wfc(cli, api, path, *args, max_examples=5, **wfc):
+    return cli.run(
+        api.schema_url,
+        f"--max-examples={max_examples}",
+        *args,
+        config={"auth": {"wfc": {"path": path, **wfc}}},
+    )
+
+
 def test_wfc_fixed_headers_reach_requests(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(tmp_path, {"auth": [{"name": "u", "fixedHeaders": [{"name": "X-Api-Key", "value": "static"}]}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "X-Api-Key") == "static" for c in _protected_calls(api))
 
 
@@ -70,7 +79,7 @@ def test_wfc_body_token_reaches_requests(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=_token())}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
@@ -79,7 +88,7 @@ def test_wfc_header_token_reaches_requests(cli, ctx, tmp_path):
     token = _token(extractFrom="header", extractSelector="X-Auth-Token")
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=token)}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
@@ -88,7 +97,7 @@ def test_wfc_query_token_reaches_requests(cli, ctx, tmp_path):
     token = _token(sendIn="query", sendName="token", sendTemplate="{token}")
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=token)}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(c.query.get("token") == WFC_TOKEN for c in _protected_calls(api))
 
 
@@ -97,7 +106,7 @@ def test_wfc_number_token_coerced(cli, ctx, tmp_path):
     token = _token(extractSelector="/number_token", sendName="X-Token", sendTemplate="{token}")
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=token)}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "X-Token") == "42" for c in _protected_calls(api))
 
 
@@ -105,7 +114,7 @@ def test_wfc_cookie_auth_reaches_requests(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(expectCookies=True)}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(f"session={WFC_SESSION}" in (_header(c, "Cookie") or "") for c in _protected_calls(api))
 
 
@@ -114,7 +123,7 @@ def test_wfc_form_encoded_login(cli, ctx, tmp_path):
     login = _login(token=_token(), contentType="application/x-www-form-urlencoded")
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
@@ -130,7 +139,7 @@ def test_wfc_payload_raw_login(cli, ctx, tmp_path):
     }
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
@@ -145,7 +154,7 @@ def test_wfc_external_endpoint_url(cli, ctx, tmp_path):
     }
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
@@ -161,8 +170,7 @@ def test_wfc_selects_named_user(cli, ctx, tmp_path):
         },
     )
 
-    result = cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth, "user": "bob"}}})
-    assert result.exit_code == 0
+    assert _run_wfc(cli, api, auth, user="bob").exit_code == 0
     assert all(_header(c, "X-Api-Key") == "bob-key" for c in _protected_calls(api))
 
 
@@ -171,7 +179,7 @@ def test_wfc_yaml_document(cli, ctx, tmp_path):
     doc = "auth:\n  - name: u\n    fixedHeaders:\n      - name: X-Api-Key\n        value: static\n"
     auth = _write(tmp_path, doc, name="auth.yaml")
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "X-Api-Key") == "static" for c in _protected_calls(api))
 
 
@@ -189,7 +197,7 @@ def test_wfc_body_token_extraction_errors(cli, ctx, tmp_path, selector, match):
     login = _login(token=_token(extractSelector=selector))
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert match in result.stdout.lower()
 
@@ -199,7 +207,7 @@ def test_wfc_header_token_missing(cli, ctx, tmp_path):
     login = _login(token=_token(extractFrom="header", extractSelector="X-Absent"))
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "header 'x-absent' not found" in result.stdout.lower()
 
@@ -209,7 +217,7 @@ def test_wfc_login_custom_headers(cli, ctx, tmp_path):
     login = _login(token=_token(), headers=[{"name": "X-Login", "value": "on"}])
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    assert cli.run(api.schema_url, "--max-examples=5", config={"auth": {"wfc": {"path": auth}}}).exit_code == 0
+    assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
@@ -217,7 +225,7 @@ def test_wfc_login_non_2xx(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login_failing()
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=_token())}]})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "500" in result.stdout
 
@@ -226,7 +234,7 @@ def test_wfc_login_body_not_json(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login_plain()
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=_token())}]})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "not valid json" in result.stdout.lower()
 
@@ -235,7 +243,7 @@ def test_wfc_login_expects_cookies_but_none_returned(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login_plain()
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(expectCookies=True)}]})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "no cookies returned" in result.stdout.lower()
 
@@ -245,7 +253,7 @@ def test_wfc_unsupported_content_type(cli, ctx, tmp_path):
     login = _login(token=_token(), contentType="application/xml")
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "unsupported content type" in result.stdout.lower()
 
@@ -256,10 +264,7 @@ def test_wfc_login_forwards_client_cert(cli, ctx, tmp_path):
     cert.write_text("dummy")
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=_token())}]})
 
-    result = cli.run(
-        api.schema_url, "--max-examples=5", f"--request-cert={cert}", config={"auth": {"wfc": {"path": auth}}}
-    )
-    assert result.exit_code == 0
+    assert _run_wfc(cli, api, auth, f"--request-cert={cert}").exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
 
 
@@ -382,7 +387,7 @@ def test_wfc_unreadable_file(cli, ctx, tmp_path):
     if os.access(path, os.R_OK):
         pytest.skip("filesystem ignored chmod 0 (likely running as root or Windows)")
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": str(path)}}})
+    result = _run_wfc(cli, api, str(path), max_examples=1)
     assert result.exit_code != 0
     assert "failed to read" in result.stdout.lower()
 
@@ -398,7 +403,7 @@ def test_wfc_login_connection_error(cli, ctx, tmp_path):
     }
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": login}]})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "login endpoint call failed" in result.stdout.lower()
 
@@ -415,7 +420,7 @@ def test_wfc_multiple_users_without_selection(cli, ctx, tmp_path):
         },
     )
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert "specify which user" in result.stdout.lower()
 
@@ -432,7 +437,7 @@ def test_wfc_unknown_user(cli, ctx, tmp_path):
         },
     )
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth, "user": "carol"}}})
+    result = _run_wfc(cli, api, auth, max_examples=1, user="carol")
     assert result.exit_code != 0
     assert "carol" in result.stdout.lower() and "not found" in result.stdout.lower()
 
@@ -452,23 +457,21 @@ def test_wfc_file_errors(cli, ctx, tmp_path, filename, content, match):
     path = tmp_path / filename
     path.write_text(content)
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": str(path)}}})
+    result = _run_wfc(cli, api, str(path), max_examples=1)
     assert result.exit_code != 0
     assert match in result.stdout.lower()
 
 
 def test_wfc_file_not_found(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
-    result = cli.run(
-        api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": str(tmp_path / "nope.json")}}}
-    )
+    result = _run_wfc(cli, api, str(tmp_path / "nope.json"), max_examples=1)
     assert result.exit_code != 0
     assert "not found" in result.stdout.lower()
 
 
 def test_wfc_path_is_directory(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": str(tmp_path)}}})
+    result = _run_wfc(cli, api, str(tmp_path), max_examples=1)
     assert result.exit_code != 0
     assert "not a file" in result.stdout.lower()
 
@@ -562,7 +565,7 @@ def test_wfc_document_validation_errors(cli, ctx, tmp_path, entries, match):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(tmp_path, {"auth": entries})
 
-    result = cli.run(api.schema_url, "--max-examples=1", config={"auth": {"wfc": {"path": auth}}})
+    result = _run_wfc(cli, api, auth, max_examples=1)
     assert result.exit_code != 0
     assert match in result.stdout.lower()
 

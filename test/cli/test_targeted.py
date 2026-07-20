@@ -63,7 +63,7 @@ def metric_function():
     def new_metric(context):
         return 0.5
 
-    yield metric_function
+    yield new_metric
 
     METRICS.unregister("new_metric")
 
