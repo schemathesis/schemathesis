@@ -1,6 +1,5 @@
 import json
 from typing import Annotated
-from unittest.mock import Mock
 
 import pytest
 import requests
@@ -122,7 +121,7 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("ctx", "request_kwargs", "parameters", "expected"),
+    ("check_context", "request_kwargs", "parameters", "expected"),
     [
         (
             CheckContext(
@@ -231,11 +230,11 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
         ),
     ],
 )
-def test_contains_auth(ctx, request_kwargs, parameters, expected, response_factory):
+def test_contains_auth(check_context, request_kwargs, parameters, expected, response_factory, case_factory):
     response = response_factory.requests()
     response.request = requests.Request("GET", **request_kwargs).prepare()
     assert (
-        _contains_auth(ctx, Mock(_has_explicit_auth=False), Response.from_requests(response, verify=True), parameters)
+        _contains_auth(check_context, case_factory(), Response.from_requests(response, verify=True), parameters)
         == expected
     )
 

@@ -359,15 +359,9 @@ def test_validate_response_no_errors(testdir):
     testdir.make_test(
         r"""
 import requests
+from io import BytesIO
+from urllib3 import HTTPResponse
 from schemathesis.core.transport import Response
-from unittest.mock import Mock
-
-class Headers(dict):
-
-    def getlist(self, key):
-        v = self.get(key)
-        if v is not None:
-            return [v]
 
 @schema.parametrize()
 def test_(case):
@@ -375,7 +369,7 @@ def test_(case):
     response._content = b"{}"
     response.headers["Content-Type"] = "application/json"
 
-    response.raw = Mock(headers=Headers({"Content-Type": "application/json"}))
+    response.raw = HTTPResponse(body=BytesIO(response._content), status=200, headers=response.headers)
     response.status_code = 200
     request = requests.PreparedRequest()
     request.prepare("GET", "http://127.0.0.1")

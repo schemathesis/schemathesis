@@ -1,6 +1,6 @@
 import json
 from unittest import SkipTest
-from unittest.mock import ANY, Mock
+from unittest.mock import ANY
 
 import pytest
 import requests
@@ -195,7 +195,9 @@ def test_server_error(ctx):
     assert "Hidden 1 / 0 bug" in str(exc.value.exceptions[0])
 
 
-def test_multiple_server_error():
+def test_multiple_server_error(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = schema["Mutation"]["addBook"].Case()
     payload = {
         "data": None,
         "errors": [
@@ -205,7 +207,7 @@ def test_multiple_server_error():
         ],
     }
     with pytest.raises(Failure, match="GraphQL server error") as exc:
-        validate_graphql_response(Mock(operation=Mock(label="GET/ foo")), payload)
+        validate_graphql_response(case, payload)
 
     assert exc.value.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
 

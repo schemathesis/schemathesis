@@ -44,13 +44,13 @@ def auth_provider_class(token):
     return Auth
 
 
-def test_cache(auth_provider_class, token, mocker):
+def test_cache(auth_provider_class, token, case_factory):
     current_time = 0.0
 
     def timer():
         return current_time
 
-    context = mocker.create_autospec(AuthContext)
+    context = AuthContext(operation=case_factory().operation, app=None)
     # When caching provider is used
     provider = CachingAuthProvider(auth_provider_class(), timer=timer)
     # Then all `get` calls are cached
@@ -105,10 +105,11 @@ def test_register_cached(auth_storage, auth_provider_class):
     assert isinstance(auth_storage.providers[0].provider, auth_provider_class)
 
 
-def test_set_noop(auth_storage, mocker):
+def test_set_noop(auth_storage, case_factory):
     # When `AuthStorage.set` is called without `provider`
+    case = case_factory()
     with pytest.raises(IncorrectUsage, match="No auth provider is defined."):
-        auth_storage.set(mocker.create_autospec(Case), mocker.create_autospec(AuthContext))
+        auth_storage.set(case, AuthContext(operation=case.operation, app=None))
     # This normally should not happen, as it is checked before.
 
 
