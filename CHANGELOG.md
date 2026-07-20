@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.0...HEAD) - TBD
 
+### :wrench: Changed
+
+- Data generation for `enum`, `const`, and bare `type` schemas moved to `jsonschema-rs`; faster as a side effect.
+
 ## [4.24.0](https://github.com/schemathesis/schemathesis/compare/v4.23.0...v4.24.0) - 2026-07-19
 
 ### :rocket: Added
