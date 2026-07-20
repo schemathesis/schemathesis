@@ -1,10 +1,11 @@
 import json
-from unittest.mock import Mock
+from io import BytesIO
 
 import pytest
 import requests
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from urllib3 import HTTPResponse
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import Response
@@ -69,13 +70,6 @@ def case(operation):
     )
 
 
-class Headers(dict):
-    def getlist(self, key):
-        v = self.get(key)
-        if v is not None:
-            return [v]
-
-
 @pytest.fixture(scope="module")
 def response():
     response = requests.Response()
@@ -83,7 +77,7 @@ def response():
     response.status_code = 200
     response.headers["Content-Type"] = "application/json"
     response.headers["X-Response"] = "Y"
-    response.raw = Mock(headers=Headers({"Content-Type": "application/json", "X-Response": "Y"}))
+    response.raw = HTTPResponse(body=BytesIO(response._content), status=200, headers=response.headers)
     return Response.from_requests(response, True)
 
 
