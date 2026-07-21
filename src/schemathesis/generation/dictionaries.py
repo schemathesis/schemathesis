@@ -323,21 +323,36 @@ def resolve_body_bindings(
 
 def _resolve_body_leaf_schema(schema: JsonSchema, pointer: str) -> JsonSchema | None:
     # `pointer` always comes from `parse_body_path`, so it is `/`-prefixed and non-empty.
-    current: JsonSchema = schema
-    for segment in pointer[1:].split("/"):
-        if not isinstance(current, dict):
-            return None
-        if segment == "*":
-            items = current.get("items")
-            if not isinstance(items, (dict, bool)):
-                return None
-            current = items
-        else:
-            properties = current.get("properties")
-            if not isinstance(properties, dict) or segment not in properties:
-                return None
-            current = properties[segment]
-    return current if isinstance(current, (dict, bool)) else None
+    return _walk_leaf_schema(schema, pointer[1:].split("/"))
+
+
+def _walk_leaf_schema(current: JsonSchema, segments: list[str]) -> JsonSchema | None:
+    if not segments:
+        return current if isinstance(current, (dict, bool)) else None
+    if not isinstance(current, dict):
+        return None
+    segment, *rest = segments
+    if segment == "*":
+        items = current.get("items")
+        if isinstance(items, (dict, bool)):
+            found = _walk_leaf_schema(items, rest)
+            if found is not None:
+                return found
+    else:
+        properties = current.get("properties")
+        if isinstance(properties, dict) and segment in properties:
+            found = _walk_leaf_schema(properties[segment], rest)
+            if found is not None:
+                return found
+    # The field may live inside a subschema, so descend combinator branches with the same path.
+    for keyword in ("oneOf", "anyOf", "allOf"):
+        branches = current.get(keyword)
+        if isinstance(branches, list):
+            for branch in branches:
+                found = _walk_leaf_schema(branch, segments)
+                if found is not None:
+                    return found
+    return None
 
 
 def build_body_dictionary_overlay_strategy(
