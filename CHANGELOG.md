@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Fuzz dictionaries not applied to body fields nested under `oneOf`/`anyOf`/`allOf` or `if`/`then`/`else`. [#4347](https://github.com/schemathesis/schemathesis/issues/4347)
+
 ### :wrench: Changed
 
 - Data generation for `enum`, `const`, and bare `type` schemas moved to `jsonschema-rs`; faster as a side effect.

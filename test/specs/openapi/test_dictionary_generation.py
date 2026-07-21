@@ -619,6 +619,64 @@ def test_body_binding_top_level_field(ctx):
 
 
 @pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("combinator", ["oneOf", "anyOf", "allOf"])
+def test_body_binding_field_under_combinator(ctx, combinator):
+    object_schema = {
+        "type": "object",
+        "properties": {"region": {"type": "string"}},
+        "required": ["region"],
+    }
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"region": {"values": ["DE", "GB", "US"]}},
+            "parameters": {"body.region": {"dictionary": "region"}},
+        },
+        _path_with_body({combinator: [object_schema]}),
+    )
+    operation = schema["/items"]["POST"]
+    seen: set[str] = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        seen.add(case.body.get("region") if isinstance(case.body, dict) else None)
+
+    collect()
+    assert seen == {"DE", "GB", "US"}
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_field_under_conditional(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"region": {"values": ["DE", "GB", "US"]}},
+            "parameters": {"body.region": {"dictionary": "region"}},
+        },
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {"kind": {"const": "x"}},
+                "required": ["kind"],
+                "if": {"properties": {"kind": {"const": "x"}}},
+                "then": {"properties": {"region": {"type": "string"}}, "required": ["region"]},
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    seen: set[str] = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        seen.add(case.body.get("region") if isinstance(case.body, dict) else None)
+
+    collect()
+    assert seen == {"DE", "GB", "US"}
+
+
+@pytest.mark.hypothesis_nested
 def test_body_binding_nested_field(ctx):
     schema = _load_schema_with_dictionaries(
         ctx,
