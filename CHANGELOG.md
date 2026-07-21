@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.0...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.1...HEAD) - TBD
+
+## [4.24.1](https://github.com/schemathesis/schemathesis/compare/v4.24.0...v4.24.1) - 2026-07-21
 
 ### :bug: Fixed
 
@@ -8,7 +10,7 @@
 
 ### :wrench: Changed
 
-- Data generation for `enum`, `const`, and bare `type` schemas moved to `jsonschema-rs`; faster as a side effect.
+- **INTERNAL**: Canonicalization for `enum`, `const`, and bare `type` schemas moved to `jsonschema-rs`.
 
 ## [4.24.0](https://github.com/schemathesis/schemathesis/compare/v4.23.0...v4.24.0) - 2026-07-19
 
