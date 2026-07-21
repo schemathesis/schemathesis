@@ -11,6 +11,7 @@ from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from hypothesis.reporting import with_reporter
 
 from schemathesis.config import OutputConfig
+from schemathesis.core.jsonschema import is_provably_unsatisfiable
 from schemathesis.core.jsonschema.bundler import unbundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.output import truncate_json
@@ -101,6 +102,7 @@ def is_empty_strategy_error(exc: InvalidArgument) -> bool:
 def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParameter | None:
     from hypothesis_jsonschema import from_schema
 
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
     for location, container in (
         (ParameterLocation.QUERY, operation.query),
         (ParameterLocation.PATH, operation.path_parameters),
@@ -109,15 +111,20 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
         (ParameterLocation.BODY, operation.body),
     ):
         for parameter in container:
-            try:
-                generate_one(from_schema(parameter.optimized_schema))
-            except (Unsatisfiable, InvalidArgument):
-                if location == ParameterLocation.BODY:
-                    name = parameter.media_type
-                else:
-                    name = parameter.name
-                schema = unbundle(parameter.optimized_schema, parameter.name_to_uri)
-                return UnsatisfiableParameter(location=location, name=name, schema=schema)
+            optimized = parameter.optimized_schema
+            # An unproven schema still needs a generation attempt, since the prune is incomplete.
+            if not is_provably_unsatisfiable(optimized, validator_cls):
+                try:
+                    generate_one(from_schema(optimized))
+                    continue
+                except (Unsatisfiable, InvalidArgument):
+                    pass
+            if location == ParameterLocation.BODY:
+                name = parameter.media_type
+            else:
+                name = parameter.name
+            schema = unbundle(optimized, parameter.name_to_uri)
+            return UnsatisfiableParameter(location=location, name=name, schema=schema)
     return None
 
 

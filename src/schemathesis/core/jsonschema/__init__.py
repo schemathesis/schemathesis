@@ -232,15 +232,37 @@ def is_valid(value: object, schema: JsonSchema) -> bool:
         return True
 
 
+# Draft number `canonicalize` should interpret a schema under, keyed by the schema's validator class.
+CANONICALIZE_DRAFT_BY_VALIDATOR: dict[type[jsonschema_rs.Validator], int] = {
+    jsonschema_rs.Draft4Validator: jsonschema_rs.Draft4,
+    jsonschema_rs.Draft6Validator: jsonschema_rs.Draft6,
+    jsonschema_rs.Draft7Validator: jsonschema_rs.Draft7,
+    jsonschema_rs.Draft201909Validator: jsonschema_rs.Draft201909,
+    jsonschema_rs.Draft202012Validator: jsonschema_rs.Draft202012,
+}
+
+
+def is_provably_unsatisfiable(schema: JsonSchema, validator_cls: type) -> bool:
+    # `canonicalize` proves only some contradictions, so `True` means the schema is definitely
+    # unsatisfiable while `False` (or a canonicalization error) means unknown, and generation still runs.
+    try:
+        canonical = jsonschema_rs.canonicalize(schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR.get(validator_cls))
+    except ValueError:
+        return False
+    return not canonical.is_satisfiable()
+
+
 __all__ = [
     "ALL_KEYWORDS",
     "BundleCache",
     "Bundler",
     "BundleError",
+    "CANONICALIZE_DRAFT_BY_VALIDATOR",
     "DRAFT4_SUPPLEMENTAL_FORMATS",
     "DRAFT_03_DIALECT",
     "VALIDATED_FORMATS_BY_DRAFT",
     "FANCY_REGEX_OPTIONS",
+    "is_provably_unsatisfiable",
     "is_valid",
     "make_validator",
     "make_validator_for",
