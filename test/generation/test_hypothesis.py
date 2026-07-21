@@ -170,6 +170,108 @@ def test_ref_with_sibling_anyof_against_anyof_target(ctx):
     test()
 
 
+def test_draft4_typed_integer_enum_stays_in_enum(ctx):
+    # OpenAPI 3.0 is Draft 4, where an integer enum canonicalizes to a typed group; body must stay in the enum.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "integer", "enum": [1, 2]}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        assert case.body in (1, 2), case.body
+
+    test()
+
+
+def test_empty_enum_body_is_omitted(ctx):
+    # An empty enum canonicalizes to `false`; an optional body carrying it generates no value.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": False,
+                        "content": {"application/json": {"schema": {"enum": []}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=5, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        assert case.body is NOT_SET
+
+    test()
+
+
+def test_multitype_null_boolean_body(ctx):
+    # A 3.1 `type: [null, boolean]` body lifts to a multi-type union; values stay null or boolean.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": ["null", "boolean"]}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        assert case.body is None or isinstance(case.body, bool), case.body
+
+    test()
+
+
+@pytest.mark.parametrize("codec", ["utf-8", None])
+@pytest.mark.parametrize("allow_x00", [True, False])
+def test_string_body_respects_alphabet(ctx, codec, allow_x00):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "string"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.config.generation.allow_x00 = allow_x00
+    schema.config.generation.codec = codec
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        assert isinstance(case.body, str)
+        if not allow_x00:
+            assert "\x00" not in case.body
+
+    test()
+
+
 @pytest.mark.parametrize(
     ("schema", "expected_module"),
     [
