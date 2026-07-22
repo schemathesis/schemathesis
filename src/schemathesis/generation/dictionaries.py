@@ -19,7 +19,7 @@ from schemathesis.config._dictionaries import (
     lookup_parameter,
     parse_body_path,
 )
-from schemathesis.core.jsonschema import make_validator
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
@@ -323,10 +323,28 @@ def resolve_body_bindings(
 
 def _resolve_body_leaf_schema(schema: JsonSchema, pointer: str) -> JsonSchema | None:
     # `pointer` always comes from `parse_body_path`, so it is `/`-prefixed and non-empty.
-    return _walk_leaf_schema(schema, pointer[1:].split("/"))
+    bundled = schema.get(BUNDLE_STORAGE_KEY) if isinstance(schema, dict) else None
+    if not isinstance(bundled, dict):
+        bundled = {}
+    leaf = _walk_leaf_schema(schema, pointer[1:].split("/"), bundled, ())
+    if leaf is None:
+        return None
+    # The leaf may reference other bundled definitions, so keep them reachable for validation.
+    return schema_with_bundle(leaf, schema)
 
 
-def _walk_leaf_schema(current: JsonSchema, segments: list[str]) -> JsonSchema | None:
+def _walk_leaf_schema(
+    current: JsonSchema, segments: list[str], bundled: dict[str, JsonSchema], visited: tuple[str, ...]
+) -> JsonSchema | None:
+    if isinstance(current, dict):
+        reference = current.get("$ref")
+        if isinstance(reference, str):
+            if reference in visited:
+                return None
+            target = bundled.get(reference.rsplit("/", 1)[-1])
+            if target is None:
+                return None
+            return _walk_leaf_schema(target, segments, bundled, (*visited, reference))
     if not segments:
         return current if isinstance(current, (dict, bool)) else None
     if not isinstance(current, dict):
@@ -335,13 +353,13 @@ def _walk_leaf_schema(current: JsonSchema, segments: list[str]) -> JsonSchema | 
     if segment == "*":
         items = current.get("items")
         if isinstance(items, (dict, bool)):
-            found = _walk_leaf_schema(items, rest)
+            found = _walk_leaf_schema(items, rest, bundled, visited)
             if found is not None:
                 return found
     else:
         properties = current.get("properties")
         if isinstance(properties, dict) and segment in properties:
-            found = _walk_leaf_schema(properties[segment], rest)
+            found = _walk_leaf_schema(properties[segment], rest, bundled, visited)
             if found is not None:
                 return found
     # The field may live inside a subschema, so descend combinator branches with the same path.
@@ -349,7 +367,7 @@ def _walk_leaf_schema(current: JsonSchema, segments: list[str]) -> JsonSchema | 
         branches = current.get(keyword)
         if isinstance(branches, list):
             for branch in branches:
-                found = _walk_leaf_schema(branch, segments)
+                found = _walk_leaf_schema(branch, segments, bundled, visited)
                 if found is not None:
                     return found
     return None

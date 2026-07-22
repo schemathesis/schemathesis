@@ -17,8 +17,8 @@ from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import SemanticDraw
 
 
-def _load_schema_with_dictionaries(ctx, config: dict, paths: dict, *, version: str = "3.0.2"):
-    schema = ctx.openapi.load_schema(paths, version=version)
+def _load_schema_with_dictionaries(ctx, config: dict, paths: dict, *, version: str = "3.0.2", **kwargs):
+    schema = ctx.openapi.load_schema(paths, version=version, **kwargs)
     parent_config = SchemathesisConfig.from_dict(config)
     schema.config._parent = parent_config
     schema.config.generation = parent_config.projects.default.generation
@@ -671,6 +671,45 @@ def test_body_binding_field_under_conditional(ctx):
     @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
     def collect(case):
         seen.add(case.body.get("region") if isinstance(case.body, dict) else None)
+
+    collect()
+    assert seen == {"DE", "GB", "US"}
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("root_is_ref", [False, True], ids=["inline-root", "ref-root"])
+def test_body_binding_field_behind_ref(ctx, root_is_ref):
+    body_schema = {
+        "type": "object",
+        "properties": {"emission_factor": {"$ref": "#/components/schemas/Selector"}},
+        "required": ["emission_factor"],
+    }
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"region": {"values": ["DE", "GB", "US"]}},
+            "parameters": {"body.emission_factor.region": {"dictionary": "region"}},
+        },
+        _path_with_body({"$ref": "#/components/schemas/Body"} if root_is_ref else body_schema),
+        components={
+            "schemas": {
+                "Body": body_schema,
+                "Selector": {
+                    "oneOf": [
+                        {"type": "object", "properties": {"region": {"type": "string"}}, "required": ["region"]},
+                    ]
+                },
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    seen: set[str] = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        emission_factor = case.body.get("emission_factor") if isinstance(case.body, dict) else None
+        seen.add(emission_factor.get("region") if isinstance(emission_factor, dict) else None)
 
     collect()
     assert seen == {"DE", "GB", "US"}
