@@ -13,7 +13,8 @@ import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type, make_validator, maybe_resolve_bundled
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS, get_type, make_validator
+from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import Response, expand_status_code
@@ -681,6 +682,33 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
     return None
 
 
+def _collect_declared_properties(
+    schema: JsonSchema, bundle: dict[str, JsonSchema], visited: set[str]
+) -> tuple[set[str], bool]:
+    """Property names declared anywhere in the schema, plus whether extras are already forbidden."""
+    if not isinstance(schema, dict):
+        return set(), False
+    reference = schema.get("$ref")
+    if isinstance(reference, str):
+        if reference in visited:
+            return set(), False
+        target = bundle.get(reference.rsplit("/", 1)[-1])
+        if target is None:
+            return set(), False
+        return _collect_declared_properties(target, bundle, visited | {reference})
+    properties = schema.get("properties")
+    declared = set(properties) if isinstance(properties, dict) else set()
+    forbids_extras = schema.get("additionalProperties") is False
+    for keyword in ("allOf", "anyOf", "oneOf"):
+        branches = schema.get(keyword)
+        if isinstance(branches, list):
+            for branch in branches:
+                branch_declared, branch_forbids = _collect_declared_properties(branch, bundle, visited)
+                declared |= branch_declared
+                forbids_extras = forbids_extras or branch_forbids
+    return declared, forbids_extras
+
+
 def _additional_properties_hint(case: Case) -> str | None:
     """Return a hint if extra body properties are the likely cause of server rejection."""
     if not isinstance(case.body, dict):
@@ -699,11 +727,11 @@ def _additional_properties_hint(case: Case) -> str | None:
         raw = alternative.raw_schema
         if not isinstance(raw, dict):
             return None
-        resolved = maybe_resolve_bundled(raw)
-        if resolved.get("additionalProperties") is False:
+        declared, forbids_extras = _collect_declared_properties(raw, raw.get(BUNDLE_STORAGE_KEY) or {}, set())
+        if forbids_extras:
             return None
 
-        extra = set(case.body.keys()) - set(resolved.get("properties", {}).keys())
+        extra = set(case.body.keys()) - declared
         if not extra:
             return None
 

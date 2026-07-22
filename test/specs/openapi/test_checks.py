@@ -393,6 +393,90 @@ def test_additional_properties_hint_resolves_bundled_ref(ctx, body, expected_hin
         assert hint is not None and expected_hint in hint, f"Expected mention of {expected_hint} in {hint!r}"
 
 
+@pytest.mark.parametrize("combinator", ["allOf", "anyOf"])
+@pytest.mark.parametrize(
+    ("body", "expected_hint"),
+    [
+        pytest.param({"a": "x", "b": "y"}, None, id="declared-keys-only"),
+        pytest.param({"a": "x", "b": "y", "extra": "yes"}, "`extra`", id="real-extra-fires"),
+    ],
+)
+def test_additional_properties_hint_with_composed_properties(ctx, combinator, body, expected_hint):
+    # Properties declared inside combinator branches are not extras, and telling the user to add
+    # `additionalProperties: false` there would reject valid requests.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "X", "version": "1"},
+            "paths": {
+                "/foo": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        combinator: [
+                                            {"$ref": "#/components/schemas/Base"},
+                                            {"type": "object", "properties": {"a": {"type": "string"}}},
+                                        ]
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "components": {"schemas": {"Base": {"type": "object", "properties": {"b": {"type": "string"}}}}},
+        }
+    )
+    operation = schema["/foo"]["POST"]
+    case = operation.Case(body=body, media_type="application/json", method="POST")
+    hint = _additional_properties_hint(case)
+    if expected_hint is None:
+        assert hint is None, f"False positive: {hint!r}"
+    else:
+        assert hint is not None and expected_hint in hint, f"Expected mention of {expected_hint} in {hint!r}"
+        assert "`a`" not in hint and "`b`" not in hint, f"Declared keys reported as extras: {hint!r}"
+
+
+def test_additional_properties_hint_skipped_when_branch_forbids_extras(ctx):
+    # `additionalProperties: false` inside a branch already forbids extras, so advising to add it is noise.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "X", "version": "1"},
+            "paths": {
+                "/foo": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "properties": {"a": {"type": "string"}},
+                                                "additionalProperties": False,
+                                            }
+                                        ]
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/foo"]["POST"]
+    case = operation.Case(body={"a": "x", "extra": "yes"}, media_type="application/json", method="POST")
+    assert _additional_properties_hint(case) is None
+
+
 @pytest.mark.parametrize(
     ("status_code", "should_raise"),
     [

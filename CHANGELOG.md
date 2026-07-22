@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- `positive_data_acceptance` hint counting properties declared under `allOf`/`anyOf`/`oneOf` as undocumented.
 - Fuzz dictionaries and body overrides not applied to fields behind `$ref`. [#4350](https://github.com/schemathesis/schemathesis/issues/4350)
 
 ## [4.24.1](https://github.com/schemathesis/schemathesis/compare/v4.24.0...v4.24.1) - 2026-07-21
