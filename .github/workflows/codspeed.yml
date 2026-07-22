@@ -31,9 +31,14 @@ jobs:
 
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
+      - name: Install
+        run: |
+          uv venv
+          uv pip install ".[bench]"
+
       - name: Run benchmarks
         uses: CodSpeedHQ/action@f99becdce5e5d51fd556489ebef684f4ecfd6286 # v4.18.5
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "simulation"
-          run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio --test-group=${{ matrix.shard }} --test-group-count=4
+          run: .venv/bin/pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio --test-group=${{ matrix.shard }} --test-group-count=4
