@@ -37,7 +37,7 @@ dependencies = [
   "hypothesis>=6.130.12,<7",
   "hypothesis_graphql>=0.13.1,<1",
   "hypothesis_jsonschema>=0.23.1,<0.24",
-  "jsonschema_rs>=0.48.5",
+  "jsonschema_rs @ git+https://github.com/Stranger6667/jsonschema.git@master#subdirectory=crates/jsonschema-py",
   "pyrate-limiter>=4.0,<5.0",
   "pytest>=9,<10",
   "PyYAML>=5.1,<7.0",
@@ -90,6 +90,9 @@ st = "schemathesis.cli:schemathesis"
 
 [project.entry-points.pytest11]
 schemathesis = "schemathesis.pytest.plugin"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.sdist]
 exclude = [
