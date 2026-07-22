@@ -211,7 +211,7 @@ TestStateful = schema.as_state_machine().TestCase
     )
     result = testdir.runpytest("--tb=short")
     result.assert_outcomes(failed=1)
-    # Then internal frames should not appear after the "Falsifying example" block
+    # Then internal frames should not appear after the failing-example block
     assert " in step" not in result.stdout.str()
 
 

@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from ..utils import HERE
+from ..utils import HERE, has_hypothesis_failure_header
 
 
 @pytest.fixture(autouse=True)
@@ -43,4 +43,4 @@ class TestSchema(TestCase):
     result = testdir.run(sys.executable, "-m", "unittest", str(module))
     assert result.ret == 1
     result.stderr.re_match_lines([".* assert 0.*", "FAILED (failures=1)"])
-    result.stderr.re_match_lines(["Falsifying example: .*"])
+    assert has_hypothesis_failure_header(result.stderr.str())

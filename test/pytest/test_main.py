@@ -3,6 +3,7 @@ import platform
 import pytest
 
 from schemathesis.generation.modes import GenerationMode
+from test.utils import has_hypothesis_failure_header
 
 
 def test_pytest_parametrize_fixture(testdir):
@@ -736,10 +737,10 @@ def test_b(v):
     stdout = result.stdout.str()
     # Internal Schemathesis' frames should not appear in the output
     assert "def validate_response(" not in stdout
-    # And Hypothesis "Falsifying example" block is not in the output of Schemathesis' tests
-    assert "Falsifying example: test_a(" not in stdout
+    # And the Hypothesis failing-example block is not in the output of Schemathesis' tests
+    assert not has_hypothesis_failure_header(stdout, "test_a(")
     # And regular Hypothesis tests have it
-    assert "Falsifying example: test_b(" in stdout
+    assert has_hypothesis_failure_header(stdout, "test_b(")
 
 
 def test_stateful_missing_links_hide_hypothesis_block(testdir):
@@ -779,7 +780,7 @@ def test_statefully(state_machine):
     result.assert_outcomes(failed=1)
     stdout = result.stdout.str()
     assert "Schema contains no link definitions required for stateful testing" in stdout
-    assert "Falsifying example" not in stdout
+    assert not has_hypothesis_failure_header(stdout)
 
 
 def test_invalid_schema_reraising(testdir):

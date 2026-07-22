@@ -27,6 +27,15 @@ from test.apps import builders
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# Hypothesis renamed this header in 6.159.0 ("Falsifying example" -> "Failing test case"). Tests that
+# assert the header is *present* fail loudly on a future rename, which is what keeps the tests asserting
+# its absence from silently passing against a string Hypothesis no longer emits.
+HYPOTHESIS_FAILURE_HEADERS = ("Failing test case", "Falsifying example")
+
+
+def has_hypothesis_failure_header(text: str, test_name: str = "") -> bool:
+    return any(f"{header}: {test_name}" in text for header in HYPOTHESIS_FAILURE_HEADERS)
+
 
 def get_schema_path(schema_name: str) -> str:
     return os.path.join(HERE, "data", schema_name)
