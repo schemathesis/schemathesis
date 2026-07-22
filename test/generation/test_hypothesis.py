@@ -243,16 +243,21 @@ def test_multitype_null_boolean_body(ctx):
     test()
 
 
-@pytest.mark.parametrize("codec", ["utf-8", None])
+@pytest.mark.parametrize(
+    "body_schema",
+    [{"type": "string"}, {"type": "string", "pattern": ".+"}],
+    ids=["plain", "pattern"],
+)
+@pytest.mark.parametrize("codec", ["utf-8", "ascii", None])
 @pytest.mark.parametrize("allow_x00", [True, False])
-def test_string_body_respects_alphabet(ctx, codec, allow_x00):
+def test_string_body_respects_alphabet(ctx, codec, allow_x00, body_schema):
     schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
                     "requestBody": {
                         "required": True,
-                        "content": {"application/json": {"schema": {"type": "string"}}},
+                        "content": {"application/json": {"schema": body_schema}},
                     },
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -268,6 +273,33 @@ def test_string_body_respects_alphabet(ctx, codec, allow_x00):
         assert isinstance(case.body, str)
         if not allow_x00:
             assert "\x00" not in case.body
+        if codec is not None:
+            case.body.encode(codec)
+
+    test()
+
+
+def test_anyof_disjoint_branches_body(ctx):
+    # A 3.1 `anyOf` of branches that don't merge into one type lifts to a union; values stay in one branch.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"anyOf": [{"type": "integer"}, {"type": "null"}]}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        assert case.body is None or isinstance(case.body, int), case.body
 
     test()
 
