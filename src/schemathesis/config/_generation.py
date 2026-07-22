@@ -152,23 +152,33 @@ class GenerationConfig(DiffBase):
         exclude_header_characters: str | None = None,
     ) -> None:
         if modes is not None:
-            self.modes = modes
+            self.modes = [_to_generation_mode(mode) for mode in modes]
         if max_examples is not None:
+            if not isinstance(max_examples, int) or isinstance(max_examples, bool):
+                raise ConfigError.from_invalid_type(
+                    section="[generation]", name="max-examples", value=max_examples, expected="an integer"
+                )
             self.max_examples = max_examples
-        self.no_shrink = no_shrink or False
-        self.deterministic = deterministic or False
-        self.allow_x00 = allow_x00 if allow_x00 is not None else True
-        self.allow_extra_parameters = allow_extra_parameters if allow_extra_parameters is not None else True
+        if no_shrink is not None:
+            self.no_shrink = no_shrink
+        if deterministic is not None:
+            self.deterministic = deterministic
+        if allow_x00 is not None:
+            self.allow_x00 = allow_x00
+        if allow_extra_parameters is not None:
+            self.allow_extra_parameters = allow_extra_parameters
         if codec is not None:
             self.codec = codec
         if maximize is not None:
             self.maximize = maximize
         if with_security_parameters is not None:
             self.with_security_parameters = with_security_parameters
-        self.graphql_allow_null = graphql_allow_null if graphql_allow_null is not None else True
+        if graphql_allow_null is not None:
+            self.graphql_allow_null = graphql_allow_null
         if database is not None:
             self.database = database
-        self.unique_inputs = unique_inputs or False
+        if unique_inputs is not None:
+            self.unique_inputs = unique_inputs
         if exclude_header_characters is not None:
             self.exclude_header_characters = exclude_header_characters
 
@@ -183,6 +193,15 @@ class GenerationConfig(DiffBase):
             merged_dictionaries.update(config.dictionaries)
         merged.dictionaries = merged_dictionaries
         return merged
+
+
+def _to_generation_mode(value: GenerationMode | str) -> GenerationMode:
+    try:
+        return GenerationMode(value)
+    except ValueError:
+        raise ConfigError.from_invalid_value(
+            section="[generation]", name="mode", value=value, valid=[mode.value for mode in GenerationMode]
+        ) from None
 
 
 def _get_maximize(value: Any) -> list[MetricFunction]:

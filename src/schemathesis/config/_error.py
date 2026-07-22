@@ -37,6 +37,26 @@ class ConfigError(SchemathesisError):
             message = _format_oneof_error(error)
         return cls(message)
 
+    @classmethod
+    def from_invalid_value(cls, *, section: str, name: str, value: object, valid: list[str]) -> ConfigError:
+        suggestion = ""
+        if isinstance(value, str):
+            match = _find_closest_match(value, valid)
+            if match:
+                suggestion = f" Did you mean '{match}'?"
+        return cls(
+            f"Error in {section} section:\n  Invalid value:\n\n"
+            f"  - '{name}' -> {value!r} is not a valid value.{suggestion}\n\n"
+            f"Valid values are: {', '.join(repr(item) for item in valid)}."
+        )
+
+    @classmethod
+    def from_invalid_type(cls, *, section: str, name: str, value: object, expected: str) -> ConfigError:
+        return cls(
+            f"Error in {section} section:\n  Type error:\n\n"
+            f"  - '{name}' -> Must be {expected}, but got {type(value).__name__}."
+        )
+
 
 _BOUND_PREDICATES = {
     "minimum": "Must be at least",
