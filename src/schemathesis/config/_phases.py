@@ -7,6 +7,7 @@ from typing import Any
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._dictionaries import DictionaryDefinition
 from schemathesis.config._diff_base import DiffBase
+from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 
@@ -431,6 +432,10 @@ class PhasesConfig(DiffBase):
         )
 
     def update(self, *, phases: list[str]) -> None:
+        known = ["examples", "coverage", "fuzzing", "stateful"]
+        for phase in phases:
+            if phase not in known:
+                raise ConfigError.from_invalid_value(section="[phases]", name="phases", value=phase, valid=known)
         self.examples.enabled = "examples" in phases
         self.coverage.enabled = "coverage" in phases
         self.fuzzing.enabled = "fuzzing" in phases
