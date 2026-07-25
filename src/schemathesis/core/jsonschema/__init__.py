@@ -232,7 +232,6 @@ def is_valid(value: object, schema: JsonSchema) -> bool:
         return True
 
 
-# Draft number `canonicalize` should interpret a schema under, keyed by the schema's validator class.
 CANONICALIZE_DRAFT_BY_VALIDATOR: dict[type[jsonschema_rs.Validator], int] = {
     jsonschema_rs.Draft4Validator: jsonschema_rs.Draft4,
     jsonschema_rs.Draft6Validator: jsonschema_rs.Draft6,
