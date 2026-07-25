@@ -1200,10 +1200,13 @@ def _canonical_strategy_or_none(
 ) -> st.SearchStrategy[JsonValue] | None:
     """Strategy for a fully modeled document; `None` routes to hypothesis-jsonschema."""
     try:
-        canonical = jsonschema_rs.canonicalize(schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR.get(validator_cls))
+        canonical = jsonschema_rs.canonicalize(schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls])
     except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
         return None
     if canonical.kind == "raw":
+        return None
+    # Handle unsatisfiability via `hypothesis-jsonschema` for now
+    if not canonical.is_satisfiable():
         return None
     context = StrategyContext(alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec))
     try:

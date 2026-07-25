@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from base64 import b64decode
 
 import jsonschema_rs
@@ -1305,5 +1306,51 @@ def test_positive_integers_stay_within_format_range(ctx, format, minimum, maximu
     @settings(max_examples=250, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert minimum <= case.body["value"] <= maximum, f"Out of {format} range: {case.body['value']}"
+
+    test()
+
+
+def test_integer_multiple_of_body(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "integer", "multipleOf": 3, "minimum": 1}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None)
+    def test(case):
+        assert case.body >= 1 and case.body % 3 == 0, case.body
+
+    test()
+
+
+def test_format_constrained_string_body(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "string", "format": "uuid"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None)
+    def test(case):
+        uuid.UUID(case.body)
 
     test()

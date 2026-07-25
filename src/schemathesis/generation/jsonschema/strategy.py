@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from fractions import Fraction
 from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
@@ -45,13 +46,44 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canon.AnyOfView):
         return st.one_of([from_schema(branch, ctx) for branch in view.branches])
     if isinstance(view, canon.IntegerView):
-        return st.integers(min_value=view.minimum, max_value=view.maximum)
+        return _integer(view)
     if isinstance(view, canon.StringView):
         return _string(view, ctx)
     raise UnsupportedView(schema.kind)
 
 
+def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonValue]:
+    step_size = _divisor_step(view.multiple_of)
+    if step_size is None:
+        return st.integers(min_value=view.minimum, max_value=view.maximum)
+    # On a `p/q` grid only multiples of `p` are whole, `q` being coprime to it.
+    stride = step_size.numerator
+    low = None if view.minimum is None else -(-view.minimum // stride)
+    high = None if view.maximum is None else view.maximum // stride
+    return st.integers(min_value=low, max_value=high).map(lambda step: step * stride)
+
+
+def _divisor_step(divisors: list[float]) -> Fraction | None:
+    # Exact rationals: `step * 0.1` in binary floats lands off the grid two times out of five. Several
+    # divisors admit exactly the multiples of their least common multiple.
+    step_size = None
+    for divisor in divisors:
+        current = Fraction(str(divisor))
+        if step_size is None:
+            step_size = current
+        else:
+            step_size = Fraction(
+                math.lcm(step_size.numerator, current.numerator),
+                math.gcd(step_size.denominator, current.denominator),
+            )
+    return step_size
+
+
 def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    # Formats and content facets narrow the admitted strings, and driving them needs generators this
+    # module has no access to.
+    if view.formats or view.content_media_types or view.content_encodings:
+        raise UnsupportedView("string")
     if not view.patterns:
         kwargs: dict[str, int] = {}
         if view.min_length is not None:
