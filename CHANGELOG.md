@@ -8,7 +8,7 @@
 
 ### :wrench: Changed
 
-- **INTERNAL**: Data generation for `string`, `integer`, and `anyOf` schemas built from the `jsonschema-rs` canonical form.
+- **INTERNAL**: Data generation for `string`, `integer`, `object`, `array`, and `anyOf` schemas built from the `jsonschema-rs` canonical form.
 
 ## [4.24.2](https://github.com/schemathesis/schemathesis/compare/v4.24.1...v4.24.2) - 2026-07-22
 

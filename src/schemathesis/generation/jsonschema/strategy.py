@@ -16,6 +16,9 @@ if TYPE_CHECKING:
     from schemathesis.generation.jsonschema.context import StrategyContext
 
 
+_EXTRA_KEYS = 5
+
+
 class UnsupportedView(Exception):
     """A canonical node this module cannot build from; the caller falls back to `hypothesis-jsonschema`."""
 
@@ -49,7 +52,55 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _integer(view)
     if isinstance(view, canon.StringView):
         return _string(view, ctx)
+    if isinstance(view, canon.ObjectView):
+        return _object(view, ctx)
+    if isinstance(view, canon.ArrayView):
+        return _array(view, ctx)
     raise UnsupportedView(schema.kind)
+
+
+def _array(view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    if view.contains or view.prefix_items:
+        raise UnsupportedView("array")
+    element = _anything(ctx) if view.items is None else from_schema(view.items, ctx)
+    kwargs: dict[str, int] = {}
+    if view.min_items is not None:
+        kwargs["min_size"] = view.min_items
+    if view.max_items is not None:
+        kwargs["max_size"] = view.max_items
+    if view.unique_items:
+        return st.lists(element, unique_by=_equality_key, **kwargs)
+    return st.lists(element, **kwargs)
+
+
+def _equality_key(value: JsonValue) -> object:
+    # JSON Schema compares numbers by value, so `1` and `1.0` are the same array element.
+    if isinstance(value, bool):
+        return ("boolean", value)
+    if isinstance(value, (int, float)):
+        try:
+            return ("number", float(value))
+        except OverflowError:
+            return ("number", value)
+    return ("json", jsonschema_rs.canonical.json.to_string(value))
+
+
+def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    if (
+        view.pattern_properties
+        or view.property_names is not None
+        or view.additional_properties is not None
+        or view.min_properties is not None
+        or view.max_properties is not None
+    ):
+        raise UnsupportedView("object")
+    entries = {key: from_schema(entry, ctx) for key, entry in view.properties.items()}
+    required = {key: entries[key] if key in entries else _anything(ctx) for key in view.required}
+    optional = {key: entry for key, entry in entries.items() if key not in view.required}
+    named = st.fixed_dictionaries(required, optional=optional)
+    known = set(view.properties) | set(view.required)
+    extra = st.dictionaries(_text(ctx).filter(lambda key: key not in known), _anything(ctx), max_size=_EXTRA_KEYS)
+    return st.tuples(named, extra).map(lambda parts: {**parts[1], **parts[0]})
 
 
 def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonValue]:

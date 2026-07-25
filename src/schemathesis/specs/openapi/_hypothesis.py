@@ -23,7 +23,7 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
 )
-from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.numeric import (
     bounds_are_unsatisfiable,
     is_numeric_bound,
@@ -37,7 +37,8 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis import custom_formats_cache
+from schemathesis.generation._cache import schema_cache_key
+from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
 from schemathesis.generation.jsonschema import Alphabet, StrategyContext
 from schemathesis.generation.jsonschema.strategy import UnsupportedView
 from schemathesis.generation.jsonschema.strategy import from_schema as canonical_from_schema
@@ -1200,11 +1201,39 @@ def _canonical_strategy_or_none(
 ) -> st.SearchStrategy[JsonValue] | None:
     """Strategy for a fully modeled document; `None` routes to hypothesis-jsonschema."""
     try:
-        canonical = jsonschema_rs.canonicalize(schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls])
+        key = (
+            schema_cache_key(schema),
+            validator_cls,
+            generation_config.allow_x00,
+            generation_config.codec,
+        )
+    except (TypeError, ValueError):
+        key = None
+    if key is not None:
+        cached = canonical_strategy_cache.get(key)
+        if cached is not MISSING:
+            return cached
+    strategy = _build_canonical_strategy(schema, generation_config, validator_cls)
+    if key is not None:
+        canonical_strategy_cache[key] = strategy
+    return strategy
+
+
+def _build_canonical_strategy(
+    schema: JsonSchema, generation_config: GenerationConfig, validator_cls: type[jsonschema_rs.Validator]
+) -> st.SearchStrategy[JsonValue] | None:
+    draft = CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls]
+    try:
+        canonical = jsonschema_rs.canonicalize(schema, draft=draft, pattern_options=FANCY_REGEX_OPTIONS)
     except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
         return None
     if canonical.kind == "raw":
-        return None
+        # A `$ref` anywhere keeps the whole document unmodeled, and bundling leaves every body
+        # schema carrying one. `hypothesis-jsonschema` inlines them on its own path, so resolving
+        # here only moves that work earlier.
+        canonical = _canonicalize_resolved(schema, draft)
+        if canonical is None:
+            return None
     # Handle unsatisfiability via `hypothesis-jsonschema` for now
     if not canonical.is_satisfiable():
         return None
@@ -1213,6 +1242,22 @@ def _canonical_strategy_or_none(
         return canonical_from_schema(canonical, context)
     except UnsupportedView:
         return None
+
+
+def _canonicalize_resolved(schema: JsonSchema, draft: int) -> jsonschema_rs.CanonicalSchema | None:
+    """Canonicalize with local references inlined, or `None` when that does not help."""
+    from hypothesis_jsonschema import _resolve
+
+    if not isinstance(schema, dict):
+        return None
+    try:
+        # `resolve_all_refs` rewrites in place, and the caller's schema is shared with the rest of
+        # the pipeline.
+        resolved = _resolve.resolve_all_refs(deepclone(schema))
+        canonical = jsonschema_rs.canonicalize(resolved, draft=draft, pattern_options=FANCY_REGEX_OPTIONS)
+    except Exception:
+        return None
+    return None if canonical.kind == "raw" else canonical
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:

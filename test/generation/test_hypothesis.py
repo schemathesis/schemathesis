@@ -12,15 +12,19 @@ from hypothesis_jsonschema import _canonicalise as canonicalise
 from hypothesis_jsonschema import from_schema
 
 import schemathesis
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.hypothesis import examples, setup
+from schemathesis.core.transforms import deepclone
+from schemathesis.generation.hypothesis import canonical_strategy_cache, examples, setup
+from schemathesis.generation.jsonschema import Alphabet, StrategyContext
+from schemathesis.generation.jsonschema.strategy import from_schema as canonical_from_schema
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
-from schemathesis.specs.openapi._hypothesis import jsonify_python_specific_types
+from schemathesis.specs.openapi._hypothesis import _canonical_strategy_or_none, jsonify_python_specific_types
 from schemathesis.specs.openapi.adapter import v2
 from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiBody,
@@ -1354,3 +1358,72 @@ def test_format_constrained_string_body(ctx):
         uuid.UUID(case.body)
 
     test()
+
+
+def _canonical_strategy(schema, draft=7):
+    canonical = jsonschema_rs.canonicalize(schema, draft=draft)
+    return canonical_from_schema(canonical, StrategyContext(alphabet=Alphabet()))
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+        {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "required": ["a"]},
+        {"type": "object", "properties": {"a": {"type": "string", "minLength": 2}}},
+        {"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "integer"}}}}},
+        {"type": "array", "items": {"type": "integer"}},
+        {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 4},
+        {"type": "array", "items": {"type": "integer"}, "uniqueItems": True, "minItems": 3},
+        {"type": "array", "items": {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}},
+        {"type": "object", "properties": {"xs": {"type": "array", "items": {"type": "integer"}}}, "required": ["xs"]},
+    ],
+)
+def test_generator(schema):
+    strategy = _canonical_strategy(schema)
+    validator = jsonschema_rs.Draft7Validator(schema)
+
+    @given(strategy)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert validator.is_valid(value), value
+
+    test()
+
+
+BUNDLED_SCHEMA = {
+    "type": "object",
+    "required": ["item"],
+    "properties": {"item": {"$ref": "#/x-bundled/Item"}},
+    "x-bundled": {"Item": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}},
+}
+
+
+def test_bundled_refs_reach_the_canonical_path():
+    canonical_strategy_cache.clear()
+    strategy = _canonical_strategy_or_none(BUNDLED_SCHEMA, GenerationConfig(), jsonschema_rs.Draft7Validator)
+    assert strategy is not None
+
+    validator = jsonschema_rs.Draft7Validator(BUNDLED_SCHEMA)
+
+    @given(strategy)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert validator.is_valid(value), value
+
+    test()
+
+
+def test_bundled_resolution_leaves_the_input_untouched():
+    canonical_strategy_cache.clear()
+    schema = deepclone(BUNDLED_SCHEMA)
+    _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft7Validator)
+    assert schema == BUNDLED_SCHEMA
+
+
+def test_large_pattern_reaches_the_canonical_path():
+    # Real AWS schemas carry patterns whose compiled size exceeds the default regex limit; the
+    # canonical path must use the same regex configuration as the validators.
+    canonical_strategy_cache.clear()
+    schema = {"type": "object", "properties": {"a": {"type": "string", "pattern": "^.{0,100000}$"}}}
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft7Validator) is not None
