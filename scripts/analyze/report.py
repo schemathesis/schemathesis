@@ -424,7 +424,7 @@ def render_markdown(run: RunMetrics) -> str:
             operation_count = len(operations)
             unique = unique_per_check[check_name]
             occurrences = run.failure_counts.get(check_name, unique)
-            extra = f": {sorted(operations)[0]}" if operation_count == 1 else ""
+            extra = f": {min(operations)}" if operation_count == 1 else ""
             suffix = "operation" if operation_count == 1 else "operations"
             write(
                 f"- `{check_name}` — {unique} unique, {occurrences} occurrences "
