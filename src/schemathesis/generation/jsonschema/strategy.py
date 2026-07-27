@@ -2,22 +2,37 @@ from __future__ import annotations
 
 import math
 import re
+import sys
 from fractions import Fraction
 from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
 import jsonschema_rs
 from hypothesis import strategies as st
+from jsonschema_rs import canonical
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from decimal import Decimal
+
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.generation.jsonschema.context import StrategyContext
 
+    # A bound arrives as `Decimal` when no float spells it back.
+    Numeric = int | float | Decimal
+
 
 class UnsupportedView(Exception):
     """A canonical node this module cannot build from; the caller falls back to `hypothesis-jsonschema`."""
+
+
+class Unrepresentable:
+    """A grid point with no JSON number to carry it; the caller filters it out."""
+
+
+UNREPRESENTABLE = Unrepresentable()
 
 
 def from_schema(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
@@ -29,54 +44,184 @@ def from_schema(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> 
 
 
 def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    canon = jsonschema_rs.canonical
     view = schema.view()
-    if isinstance(view, canon.TrueView):
+    if isinstance(view, canonical.TrueView):
         return _anything(ctx)
-    if isinstance(view, canon.FalseView):
+    if isinstance(view, canonical.FalseView):
         return st.nothing()
-    if isinstance(view, canon.ConstView):
+    if isinstance(view, canonical.ConstView):
         return st.just(cast("JsonValue", view.value))
-    if isinstance(view, canon.EnumView):
+    if isinstance(view, canonical.EnumView):
         return st.sampled_from(view.values)
-    if isinstance(view, canon.MultiTypeView):
+    if isinstance(view, canonical.MultiTypeView):
         return st.one_of([_bare_type(name, ctx) for name in view.types])
-    if isinstance(view, canon.TypedGroupView):
+    if isinstance(view, canonical.TypedGroupView):
         return from_schema(view.body, ctx)
-    if isinstance(view, canon.AnyOfView):
+    if isinstance(view, canonical.AnyOfView):
         return st.one_of([from_schema(branch, ctx) for branch in view.branches])
-    if isinstance(view, canon.IntegerView):
+    if isinstance(view, canonical.IntegerView):
         return _integer(view)
-    if isinstance(view, canon.StringView):
+    if isinstance(view, canonical.NumberView):
+        return _number(view)
+    if isinstance(view, canonical.StringView):
         return _string(view, ctx)
     raise UnsupportedView(schema.kind)
 
 
 def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonValue]:
-    step_size = _divisor_step(view.multiple_of)
-    if step_size is None:
+    multiple_of = _combined_multiple_of(view.multiple_of)
+    if multiple_of is None:
         return st.integers(min_value=view.minimum, max_value=view.maximum)
     # On a `p/q` grid only multiples of `p` are whole, `q` being coprime to it.
-    stride = step_size.numerator
+    stride = multiple_of.numerator
     low = None if view.minimum is None else -(-view.minimum // stride)
     high = None if view.maximum is None else view.maximum // stride
     return st.integers(min_value=low, max_value=high).map(lambda step: step * stride)
 
 
-def _divisor_step(divisors: list[float]) -> Fraction | None:
+def _number(view: jsonschema_rs.canonical.NumberView) -> SearchStrategy[JsonValue]:
+    multiple_of = _combined_multiple_of(view.multiple_of)
+    if multiple_of is not None:
+        steps = _steps(
+            _lower_step(view.minimum, view.exclusive_minimum, multiple_of),
+            _upper_step(view.maximum, view.exclusive_maximum, multiple_of),
+        )
+        # Grid points that no float represents round to a neighbour off the grid or outside the bounds.
+        is_valid = _grid_check(view, multiple_of)
+        return steps.map(lambda step: _fraction_to_json_number(step * multiple_of)).filter(is_valid)
+
+    bounds = _representable_float_bounds(view)
+    if bounds is not None:
+        float_low, float_high = bounds
+        return st.floats(min_value=float_low, max_value=float_high, allow_nan=False, allow_infinity=False).map(
+            lambda value: value or 0.0
+        )
+    # No float lies within the bounds, leaving the integers that do.
+    return _steps(
+        _lower_step(view.minimum, view.exclusive_minimum, Fraction(1)),
+        _upper_step(view.maximum, view.exclusive_maximum, Fraction(1)),
+    )
+
+
+def _grid_check(
+    view: jsonschema_rs.canonical.NumberView, multiple_of: Fraction
+) -> Callable[[int | float | Unrepresentable], bool]:
+    """Accept only what every reading of the emitted number clears."""
+    minimum = None if view.minimum is None else _spelled(view.minimum)
+    maximum = None if view.maximum is None else _spelled(view.maximum)
+    exclusive_minimum = view.exclusive_minimum
+    exclusive_maximum = view.exclusive_maximum
+
+    def is_valid(value: int | float | Unrepresentable) -> bool:
+        if value is UNREPRESENTABLE:
+            return False
+        number = cast("int | float", value)
+        spelled = _spelled(number)
+        if spelled % multiple_of != 0:
+            return False
+        for reading in _readings(number, spelled):
+            if minimum is not None and (reading <= minimum if exclusive_minimum else reading < minimum):
+                return False
+            if maximum is not None and (reading >= maximum if exclusive_maximum else reading > maximum):
+                return False
+        return True
+
+    return is_valid
+
+
+def _readings(value: int | float, spelled: Fraction) -> tuple[Fraction, ...]:
+    # A reader either keeps the decimal spelled here or parses it into an `f64`, and `jsonschema-rs`
+    # itself does both: the `f64` for a bound fitting an `i64`, the decimal for anything wider.
+    return (spelled,) if isinstance(value, int) else (spelled, Fraction(value))
+
+
+def _steps(low: int | None, high: int | None) -> SearchStrategy[int]:
+    if low is not None and high is not None and low > high:
+        # Canonical bounds come from binary float arithmetic; exact rationals can find the range empty.
+        return st.nothing()
+    return st.integers(min_value=low, max_value=high)
+
+
+def _lower_step(bound: int | float | None, exclusive: bool, step_size: Fraction) -> int | None:
+    if bound is None:
+        return None
+    quotient = _quotient(bound, step_size)
+    return math.floor(quotient) + 1 if exclusive else math.ceil(quotient)
+
+
+def _upper_step(bound: int | float | None, exclusive: bool, step_size: Fraction) -> int | None:
+    if bound is None:
+        return None
+    quotient = _quotient(bound, step_size)
+    return math.ceil(quotient) - 1 if exclusive else math.floor(quotient)
+
+
+def _quotient(bound: int | float, step_size: Fraction) -> Fraction:
+    return _spelled(bound) / step_size
+
+
+def _spelled(value: Numeric) -> Fraction:
+    # `str` first: a JSON number means the decimal it spells, not the binary float storing it.
+    return Fraction(str(value))
+
+
+def _fraction_to_json_number(value: Fraction) -> int | float | Unrepresentable:
+    if value.denominator == 1:
+        return value.numerator
+    try:
+        return float(value)
+    except OverflowError:
+        # Whole grid points ride out as exact integers, fractional ones need a float to land in.
+        return UNREPRESENTABLE
+
+
+def _representable_float_bounds(
+    view: jsonschema_rs.canonical.NumberView,
+) -> tuple[float | None, float | None] | None:
+    low = None
+    if view.minimum is not None:
+        if view.minimum > sys.float_info.max:
+            return None
+        if view.minimum >= -sys.float_info.max:
+            low = float(view.minimum)
+            # An exclusive bound rules out its own rounding; an inclusive one only rules out a float
+            # landing under it.
+            minimum = _spelled(view.minimum)
+            if view.exclusive_minimum or any(reading < minimum for reading in _readings(low, _spelled(low))):
+                low = math.nextafter(low, math.inf)
+
+    high = None
+    if view.maximum is not None:
+        if view.maximum < -sys.float_info.max:
+            return None
+        if view.maximum <= sys.float_info.max:
+            high = float(view.maximum)
+            maximum = _spelled(view.maximum)
+            if view.exclusive_maximum or any(reading > maximum for reading in _readings(high, _spelled(high))):
+                high = math.nextafter(high, -math.inf)
+
+    if low is not None and high is not None and low > high:
+        return None
+    if (low is not None and math.isinf(low)) or (high is not None and math.isinf(high)):
+        # Stepping off the last float leaves the range; only integers clear the bound.
+        return None
+    return low, high
+
+
+def _combined_multiple_of(values: list[float]) -> Fraction | None:
     # Exact rationals: `step * 0.1` in binary floats lands off the grid two times out of five. Several
     # divisors admit exactly the multiples of their least common multiple.
-    step_size = None
-    for divisor in divisors:
-        current = Fraction(str(divisor))
-        if step_size is None:
-            step_size = current
+    combined = None
+    for value in values:
+        candidate = Fraction(str(value))
+        if combined is None:
+            combined = candidate
         else:
-            step_size = Fraction(
-                math.lcm(step_size.numerator, current.numerator),
-                math.gcd(step_size.denominator, current.denominator),
+            combined = Fraction(
+                math.lcm(combined.numerator, candidate.numerator),
+                math.gcd(combined.denominator, candidate.denominator),
             )
-    return step_size
+    return combined
 
 
 def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:

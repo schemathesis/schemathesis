@@ -1,4 +1,5 @@
 import datetime
+import sys
 import uuid
 from base64 import b64decode
 
@@ -7,20 +8,23 @@ import pytest
 from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
 from hypothesis.database import InMemoryExampleDatabase
+from hypothesis.errors import Unsatisfiable
 from hypothesis.internal.observability import with_observability_callback
 from hypothesis_jsonschema import _canonicalise as canonicalise
 from hypothesis_jsonschema import from_schema
 
 import schemathesis
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
+from schemathesis.generation.jsonschema import StrategyContext, strategy
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
-from schemathesis.specs.openapi._hypothesis import jsonify_python_specific_types
+from schemathesis.specs.openapi._hypothesis import _canonical_strategy_or_none, jsonify_python_specific_types
 from schemathesis.specs.openapi.adapter import v2
 from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiBody,
@@ -1352,5 +1356,189 @@ def test_format_constrained_string_body(ctx):
     @settings(max_examples=10, deadline=None)
     def test(case):
         uuid.UUID(case.body)
+
+    test()
+
+
+CANONICAL_NUMBER_SCHEMAS = [
+    {"type": "number", "minimum": 1, "maximum": 5},
+    {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+    {"type": "number", "minimum": 1.5, "exclusiveMaximum": 2.5},
+    {"type": "number", "maximum": 0},
+    {"type": "number", "multipleOf": 0.5},
+    {"type": "number", "multipleOf": 0.1, "minimum": -1, "maximum": 1},
+    {"type": "number", "multipleOf": 1e-20, "minimum": 1.1, "maximum": 1.1000000000000003},
+    {"type": "number", "multipleOf": 1.5, "exclusiveMinimum": 0},
+    {"type": "number", "multipleOf": 0.5, "exclusiveMinimum": 1, "exclusiveMaximum": 2.5},
+    {"type": "number", "allOf": [{"multipleOf": 0.25}, {"multipleOf": 0.75}]},
+    {"type": "number", "minimum": -1e308, "maximum": 1e308},
+    {"type": "number", "exclusiveMinimum": 0, "maximum": 1e-320},
+    # Bounds outside the float range: only the representable part of the interval can be drawn.
+    {"type": "number", "minimum": -(10**400), "maximum": 10**400},
+    # No float clears the minimum, leaving the integers above it.
+    {"type": "number", "minimum": 10**400},
+    # A fractional grid reaches past the float range.
+    {"type": "number", "multipleOf": 0.3, "minimum": 10**308},
+    # The nearest float to the bound sits above it, yet counts as the bound once compared as a float.
+    {"type": "number", "exclusiveMinimum": 10**25, "maximum": 1e308},
+    {"type": "number", "minimum": -1e308, "exclusiveMaximum": -(10**25)},
+    # No float lies at or below the maximum.
+    {"type": "number", "maximum": -(10**400)},
+    # Grid points round to a float that one of the two readings puts outside the bounds.
+    {"type": "number", "multipleOf": 0.1, "minimum": 10**18 - 1000, "maximum": 10**18 - 1},
+]
+
+CANONICAL_INTEGER_SCHEMAS = [
+    {"type": "integer", "minimum": 1, "maximum": 10},
+    {"type": "integer", "multipleOf": 7, "minimum": 0, "maximum": 10**6},
+    # Two `multipleOf` values the canonicalizer cannot fold into one.
+    {"type": "number", "allOf": [{"multipleOf": 1e308}, {"multipleOf": 3e307}]},
+]
+
+
+@pytest.mark.parametrize("schema", CANONICAL_NUMBER_SCHEMAS, ids=str)
+def test_canonical_number_generation(schema):
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    assert canonical_schema.kind == "number"
+    is_valid = jsonschema_rs.validator_for(schema).is_valid
+
+    @given(strategy.from_schema(canonical_schema, StrategyContext()))
+    @settings(max_examples=10, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+@pytest.mark.parametrize("schema", CANONICAL_INTEGER_SCHEMAS, ids=str)
+def test_canonical_integer_generation(schema):
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    assert canonical_schema.kind == "integer"
+    is_valid = jsonschema_rs.validator_for(schema).is_valid
+
+    @given(strategy.from_schema(canonical_schema, StrategyContext()))
+    @settings(max_examples=10, deadline=None)
+    def test(value):
+        assert isinstance(value, int)
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_number_generation_without_representable_values():
+    schema = {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 5e-324}
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+
+    with pytest.raises(Unsatisfiable):
+        find(
+            strategy.from_schema(canonical_schema, StrategyContext()),
+            lambda _: True,
+            settings=settings(max_examples=10, database=None),
+        )
+
+
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        {
+            "type": "number",
+            "multipleOf": 0.1,
+            "exclusiveMinimum": 1e20,
+            "maximum": 10**20 + 100_000,
+        },
+        {
+            "anyOf": [
+                {
+                    "type": "number",
+                    "multipleOf": 0.1,
+                    "exclusiveMinimum": 1e20,
+                    "maximum": 10**20 + 100_000,
+                },
+                {"const": "valid"},
+            ]
+        },
+        # The bound folds onto a grid point no float holds, which the schema reads as its neighbour.
+        {
+            "type": "number",
+            "multipleOf": 1e-20,
+            "exclusiveMinimum": 10**25,
+            "maximum": 1e308,
+        },
+    ],
+    ids=["number", "number-branch", "number-bound-off-the-float-grid"],
+)
+def test_canonical_number_generation_respects_original_schema(ctx, body_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": body_schema,
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    is_valid = jsonschema_rs.Draft202012Validator(body_schema).is_valid
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None)
+    def test(case):
+        assert is_valid(case.body)
+
+    test()
+
+
+@pytest.mark.parametrize(
+    ("schema", "rejected"),
+    [
+        # The nearest float to the folded bound spells the excluded bound back.
+        (
+            {"type": "number", "multipleOf": 1e-20, "exclusiveMinimum": 10**25, "maximum": 1e308},
+            1e25,
+        ),
+        # The nearest float to the maximum spells a decimal above it.
+        (
+            {"type": "number", "minimum": 0.1, "maximum": 123456789012345678901234567890},
+            1.2345678901234568e29,
+        ),
+    ],
+    ids=["bound-off-the-float-grid", "bound-above-the-float-grid"],
+)
+def test_canonical_number_never_spells_a_rejected_bound(schema, rejected):
+    assert not jsonschema_rs.Draft202012Validator(schema).is_valid(rejected)
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=100, deadline=None, database=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_number_above_the_float_range():
+    # No float clears the bound, but the integers above it are still JSON numbers.
+    schema = {"type": "number", "exclusiveMinimum": sys.float_info.max}
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=20, deadline=None, database=None)
+    def test(value):
+        assert isinstance(value, int)
+        assert is_valid(value), value
 
     test()

@@ -1223,19 +1223,21 @@ def _build_canonical_strategy(
     schema: JsonSchema, generation_config: GenerationConfig, validator_cls: type[jsonschema_rs.Validator]
 ) -> st.SearchStrategy[JsonValue] | None:
     try:
-        canonical = jsonschema_rs.canonicalize(
+        canonical_schema = jsonschema_rs.canonicalize(
             schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], pattern_options=FANCY_REGEX_OPTIONS
         )
     except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
         return None
-    if canonical.kind == "raw":
+    if canonical_schema.kind == "raw":
         return None
     # Handle unsatisfiability via `hypothesis-jsonschema` for now
-    if not canonical.is_satisfiable():
+    if not canonical_schema.is_satisfiable():
         return None
-    context = StrategyContext(alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec))
+    context = StrategyContext(
+        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
+    )
     try:
-        return canonical_from_schema(canonical, context)
+        return canonical_from_schema(canonical_schema, context)
     except UnsupportedView:
         return None
 
