@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.3...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Cache canonical-form strategies across operations.
+
 ### :wrench: Changed
 
 - **INTERNAL**: Match the canonicalization regex engine to the validator's.
