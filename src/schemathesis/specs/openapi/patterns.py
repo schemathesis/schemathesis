@@ -763,15 +763,16 @@ def _classify_structure(nodes: list[_Node]) -> _Structure:
             return ("unknown",)
 
 
-def _transform_node(node: _Node, min_l: int | None, max_l: int | None) -> _Node | None:
-    """Transform a single content node."""
+def _transform_node(node: _Node, min_l: int | None, max_l: int | None, *, anchored: bool = False) -> _Node | None:
+    """Transform a single content node; `anchored` content matches exactly one char, so the budget may only narrow it."""
     op, value = node
     if op in REPEATS:
         return _transform_repeat(op, value, min_l, max_l)
-    if op in (LITERAL, NOT_LITERAL, IN) and max_l != 0:
-        return _wrap_as_repeat(node, min_l, max_l)
-    if op == sre.ANY:
-        return _transform_repeat(sre.MAX_REPEAT, (1, 1, [(sre.ANY, None)]), min_l, max_l)
+    if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
+        if anchored:
+            return _transform_repeat(sre.MAX_REPEAT, (1, 1, [node]), min_l, max_l)
+        if max_l != 0:
+            return _wrap_as_repeat(node, min_l, max_l)
     return None
 
 
@@ -838,11 +839,7 @@ def _transform_anchored_single(
     elif op in REPEATS and len(value[2]) == 1 and value[2][0][0] == sre.IN and _matches_anything(value[2][0][1]):
         content = (op, (value[0], value[1], [(sre.ANY, None)]))
 
-    op, value = content
-    if op == LITERAL and ((min_l is not None and min_l > 1) or (max_l is not None and max_l < 1)):
-        return None
-
-    result = _transform_node(content, min_l, max_l)
+    result = _transform_node(content, min_l, max_l, anchored=True)
     if result is None:
         return None
     return [leading, result, trailing]

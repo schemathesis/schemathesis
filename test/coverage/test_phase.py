@@ -1265,7 +1265,7 @@ def test_negative_patterns(ctx):
                                 "type": "string",
                                 "minLength": 3,
                                 "maxLength": 10,
-                                "pattern": "^[a-zA-Z0-9-_]$",
+                                "pattern": "^[a-zA-Z0-9-_]+$",
                             },
                         },
                         "required": ["name"],
@@ -1283,7 +1283,8 @@ def test_negative_patterns(ctx):
             },
             {
                 "body": {
-                    "name": "000",
+                    # Arbitrary text that does not match the pattern, drawn within the length bounds.
+                    "name": Pattern("(?s)^.{3,10}$"),
                 },
             },
             {

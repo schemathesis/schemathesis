@@ -80,6 +80,17 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("^.+$", 0, 5, "^.{1,5}$"),
         ("^.{0,1}$", 0, 5, "^.{0,1}$"),
         ("^.$", 0, 5, "^.{1}$"),
+        # Fully anchored single-char content matches exactly one character, so the length
+        # budget may only narrow it - widening would admit strings the pattern rejects.
+        ("^[a-z]$", None, 2, "^[a-z]{1}$"),
+        ("^[a-z]$", 1, 3, "^[a-z]{1}$"),
+        ("^[a-z]$", 2, 5, "^[a-z]$"),
+        (r"^\S$", None, 2, r"^\S{1}$"),
+        ("^[^x]$", 1, 4, "^[^x]{1}$"),
+        # Unanchored `.` is a substring requirement like any other single-char node.
+        (".", None, 2, "^.{1,2}$"),
+        (".", 2, 5, "^.{2,5}$"),
+        (".", 2, None, ".{2,}"),
         ("[a-z]*$", None, 5, "^[a-z]{0,5}$"),
         ("[a-z]*$", 3, 5, "^[a-z]{3,5}$"),
         ("[a-z]+$", 0, 5, "^[a-z]{1,5}$"),

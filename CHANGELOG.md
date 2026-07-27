@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- Strings longer than a single-character `pattern` like `^[a-z]$` allows when `maxLength` is set.
+
 ### :racing_car: Performance
 
 - Cache canonical-form strategies across operations.
