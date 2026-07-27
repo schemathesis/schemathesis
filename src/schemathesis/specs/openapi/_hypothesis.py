@@ -23,7 +23,7 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
 )
-from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.numeric import (
     bounds_are_unsatisfiable,
     is_numeric_bound,
@@ -1200,7 +1200,9 @@ def _canonical_strategy_or_none(
 ) -> st.SearchStrategy[JsonValue] | None:
     """Strategy for a fully modeled document; `None` routes to hypothesis-jsonschema."""
     try:
-        canonical = jsonschema_rs.canonicalize(schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls])
+        canonical = jsonschema_rs.canonicalize(
+            schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], pattern_options=FANCY_REGEX_OPTIONS
+        )
     except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
         return None
     if canonical.kind == "raw":
