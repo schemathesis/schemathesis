@@ -271,27 +271,29 @@ def test_validation_schema_preserves_if_then_else():
                 "required": ["success"],
             },
         ),
+        # `^[abc\d]$` matches exactly one character, so a wider length range is unsatisfiable
+        # and both bounds have to stay as keywords.
         (
             {
                 "minLength": 3,
                 "maxLength": 40,
                 "pattern": r"^[abc\d]$",
             },
-            {"pattern": r"^[abc\d]{3,40}$"},
+            {"minLength": 3, "maxLength": 40, "pattern": r"^[abc\d]$"},
         ),
         (
             {
                 "maxLength": 40,
                 "pattern": r"^[abc\d]$",
             },
-            {"pattern": r"^[abc\d]{1,40}$"},
+            {"pattern": r"^[abc\d]{1}$"},
         ),
         (
             {
                 "minLength": 3,
                 "pattern": r"^[abc\d]$",
             },
-            {"pattern": r"^[abc\d]{3,}$"},
+            {"minLength": 3, "pattern": r"^[abc\d]$"},
         ),
         (
             {
