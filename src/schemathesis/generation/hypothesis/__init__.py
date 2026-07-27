@@ -13,6 +13,8 @@ schema_generation_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)
 # Stable identity for per-(generation_config, mode) custom-format dicts, so downstream caches
 # keyed on `id(custom_formats)` actually hit instead of seeing a fresh dict per call.
 custom_formats_cache: Final[BoundedCache] = BoundedCache(maxsize=32)
+# Cross-operation cache for the canonical-form strategy keyed on (schema, validator, alphabet).
+canonical_strategy_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
 _resolve_result_cache: Final[BoundedCache] = BoundedCache(maxsize=256)
 _merged_result_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
 _canonicalish_result_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)

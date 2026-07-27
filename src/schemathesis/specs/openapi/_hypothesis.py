@@ -37,7 +37,8 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis import custom_formats_cache
+from schemathesis.generation._cache import schema_cache_key
+from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
 from schemathesis.generation.jsonschema import Alphabet, StrategyContext
 from schemathesis.generation.jsonschema.strategy import UnsupportedView
 from schemathesis.generation.jsonschema.strategy import from_schema as canonical_from_schema
@@ -1199,6 +1200,28 @@ def _canonical_strategy_or_none(
     schema: JsonSchema, generation_config: GenerationConfig, validator_cls: type[jsonschema_rs.Validator]
 ) -> st.SearchStrategy[JsonValue] | None:
     """Strategy for a fully modeled document; `None` routes to hypothesis-jsonschema."""
+    try:
+        key = (
+            schema_cache_key(schema),
+            validator_cls,
+            generation_config.allow_x00,
+            generation_config.codec,
+        )
+    except (TypeError, ValueError):
+        key = None
+    if key is not None:
+        cached = canonical_strategy_cache.get(key)
+        if cached is not MISSING:
+            return cached
+    strategy = _build_canonical_strategy(schema, generation_config, validator_cls)
+    if key is not None:
+        canonical_strategy_cache[key] = strategy
+    return strategy
+
+
+def _build_canonical_strategy(
+    schema: JsonSchema, generation_config: GenerationConfig, validator_cls: type[jsonschema_rs.Validator]
+) -> st.SearchStrategy[JsonValue] | None:
     try:
         canonical = jsonschema_rs.canonicalize(
             schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], pattern_options=FANCY_REGEX_OPTIONS
