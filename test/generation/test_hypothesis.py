@@ -1709,6 +1709,13 @@ CANONICAL_ARRAY_SCHEMAS = [
     {"type": "array", "items": {"type": "array", "items": {"type": "integer"}}, "maxItems": 3},
     {"type": "object", "properties": {"xs": {"type": "array", "items": {"type": "integer"}}}, "required": ["xs"]},
     {"type": "array", "items": {"anyOf": [{"type": "integer"}, {"type": "string"}]}},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}]},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "items": False},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "maxItems": 1},
+    {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}, "minItems": 3},
+    {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}, "maxItems": 4},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "integer"}], "uniqueItems": True, "minItems": 4},
+    {"type": "array", "prefixItems": [{"type": "object", "required": ["a"]}], "items": {"type": "array"}},
 ]
 
 
@@ -1727,7 +1734,6 @@ def test_canonical_array_generation(schema):
 
 
 UNSUPPORTED_ARRAY_SCHEMAS = [
-    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}]},
     {"type": "array", "contains": {"type": "integer"}},
 ]
 
@@ -1735,6 +1741,17 @@ UNSUPPORTED_ARRAY_SCHEMAS = [
 @pytest.mark.parametrize("schema", UNSUPPORTED_ARRAY_SCHEMAS, ids=str)
 def test_canonical_array_falls_back(schema):
     assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+
+
+def test_canonical_array_prefix_items_reaches_beyond_the_prefix():
+    built = _canonical_strategy_or_none(
+        {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    find(built, lambda value: len(value) > 1, settings=settings(max_examples=1000, database=None))
 
 
 def test_canonical_array_unique_items_separates_booleans_from_numbers():
