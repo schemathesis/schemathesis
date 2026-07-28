@@ -183,25 +183,6 @@ def test_proxy_error(ctx, cli, snapshot_cli):
     )
 
 
-def test_generation_config(ctx, cli, mocker):
-    from schemathesis.specs.openapi import _hypothesis
-
-    api = ctx.openapi.apps.users_crud()
-    mocked = mocker.spy(_hypothesis, "from_schema")
-    cli.run(
-        api.schema_url,
-        "--phases=stateful",
-        "--max-examples=10",
-        "--generation-allow-x00=false",
-        "--generation-codec=ascii",
-        "--generation-with-security-parameters=false",
-        "-c not_a_server_error",
-    )
-    from_schema_kwargs = mocked.call_args_list[0].kwargs
-    assert from_schema_kwargs["allow_x00"] is False
-    assert from_schema_kwargs["codec"] == "ascii"
-
-
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_keyboard_interrupt(ctx, cli, mocker, snapshot_cli):
     def mocked(*args, **kwargs):

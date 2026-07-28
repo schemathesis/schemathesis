@@ -13,7 +13,7 @@
 ### :wrench: Changed
 
 - **INTERNAL**: Match the canonicalization regex engine to the validator's.
-- **INTERNAL**: Data generation for `number` schemas built from the `jsonschema-rs` canonical form.
+- **INTERNAL**: Data generation for `number` and `object` schemas built from the `jsonschema-rs` canonical form.
 
 ## [4.24.3](https://github.com/schemathesis/schemathesis/compare/v4.24.2...v4.24.3) - 2026-07-26
 

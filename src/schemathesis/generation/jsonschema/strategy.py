@@ -24,6 +24,10 @@ if TYPE_CHECKING:
     Numeric = int | float | Decimal
 
 
+# Upper bound on properties drawn beyond the ones the schema names.
+_EXTRA_KEYS = 5
+
+
 class UnsupportedView(Exception):
     """A canonical node this module cannot build from; the caller falls back to `hypothesis-jsonschema`."""
 
@@ -65,7 +69,53 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _number(view)
     if isinstance(view, canonical.StringView):
         return _string(view, ctx)
+    if isinstance(view, canonical.ObjectView):
+        return _object(view, ctx)
     raise UnsupportedView(schema.kind)
+
+
+def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    # Every remaining facet constrains keys this module draws freely, and honouring them needs a
+    # joint draw over names, values and size.
+    if (
+        view.pattern_properties
+        or view.additional_properties is not None
+        or view.min_properties is not None
+        or view.max_properties is not None
+    ):
+        raise UnsupportedView("object")
+    entries = {key: from_schema(entry, ctx) for key, entry in view.properties.items()}
+    # A key can be required without `properties` saying anything about its value.
+    required = {key: entries[key] if key in entries else _anything(ctx) for key in view.required}
+    optional = {key: entry for key, entry in entries.items() if key not in view.required}
+    if view.property_names is not None:
+        # A closed name set — what `additionalProperties: false` folds into — admits nothing else,
+        # so the names it lists are the only optional keys.
+        names = _closed_names(view.property_names)
+        if names is None:
+            raise UnsupportedView("object")
+        # Sorted: draw order decides what a seed replays, and set iteration order is not stable
+        # across processes.
+        optional.update({name: _anything(ctx) for name in sorted(names - set(required) - set(optional))})
+        return st.fixed_dictionaries(required, optional=optional)
+    named = st.fixed_dictionaries(required, optional=optional)
+    known = set(view.properties) | set(view.required)
+    extra = st.dictionaries(_text(ctx).filter(lambda key: key not in known), _anything(ctx), max_size=_EXTRA_KEYS)
+    return st.tuples(named, extra).map(lambda parts: {**parts[1], **parts[0]})
+
+
+def _closed_names(schema: jsonschema_rs.CanonicalSchema) -> set[str] | None:
+    """The finite set of admitted property names, or `None` when names are not enumerable."""
+    view = schema.view()
+    if isinstance(view, canonical.ConstView):
+        names = {view.value}
+    elif isinstance(view, canonical.EnumView):
+        names = set(view.values)
+    else:
+        return None
+    # Canonicalization drops admitted values no property name could equal.
+    assert all(isinstance(name, str) for name in names)
+    return names
 
 
 def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonValue]:
