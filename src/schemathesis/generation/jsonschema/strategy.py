@@ -11,6 +11,8 @@ import jsonschema_rs
 from hypothesis import strategies as st
 from jsonschema_rs import canonical
 
+from schemathesis.generation.jsonschema.context import Alphabet
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from decimal import Decimal
@@ -75,7 +77,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
 
 
 def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    # Every remaining facet constrains keys this module draws freely, and honouring them needs a
+    # Every remaining facet constrains keys this module draws freely, and honoring them needs a
     # joint draw over names, values and size.
     if (
         view.pattern_properties
@@ -275,10 +277,17 @@ def _combined_multiple_of(values: list[float]) -> Fraction | None:
 
 
 def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    # Formats and content facets narrow the admitted strings, and driving them needs generators this
-    # module has no access to.
-    if view.formats or view.content_media_types or view.content_encodings:
+    # Content facets narrow the admitted strings, and driving them needs generators this module has
+    # no access to.
+    if view.content_media_types or view.content_encodings:
         raise UnsupportedView("string")
+    # A name with no generator behind it is an annotation and leaves the strings unconstrained.
+    known = [name for name in view.formats if name in ctx.formats]
+    if len(known) > 1:
+        # Two generators, one value: satisfying both needs an intersection this module cannot build.
+        raise UnsupportedView("string")
+    if known:
+        return _formatted(known[0], view, ctx)
     if not view.patterns:
         kwargs: dict[str, int] = {}
         if view.min_length is not None:
@@ -292,13 +301,31 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         raise UnsupportedView("string")
     # `fullmatch` avoids `$` matching before a trailing newline (which the validator rejects);
     # full matches are a subset of the search matches the schema accepts, so it stays sound.
-    strategy = st.from_regex(view.patterns[0], fullmatch=True, alphabet=_alphabet(ctx))
-    if view.min_length is not None or view.max_length is not None:
-        # Length is normally folded into the pattern upstream; this filter is the soundness net.
-        low = view.min_length or 0
-        high = math.inf if view.max_length is None else view.max_length
-        strategy = strategy.filter(lambda value: low <= len(value) <= high)
-    return strategy
+    strategy = st.from_regex(view.patterns[0], fullmatch=True, alphabet=ctx.alphabet.as_strategy())
+    # Length is normally folded into the pattern upstream; this filter is the soundness net.
+    return _within_length(strategy, view)
+
+
+def _formatted(name: str, view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    """Values from the generator registered for `name`, narrowed to the facets around it."""
+    strategy = ctx.formats[name]
+    for pattern in view.patterns:
+        if not _compiles(pattern):
+            raise UnsupportedView("string")
+        # A format generator cannot be steered, so the pattern can only be filtered for. `search`,
+        # not `fullmatch`: an unanchored pattern admits a match anywhere in the value.
+        strategy = strategy.filter(re.compile(pattern).search)
+    return _within_length(strategy, view)
+
+
+def _within_length(
+    strategy: SearchStrategy[JsonValue], view: jsonschema_rs.canonical.StringView
+) -> SearchStrategy[JsonValue]:
+    if view.min_length is None and view.max_length is None:
+        return strategy
+    low = view.min_length or 0
+    high = math.inf if view.max_length is None else view.max_length
+    return strategy.filter(lambda value: low <= len(value) <= high)
 
 
 def _compiles(pattern: str) -> bool:
@@ -317,7 +344,7 @@ def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:
 def _anything_for(allow_x00: bool, codec: str | None) -> SearchStrategy[JsonValue]:
     # Arbitrary JSON value; containers bounded to keep draws cheap. Assembling the recursive strategy
     # costs far more than every other lifter combined, and it depends only on the alphabet.
-    text = st.text(alphabet=_alphabet_for(allow_x00, codec))
+    text = st.text(alphabet=Alphabet(allow_x00=allow_x00, codec=codec).as_strategy())
     return st.recursive(
         st.none()
         | st.booleans()
@@ -329,19 +356,7 @@ def _anything_for(allow_x00: bool, codec: str | None) -> SearchStrategy[JsonValu
 
 
 def _text(ctx: StrategyContext, **kwargs: int) -> SearchStrategy[str]:
-    return st.text(alphabet=_alphabet(ctx), **kwargs)
-
-
-def _alphabet(ctx: StrategyContext) -> SearchStrategy[str]:
-    return _alphabet_for(ctx.alphabet.allow_x00, ctx.alphabet.codec)
-
-
-@lru_cache
-def _alphabet_for(allow_x00: bool, codec: str | None) -> SearchStrategy[str]:
-    exclude_characters = "" if allow_x00 else "\x00"
-    if codec is not None:
-        return st.characters(codec=codec, exclude_characters=exclude_characters)
-    return st.characters(exclude_characters=exclude_characters)
+    return st.text(alphabet=ctx.alphabet.as_strategy(), **kwargs)
 
 
 def _bare_type(name: str, ctx: StrategyContext) -> SearchStrategy[JsonValue]:

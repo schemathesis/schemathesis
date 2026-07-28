@@ -5,6 +5,8 @@
 ### :bug: Fixed
 
 - Strings longer than a single-character `pattern` like `^[a-z]$` allows when `maxLength` is set.
+- Honor `format` when generating string values for Open API 3.1.
+- Generate `hostname` and `idn-hostname` values that validators accept.
 
 ### :racing_car: Performance
 
@@ -13,7 +15,8 @@
 ### :wrench: Changed
 
 - **INTERNAL**: Match the canonicalization regex engine to the validator's.
-- **INTERNAL**: Data generation for `number` and `object` schemas built from the `jsonschema-rs` canonical form.
+- **INTERNAL**: Data generation for `number`, `object`, and `format` schemas built from the `jsonschema-rs` canonical form.
+- **INTERNAL**: Own all `format` value generators instead of delegating to `hypothesis-jsonschema`.
 
 ## [4.24.3](https://github.com/schemathesis/schemathesis/compare/v4.24.2...v4.24.3) - 2026-07-26
 

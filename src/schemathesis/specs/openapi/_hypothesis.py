@@ -67,6 +67,7 @@ from schemathesis.specs.openapi.formats import (
     HEADER_FORMAT,
     INVALID_HEADER_CHARS,
     STRING_FORMATS,
+    get_alphabet_format_strategies,
     get_default_format_strategies,
     header_values,
 )
@@ -1068,6 +1069,10 @@ def _build_custom_formats_uncached(
 
             custom_formats[HEADER_FORMAT] = header_strategy()
     custom_formats.update(get_header_format_strategies(mode))
+    # Pinned to the character set in force, since this map goes to callers that cannot supply one.
+    alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec).as_strategy()
+    for name, build in get_alphabet_format_strategies().items():
+        custom_formats[name] = build(alphabet)
     return custom_formats
 
 
@@ -1224,7 +1229,12 @@ def _build_canonical_strategy(
 ) -> st.SearchStrategy[JsonValue] | None:
     try:
         canonical_schema = jsonschema_rs.canonicalize(
-            schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], pattern_options=FANCY_REGEX_OPTIONS
+            schema,
+            draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+            pattern_options=FANCY_REGEX_OPTIONS,
+            # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a
+            # `format`-carrying schema generating arbitrary strings on this path.
+            validate_formats=True,
         )
     except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
         return None
@@ -1235,6 +1245,7 @@ def _build_canonical_strategy(
         return None
     context = StrategyContext(
         alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
+        formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
     )
     try:
         return canonical_from_schema(canonical_schema, context)
