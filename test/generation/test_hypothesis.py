@@ -1337,25 +1337,39 @@ def test_integer_multiple_of_body(ctx):
     test()
 
 
-def test_format_constrained_string_body(ctx):
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+@pytest.mark.parametrize(
+    ("body_schema", "extract"),
+    [
+        ({"type": "string", "format": "uuid"}, lambda body: body),
+        (
+            {"type": "object", "properties": {"id": {"type": "string", "format": "uuid"}}, "required": ["id"]},
+            lambda body: body["id"],
+        ),
+    ],
+    ids=["bare", "property"],
+)
+def test_format_constrained_string_body(ctx, version, body_schema, extract):
+    # Draft 2020-12 reads `format` as an annotation, which must not turn `uuid` into arbitrary text.
     schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
                     "requestBody": {
                         "required": True,
-                        "content": {"application/json": {"schema": {"type": "string", "format": "uuid"}}},
+                        "content": {"application/json": {"schema": body_schema}},
                     },
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        version=version,
     )
 
     @given(schema["/data"]["POST"].as_strategy())
     @settings(max_examples=10, deadline=None)
     def test(case):
-        uuid.UUID(case.body)
+        uuid.UUID(extract(case.body))
 
     test()
 
@@ -1772,3 +1786,188 @@ def test_canonical_array_respects_size_bounds():
         assert 2 <= len(value) <= 3, value
 
     test()
+
+
+# Formats the validator asserts, so generated values can be checked against the schema itself.
+ASSERTED_FORMATS = [
+    "date",
+    "date-time",
+    "time",
+    "duration",
+    "email",
+    "idn-email",
+    "hostname",
+    "idn-hostname",
+    "ipv4",
+    "ipv6",
+    "uri",
+    "uri-reference",
+    "uri-template",
+    "iri",
+    "iri-reference",
+    "json-pointer",
+    "relative-json-pointer",
+    "uuid",
+]
+
+
+@pytest.mark.parametrize("name", ASSERTED_FORMATS)
+def test_canonical_string_format_generation(name):
+    schema = {"type": "string", "format": name}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None, name
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_string_format_byte():
+    built = _canonical_strategy_or_none(
+        {"type": "string", "format": "byte"}, GenerationConfig(), jsonschema_rs.Draft4Validator
+    )
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        b64decode(value)
+
+    test()
+
+
+def test_canonical_string_format_binary():
+    built = _canonical_strategy_or_none(
+        {"type": "string", "format": "binary"}, GenerationConfig(), jsonschema_rs.Draft4Validator
+    )
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert isinstance(value, Binary), value
+
+    test()
+
+
+def test_canonical_unknown_format_is_ignored():
+    # Unknown formats are annotations; they must not block generation or narrow the strings drawn.
+    schema = {"type": "string", "format": "decimal", "minLength": 3, "maxLength": 6}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert 3 <= len(value) <= 6, value
+
+    test()
+
+
+def test_canonical_format_within_length_bounds():
+    schema = {"type": "string", "format": "uuid", "minLength": 36, "maxLength": 36}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_format_drops_values_over_the_length_bound():
+    # A format generator cannot be steered by length, so the bound can only be filtered for; the
+    # generator reaches 32 characters here and every one of those must be discarded.
+    schema = {"type": "string", "format": "date-time", "maxLength": 25}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert len(value) <= 25, value
+
+    test()
+
+
+def test_canonical_format_respects_pattern():
+    schema = {"type": "string", "format": "hostname", "pattern": "^a"}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    # A format generator cannot be steered by a pattern, so most draws are discarded.
+    @given(built)
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_format_drops_values_the_pattern_rejects():
+    built = _canonical_strategy_or_none(
+        {"type": "string", "format": "uuid", "pattern": "^not-a-uuid$"},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    with pytest.raises(Unsatisfiable):
+        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+
+
+def test_canonical_conflicting_formats_fall_back():
+    # Two formats at once needs a conjunction this module cannot build.
+    schema = {"allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]}
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_canonical_object_property_formats(ctx, version):
+    body_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string", "format": "uuid"}, "seen": {"type": "string", "format": "date-time"}},
+        "required": ["id", "seen"],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+    is_valid = jsonschema_rs.Draft202012Validator(body_schema, validate_formats=True).is_valid
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None)
+    def test(case):
+        assert is_valid(case.body), case.body
+
+    test()
+
+
+@pytest.mark.parametrize(
+    ("schema", "validator_cls"),
+    [
+        ({"type": "string", "contentMediaType": "application/json"}, jsonschema_rs.Draft7Validator),
+        ({"type": "string", "contentEncoding": "base64"}, jsonschema_rs.Draft7Validator),
+        # A pattern Python `re` rejects cannot drive generation, with or without a format.
+        ({"type": "string", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
+        ({"type": "string", "format": "uuid", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
+    ],
+    ids=["content-media-type", "content-encoding", "pattern", "format-and-pattern"],
+)
+def test_canonical_string_falls_back(schema, validator_cls):
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls) is None

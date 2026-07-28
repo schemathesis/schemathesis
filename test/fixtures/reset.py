@@ -10,7 +10,7 @@ from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
 from schemathesis.core.jsonschema import _validator_failure_cache, validator_cache
 from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
-from schemathesis.generation.hypothesis import custom_formats_cache, schema_generation_cache
+from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache, schema_generation_cache
 from schemathesis.specs.openapi import media_types
 from schemathesis.specs.openapi.formats import STRING_FORMATS
 from schemathesis.transport.asgi import ASGI_TRANSPORT
@@ -58,6 +58,8 @@ def reset_hooks():
     # Process-wide caches; clear so monkeypatched strategies in one test don't leak cached results.
     schema_generation_cache.clear()
     custom_formats_cache.clear()
+    # Formats are dropped from the registry above without going through `unregister_string_format`.
+    canonical_strategy_cache.clear()
     validator_cache.clear()
     _validator_failure_cache.clear()
     from schemathesis.specs.openapi.coverage._schema import _REMOVE_EXAMPLES_CACHE
