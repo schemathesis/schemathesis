@@ -79,11 +79,12 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
 
 
 def _array(view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    # Both pin what sits at a given position, which needs the elements drawn jointly rather than
-    # one at a time.
-    if view.contains or view.prefix_items:
+    # How many elements match is a property of the array as a whole, not of any one position.
+    if view.contains:
         raise UnsupportedView("array")
     element = _anything(ctx) if view.items is None else from_schema(view.items, ctx)
+    if view.prefix_items:
+        return _tuple(view, element, ctx)
     kwargs: dict[str, int] = {}
     if view.min_items is not None:
         kwargs["min_size"] = view.min_items
@@ -92,6 +93,35 @@ def _array(view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext) -> Sea
     if view.unique_items:
         return st.lists(element, unique_by=_json_identity, **kwargs)
     return st.lists(element, **kwargs)
+
+
+def _tuple(
+    view: jsonschema_rs.canonical.ArrayView, element: SearchStrategy[JsonValue], ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
+    """An array whose leading positions each carry their own schema."""
+    # A schema past the length ceiling pins a position no array can have.
+    pinned = view.prefix_items if view.max_items is None else view.prefix_items[: view.max_items]
+    head = st.tuples(*[from_schema(entry, ctx) for entry in pinned])
+    # Arrays shorter than the prefix are admitted too, but skipping them keeps the draw a plain
+    # concatenation instead of a size-first two-step.
+    kwargs: dict[str, int] = {"min_size": max(0, (view.min_items or 0) - len(pinned))}
+    if view.max_items is not None:
+        kwargs["max_size"] = view.max_items - len(pinned)
+    if view.unique_items:
+        # `unique_by` settles the tail; the filter catches what it cannot see — collisions inside the
+        # prefix and across the two halves.
+        tail = st.lists(element, unique_by=_json_identity, **kwargs)
+        return st.tuples(head, tail).map(_concat).filter(_all_unique)
+    return st.tuples(head, st.lists(element, **kwargs)).map(_concat)
+
+
+def _concat(parts: tuple[tuple[JsonValue, ...], list[JsonValue]]) -> JsonValue:
+    return [*parts[0], *parts[1]]
+
+
+def _all_unique(values: JsonValue) -> bool:
+    assert isinstance(values, list)
+    return len({_json_identity(value) for value in values}) == len(values)
 
 
 def _json_identity(value: JsonValue) -> object:

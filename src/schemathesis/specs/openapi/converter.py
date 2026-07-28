@@ -366,7 +366,9 @@ def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
             and isinstance(entry.get("contains"), dict)
             and entry["contains"].keys() == {"const"}
         ):
-            consts.append({"const": entry["contains"]["const"]})
+            # A single-value `enum`, not `const`: OpenAPI 3.0 schemas are read as draft 4, which
+            # has no `const` and would silently leave the position unconstrained.
+            consts.append({"enum": [entry["contains"]["const"]]})
         else:
             keep.append(entry)
     if len(consts) < 2:
