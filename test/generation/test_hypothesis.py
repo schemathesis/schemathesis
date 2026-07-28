@@ -20,7 +20,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
-from schemathesis.generation.jsonschema import StrategyContext, strategy
+from schemathesis.generation.jsonschema import Alphabet, StrategyContext, strategy
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
@@ -1540,5 +1540,149 @@ def test_canonical_number_above_the_float_range():
     def test(value):
         assert isinstance(value, int)
         assert is_valid(value), value
+
+    test()
+
+
+CANONICAL_OBJECT_SCHEMAS = [
+    {"type": "object"},
+    {"type": "object", "properties": {"a": {"type": "integer"}}},
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+    {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "required": ["a"]},
+    {"type": "object", "properties": {"a": {"type": "string", "minLength": 2}}},
+    {"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "integer"}}}}},
+    # A required key the schema says nothing else about.
+    {"type": "object", "required": ["a"]},
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a", "b"]},
+    {"type": "object", "properties": {"a": {"anyOf": [{"type": "integer"}, {"type": "string"}]}}},
+    {
+        "allOf": [
+            {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+            {"type": "object", "properties": {"a": {"minimum": 5}, "b": {"type": "string"}}},
+        ]
+    },
+]
+
+
+@pytest.mark.parametrize("schema", CANONICAL_OBJECT_SCHEMAS, ids=str)
+def test_canonical_object_generation(schema):
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    is_valid = jsonschema_rs.validator_for(schema).is_valid
+
+    @given(strategy.from_schema(canonical_schema, StrategyContext()))
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert isinstance(value, dict)
+        assert is_valid(value), value
+
+    test()
+
+
+UNSUPPORTED_OBJECT_SCHEMAS = [
+    {"type": "object", "patternProperties": {"^a": {"type": "integer"}}},
+    {"type": "object", "propertyNames": {"maxLength": 3}},
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
+    {"type": "object", "minProperties": 2},
+    {"type": "object", "maxProperties": 2},
+    # An array property keeps the whole object off the canonical path.
+    {"type": "object", "properties": {"a": {"type": "array", "items": {"type": "integer"}}}, "required": ["a"]},
+]
+
+
+@pytest.mark.parametrize("schema", UNSUPPORTED_OBJECT_SCHEMAS, ids=str)
+def test_canonical_object_falls_back(schema):
+    assert jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012).kind == "object"
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+
+
+def test_canonical_object_generates_extra_properties():
+    schema = {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+
+    find(
+        strategy.from_schema(canonical_schema, StrategyContext()),
+        lambda value: set(value) - {"a"},
+        settings=settings(max_examples=1000, database=None),
+    )
+
+
+CLOSED_OBJECT_SCHEMAS = [
+    ({"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": False}, {"a"}),
+    (
+        {
+            "type": "object",
+            "properties": {"a": {"type": "integer"}, "b": {"type": "string"}},
+            "required": ["a"],
+            "additionalProperties": False,
+        },
+        {"a", "b"},
+    ),
+    # Names the schema admits without constraining their values.
+    ({"type": "object", "propertyNames": {"enum": ["a", "z"]}}, {"a", "z"}),
+    ({"type": "object", "propertyNames": {"const": "a"}}, {"a"}),
+    (
+        {"type": "object", "properties": {"a": {"type": "integer"}}, "propertyNames": {"enum": ["a", "z"]}},
+        {"a", "z"},
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("schema", "allowed"),
+    CLOSED_OBJECT_SCHEMAS,
+    ids=["closed", "closed-with-required", "names-enum", "names-const", "names-beyond-properties"],
+)
+def test_canonical_closed_object_generation(schema, allowed):
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    is_valid = jsonschema_rs.validator_for(schema).is_valid
+
+    @given(strategy.from_schema(canonical_schema, StrategyContext()))
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert set(value) <= allowed, value
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_closed_object_reaches_every_admitted_name():
+    schema = {
+        "type": "object",
+        "properties": {"a": {"type": "integer"}, "b": {"type": "string"}},
+        "required": ["a"],
+        "additionalProperties": False,
+    }
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+
+    find(
+        strategy.from_schema(canonical_schema, StrategyContext()),
+        lambda value: set(value) == {"a", "b"},
+        settings=settings(max_examples=1000, database=None),
+    )
+
+
+def test_canonical_object_unsatisfiable_when_required_name_is_not_admitted():
+    schema = {
+        "type": "object",
+        "properties": {"a": {"type": "integer"}},
+        "required": ["b"],
+        "additionalProperties": False,
+    }
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+
+
+def test_canonical_object_respects_alphabet():
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    context = StrategyContext(alphabet=Alphabet(allow_x00=False, codec="ascii"))
+
+    @given(strategy.from_schema(canonical_schema, context))
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        for key, item in value.items():
+            assert "\x00" not in key
+            key.encode("ascii")
+            if isinstance(item, str):
+                assert "\x00" not in item
 
     test()
