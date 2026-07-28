@@ -109,3 +109,44 @@ def test_registering_a_format_invalidates_built_strategies():
         assert value.isdigit(), value
 
     test()
+
+
+def test_regex_format_respects_generation_alphabet():
+    built = _canonical_strategy_or_none(
+        {"type": "string", "format": "regex"},
+        GenerationConfig(allow_x00=False, codec="ascii"),
+        jsonschema_rs.Draft202012Validator,
+    )
+
+    @given(built)
+    @SETTINGS
+    def test(value):
+        assert "\x00" not in value
+        value.encode("ascii")
+
+    test()
+
+
+def test_canonical_strategy_cache_respects_header_exclusions():
+    schema = {
+        "type": "object",
+        "properties": {"X-Foo": {"type": "string", "format": "_header_value", "minLength": 1, "maxLength": 1}},
+        "required": ["X-Foo"],
+        "additionalProperties": False,
+    }
+
+    def generation_config(allowed: str) -> GenerationConfig:
+        excluded = "".join(chr(codepoint) for codepoint in range(128) if chr(codepoint) != allowed)
+        return GenerationConfig(codec="ascii", exclude_header_characters=excluded)
+
+    first_config = generation_config("A")
+    second_config = generation_config("B")
+    _canonical_strategy_or_none(schema, first_config, jsonschema_rs.Draft4Validator)
+    built = _canonical_strategy_or_none(schema, second_config, jsonschema_rs.Draft4Validator)
+
+    @given(built)
+    @SETTINGS
+    def test(value):
+        assert value["X-Foo"] == "B"
+
+    test()
