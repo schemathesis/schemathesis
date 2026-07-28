@@ -1598,8 +1598,6 @@ UNSUPPORTED_OBJECT_SCHEMAS = [
     {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
     {"type": "object", "minProperties": 2},
     {"type": "object", "maxProperties": 2},
-    # An array property keeps the whole object off the canonical path.
-    {"type": "object", "properties": {"a": {"type": "array", "items": {"type": "integer"}}}, "required": ["a"]},
 ]
 
 
@@ -1885,3 +1883,92 @@ def test_canonical_object_property_formats(ctx, version):
 )
 def test_canonical_string_falls_back(schema, validator_cls):
     assert _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls) is None
+
+
+CANONICAL_ARRAY_SCHEMAS = [
+    {"type": "array", "items": {"type": "integer"}},
+    {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 4},
+    {"type": "array", "items": {"type": "integer"}, "uniqueItems": True, "minItems": 3},
+    {"type": "array", "items": {"type": "number"}, "uniqueItems": True, "minItems": 2},
+    {"type": "array", "items": True, "uniqueItems": True, "minItems": 2, "maxItems": 5},
+    {"type": "array", "items": {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}},
+    {"type": "array", "items": {"type": "array", "items": {"type": "integer"}}, "maxItems": 3},
+    {"type": "array", "items": {"type": "string", "format": "uuid"}, "minItems": 1},
+    {"type": "object", "properties": {"xs": {"type": "array", "items": {"type": "integer"}}}, "required": ["xs"]},
+    {"type": "array", "items": {"anyOf": [{"type": "integer"}, {"type": "string"}]}},
+]
+
+
+@pytest.mark.parametrize("schema", CANONICAL_ARRAY_SCHEMAS, ids=str)
+def test_canonical_array_generation(schema):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+UNSUPPORTED_ARRAY_SCHEMAS = [
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}]},
+    {"type": "array", "contains": {"type": "integer"}},
+]
+
+
+@pytest.mark.parametrize("schema", UNSUPPORTED_ARRAY_SCHEMAS, ids=str)
+def test_canonical_array_falls_back(schema):
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+
+
+def test_canonical_array_unique_items_separates_booleans_from_numbers():
+    # `true` and `1` are distinct JSON values, so both may sit in the same unique array.
+    built = _canonical_strategy_or_none(
+        {"type": "array", "items": True, "uniqueItems": True, "minItems": 2},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    find(
+        built,
+        lambda value: any(item is True for item in value) and 1 in value,
+        settings=settings(max_examples=2000, database=None),
+    )
+
+
+def test_canonical_array_unique_items_merges_equal_numbers():
+    # `1` and `1.0` are the same JSON value and must never share an array.
+    built = _canonical_strategy_or_none(
+        {"type": "array", "items": {"type": "number"}, "uniqueItems": True, "minItems": 2, "maxItems": 5},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=50, deadline=None)
+    def test(value):
+        rendered = [float(item) for item in value]
+        assert len(set(rendered)) == len(rendered), value
+
+    test()
+
+
+def test_canonical_array_respects_size_bounds():
+    built = _canonical_strategy_or_none(
+        {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 3},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert 2 <= len(value) <= 3, value
+
+    test()
