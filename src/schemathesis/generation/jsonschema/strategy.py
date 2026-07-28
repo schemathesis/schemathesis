@@ -109,16 +109,13 @@ def _json_identity(value: JsonValue) -> object:
 def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     # Every remaining facet constrains keys this module draws freely, and honoring them needs a
     # joint draw over names, values and size.
-    if (
-        view.pattern_properties
-        or view.additional_properties is not None
-        or view.min_properties is not None
-        or view.max_properties is not None
-    ):
+    if view.pattern_properties or view.min_properties is not None or view.max_properties is not None:
         raise UnsupportedView("object")
     entries = {key: from_schema(entry, ctx) for key, entry in view.properties.items()}
+    # Whatever `properties` does not name answers to `additionalProperties`, and is otherwise free.
+    unnamed = _anything(ctx) if view.additional_properties is None else from_schema(view.additional_properties, ctx)
     # A key can be required without `properties` saying anything about its value.
-    required = {key: entries[key] if key in entries else _anything(ctx) for key in view.required}
+    required = {key: entries[key] if key in entries else unnamed for key in view.required}
     optional = {key: entry for key, entry in entries.items() if key not in view.required}
     if view.property_names is not None:
         # A closed name set — what `additionalProperties: false` folds into — admits nothing else,
@@ -128,11 +125,11 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
             raise UnsupportedView("object")
         # Sorted: draw order decides what a seed replays, and set iteration order is not stable
         # across processes.
-        optional.update({name: _anything(ctx) for name in sorted(names - set(required) - set(optional))})
+        optional.update(dict.fromkeys(sorted(names - set(required) - set(optional)), unnamed))
         return st.fixed_dictionaries(required, optional=optional)
     named = st.fixed_dictionaries(required, optional=optional)
     known = set(view.properties) | set(view.required)
-    extra = st.dictionaries(_text(ctx).filter(lambda key: key not in known), _anything(ctx), max_size=_EXTRA_KEYS)
+    extra = st.dictionaries(_text(ctx).filter(lambda key: key not in known), unnamed, max_size=_EXTRA_KEYS)
     return st.tuples(named, extra).map(lambda parts: {**parts[1], **parts[0]})
 
 

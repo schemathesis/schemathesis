@@ -1595,7 +1595,6 @@ def test_canonical_object_generation(schema):
 UNSUPPORTED_OBJECT_SCHEMAS = [
     {"type": "object", "patternProperties": {"^a": {"type": "integer"}}},
     {"type": "object", "propertyNames": {"maxLength": 3}},
-    {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
     {"type": "object", "minProperties": 2},
     {"type": "object", "maxProperties": 2},
 ]
@@ -1971,3 +1970,55 @@ def test_canonical_object_property_formats(ctx, version):
 )
 def test_canonical_string_falls_back(schema, validator_cls):
     assert _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls) is None
+
+
+ADDITIONAL_PROPERTIES_SCHEMAS = [
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
+    {"type": "object", "additionalProperties": {"type": "integer"}},
+    # The required key is absent from `properties`, so its value answers to `additionalProperties`.
+    {"type": "object", "required": ["a"], "additionalProperties": {"type": "string", "minLength": 2}},
+    {
+        "type": "object",
+        "properties": {"a": {"type": "integer"}},
+        "required": ["a"],
+        "additionalProperties": {"type": "array", "items": {"type": "integer"}},
+    },
+    {"type": "object", "additionalProperties": {"type": "object", "properties": {"b": {"type": "integer"}}}},
+    {"type": "object", "additionalProperties": {"anyOf": [{"type": "integer"}, {"type": "boolean"}]}},
+]
+
+
+@pytest.mark.parametrize("schema", ADDITIONAL_PROPERTIES_SCHEMAS, ids=str)
+def test_canonical_object_additional_properties(schema):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_object_additional_properties_reaches_extra_keys():
+    schema = {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    find(built, lambda value: set(value) - {"a"}, settings=settings(max_examples=1000, database=None))
+
+
+def test_canonical_object_keeps_declared_names_outside_the_alphabet():
+    # The alphabet governs generated strings; a name the schema mandates is not negotiable.
+    schema = {"type": "object", "properties": {"é": {"type": "integer"}}, "required": ["é"]}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(codec="ascii"), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=10, deadline=None)
+    def test(value):
+        assert "é" in value, value
+
+    test()
