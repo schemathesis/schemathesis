@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 
 import jsonschema_rs
 import pytest
@@ -31,7 +32,8 @@ def test_deep_leaf_bug_detected_via_negative_fuzzing(ctx, cli, snapshot_cli):
 
 
 def test_negative_fuzzing_distributes_across_depths(ctx):
-    # 500 examples: ~14 targets sampled uniformly; depth-3 leaves need the budget to reliably appear.
+    # `continue_on_failure` so the whole budget runs: stopping at the first failure leaves a handful
+    # of mutations, too few for every depth to appear and too few to mean anything if they do.
     api = ctx.openapi.apps.deep_leaf_bug()
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.seed = 42
@@ -39,9 +41,10 @@ def test_negative_fuzzing_distributes_across_depths(ctx):
     schema.config.phases.examples.enabled = False
     schema.config.phases.coverage.enabled = False
     schema.config.phases.stateful.enabled = False
+    schema.config.update(continue_on_failure=True)
     schema.config.phases.fuzzing.generation.update(max_examples=500)
 
-    seen_depths: set[int] = set()
+    per_depth: Counter[int] = Counter()
     for event in schemathesis.engine.from_schema(schema).execute():
         if not isinstance(event, ScenarioFinished):
             continue
@@ -53,9 +56,9 @@ def test_negative_fuzzing_distributes_across_depths(ctx):
             if not isinstance(data, FuzzingPhaseData):
                 continue
             for mutation in data.mutations:
-                seen_depths.add(len(mutation.path))
+                per_depth[len(mutation.path)] += 1
 
-    assert seen_depths >= {0, 1, 2, 3}, f"only saw depths {sorted(seen_depths)}"
+    assert set(per_depth) >= {0, 1, 2, 3}, f"only saw depths {sorted(per_depth.items())}"
 
 
 def test_operator_swarm_yields_homogeneous_and_heterogeneous_cases(ctx):
