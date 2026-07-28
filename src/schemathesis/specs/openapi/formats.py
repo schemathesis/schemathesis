@@ -297,14 +297,14 @@ def _compiles(pattern: str) -> bool:
     return True
 
 
-def regex_values() -> st.SearchStrategy[str]:
+def regex_values(alphabet: st.SearchStrategy[str]) -> st.SearchStrategy[str]:
     """Generate regular expressions."""
     from hypothesis import strategies as st
 
     # Every piece is an atom followed by an optional quantifier, so patterns compile by
     # construction. Drawing fragments independently instead leaves the majority uncompilable, and
     # discarding those costs more than everything else in this generator combined.
-    literal = st.characters(exclude_categories=("Cs",), exclude_characters=_REGEX_METACHARACTERS)
+    literal = alphabet.filter(lambda character: character not in _REGEX_METACHARACTERS)
     atom = st.sampled_from(_REGEX_ATOMS) | st.text(alphabet=literal, min_size=1, max_size=3)
     piece = st.builds(operator.add, atom, st.sampled_from(_REGEX_QUANTIFIERS))
     return st.builds(
@@ -348,6 +348,7 @@ def relative_json_pointer_values(alphabet: st.SearchStrategy[str]) -> st.SearchS
 def get_alphabet_format_strategies() -> dict[str, Callable[[st.SearchStrategy[str]], st.SearchStrategy[str]]]:
     """Formats whose values are built from the character set in force rather than fixed up front."""
     return {
+        "regex": regex_values,
         "json-pointer": json_pointer_values,
         "relative-json-pointer": relative_json_pointer_values,
     }
@@ -373,7 +374,6 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
         "date": rfc3339_values("full-date"),
         "time": rfc3339_values("full-time"),
         "color": color_values(),
-        "regex": regex_values(),
         "hostname": domains,
         "idn-hostname": domains,
         "ipv4": st.integers(0, 2**32 - 1).map(lambda packed: str(ipaddress.IPv4Address(packed))),

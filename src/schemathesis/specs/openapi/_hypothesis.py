@@ -1211,6 +1211,7 @@ def _canonical_strategy_or_none(
             validator_cls,
             generation_config.allow_x00,
             generation_config.codec,
+            generation_config.exclude_header_characters,
         )
     except (TypeError, ValueError):
         key = None
