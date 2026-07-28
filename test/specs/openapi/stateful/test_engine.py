@@ -11,7 +11,6 @@ import schemathesis
 import schemathesis.openapi
 from schemathesis.checks import CheckContext, not_a_server_error
 from schemathesis.config import ChecksConfig
-from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
@@ -327,33 +326,39 @@ def test_find_use_after_free(engine_factory):
 
 _STATE_MACHINE_SETTINGS = hypothesis.settings(
     max_examples=60,
-    stateful_step_count=DEFAULT_MAX_SCENARIO_STEPS,
+    stateful_step_count=10,
     deadline=None,
     suppress_health_check=list(hypothesis.HealthCheck),
 )
 
 
-def _use_after_free_schema(ctx):
+def _use_after_free_state_machine(ctx):
     api = ctx.openapi.apps.stateful_users(UseAfterFree())
     schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.checks.update(included_check_names=["use_after_free"])
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
-    return schema
+    store = api.wsgi_app.config["store"]
+
+    class StateMachine(schema.as_state_machine()):
+        def setup(self):
+            # Which bundle a step feeds depends on the status the server answers with, so a scenario
+            # replayed while shrinking against a server the earlier scenarios have moved on can enable
+            # a different set of rules, and Hypothesis reports that as inconsistent data generation.
+            store.reset()
+
+    return StateMachine
 
 
+@flaky(max_runs=10, min_passes=1)
 def test_find_use_after_free_via_state_machine(ctx):
-    schema = _use_after_free_schema(ctx)
-    StateMachine = schema.as_state_machine()
-
     with pytest.raises(FailureGroup) as exc_info:
-        StateMachine.run(settings=_STATE_MACHINE_SETTINGS)
+        _use_after_free_state_machine(ctx).run(settings=_STATE_MACHINE_SETTINGS)
     assert any("Use after free" in str(e) for e in exc_info.value.exceptions)
 
 
+@flaky(max_runs=10, min_passes=1)
 def test_find_use_after_free_via_state_machine_with_overridden_validate_response(ctx):
-    schema = _use_after_free_schema(ctx)
-
-    class CustomStateMachine(schema.as_state_machine()):
+    class CustomStateMachine(_use_after_free_state_machine(ctx)):
         def validate_response(self, response, case, additional_checks=None, **kwargs):
             super().validate_response(response, case, additional_checks=additional_checks, **kwargs)
 

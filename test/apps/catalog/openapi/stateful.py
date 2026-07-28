@@ -33,15 +33,24 @@ class StatefulConfig:
     wrong_link_to_missing_id: bool = False
 
 
+def _initial_users() -> dict[int, dict]:
+    return {0: {"id": 0, "name": "John Doe", "last_modified": "2021-01-01T00:00:00Z"}}
+
+
 @dataclass
 class UserStore:
     config: StatefulConfig = field(default_factory=StatefulConfig)
-    users: dict[int, dict] = field(
-        default_factory=lambda: {0: {"id": 0, "name": "John Doe", "last_modified": "2021-01-01T00:00:00Z"}}
-    )
+    users: dict[int, dict] = field(default_factory=_initial_users)
     next_user_id: int = 1
     freed_ids: list[int] = field(default_factory=list)
     deleted_orders: set = field(default_factory=set)
+
+    def reset(self) -> None:
+        """Drop everything the requests so far created, keeping what the modifiers configured."""
+        self.users = _initial_users()
+        self.next_user_id = 1
+        self.freed_ids = []
+        self.deleted_orders = set()
 
 
 def stateful_users(*modifiers: Modifier[UserStore]) -> OpenAPIApp:
@@ -49,6 +58,7 @@ def stateful_users(*modifiers: Modifier[UserStore]) -> OpenAPIApp:
     app = make_flask_app_from_schema(spec)
     app.config["schema"] = spec
     store = UserStore()
+    app.config["store"] = store
     _register_handlers(app, store)
     for modifier in sorted(modifiers, key=lambda m: m.priority):
         modifier.apply(app, store)
