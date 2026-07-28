@@ -71,7 +71,37 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _string(view, ctx)
     if isinstance(view, canonical.ObjectView):
         return _object(view, ctx)
+    if isinstance(view, canonical.ArrayView):
+        return _array(view, ctx)
     raise UnsupportedView(schema.kind)
+
+
+def _array(view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    # Both pin what sits at a given position, which needs the elements drawn jointly rather than
+    # one at a time.
+    if view.contains or view.prefix_items:
+        raise UnsupportedView("array")
+    element = _anything(ctx) if view.items is None else from_schema(view.items, ctx)
+    kwargs: dict[str, int] = {}
+    if view.min_items is not None:
+        kwargs["min_size"] = view.min_items
+    if view.max_items is not None:
+        kwargs["max_size"] = view.max_items
+    if view.unique_items:
+        return st.lists(element, unique_by=_json_identity, **kwargs)
+    return st.lists(element, **kwargs)
+
+
+def _json_identity(value: JsonValue) -> object:
+    """What `uniqueItems` counts as the same value."""
+    # `True == 1` in Python, but `true` and `1` are different JSON values.
+    if isinstance(value, bool):
+        return ("boolean", value)
+    # Numbers compare by value, so `1` and `1.0` are one element. Exact rationals, since rounding
+    # to a float would merge distinct numbers that happen to share one.
+    if isinstance(value, (int, float)):
+        return ("number", _spelled(value))
+    return ("json", canonical.json.to_string(value))
 
 
 def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
