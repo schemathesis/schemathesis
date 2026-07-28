@@ -761,6 +761,33 @@ def test_request_body_with_boolean_true_schema(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--max-examples=1", "--checks=not_a_server_error") == snapshot_cli
 
 
+def test_optimized_schema_untouched_under_draft_2020_12(ctx):
+    # A 3.1 array schema reaches generation as written; respelling it in Draft 4 vocabulary would fail
+    # 2020-12 canonicalization and silently disable the canonical engine for it.
+    array_schema = {
+        "type": "array",
+        "prefixItems": [{"type": "integer"}],
+        "items": {"type": "string"},
+        "allOf": [{"contains": {"const": "A"}}, {"contains": {"const": "B"}}],
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/payload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": array_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    assert schema["/payload"]["POST"].body[0].optimized_schema == array_schema
+
+
 def test_parameter_type_detection(ctx, cli, snapshot_cli):
     # See GH-3149
     schema_path = ctx.openapi.write_schema(

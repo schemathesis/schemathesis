@@ -947,13 +947,15 @@ class OpenApiComponent(ABC):
 
     def _build_schema(self, *, optimize: bool) -> JsonSchema:
         """Build JSON schema with optional optimizations for data generation."""
+        is_draft_2020_12 = self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
         schema = to_json_schema(
             self.raw_schema,
             nullable_keyword=self.adapter.nullable_keyword,
             update_quantifiers=optimize,
-            upgrade_legacy_exclusive_bounds=(
-                self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
-            ),
+            upgrade_legacy_exclusive_bounds=is_draft_2020_12,
+            # Draft 2020-12 generation reads `prefixItems` and `contains` natively; the Draft 4
+            # rewrite emits `items: [...]` that 2020-12 canonicalization rejects.
+            convert_prefix_items=not is_draft_2020_12,
             name_to_uri=self.name_to_uri,
             merge_ref_siblings=self.adapter.ref_siblings,
         )
