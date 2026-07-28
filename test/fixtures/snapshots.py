@@ -213,7 +213,7 @@ class CliSnapshotConfig:
         # generated property names verbatim — those names are random Hypothesis output
         # and shift across runs. Collapse the count + names to a placeholder.
         data = re.sub(
-            r"contains \d+ additional properties not defined in the schema \(.*?\)\. The server",
+            r"contains \d+ additional (?:property|properties) not defined in the schema \(.*?\)\. The server",
             "contains <N> additional properties not defined in the schema (<NAMES>). The server",
             data,
             flags=re.DOTALL,
