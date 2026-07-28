@@ -192,7 +192,7 @@ def _to_json_schema(
     if convert_if_then_else:
         _rewrite_if_then_else(schema)
 
-    if schema_type == "array":
+    if schema_type == "array" and convert_prefix_items:
         _rewrite_allof_of_contains_consts(schema)
 
     if not is_response_schema:
@@ -349,9 +349,8 @@ def _branch_is_polymorphic(ref: str, bundle: dict[str, Any] | None) -> bool:
 
 
 def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
-    # `allOf: [{contains: {const: A}}, {contains: {const: B}}, ...]` can't be merged by
-    # hypothesis-jsonschema, so it falls back to filtering and exhausts. Rewriting the
-    # required consts as a positional `items` prefix forces them into the array up front.
+    # Draft 4 has no `contains`, so it reads as an annotation and the values never land. A
+    # positional `items` prefix forces them in. Draft 2020-12 places them via `contains` instead.
     all_of = schema.get("allOf")
     if not isinstance(all_of, list) or len(all_of) < 2:
         return

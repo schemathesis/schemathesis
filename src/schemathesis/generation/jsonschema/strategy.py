@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import re
 import sys
+from dataclasses import dataclass, replace
 from fractions import Fraction
 from functools import lru_cache
 from typing import TYPE_CHECKING, NamedTuple, cast
@@ -12,10 +13,14 @@ from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
 from jsonschema_rs import canonical
 
+from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, make_validator_for
+from schemathesis.core.jsonschema.references import has_ref
 from schemathesis.generation.jsonschema.context import Alphabet
+from schemathesis.specs.openapi.patterns import pattern_length_bounds
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
     from decimal import Decimal
 
     from hypothesis.strategies import SearchStrategy
@@ -26,13 +31,17 @@ if TYPE_CHECKING:
     # A bound arrives as `Decimal` when no float spells it back.
     Numeric = int | float | Decimal
 
+    # Values a position or demand can draw from, and how many distinct ones it needs. `None` where
+    # they cannot be counted, and so can never run out.
+    Need = tuple[frozenset[object] | None, int]
+
 
 # Upper bound on properties drawn beyond the ones the schema names.
 _EXTRA_KEYS = 5
 
 
 class UnsupportedView(Exception):
-    """A canonical node this module cannot build from; the caller falls back to `hypothesis-jsonschema`."""
+    """A canonical node this module cannot build from; the caller decides what to do instead."""
 
 
 class _PatternProperty(NamedTuple):
@@ -71,7 +80,9 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canonical.MultiTypeView):
         return st.one_of([_bare_type(name, ctx) for name in view.types])
     if isinstance(view, canonical.TypedGroupView):
-        return from_schema(view.body, ctx)
+        # The node means "type is `type_name` *and* body"; canonicalization folds the type in first,
+        # so this is a net, not the filter doing the work.
+        return from_schema(view.body, ctx).filter(_TYPE_CHECKS[view.type_name])
     if isinstance(view, canonical.AnyOfView):
         return st.one_of([from_schema(branch, ctx) for branch in view.branches])
     if isinstance(view, canonical.IntegerView):
@@ -83,7 +94,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canonical.ObjectView):
         return _object(view, ctx)
     if isinstance(view, canonical.ArrayView):
-        return _array(view, ctx)
+        return _array(schema, view, ctx)
     if isinstance(view, canonical.ReferenceView):
         return _reference(schema, view, ctx)
     raise UnsupportedView(schema.kind)
@@ -97,9 +108,8 @@ def _reference(
     # pointer with no definition behind it: it names the document itself.
     target = ctx.root if view.uri == "#" else schema.definitions()[view.uri]
     if view.uri == "#" or view.uri in ctx.resolving:
-        # The pointer leads back into what is still being built — for `#`, always the document itself.
-        # Spelling the rest of the value lazily lets a draw stop descending, where unrolling it here
-        # never would; for `#` it also spares rebuilding the whole document a second time.
+        # The pointer leads back into what is still being built; spelling the rest lazily lets a
+        # draw stop descending, where unrolling it here never would.
         return st.deferred(lambda: from_schema(target, ctx))
     ctx.resolving.add(view.uri)
     try:
@@ -108,13 +118,53 @@ def _reference(
         ctx.resolving.discard(view.uri)
 
 
-def _array(view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    # How many elements match is a property of the array as a whole, not of any one position.
-    if view.contains:
-        raise UnsupportedView("array")
-    element = _anything(ctx) if view.items is None else from_schema(view.items, ctx)
-    if view.prefix_items:
-        return _tuple(view, element, ctx)
+@dataclass(frozen=True, slots=True)
+class _Demand:
+    """One `contains` demand, together with what an array can draw to meet it."""
+
+    schema: jsonschema_rs.CanonicalSchema
+    minimum: int
+    ceiling: int | None
+    # Values meeting both the demand and `items`, or `None` when nothing appended can meet it.
+    element: SearchStrategy[JsonValue] | None = None
+    # The distinct values it can draw from, when they can be counted.
+    supply: frozenset[object] | None = None
+    # Whether the element provably stays off every other bounded demand.
+    counted: bool = True
+
+
+@dataclass(slots=True)
+class _Placement:
+    """How one demand's matches are spread over an array's positions."""
+
+    demand: _Demand
+    # Opening positions narrowed to meet the demand.
+    carried: int = 0
+    # Positions appended past the opening ones to meet the rest of it.
+    placed: int = 0
+    # Further appended positions it may take on where nothing else can fill them.
+    slack: int = 0
+
+
+@dataclass(slots=True)
+class _Layout:
+    """One assignment of every demand's matches to an array's positions."""
+
+    # The opening positions, each narrowed towards or away from the demands.
+    entries: list[jsonschema_rs.CanonicalSchema]
+    placements: list[_Placement]
+    # Whether every position's match count is one this steered rather than guessed.
+    counted: bool
+    # Whether the opening positions are the whole array, with nothing able to follow them.
+    closed: bool
+
+
+def _array(
+    schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
+    if view.prefix_items or view.contains:
+        return _with_fixed_elements(schema, view, ctx)
+    element = _element(view.items, ctx)
     kwargs: dict[str, int] = {}
     if view.min_items is not None:
         kwargs["min_size"] = view.min_items
@@ -125,43 +175,474 @@ def _array(view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext) -> Sea
     return st.lists(element, **kwargs)
 
 
-def _tuple(
-    view: jsonschema_rs.canonical.ArrayView, element: SearchStrategy[JsonValue], ctx: StrategyContext
+def _with_fixed_elements(
+    schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
-    """An array whose leading positions each carry their own schema."""
+    """An array whose opening positions the schema names or demands, followed by free ones."""
     # A schema past the length ceiling pins a position no array can have.
-    pinned = view.prefix_items if view.max_items is None else view.prefix_items[: view.max_items]
-    entries = [from_schema(entry, ctx) for entry in pinned]
-    kwargs: dict[str, int] = {"min_size": max(0, (view.min_items or 0) - len(pinned))}
-    if view.max_items is not None:
-        kwargs["max_size"] = view.max_items - len(pinned)
+    entries = list(view.prefix_items if view.max_items is None else view.prefix_items[: view.max_items])
+    demands = [_Demand(item.schema, _minimum_contains(item), item.max_contains) for item in view.contains]
     if view.unique_items:
-        # `unique_by` settles the tail; the filter catches what it cannot see — collisions inside the
-        # prefix and across the two halves.
-        tail = st.lists(element, unique_by=_json_identity, **kwargs)
+        # One element can meet several demands at once; folding those spares a unique array a repeat.
+        demands = _merged(demands, view.items)
+    # Placing the demanded elements beats filtering: `items` on its own may match rarely, or never.
+    bounded = [demand.schema for demand in demands if demand.ceiling is not None]
+    resolved = []
+    for demand in demands:
+        avoid = [other for other in bounded if other is not demand.schema]
+        element, counted = _matching(view.items, demand.schema, avoid, ctx)
+        supply = _supply(view.items, demand.schema) if view.unique_items else None
+        resolved.append(replace(demand, element=element, supply=supply, counted=counted))
+    demands = resolved
+
+    closed = False
+    if view.unique_items:
+        # One element can count for several demands, and matches can always be appended, so a demand
+        # only needs its own domain to hold enough distinct values.
+        if any(demand.supply is not None and len(demand.supply) < demand.minimum for demand in demands):
+            return st.nothing()
+        limit = _distinct_limit(entries, demands)
+        if limit < len(entries):
+            # The prefix runs out of distinct values there, and the next position could take none.
+            entries = entries[:limit]
+            closed = True
+
+    # Carrying a demand reaches the shortest array; appending keeps positions free to draw what they
+    # admit. Neither dominates; `one_of` shrinks toward the first.
+    candidates = [_laid_out(entries, demands, closed=closed, carry=True)]
+    if entries:
+        candidates.append(_laid_out(entries, demands, closed=closed, carry=False))
+    layouts = [layout for layout in candidates if layout is not None]
+    if len(layouts) == 2 and _carried(layouts[0]) == _carried(layouts[1]):
+        # Nothing was carried that would otherwise have been appended, so the two coincide.
+        layouts.pop()
+    # Arrays shorter than the prefix are instances too, whenever the truncation still carries every
+    # demand — and when a position admits nothing, the only ones.
+    shorter = [
+        layout
+        for length in range(view.min_items or 0, len(entries))
+        if (layout := _laid_out(entries[:length], demands, closed=True, carry=True)) is not None
+    ]
+    layouts = [*shorter, *layouts]
+    return st.one_of([_from_layout(schema, view, layout, ctx) for layout in layouts])
+
+
+def _laid_out(
+    entries: list[jsonschema_rs.CanonicalSchema], demands: list[_Demand], *, closed: bool, carry: bool
+) -> _Layout | None:
+    """Assign each demand's matches to positions, or `None` when no array clears the schema this way."""
+    entries = list(entries)
+    placements = []
+    counted = all(demand.counted for demand in demands)
+    for demand in demands:
+        placement = _Placement(demand)
+        appendable = demand.element is not None and not closed
+        for index, entry in enumerate(entries):
+            if _covers(demand.schema, entry):
+                # Every value this position admits meets the demand, so it carries one.
+                entries[index] = _narrowed(entry, demand.schema) or entry
+                placement.carried += 1
+                continue
+            if placement.carried < demand.minimum and (carry or not appendable):
+                # The only way to meet it when nothing can be appended, the shortest array otherwise.
+                narrowed = _narrowed(entry, demand.schema)
+                if narrowed is not None:
+                    entries[index] = narrowed
+                    placement.carried += 1
+                    continue
+            if demand.ceiling is not None:
+                # A position matching by chance would push the count past the ceiling.
+                without = _narrowed(entry, demand.schema, negate=True)
+                if without is None:
+                    counted = False
+                else:
+                    entries[index] = without
+        placement.placed = max(0, demand.minimum - placement.carried)
+        if demand.ceiling is not None and placement.carried + placement.placed > demand.ceiling:
+            # More positions meet the demand than it admits: no array clears this schema.
+            return None
+        if placement.placed and not appendable:
+            return None
+        placements.append(placement)
+    return _Layout(entries, placements, counted=counted, closed=closed)
+
+
+def _from_layout(
+    schema: jsonschema_rs.CanonicalSchema,
+    view: jsonschema_rs.canonical.ArrayView,
+    layout: _Layout,
+    ctx: StrategyContext,
+) -> SearchStrategy[JsonValue]:
+    """The arrays one layout admits, drawn as its parts laid end to end."""
+    minimum = view.min_items or 0
+    fixed = _spelled_out(layout)
+    if view.max_items is not None and view.max_items < fixed:
+        # The spelled-out elements alone overflow the length ceiling.
+        return st.nothing()
+    if layout.closed or view.max_items == fixed:
+        free: SearchStrategy[JsonValue] = st.nothing()
+        free_values = None
     else:
-        tail = st.lists(element, **kwargs)
-    full = st.tuples(st.tuples(*entries), tail).map(_concat)
-    # Arrays shorter than the prefix are instances whenever the floor allows them — and when a prefix
-    # position admits nothing (a reference cycle), the only ones.
-    shorter = [st.tuples(*entries[:length]).map(_as_list) for length in range(view.min_items or 0, len(pinned))]
-    strategy = st.one_of([*shorter, full])
-    if view.unique_items:
-        strategy = strategy.filter(_all_unique)
+        free, free_values = _free(view, layout.placements, ctx)
+    if layout.closed:
+        # The opening positions are the whole array, so the lower size bound has to fall within them.
+        if minimum > fixed:
+            return st.nothing()
+    elif free.is_empty:
+        # The demanded elements carry the length: the shortfall first, then slack under the ceilings.
+        if not _carry(layout.placements, minimum - fixed, unique=view.unique_items):
+            return st.nothing()
+        fixed = _spelled_out(layout)
+        headroom = None if view.max_items is None else view.max_items - fixed
+        for placement in layout.placements:
+            room = _room(placement, unique=view.unique_items)
+            if placement.demand.element is None or not room:
+                continue
+            placement.slack = room if headroom is None else min(room, headroom)
+            if headroom is not None:
+                headroom -= placement.slack
+    elif view.unique_items and free_values is not None and minimum - fixed > len(free_values):
+        # The tail holds fewer distinct values than the floor asks; the demanded elements carry the rest.
+        if not _carry(layout.placements, minimum - fixed - len(free_values), unique=view.unique_items):
+            return st.nothing()
+        fixed = _spelled_out(layout)
+
+    # No part for absent opening positions: an empty `st.tuples` still costs a draw.
+    parts: list[SearchStrategy[Sequence[JsonValue]]] = []
+    if layout.entries:
+        parts.append(st.tuples(*[from_schema(entry, ctx) for entry in layout.entries]))
+    parts.extend(
+        _repeated(placement, unique=view.unique_items)
+        for placement in layout.placements
+        if placement.placed or placement.slack
+    )
+    if free.is_empty:
+        # No tail part: `st.lists` refuses a positive ceiling over an element strategy drawing nothing.
+        return _joined(parts, unique=view.unique_items, checked=layout.counted, schema=schema)
+    kwargs: dict[str, int] = {"min_size": max(0, minimum - fixed)}
+    if view.max_items is not None:
+        kwargs["max_size"] = view.max_items - fixed
+    # `unique_by` settles the free positions; collisions across parts are left to the joined filter.
+    distinct = {"unique_by": _json_identity} if view.unique_items else {}
+    parts.append(st.lists(free, **distinct, **kwargs))
+    return _joined(parts, unique=view.unique_items, checked=layout.counted, schema=schema)
+
+
+def _spelled_out(layout: _Layout) -> int:
+    """How many positions the layout names outright, before any free ones follow."""
+    return len(layout.entries) + sum(placement.placed for placement in layout.placements)
+
+
+def _carried(layout: _Layout) -> list[int]:
+    """How many opening positions each demand took on, in demand order."""
+    return [placement.carried for placement in layout.placements]
+
+
+def _joined(
+    parts: list[SearchStrategy[Sequence[JsonValue]]],
+    *,
+    unique: bool,
+    checked: bool,
+    schema: jsonschema_rs.CanonicalSchema,
+) -> SearchStrategy[JsonValue]:
+    """The parts of an array, drawn together and laid end to end."""
+    drawn: SearchStrategy = st.tuples(*parts)
+    if unique:
+        drawn = drawn.filter(_parts_unique)
+    strategy: SearchStrategy[JsonValue] = drawn.map(_concat)
+    if not checked:
+        # A position could not be steered clear of a bounded demand, so its final match count is
+        # confirmed against the schema itself; the draw is built to clear it, so this rejects rarely.
+        strategy = strategy.filter(_validator(schema))
     return strategy
 
 
-def _as_list(parts: tuple[JsonValue, ...]) -> JsonValue:
-    return list(parts)
+def _merged(demands: list[_Demand], items: jsonschema_rs.CanonicalSchema | None) -> list[_Demand]:
+    """Demands that one element could meet together, folded into one."""
+    merged: list[_Demand] = []
+    for demand in demands:
+        for position, other in enumerate(merged):
+            # A ceiling counts matches of the original demand, which the fold would stop tracking.
+            if demand.minimum == other.minimum == 1 and demand.ceiling is None and other.ceiling is None:
+                joint = _narrowed(other.schema, demand.schema)
+                # Within `items` the two may share nothing even when the joint stands on its own.
+                if joint is not None and (items is None or _narrowed(items, joint) is not None):
+                    merged[position] = replace(other, schema=joint)
+                    break
+            # A wider demand with no ceiling and no greater floor is met by the stricter one's elements.
+            if demand.ceiling is None and demand.minimum <= other.minimum and _covers(demand.schema, other.schema):
+                break
+            if other.ceiling is None and other.minimum <= demand.minimum and _covers(other.schema, demand.schema):
+                merged[position] = demand
+                break
+        else:
+            merged.append(demand)
+    return merged
 
 
-def _concat(parts: tuple[tuple[JsonValue, ...], list[JsonValue]]) -> JsonValue:
-    return [*parts[0], *parts[1]]
+def _distinct_limit(entries: list[jsonschema_rs.CanonicalSchema], demands: list[_Demand]) -> int:
+    """How many opening positions can hold values distinct from one another."""
+    limit = len(entries)
+    values = [_finite_values(entry) for entry in entries]
+    while limit and not _feasible([(entry, 1) for entry in values[:limit]] + _appended_needs(values[:limit], demands)):
+        limit -= 1
+    return limit
 
 
-def _all_unique(values: JsonValue) -> bool:
-    assert isinstance(values, list)
-    return len({_json_identity(value) for value in values}) == len(values)
+def _appended_needs(values: list[frozenset[object] | None], demands: list[_Demand]) -> list[Need]:
+    """What each demand needs of its own, past the opening positions already meeting it."""
+    needs: list[Need] = []
+    for demand in demands:
+        if demand.supply is None:
+            needs.append((None, demand.minimum))
+            continue
+        # A position admitting nothing outside the demand meets it without a value of its own.
+        # Sufficient, not complete: undercounting only shortens the array.
+        carried = sum(1 for entry in values if entry is not None and entry <= demand.supply)
+        needs.append((demand.supply, max(0, demand.minimum - carried)))
+    return needs
+
+
+def _feasible(needs: list[Need]) -> bool:
+    """Whether every position can be handed a value of its own."""
+    # Only a finite value set can force a repeat. Exact bipartite matching: greedy assignment misses
+    # shapes like `{1,2} {1,2} {3,4} {1,3}`, calling a satisfiable schema empty.
+    units = [values for values, count in needs if values is not None for _ in range(count)]
+    universe = {value for values in units for value in values}
+    if len(units) > 16 or len(universe) > 64:
+        # Too wide to force a repeat cheaply; the draws settle it.
+        return True
+    owner: dict[object, int] = {}
+
+    def claim(unit: int, seen: set[object]) -> bool:
+        for value in sorted(units[unit] - seen, key=repr):
+            seen.add(value)
+            if value not in owner or claim(owner[value], seen):
+                owner[value] = unit
+                return True
+        return False
+
+    return all(claim(unit, set()) for unit in range(len(units)))
+
+
+def _carry(placements: list[_Placement], shortfall: int, *, unique: bool) -> bool:
+    """Place more demanded elements to reach the lower size bound, as far as the ceilings allow."""
+    for placement in placements:
+        if shortfall <= 0:
+            break
+        # A demand nothing appended can meet still leaves the rest to absorb the shortfall.
+        if placement.demand.element is None:
+            continue
+        room = _room(placement, unique=unique)
+        take = shortfall if room is None else min(shortfall, room)
+        placement.placed += take
+        shortfall -= take
+    return shortfall <= 0
+
+
+def _room(placement: _Placement, *, unique: bool) -> int | None:
+    """How many more of this demand's elements fit, or `None` when nothing bounds them."""
+    demand = placement.demand
+    taken = placement.carried + placement.placed
+    room = None if demand.ceiling is None else demand.ceiling - taken
+    if unique and demand.supply is not None:
+        # Distinct values also run out where the domain does, whatever the ceiling says.
+        left = len(demand.supply) - taken
+        room = left if room is None else min(room, left)
+    return room
+
+
+def _matching(
+    items: jsonschema_rs.CanonicalSchema | None,
+    demand: jsonschema_rs.CanonicalSchema,
+    avoid: list[jsonschema_rs.CanonicalSchema],
+    ctx: StrategyContext,
+) -> tuple[SearchStrategy[JsonValue] | None, bool]:
+    """Values clearing the element schema and the demand, and whether they provably stay off `avoid`."""
+    schema = _combine(items, demand, negate_right=False)
+    if not schema.is_satisfiable():
+        return None, True
+    steered: jsonschema_rs.CanonicalSchema | None = schema
+    for other in avoid:
+        steered = None if steered is None else _narrowed(steered, other, negate=True)
+    if steered is not None:
+        try:
+            return from_schema(steered, ctx), True
+        except UnsupportedView:
+            pass
+    counted = not avoid
+    try:
+        return from_schema(schema, ctx), counted
+    except UnsupportedView:
+        pass
+    # The intersection is not one this builds from, so the demand narrows the elements by filter.
+    return _element(items, ctx).filter(_validator(demand)), counted
+
+
+def _free(
+    view: jsonschema_rs.canonical.ArrayView, placements: list[_Placement], ctx: StrategyContext
+) -> tuple[SearchStrategy[JsonValue], frozenset[object] | None]:
+    """What `items` admits minus every bounded demand, with its distinct values when countable."""
+    bounded = [placement.demand.schema for placement in placements if placement.demand.ceiling is not None]
+    if not bounded:
+        values = None if view.items is None else _finite_values(view.items)
+        return _element(view.items, ctx), values
+    # Filler that cannot match holds the ceiling without a counting filter.
+    schema = view.items
+    for demand in bounded:
+        schema = _combine(schema, demand, negate_right=True)
+    try:
+        return from_schema(schema, ctx), _finite_values(schema)
+    except UnsupportedView:
+        pass
+    if any(_covers(demand, view.items) for demand in bounded):
+        # A demand admits everything `items` does; the matches carry the array on their own.
+        return st.nothing(), None
+    # What is left of `items` is not one this builds from, so the demands become a filter.
+    checks = [_validator(demand) for demand in bounded]
+    return _element(view.items, ctx).filter(lambda value: not any(check(value) for check in checks)), None
+
+
+# Bounded, small: the layouts revisit few pairs; equality carries the definition maps, so a hit is exact.
+@lru_cache(maxsize=512)
+def _covers(demand: jsonschema_rs.CanonicalSchema, items: jsonschema_rs.CanonicalSchema | None) -> bool:
+    """Whether the demand admits every value the element schema does."""
+    if items is None:
+        return isinstance(demand.view(), canonical.TrueView)
+    narrowed = _narrowed(items, demand)
+    return narrowed is not None and narrowed.to_json_schema() == items.to_json_schema()
+
+
+@lru_cache(maxsize=512)
+def _narrowed(
+    left: jsonschema_rs.CanonicalSchema, right: jsonschema_rs.CanonicalSchema, *, negate: bool = False
+) -> jsonschema_rs.CanonicalSchema | None:
+    """`left` narrowed to — or away from — `right`, or `None` when nothing usable is left of it."""
+    schema = _combine(left, right, negate_right=negate)
+    # A difference like `integer and not integer` stays unfolded, and canonicalization calls it
+    # satisfiable; nothing can be drawn from it either way.
+    if schema.kind == "raw" or not schema.is_satisfiable():
+        return None
+    return schema
+
+
+def _repeated(placement: _Placement, *, unique: bool) -> SearchStrategy[list[JsonValue]]:
+    """One demand's matches, drawn together rather than as a strategy per position."""
+    element = placement.demand.element
+    # A placement only ever takes positions the demand can fill; `_laid_out` gives up otherwise.
+    assert element is not None
+    count = placement.placed
+    kwargs = {"unique_by": _json_identity} if unique else {}
+    repeated = st.lists(element, min_size=count, max_size=count + placement.slack, **kwargs)
+    try:
+        repeated.validate()
+    except InvalidArgument as exc:
+        # No looser strategy to filter here: the demand is for more elements than Hypothesis draws
+        # in one value, and an array shorter than `minContains` would not clear the schema.
+        raise InvalidSchema(f"Cannot generate an array with {count} demanded elements") from exc
+    return repeated
+
+
+def _element(items: jsonschema_rs.CanonicalSchema | None, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    return _anything(ctx) if items is None else from_schema(items, ctx)
+
+
+# The shared factory applies the project-wide kwargs — format assertions and the fancy-regex
+# engine — so the filter judges a value exactly the way conformance checks do.
+@lru_cache(maxsize=4096)
+def _validator(schema: jsonschema_rs.CanonicalSchema) -> Callable[[JsonValue], bool]:
+    return make_validator_for(schema.to_json_schema()).is_valid
+
+
+def _supply(
+    items: jsonschema_rs.CanonicalSchema | None, demand: jsonschema_rs.CanonicalSchema
+) -> frozenset[object] | None:
+    """The distinct values an element meeting the demand can take, when they can be counted."""
+    view = demand.view()
+    if isinstance(view, canonical.ConstView):
+        raw = [cast("JsonValue", view.value)]
+    elif isinstance(view, canonical.EnumView):
+        raw = list(view.values)
+    else:
+        return None
+    if items is not None:
+        # An element also answers to `items`; a demanded value it rejects is not drawable.
+        admits = _validator(items)
+        raw = [value for value in raw if admits(value)]
+    return frozenset(_json_identity(value) for value in raw)
+
+
+@lru_cache(maxsize=512)
+def _finite_values(schema: jsonschema_rs.CanonicalSchema) -> frozenset[object] | None:
+    """The values this schema admits, as uniqueness keys, or `None` when they are not enumerable."""
+    view = schema.view()
+    if isinstance(view, canonical.ConstView):
+        return frozenset({_json_identity(cast("JsonValue", view.value))})
+    if isinstance(view, canonical.EnumView):
+        return frozenset(_json_identity(value) for value in view.values)
+    return None
+
+
+def _minimum_contains(demand: jsonschema_rs.canonical.ContainsView) -> int:
+    return 1 if demand.min_contains is None else demand.min_contains
+
+
+def _combine(
+    left: jsonschema_rs.CanonicalSchema | None,
+    right: jsonschema_rs.CanonicalSchema,
+    *,
+    negate_right: bool,
+) -> jsonschema_rs.CanonicalSchema:
+    """Both sides as one schema, spelled as a document and re-canonicalized.
+
+    No `intersect`/`negate` binding exists yet. Both sides come from one document, so the merge is
+    a valid document of the same draft; an unfoldable one comes back as `raw`, not as an error.
+    """
+    branches: list[dict[str, JsonValue]] = []
+    # A `$ref` resolves against the new root, so the definition maps move up with the branches,
+    # keeping `$defs` and `definitions` apart: a pointer names the one it goes through.
+    definitions: dict[str, dict[str, JsonValue]] = {}
+    schemas = (right,) if left is None else (left, right)
+    for schema in schemas:
+        branch = schema.to_json_schema()
+        # A `true` node emits `{}` and a `false` one `{"not": {}}`, so a bare boolean never arrives.
+        assert isinstance(branch, dict)
+        # The wrapper declares the dialect; a branch repeating it reads as an embedded resource and
+        # blocks the merge.
+        branch.pop("$schema", None)
+        for name in ("$defs", "definitions"):
+            found = branch.pop(name, None)
+            if found:
+                assert isinstance(found, dict)
+                definitions.setdefault(name, {}).update(found)
+        branches.append(branch)
+    if negate_right:
+        branches[-1] = {"not": branches[-1]}
+    merged: dict[str, JsonValue] = branches[0] if left is None else {"allOf": cast("JsonValue", branches)}
+    if any(has_ref(branch) for branch in branches):
+        # The maps hold every target in the document, so they only ride along where one is pointed at.
+        merged.update(definitions)
+    return jsonschema_rs.canonicalize(
+        merged,
+        draft=right.draft if left is None else left.draft,
+        pattern_options=FANCY_REGEX_OPTIONS,
+        validate_formats=True,
+    )
+
+
+def _concat(parts: tuple[Sequence[JsonValue], ...]) -> JsonValue:
+    return [value for part in parts for value in part]
+
+
+def _parts_unique(parts: tuple[Sequence[JsonValue], ...]) -> bool:
+    # `unique_by` settled each part on its own; only collisions across them are left to catch.
+    seen: set[object] = set()
+    for part in parts:
+        keys = {_json_identity(value) for value in part}
+        if len(keys) != len(part) or keys & seen:
+            return False
+        seen |= keys
+    return True
 
 
 def _json_identity(value: JsonValue) -> object:
@@ -186,10 +667,8 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
     optional = {key: entry for key, entry in entries.items() if key not in view.required}
     names = None if view.property_names is None else _closed_names(view.property_names)
     if names is not None:
-        # A closed name set — what `additionalProperties: false` folds into — admits nothing else,
-        # so the names it lists are the only optional keys.
-        # Sorted: draw order decides what a seed replays, and set iteration order is not stable
-        # across processes.
+        # A closed name set admits nothing else, so its names are the only optional keys.
+        # Sorted: set iteration order is not stable across processes, and draw order decides replays.
         optional.update({name: value_for(name) for name in sorted(names - set(required) - set(optional))})
         extra = None
     else:
@@ -211,10 +690,15 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
 def _collect(
     entries: SearchStrategy[tuple[str, JsonValue]], low: int, high: int
 ) -> SearchStrategy[dict[str, JsonValue]]:
-    if low and entries.is_empty:
-        # No key can be spelled, and the floor asks for one anyway.
-        return st.nothing()
-    return st.lists(entries, unique_by=lambda entry: entry[0], min_size=low, max_size=high).map(dict)
+    def resolved() -> SearchStrategy[dict[str, JsonValue]]:
+        if entries.is_empty:
+            # No key can be spelled; the floor decides whether that is fatal or only means no extras.
+            return st.nothing() if low else st.just({})
+        return st.lists(entries, unique_by=lambda entry: entry[0], min_size=low, max_size=high).map(dict)
+
+    # `is_empty` forces the entries, and a self-referential schema is still being built here, so the
+    # choice waits for the first draw.
+    return st.deferred(resolved)
 
 
 def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[str]:
@@ -237,9 +721,9 @@ def _value_source(
     view: jsonschema_rs.canonical.ObjectView, unnamed: SearchStrategy[JsonValue], ctx: StrategyContext
 ) -> Callable[[str], SearchStrategy[JsonValue]]:
     """The value strategy a property name answers to under `patternProperties`."""
-    # The validator's own regex engine decides what a pattern matches; Python `re` reads several
-    # constructs differently and would hand the key the wrong schema. Values are built here, not on
-    # the draw that needs them, so a declined schema is refused while the caller can still fall back.
+    # The validator's regex engine decides what a pattern claims — Python `re` would hand the key
+    # the wrong schema. Values are built eagerly so a declined schema is refused while the caller
+    # can still fall back.
     patterns = [
         _PatternProperty(
             claims=jsonschema_rs.validator_for({"type": "string", "pattern": pattern}).is_valid,
@@ -292,9 +776,8 @@ def _sized_object(
     result = draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in chosen}}))
     if entries is None:
         return result
-    # `_EXTRA_KEYS` bounds how far past the floor a draw reaches, not how many keys it may hold —
-    # capping the total instead would pin every object with a floor of `_EXTRA_KEYS` or more to
-    # exactly that floor.
+    # The cap bounds the distance past the floor, not the total — capping the total would pin
+    # every object with a floor at or above it to exactly that floor.
     extra_low = max(0, minimum - len(result))
     extra_high = extra_low + _EXTRA_KEYS if maximum is None else min(extra_low + _EXTRA_KEYS, maximum - len(result))
     extra = draw(_collect(entries, extra_low, extra_high))
@@ -503,22 +986,22 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         # `\p{L}`) can't drive generation at all.
         raise UnsupportedView("string")
     pattern = view.patterns[0]
-    # A pattern is a search, so the value may carry anything around the match. Drawing full matches
-    # only would be sound but narrow: `^x` would spell one single string, so `propertyNames` beside a
-    # `minProperties` floor could not find distinct keys at all.
+    if view.max_length is not None and pattern_length_bounds(pattern)[0] > view.max_length:
+        # Every value has to carry a match, and no match fits under the ceiling. Saying so up front
+        # lets the caller see the emptiness instead of meeting it as a filter that never passes.
+        return st.nothing()
+    # A pattern is a search, so the value may carry anything around the match; full matches only
+    # would leave `^x` spelling a single string, starving `propertyNames` of distinct keys.
     strategy = st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy())
     try:
         strategy.validate()
     except InvalidArgument:
-        # Reading the pattern over ASCII is what the validator does, but it also leaves a character
-        # spelled out above that range unreachable, and `from_regex` refuses the whole pattern over
-        # it. The wider reading draws those, and the narrow one still decides what counts.
+        # ASCII is the validator's reading, but it leaves characters spelled above that range
+        # unreachable; the wider reading draws those, the narrow one still decides what counts.
         strategy = st.from_regex(re.compile(pattern), alphabet=ctx.alphabet.as_strategy()).filter(compiled.search)
     if "$" in pattern:
-        # Python matches `$` before a trailing newline as well, where the validator takes it for the
-        # end of the string. Anywhere else the two readings agree. An escaped or bracketed `$` is a
-        # literal and needs no filtering, but telling those apart costs more than dropping the
-        # newline-terminated values they admit.
+        # Python also matches `$` before a trailing newline, where the validator means end of string;
+        # telling literal `$`s apart costs more than dropping the newline-terminated values.
         strategy = strategy.filter(lambda value: not value.endswith("\n"))
     # Length is normally folded into the pattern upstream; this filter is the soundness net.
     return _within_length(strategy, view)
@@ -578,6 +1061,19 @@ def _anything_for(allow_x00: bool, codec: str | None) -> SearchStrategy[JsonValu
 
 def _text(ctx: StrategyContext, **kwargs: int) -> SearchStrategy[str]:
     return st.text(alphabet=ctx.alphabet.as_strategy(), **kwargs)
+
+
+# What each JSON type name admits. `True == 1` in Python, but `true` is not a JSON number, and a
+# `TypedGroupView` over `integer` comes from Draft 4, where a fractional spelling is not one either.
+_TYPE_CHECKS: dict[str, Callable[[JsonValue], bool]] = {
+    "null": lambda value: value is None,
+    "boolean": lambda value: isinstance(value, bool),
+    "integer": lambda value: isinstance(value, int) and not isinstance(value, bool),
+    "number": lambda value: isinstance(value, (int, float)) and not isinstance(value, bool),
+    "string": lambda value: isinstance(value, str),
+    "array": lambda value: isinstance(value, list),
+    "object": lambda value: isinstance(value, dict),
+}
 
 
 def _bare_type(name: str, ctx: StrategyContext) -> SearchStrategy[JsonValue]:

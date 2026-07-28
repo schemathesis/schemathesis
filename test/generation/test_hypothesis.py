@@ -22,6 +22,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
+from schemathesis.generation.jsonschema import strategy
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
@@ -800,9 +801,10 @@ def test_malformed_annotation_behind_a_reference_still_generates(ctx):
     assert isinstance(case.body["field"], str)
 
 
-def test_array_with_allof_of_multiple_contains(ctx):
-    # `allOf` of multiple `contains` schemas can't be merged; without help, generation
-    # falls back to filtering and exhausts before satisfying both consts.
+@pytest.mark.parametrize("version", ["3.0.0", "3.1.0"])
+def test_array_with_allof_of_multiple_contains(ctx, version):
+    # Filtering for several `contains` demands exhausts before both consts land, so each is placed:
+    # by the `contains` strategy under 3.1, by the converter's positional prefix under Draft 4.
     schema = ctx.openapi.load_schema(
         {
             "/probe": {
@@ -833,7 +835,8 @@ def test_array_with_allof_of_multiple_contains(ctx):
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        version=version,
     )
 
     case = examples.generate_one(schema["/probe"]["POST"].as_strategy())
@@ -1519,6 +1522,92 @@ CANONICAL_ARRAY_SCHEMAS = [
     {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}, "maxItems": 4},
     {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "integer"}], "uniqueItems": True, "minItems": 4},
     {"type": "array", "prefixItems": [{"type": "object", "required": ["a"]}], "items": {"type": "array"}},
+    {"type": "array", "contains": {"type": "integer"}},
+    {"type": "array", "items": {"type": "number"}, "contains": {"type": "integer"}},
+    {"type": "array", "items": {"type": "string"}, "contains": {"const": "A"}},
+    {"type": "array", "contains": {"type": "integer"}, "minItems": 3},
+    {"type": "array", "contains": {"type": "integer"}, "maxItems": 1},
+    {"type": "array", "contains": {"const": "A"}, "minContains": 2},
+    {"type": "array", "items": {"type": "integer"}, "contains": {"minimum": 10}, "minContains": 3, "minItems": 5},
+    {"type": "array", "prefixItems": [{"type": "string"}], "contains": {"type": "integer"}},
+    {"type": "array", "contains": {"type": "integer"}, "maxContains": 2},
+    {
+        "type": "array",
+        "items": {"type": "integer"},
+        "contains": {"minimum": 10},
+        "minContains": 2,
+        "maxContains": 3,
+        "minItems": 5,
+    },
+    {"type": "array", "items": {"type": "integer"}, "contains": {"type": "integer"}, "maxContains": 3, "minItems": 3},
+    {
+        "type": "array",
+        "items": {"type": "string"},
+        "contains": {"type": "string", "minLength": 5},
+        "uniqueItems": True,
+        "minItems": 3,
+    },
+    # Matches and filler come from disjoint schemas, so uniqueness holds across the join.
+    {"type": "array", "contains": {"type": "integer"}, "maxContains": 2, "uniqueItems": True},
+    # Nothing appended can meet the demand, so a pinned position takes it on.
+    {
+        "type": "array",
+        "prefixItems": [{"type": "integer"}],
+        "items": {"type": "string"},
+        "contains": {"type": "integer", "minimum": 10},
+    },
+    # A pinned position that may match by chance is steered away from a bounded demand.
+    {"type": "array", "prefixItems": [{"type": "integer"}], "contains": {"minimum": 10}, "maxContains": 1},
+    # Where it cannot be steered, the count is confirmed against the schema instead.
+    {"type": "array", "prefixItems": [{"type": "string"}], "contains": {"type": "integer"}, "maxContains": 1},
+    # Every element matches, so the demand takes on the slack the ceiling and the length bound leave.
+    {"type": "array", "items": {"type": "integer"}, "contains": {"type": "integer"}, "maxContains": 3, "maxItems": 5},
+    # A ceiling keeps two demands apart that would otherwise fold into one element.
+    {
+        "type": "array",
+        "uniqueItems": True,
+        "allOf": [{"contains": {"const": "A"}, "maxContains": 2}, {"contains": {"const": "B"}}],
+    },
+    # Distinct values run out before the ceiling does, so the demand takes no slack.
+    {
+        "type": "array",
+        "items": {"enum": [1, 2]},
+        "contains": {"enum": [1, 2]},
+        "maxContains": 2,
+        "uniqueItems": True,
+        "minItems": 2,
+    },
+    # The intersection stays an unfolded `allOf`, so the demand becomes a filter.
+    {
+        "type": "array",
+        "items": {"type": "string"},
+        "contains": {"$ref": "#/$defs/long"},
+        "$defs": {"long": {"minLength": 4}},
+    },
+    # Same for the filler the ceiling needs.
+    {
+        "type": "array",
+        "items": {"type": "string"},
+        "contains": {"$ref": "#/$defs/long"},
+        "maxContains": 1,
+        "$defs": {"long": {"minLength": 4}},
+    },
+    # A demand met by the truncated prefix must not append past where it stops.
+    {
+        "type": "array",
+        "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [1, 2]}],
+        "contains": {"type": "integer"},
+        "uniqueItems": True,
+    },
+    # The same where a ceiling would otherwise hand it slack to append into.
+    {
+        "type": "array",
+        "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [1, 2]}],
+        "contains": {"minimum": 10},
+        "minContains": 0,
+        "maxContains": 1,
+        "uniqueItems": True,
+    },
 ]
 
 # Formats the validator asserts, so generated values can be checked against the schema itself.
@@ -1603,6 +1692,9 @@ CANONICAL_CASES = [
         },
         (),
     ),
+    # Anything at all, and a property nothing satisfies.
+    ({}, ()),
+    ({"type": "object", "properties": {"a": False}}, (lambda value: "a" not in value,)),
     # A key the pattern claims is drawable even though nothing names it.
     (
         {"type": "object", "patternProperties": {"^a": {"type": "integer"}}},
@@ -1615,6 +1707,18 @@ CANONICAL_CASES = [
             lambda value: any(key.startswith("a") for key in value),
             lambda value: any(key.endswith("b") for key in value),
         ),
+    ),
+    # A pattern Python `re` rejects names no keys, but the rest of the schema still generates.
+    ({"type": "object", "patternProperties": {r"\p{L}": {"type": "integer"}}}, ()),
+    # A key both patterns claim answers to both schemas.
+    (
+        {
+            "type": "object",
+            "patternProperties": {"^a": {"type": "integer"}, "^ab": {"multipleOf": 2}},
+            "additionalProperties": False,
+            "minProperties": 1,
+        },
+        (lambda value: any(key.startswith("ab") for key in value),),
     ),
     # A closed schema whose only admitted keys come from the pattern.
     (
@@ -1658,6 +1762,297 @@ CANONICAL_CASES = [
     # `#` names the document itself; canonicalization resolves these cycles before generation sees them.
     ({"type": "object", "properties": {"child": {"$ref": "#"}}}, ()),
     ({"type": "object", "properties": {"kids": {"type": "array", "items": {"$ref": "#"}}}}, ()),
+    # An array reaching past the demanded element, not only the shortest one that meets the demand.
+    ({"type": "array", "items": {"type": "integer"}, "contains": {"const": 1}}, (lambda value: len(value) > 1,)),
+    # Two `contains` demands the canonical form keeps side by side; both values land.
+    (
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "allOf": [{"contains": {"const": "A"}}, {"contains": {"const": "B"}}],
+        },
+        (lambda value: "A" in value and "B" in value,),
+    ),
+    # Demands pinned to distinct values can share a unique array.
+    (
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": True,
+            "allOf": [{"contains": {"const": "A"}}, {"contains": {"const": "B"}}],
+        },
+        (lambda value: "A" in value and "B" in value,),
+    ),
+    # Every item matches the demand, so the ceiling — not the filler — carries the lower size bound.
+    (
+        {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^a{5,}$"},
+            "contains": {"minLength": 3},
+            "maxContains": 5,
+            "minItems": 3,
+        },
+        (lambda value: len(value) > 3,),
+    ),
+    # Only the prefix can meet the demand, so that position takes it on — and the tail still grows.
+    (
+        {
+            "type": "array",
+            "prefixItems": [{"type": "integer"}],
+            "items": {"type": "string"},
+            "contains": {"type": "integer"},
+        },
+        (lambda value: len(value) > 1,),
+    ),
+    # Both demands are met by the same value, so one element covers them in a unique array.
+    (
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "allOf": [{"contains": {"const": "A"}}, {"contains": {"pattern": "^A$"}}],
+            "uniqueItems": True,
+        },
+        (lambda value: value == ["A"], lambda value: len(value) > 1),
+    ),
+    # The prefix position cannot help but match, so it is the one match the ceiling admits.
+    (
+        {"type": "array", "prefixItems": [{"type": "integer"}], "contains": {"type": "integer"}, "maxContains": 1},
+        (lambda value: len(value) > 1,),
+    ),
+    # Several distinct matches, drawn apart from the filler they cannot equal.
+    (
+        {
+            "type": "array",
+            "items": {"type": "integer"},
+            "contains": {"minimum": 10},
+            "minContains": 3,
+            "maxContains": 4,
+            "uniqueItems": True,
+            "minItems": 5,
+        },
+        (lambda value: sum(item >= 10 for item in value) == 3 and any(item < 10 for item in value),),
+    ),
+    # A ceiling of zero: every position has to avoid the demand.
+    (
+        {"type": "array", "contains": {"type": "integer"}, "minContains": 0, "maxContains": 0, "minItems": 2},
+        (lambda value: len(value) > 2,),
+    ),
+    # Three positions over a two-value domain cannot all differ, so the array stops early — but it
+    # still reaches the length that does work, in either order.
+    (
+        {"type": "array", "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [1, 2]}], "uniqueItems": True},
+        (lambda value: value == [1, 2], lambda value: value == [2, 1]),
+    ),
+    # A demand contributing no element leaves nothing to build from its schema, and the array is
+    # still more than the empty one that trivially clears it.
+    (
+        {
+            "type": "array",
+            "contains": {"type": "object", "patternProperties": {"^a": {"type": "integer"}}},
+            "minContains": 0,
+            "maxContains": 2,
+        },
+        (lambda value: len(value) > 0,),
+    ),
+    # The length ceiling leaves `items` governing no position.
+    (
+        {
+            "type": "array",
+            "prefixItems": [{"type": "integer"}],
+            "items": {"$ref": "#/$defs/unbuildable"},
+            "maxItems": 1,
+            "$defs": {"unbuildable": {"type": "object", "minProperties": 2}},
+        },
+        (lambda value: len(value) == 1,),
+    ),
+    # A position may take the demand on, so the shortest array is reachable — and the longer one.
+    (
+        {"type": "array", "prefixItems": [{"type": "integer"}], "contains": {"const": 7}, "maxItems": 2},
+        (lambda value: value == [7], lambda value: len(value) == 2),
+    ),
+    # The same where the ceiling admits only that one match.
+    (
+        {"type": "array", "prefixItems": [{"type": "string"}], "contains": {"minLength": 4}, "maxContains": 1},
+        (lambda value: len(value) == 1, lambda value: len(value) > 1),
+    ),
+    # A demand the prefix already meets asks for no distinct value of its own.
+    (
+        {
+            "type": "array",
+            "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [1, 2]}],
+            "contains": {"enum": [1, 2]},
+            "uniqueItems": True,
+        },
+        (lambda value: len(value) == 2,),
+    ),
+    # A demand the prefix meets contributes nothing appendable; the next demand absorbs the floor.
+    (
+        {
+            "type": "array",
+            "prefixItems": [{"type": "integer"}],
+            "items": {"type": "string"},
+            "allOf": [{"contains": {"type": "integer"}}, {"contains": {"type": "string"}, "maxContains": 3}],
+            "minItems": 4,
+        },
+        (lambda value: len(value) == 4,),
+    ),
+    # A pinned position closes the tail, and the shorter arrays are still instances.
+    (
+        {"type": "array", "prefixItems": [{"type": "integer"}], "items": False},
+        (lambda value: len(value) == 0, lambda value: len(value) == 1),
+    ),
+    # Both pinned positions cannot help but match the bounded demand, so only shorter arrays remain.
+    (
+        {
+            "type": "array",
+            "prefixItems": [{"type": "integer"}, {"type": "integer"}],
+            "contains": {"type": "integer"},
+            "maxContains": 1,
+        },
+        (lambda value: len(value) == 1,),
+    ),
+    # The tail runs out of distinct values below the floor, so the demanded element fills the rest.
+    (
+        {
+            "type": "array",
+            "items": {"enum": [1, 2, 3]},
+            "contains": {"const": 2},
+            "minContains": 0,
+            "maxContains": 1,
+            "minItems": 3,
+            "uniqueItems": True,
+        },
+        (lambda value: len(value) == 3,),
+    ),
+    # The wide demand comes first and is absorbed by the stricter bounded one behind it.
+    (
+        {
+            "type": "array",
+            "items": {"enum": ["A", "X"]},
+            "uniqueItems": True,
+            "allOf": [{"contains": {"enum": ["A", "B"]}}, {"contains": {"const": "A"}, "maxContains": 2}],
+        },
+        (lambda value: value == ["A"],),
+    ),
+    (
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": True,
+            "allOf": [{"contains": {"minLength": 1}}, {"contains": {"minLength": 2}, "maxContains": 2}],
+        },
+        (lambda value: len(value) == 1 and len(value[0]) >= 2,),
+    ),
+    # A prefix too wide to match cheaply skips the distinct-value check and still draws in full.
+    (
+        {
+            "type": "array",
+            "uniqueItems": True,
+            "minItems": 17,
+            "prefixItems": [{"enum": [index, index + 100]} for index in range(17)],
+        },
+        (lambda value: len(value) == 17,),
+    ),
+    # A demand inside another demand's domain cannot be steered off it; the net has to count.
+    (
+        {
+            "type": "array",
+            "items": {"enum": ["A", "B"]},
+            "allOf": [{"contains": {"enum": ["A", "B"]}, "maxContains": 3}, {"contains": {"const": "A"}}],
+        },
+        (lambda value: len(value) > 1,),
+    ),
+    # One element meets both demands at once, so they do not need a distinct value each.
+    (
+        {
+            "type": "array",
+            "uniqueItems": True,
+            "items": {"enum": ["A", "X"]},
+            "allOf": [{"contains": {"const": "A"}, "maxContains": 2}, {"contains": {"enum": ["A", "B"]}}],
+        },
+        (lambda value: value == ["A"],),
+    ),
+    # Only one assignment hands every position a distinct value, and it is not the greedy one.
+    (
+        {
+            "type": "array",
+            "uniqueItems": True,
+            "minItems": 4,
+            "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [3, 4]}, {"enum": [1, 3]}],
+        },
+        (lambda value: len(value) == 4,),
+    ),
+    # Extra keys have no value to carry — the object stays, with nothing but its named keys.
+    (
+        {
+            "type": "object",
+            "additionalProperties": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "contains": {"type": "integer"},
+                "maxContains": 2,
+                "minItems": 4,
+            },
+        },
+        (lambda value: value == {},),
+    ),
+    # The demand, the elements, and the ceiling-holding filler all meet through `$defs` pointers.
+    (
+        {
+            "type": "array",
+            "items": {"$ref": "#/$defs/text"},
+            "contains": {"$ref": "#/$defs/long"},
+            "maxContains": 1,
+            "minItems": 2,
+            "$defs": {"text": {"type": "string"}, "long": {"minLength": 4}},
+        },
+        (lambda value: any(len(item) >= 4 for item in value) and any(len(item) < 4 for item in value),),
+    ),
+    (
+        {
+            "type": "array",
+            "items": {"$ref": "#/$defs/text"},
+            "contains": {"$ref": "#/definitions/long"},
+            "$defs": {"text": {"type": "string"}},
+            "definitions": {"long": {"minLength": 4}},
+        },
+        (lambda value: any(len(item) >= 4 for item in value) and any(len(item) < 4 for item in value),),
+    ),
+    # A pattern demand cannot be negated constructively, so the filler holds the ceiling by filter.
+    (
+        {"type": "array", "items": {"type": "string"}, "contains": {"pattern": "^a"}, "maxContains": 1, "minItems": 2},
+        (lambda value: len(value) >= 2,),
+    ),
+    # Within `items` the demands' matches are disjoint, so folding them would lose both.
+    (
+        {
+            "type": "array",
+            "items": {"enum": [1, "aa"]},
+            "uniqueItems": True,
+            "allOf": [{"contains": {"enum": [1, "bb"]}}, {"contains": {"enum": ["aa", "bb"]}}],
+        },
+        (lambda value: len(value) == 2,),
+    ),
+    # One demand's element may not land on another demand's ceiling.
+    (
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "allOf": [{"contains": {"const": "A"}, "maxContains": 1}, {"contains": {"minLength": 1}}],
+        },
+        (lambda value: len(value) > 1,),
+    ),
+    (
+        {
+            "type": "array",
+            "items": {"enum": ["A", "B"]},
+            "allOf": [
+                {"contains": {"const": "A"}, "maxContains": 1},
+                {"contains": {"enum": ["A", "B"]}, "minContains": 2},
+            ],
+        },
+        (lambda value: len(value) > 2,),
+    ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
@@ -1718,6 +2113,26 @@ def test_pattern_properties_root_reference_overlap():
         assert is_valid(value), value
 
     test()
+
+
+def test_canonical_contains_conflicting_formats_never_unsound():
+    # No string is both an ipv4 and a date; the filter must reject every draw, not pass one format-blind.
+    schema = {
+        "type": "array",
+        "items": {"type": "string"},
+        "contains": {"allOf": [{"format": "ipv4"}, {"format": "date"}]},
+    }
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(value):
+        assert is_valid(value), value
+
+    with pytest.raises(Unsatisfiable):
+        test()
 
 
 def test_pattern_properties_root_reference_single_pattern():
@@ -1839,7 +2254,6 @@ def test_canonical_reference_with_no_finite_value_admits_nothing():
 
 
 UNSUPPORTED_SCHEMAS = [
-    ({"type": "array", "contains": {"type": "integer"}}, jsonschema_rs.Draft202012Validator),
     ({"type": "string", "contentMediaType": "application/json"}, jsonschema_rs.Draft7Validator),
     ({"type": "string", "contentEncoding": "base64"}, jsonschema_rs.Draft7Validator),
     # A pattern Python `re` rejects cannot drive generation, with or without a format.
@@ -1850,9 +2264,9 @@ UNSUPPORTED_SCHEMAS = [
         {"allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]},
         jsonschema_rs.Draft202012Validator,
     ),
-    # `contains` behind a pattern is only reached on a draw, and must still be refused up front.
+    # A node behind a pattern is only reached on a draw, and must still be refused up front.
     (
-        {"type": "object", "patternProperties": {"^a": {"type": "array", "contains": {"type": "integer"}}}},
+        {"type": "object", "patternProperties": {"^a": {"type": "string", "pattern": r"\p{L}"}}},
         jsonschema_rs.Draft202012Validator,
     ),
 ]
@@ -2105,6 +2519,187 @@ def test_canonical_object_respects_alphabet():
             key.encode("ascii")
             if isinstance(item, str):
                 assert "\x00" not in item
+
+    test()
+
+
+@pytest.mark.parametrize(
+    ("type_name", "admitted", "rejected"),
+    [
+        ("null", [None], [False, 0, "", [], {}]),
+        ("boolean", [True, False], [None, 0, 1, "", [], {}]),
+        # `True == 1` in Python, but `true` is not a JSON number.
+        ("integer", [0, 1, -3], [None, True, False, 1.5, "1", [], {}]),
+        ("number", [0, 1, -3, 1.5], [None, True, False, "1", [], {}]),
+        ("string", ["", "a"], [None, True, 1, [], {}]),
+        ("array", [[], [1]], [None, True, 1, "", {}]),
+        ("object", [{}, {"a": 1}], [None, True, 1, "", []]),
+    ],
+)
+def test_typed_group_checks(type_name, admitted, rejected):
+    # Nothing downstream would notice this table being wrong: no canonical body admits a value
+    # outside its own type, so the guard never fires. Pinned directly for that reason.
+    check = strategy._TYPE_CHECKS[type_name]
+    assert all(check(value) for value in admitted)
+    assert not any(check(value) for value in rejected)
+
+
+def test_canonical_typed_group_keeps_the_type():
+    # `type` and the enum arrive as separate halves of one node: Draft 4 reads `enum` without a type
+    # check, so the type has to be applied on top of whatever the body admits.
+    schema = {"type": "integer", "oneOf": [{"enum": [1, "a"]}, {"enum": [2, None]}]}
+    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft4)
+    assert canonical_schema.kind == "typed_group"
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+    find(built, lambda value: value == 2, settings=settings(max_examples=1000, database=None))
+
+
+UNSATISFIABLE_ARRAY_SCHEMAS = [
+    # Nothing clears the demand without matching it, and the ceiling admits fewer matches than
+    # the lower size bound needs.
+    {
+        "type": "array",
+        "items": {"type": "string", "pattern": "^a{5,}$"},
+        "contains": {"minLength": 3},
+        "maxContains": 1,
+        "minItems": 3,
+    },
+    # Every position matches, so the ceiling and the lower size bound cannot both hold.
+    {
+        "type": "array",
+        "items": {"type": "integer"},
+        "contains": {"type": "integer"},
+        "maxContains": 2,
+        "minItems": 4,
+    },
+    # Two distinct values are demanded from a domain holding one.
+    {"type": "array", "contains": {"const": 7}, "minContains": 2, "uniqueItems": True},
+    # The demand admits two values, but only one of them clears `items`.
+    {
+        "type": "array",
+        "items": {"type": "string"},
+        "contains": {"enum": [1, "a"]},
+        "minContains": 2,
+        "uniqueItems": True,
+    },
+    # The pinned position and both demanded elements together overflow the length ceiling.
+    {
+        "type": "array",
+        "prefixItems": [{"type": "integer"}],
+        "items": {"type": "string"},
+        "allOf": [{"contains": {"const": "A"}}, {"contains": {"const": "B"}}],
+        "maxItems": 2,
+    },
+    # The tail runs out of distinct values below the floor, and the barred match cannot fill in.
+    {
+        "type": "array",
+        "items": {"enum": [1, 2, 3]},
+        "contains": {"const": 2},
+        "minContains": 0,
+        "maxContains": 0,
+        "minItems": 3,
+        "uniqueItems": True,
+    },
+    # The prefix stops where its values run out, leaving the demand nowhere to go.
+    {
+        "type": "array",
+        "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [1, 2]}],
+        "uniqueItems": True,
+        "contains": {"const": 9},
+    },
+    # The prefix stops at two positions, and nothing may follow it to reach the third.
+    {
+        "type": "array",
+        "prefixItems": [{"enum": [1, 2]}, {"enum": [1, 2]}, {"enum": [1, 2]}],
+        "contains": {"type": "integer"},
+        "minItems": 3,
+        "uniqueItems": True,
+    },
+]
+
+
+@pytest.mark.parametrize("schema", UNSATISFIABLE_ARRAY_SCHEMAS, ids=str)
+def test_canonical_array_admits_nothing(schema):
+    # Canonicalization cannot see these contradictions; laying the positions out does, and the answer
+    # is a strategy that draws nothing.
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    assert built.is_empty
+
+
+def test_canonical_array_min_contains_beyond_what_hypothesis_draws():
+    # No looser strategy to filter, so this is reported against the operation. Finding that out must
+    # not cost a strategy per demanded position — that would be gigabytes before the first draw.
+    with pytest.raises(InvalidSchema, match="5000000 demanded elements"):
+        _canonical_strategy_or_none(
+            {"type": "array", "items": {"type": "integer"}, "contains": {"const": 7}, "minContains": 5000000},
+            GenerationConfig(),
+            jsonschema_rs.Draft202012Validator,
+        )
+
+
+def test_canonical_array_contains_is_satisfied_without_filtering():
+    # The demanded element is placed, not filtered for, so a needle `items` rarely hits still lands.
+    built = _canonical_strategy_or_none(
+        {"type": "array", "items": {"type": "integer"}, "contains": {"const": 7654321}},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert 7654321 in value, value
+
+    test()
+
+
+def test_canonical_array_min_contains_places_every_demanded_element():
+    built = _canonical_strategy_or_none(
+        {"type": "array", "items": {"type": "string"}, "contains": {"const": "A"}, "minContains": 3},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert value.count("A") >= 3, value
+
+    test()
+
+
+def test_canonical_array_max_contains_uses_non_matching_filler():
+    built = _canonical_strategy_or_none(
+        {
+            "type": "array",
+            "items": {"type": "integer"},
+            "contains": {"minimum": 10},
+            "minContains": 2,
+            "maxContains": 3,
+            "minItems": 5,
+        },
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert sum(item >= 10 for item in value) == 2, value
 
     test()
 

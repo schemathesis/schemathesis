@@ -11,6 +11,7 @@ from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from hypothesis.reporting import with_reporter
 
 from schemathesis.config import OutputConfig
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema.bundler import unbundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.output import truncate_json
@@ -128,7 +129,7 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
         for parameter in container:
             try:
                 generate_one(_parameter_strategy(operation, parameter, location))
-            except (Unsatisfiable, InvalidArgument):
+            except (Unsatisfiable, InvalidArgument, InvalidSchema):
                 if location == ParameterLocation.BODY:
                     name = parameter.media_type
                 else:
@@ -250,7 +251,7 @@ def find_slow_parameter(operation: APIOperation, reason: HealthCheck) -> SlowPar
         for parameter in container:
             try:
                 generate_one(_parameter_strategy(operation, parameter, location), suppress_health_check=[])
-            except (FailedHealthCheck, Unsatisfiable, InvalidArgument):
+            except (FailedHealthCheck, Unsatisfiable, InvalidArgument, InvalidSchema):
                 if location == ParameterLocation.BODY:
                     name = parameter.media_type
                 else:

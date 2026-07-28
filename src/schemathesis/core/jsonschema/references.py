@@ -89,7 +89,7 @@ def _sanitize_combinators(schema: JsonSchemaObject, is_recursive_ref: Callable[[
             if non_recursive and len(non_recursive) < len(flattened):
                 flattened = non_recursive
 
-        cleaned = [variant for variant in flattened if not _has_ref(variant)]
+        cleaned = [variant for variant in flattened if not has_ref(variant)]
 
         # Only update if we have non-$ref variants
         if cleaned:
@@ -172,7 +172,7 @@ def _sanitize_properties(schema: JsonSchemaObject) -> None:
     required = schema.get("required", [])
 
     for name, subschema in list(properties.items()):
-        if not _has_ref(subschema):
+        if not has_ref(subschema):
             continue
 
         if name not in required:
@@ -192,7 +192,7 @@ def _sanitize_pattern_properties(schema: JsonSchemaObject) -> None:
     if not isinstance(pattern_properties, dict):
         return
     for key, subschema in list(pattern_properties.items()):
-        if _has_ref(subschema):
+        if has_ref(subschema):
             del pattern_properties[key]
 
 
@@ -200,13 +200,13 @@ def _sanitize_items(schema: JsonSchemaObject) -> None:
     """Convert to empty array ONLY if minItems allows it."""
     items = schema["items"]
 
-    has_ref = False
+    contains_ref = False
     if isinstance(items, dict):
-        has_ref = _has_ref(items)
+        contains_ref = has_ref(items)
     elif isinstance(items, list):
-        has_ref = any(_has_ref(item) for item in items)
+        contains_ref = any(has_ref(item) for item in items)
 
-    if not has_ref:
+    if not contains_ref:
         return
 
     min_items = schema.get("minItems", 0)
@@ -222,7 +222,7 @@ def _sanitize_prefix_items(schema: JsonSchemaObject) -> None:
     if not isinstance(prefix_items, list):
         return
 
-    if not any(_has_ref(item) for item in prefix_items):
+    if not any(has_ref(item) for item in prefix_items):
         return
 
     min_items = schema.get("minItems", 0)
@@ -240,17 +240,17 @@ def _convert_to_empty_array(schema: JsonSchemaObject) -> None:
 
 def _sanitize_additional_properties(schema: JsonSchemaObject) -> None:
     additional = schema["additionalProperties"]
-    if _has_ref(additional):
+    if has_ref(additional):
         schema["additionalProperties"] = False
 
 
 def _sanitize_additional_items(schema: JsonSchemaObject) -> None:
     additional = schema["additionalItems"]
-    if _has_ref(additional):
+    if has_ref(additional):
         schema["additionalItems"] = False
 
 
-def _has_ref(schema: object) -> bool:
+def has_ref(schema: object) -> bool:
     """Check if schema contains $ref at any level."""
     if not isinstance(schema, dict):
         return False
@@ -259,11 +259,11 @@ def _has_ref(schema: object) -> bool:
         return True
     for value in schema.values():
         if isinstance(value, dict):
-            if _has_ref(value):
+            if has_ref(value):
                 return True
         elif isinstance(value, list):
             for item in value:
-                if isinstance(item, dict) and _has_ref(item):
+                if isinstance(item, dict) and has_ref(item):
                     return True
 
     return False

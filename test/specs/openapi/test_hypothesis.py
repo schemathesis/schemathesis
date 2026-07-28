@@ -15,7 +15,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema.resolver import load_file
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis.reporting import find_unsatisfiable_parameter
+from schemathesis.generation.hypothesis.reporting import find_slow_parameter, find_unsatisfiable_parameter
 from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
@@ -1207,3 +1207,67 @@ def test_unsatisfiable_parameter_is_the_one_the_engine_cannot_draw(ctx):
 
     assert found is not None
     assert found.name == "impossible"
+
+
+def test_slow_parameter_probe_survives_a_parameter_that_cannot_build(ctx):
+    # A strategy failing at build time must not escape the error-reporting probe
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"type": "integer"},
+                                    "contains": {"const": 7},
+                                    "minContains": 5000000,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    found = find_slow_parameter(schema["/data"]["POST"], HealthCheck.too_slow)
+
+    assert found is not None
+    assert found.name == "application/json"
+
+
+def test_unsatisfiable_probe_survives_a_parameter_that_cannot_build(ctx):
+    # A strategy failing at build time must not escape the error-reporting probe
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"type": "integer"},
+                                    "contains": {"const": 7},
+                                    "minContains": 5000000,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    found = find_unsatisfiable_parameter(schema["/data"]["POST"])
+
+    assert found is not None
+    assert found.name == "application/json"
