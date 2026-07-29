@@ -20,7 +20,6 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
-from schemathesis.generation.jsonschema import Alphabet, StrategyContext, strategy
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
@@ -1409,46 +1408,217 @@ CANONICAL_INTEGER_SCHEMAS = [
     {"type": "number", "allOf": [{"multipleOf": 1e308}, {"multipleOf": 3e307}]},
 ]
 
+CANONICAL_OBJECT_SCHEMAS = [
+    {"type": "object"},
+    {"type": "object", "properties": {"a": {"type": "integer"}}},
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+    {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "required": ["a"]},
+    {"type": "object", "properties": {"a": {"type": "string", "minLength": 2}}},
+    {"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "integer"}}}}},
+    # A required key the schema says nothing else about.
+    {"type": "object", "required": ["a"]},
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a", "b"]},
+    {"type": "object", "properties": {"a": {"anyOf": [{"type": "integer"}, {"type": "string"}]}}},
+    {
+        "allOf": [
+            {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+            {"type": "object", "properties": {"a": {"minimum": 5}, "b": {"type": "string"}}},
+        ]
+    },
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
+    {"type": "object", "additionalProperties": {"type": "integer"}},
+    # The required key is absent from `properties`, so its value answers to `additionalProperties`.
+    {"type": "object", "required": ["a"], "additionalProperties": {"type": "string", "minLength": 2}},
+    {
+        "type": "object",
+        "properties": {"a": {"type": "integer"}},
+        "required": ["a"],
+        "additionalProperties": {"type": "array", "items": {"type": "integer"}},
+    },
+    {"type": "object", "additionalProperties": {"type": "object", "properties": {"b": {"type": "integer"}}}},
+    {"type": "object", "additionalProperties": {"anyOf": [{"type": "integer"}, {"type": "boolean"}]}},
+    {"type": "object", "minProperties": 2},
+    {"type": "object", "maxProperties": 2},
+    {"type": "object", "minProperties": 2, "maxProperties": 2},
+    # A floor beyond the extra keys drawn by default.
+    {"type": "object", "minProperties": 8},
+    {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "minProperties": 1},
+    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"], "maxProperties": 1},
+    {
+        "type": "object",
+        "properties": {"a": {"type": "integer"}, "b": {"type": "string"}},
+        "additionalProperties": False,
+        "minProperties": 2,
+    },
+    {"type": "object", "propertyNames": {"enum": ["a", "b", "c"]}, "minProperties": 2},
+    {"type": "object", "propertyNames": {"maxLength": 3}},
+    {"type": "object", "propertyNames": {"pattern": "^x"}, "maxProperties": 3},
+    {"type": "object", "propertyNames": {"pattern": "x[0-9]+"}, "minProperties": 2},
+    {"type": "object", "propertyNames": {"maxLength": 4, "pattern": "^x"}, "minProperties": 2},
+    {"type": "object", "propertyNames": {"anyOf": [{"pattern": "x[0-9]+"}, {"maxLength": 3}]}},
+]
 
-@pytest.mark.parametrize("schema", CANONICAL_NUMBER_SCHEMAS, ids=str)
-def test_canonical_number_generation(schema):
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
-    assert canonical_schema.kind == "number"
-    is_valid = jsonschema_rs.validator_for(schema).is_valid
+CANONICAL_ARRAY_SCHEMAS = [
+    {"type": "array", "items": {"type": "integer"}},
+    {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 4},
+    {"type": "array", "items": {"type": "integer"}, "uniqueItems": True, "minItems": 3},
+    {"type": "array", "items": {"type": "number"}, "uniqueItems": True, "minItems": 2},
+    {"type": "array", "items": True, "uniqueItems": True, "minItems": 2, "maxItems": 5},
+    {"type": "array", "items": {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}},
+    {"type": "array", "items": {"type": "array", "items": {"type": "integer"}}, "maxItems": 3},
+    {"type": "object", "properties": {"xs": {"type": "array", "items": {"type": "integer"}}}, "required": ["xs"]},
+    {"type": "array", "items": {"anyOf": [{"type": "integer"}, {"type": "string"}]}},
+    {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 3},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}]},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "items": False},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "maxItems": 1},
+    {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}, "minItems": 3},
+    {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}, "maxItems": 4},
+    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "integer"}], "uniqueItems": True, "minItems": 4},
+    {"type": "array", "prefixItems": [{"type": "object", "required": ["a"]}], "items": {"type": "array"}},
+]
 
-    @given(strategy.from_schema(canonical_schema, StrategyContext()))
-    @settings(max_examples=10, deadline=None)
+# Formats the validator asserts, so generated values can be checked against the schema itself.
+ASSERTED_FORMATS = [
+    "date",
+    "date-time",
+    "time",
+    "duration",
+    "email",
+    "idn-email",
+    "hostname",
+    "idn-hostname",
+    "ipv4",
+    "ipv6",
+    "uri",
+    "uri-reference",
+    "uri-template",
+    "iri",
+    "iri-reference",
+    "json-pointer",
+    "relative-json-pointer",
+    "uuid",
+]
+
+# Each row pairs a schema with predicates for values that must be drawable from it. An empty tuple
+# checks only that every drawn value is valid.
+CANONICAL_CASES = [
+    *[(schema, ()) for schema in CANONICAL_NUMBER_SCHEMAS],
+    *[(schema, ()) for schema in CANONICAL_INTEGER_SCHEMAS],
+    *[(schema, ()) for schema in CANONICAL_OBJECT_SCHEMAS],
+    *[(schema, ()) for schema in CANONICAL_ARRAY_SCHEMAS],
+    *[({"type": "string", "format": name}, ()) for name in ASSERTED_FORMATS],
+    # An unknown format is an annotation: it must neither block generation nor narrow the strings.
+    ({"type": "string", "format": "decimal", "minLength": 3, "maxLength": 6}, ()),
+    ({"type": "string", "format": "uuid", "minLength": 36, "maxLength": 36}, ()),
+    ({"type": "string", "format": "hostname", "pattern": "^a"}, ()),
+    # A pattern is a search, so the value may carry anything around the match.
+    ({"type": "string", "pattern": "^x"}, (lambda value: len(value) > 1,)),
+    # Python's `re` matches `$` before a trailing newline; the validator does not.
+    ({"type": "string", "pattern": "x$"}, ()),
+    ({"type": "string", "pattern": "[0-9]{2}", "maxLength": 4}, ()),
+    # A ceiling narrows the sizes, it does not pin the object to its floor.
+    (
+        {"type": "object", "properties": {"a": {"type": "integer"}}, "maxProperties": 3},
+        (lambda value: len(value) == 3,),
+    ),
+    # A floor past the extras drawn by default does not pin the object either.
+    ({"type": "object", "minProperties": 6}, (lambda value: len(value) > 6,)),
+    ({"type": "object", "minProperties": 6, "maxProperties": 8}, (lambda value: len(value) == 8,)),
+    (
+        {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
+        (lambda value: set(value) - {"a"},),
+    ),
+    (
+        {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
+        (lambda value: set(value) - {"a"},),
+    ),
+    (
+        {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}},
+        (lambda value: len(value) > 1,),
+    ),
+]
+# NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
+# a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
+# gw11". Derive the ids from the schemas alone.
+CANONICAL_CASE_IDS = [str(schema) for schema, _ in CANONICAL_CASES]
+
+
+@pytest.mark.parametrize(("schema", "reaches"), CANONICAL_CASES, ids=CANONICAL_CASE_IDS)
+def test_canonical_generation(schema, reaches):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    # A format generator cannot be steered by a pattern or a length, so those draws are discarded.
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
     def test(value):
         assert is_valid(value), value
 
     test()
+
+
+@pytest.mark.parametrize(
+    ("schema", "reaches"),
+    [case for case in CANONICAL_CASES if case[1]],
+    ids=[case_id for case_id, case in zip(CANONICAL_CASE_IDS, CANONICAL_CASES, strict=True) if case[1]],
+)
+def test_canonical_generation_reaches(schema, reaches):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    # High budget: each predicate looks for one specific value, not a property of every draw.
+    for predicate in reaches:
+        find(built, predicate, settings=settings(max_examples=1000, database=None))
 
 
 @pytest.mark.parametrize("schema", CANONICAL_INTEGER_SCHEMAS, ids=str)
-def test_canonical_integer_generation(schema):
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
-    assert canonical_schema.kind == "integer"
-    is_valid = jsonschema_rs.validator_for(schema).is_valid
+def test_canonical_integer_generation_emits_python_ints(schema):
+    # `1.0` satisfies `type: integer` in JSON terms, so the validator alone would accept a float here.
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
 
-    @given(strategy.from_schema(canonical_schema, StrategyContext()))
+    @given(built)
     @settings(max_examples=10, deadline=None)
     def test(value):
-        assert isinstance(value, int)
-        assert is_valid(value), value
+        assert isinstance(value, int), value
 
     test()
 
 
+UNSUPPORTED_SCHEMAS = [
+    ({"type": "object", "patternProperties": {"^a": {"type": "integer"}}}, jsonschema_rs.Draft202012Validator),
+    ({"type": "array", "contains": {"type": "integer"}}, jsonschema_rs.Draft202012Validator),
+    ({"type": "string", "contentMediaType": "application/json"}, jsonschema_rs.Draft7Validator),
+    ({"type": "string", "contentEncoding": "base64"}, jsonschema_rs.Draft7Validator),
+    # A pattern Python `re` rejects cannot drive generation, with or without a format.
+    ({"type": "string", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
+    ({"type": "string", "format": "uuid", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
+    # Two formats at once needs a conjunction this module cannot build.
+    (
+        {"allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]},
+        jsonschema_rs.Draft202012Validator,
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("schema", "validator_cls"), UNSUPPORTED_SCHEMAS, ids=[str(schema) for schema, _ in UNSUPPORTED_SCHEMAS]
+)
+def test_canonical_unsupported_schemas_fall_back(schema, validator_cls):
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls) is None
+
+
 def test_canonical_number_generation_without_representable_values():
-    schema = {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 5e-324}
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    built = _canonical_strategy_or_none(
+        {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 5e-324},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
 
     with pytest.raises(Unsatisfiable):
-        find(
-            strategy.from_schema(canonical_schema, StrategyContext()),
-            lambda _: True,
-            settings=settings(max_examples=10, database=None),
-        )
+        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
 
 
 @pytest.mark.parametrize(
@@ -1558,100 +1728,6 @@ def test_canonical_number_above_the_float_range():
     test()
 
 
-CANONICAL_OBJECT_SCHEMAS = [
-    {"type": "object"},
-    {"type": "object", "properties": {"a": {"type": "integer"}}},
-    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
-    {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "required": ["a"]},
-    {"type": "object", "properties": {"a": {"type": "string", "minLength": 2}}},
-    {"type": "object", "properties": {"a": {"type": "object", "properties": {"b": {"type": "integer"}}}}},
-    # A required key the schema says nothing else about.
-    {"type": "object", "required": ["a"]},
-    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a", "b"]},
-    {"type": "object", "properties": {"a": {"anyOf": [{"type": "integer"}, {"type": "string"}]}}},
-    {
-        "allOf": [
-            {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]},
-            {"type": "object", "properties": {"a": {"minimum": 5}, "b": {"type": "string"}}},
-        ]
-    },
-    {"type": "object", "minProperties": 2},
-    {"type": "object", "maxProperties": 2},
-    {"type": "object", "minProperties": 2, "maxProperties": 2},
-    # A floor beyond the extra keys drawn by default.
-    {"type": "object", "minProperties": 8},
-    {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "minProperties": 1},
-    {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"], "maxProperties": 1},
-    {
-        "type": "object",
-        "properties": {"a": {"type": "integer"}, "b": {"type": "string"}},
-        "additionalProperties": False,
-        "minProperties": 2,
-    },
-    {"type": "object", "propertyNames": {"enum": ["a", "b", "c"]}, "minProperties": 2},
-    {"type": "object", "propertyNames": {"maxLength": 3}},
-    {"type": "object", "propertyNames": {"pattern": "^x"}, "maxProperties": 3},
-    {"type": "object", "propertyNames": {"pattern": "x[0-9]+"}, "minProperties": 2},
-    {"type": "object", "propertyNames": {"maxLength": 4, "pattern": "^x"}, "minProperties": 2},
-    {"type": "object", "propertyNames": {"anyOf": [{"pattern": "x[0-9]+"}, {"maxLength": 3}]}},
-]
-
-
-@pytest.mark.parametrize("schema", CANONICAL_OBJECT_SCHEMAS, ids=str)
-def test_canonical_object_generation(schema):
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
-    is_valid = jsonschema_rs.validator_for(schema).is_valid
-
-    @given(strategy.from_schema(canonical_schema, StrategyContext()))
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert isinstance(value, dict)
-        assert is_valid(value), value
-
-    test()
-
-
-UNSUPPORTED_OBJECT_SCHEMAS = [
-    {"type": "object", "patternProperties": {"^a": {"type": "integer"}}},
-]
-
-
-@pytest.mark.parametrize("schema", UNSUPPORTED_OBJECT_SCHEMAS, ids=str)
-def test_canonical_object_falls_back(schema):
-    assert jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012).kind == "object"
-    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
-
-
-def test_canonical_object_generates_extra_properties():
-    schema = {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
-
-    find(
-        strategy.from_schema(canonical_schema, StrategyContext()),
-        lambda value: set(value) - {"a"},
-        settings=settings(max_examples=1000, database=None),
-    )
-
-
-SIZED_OBJECT_REACHES = [
-    # A ceiling narrows the sizes, it does not pin the object to its floor.
-    ({"type": "object", "properties": {"a": {"type": "integer"}}, "maxProperties": 3}, lambda value: len(value) == 3),
-    # A floor past the extras drawn by default does not pin the object either.
-    ({"type": "object", "minProperties": 6}, lambda value: len(value) > 6),
-    ({"type": "object", "minProperties": 6, "maxProperties": 8}, lambda value: len(value) == 8),
-]
-
-
-@pytest.mark.parametrize(
-    ("schema", "predicate"), SIZED_OBJECT_REACHES, ids=[str(schema) for schema, _ in SIZED_OBJECT_REACHES]
-)
-def test_canonical_object_reaches_the_property_bounds(schema, predicate):
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-
-    find(built, predicate, settings=settings(max_examples=1000, database=None))
-
-
 def test_canonical_object_prefers_documented_keys_for_the_floor():
     schema = {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "string"}}, "minProperties": 2}
     built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
@@ -1692,10 +1768,11 @@ CLOSED_OBJECT_SCHEMAS = [
     ids=["closed", "closed-with-required", "names-enum", "names-const", "names-beyond-properties"],
 )
 def test_canonical_closed_object_generation(schema, allowed):
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
     is_valid = jsonschema_rs.validator_for(schema).is_valid
 
-    @given(strategy.from_schema(canonical_schema, StrategyContext()))
+    @given(built)
     @settings(max_examples=25, deadline=None)
     def test(value):
         assert set(value) <= allowed, value
@@ -1711,13 +1788,10 @@ def test_canonical_closed_object_reaches_every_admitted_name():
         "required": ["a"],
         "additionalProperties": False,
     }
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
 
-    find(
-        strategy.from_schema(canonical_schema, StrategyContext()),
-        lambda value: set(value) == {"a", "b"},
-        settings=settings(max_examples=1000, database=None),
-    )
+    find(built, lambda value: set(value) == {"a", "b"}, settings=settings(max_examples=1000, database=None))
 
 
 def test_canonical_object_unsatisfiable_when_required_name_is_not_admitted():
@@ -1731,11 +1805,14 @@ def test_canonical_object_unsatisfiable_when_required_name_is_not_admitted():
 
 
 def test_canonical_object_respects_alphabet():
-    schema = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
-    canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012)
-    context = StrategyContext(alphabet=Alphabet(allow_x00=False, codec="ascii"))
+    built = _canonical_strategy_or_none(
+        {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]},
+        GenerationConfig(allow_x00=False, codec="ascii"),
+        jsonschema_rs.Draft202012Validator,
+    )
+    assert built is not None
 
-    @given(strategy.from_schema(canonical_schema, context))
+    @given(built)
     @settings(max_examples=25, deadline=None)
     def test(value):
         for key, item in value.items():
@@ -1745,61 +1822,6 @@ def test_canonical_object_respects_alphabet():
                 assert "\x00" not in item
 
     test()
-
-
-CANONICAL_ARRAY_SCHEMAS = [
-    {"type": "array", "items": {"type": "integer"}},
-    {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 4},
-    {"type": "array", "items": {"type": "integer"}, "uniqueItems": True, "minItems": 3},
-    {"type": "array", "items": {"type": "number"}, "uniqueItems": True, "minItems": 2},
-    {"type": "array", "items": True, "uniqueItems": True, "minItems": 2, "maxItems": 5},
-    {"type": "array", "items": {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}},
-    {"type": "array", "items": {"type": "array", "items": {"type": "integer"}}, "maxItems": 3},
-    {"type": "object", "properties": {"xs": {"type": "array", "items": {"type": "integer"}}}, "required": ["xs"]},
-    {"type": "array", "items": {"anyOf": [{"type": "integer"}, {"type": "string"}]}},
-    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}]},
-    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "items": False},
-    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "maxItems": 1},
-    {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}, "minItems": 3},
-    {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}, "maxItems": 4},
-    {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "integer"}], "uniqueItems": True, "minItems": 4},
-    {"type": "array", "prefixItems": [{"type": "object", "required": ["a"]}], "items": {"type": "array"}},
-]
-
-
-@pytest.mark.parametrize("schema", CANONICAL_ARRAY_SCHEMAS, ids=str)
-def test_canonical_array_generation(schema):
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
-
-    @given(built)
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert is_valid(value), value
-
-    test()
-
-
-UNSUPPORTED_ARRAY_SCHEMAS = [
-    {"type": "array", "contains": {"type": "integer"}},
-]
-
-
-@pytest.mark.parametrize("schema", UNSUPPORTED_ARRAY_SCHEMAS, ids=str)
-def test_canonical_array_falls_back(schema):
-    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
-
-
-def test_canonical_array_prefix_items_reaches_beyond_the_prefix():
-    built = _canonical_strategy_or_none(
-        {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}},
-        GenerationConfig(),
-        jsonschema_rs.Draft202012Validator,
-    )
-    assert built is not None
-
-    find(built, lambda value: len(value) > 1, settings=settings(max_examples=1000, database=None))
 
 
 def test_canonical_array_unique_items_separates_booleans_from_numbers():
@@ -1836,97 +1858,6 @@ def test_canonical_array_unique_items_merges_equal_numbers():
     test()
 
 
-def test_canonical_array_respects_size_bounds():
-    built = _canonical_strategy_or_none(
-        {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 3},
-        GenerationConfig(),
-        jsonschema_rs.Draft202012Validator,
-    )
-    assert built is not None
-
-    @given(built)
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert 2 <= len(value) <= 3, value
-
-    test()
-
-
-# `reaches` names values that must be drawable; an empty tuple asks for soundness only.
-CANONICAL_PATTERN_CASES = [
-    # A pattern is a search, so the value may carry anything around the match.
-    ({"type": "string", "pattern": "^x"}, (lambda value: len(value) > 1,)),
-    # Python's `re` matches `$` before a trailing newline; the validator does not.
-    ({"type": "string", "pattern": "x$"}, ()),
-    ({"type": "string", "pattern": "[0-9]{2}", "maxLength": 4}, ()),
-]
-PATTERN_IDS = [str(schema) for schema, _ in CANONICAL_PATTERN_CASES]
-
-
-@pytest.mark.parametrize(("schema", "reaches"), CANONICAL_PATTERN_CASES, ids=PATTERN_IDS)
-def test_canonical_pattern_generation_is_sound(schema, reaches):
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
-
-    @given(built)
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert is_valid(value), value
-
-    test()
-
-
-@pytest.mark.parametrize(
-    ("schema", "reaches"),
-    [case for case in CANONICAL_PATTERN_CASES if case[1]],
-    ids=[id for id, case in zip(PATTERN_IDS, CANONICAL_PATTERN_CASES, strict=True) if case[1]],
-)
-def test_canonical_pattern_generation_reaches(schema, reaches):
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-    for predicate in reaches:
-        find(built, predicate, settings=settings(max_examples=1000, database=None))
-
-
-# Formats the validator asserts, so generated values can be checked against the schema itself.
-ASSERTED_FORMATS = [
-    "date",
-    "date-time",
-    "time",
-    "duration",
-    "email",
-    "idn-email",
-    "hostname",
-    "idn-hostname",
-    "ipv4",
-    "ipv6",
-    "uri",
-    "uri-reference",
-    "uri-template",
-    "iri",
-    "iri-reference",
-    "json-pointer",
-    "relative-json-pointer",
-    "uuid",
-]
-
-
-@pytest.mark.parametrize("name", ASSERTED_FORMATS)
-def test_canonical_string_format_generation(name):
-    schema = {"type": "string", "format": name}
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None, name
-    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
-
-    @given(built)
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert is_valid(value), value
-
-    test()
-
-
 def test_canonical_string_format_byte():
     built = _canonical_strategy_or_none(
         {"type": "string", "format": "byte"}, GenerationConfig(), jsonschema_rs.Draft4Validator
@@ -1955,34 +1886,6 @@ def test_canonical_string_format_binary():
     test()
 
 
-def test_canonical_unknown_format_is_ignored():
-    # Unknown formats are annotations; they must not block generation or narrow the strings drawn.
-    schema = {"type": "string", "format": "decimal", "minLength": 3, "maxLength": 6}
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-
-    @given(built)
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert 3 <= len(value) <= 6, value
-
-    test()
-
-
-def test_canonical_format_within_length_bounds():
-    schema = {"type": "string", "format": "uuid", "minLength": 36, "maxLength": 36}
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
-
-    @given(built)
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert is_valid(value), value
-
-    test()
-
-
 def test_canonical_format_drops_values_over_the_length_bound():
     # A format generator cannot be steered by length, so the bound can only be filtered for; the
     # generator reaches 32 characters here and every one of those must be discarded.
@@ -1998,21 +1901,6 @@ def test_canonical_format_drops_values_over_the_length_bound():
     test()
 
 
-def test_canonical_format_respects_pattern():
-    schema = {"type": "string", "format": "hostname", "pattern": "^a"}
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
-
-    # A format generator cannot be steered by a pattern, so most draws are discarded.
-    @given(built)
-    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
-    def test(value):
-        assert is_valid(value), value
-
-    test()
-
-
 def test_canonical_format_drops_values_the_pattern_rejects():
     built = _canonical_strategy_or_none(
         {"type": "string", "format": "uuid", "pattern": "^not-a-uuid$"},
@@ -2023,12 +1911,6 @@ def test_canonical_format_drops_values_the_pattern_rejects():
 
     with pytest.raises(Unsatisfiable):
         find(built, lambda _: True, settings=settings(max_examples=10, database=None))
-
-
-def test_canonical_conflicting_formats_fall_back():
-    # Two formats at once needs a conjunction this module cannot build.
-    schema = {"allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]}
-    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
@@ -2057,59 +1939,6 @@ def test_canonical_object_property_formats(ctx, version):
         assert is_valid(case.body), case.body
 
     test()
-
-
-@pytest.mark.parametrize(
-    ("schema", "validator_cls"),
-    [
-        ({"type": "string", "contentMediaType": "application/json"}, jsonschema_rs.Draft7Validator),
-        ({"type": "string", "contentEncoding": "base64"}, jsonschema_rs.Draft7Validator),
-        # A pattern Python `re` rejects cannot drive generation, with or without a format.
-        ({"type": "string", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
-        ({"type": "string", "format": "uuid", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
-    ],
-    ids=["content-media-type", "content-encoding", "pattern", "format-and-pattern"],
-)
-def test_canonical_string_falls_back(schema, validator_cls):
-    assert _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls) is None
-
-
-ADDITIONAL_PROPERTIES_SCHEMAS = [
-    {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}},
-    {"type": "object", "additionalProperties": {"type": "integer"}},
-    # The required key is absent from `properties`, so its value answers to `additionalProperties`.
-    {"type": "object", "required": ["a"], "additionalProperties": {"type": "string", "minLength": 2}},
-    {
-        "type": "object",
-        "properties": {"a": {"type": "integer"}},
-        "required": ["a"],
-        "additionalProperties": {"type": "array", "items": {"type": "integer"}},
-    },
-    {"type": "object", "additionalProperties": {"type": "object", "properties": {"b": {"type": "integer"}}}},
-    {"type": "object", "additionalProperties": {"anyOf": [{"type": "integer"}, {"type": "boolean"}]}},
-]
-
-
-@pytest.mark.parametrize("schema", ADDITIONAL_PROPERTIES_SCHEMAS, ids=str)
-def test_canonical_object_additional_properties(schema):
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
-
-    @given(built)
-    @settings(max_examples=25, deadline=None)
-    def test(value):
-        assert is_valid(value), value
-
-    test()
-
-
-def test_canonical_object_additional_properties_reaches_extra_keys():
-    schema = {"type": "object", "properties": {"a": {"type": "integer"}}, "additionalProperties": {"type": "string"}}
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
-
-    find(built, lambda value: set(value) - {"a"}, settings=settings(max_examples=1000, database=None))
 
 
 def test_canonical_object_keeps_declared_names_outside_the_alphabet():
