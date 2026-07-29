@@ -1456,6 +1456,18 @@ CANONICAL_OBJECT_SCHEMAS = [
     {"type": "object", "propertyNames": {"pattern": "x[0-9]+"}, "minProperties": 2},
     {"type": "object", "propertyNames": {"maxLength": 4, "pattern": "^x"}, "minProperties": 2},
     {"type": "object", "propertyNames": {"anyOf": [{"pattern": "x[0-9]+"}, {"maxLength": 3}]}},
+    # A required key `properties` says nothing about, but a pattern does.
+    {"type": "object", "patternProperties": {"^a": {"type": "integer"}}, "required": ["ax"]},
+    {"type": "object", "properties": {"ab": {"minimum": 1}}, "patternProperties": {"^a": {"type": "integer"}}},
+    {
+        "type": "object",
+        "patternProperties": {"^a": {"type": "integer"}},
+        "additionalProperties": False,
+        "minProperties": 2,
+    },
+    {"type": "object", "patternProperties": {"^a": {"type": "integer"}}, "propertyNames": {"enum": ["a1", "zz"]}},
+    # Python reads `\d` as any Unicode digit, the validator as ASCII only.
+    {"type": "object", "patternProperties": {"^\\d": {"type": "integer"}}},
 ]
 
 CANONICAL_ARRAY_SCHEMAS = [
@@ -1517,6 +1529,28 @@ CANONICAL_CASES = [
     # Python's `re` matches `$` before a trailing newline; the validator does not.
     ({"type": "string", "pattern": "x$"}, ()),
     ({"type": "string", "pattern": "[0-9]{2}", "maxLength": 4}, ()),
+    # Python reads the shorthand classes over the whole of Unicode, the validator over ASCII only.
+    ({"type": "string", "pattern": "^\\d+"}, (lambda value: len(value) > 1,)),
+    ({"type": "string", "pattern": "^[\\w]+"}, ()),
+    ({"type": "string", "pattern": "\\s"}, ()),
+    # A key the pattern claims is drawable even though nothing names it.
+    (
+        {"type": "object", "patternProperties": {"^a": {"type": "integer"}}},
+        (lambda value: any(key.startswith("a") for key in value),),
+    ),
+    # Each pattern names keys of its own; one claimed by both is only reachable by chance.
+    (
+        {"type": "object", "patternProperties": {"^a": {"type": "integer"}, "b$": {"multipleOf": 2}}},
+        (
+            lambda value: any(key.startswith("a") for key in value),
+            lambda value: any(key.endswith("b") for key in value),
+        ),
+    ),
+    # A closed schema whose only admitted keys come from the pattern.
+    (
+        {"type": "object", "patternProperties": {"^a": {"type": "integer"}}, "additionalProperties": False},
+        (lambda value: len(value) > 1,),
+    ),
     # A ceiling narrows the sizes, it does not pin the object to its floor.
     (
         {"type": "object", "properties": {"a": {"type": "integer"}}, "maxProperties": 3},
@@ -1587,7 +1621,6 @@ def test_canonical_integer_generation_emits_python_ints(schema):
 
 
 UNSUPPORTED_SCHEMAS = [
-    ({"type": "object", "patternProperties": {"^a": {"type": "integer"}}}, jsonschema_rs.Draft202012Validator),
     ({"type": "array", "contains": {"type": "integer"}}, jsonschema_rs.Draft202012Validator),
     ({"type": "string", "contentMediaType": "application/json"}, jsonschema_rs.Draft7Validator),
     ({"type": "string", "contentEncoding": "base64"}, jsonschema_rs.Draft7Validator),

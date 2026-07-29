@@ -137,14 +137,12 @@ def _json_identity(value: JsonValue) -> object:
 
 
 def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    # A per-pattern value schema needs the key's own name to decide which schemas it answers to.
-    if view.pattern_properties:
-        raise UnsupportedView("object")
     entries = {key: from_schema(entry, ctx) for key, entry in view.properties.items()}
     # Whatever `properties` does not name answers to `additionalProperties`, and is otherwise free.
     unnamed = _anything(ctx) if view.additional_properties is None else from_schema(view.additional_properties, ctx)
+    value_for = _value_source(view, unnamed, ctx)
     # A key can be required without `properties` saying anything about its value.
-    required = {key: entries[key] if key in entries else unnamed for key in view.required}
+    required = {key: entries[key] if key in entries else value_for(key) for key in view.required}
     optional = {key: entry for key, entry in entries.items() if key not in view.required}
     names = None if view.property_names is None else _closed_names(view.property_names)
     if names is not None:
@@ -152,19 +150,83 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
         # so the names it lists are the only optional keys.
         # Sorted: draw order decides what a seed replays, and set iteration order is not stable
         # across processes.
-        optional.update(dict.fromkeys(sorted(names - set(required) - set(optional)), unnamed))
-        free_names = None
+        optional.update({name: value_for(name) for name in sorted(names - set(required) - set(optional))})
+        extra = None
     else:
         known = set(view.properties) | set(view.required)
-        source = _text(ctx) if view.property_names is None else from_schema(view.property_names, ctx).map(_key)
-        free_names = source.filter(lambda key: key not in known)
+        free_names = _free_names(view, ctx).filter(lambda key: key not in known)
+        if view.pattern_properties:
+            # Which schemas a key answers to is decided by its own name, so name and value are one draw.
+            extra = free_names.flatmap(lambda name: st.tuples(st.just(name), value_for(name)))
+        else:
+            extra = st.tuples(free_names, unnamed)
     if view.min_properties is None and view.max_properties is None:
         named = st.fixed_dictionaries(required, optional=optional)
-        if free_names is None:
+        if extra is None:
             return named
-        extra = st.dictionaries(free_names, unnamed, max_size=_EXTRA_KEYS)
-        return st.tuples(named, extra).map(lambda parts: {**parts[1], **parts[0]})
-    return _sized_object(required, optional, free_names, unnamed, view.min_properties or 0, view.max_properties)
+        return st.tuples(named, _collect(extra, 0, _EXTRA_KEYS)).map(lambda parts: {**parts[1], **parts[0]})
+    return _sized_object(required, optional, extra, view.min_properties or 0, view.max_properties)
+
+
+def _collect(
+    entries: SearchStrategy[tuple[str, JsonValue]], low: int, high: int
+) -> SearchStrategy[dict[str, JsonValue]]:
+    return st.lists(entries, unique_by=lambda entry: entry[0], min_size=low, max_size=high).map(dict)
+
+
+def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[str]:
+    """Names for keys the schema does not spell out."""
+    if view.property_names is not None:
+        # Python `re` and the validator's engine disagree on several constructs — `\d` is Unicode here
+        # and ASCII there — so a drawn name is checked before it becomes a key.
+        is_valid = jsonschema_rs.validator_for(view.property_names.to_json_schema()).is_valid
+        return from_schema(view.property_names, ctx).map(_key).filter(is_valid)
+    # Arbitrary text practically never matches a `patternProperties` regex, so the patterns name keys too.
+    sources = [_text(ctx)]
+    for pattern in view.pattern_properties:
+        compiled = _compiled(pattern)
+        if compiled is not None:
+            sources.append(st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy()))
+    return st.one_of(sources)
+
+
+def _value_source(
+    view: jsonschema_rs.canonical.ObjectView, unnamed: SearchStrategy[JsonValue], ctx: StrategyContext
+) -> Callable[[str], SearchStrategy[JsonValue]]:
+    """The value strategy a property name answers to under `patternProperties`."""
+    # The validator's own regex engine decides what a pattern matches; Python `re` reads several
+    # constructs differently and would hand the key the wrong schema.
+    matchers = [
+        (jsonschema_rs.validator_for({"type": "string", "pattern": pattern}).is_valid, schema)
+        for pattern, schema in view.pattern_properties.items()
+    ]
+    cache: dict[tuple[int, ...], SearchStrategy[JsonValue]] = {}
+
+    def value_for(name: str) -> SearchStrategy[JsonValue]:
+        matched = tuple(index for index, (is_match, _) in enumerate(matchers) if is_match(name))
+        strategy = cache.get(matched)
+        if strategy is None:
+            strategy = cache[matched] = _pattern_values(matched, matchers, unnamed, ctx)
+        return strategy
+
+    return value_for
+
+
+def _pattern_values(
+    matched: tuple[int, ...],
+    matchers: list[tuple[Callable[[str], bool], jsonschema_rs.CanonicalSchema]],
+    unnamed: SearchStrategy[JsonValue],
+    ctx: StrategyContext,
+) -> SearchStrategy[JsonValue]:
+    # `additionalProperties` only reaches names no pattern claims.
+    if not matched:
+        return unnamed
+    strategy = from_schema(matchers[matched[0]][1], ctx)
+    for index in matched[1:]:
+        # Satisfying several patterns at once needs an intersection this module cannot build, so the
+        # first one drives the draw and the rest filter it. Overlapping patterns are rare.
+        strategy = strategy.filter(jsonschema_rs.validator_for(matchers[index][1].to_json_schema()).is_valid)
+    return strategy
 
 
 @st.composite  # type: ignore[untyped-decorator]
@@ -172,8 +234,7 @@ def _sized_object(
     draw: st.DrawFn,
     required: dict[str, SearchStrategy[JsonValue]],
     optional: dict[str, SearchStrategy[JsonValue]],
-    free_names: SearchStrategy[str] | None,
-    unnamed: SearchStrategy[JsonValue],
+    entries: SearchStrategy[tuple[str, JsonValue]] | None,
     minimum: int,
     maximum: int | None,
 ) -> JsonValue:
@@ -184,14 +245,14 @@ def _sized_object(
     high = len(keys) if maximum is None else min(len(keys), maximum - len(required))
     chosen = draw(st.sets(st.sampled_from(keys), min_size=low, max_size=high)) if keys else set()
     result = draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in chosen}}))
-    if free_names is None:
+    if entries is None:
         return result
     # `_EXTRA_KEYS` bounds how far past the floor a draw reaches, not how many keys it may hold —
     # capping the total instead would pin every object with a floor of `_EXTRA_KEYS` or more to
     # exactly that floor.
     extra_low = max(0, minimum - len(result))
     extra_high = extra_low + _EXTRA_KEYS if maximum is None else min(extra_low + _EXTRA_KEYS, maximum - len(result))
-    extra = draw(st.dictionaries(free_names, unnamed, min_size=extra_low, max_size=extra_high))
+    extra = draw(_collect(entries, extra_low, extra_high))
     return {**extra, **result}
 
 
@@ -391,7 +452,8 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         if view.max_length is not None:
             kwargs["max_size"] = view.max_length
         return _text(ctx, **kwargs)
-    if len(view.patterns) > 1 or not _compiles(view.patterns[0]):
+    compiled = _compiled(view.patterns[0])
+    if len(view.patterns) > 1 or compiled is None:
         # Intersecting patterns need a conjunctive rewrite, and a pattern Python `re` rejects (e.g. ECMA
         # `\p{L}`) can't drive generation at all.
         raise UnsupportedView("string")
@@ -399,7 +461,7 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
     # A pattern is a search, so the value may carry anything around the match. Drawing full matches
     # only would be sound but narrow: `^x` would spell one single string, so `propertyNames` beside a
     # `minProperties` floor could not find distinct keys at all.
-    strategy = st.from_regex(pattern, alphabet=ctx.alphabet.as_strategy())
+    strategy = st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy())
     if "$" in pattern:
         # Python matches `$` before a trailing newline as well, where the validator takes it for the
         # end of the string. Anywhere else the two readings agree. An escaped or bracketed `$` is a
@@ -414,11 +476,12 @@ def _formatted(name: str, view: jsonschema_rs.canonical.StringView, ctx: Strateg
     """Values from the generator registered for `name`, narrowed to the facets around it."""
     strategy = ctx.formats[name]
     for pattern in view.patterns:
-        if not _compiles(pattern):
+        compiled = _compiled(pattern)
+        if compiled is None:
             raise UnsupportedView("string")
         # A format generator cannot be steered, so the pattern can only be filtered for. `search`,
         # not `fullmatch`: an unanchored pattern admits a match anywhere in the value.
-        strategy = strategy.filter(re.compile(pattern).search)
+        strategy = strategy.filter(compiled.search)
     return _within_length(strategy, view)
 
 
@@ -432,12 +495,14 @@ def _within_length(
     return strategy.filter(lambda value: low <= len(value) <= high)
 
 
-def _compiles(pattern: str) -> bool:
+def _compiled(pattern: str) -> re.Pattern[str] | None:
+    """The pattern under the validator's reading of it, or `None` when Python `re` rejects it."""
+    # `re.ASCII`: the validator's engine expands `\d`, `\w`, `\s` and `\b` over ASCII, Python over the
+    # whole of Unicode, so the default reading draws values the schema rejects.
     try:
-        re.compile(pattern)
-        return True
+        return re.compile(pattern, re.ASCII)
     except re.error:
-        return False
+        return None
 
 
 def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:
