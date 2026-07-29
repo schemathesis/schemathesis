@@ -137,9 +137,8 @@ def _json_identity(value: JsonValue) -> object:
 
 
 def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    # Every remaining facet constrains keys this module draws freely, and honoring them needs a
-    # joint draw over names, values and size.
-    if view.pattern_properties or view.min_properties is not None or view.max_properties is not None:
+    # A per-pattern value schema needs the key's own name to decide which schemas it answers to.
+    if view.pattern_properties:
         raise UnsupportedView("object")
     entries = {key: from_schema(entry, ctx) for key, entry in view.properties.items()}
     # Whatever `properties` does not name answers to `additionalProperties`, and is otherwise free.
@@ -147,20 +146,60 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
     # A key can be required without `properties` saying anything about its value.
     required = {key: entries[key] if key in entries else unnamed for key in view.required}
     optional = {key: entry for key, entry in entries.items() if key not in view.required}
-    if view.property_names is not None:
+    names = None if view.property_names is None else _closed_names(view.property_names)
+    if names is not None:
         # A closed name set — what `additionalProperties: false` folds into — admits nothing else,
         # so the names it lists are the only optional keys.
-        names = _closed_names(view.property_names)
-        if names is None:
-            raise UnsupportedView("object")
         # Sorted: draw order decides what a seed replays, and set iteration order is not stable
         # across processes.
         optional.update(dict.fromkeys(sorted(names - set(required) - set(optional)), unnamed))
-        return st.fixed_dictionaries(required, optional=optional)
-    named = st.fixed_dictionaries(required, optional=optional)
-    known = set(view.properties) | set(view.required)
-    extra = st.dictionaries(_text(ctx).filter(lambda key: key not in known), unnamed, max_size=_EXTRA_KEYS)
-    return st.tuples(named, extra).map(lambda parts: {**parts[1], **parts[0]})
+        free_names = None
+    else:
+        known = set(view.properties) | set(view.required)
+        source = _text(ctx) if view.property_names is None else from_schema(view.property_names, ctx).map(_key)
+        free_names = source.filter(lambda key: key not in known)
+    if view.min_properties is None and view.max_properties is None:
+        named = st.fixed_dictionaries(required, optional=optional)
+        if free_names is None:
+            return named
+        extra = st.dictionaries(free_names, unnamed, max_size=_EXTRA_KEYS)
+        return st.tuples(named, extra).map(lambda parts: {**parts[1], **parts[0]})
+    return _sized_object(required, optional, free_names, unnamed, view.min_properties or 0, view.max_properties)
+
+
+@st.composite  # type: ignore[untyped-decorator]
+def _sized_object(
+    draw: st.DrawFn,
+    required: dict[str, SearchStrategy[JsonValue]],
+    optional: dict[str, SearchStrategy[JsonValue]],
+    free_names: SearchStrategy[str] | None,
+    unnamed: SearchStrategy[JsonValue],
+    minimum: int,
+    maximum: int | None,
+) -> JsonValue:
+    """An object whose property count answers to `minProperties` / `maxProperties`."""
+    keys = sorted(optional)
+    # Documented keys fill the floor first; names drawn out of nowhere only cover what they cannot.
+    low = min(len(keys), max(0, minimum - len(required)))
+    high = len(keys) if maximum is None else min(len(keys), maximum - len(required))
+    chosen = draw(st.sets(st.sampled_from(keys), min_size=low, max_size=high)) if keys else set()
+    result = draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in chosen}}))
+    if free_names is None:
+        return result
+    # `_EXTRA_KEYS` bounds how far past the floor a draw reaches, not how many keys it may hold —
+    # capping the total instead would pin every object with a floor of `_EXTRA_KEYS` or more to
+    # exactly that floor.
+    extra_low = max(0, minimum - len(result))
+    extra_high = extra_low + _EXTRA_KEYS if maximum is None else min(extra_low + _EXTRA_KEYS, maximum - len(result))
+    extra = draw(st.dictionaries(free_names, unnamed, min_size=extra_low, max_size=extra_high))
+    return {**extra, **result}
+
+
+def _key(name: JsonValue) -> str:
+    """A drawn property name, checked rather than cast."""
+    # `property_names` constrains keys, so canonicalization keeps only what a key could spell.
+    assert isinstance(name, str), name
+    return name
 
 
 def _closed_names(schema: jsonschema_rs.CanonicalSchema) -> set[str] | None:
@@ -356,9 +395,17 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         # Intersecting patterns need a conjunctive rewrite, and a pattern Python `re` rejects (e.g. ECMA
         # `\p{L}`) can't drive generation at all.
         raise UnsupportedView("string")
-    # `fullmatch` avoids `$` matching before a trailing newline (which the validator rejects);
-    # full matches are a subset of the search matches the schema accepts, so it stays sound.
-    strategy = st.from_regex(view.patterns[0], fullmatch=True, alphabet=ctx.alphabet.as_strategy())
+    pattern = view.patterns[0]
+    # A pattern is a search, so the value may carry anything around the match. Drawing full matches
+    # only would be sound but narrow: `^x` would spell one single string, so `propertyNames` beside a
+    # `minProperties` floor could not find distinct keys at all.
+    strategy = st.from_regex(pattern, alphabet=ctx.alphabet.as_strategy())
+    if "$" in pattern:
+        # Python matches `$` before a trailing newline as well, where the validator takes it for the
+        # end of the string. Anywhere else the two readings agree. An escaped or bracketed `$` is a
+        # literal and needs no filtering, but telling those apart costs more than dropping the
+        # newline-terminated values they admit.
+        strategy = strategy.filter(lambda value: not value.endswith("\n"))
     # Length is normally folded into the pattern upstream; this filter is the soundness net.
     return _within_length(strategy, view)
 
