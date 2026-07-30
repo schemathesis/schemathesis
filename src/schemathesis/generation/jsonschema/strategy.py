@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 
 import jsonschema_rs
 from hypothesis import strategies as st
+from hypothesis.errors import InvalidArgument
 from jsonschema_rs import canonical
 
 from schemathesis.generation.jsonschema.context import Alphabet
@@ -83,7 +84,26 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _object(view, ctx)
     if isinstance(view, canonical.ArrayView):
         return _array(view, ctx)
+    if isinstance(view, canonical.ReferenceView):
+        return _reference(schema, view, ctx)
     raise UnsupportedView(schema.kind)
+
+
+def _reference(
+    schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ReferenceView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
+    """Values admitted by the schema the pointer names."""
+    # Canonicalization refuses a pointer it cannot resolve, so the target is here.
+    target = schema.definitions()[view.uri]
+    if view.uri in ctx.resolving:
+        # The pointer leads back into what is still being built. Spelling the rest of the value
+        # lazily lets a draw stop descending, where unrolling it here never would.
+        return st.deferred(lambda: from_schema(target, ctx))
+    ctx.resolving.add(view.uri)
+    try:
+        return from_schema(target, ctx)
+    finally:
+        ctx.resolving.discard(view.uri)
 
 
 def _array(view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
@@ -179,6 +199,9 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
 def _collect(
     entries: SearchStrategy[tuple[str, JsonValue]], low: int, high: int
 ) -> SearchStrategy[dict[str, JsonValue]]:
+    if low and entries.is_empty:
+        # No key can be spelled, and the floor asks for one anyway.
+        return st.nothing()
     return st.lists(entries, unique_by=lambda entry: entry[0], min_size=low, max_size=high).map(dict)
 
 
@@ -472,6 +495,13 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
     # only would be sound but narrow: `^x` would spell one single string, so `propertyNames` beside a
     # `minProperties` floor could not find distinct keys at all.
     strategy = st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy())
+    try:
+        strategy.validate()
+    except InvalidArgument:
+        # Reading the pattern over ASCII is what the validator does, but it also leaves a character
+        # spelled out above that range unreachable, and `from_regex` refuses the whole pattern over
+        # it. The wider reading draws those, and the narrow one still decides what counts.
+        strategy = st.from_regex(re.compile(pattern), alphabet=ctx.alphabet.as_strategy()).filter(compiled.search)
     if "$" in pattern:
         # Python matches `$` before a trailing newline as well, where the validator takes it for the
         # end of the string. Anywhere else the two readings agree. An escaped or bracketed `$` is a
