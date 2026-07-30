@@ -1245,6 +1245,7 @@ def _build_canonical_strategy(
     if not canonical_schema.is_satisfiable():
         return None
     context = StrategyContext(
+        root=canonical_schema,
         alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
         formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
     )
