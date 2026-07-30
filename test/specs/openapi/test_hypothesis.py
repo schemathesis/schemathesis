@@ -15,6 +15,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema.resolver import load_file
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis.reporting import find_unsatisfiable_parameter
 from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
@@ -1170,3 +1171,39 @@ def test_float_format_snapping_dependency_named_like_keyword():
     dependency = schema["dependencies"]["not"]
     assert "exclusiveMinimum" not in dependency
     assert dependency["minimum"] > 0
+
+
+def test_unsatisfiable_parameter_is_the_one_the_engine_cannot_draw(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "choice",
+                            "required": True,
+                            "schema": {
+                                "oneOf": [
+                                    {"type": "object", "properties": {"a": {"type": "string"}}},
+                                    {"type": "object", "properties": {"b": {"type": "string"}}},
+                                ]
+                            },
+                        },
+                        {
+                            "in": "query",
+                            "name": "impossible",
+                            "required": True,
+                            "schema": {"type": "string", "minLength": 5, "maxLength": 2},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    found = find_unsatisfiable_parameter(schema["/data"]["GET"])
+
+    assert found is not None
+    assert found.name == "impossible"

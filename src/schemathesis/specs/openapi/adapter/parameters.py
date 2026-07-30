@@ -863,6 +863,11 @@ class OpenApiComponent(ABC):
     name_to_uri: dict[str, str]
     adapter: SpecificationAdapter
 
+    @property
+    @abstractmethod
+    def media_type(self) -> str | None:
+        """Media type this component carries, if any."""
+
     __slots__ = (
         "definition",
         "is_required",
