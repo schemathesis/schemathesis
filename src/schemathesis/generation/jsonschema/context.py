@@ -34,6 +34,8 @@ def _characters(allow_x00: bool, codec: str | None) -> SearchStrategy[str]:
 class StrategyContext:
     """Shared configuration threaded through `from_schema`."""
 
+    # The document `#` names; it is not one of its own definitions.
+    root: jsonschema_rs.CanonicalSchema
     alphabet: Alphabet = field(default_factory=Alphabet)
     # Values for `format`, by name. Names absent here are annotations and do not constrain generation.
     formats: dict[str, SearchStrategy] = field(default_factory=dict)

@@ -93,8 +93,9 @@ def _reference(
     schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ReferenceView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """Values admitted by the schema the pointer names."""
-    # Canonicalization refuses a pointer it cannot resolve, so the target is here.
-    target = schema.definitions()[view.uri]
+    # Canonicalization refuses a pointer it cannot resolve, so the target is here. `#` is the one
+    # pointer with no definition behind it: it names the document itself.
+    target = ctx.root if view.uri == "#" else schema.definitions()[view.uri]
     if view.uri in ctx.resolving:
         # The pointer leads back into what is still being built. Spelling the rest of the value
         # lazily lets a draw stop descending, where unrolling it here never would.
