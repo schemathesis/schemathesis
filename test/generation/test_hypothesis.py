@@ -1,4 +1,5 @@
 import datetime
+import re
 import sys
 import uuid
 from base64 import b64decode
@@ -17,7 +18,7 @@ import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
@@ -741,7 +742,6 @@ def test_as_strategy_example_resolves_bundled_refs(tmp_path):
 
 
 def test_invalid_schema_for_malformed_subschema(ctx):
-    # `description: null` violates JSON Schema; surface it as InvalidSchema rather than a raw validator error.
     schema = ctx.openapi.load_schema(
         {
             "/probe": {
@@ -762,11 +762,41 @@ def test_invalid_schema_for_malformed_subschema(ctx):
                 }
             }
         },
-        components={"schemas": {"Bad": {"type": "string", "description": None}}},
+        components={"schemas": {"Bad": {"type": "string", "maxLength": "5"}}},
     )
 
-    with pytest.raises(InvalidSchema, match="description"):
+    with pytest.raises(InvalidSchema, match="maxLength"):
         examples.generate_one(schema["/probe"]["POST"].as_strategy())
+
+
+def test_malformed_annotation_behind_a_reference_still_generates(ctx):
+    # An annotation cannot change which values the schema admits, and canonicalization drops it.
+    schema = ctx.openapi.load_schema(
+        {
+            "/probe": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"field": {"$ref": "#/components/schemas/Annotated"}},
+                                    "required": ["field"],
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"schemas": {"Annotated": {"type": "string", "description": None}}},
+    )
+
+    case = examples.generate_one(schema["/probe"]["POST"].as_strategy())
+
+    assert isinstance(case.body["field"], str)
 
 
 def test_array_with_allof_of_multiple_contains(ctx):
@@ -1533,6 +1563,45 @@ CANONICAL_CASES = [
     ({"type": "string", "pattern": "^\\d+"}, (lambda value: len(value) > 1,)),
     ({"type": "string", "pattern": "^[\\w]+"}, ()),
     ({"type": "string", "pattern": "\\s"}, ()),
+    # A `$ref` names the schema to draw from, and repeats of it draw the same way.
+    ({"$ref": "#/$defs/text", "$defs": {"text": {"type": "string", "minLength": 3}}}, ()),
+    (
+        {
+            "type": "object",
+            "properties": {"a": {"$ref": "#/$defs/text"}, "b": {"$ref": "#/$defs/text"}},
+            "required": ["a", "b"],
+            "$defs": {"text": {"type": "string", "minLength": 3}},
+        },
+        (),
+    ),
+    ({"type": "array", "items": {"$ref": "#/$defs/n"}, "$defs": {"n": {"type": "integer"}}}, ()),
+    # A pointer through another pointer.
+    ({"$ref": "#/$defs/a", "$defs": {"a": {"$ref": "#/$defs/b"}, "b": {"type": "integer"}}}, ()),
+    # A schema that names itself: shallow instances are instances, and deeper ones stay reachable.
+    (
+        {
+            "$ref": "#/$defs/node",
+            "$defs": {
+                "node": {
+                    "type": "object",
+                    "properties": {"child": {"$ref": "#/$defs/node"}, "value": {"type": "integer"}},
+                    "required": ["value"],
+                }
+            },
+        },
+        (lambda value: isinstance(value.get("child"), dict),),
+    ),
+    # Two schemas that name each other.
+    (
+        {
+            "$ref": "#/$defs/a",
+            "$defs": {
+                "a": {"type": "object", "properties": {"b": {"$ref": "#/$defs/b"}}},
+                "b": {"type": "object", "properties": {"a": {"$ref": "#/$defs/a"}}},
+            },
+        },
+        (),
+    ),
     # A key the pattern claims is drawable even though nothing names it.
     (
         {"type": "object", "patternProperties": {"^a": {"type": "integer"}}},
@@ -1618,6 +1687,82 @@ def test_canonical_integer_generation_emits_python_ints(schema):
         assert isinstance(value, int), value
 
     test()
+
+
+def test_canonical_reference_is_not_inlined(ctx):
+    # One target, many pointers: the strategy is built once and shared, where inlining would
+    # rebuild the same subtree for every pointer.
+    definitions = {"text": {"type": "string", "minLength": 3}}
+    properties = {f"p{index}": {"$ref": "#/$defs/text"} for index in range(20)}
+    schema = {"type": "object", "properties": properties, "required": list(properties), "$defs": definitions}
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=10, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_reference_without_a_target_is_refused_by_canonicalization():
+    schema = {"type": "object", "properties": {"a": {"$ref": "#/$defs/missing"}}, "$defs": {"other": {}}}
+
+    with pytest.raises(jsonschema_rs.canonical.CanonicalizationError, match="does not exist"):
+        jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012, pattern_options=FANCY_REGEX_OPTIONS)
+
+    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+
+
+def test_canonical_pattern_naming_a_character_outside_the_alphabet(ctx):
+    # `from_regex` refuses a pattern that spells out a character the alphabet excludes, even where
+    # the same pattern admits others it does not. Those values are still fair game.
+    schema = {"type": "string", "pattern": "^[\\x85a-z]{1,10}$"}
+    matches = re.compile("^[\x85a-z]{1,10}$").fullmatch
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert matches(value), value
+
+    test()
+
+    find(built, lambda value: len(value) > 1, settings=settings(max_examples=1000, database=None))
+
+
+def test_canonical_object_floor_over_values_that_cannot_be_drawn():
+    # Every property would need a value, and the only schema on offer admits none.
+    schema = {
+        "type": "object",
+        "additionalProperties": {"$ref": "#/$defs/node"},
+        "minProperties": 1,
+        "$defs": {"node": {"type": "object", "required": ["child"], "properties": {"child": {"$ref": "#/$defs/node"}}}},
+    }
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    with pytest.raises(Unsatisfiable):
+        find(built, lambda value: True, settings=settings(max_examples=50, database=None))
+
+
+def test_canonical_reference_with_no_finite_value_admits_nothing():
+    # Every instance would need a child, and so would that child.
+    schema = {
+        "$ref": "#/$defs/node",
+        "$defs": {"node": {"type": "object", "required": ["child"], "properties": {"child": {"$ref": "#/$defs/node"}}}},
+    }
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    with pytest.raises(Unsatisfiable):
+        find(built, lambda value: True, settings=settings(max_examples=50, database=None))
 
 
 UNSUPPORTED_SCHEMAS = [

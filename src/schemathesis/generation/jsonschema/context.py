@@ -38,3 +38,5 @@ class StrategyContext:
     # Values for `format`, by name. Names absent here are annotations and do not constrain generation.
     formats: dict[str, SearchStrategy] = field(default_factory=dict)
     cache: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
+    # Reference targets currently being built, so a cycle can be spelled lazily instead of unrolled.
+    resolving: set[str] = field(default_factory=set)
