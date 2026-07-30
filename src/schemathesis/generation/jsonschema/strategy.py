@@ -5,7 +5,7 @@ import re
 import sys
 from fractions import Fraction
 from functools import lru_cache
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NamedTuple, cast
 
 import jsonschema_rs
 from hypothesis import strategies as st
@@ -32,6 +32,14 @@ _EXTRA_KEYS = 5
 
 class UnsupportedView(Exception):
     """A canonical node this module cannot build from; the caller falls back to `hypothesis-jsonschema`."""
+
+
+class _PatternProperty(NamedTuple):
+    """One `patternProperties` entry: the names it claims, and the values it admits."""
+
+    claims: Callable[[str], bool]
+    values: SearchStrategy[JsonValue]
+    accepts: Callable[[JsonValue], bool]
 
 
 class Unrepresentable:
@@ -195,37 +203,39 @@ def _value_source(
 ) -> Callable[[str], SearchStrategy[JsonValue]]:
     """The value strategy a property name answers to under `patternProperties`."""
     # The validator's own regex engine decides what a pattern matches; Python `re` reads several
-    # constructs differently and would hand the key the wrong schema.
-    matchers = [
-        (jsonschema_rs.validator_for({"type": "string", "pattern": pattern}).is_valid, schema)
+    # constructs differently and would hand the key the wrong schema. Values are built here, not on
+    # the draw that needs them, so a declined schema is refused while the caller can still fall back.
+    patterns = [
+        _PatternProperty(
+            claims=jsonschema_rs.validator_for({"type": "string", "pattern": pattern}).is_valid,
+            values=from_schema(schema, ctx),
+            accepts=jsonschema_rs.validator_for(schema.to_json_schema()).is_valid,
+        )
         for pattern, schema in view.pattern_properties.items()
     ]
     cache: dict[tuple[int, ...], SearchStrategy[JsonValue]] = {}
 
     def value_for(name: str) -> SearchStrategy[JsonValue]:
-        matched = tuple(index for index, (is_match, _) in enumerate(matchers) if is_match(name))
+        matched = tuple(index for index, pattern in enumerate(patterns) if pattern.claims(name))
         strategy = cache.get(matched)
         if strategy is None:
-            strategy = cache[matched] = _pattern_values(matched, matchers, unnamed, ctx)
+            strategy = cache[matched] = _pattern_values(matched, patterns, unnamed)
         return strategy
 
     return value_for
 
 
 def _pattern_values(
-    matched: tuple[int, ...],
-    matchers: list[tuple[Callable[[str], bool], jsonschema_rs.CanonicalSchema]],
-    unnamed: SearchStrategy[JsonValue],
-    ctx: StrategyContext,
+    matched: tuple[int, ...], patterns: list[_PatternProperty], unnamed: SearchStrategy[JsonValue]
 ) -> SearchStrategy[JsonValue]:
     # `additionalProperties` only reaches names no pattern claims.
     if not matched:
         return unnamed
-    strategy = from_schema(matchers[matched[0]][1], ctx)
+    strategy = patterns[matched[0]].values
     for index in matched[1:]:
         # Satisfying several patterns at once needs an intersection this module cannot build, so the
         # first one drives the draw and the rest filter it. Overlapping patterns are rare.
-        strategy = strategy.filter(jsonschema_rs.validator_for(matchers[index][1].to_json_schema()).is_valid)
+        strategy = strategy.filter(patterns[index].accepts)
     return strategy
 
 
@@ -285,7 +295,7 @@ def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonVa
     stride = multiple_of.numerator
     low = None if view.minimum is None else -(-view.minimum // stride)
     high = None if view.maximum is None else view.maximum // stride
-    return st.integers(min_value=low, max_value=high).map(lambda step: step * stride)
+    return _steps(low, high).map(lambda step: step * stride)
 
 
 def _number(view: jsonschema_rs.canonical.NumberView) -> SearchStrategy[JsonValue]:

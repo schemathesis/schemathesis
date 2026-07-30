@@ -1632,6 +1632,11 @@ UNSUPPORTED_SCHEMAS = [
         {"allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]},
         jsonschema_rs.Draft202012Validator,
     ),
+    # `contains` behind a pattern is only reached on a draw, and must still be refused up front.
+    (
+        {"type": "object", "patternProperties": {"^a": {"type": "array", "contains": {"type": "integer"}}}},
+        jsonschema_rs.Draft202012Validator,
+    ),
 ]
 
 
@@ -1648,6 +1653,16 @@ def test_canonical_number_generation_without_representable_values():
         GenerationConfig(),
         jsonschema_rs.Draft202012Validator,
     )
+    assert built is not None
+
+    with pytest.raises(Unsatisfiable):
+        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+
+
+def test_canonical_integer_grid_without_a_multiple_in_range():
+    # No integer between 1 and 2.5 is a multiple of 1.5, and canonicalization does not rule it out.
+    schema = {"type": "integer", "minimum": 1, "maximum": 2.5, "multipleOf": 1.5}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     assert built is not None
 
     with pytest.raises(Unsatisfiable):
@@ -1756,6 +1771,25 @@ def test_canonical_number_above_the_float_range():
     @settings(max_examples=20, deadline=None, database=None)
     def test(value):
         assert isinstance(value, int)
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_overlapping_pattern_properties():
+    # `ab` is claimed by both patterns, so its value answers to both schemas at once.
+    schema = {
+        "type": "object",
+        "patternProperties": {"^a": {"type": "integer", "multipleOf": 2}, "b$": {"minimum": 10}},
+        "required": ["ab"],
+    }
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
         assert is_valid(value), value
 
     test()
@@ -1986,3 +2020,160 @@ def test_canonical_object_keeps_declared_names_outside_the_alphabet():
         assert "é" in value, value
 
     test()
+
+
+# Bounds where a decimal and its `f64` reading disagree.
+NUMERIC_BOUNDS = st.sampled_from(
+    [-(10**25), -1, 0, 1, 0.1, 2.5, 1e-7, 10**18 - 1, 1e18, 1e25, 10**25, 1e308, 10**400, 5e-324]
+)
+MULTIPLE_OF_VALUES = st.sampled_from([1, 2, 7, 0.1, 0.25, 1.5, 1e-7, 1e308])
+STRING_PATTERNS = st.sampled_from(["^x", "x$", "^[a-z]{2,4}$", "\\d+", "[0-9]{2}", "^\\w+$", "a|b", "\\s"])
+PROPERTY_NAMES = ["a", "b", "ax", "x1", "zz"]
+# `^\d` and `^\w+$` read one way in Python and another in the validator's engine.
+NAME_CONSTRAINTS = [
+    {"enum": ["a", "zz"]},
+    {"const": "a"},
+    {"pattern": "^x"},
+    {"pattern": "^\\d"},
+    {"pattern": "^\\w+$"},
+    {"maxLength": 3},
+]
+JSON_VALUES = [None, True, 1, 1.5, "a", "", [], [1], {}, {"a": 1}]
+
+
+@st.composite
+def numeric_schemas(draw):
+    schema = {"type": draw(st.sampled_from(["integer", "number"]))}
+    keywords = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"]
+    for keyword in draw(st.sets(st.sampled_from(keywords), max_size=3)):
+        schema[keyword] = draw(MULTIPLE_OF_VALUES if keyword == "multipleOf" else NUMERIC_BOUNDS)
+    # Canonicalization drops the exclusive bound when its inclusive partner is outside the float range.
+    for inclusive, exclusive in (("minimum", "exclusiveMinimum"), ("maximum", "exclusiveMaximum")):
+        if abs(schema.get(inclusive, 0)) > sys.float_info.max:
+            schema.pop(exclusive, None)
+    return schema
+
+
+@st.composite
+def string_schemas(draw):
+    schema = {"type": "string"}
+    if draw(st.booleans()):
+        # A format generator answers to no facet around it, so the bounds stay loose enough to survive.
+        schema["format"] = draw(st.sampled_from(ASSERTED_FORMATS))
+        if draw(st.booleans()):
+            schema["maxLength"] = draw(st.integers(0, 40))
+        if draw(st.booleans()):
+            schema["minLength"] = draw(st.integers(0, 8))
+        return schema
+    if draw(st.booleans()):
+        schema["pattern"] = draw(STRING_PATTERNS)
+    if draw(st.booleans()):
+        schema["minLength"] = draw(st.integers(0, 4))
+    if draw(st.booleans()):
+        schema["maxLength"] = draw(st.integers(0, 8))
+    return schema
+
+
+@st.composite
+def object_schemas(draw, children):
+    schema = {"type": "object"}
+    names = sorted(draw(st.sets(st.sampled_from(PROPERTY_NAMES), max_size=3)))
+    if names:
+        schema["properties"] = {name: draw(children) for name in names}
+        schema["required"] = sorted(draw(st.sets(st.sampled_from(names), max_size=2)))
+    if draw(st.booleans()):
+        schema["additionalProperties"] = draw(st.one_of(st.just(False), children))
+    # Two patterns can claim one key, and its value has to satisfy both at once.
+    patterns = sorted(draw(st.sets(st.sampled_from(["^a", "x$", "^\\d", "^.{2}$"]), max_size=2)))
+    if patterns:
+        schema["patternProperties"] = {pattern: draw(children) for pattern in patterns}
+    if draw(st.booleans()):
+        schema["propertyNames"] = draw(st.sampled_from(NAME_CONSTRAINTS))
+    if draw(st.booleans()):
+        schema["minProperties"] = draw(st.integers(0, 3))
+    if draw(st.booleans()):
+        schema["maxProperties"] = draw(st.integers(0, 4))
+    return schema
+
+
+@st.composite
+def array_schemas(draw, children):
+    schema = {"type": "array"}
+    if draw(st.booleans()):
+        schema["items"] = draw(st.one_of(st.just(False), children))
+    if draw(st.booleans()):
+        schema["prefixItems"] = draw(st.lists(children, min_size=1, max_size=2))
+    unique = draw(st.booleans())
+    if unique:
+        schema["uniqueItems"] = True
+    if draw(st.booleans()):
+        # A floor above the distinct values an element admits leaves the draw spinning on uniqueness.
+        schema["minItems"] = draw(st.integers(0, 2 if unique else 3))
+    if draw(st.booleans()):
+        schema["maxItems"] = draw(st.integers(0, 4))
+    return schema
+
+
+ANY_SCHEMA = st.recursive(
+    st.one_of(
+        st.sampled_from([{}, {"type": "null"}, {"type": "boolean"}]),
+        numeric_schemas(),
+        string_schemas(),
+        st.builds(lambda value: {"const": value}, st.sampled_from(JSON_VALUES)),
+        st.builds(
+            lambda values: {"enum": values},
+            st.lists(st.sampled_from(JSON_VALUES), min_size=1, max_size=4, unique_by=repr),
+        ),
+    ),
+    lambda children: st.one_of(
+        object_schemas(children),
+        array_schemas(children),
+        st.builds(lambda branches: {"anyOf": branches}, st.lists(children, min_size=1, max_size=3)),
+        st.builds(lambda branches: {"allOf": branches}, st.lists(children, min_size=2, max_size=2)),
+    ),
+    max_leaves=4,
+)
+
+
+def assert_generation_is_sound(schemas, *, max_examples, floor):
+    validated = 0
+
+    @given(schema=schemas, data=st.data())
+    @settings(
+        max_examples=max_examples,
+        deadline=None,
+        database=None,
+        suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow, HealthCheck.data_too_large],
+    )
+    def test(schema, data):
+        nonlocal validated
+        built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+        # A schema this module declines to model is served by `hypothesis-jsonschema` instead.
+        assume(built is not None)
+        value = data.draw(built)
+        assert jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid(value), (schema, value)
+        validated += 1
+
+    test()
+    # Schemas that never reach the assertion would leave the run green and empty.
+    assert validated > floor, validated
+
+
+def test_canonical_generation_soundness():
+    assert_generation_is_sound(ANY_SCHEMA, max_examples=300, floor=50)
+
+
+def test_canonical_number_generation_soundness():
+    assert_generation_is_sound(numeric_schemas(), max_examples=500, floor=100)
+
+
+def test_canonical_string_generation_soundness():
+    assert_generation_is_sound(string_schemas(), max_examples=500, floor=100)
+
+
+def test_canonical_object_generation_soundness():
+    assert_generation_is_sound(object_schemas(ANY_SCHEMA), max_examples=400, floor=50)
+
+
+def test_canonical_array_generation_soundness():
+    assert_generation_is_sound(array_schemas(ANY_SCHEMA), max_examples=300, floor=50)
