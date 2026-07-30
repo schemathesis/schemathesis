@@ -31,6 +31,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     prevent_unsatisfiable_schema,
     remove_required_property,
 )
+from schemathesis.specs.openapi.negative.utils import can_negate
 from test.utils import assert_requests_call
 
 MAX_EXAMPLES = 15
@@ -1399,3 +1400,21 @@ def test_negative_data_rejection_array_path_param_hook_rewrite_no_false_positive
             "--phases=examples",
             exit_code=ExitCode.OK,
         )
+
+
+NEGATABLE_SCHEMAS = [
+    ({}, False),
+    (True, False),
+    ({"description": "free text"}, False),
+    ({"title": "note", "example": "text"}, False),
+    ({"type": "string"}, True),
+    ({"minimum": 5}, True),
+    ({"const": 5}, True),
+    ({"not": {}}, True),
+    ({"pattern": "["}, True),
+]
+
+
+@pytest.mark.parametrize(("schema", "expected"), NEGATABLE_SCHEMAS, ids=str)
+def test_can_negate(schema, expected):
+    assert can_negate(schema) is expected
