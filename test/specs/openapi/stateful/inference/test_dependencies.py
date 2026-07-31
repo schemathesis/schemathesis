@@ -6069,3 +6069,36 @@ def test_content_wrapper_unwrapped_around_single_object(ctx):
     )
     [output] = graph.operations["POST /albums"].outputs
     assert (output.resource.name, output.pointer, output.cardinality.value) == ("Album", "/content", "ONE")
+
+
+def test_self_referencing_component_terminates(ctx):
+    # A component that refers to itself must not send reference resolution into infinite recursion.
+    node = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "children": {"type": "array", "items": component_ref("Node")},
+        },
+        "required": ["id"],
+    }
+    # `allOf` is what routes the response schema through `canonicalize`.
+    node_envelope = {"allOf": [component_ref("Node")]}
+    paths = {
+        "/nodes": {
+            "post": {
+                "operationId": "createNode",
+                "responses": {"201": {"content": {"application/json": {"schema": node_envelope}}}},
+            }
+        },
+        "/nodes/{node_id}": {
+            "get": {
+                "operationId": "getNode",
+                "parameters": [path_param("node_id")],
+                "responses": {"200": {"content": {"application/json": {"schema": node_envelope}}}},
+            }
+        },
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Node": node}})
+
+    assert [entry.producer_operation_ref for entry in graph.iter_links()] == ["#/paths/~1nodes/post"]

@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, NamedTuple, cast
 import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
+from hypothesis.strategies._internal.deferred import DeferredStrategy
 from jsonschema_rs import canonical
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, make_validator_for
-from schemathesis.core.jsonschema.references import has_ref
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.specs.openapi.patterns import pattern_length_bounds
 
@@ -59,10 +59,24 @@ class Unrepresentable:
 UNREPRESENTABLE = Unrepresentable()
 
 
+class _Node(DeferredStrategy):
+    """One schema, named rather than spelled out."""
+
+    # A schema reached from many places, or from itself, would otherwise spell out the same subtree at
+    # every mention, growing what Hypothesis prints - a rejected filter, a failed draw - past any use.
+
+    def __init__(self, strategy: SearchStrategy[JsonValue], kind: str) -> None:
+        super().__init__(lambda: strategy)
+        self.kind = kind
+
+    def __repr__(self) -> str:
+        return f"schema({self.kind})"
+
+
 def from_schema(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     cached = ctx.cache.get(schema)
     if cached is None:
-        cached = _build(schema, ctx)
+        cached = _Node(_build(schema, ctx), schema.kind)
         ctx.cache[schema] = cached
     return cached
 
@@ -97,6 +111,10 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _array(schema, view, ctx)
     if isinstance(view, canonical.ReferenceView):
         return _reference(schema, view, ctx)
+    if isinstance(view, canonical.AllOfView):
+        return _all_of(view, ctx)
+    if isinstance(view, canonical.OneOfView):
+        return _one_of(view, ctx)
     raise UnsupportedView(schema.kind)
 
 
@@ -107,15 +125,92 @@ def _reference(
     # Canonicalization refuses a pointer it cannot resolve, so the target is here. `#` is the one
     # pointer with no definition behind it: it names the document itself.
     target = ctx.root if view.uri == "#" else schema.definitions()[view.uri]
-    if view.uri == "#" or view.uri in ctx.resolving:
-        # The pointer leads back into what is still being built; spelling the rest lazily lets a
-        # draw stop descending, where unrolling it here never would.
-        return st.deferred(lambda: from_schema(target, ctx))
-    ctx.resolving.add(view.uri)
+    pending = ctx.pending.get(view.uri)
+    if pending is not None:
+        # A pointer back into what is still being built. Spelling the rest of the value lazily lets
+        # a draw stop descending, where unrolling it here never would, and every pointer to this
+        # target gets that same strategy - so a cycle in the schema becomes one Hypothesis can see.
+        ctx.cyclic = True
+        return pending
+    ctx.pending[view.uri] = st.deferred(lambda: from_schema(target, ctx))
     try:
         return from_schema(target, ctx)
     finally:
-        ctx.resolving.discard(view.uri)
+        del ctx.pending[view.uri]
+
+
+def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    """Values every branch admits.
+
+    What reaches here is an `allOf` canonicalization left standing, which happens where a branch is
+    a pointer: folding one would mean unrolling whatever it names. Following the pointers gives the
+    intersection back, one branch at a time, until only pointers leading back into the value remain.
+    """
+    followed = []
+    opened = []
+    for branch in view.branches:
+        branch_view = branch.view()
+        if isinstance(branch_view, canonical.ReferenceView) and branch_view.uri not in ctx.following:
+            ctx.following.add(branch_view.uri)
+            opened.append(branch_view.uri)
+            followed.append(ctx.root if branch_view.uri == "#" else branch.definitions()[branch_view.uri])
+        else:
+            followed.append(branch)
+    try:
+        if opened:
+            # Still an `allOf` where a followed branch pointed on; the next round follows those.
+            return from_schema(_intersection(followed), ctx)
+        # Every branch is a pointer back into the value being built, so none of them can drive a
+        # draw on its own. The first one does, and the rest judge what it gives.
+        driver, *rest = followed
+        strategy = from_schema(driver, ctx)
+        for other in rest:
+            strategy = strategy.filter(jsonschema_rs.validator_for(other.to_json_schema()).is_valid)
+        return strategy
+    finally:
+        ctx.following.difference_update(opened)
+
+
+def _one_of(view: jsonschema_rs.canonical.OneOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    """Values exactly one branch admits."""
+    validators = [jsonschema_rs.validator_for(branch.to_json_schema()) for branch in view.branches]
+    branches = []
+    for index, branch in enumerate(view.branches):
+        strategy = from_schema(branch, ctx)
+        # What the other branches also admit belongs to no branch alone.
+        others = validators[:index] + validators[index + 1 :]
+        branches.append(
+            strategy.filter(lambda value, others=others: not any(other.is_valid(value) for other in others))
+        )
+    return st.one_of(branches)
+
+
+def _intersection(branches: list[jsonschema_rs.CanonicalSchema]) -> jsonschema_rs.CanonicalSchema:
+    """One schema admitting what every branch admits."""
+    documents: list[JsonValue] = []
+    # A `$ref` resolves against the document root, which the wrapper below becomes, so the targets
+    # have to move up with it. The two keywords stay apart: a pointer names the one it goes through.
+    definitions: dict[str, dict[str, JsonValue]] = {}
+    for branch in branches:
+        document = branch.to_json_schema()
+        # A `true` node emits `{}` and a `false` one `{"not": {}}`, so a bare boolean never arrives.
+        assert isinstance(document, dict)
+        # The wrapper declares the dialect; a branch repeating it reads as an embedded resource.
+        document.pop("$schema", None)
+        for name in ("$defs", "definitions"):
+            found = document.pop(name, None)
+            if found:
+                assert isinstance(found, dict)
+                definitions.setdefault(name, {}).update(found)
+        documents.append(document)
+    merged: dict[str, JsonValue] = {"allOf": cast("JsonValue", documents)}
+    merged.update(definitions)
+    return jsonschema_rs.canonicalize(
+        merged,
+        draft=branches[0].draft,
+        pattern_options=FANCY_REGEX_OPTIONS,
+        validate_formats=True,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -619,7 +714,7 @@ def _combine(
     if negate_right:
         branches[-1] = {"not": branches[-1]}
     merged: dict[str, JsonValue] = branches[0] if left is None else {"allOf": cast("JsonValue", branches)}
-    if any(has_ref(branch) for branch in branches):
+    if any(_has_ref(branch) for branch in branches):
         # The maps hold every target in the document, so they only ride along where one is pointed at.
         merged.update(definitions)
     return jsonschema_rs.canonicalize(
@@ -628,6 +723,21 @@ def _combine(
         pattern_options=FANCY_REGEX_OPTIONS,
         validate_formats=True,
     )
+
+
+def _has_ref(schema: dict[str, JsonValue]) -> bool:
+    """Whether the schema carries a pointer at any depth."""
+    if "$ref" in schema:
+        return True
+    for value in schema.values():
+        if isinstance(value, dict):
+            if _has_ref(value):
+                return True
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict) and _has_ref(item):
+                    return True
+    return False
 
 
 def _concat(parts: tuple[Sequence[JsonValue], ...]) -> JsonValue:

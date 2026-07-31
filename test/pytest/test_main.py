@@ -457,7 +457,7 @@ def test(case):
     result = testdir.runpytest("-rs")
     # Then this test should be failed with a proper error message
     result.assert_outcomes(failed=1)
-    assert "Schema `#/components/schemas/Node` has a required reference to itself" in result.stdout.str()
+    assert "Cannot generate test data for request body" in result.stdout.str()
 
 
 def test_checks_as_a_list(testdir, ctx):

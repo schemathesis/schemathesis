@@ -5,7 +5,10 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, Literal, TypeAlias, TypeGuard
 
+import jsonschema_rs
+
 from schemathesis.core.errors import InternalError
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 
 # Unicode property escape translations (PCRE/Java/JS -> Python approximations)
 # These cover Latin-based scripts which handle the majority of real-world APIs
@@ -299,6 +302,16 @@ def normalize_regex(pattern: object) -> str | None:
 
 
 _POSIX_CLASS_RE = re.compile(r"\[\[:\^?[a-zA-Z]+:\]")
+
+
+@lru_cache(maxsize=256)
+def is_valid_jsonschema_rs_regex(pattern: str) -> bool:
+    """Whether the engine behind validation and canonicalization can compile the pattern."""
+    try:
+        jsonschema_rs.Draft202012Validator({"pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS)
+        return True
+    except jsonschema_rs.ValidationError:
+        return False
 
 
 def is_valid_python_regex(pattern: object) -> TypeGuard[str]:

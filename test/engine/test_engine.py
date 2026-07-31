@@ -721,9 +721,7 @@ def test_skip_operations_with_recursive_references(ctx, schema_with_recursive_re
     stream = EventStream(schema).execute()
     # Then it causes an error with a proper error message
     stream.assert_after_execution_status(Status.ERROR)
-    assert "Schema `#/components/schemas/Node` has a required reference to itself" in str(
-        stream.find(events.NonFatalError).info
-    )
+    assert "Cannot generate test data for request body" in str(stream.find(events.NonFatalError).info)
 
 
 @pytest.mark.parametrize(

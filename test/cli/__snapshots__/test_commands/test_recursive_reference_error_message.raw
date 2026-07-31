@@ -17,13 +17,13 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
- 🚫  Examples (in 0.00s)
+ ⏭   Examples (in 0.00s)
 
-     🚫 1 error
+     ⏭  1 skipped
 
- 🚫  Coverage (in 0.00s)
+ ⏭   Coverage (in 0.00s)
 
-     🚫 1 error
+     ⏭  1 skipped
 
  🚫  Fuzzing (in 0.00s)
 
@@ -33,7 +33,27 @@ Schemathesis dev
 __________________________________ POST /foo ___________________________________
 Schema Error
 
-Schema `#/components/schemas/Node` has a required reference to itself
+Cannot generate test data for request body (application/json)
+Schema:
+
+{
+    "$ref": "#/components/schemas/Node",
+    "components": {
+        "schemas": {
+            "Node": {
+                "type": "object",
+                "required": [
+                    "child"
+                ],
+    // Output truncated...
+}
+
+This usually means:
+  - Type mismatch (e.g., enum with strings but type: integer)
+  - Contradictory constraints (e.g., minimum > maximum)
+  - Regex that's too complex to generate values for
+
+Tip: Review all parameters and request body schemas for conflicting constraints.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -45,8 +65,8 @@ API Operations:
   Errored: 1
 
 Test Phases:
-  🚫 Examples
-  🚫 Coverage
+  ⏭  Examples
+  ⏭  Coverage
   🚫 Fuzzing
   ⏭  Stateful (not applicable)
 

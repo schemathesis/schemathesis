@@ -8,7 +8,7 @@ from schemathesis.core.errors import (
     InvalidRegexPattern,
     UnresolvableReference,
 )
-from schemathesis.core.jsonschema import bundle_for_generation, make_validator_for
+from schemathesis.core.jsonschema import make_validator_for
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
@@ -140,33 +140,17 @@ def test_invalid_regex_example_generation_error(ctx):
 
 
 def test_infinite_recursive_reference_example_generation_error(ctx):
-    recursive_schema = {
-        "components": {
-            "schemas": {
-                "Node": {
-                    "type": "object",
-                    "required": ["child"],
-                    "properties": {"child": {"$ref": "#/components/schemas/Node"}},
-                }
-            }
-        },
-        "$ref": "#/components/schemas/Node",
-    }
-    schema = _schema_with_query_and_body_example(
-        ctx,
-        extra_operation={"x-recursive-schema": recursive_schema},
-    )
+    schema = _schema_with_query_and_body_example(ctx)
     loaded = schemathesis.openapi.from_dict(schema)
 
     @loaded.hook
     def before_generate_query(context, strategy):
-        schema = context.operation.definition.raw["x-recursive-schema"]
+        def fail(value):
+            raise InfiniteRecursiveReference(
+                "#/components/schemas/Node", ["#/components/schemas/Node", "#/components/schemas/Node"]
+            )
 
-        def bundle(value):
-            bundle_for_generation(schema, make_root_resolver(schema))
-            return value
-
-        return strategy.map(bundle)
+        return strategy.map(fail)
 
     stream = _examples_only(loaded)
 

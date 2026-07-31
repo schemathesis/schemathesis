@@ -1564,7 +1564,7 @@ def _bundle_parameter(
     if schema is not None:
         definition = dict(definition)
         try:
-            bundled = bundler.bundle_for_generation(
+            bundled = bundler.bundle(
                 schema,
                 parameter_resolver,
             )
@@ -1585,7 +1585,7 @@ def _bundle_parameter(
                 media_type_object = dict(media_type_object)
                 nested_schema = media_type_object.get("schema")
                 if isinstance(nested_schema, dict):
-                    bundled = bundler.bundle_for_generation(
+                    bundled = bundler.bundle(
                         nested_schema,
                         parameter_resolver,
                     )
@@ -1750,7 +1750,7 @@ def iter_parameters_v3(
                         resource_name = resource_name_from_ref(items["$ref"])
                 try:
                     to_bundle = cast(dict[str, Any], schema)
-                    bundled = bundler.bundle_for_generation(
+                    bundled = bundler.bundle(
                         to_bundle,
                         body_resolver,
                     )

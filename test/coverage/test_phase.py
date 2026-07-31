@@ -9281,3 +9281,74 @@ def test_negative_coverage_violates_int64_format_bounds(ctx):
     assert violations[CoverageScenario.VALUE_ABOVE_MAXIMUM] == 2**63
     assert violations[CoverageScenario.VALUE_BELOW_MINIMUM] == -(2**63) - 1
     assert all(case.meta.generation.mode == GenerationMode.NEGATIVE for case in cases)
+
+
+def test_coverage_recursive_body_is_generated(ctx):
+    # A pointer back into the value has no unrolled form, so the value is built from the pointer
+    # itself rather than from a copy of what it names.
+    schema = ctx.openapi.load_schema(
+        {
+            "/nodes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {"name": {"type": "string"}, "child": {"$ref": "#/components/schemas/Node"}},
+                }
+            }
+        },
+    )
+    operation = schema["/nodes"]["POST"]
+    validator = _body_validator(operation)
+
+    positives = [case.body for case in _iter_cases(operation, GenerationMode.POSITIVE) if isinstance(case.body, dict)]
+
+    assert positives
+    for body in positives:
+        assert validator.is_valid(body), body
+    assert any("child" in body for body in positives)
+
+
+def test_coverage_recursion_around_a_node_that_cannot_be_built(ctx):
+    # Two formats at once is a conjunction neither generator spells, and the pointer around it has
+    # no unrolled form either, so the body yields nothing instead of raising.
+    schema = ctx.openapi.load_schema(
+        {
+            "/nodes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "properties": {
+                        "stamp": {
+                            "allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]
+                        },
+                        "child": {"$ref": "#/components/schemas/Node"},
+                    },
+                }
+            }
+        },
+    )
+    operation = schema["/nodes"]["POST"]
+
+    assert [case for case in _iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET] == []

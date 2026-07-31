@@ -32,7 +32,7 @@ def test_bundle_many_flat_references(benchmark):
 
     resolver = make_root_resolver({"definitions": definitions})
 
-    benchmark(lambda: Bundler().bundle(schema, resolver, inline_recursive=True))
+    benchmark(lambda: Bundler().bundle(schema, resolver))
 
 
 @pytest.mark.benchmark(group="bundle-deep-nested-references")
@@ -51,7 +51,7 @@ def test_bundle_deep_nested_references(benchmark):
 
     resolver = make_root_resolver({"definitions": definitions})
 
-    benchmark(lambda: Bundler().bundle(schema, resolver, inline_recursive=True))
+    benchmark(lambda: Bundler().bundle(schema, resolver))
 
 
 @pytest.mark.benchmark(group="bundle-duplicate-references")
@@ -76,14 +76,14 @@ def test_bundle_duplicate_references(benchmark):
 
     resolver = make_root_resolver({"definitions": definitions})
 
-    benchmark(lambda: Bundler().bundle(schema, resolver, inline_recursive=True))
+    benchmark(lambda: Bundler().bundle(schema, resolver))
 
 
 def _bundle_many(schemas: list, resolver: Resolver) -> None:
-    # Share a single Bundler across sites — matches production OpenApiSchema._bundler lifetime, exercises the cache.
+    # Share a single Bundler across sites — matches production OpenApiSchema._bundler lifetime.
     bundler = Bundler()
     for schema in schemas:
-        bundler.bundle_for_generation(schema, resolver)
+        bundler.bundle(schema, resolver)
 
 
 @pytest.mark.benchmark(group="bundle-recursive-self-ref")
@@ -225,7 +225,7 @@ def _collect_parameter_schemas(raw_schema: dict) -> list[dict]:
 def _bundle_each(schemas: list[dict], resolver: Resolver) -> None:
     bundler = Bundler()
     for schema in schemas:
-        bundler.bundle_for_generation(schema, resolver)
+        bundler.bundle(schema, resolver)
 
 
 @pytest.mark.benchmark(group="bundle-real-world")

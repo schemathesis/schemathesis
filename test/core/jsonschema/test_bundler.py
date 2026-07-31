@@ -3,8 +3,7 @@ from typing import Any
 import pytest
 
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InfiniteRecursiveReference
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler, bundle_for_generation, bundle_for_validation
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler, bundle
 from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
@@ -155,13 +154,12 @@ DEFINITIONS = {
                 },
             },
             {
-                "type": "object",
-                "properties": {
-                    "child": {
-                        # Inlined 1 level
-                        "properties": {},
+                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+                BUNDLE_STORAGE_KEY: {
+                    "schema1": {
                         "type": "object",
-                    },
+                        "properties": {"child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}},
+                    }
                 },
             },
         ),
@@ -177,13 +175,7 @@ DEFINITIONS = {
                     },
                     "B": {
                         "type": "object",
-                        "properties": {
-                            "a": {
-                                # Inlined 1 level
-                                "properties": {},
-                                "type": "object",
-                            },
-                        },
+                        "properties": {"a": {"$ref": "#/definitions/A"}},
                     },
                 }
             },
@@ -200,13 +192,7 @@ DEFINITIONS = {
                     },
                     "schema2": {
                         "type": "object",
-                        "properties": {
-                            "a": {
-                                # Inlined 1 level
-                                "properties": {},
-                                "type": "object",
-                            }
-                        },
+                        "properties": {"a": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}},
                     },
                 },
             },
@@ -266,12 +252,8 @@ DEFINITIONS = {
                         "properties": {
                             "key": {
                                 "anyOf": [
-                                    {
-                                        "properties": {},
-                                    },
-                                    {
-                                        "items": {},
-                                    },
+                                    {"$ref": "#/x-bundled/schema1"},
+                                    {"items": {}},
                                 ],
                             },
                         },
@@ -319,12 +301,7 @@ DEFINITIONS = {
                             "$ref": "#/x-bundled/schema1",
                         },
                         "properties": {
-                            "schema": {
-                                "patternProperties": {
-                                    "$ref": "#/x-bundled/schema1",
-                                },
-                                "properties": {},
-                            },
+                            "schema": {"$ref": "#/x-bundled/schema2"},
                         },
                     },
                 },
@@ -370,17 +347,7 @@ DEFINITIONS = {
                     "schema3": {},
                     "schema4": {
                         "properties": {
-                            "key": {
-                                # Inlined recursive reference
-                                "oneOf": [
-                                    {
-                                        "$ref": "#/x-bundled/schema3",
-                                    },
-                                    {
-                                        "properties": {},
-                                    },
-                                ],
-                            },
+                            "key": {"$ref": "#/x-bundled/schema2"},
                         },
                     },
                 },
@@ -409,24 +376,23 @@ DEFINITIONS = {
 )
 def test_bundle(schema, store, expected):
     resolver = make_root_resolver(store)
-    assert Bundler().bundle(schema, resolver, inline_recursive=True).schema == expected
+    assert Bundler().bundle(schema, resolver).schema == expected
 
 
 def test_unresolvable_pointer():
     resolver = make_root_resolver({})
     with pytest.raises(RefResolutionError):
-        Bundler().bundle({"$ref": "#/definitions/NonExistent"}, resolver, inline_recursive=True)
+        Bundler().bundle({"$ref": "#/definitions/NonExistent"}, resolver)
 
 
 def test_bundle_ref_resolves_to_none_error_message():
     resolver = make_root_resolver({"definitions": {"User": None}})
     with pytest.raises(BundleError) as exc:
-        Bundler().bundle({"$ref": "#/definitions/User"}, resolver, inline_recursive=True)
+        Bundler().bundle({"$ref": "#/definitions/User"}, resolver)
     assert str(exc.value) == "Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got null"
 
 
 def test_bundle_recursive_not_inlined():
-    # When recursive references are not inlined via inline_recursive=False
     schema = {"$ref": "#/definitions/Node"}
     store = {
         "definitions": {
@@ -441,7 +407,7 @@ def test_bundle_recursive_not_inlined():
 
     resolver = make_root_resolver(store)
 
-    assert Bundler().bundle(schema, resolver, inline_recursive=False).schema == {
+    assert Bundler().bundle(schema, resolver).schema == {
         "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
         BUNDLE_STORAGE_KEY: {
             "schema1": {
@@ -454,7 +420,7 @@ def test_bundle_recursive_not_inlined():
     }
 
 
-def test_bundle_for_generation_inlines_recursive_references():
+def test_bundle_preserves_recursive_references():
     schema = {"$ref": "#/definitions/Node"}
     store = {
         "definitions": {
@@ -469,33 +435,7 @@ def test_bundle_for_generation_inlines_recursive_references():
 
     resolver = make_root_resolver(store)
 
-    assert bundle_for_generation(schema, resolver).schema == {
-        "type": "object",
-        "properties": {
-            "child": {
-                "properties": {},
-                "type": "object",
-            },
-        },
-    }
-
-
-def test_bundle_for_validation_preserves_recursive_references():
-    schema = {"$ref": "#/definitions/Node"}
-    store = {
-        "definitions": {
-            "Node": {
-                "type": "object",
-                "properties": {
-                    "child": {"$ref": "#/definitions/Node"},
-                },
-            }
-        },
-    }
-
-    resolver = make_root_resolver(store)
-
-    assert bundle_for_validation(schema, resolver).schema == {
+    assert bundle(schema, resolver).schema == {
         "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
         BUNDLE_STORAGE_KEY: {
             "schema1": {
@@ -509,7 +449,6 @@ def test_bundle_for_validation_preserves_recursive_references():
 
 
 def test_bundle_non_recursive_inlined():
-    # When non-recursive references are not inlined via inline_recursive=False
     schema = {"$ref": "#/definitions/User"}
     store = {
         "definitions": {
@@ -519,7 +458,7 @@ def test_bundle_non_recursive_inlined():
 
     resolver = make_root_resolver(store)
 
-    assert Bundler().bundle(schema, resolver, inline_recursive=False).schema == {"type": "object"}
+    assert Bundler().bundle(schema, resolver).schema == {"type": "object"}
 
 
 def _strip_remote_refs(value: Any) -> Any:
@@ -539,7 +478,7 @@ def test_bundles_open_api_schemas(schema):
     # so the test stays offline.
     schema = _strip_remote_refs(schema)
     resolver = make_root_resolver(schema)
-    Bundler().bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver)
 
 
 def test_bundle_infinite_recursive_required_cycle_message():
@@ -566,18 +505,10 @@ def test_bundle_infinite_recursive_required_cycle_message():
 
     resolver = make_root_resolver(store)
 
-    with pytest.raises(InfiniteRecursiveReference) as exc:
-        Bundler().bundle(schema, resolver, inline_recursive=True)
+    bundled = Bundler().bundle(schema, resolver).schema
 
-    assert (
-        str(exc.value)
-        == """Schema `#/definitions/A` has required references forming a cycle:
-
-  #/definitions/A ->
-  #/definitions/B ->
-  #/definitions/C ->
-  #/definitions/A"""
-    )
+    assert bundled["$ref"] == f"#/{BUNDLE_STORAGE_KEY}/schema1"
+    assert bundled[BUNDLE_STORAGE_KEY]["schema1"]["properties"]["b"] == {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2"}
 
 
 def test_bundle_self_recursion_through_pattern_properties_is_breakable():
@@ -596,12 +527,10 @@ def test_bundle_self_recursion_through_pattern_properties_is_breakable():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver)
 
 
 def test_bundle_self_cycle_through_dead_definitions_block():
-    # Self-referential `definitions` entries are unreachable once optional properties
-    # are pruned, so they should not surface as `InfiniteRecursiveReference`.
     schema = {"$ref": "#/definitions/Meta"}
     store = {
         "definitions": {
@@ -624,7 +553,7 @@ def test_bundle_self_cycle_through_dead_definitions_block():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver)
 
 
 def test_bundle_oneof_with_indirectly_recursive_branch_skips_it():
@@ -656,7 +585,7 @@ def test_bundle_oneof_with_indirectly_recursive_branch_skips_it():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver)
 
 
 def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
@@ -682,7 +611,7 @@ def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver)
 
 
 def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
@@ -703,7 +632,7 @@ def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver)
 
 
 def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
@@ -740,7 +669,7 @@ def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
 
     resolver = make_root_resolver(store)
 
-    Bundler().bundle(schema, resolver, inline_recursive=True)
+    Bundler().bundle(schema, resolver)
 
 
 def test_unbundle_decodes_pointer_escaping_in_definition_names():

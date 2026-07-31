@@ -40,5 +40,10 @@ class StrategyContext:
     # Values for `format`, by name. Names absent here are annotations and do not constrain generation.
     formats: dict[str, SearchStrategy] = field(default_factory=dict)
     cache: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
-    # Reference targets currently being built, so a cycle can be spelled lazily instead of unrolled.
-    resolving: set[str] = field(default_factory=set)
+    # Placeholders for the pointer targets currently being built, by URI.
+    pending: dict[str, SearchStrategy] = field(default_factory=dict)
+    # Whether a pointer led back into a value still being built.
+    cyclic: bool = False
+    # Pointer targets already followed while folding an `allOf`, which stops a cyclic one from
+    # unrolling forever.
+    following: set[str] = field(default_factory=set)

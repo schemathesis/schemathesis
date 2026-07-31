@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 import string
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache, partial
@@ -16,6 +16,7 @@ from itertools import combinations
 from math import inf, nextafter
 
 from schemathesis.core.jsonschema import (
+    CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
     VALIDATED_FORMATS_BY_DRAFT,
     is_valid,
@@ -46,7 +47,7 @@ import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
-from hypothesis_jsonschema._canonicalise import canonicalish
+from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError, canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
@@ -61,6 +62,7 @@ from schemathesis.core.validation import contains_unicode_surrogate_pair, has_in
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
+from schemathesis.generation.jsonschema import build
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.patterns import (
@@ -317,6 +319,8 @@ class CoverageContext:
     update_pattern: Callable[[str, int | None, int | None], str] | None
     _resolver: Resolver | None
     allow_extra_parameters: bool
+    expanding: dict[str, int]
+    generating: dict[str, int]
 
     __slots__ = (
         "root_schema",
@@ -331,6 +335,8 @@ class CoverageContext:
         "update_pattern",
         "_resolver",
         "allow_extra_parameters",
+        "expanding",
+        "generating",
     )
 
     def __init__(
@@ -348,6 +354,8 @@ class CoverageContext:
         _resolver: Resolver | None = None,
         _path_str_cache_cell: list[str | None] | None = None,
         allow_extra_parameters: bool = True,
+        expanding: dict[str, int] | None = None,
+        generating: dict[str, int] | None = None,
     ) -> None:
         self.root_schema = root_schema
         self.location = location
@@ -366,6 +374,10 @@ class CoverageContext:
         self.update_pattern = update_pattern
         self._resolver = _resolver
         self.allow_extra_parameters = allow_extra_parameters
+        # How deep the walk is inside each reference, shared with every context derived from this one.
+        self.expanding = expanding if expanding is not None else {}
+        # The same, for building one value; a value nests on its own budget, not the walk's.
+        self.generating = generating if generating is not None else {}
 
     def __repr__(self) -> str:
         # Bound methods are used as Hypothesis filter predicates; the default slot dump
@@ -385,6 +397,29 @@ class CoverageContext:
         """Resolve a $ref to its schema definition."""
         _, resolved = resolve_reference(self.resolver, ref)
         return resolved
+
+    @contextmanager
+    def expand(self, reference: str, *, counters: dict[str, int] | None = None) -> Generator[None, None, None]:
+        """Go into a reference, counting how many times this one is already open."""
+        counters = self.expanding if counters is None else counters
+        counters[reference] = counters.get(reference, 0) + 1
+        try:
+            yield
+        finally:
+            depth = counters[reference] - 1
+            if depth:
+                counters[reference] = depth
+            else:
+                del counters[reference]
+
+    def is_exhausted(self, reference: str, *, counters: dict[str, int] | None = None) -> bool:
+        """Whether this reference has been gone through as far as it goes.
+
+        A cycle has no end, so the walk needs one. Going around it twice leaves the position that
+        points back carrying the schema it names, which is what a negative case there has to break.
+        """
+        counters = self.expanding if counters is None else counters
+        return counters.get(reference, 0) >= 2
 
     @contextmanager
     def at(self, key: str | int) -> Generator[None, None, None]:
@@ -418,6 +453,8 @@ class CoverageContext:
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
             allow_extra_parameters=self.allow_extra_parameters,
+            expanding=self.expanding,
+            generating=self.generating,
         )
 
     def with_negative(self) -> CoverageContext:
@@ -434,6 +471,8 @@ class CoverageContext:
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
             allow_extra_parameters=self.allow_extra_parameters,
+            expanding=self.expanding,
+            generating=self.generating,
         )
 
     def is_valid_for_location(self, value: Any) -> bool:
@@ -479,8 +518,16 @@ class CoverageContext:
     def generate_from_schema(self, schema: JsonSchema) -> Any:
         if isinstance(schema, dict) and "$ref" in schema:
             reference = schema["$ref"]
-            # Deep clone to avoid circular references in Python objects
-            schema = deepclone(self.resolve_ref(reference))
+            if self.is_exhausted(reference, counters=self.generating):
+                # The value would have to keep nesting, so there is nothing finite to put here.
+                # An optional property drops out; a required one takes the whole value with it.
+                raise Unsatisfiable
+            with self.expand(reference, counters=self.generating):
+                # Deep clone to avoid circular references in Python objects
+                return self._generate_from_resolved(deepclone(self.resolve_ref(reference)))
+        return self._generate_from_resolved(schema)
+
+    def _generate_from_resolved(self, schema: JsonSchema) -> Any:
         if isinstance(schema, bool):
             if not schema:
                 raise Unsatisfiable
@@ -695,7 +742,17 @@ class CoverageContext:
         ):
             validator = _get_format_validator(fmt, self.validator_cls)
             strategy = strategy.filter(lambda v: not isinstance(v, str) or validator.is_valid(v))
-        return self.generate_from(strategy)
+        try:
+            return self.generate_from(strategy)
+        except HypothesisRefResolutionError:
+            # Pointers that lead back into the value have no unrolled form to hand over. The engine
+            # that models them directly does have one.
+            recursive = build(
+                cloned, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[self.validator_cls], formats=self.custom_formats
+            )
+            if recursive is None:
+                raise Unsatisfiable from None
+            return self.generate_from(recursive)
 
 
 def _update_schema_pattern(
@@ -1220,6 +1277,10 @@ def cover_schema_iter(
 
     if isinstance(schema, dict) and "$ref" in schema:
         reference = schema["$ref"]
+        if ctx.is_exhausted(reference):
+            # Going around again would never come back out, and a value covering this position has
+            # to satisfy what the pointer names, so there is nothing left to say about it.
+            return
         try:
             resolved = ctx.resolve_ref(reference)
             if isinstance(resolved, dict):
@@ -1247,17 +1308,19 @@ def cover_schema_iter(
                         unmerged_validator = ctx.validator_cls(check_schema, pattern_options=FANCY_REGEX_OPTIONS)
                     except Exception:
                         pass
-                for generated in cover_schema_iter(ctx, merged, seen):
-                    if (
-                        unmerged_validator is not None
-                        and generated.generation_mode == GenerationMode.NEGATIVE
-                        and not contains_binary(generated.value)
-                        and unmerged_validator.is_valid(generated.value)
-                    ):
-                        continue
-                    yield generated
+                with ctx.expand(reference):
+                    for generated in cover_schema_iter(ctx, merged, seen):
+                        if (
+                            unmerged_validator is not None
+                            and generated.generation_mode == GenerationMode.NEGATIVE
+                            and not contains_binary(generated.value)
+                            and unmerged_validator.is_valid(generated.value)
+                        ):
+                            continue
+                        yield generated
             else:
-                yield from cover_schema_iter(ctx, resolved, seen)
+                with ctx.expand(reference):
+                    yield from cover_schema_iter(ctx, resolved, seen)
             return
         except RefResolutionError:
             # Can't resolve a reference - at this point, we can't generate anything useful as `$ref` is in the current schema root
@@ -1815,7 +1878,7 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
         # Without forcing object generation here, Hypothesis treats `properties`-only or
         # `$ref`-to-properties-only sub-schemas as "any value" and can emit `null` or `{}`.
         implied: JsonSchemaObject | None = None
-        if "$ref" in schema:
+        if "$ref" in schema and not ctx.is_exhausted(schema["$ref"]):
             try:
                 candidate = ctx.resolve_ref(schema["$ref"])
                 if isinstance(candidate, dict) and (
@@ -1835,7 +1898,11 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
             inflated_required = list(
                 dict.fromkeys(original_required + [k for k, v in properties.items() if v != {"not": {}}])
             )
-            return _get_template_schema({**implied, "required": inflated_required}, "object", ctx)
+            reference = schema.get("$ref")
+            # Whatever the template pulls in through this pointer counts against its budget, so a
+            # cyclic one stops instead of nesting forever.
+            with ctx.expand(reference) if isinstance(reference, str) else nullcontext():
+                return _get_template_schema({**implied, "required": inflated_required}, "object", ctx)
         _schema = deepclone(schema)
         if ctx.update_pattern is not None:
             _update_schema_pattern(_schema, ctx.update_pattern)

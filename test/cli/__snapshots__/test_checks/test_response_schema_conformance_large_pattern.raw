@@ -1,4 +1,4 @@
-Exit code: 1
+Exit code: 0
 ---
 Stdout:
 Schemathesis dev
@@ -21,52 +21,29 @@ Schemathesis dev
 
      ⏭  1 skipped
 
- 🚫  Coverage (in 0.00s)
+ ✅  Coverage (in 0.00s)
 
-     🚫 1 error
+     ✅ 1 passed
 
- 🚫  Fuzzing (in 0.00s)
+ ✅  Fuzzing (in 0.00s)
 
-     🚫 1 error
+     ✅ 1 passed
 
-==================================== ERRORS ====================================
-__________________________________ GET /data ___________________________________
-Schema Error
-
-Invalid Schema Object in response definition
-
-Location:
-    [root]
-
-Problematic definition:
-    "^.{0,404600}$"
-
-Error details:
-    "^.{0,404600}$" is not a "regex"
-
-See: https://spec.openapis.org/oas/v3.0.2#schema-object
-
-Need more help?
-    Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 1/1
-  Tested: 0
-  Errored: 1
+  Tested: 1
 
 Test Phases:
   ⏭  Examples
-  🚫 Coverage
-  🚫 Fuzzing
+  ✅ Coverage
+  ✅ Fuzzing
   ⏭  Stateful (not applicable)
 
-Errors:
-  🚫 Schema Error: 1
-
 Test cases:
-  N generated
+  N generated, N passed
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+=========================== No issues found in 1.00s ===========================
