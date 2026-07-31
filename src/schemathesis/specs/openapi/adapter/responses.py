@@ -10,7 +10,7 @@ from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
-from schemathesis.core.jsonschema.bundler import Bundle, bundle_for_validation
+from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transport import expand_status_code
@@ -338,7 +338,7 @@ def _prepare_schema(
     merge_ref_siblings: bool = False,
 ) -> Bundle:
     try:
-        bundled = bundle_for_validation(schema, resolver)
+        bundled = bundle(schema, resolver)
     except RefResolutionError as exc:
         raise InvalidSchema.from_reference_resolution_error(exc, None, None) from None
     # Do not clone the schema, as bundling already does it

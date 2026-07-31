@@ -369,13 +369,11 @@ def _resolve_bundled(
     if isinstance(schema, dict):
         reference = schema.get("$ref")
         if isinstance(reference, str):
-            # Check if this reference is already in the current path
+            # This walk explores everything, so a cycle would take it around forever. Whatever the
+            # pointer names has already been looked at once, and an empty schema carries no example
+            # and nothing further to explore.
             if reference in reference_path:
-                # Real infinite recursive references are caught at the bundling stage.
-                # This recursion happens because of how the example phase generates data - it explores everything,
-                # so it is the easiest way to break such cycles
-                cycle_path = list(reference_path[reference_path.index(reference) :])
-                raise InfiniteRecursiveReference(reference, cycle_path)
+                return {}, reference_path, resolver
 
             new_path = reference_path + (reference,)
 

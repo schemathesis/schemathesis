@@ -17,21 +17,30 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
- 🚫  Fuzzing (in 0.00s)
+ ❌  Fuzzing (in 0.00s)
 
-     🚫 1 error
+     ❌ 1 failed
 
-==================================== ERRORS ====================================
+=================================== FAILURES ===================================
 __________________________________ POST /test __________________________________
-Schema Error
+1. Test Case ID: <PLACEHOLDER>
 
-Failed to generate test cases for this API operation because of unsupported regular expression `[\uD800-\uDBFF]`
+- API accepted schema-violating request
 
-Tip: Ensure your regex follows ECMA 262 (JavaScript) syntax.
-For guidance, visit: https://json-schema.org/understanding-json-schema/reference/regular_expressions
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 405, 406, 409, 422, 428, 5xx
+    Invalid component: <PLACEHOLDER>
 
-Need more help?
-    Join our Discord server: https://discord.gg/R9ASRAmHnA
+[200] OK:
+
+    `{"status":"ok"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -41,15 +50,15 @@ API Operations:
 Test Phases:
   ⏭  Examples (disabled)
   ⏭  Coverage (disabled)
-  🚫 Fuzzing
+  ❌ Fuzzing
   ⏭  Stateful (disabled)
 
-Errors:
-  🚫 Schema Error: 1
+Failures:
+  ❌ API accepted schema-violating request: 1
 
 Test cases:
-  N generated, N passed
+  N generated, N found N unique failures
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+============================== 1 failure in 1.00s ==============================

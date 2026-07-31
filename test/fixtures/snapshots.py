@@ -229,12 +229,12 @@ class CliSnapshotConfig:
                 data,
                 flags=re.MULTILINE,
             )
-            # Negative-fuzzing variance can produce body content with non-printable
-            # bytes on some Pythons but not others; the curl advisory then appears
-            # only on those runs. Strip the warning and its trailing blank line so
-            # spacing matches the warning-free runs.
+            # Negative-fuzzing variance can produce body content with non-printable bytes, and the
+            # curl advisory for those only appears where shell detection comes up empty — true on
+            # CI, false on a developer machine. Strip the warning and the blank line under it, which
+            # the reproduce block indents, so spacing matches the warning-free runs.
             data = re.sub(
-                r"^[ \t]*⚠️[ \t]+Request body contains non-printable characters\..*\n\n",
+                r"^[ \t]*⚠️[ \t]+Request body contains non-printable characters\.[^\n]*\n[ \t]*\n",
                 "",
                 data,
                 flags=re.MULTILINE,

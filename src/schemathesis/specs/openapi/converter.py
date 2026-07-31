@@ -8,6 +8,7 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_T
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.patterns import (
+    is_valid_jsonschema_rs_regex,
     is_valid_python_regex,
     normalize_regex,
     pattern_length_bounds,
@@ -149,6 +150,11 @@ def _to_json_schema(
             translated = normalize_regex(pattern)
             if translated is not None:
                 schema["pattern"] = translated
+        # A pattern the validator cannot compile constrains nothing, and keeping it only stops the
+        # rest of the schema from being modeled.
+        current = schema.get("pattern")
+        if isinstance(current, str) and not is_valid_jsonschema_rs_regex(current):
+            del schema["pattern"]
     if update_quantifiers:
         update_pattern_in_schema(schema)
     # Sometimes `required` is incorrectly has a boolean value
@@ -524,7 +530,9 @@ def update_pattern_in_schema(schema: dict[str, Any]) -> None:
     max_length = schema.get("maxLength")
     if pattern and (min_length or max_length):
         new_pattern = update_quantifier(pattern, min_length, max_length)
-        if new_pattern != pattern:
+        # A bound the schema states in the thousands becomes a quantifier the validator's regex
+        # engine refuses to compile; the pattern it started from is the one that still works.
+        if new_pattern != pattern and is_valid_jsonschema_rs_regex(new_pattern):
             # Pop a bound only if the rewrite encodes it; rewrites with unbounded slots can't absorb `maxLength`.
             new_min, new_max = pattern_length_bounds(new_pattern)
             schema["pattern"] = new_pattern

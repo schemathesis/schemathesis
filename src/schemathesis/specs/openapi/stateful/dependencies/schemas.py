@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from schemathesis.core.jsonschema import ALL_KEYWORDS
-from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle_for_generation
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.text import to_snake_case
@@ -40,14 +40,23 @@ def resolve_all_refs(schema: JsonSchemaObject) -> dict[str, Any]:
     bundled = schema.get(BUNDLE_STORAGE_KEY, {})
 
     resolved_cache: dict[str, dict[str, Any]] = {}
+    in_flight: set[str] = set()
 
     def resolve(ref: str) -> dict[str, Any]:
         # All references here are bundled, therefore it is safe to avoid full reference resolving
         if ref in resolved_cache:
             return resolved_cache[ref]
+        if ref in in_flight:
+            # The reference points back at a target still being resolved. Cut the cycle here:
+            # deeper levels repeat property names that the enclosing level already carries.
+            return {}
         key = ref.split("/")[-1]
-        # No clone needed, as it will be cloned inside `merged`
-        result = resolve_all_refs_inner(bundled[key], resolve=resolve)
+        in_flight.add(ref)
+        try:
+            # No clone needed, as it will be cloned inside `merged`
+            result = resolve_all_refs_inner(bundled[key], resolve=resolve)
+        finally:
+            in_flight.discard(ref)
         resolved_cache[ref] = result
         return result
 
@@ -102,7 +111,7 @@ def canonicalize(
     from schemathesis.specs.openapi.converter import to_json_schema
 
     # Discovery needs all references resolvable and non-recursive; bundling solves that.
-    bundled = bundle_for_generation(schema, resolver).schema
+    bundled = bundle(schema, resolver).schema
     # Translate PCRE patterns (e.g. `\p{L}`) to Python-compatible equivalents.
     bundled = to_json_schema(bundled, nullable_keyword, update_quantifiers=False)
     if not isinstance(bundled, dict):

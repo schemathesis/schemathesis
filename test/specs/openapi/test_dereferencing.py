@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from flask import Flask, jsonify
 from hypothesis import HealthCheck, given, settings
+from hypothesis.errors import Unsatisfiable
 from jsonschema_rs import Draft4Validator
 from werkzeug.exceptions import InternalServerError
 
@@ -135,13 +136,19 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
     ],
 )
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
-def test_non_removable_recursive_references(ctx, definition):
-    schema = ctx.openapi.build_schema({})
-    build_schema_with_recursion(schema, definition)
-    schema = schemathesis.openapi.from_dict(schema)
+def test_recursion_with_no_finite_value(ctx, definition):
+    # Every value these schemas admit would have to be infinitely deep
+    raw_schema = ctx.openapi.build_schema({})
+    build_schema_with_recursion(raw_schema, definition)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
-    with pytest.raises(InvalidSchema):
-        schema["/users"]["POST"]
+    @given(case=schema["/users"]["POST"].as_strategy())
+    @settings(max_examples=1, deadline=None)
+    def test(case):
+        pass
+
+    with pytest.raises(Unsatisfiable):
+        test()
 
 
 def test_nested_recursive_references(ctx):

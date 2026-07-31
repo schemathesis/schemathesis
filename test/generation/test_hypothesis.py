@@ -2197,6 +2197,199 @@ def test_canonical_reference_is_not_inlined(ctx):
     test()
 
 
+RECURSIVE_SHAPES = [
+    # A pointer under `properties`, the plain nesting case.
+    {"type": "object", "properties": {"child": {"$ref": "#/$defs/node"}, "name": {"type": "string"}}},
+    # A pointer under `items`, where the value branches at every level.
+    {"type": "array", "items": {"$ref": "#/$defs/node"}, "maxItems": 2},
+    # A pointer inside an `allOf`, which canonicalization cannot fold away.
+    {"allOf": [{"$ref": "#/$defs/node"}, {"type": "object"}]},
+    # A pointer inside a `oneOf`, where the other branch is what ends the value.
+    {
+        "oneOf": [
+            {"type": "integer"},
+            {"type": "object", "required": ["a"], "properties": {"a": {"$ref": "#/$defs/node"}}},
+        ]
+    },
+    # A pointer through a second schema and back.
+    {"type": "object", "properties": {"other": {"$ref": "#/$defs/other"}}},
+    # A pointer at a position `prefixItems` names, where the array may also stop before it.
+    {"type": "array", "prefixItems": [{"$ref": "#/$defs/node"}, {"type": "integer"}], "maxItems": 2},
+]
+
+
+@pytest.mark.parametrize("node", RECURSIVE_SHAPES, ids=[str(shape) for shape in RECURSIVE_SHAPES])
+def test_canonical_recursion_is_drawn_at_any_depth(node):
+    schema = {
+        "$ref": "#/$defs/node",
+        "$defs": {"node": node, "other": {"type": "object", "properties": {"back": {"$ref": "#/$defs/node"}}}},
+    }
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+    def depth(value):
+        if isinstance(value, dict):
+            return 1 + max((depth(item) for item in value.values()), default=0)
+        if isinstance(value, list):
+            return 1 + max((depth(item) for item in value), default=0)
+        return 0
+
+    # Inlining a pointer bounds how deep a value can go; naming it does not.
+    find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
+
+
+def test_canonical_all_of_through_a_pointer_is_folded():
+    # Following the pointer gives the intersection back, so the draw is exact rather than filtered.
+    schema = {
+        "allOf": [
+            {"$ref": "#/$defs/named"},
+            {"type": "object", "required": ["age"], "properties": {"age": {"type": "integer"}}},
+        ],
+        "$defs": {
+            "named": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {"name": {"type": "string", "minLength": 1}},
+            }
+        },
+    }
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_all_of_chain_of_pointers_is_folded():
+    # Each round follows one pointer, and what it names points on to the next.
+    schema = {
+        "allOf": [
+            {"$ref": "#/$defs/outer"},
+            {"type": "object", "required": ["c"], "properties": {"c": {"type": "boolean"}}},
+        ],
+        "$defs": {
+            "outer": {
+                "allOf": [
+                    {"$ref": "#/$defs/inner"},
+                    {"type": "object", "required": ["b"], "properties": {"b": {"type": "integer"}}},
+                ]
+            },
+            "inner": {"type": "object", "required": ["a"], "properties": {"a": {"type": "string"}}},
+        },
+    }
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_all_of_with_a_pointer_back_into_the_value():
+    # The cyclic branch cannot drive a draw, so the other one does and it judges the result.
+    schema = {
+        "$ref": "#/$defs/node",
+        "$defs": {
+            "node": {
+                "type": "object",
+                "properties": {
+                    "parent": {
+                        "allOf": [
+                            {"$ref": "#/$defs/node"},
+                            {"type": "object", "required": ["tag"], "properties": {"tag": {"type": "string"}}},
+                        ]
+                    }
+                },
+            }
+        },
+    }
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+    find(built, lambda value: "parent" in value, settings=settings(max_examples=1000, database=None))
+
+
+def test_canonical_one_of_admits_only_what_a_single_branch_takes():
+    # Canonicalization keeps a `oneOf` whose branches are pointers, since folding one means
+    # unrolling what it names.
+    schema = {
+        "oneOf": [{"$ref": "#/$defs/small"}, {"$ref": "#/$defs/large"}],
+        "$defs": {"small": {"type": "integer", "maximum": 10}, "large": {"type": "integer", "minimum": 0}},
+    }
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=50, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        # Values both branches take belong to neither of them alone.
+        assert is_valid(value), value
+
+    test()
+
+    # Both ends stay reachable; only the overlap between them is gone.
+    find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
+    find(built, lambda value: value > 10, settings=settings(max_examples=1000, database=None))
+
+
+def test_canonical_array_shorter_than_the_positions_it_names():
+    # Nothing has to fill a position the array never reaches.
+    schema = {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "maxItems": 2}
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    find(built, lambda value: value == [], settings=settings(max_examples=1000, database=None))
+    find(built, lambda value: len(value) == 1, settings=settings(max_examples=1000, database=None))
+    find(built, lambda value: len(value) == 2, settings=settings(max_examples=1000, database=None))
+
+
+def test_canonical_array_keeps_the_positions_a_floor_demands():
+    schema = {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "minItems": 2, "maxItems": 2}
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert len(value) == 2 and is_valid(value), value
+
+    test()
+
+
 def test_canonical_reference_without_a_target_is_refused_by_canonicalization():
     schema = {"type": "object", "properties": {"a": {"$ref": "#/$defs/missing"}}, "$defs": {"other": {}}}
 
@@ -2246,11 +2439,21 @@ def test_canonical_reference_with_no_finite_value_admits_nothing():
         "$ref": "#/$defs/node",
         "$defs": {"node": {"type": "object", "required": ["child"], "properties": {"child": {"$ref": "#/$defs/node"}}}},
     }
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-    assert built is not None
 
-    with pytest.raises(Unsatisfiable):
-        find(built, lambda value: True, settings=settings(max_examples=50, database=None))
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+    assert built is not None
+    assert built.is_empty
+
+
+def test_canonical_reference_straight_back_to_itself_admits_nothing():
+    # The pointer names a schema that is only that same pointer again.
+    schema = {"$ref": "#/$defs/node", "$defs": {"node": {"$ref": "#/$defs/node"}}}
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+    assert built is not None
+    assert built.is_empty
 
 
 UNSUPPORTED_SCHEMAS = [
@@ -2821,6 +3024,50 @@ def test_canonical_object_property_formats(ctx, version):
     test()
 
 
+def test_canonical_contains_demand_behind_a_branch_pointer(ctx):
+    # A demand one branch reaches through a pointer still has to draw from what the pointer names.
+    big = {"type": "integer", "minimum": 5}
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"type": ["integer", "string"]},
+                                    "contains": {"anyOf": [{"$ref": "#/components/schemas/Big"}, {"type": "string"}]},
+                                    "minItems": 1,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={"schemas": {"Big": big}},
+    )
+    is_valid = jsonschema_rs.Draft202012Validator(
+        {
+            "type": "array",
+            "items": {"type": ["integer", "string"]},
+            "contains": {"anyOf": [big, {"type": "string"}]},
+            "minItems": 1,
+        }
+    ).is_valid
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=10, deadline=None)
+    def test(case):
+        assert is_valid(case.body), case.body
+
+    test()
+
+
 def test_canonical_object_keeps_declared_names_outside_the_alphabet():
     # The alphabet governs generated strings; a name the schema mandates is not negotiable.
     schema = {"type": "object", "properties": {"é": {"type": "integer"}}, "required": ["é"]}
@@ -3015,6 +3262,7 @@ METASCHEMA_IDS = ["draft4", "draft6", "draft7"]
 
 
 @pytest.mark.parametrize(("validator_cls", "metaschema"), METASCHEMAS, ids=METASCHEMA_IDS)
+@pytest.mark.filterwarnings("error::hypothesis.errors.HypothesisWarning")
 def test_metaschema_generation(validator_cls, metaschema):
     built = _canonical_strategy_or_none(metaschema, GenerationConfig(), validator_cls)
     assert built is not None
@@ -3029,6 +3277,7 @@ def test_metaschema_generation(validator_cls, metaschema):
 
 
 @pytest.mark.parametrize(("validator_cls", "metaschema"), METASCHEMAS, ids=METASCHEMA_IDS)
+@pytest.mark.filterwarnings("error::hypothesis.errors.HypothesisWarning")
 def test_metaschema_generation_soundness(validator_cls, metaschema):
     schemas = _canonical_strategy_or_none(metaschema, GenerationConfig(), validator_cls)
     assert schemas is not None

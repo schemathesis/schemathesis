@@ -23,7 +23,7 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
 )
-from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR
 from schemathesis.core.jsonschema.numeric import (
     bounds_are_unsatisfiable,
     is_numeric_bound,
@@ -39,9 +39,7 @@ from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
-from schemathesis.generation.jsonschema import Alphabet, StrategyContext
-from schemathesis.generation.jsonschema.strategy import UnsupportedView
-from schemathesis.generation.jsonschema.strategy import from_schema as canonical_from_schema
+from schemathesis.generation.jsonschema import Alphabet, build
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -1071,8 +1069,8 @@ def _build_custom_formats_uncached(
     custom_formats.update(get_header_format_strategies(mode))
     # Pinned to the character set in force, since this map goes to callers that cannot supply one.
     alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec).as_strategy()
-    for name, build in get_alphabet_format_strategies().items():
-        custom_formats[name] = build(alphabet)
+    for name, make_strategy in get_alphabet_format_strategies().items():
+        custom_formats[name] = make_strategy(alphabet)
     return custom_formats
 
 
@@ -1219,42 +1217,15 @@ def _canonical_strategy_or_none(
         cached = canonical_strategy_cache.get(key)
         if cached is not MISSING:
             return cached
-    strategy = _build_canonical_strategy(schema, generation_config, validator_cls)
+    strategy = build(
+        schema,
+        draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+        formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
+        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
+    )
     if key is not None:
         canonical_strategy_cache[key] = strategy
     return strategy
-
-
-def _build_canonical_strategy(
-    schema: JsonSchema, generation_config: GenerationConfig, validator_cls: type[jsonschema_rs.Validator]
-) -> st.SearchStrategy[JsonValue] | None:
-    try:
-        canonical_schema = jsonschema_rs.canonicalize(
-            schema,
-            draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
-            pattern_options=FANCY_REGEX_OPTIONS,
-            # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a
-            # `format`-carrying schema generating arbitrary strings on this path.
-            validate_formats=True,
-        )
-    except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
-        return None
-    if canonical_schema.kind == "raw":
-        return None
-    # Unsatisfiable schemas are not modeled here for now
-    if not canonical_schema.is_satisfiable():
-        return None
-    context = StrategyContext(
-        root=canonical_schema,
-        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
-        formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
-    )
-    try:
-        # Laying out the positions can expose a contradiction canonicalization does not see, and the
-        # answer to that is an empty strategy, not another engine.
-        return canonical_from_schema(canonical_schema, context)
-    except UnsupportedView:
-        return None
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:

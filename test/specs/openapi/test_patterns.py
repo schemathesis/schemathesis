@@ -13,10 +13,12 @@ try:
 except ImportError:
     import sre_parse  # type: ignore[no-redef]
 
+import schemathesis
 from schemathesis.core.errors import InternalError
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import (
     _serialize,
+    is_valid_jsonschema_rs_regex,
     normalize_regex,
     pattern_length_bounds,
     pattern_requires_char_outside,
@@ -934,7 +936,7 @@ def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
 def test_unicode_surrogate_pattern_in_request_body(cli, ctx, snapshot_cli):
     # Surrogate code point range - invalid in regex engine
     invalid_pattern = "[\\uD800-\\uDBFF]"
@@ -1086,3 +1088,61 @@ ALNUM = string.ascii_letters + string.digits
 )
 def test_pattern_requires_char_outside(pattern, allowed, expected):
     assert pattern_requires_char_outside(pattern, allowed) == expected
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("^[a-z]+$", True),
+        # Surrogate code points, which the validator's regex engine refuses.
+        ("[\\uD800-\\uDBFF]", False),
+        # An incomplete quantifier, valid in Python and not in ECMA 262.
+        ("[A-Z]{,3}", False),
+    ],
+)
+def test_is_valid_jsonschema_rs_regex(pattern, expected):
+    assert is_valid_jsonschema_rs_regex(pattern) is expected
+
+
+def test_pattern_the_validator_cannot_compile_is_dropped(ctx):
+    # Such a pattern constrains nothing during validation, and keeping it would only stop the rest
+    # of the schema from being modeled.
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "schema": {"type": "string", "pattern": "[A-Z]{,3}", "maxLength": 5},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schemathesis.openapi.from_dict(schema)["/items"]["GET"]
+    parameter = next(iter(operation.query))
+
+    assert "pattern" not in parameter.optimized_schema
+    assert parameter.optimized_schema["maxLength"] == 5
+
+
+def test_quantifier_rewrite_the_validator_cannot_compile_is_not_taken():
+    # Folding a bound this large into the pattern makes a quantifier the regex engine refuses; the
+    # pattern and the bound both stay as they were.
+    schema = {"type": "string", "pattern": "^.{1,}$", "maxLength": 2147483647}
+
+    update_pattern_in_schema(schema)
+
+    assert schema == {"type": "string", "pattern": "^.{1,}$", "maxLength": 2147483647}
+
+
+def test_quantifier_rewrite_within_reach_is_taken():
+    schema = {"type": "string", "pattern": "^.{1,}$", "maxLength": 10}
+
+    update_pattern_in_schema(schema)
+
+    assert schema == {"type": "string", "pattern": "^.{1,10}$"}

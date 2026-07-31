@@ -1271,8 +1271,10 @@ def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, cli
 
 
 def test_query_param_invalid_ecma262_pattern_no_runtime_error(ctx, cli, app_runner):
-    # `{,3}` is valid in Python, but jsonschema_rs rejects it as an incomplete quantifier when meta-validating the schema.
-    # The `negative_data_rejection` check must not crash on such user-provided schemas.
+    # `{,3}` is valid in Python, but jsonschema_rs rejects it as an incomplete quantifier when
+    # meta-validating the schema. A pattern it cannot compile constrains nothing during validation
+    # either, so it is dropped and the rest of the schema still drives generation - and the app
+    # accepting a request without the required parameter is a genuine finding, not a crash.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -1295,13 +1297,15 @@ def test_query_param_invalid_ecma262_pattern_no_runtime_error(ctx, cli, app_runn
     def items():
         return jsonify({}), 200
 
-    cli.run_and_assert(
+    result = cli.run_and_assert(
         app_runner.openapi_url(app),
         "--phases=coverage",
         "--mode=negative",
         "--checks=negative_data_rejection",
-        exit_code=ExitCode.OK,
+        exit_code=ExitCode.TESTS_FAILED,
     )
+    assert "Runtime Error" not in result.stdout
+    assert "Schema Error" not in result.stdout
 
 
 def test_negative_data_rejection_array_path_param_no_false_positive(ctx, cli, app_runner):
