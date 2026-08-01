@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import math
 import re
 import sys
@@ -15,7 +17,12 @@ from hypothesis.strategies._internal.deferred import DeferredStrategy
 from jsonschema_rs import canonical
 
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, make_validator_for
+from schemathesis.core.jsonschema import (
+    CANONICALIZE_DRAFT_BY_VALIDATOR,
+    FANCY_REGEX_OPTIONS,
+    make_validator,
+    make_validator_for,
+)
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.specs.openapi.patterns import pattern_length_bounds
 
@@ -1072,10 +1079,8 @@ def _combined_multiple_of(values: list[float]) -> Fraction | None:
 
 
 def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    # Content facets narrow the admitted strings, and driving them needs generators this module has
-    # no access to.
     if view.content_media_types or view.content_encodings:
-        raise UnsupportedView("string")
+        return _content_string(view, ctx)
     # A name with no generator behind it is an annotation and leaves the strings unconstrained.
     known = [name for name in view.formats if name in ctx.formats]
     if known:
@@ -1105,6 +1110,38 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
             for pattern in drivers
         ]
     )
+
+
+def _content_string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    """A decoded value first, with each encoding mapped over it."""
+    if "application/json" in view.content_media_types:
+        strategy = _anything(ctx).map(json.dumps)
+    else:
+        strategy = _text(ctx)
+    for media_type in view.content_media_types:
+        if media_type != "application/json":
+            # No builder for this media type; the draft-aware check mirrors what the validator
+            # asserts, and passes everything for a type the validator does not know either.
+            strategy = strategy.filter(_content_check(ctx, "contentMediaType", media_type))
+    for encoding in view.content_encodings:
+        if encoding == "base64":
+            strategy = strategy.map(_base64_text)
+        else:
+            strategy = strategy.filter(_content_check(ctx, "contentEncoding", encoding))
+    for pattern in view.patterns:
+        strategy = strategy.filter(_facet_check("pattern", pattern))
+    return _within_length(strategy, view)
+
+
+def _base64_text(value: str) -> str:
+    return base64.b64encode(value.encode("utf-8")).decode("ascii")
+
+
+def _content_check(ctx: StrategyContext, keyword: str, value: str) -> Callable[[JsonValue], bool]:
+    # Content facets assert only in the drafts where the validator says so; the check has to be
+    # built for the document's own draft to agree with it.
+    validator_cls = next(cls for cls, draft in CANONICALIZE_DRAFT_BY_VALIDATOR.items() if draft == ctx.root.draft)
+    return make_validator({"type": "string", keyword: value}, validator_cls).is_valid
 
 
 def _pattern_driven(
