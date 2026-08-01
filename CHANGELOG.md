@@ -9,6 +9,7 @@
 - Generate `hostname` and `idn-hostname` values that validators accept.
 - `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
 - Generate string values satisfying every `pattern` and `format` in a conjunction.
+- Generate strings honoring `contentEncoding` and `contentMediaType` under Draft 7.
 
 ### :racing_car: Performance
 

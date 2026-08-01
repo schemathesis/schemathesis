@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 import sys
 import uuid
@@ -2535,8 +2536,6 @@ def test_canonical_reference_straight_back_to_itself_admits_nothing():
 
 
 UNSUPPORTED_SCHEMAS = [
-    ({"type": "string", "contentMediaType": "application/json"}, jsonschema_rs.Draft7Validator),
-    ({"type": "string", "contentEncoding": "base64"}, jsonschema_rs.Draft7Validator),
     # A pattern Python `re` rejects can only filter; alone there is nothing to drive the draw.
     ({"type": "string", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
     # A node behind a pattern is only reached on a draw, and must still be refused up front.
@@ -2552,6 +2551,41 @@ UNSUPPORTED_SCHEMAS = [
 )
 def test_canonical_unsupported_schemas_fall_back(schema, validator_cls):
     assert _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls) is None
+
+
+# Draft 7 asserts content facets, and only there does the canonical view carry them; Draft 2020-12
+# treats them as annotations and drops them before generation.
+CONTENT_STRING_CASES = [
+    (
+        {"type": "string", "contentEncoding": "base64"},
+        (lambda value: len(b64decode(value, validate=True)) > 2,),
+    ),
+    (
+        {"type": "string", "contentMediaType": "application/json"},
+        (lambda value: isinstance(json.loads(value), dict) and len(json.loads(value)) > 0,),
+    ),
+    (
+        {"type": "string", "contentEncoding": "base64", "minLength": 8},
+        (lambda value: len(value) > 8,),
+    ),
+]
+CONTENT_STRING_CASE_IDS = [str(schema) for schema, _ in CONTENT_STRING_CASES]
+
+
+@pytest.mark.parametrize(("schema", "reaches"), CONTENT_STRING_CASES, ids=CONTENT_STRING_CASE_IDS)
+def test_canonical_content_string_generation(schema, reaches):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft7Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft7Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+    for predicate in reaches:
+        find(built, predicate, settings=settings(max_examples=1000, database=None))
 
 
 def test_canonical_number_generation_without_representable_values():
@@ -3323,6 +3357,26 @@ def test_canonical_number_generation_soundness():
 
 def test_canonical_string_generation_soundness():
     assert_generation_is_sound(string_schemas(), max_examples=500, floor=100)
+
+
+@st.composite
+def content_string_schemas(draw):
+    schema = {"type": "string"}
+    if draw(st.booleans()):
+        schema["contentEncoding"] = draw(st.sampled_from(["base64", "quoted-printable"]))
+    if draw(st.booleans()):
+        schema["contentMediaType"] = draw(st.sampled_from(["application/json", "text/plain"]))
+    if draw(st.booleans()):
+        schema["minLength"] = draw(st.integers(0, 4))
+    if draw(st.booleans()):
+        schema["maxLength"] = draw(st.integers(0, 20))
+    return schema
+
+
+def test_canonical_content_generation_soundness():
+    assert_generation_is_sound(
+        content_string_schemas(), max_examples=300, floor=50, validator_cls=jsonschema_rs.Draft7Validator
+    )
 
 
 def test_canonical_object_generation_soundness():
