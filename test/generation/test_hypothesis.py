@@ -845,6 +845,48 @@ def test_array_with_allof_of_multiple_contains(ctx, version):
     assert "KyaManifest" in case.body["type"]
 
 
+def test_string_with_allof_of_formats_and_patterns(ctx):
+    # Every generated value has to satisfy both halves of each conjunction at once.
+    schema = ctx.openapi.load_schema(
+        {
+            "/probe": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "host",
+                            "required": True,
+                            "schema": {
+                                "allOf": [
+                                    {"type": "string", "format": "hostname"},
+                                    {"type": "string", "format": "ipv4"},
+                                ]
+                            },
+                        }
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "string", "allOf": [{"pattern": "^[a-z]+$"}, {"pattern": "a"}]}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    case = examples.generate_one(schema["/probe"]["POST"].as_strategy())
+
+    assert jsonschema_rs.Draft202012Validator({"type": "string", "format": "ipv4"}, validate_formats=True).is_valid(
+        case.query["host"]
+    )
+    assert re.fullmatch(r"[a-z]+", case.body) and "a" in case.body
+
+
 @pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
     schema = ctx.openapi.load_schema(
@@ -2053,6 +2095,26 @@ CANONICAL_CASES = [
         },
         (lambda value: len(value) > 2,),
     ),
+    # Two formats on one value: every ipv4 is a hostname, so the pair is satisfiable.
+    (
+        {"allOf": [{"type": "string", "format": "hostname"}, {"type": "string", "format": "ipv4"}]},
+        (lambda value: len(value) > 0,),
+    ),
+    # Two patterns on one value; the second is unanchored and must still land in the match.
+    (
+        {"type": "string", "allOf": [{"pattern": "^[a-z]+$"}, {"pattern": "a"}]},
+        (lambda value: "a" in value and len(value) > 1,),
+    ),
+    # A pattern Python `re` rejects can still filter, as long as another pattern drives the draw.
+    (
+        {"type": "string", "allOf": [{"pattern": "^[a-zA-Z]{3}$"}, {"pattern": "\\p{L}"}]},
+        (lambda value: len(value) == 3,),
+    ),
+    # The same behind a format generator.
+    (
+        {"type": "string", "format": "uuid", "pattern": "\\p{L}"},
+        (lambda value: any(character.isalpha() for character in value),),
+    ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
@@ -2122,6 +2184,22 @@ def test_canonical_contains_conflicting_formats_never_unsound():
         "items": {"type": "string"},
         "contains": {"allOf": [{"format": "ipv4"}, {"format": "date"}]},
     }
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(value):
+        assert is_valid(value), value
+
+    with pytest.raises(Unsatisfiable):
+        test()
+
+
+def test_canonical_conflicting_formats_never_unsound():
+    # No string is both an ipv4 and a date; every driver's branch must reject every draw.
+    schema = {"allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]}
     built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     assert built is not None
     is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
@@ -2256,14 +2334,8 @@ def test_canonical_reference_with_no_finite_value_admits_nothing():
 UNSUPPORTED_SCHEMAS = [
     ({"type": "string", "contentMediaType": "application/json"}, jsonschema_rs.Draft7Validator),
     ({"type": "string", "contentEncoding": "base64"}, jsonschema_rs.Draft7Validator),
-    # A pattern Python `re` rejects cannot drive generation, with or without a format.
+    # A pattern Python `re` rejects can only filter; alone there is nothing to drive the draw.
     ({"type": "string", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
-    ({"type": "string", "format": "uuid", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
-    # Two formats at once needs a conjunction this module cannot build.
-    (
-        {"allOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "date"}]},
-        jsonschema_rs.Draft202012Validator,
-    ),
     # A node behind a pattern is only reached on a draw, and must still be refused up front.
     (
         {"type": "object", "patternProperties": {"^a": {"type": "string", "pattern": r"\p{L}"}}},
@@ -2872,14 +2944,22 @@ def string_schemas(draw):
     schema = {"type": "string"}
     if draw(st.booleans()):
         # A format generator answers to no facet around it, so the bounds stay loose enough to survive.
-        schema["format"] = draw(st.sampled_from(ASSERTED_FORMATS))
+        formats = draw(st.lists(st.sampled_from(ASSERTED_FORMATS), min_size=1, max_size=2, unique=True))
+        if len(formats) == 1:
+            schema["format"] = formats[0]
+        else:
+            schema["allOf"] = [{"format": name} for name in formats]
         if draw(st.booleans()):
             schema["maxLength"] = draw(st.integers(0, 40))
         if draw(st.booleans()):
             schema["minLength"] = draw(st.integers(0, 8))
         return schema
     if draw(st.booleans()):
-        schema["pattern"] = draw(STRING_PATTERNS)
+        patterns = draw(st.lists(STRING_PATTERNS, min_size=1, max_size=2, unique=True))
+        if len(patterns) == 1:
+            schema["pattern"] = patterns[0]
+        else:
+            schema["allOf"] = [{"pattern": pattern} for pattern in patterns]
     if draw(st.booleans()):
         schema["minLength"] = draw(st.integers(0, 4))
     if draw(st.booleans()):
