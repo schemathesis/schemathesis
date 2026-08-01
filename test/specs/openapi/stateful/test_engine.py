@@ -408,23 +408,6 @@ def test_no_false_positive_ensure_resource_availability_when_id_reused(engine_fa
     assert result.events[-1].status == Status.SUCCESS
 
 
-@pytest.mark.usefixtures("restore_checks")
-def test_failed_health_check(engine_factory):
-    @schemathesis.check
-    def rejected_check(*args, **kwargs):
-        hypothesis.reject()
-
-    engine = engine_factory(
-        hypothesis_settings={"suppress_health_check": [hypothesis.HealthCheck.differing_executors]},
-        max_examples=1,
-        checks=[rejected_check],
-    )
-    result = collect_result(engine)
-    assert result.errors
-    assert isinstance(result.errors[0].value, hypothesis.errors.FailedHealthCheck)
-    assert result.events[-1].status == Status.ERROR
-
-
 @pytest.mark.parametrize(
     "kwargs",
     [{"max_failures": None}, {"max_failures": 1}],

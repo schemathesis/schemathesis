@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import threading
 
-import hypothesis
 import pytest
 
 import schemathesis
@@ -78,15 +77,10 @@ def _stateful_phase() -> Phase:
 def engine_factory(ctx, app_runner, stop_event):
     def _engine_factory(
         *modifiers: Modifier[UserStore],
-        hypothesis_settings=None,
         include=None,
         **kwargs,
     ):
         _, schema, engine_ctx = _build_stateful_engine_ctx(ctx, stop_event, *modifiers, **kwargs)
-        if hypothesis_settings is not None:
-            current = schema.config.get_hypothesis_settings()
-            new = hypothesis.settings(current, **hypothesis_settings)
-            schema.config.get_hypothesis_settings = lambda *_, **__: new
         if include is not None:
             schema = schema.include(**include)
         return stateful.execute(engine=engine_ctx, phase=_stateful_phase())

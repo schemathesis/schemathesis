@@ -7,6 +7,7 @@
 - Strings longer than a single-character `pattern` like `^[a-z]$` allows when `maxLength` is set.
 - Honor `format` when generating string values for Open API 3.1.
 - Generate `hostname` and `idn-hostname` values that validators accept.
+- `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
 
 ### :racing_car: Performance
 
