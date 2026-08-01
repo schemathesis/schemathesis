@@ -1078,11 +1078,10 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         raise UnsupportedView("string")
     # A name with no generator behind it is an annotation and leaves the strings unconstrained.
     known = [name for name in view.formats if name in ctx.formats]
-    if len(known) > 1:
-        # Two generators, one value: satisfying both needs an intersection this module cannot build.
-        raise UnsupportedView("string")
     if known:
-        return _formatted(known[0], view, ctx)
+        # One generator drives, the rest filter; which pair flows depends on the value, so every
+        # driver gets a branch and the dead ones reject their draws.
+        return st.one_of([_formatted(name, [other for other in known if other != name], view, ctx) for name in known])
     if not view.patterns:
         kwargs: dict[str, int] = {}
         if view.min_length is not None:
@@ -1090,16 +1089,30 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         if view.max_length is not None:
             kwargs["max_size"] = view.max_length
         return _text(ctx, **kwargs)
-    compiled = _compiled(view.patterns[0])
-    if len(view.patterns) > 1 or compiled is None:
-        # Intersecting patterns need a conjunctive rewrite, and a pattern Python `re` rejects (e.g. ECMA
-        # `\p{L}`) can't drive generation at all.
-        raise UnsupportedView("string")
-    pattern = view.patterns[0]
-    if view.max_length is not None and pattern_length_bounds(pattern)[0] > view.max_length:
-        # Every value has to carry a match, and no match fits under the ceiling. Saying so up front
-        # lets the caller see the emptiness instead of meeting it as a filter that never passes.
+    if view.max_length is not None and any(
+        pattern_length_bounds(pattern)[0] > view.max_length for pattern in view.patterns
+    ):
+        # Every value has to carry a match of each pattern, and one of them cannot fit under the
+        # ceiling. Saying so up front spares the caller a filter that never passes.
         return st.nothing()
+    drivers = [pattern for pattern in view.patterns if _compiled(pattern) is not None]
+    if not drivers:
+        # A pattern Python `re` rejects (e.g. ECMA `\p{L}`) can filter but not drive the draw.
+        raise UnsupportedView("string")
+    return st.one_of(
+        [
+            _pattern_driven(pattern, [other for other in view.patterns if other != pattern], view, ctx)
+            for pattern in drivers
+        ]
+    )
+
+
+def _pattern_driven(
+    pattern: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
+    """Values drawn from one pattern and filtered by the remaining ones."""
+    compiled = _compiled(pattern)
+    assert compiled is not None
     # A pattern is a search, so the value may carry anything around the match; full matches only
     # would leave `^x` spelling a single string, starving `propertyNames` of distinct keys.
     strategy = st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy())
@@ -1113,21 +1126,30 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         # Python also matches `$` before a trailing newline, where the validator means end of string;
         # telling literal `$`s apart costs more than dropping the newline-terminated values.
         strategy = strategy.filter(lambda value: not value.endswith("\n"))
+    for other in others:
+        strategy = strategy.filter(_facet_check("pattern", other))
     # Length is normally folded into the pattern upstream; this filter is the soundness net.
     return _within_length(strategy, view)
 
 
-def _formatted(name: str, view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+def _formatted(
+    name: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
     """Values from the generator registered for `name`, narrowed to the facets around it."""
     strategy = ctx.formats[name]
+    for other in others:
+        strategy = strategy.filter(_facet_check("format", other))
     for pattern in view.patterns:
-        compiled = _compiled(pattern)
-        if compiled is None:
-            raise UnsupportedView("string")
-        # A format generator cannot be steered, so the pattern can only be filtered for. `search`,
-        # not `fullmatch`: an unanchored pattern admits a match anywhere in the value.
-        strategy = strategy.filter(compiled.search)
+        # A format generator cannot be steered, so the pattern can only be filtered for.
+        strategy = strategy.filter(_facet_check("pattern", pattern))
     return _within_length(strategy, view)
+
+
+# The validator's own engine judges the facet, so `\p{L}` patterns and format assertions filter
+# exactly; a name without a checker behind it passes everything, like the validator itself.
+@lru_cache(maxsize=512)
+def _facet_check(keyword: str, value: str) -> Callable[[JsonValue], bool]:
+    return make_validator_for({"type": "string", keyword: value}).is_valid
 
 
 def _within_length(
