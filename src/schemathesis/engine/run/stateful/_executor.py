@@ -86,8 +86,10 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
         kwargs["stateful_step_count"] = DEFAULT_STATE_MACHINE_SETTINGS.stateful_step_count
     if settings.deadline == hypothesis_default.deadline:
         kwargs["deadline"] = DEFAULT_STATE_MACHINE_SETTINGS.deadline
-    if settings.suppress_health_check == hypothesis_default.suppress_health_check:
-        kwargs["suppress_health_check"] = DEFAULT_STATE_MACHINE_SETTINGS.suppress_health_check
+    # Suppressing a subset must not re-enable the rest, hence the union rather than a swap
+    kwargs["suppress_health_check"] = list(
+        dict.fromkeys([*DEFAULT_STATE_MACHINE_SETTINGS.suppress_health_check, *settings.suppress_health_check])
+    )
     return kwargs
 
 
