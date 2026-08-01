@@ -10,6 +10,7 @@
 - `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
 - Generate string values satisfying every `pattern` and `format` in a conjunction.
 - Generate strings honoring `contentEncoding` and `contentMediaType` under Draft 7.
+- Name the API operation that cannot be generated when its schema is unsatisfiable.
 
 ### :racing_car: Performance
 

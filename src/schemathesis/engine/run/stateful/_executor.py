@@ -38,7 +38,7 @@ from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.generation.hypothesis.reporting import UnsatisfiableSchema, ignore_hypothesis_output
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import (
     DEFAULT_STATE_MACHINE_SETTINGS,
@@ -411,7 +411,11 @@ def execute_state_machine_loop(
             ctx.mark_current_suite_as_seen_in_run()
             continue
         except Exception as exc:
-            if isinstance(exc, Unsatisfiable) and ctx.completed_scenarios > 0:
+            if (
+                isinstance(exc, Unsatisfiable)
+                and not isinstance(exc, UnsatisfiableSchema)
+                and ctx.completed_scenarios > 0
+            ):
                 # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
                 # values are possible to generate based on the previous observations, we retry the generation
                 if ctx.completed_scenarios >= hypothesis_settings.max_examples:

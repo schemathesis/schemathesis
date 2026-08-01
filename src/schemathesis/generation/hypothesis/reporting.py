@@ -163,6 +163,17 @@ def build_unsatisfiable_error(
     return Unsatisfiable(message)
 
 
+class UnsatisfiableSchema(Unsatisfiable):
+    """A schema that admits no value at all, as opposed to one Hypothesis gave up on."""
+
+
+def build_unsatisfiable_schema_error(operation: APIOperation) -> UnsatisfiableSchema:
+    return UnsatisfiableSchema(f"""Cannot generate test data for {operation.label}
+
+This usually means:
+{UNSATISFIABILITY_CAUSE}""")
+
+
 HEALTH_CHECK_CAUSES = {
     HealthCheck.data_too_large: """  - Arrays with large minItems (e.g., minItems: 1000)
   - Strings with large minLength (e.g., minLength: 10000)

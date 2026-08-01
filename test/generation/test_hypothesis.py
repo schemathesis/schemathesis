@@ -2809,7 +2809,9 @@ def test_canonical_object_unsatisfiable_when_required_name_is_not_admitted():
         "required": ["b"],
         "additionalProperties": False,
     }
-    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    assert built.is_empty
 
 
 def test_canonical_object_respects_alphabet():

@@ -15,6 +15,11 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 
 
+# What this module returns for a schema that admits no value. Callers recognize it by identity, which
+# says "this engine ruled the schema out" without forcing an unrelated strategy to build itself first.
+EMPTY_STRATEGY: SearchStrategy = st.nothing()
+
+
 def build(
     schema: JsonSchema,
     *,
@@ -36,10 +41,9 @@ def build(
         return None
     if canonical_schema.kind == "raw":
         return None
-    # An unsatisfiable schema is reported by the caller that draws from it, and the strategy this
-    # module would build for one says nothing about which parameter is at fault.
+    # Spelled out so the caller reports an unsatisfiable schema; no other engine gets a say.
     if not canonical_schema.is_satisfiable():
-        return None
+        return EMPTY_STRATEGY
     context = StrategyContext(
         root=canonical_schema,
         alphabet=alphabet if alphabet is not None else Alphabet(),
@@ -59,4 +63,4 @@ def build(
         return None
     # Spelling it out keeps the caller reporting an unsatisfiable schema, where a strategy that
     # only fails on a draw would surface as whatever Hypothesis raises first.
-    return st.nothing() if empty else strategy
+    return EMPTY_STRATEGY if empty else strategy
