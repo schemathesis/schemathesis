@@ -31,6 +31,7 @@ from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
+from schemathesis.generation.jsonschema import EMPTY_STRATEGY
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool, ConstantType, ConstantValue, Origin
@@ -1324,6 +1325,11 @@ class OpenApiBody(OpenApiComponent):
             target_descriptors=target_descriptors,
         )
 
+        if strategy is EMPTY_STRATEGY:
+            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
+            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+            return strategy
+
         # Mix in schema examples for positive mode (20% example, 80% generated)
         # Skip during EXAMPLES phase since examples are handled separately there
         if mix_examples and generation_mode == GenerationMode.POSITIVE:
@@ -2018,6 +2024,11 @@ class OpenApiParameterSet(ParameterSet):
                 self.name_to_uri,
                 validation_schema=validation_schema_obj,
             )
+
+            if strategy is EMPTY_STRATEGY:
+                # Every overlay below decorates a drawn value, so there is nothing for them to act on.
+                # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+                return strategy
 
             # For negative strategies, we need to handle GeneratedValue wrappers
             is_negative = strategy_factory is make_negative_strategy

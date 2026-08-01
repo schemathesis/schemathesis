@@ -39,7 +39,8 @@ from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
-from schemathesis.generation.jsonschema import Alphabet, build
+from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_schema_error
+from schemathesis.generation.jsonschema import EMPTY_STRATEGY, Alphabet, build
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -107,6 +108,10 @@ StrategyFactory = Callable[
 
 
 def _draw(draw: st.DrawFn, strategy: st.SearchStrategy, operation: APIOperation) -> Any:
+    if strategy is EMPTY_STRATEGY:
+        # Drawing from an empty strategy only rejects the input, which reads as "nothing to generate here"
+        # in phases that recover from rejection - stateful testing would report success without testing this.
+        raise build_unsatisfiable_schema_error(operation)
     try:
         return draw(strategy)
     except jsonschema_rs.ValidationError as exc:
@@ -574,9 +579,10 @@ def _maybe_set_optional_body(
     """Add NOT_SET option to strategy for optional body parameters."""
     if _body_required_per_feedback(operation, error_feedback):
         return strategy
-    if (
-        not parameter.is_required
-        and draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
+    if not parameter.is_required and (
+        # An optional body whose schema admits no value can only be omitted.
+        strategy is EMPTY_STRATEGY
+        or draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
         < OPTIONAL_BODY_RATE
     ):
         strategy |= _JUST_NOT_SET

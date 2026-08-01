@@ -569,7 +569,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1)
-    result.stdout.re_match_lines([r".*InvalidSchema: Cannot have max_size=6 < min_size=10"])
+    result.stdout.re_match_lines([r".*UnsatisfiableSchema: Cannot generate test data for GET /users"])
 
 
 def test_invalid_operation(testdir):
