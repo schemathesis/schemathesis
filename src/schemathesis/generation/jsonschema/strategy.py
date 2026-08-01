@@ -96,9 +96,10 @@ def _reference(
     # Canonicalization refuses a pointer it cannot resolve, so the target is here. `#` is the one
     # pointer with no definition behind it: it names the document itself.
     target = ctx.root if view.uri == "#" else schema.definitions()[view.uri]
-    if view.uri in ctx.resolving:
-        # The pointer leads back into what is still being built. Spelling the rest of the value
-        # lazily lets a draw stop descending, where unrolling it here never would.
+    if view.uri == "#" or view.uri in ctx.resolving:
+        # The pointer leads back into what is still being built — for `#`, always the document itself.
+        # Spelling the rest of the value lazily lets a draw stop descending, where unrolling it here
+        # never would; for `#` it also spares rebuilding the whole document a second time.
         return st.deferred(lambda: from_schema(target, ctx))
     ctx.resolving.add(view.uri)
     try:
@@ -130,9 +131,7 @@ def _tuple(
     """An array whose leading positions each carry their own schema."""
     # A schema past the length ceiling pins a position no array can have.
     pinned = view.prefix_items if view.max_items is None else view.prefix_items[: view.max_items]
-    head = st.tuples(*[from_schema(entry, ctx) for entry in pinned])
-    # Arrays shorter than the prefix are admitted too, but skipping them keeps the draw a plain
-    # concatenation instead of a size-first two-step.
+    entries = [from_schema(entry, ctx) for entry in pinned]
     kwargs: dict[str, int] = {"min_size": max(0, (view.min_items or 0) - len(pinned))}
     if view.max_items is not None:
         kwargs["max_size"] = view.max_items - len(pinned)
@@ -140,8 +139,20 @@ def _tuple(
         # `unique_by` settles the tail; the filter catches what it cannot see — collisions inside the
         # prefix and across the two halves.
         tail = st.lists(element, unique_by=_json_identity, **kwargs)
-        return st.tuples(head, tail).map(_concat).filter(_all_unique)
-    return st.tuples(head, st.lists(element, **kwargs)).map(_concat)
+    else:
+        tail = st.lists(element, **kwargs)
+    full = st.tuples(st.tuples(*entries), tail).map(_concat)
+    # Arrays shorter than the prefix are instances whenever the floor allows them — and when a prefix
+    # position admits nothing (a reference cycle), the only ones.
+    shorter = [st.tuples(*entries[:length]).map(_as_list) for length in range(view.min_items or 0, len(pinned))]
+    strategy = st.one_of([*shorter, full])
+    if view.unique_items:
+        strategy = strategy.filter(_all_unique)
+    return strategy
+
+
+def _as_list(parts: tuple[JsonValue, ...]) -> JsonValue:
+    return list(parts)
 
 
 def _concat(parts: tuple[tuple[JsonValue, ...], list[JsonValue]]) -> JsonValue:

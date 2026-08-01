@@ -4,6 +4,7 @@ import sys
 import uuid
 from base64 import b64decode
 
+import jsonschema
 import jsonschema_rs
 import pytest
 from hypothesis import HealthCheck, Phase, assume, find, given, settings
@@ -1640,6 +1641,23 @@ CANONICAL_CASES = [
         {"type": "array", "prefixItems": [{"type": "integer"}], "items": {"type": "string"}},
         (lambda value: len(value) > 1,),
     ),
+    # Arrays shorter than the prefix are instances whenever the floor allows them.
+    (
+        {"type": "array", "prefixItems": [{"const": 1}, {"const": 2}]},
+        (lambda value: len(value) == 0, lambda value: len(value) == 1),
+    ),
+    (
+        {"type": "array", "prefixItems": [{"type": "integer"}, {"type": "string"}], "minItems": 1, "maxItems": 4},
+        (lambda value: len(value) == 1,),
+    ),
+    # A cycle in a prefix position admits no value there; the shorter arrays are the instances.
+    (
+        {"type": "array", "prefixItems": [{"$ref": "#"}, {"type": "integer"}], "maxItems": 3},
+        (lambda value: len(value) == 0,),
+    ),
+    # `#` names the document itself; canonicalization resolves these cycles before generation sees them.
+    ({"type": "object", "properties": {"child": {"$ref": "#"}}}, ()),
+    ({"type": "object", "properties": {"kids": {"type": "array", "items": {"$ref": "#"}}}}, ()),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
@@ -1662,22 +1680,55 @@ def test_canonical_generation(schema, reaches):
     test()
 
 
+@pytest.mark.xfail(reason="pure reference cycles fold to `true` in an upcoming jsonschema-rs release", strict=True)
 @pytest.mark.parametrize(
     "schema",
     [
-        {"type": "object", "properties": {"child": {"$ref": "#"}}},
-        {"type": "object", "properties": {"kids": {"type": "array", "items": {"$ref": "#"}}}},
+        {"$ref": "#"},
+        {"allOf": [{"$ref": "#"}]},
+        {"$ref": "#/$defs/a", "$defs": {"a": {"$ref": "#"}}},
     ],
-    ids=["property", "array-item"],
+    ids=["direct", "all-of", "via-definition"],
 )
-def test_canonical_root_reference(schema):
-    # `#` names the document itself, which is not one of its own definitions.
+def test_degenerate_root_cycle(schema):
+    # A pure `#` cycle admits everything the validator does.
     built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     assert built is not None
     is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
 
     @given(built)
     @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+@pytest.mark.xfail(reason="needs a validator built from the canonical node itself in jsonschema-rs", strict=True)
+def test_pattern_properties_root_reference_overlap():
+    # A name claimed by both patterns must satisfy both schemas, `#` meaning the whole document.
+    schema = {"type": "object", "patternProperties": {"^a": {"type": "integer"}, "a": {"$ref": "#"}}}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=50, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_pattern_properties_root_reference_single_pattern():
+    # Without overlap no cross-pattern filter exists, so `#` values stay modeled.
+    schema = {"type": "object", "patternProperties": {"^a": {"$ref": "#"}}}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
     def test(value):
         assert is_valid(value), value
 
@@ -2320,16 +2371,18 @@ def assert_generation_is_sound(
         # A schema this module declines to model is served by `hypothesis-jsonschema` instead.
         assume(built is not None)
         try:
-            is_valid = validator_cls(schema, validate_formats=True).is_valid
-        except jsonschema_rs.ValidationError:
-            # Nothing can say whether a value fits a schema the validator itself refuses to load.
-            return
-        try:
             value = data.draw(built)
+            is_valid = validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS).is_valid
         except InvalidArgument:
             # Hypothesis refuses a collection floor past its own buffer, whatever builds the strategy.
-            assume(allow_unbuildable)
-            return
+            if not allow_unbuildable:
+                raise
+            assume(False)
+        except jsonschema_rs.ValidationError:
+            # Nothing can say whether a value fits a schema the validator itself refuses to load.
+            if not allow_unbuildable:
+                raise
+            assume(False)
         assert is_valid(value), (schema, value)
         validated += 1
 
@@ -2358,212 +2411,10 @@ def test_canonical_array_generation_soundness():
     assert_generation_is_sound(array_schemas(ANY_SCHEMA), max_examples=300, floor=50)
 
 
-DRAFT4_METASCHEMA = {
-    "id": "http://json-schema.org/draft-04/schema#",
-    "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Core schema meta-schema",
-    "definitions": {
-        "schemaArray": {"type": "array", "minItems": 1, "items": {"$ref": "#"}},
-        "positiveInteger": {"type": "integer", "minimum": 0},
-        "positiveIntegerDefault0": {"allOf": [{"$ref": "#/definitions/positiveInteger"}, {"default": 0}]},
-        "simpleTypes": {"enum": ["array", "boolean", "integer", "null", "number", "object", "string"]},
-        "stringArray": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": True},
-    },
-    "type": "object",
-    "properties": {
-        "id": {"type": "string"},
-        "$schema": {"type": "string"},
-        "title": {"type": "string"},
-        "description": {"type": "string"},
-        "default": {},
-        "multipleOf": {"type": "number", "minimum": 0, "exclusiveMinimum": True},
-        "maximum": {"type": "number"},
-        "exclusiveMaximum": {"type": "boolean", "default": False},
-        "minimum": {"type": "number"},
-        "exclusiveMinimum": {"type": "boolean", "default": False},
-        "maxLength": {"$ref": "#/definitions/positiveInteger"},
-        "minLength": {"$ref": "#/definitions/positiveIntegerDefault0"},
-        "pattern": {"type": "string", "format": "regex"},
-        "additionalItems": {"anyOf": [{"type": "boolean"}, {"$ref": "#"}], "default": {}},
-        "items": {"anyOf": [{"$ref": "#"}, {"$ref": "#/definitions/schemaArray"}], "default": {}},
-        "maxItems": {"$ref": "#/definitions/positiveInteger"},
-        "minItems": {"$ref": "#/definitions/positiveIntegerDefault0"},
-        "uniqueItems": {"type": "boolean", "default": False},
-        "maxProperties": {"$ref": "#/definitions/positiveInteger"},
-        "minProperties": {"$ref": "#/definitions/positiveIntegerDefault0"},
-        "required": {"$ref": "#/definitions/stringArray"},
-        "additionalProperties": {"anyOf": [{"type": "boolean"}, {"$ref": "#"}], "default": {}},
-        "definitions": {"type": "object", "additionalProperties": {"$ref": "#"}, "default": {}},
-        "properties": {"type": "object", "additionalProperties": {"$ref": "#"}, "default": {}},
-        "patternProperties": {"type": "object", "additionalProperties": {"$ref": "#"}, "default": {}},
-        "dependencies": {
-            "type": "object",
-            "additionalProperties": {"anyOf": [{"$ref": "#"}, {"$ref": "#/definitions/stringArray"}]},
-        },
-        "enum": {"type": "array", "minItems": 1, "uniqueItems": True},
-        "type": {
-            "anyOf": [
-                {"$ref": "#/definitions/simpleTypes"},
-                {"type": "array", "items": {"$ref": "#/definitions/simpleTypes"}, "minItems": 1, "uniqueItems": True},
-            ]
-        },
-        "format": {"type": "string"},
-        "allOf": {"$ref": "#/definitions/schemaArray"},
-        "anyOf": {"$ref": "#/definitions/schemaArray"},
-        "oneOf": {"$ref": "#/definitions/schemaArray"},
-        "not": {"$ref": "#"},
-    },
-    "dependencies": {"exclusiveMaximum": ["maximum"], "exclusiveMinimum": ["minimum"]},
-    "default": {},
-}
-
-DRAFT6_METASCHEMA = {
-    "$schema": "http://json-schema.org/draft-06/schema#",
-    "$id": "http://json-schema.org/draft-06/schema#",
-    "title": "Core schema meta-schema",
-    "definitions": {
-        "schemaArray": {"type": "array", "minItems": 1, "items": {"$ref": "#"}},
-        "nonNegativeInteger": {"type": "integer", "minimum": 0},
-        "nonNegativeIntegerDefault0": {"allOf": [{"$ref": "#/definitions/nonNegativeInteger"}, {"default": 0}]},
-        "simpleTypes": {"enum": ["array", "boolean", "integer", "null", "number", "object", "string"]},
-        "stringArray": {"type": "array", "items": {"type": "string"}, "uniqueItems": True, "default": []},
-    },
-    "type": ["object", "boolean"],
-    "properties": {
-        "$id": {"type": "string", "format": "uri-reference"},
-        "$schema": {"type": "string", "format": "uri"},
-        "$ref": {"type": "string", "format": "uri-reference"},
-        "title": {"type": "string"},
-        "description": {"type": "string"},
-        "default": {},
-        "examples": {"type": "array", "items": {}},
-        "multipleOf": {"type": "number", "exclusiveMinimum": 0},
-        "maximum": {"type": "number"},
-        "exclusiveMaximum": {"type": "number"},
-        "minimum": {"type": "number"},
-        "exclusiveMinimum": {"type": "number"},
-        "maxLength": {"$ref": "#/definitions/nonNegativeInteger"},
-        "minLength": {"$ref": "#/definitions/nonNegativeIntegerDefault0"},
-        "pattern": {"type": "string", "format": "regex"},
-        "additionalItems": {"$ref": "#"},
-        "items": {"anyOf": [{"$ref": "#"}, {"$ref": "#/definitions/schemaArray"}], "default": {}},
-        "maxItems": {"$ref": "#/definitions/nonNegativeInteger"},
-        "minItems": {"$ref": "#/definitions/nonNegativeIntegerDefault0"},
-        "uniqueItems": {"type": "boolean", "default": False},
-        "contains": {"$ref": "#"},
-        "maxProperties": {"$ref": "#/definitions/nonNegativeInteger"},
-        "minProperties": {"$ref": "#/definitions/nonNegativeIntegerDefault0"},
-        "required": {"$ref": "#/definitions/stringArray"},
-        "additionalProperties": {"$ref": "#"},
-        "definitions": {"type": "object", "additionalProperties": {"$ref": "#"}, "default": {}},
-        "properties": {"type": "object", "additionalProperties": {"$ref": "#"}, "default": {}},
-        "patternProperties": {
-            "type": "object",
-            "additionalProperties": {"$ref": "#"},
-            "propertyNames": {"format": "regex"},
-            "default": {},
-        },
-        "dependencies": {
-            "type": "object",
-            "additionalProperties": {"anyOf": [{"$ref": "#"}, {"$ref": "#/definitions/stringArray"}]},
-        },
-        "propertyNames": {"$ref": "#"},
-        "const": {},
-        "enum": {"type": "array"},
-        "type": {
-            "anyOf": [
-                {"$ref": "#/definitions/simpleTypes"},
-                {"type": "array", "items": {"$ref": "#/definitions/simpleTypes"}, "minItems": 1, "uniqueItems": True},
-            ]
-        },
-        "format": {"type": "string"},
-        "allOf": {"$ref": "#/definitions/schemaArray"},
-        "anyOf": {"$ref": "#/definitions/schemaArray"},
-        "oneOf": {"$ref": "#/definitions/schemaArray"},
-        "not": {"$ref": "#"},
-    },
-    "default": {},
-}
-
-DRAFT7_METASCHEMA = {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "http://json-schema.org/draft-07/schema#",
-    "title": "Core schema meta-schema",
-    "definitions": {
-        "schemaArray": {"type": "array", "minItems": 1, "items": {"$ref": "#"}},
-        "nonNegativeInteger": {"type": "integer", "minimum": 0},
-        "nonNegativeIntegerDefault0": {"allOf": [{"$ref": "#/definitions/nonNegativeInteger"}, {"default": 0}]},
-        "simpleTypes": {"enum": ["array", "boolean", "integer", "null", "number", "object", "string"]},
-        "stringArray": {"type": "array", "items": {"type": "string"}, "uniqueItems": True, "default": []},
-    },
-    "type": ["object", "boolean"],
-    "properties": {
-        "$id": {"type": "string", "format": "uri-reference"},
-        "$schema": {"type": "string", "format": "uri"},
-        "$ref": {"type": "string", "format": "uri-reference"},
-        "$comment": {"type": "string"},
-        "title": {"type": "string"},
-        "description": {"type": "string"},
-        "default": True,
-        "readOnly": {"type": "boolean", "default": False},
-        "examples": {"type": "array", "items": True},
-        "multipleOf": {"type": "number", "exclusiveMinimum": 0},
-        "maximum": {"type": "number"},
-        "exclusiveMaximum": {"type": "number"},
-        "minimum": {"type": "number"},
-        "exclusiveMinimum": {"type": "number"},
-        "maxLength": {"$ref": "#/definitions/nonNegativeInteger"},
-        "minLength": {"$ref": "#/definitions/nonNegativeIntegerDefault0"},
-        "pattern": {"type": "string", "format": "regex"},
-        "additionalItems": {"$ref": "#"},
-        "items": {"anyOf": [{"$ref": "#"}, {"$ref": "#/definitions/schemaArray"}], "default": True},
-        "maxItems": {"$ref": "#/definitions/nonNegativeInteger"},
-        "minItems": {"$ref": "#/definitions/nonNegativeIntegerDefault0"},
-        "uniqueItems": {"type": "boolean", "default": False},
-        "contains": {"$ref": "#"},
-        "maxProperties": {"$ref": "#/definitions/nonNegativeInteger"},
-        "minProperties": {"$ref": "#/definitions/nonNegativeIntegerDefault0"},
-        "required": {"$ref": "#/definitions/stringArray"},
-        "additionalProperties": {"$ref": "#"},
-        "definitions": {"type": "object", "additionalProperties": {"$ref": "#"}, "default": {}},
-        "properties": {"type": "object", "additionalProperties": {"$ref": "#"}, "default": {}},
-        "patternProperties": {
-            "type": "object",
-            "additionalProperties": {"$ref": "#"},
-            "propertyNames": {"format": "regex"},
-            "default": {},
-        },
-        "dependencies": {
-            "type": "object",
-            "additionalProperties": {"anyOf": [{"$ref": "#"}, {"$ref": "#/definitions/stringArray"}]},
-        },
-        "propertyNames": {"$ref": "#"},
-        "const": True,
-        "enum": {"type": "array", "items": True},
-        "type": {
-            "anyOf": [
-                {"$ref": "#/definitions/simpleTypes"},
-                {"type": "array", "items": {"$ref": "#/definitions/simpleTypes"}, "minItems": 1, "uniqueItems": True},
-            ]
-        },
-        "format": {"type": "string"},
-        "contentMediaType": {"type": "string"},
-        "contentEncoding": {"type": "string"},
-        "if": {"$ref": "#"},
-        "then": {"$ref": "#"},
-        "else": {"$ref": "#"},
-        "allOf": {"$ref": "#/definitions/schemaArray"},
-        "anyOf": {"$ref": "#/definitions/schemaArray"},
-        "oneOf": {"$ref": "#/definitions/schemaArray"},
-        "not": {"$ref": "#"},
-    },
-    "default": True,
-}
-
 METASCHEMAS = [
-    (jsonschema_rs.Draft4Validator, DRAFT4_METASCHEMA),
-    (jsonschema_rs.Draft6Validator, DRAFT6_METASCHEMA),
-    (jsonschema_rs.Draft7Validator, DRAFT7_METASCHEMA),
+    (jsonschema_rs.Draft4Validator, jsonschema.Draft4Validator.META_SCHEMA),
+    (jsonschema_rs.Draft6Validator, jsonschema.Draft6Validator.META_SCHEMA),
+    (jsonschema_rs.Draft7Validator, jsonschema.Draft7Validator.META_SCHEMA),
 ]
 METASCHEMA_IDS = ["draft4", "draft6", "draft7"]
 
@@ -2586,4 +2437,5 @@ def test_metaschema_generation(validator_cls, metaschema):
 def test_metaschema_generation_soundness(validator_cls, metaschema):
     schemas = _canonical_strategy_or_none(metaschema, GenerationConfig(), validator_cls)
     assert schemas is not None
+    # 250: metaschema draws are mostly shallow, so a smaller budget leaves the 50-validation floor flaky.
     assert_generation_is_sound(schemas, max_examples=250, floor=50, validator_cls=validator_cls, allow_unbuildable=True)
