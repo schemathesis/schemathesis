@@ -9320,8 +9320,8 @@ def test_coverage_recursive_body_is_generated(ctx):
 
 
 def test_coverage_recursion_around_a_node_that_cannot_be_built(ctx):
-    # Two formats at once is a conjunction neither generator spells, and the pointer around it has
-    # no unrolled form either, so the body yields nothing instead of raising.
+    # Two formats at once is a conjunction neither generator spells, so the only values left are the
+    # ones `minProperties` alone admits — the pointer around it must not derail them.
     schema = ctx.openapi.load_schema(
         {
             "/nodes": {
@@ -9350,5 +9350,11 @@ def test_coverage_recursion_around_a_node_that_cannot_be_built(ctx):
         },
     )
     operation = schema["/nodes"]["POST"]
+    validator = _body_validator(operation)
 
-    assert [case for case in _iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET] == []
+    positives = [case.body for case in _iter_cases(operation, GenerationMode.POSITIVE) if isinstance(case.body, dict)]
+
+    assert positives
+    for body in positives:
+        assert validator.is_valid(body), body
+        assert "stamp" not in body, body
