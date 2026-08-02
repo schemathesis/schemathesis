@@ -2326,6 +2326,49 @@ def test_canonical_recursion_is_drawn_at_any_depth(node):
     find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
 
 
+DYNAMIC_RECURSIVE_SHAPES = [
+    (
+        jsonschema_rs.Draft202012Validator,
+        {
+            "$id": "https://example.com/dynamic-tree",
+            "$dynamicAnchor": "node",
+            "type": "object",
+            "properties": {"child": {"$dynamicRef": "#node"}, "name": {"type": "string"}},
+        },
+    ),
+    (
+        jsonschema_rs.Draft201909Validator,
+        {
+            "$id": "https://example.com/recursive-tree",
+            "$recursiveAnchor": True,
+            "type": "object",
+            "properties": {"child": {"$recursiveRef": "#"}, "name": {"type": "string"}},
+        },
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("validator_cls", "schema"), DYNAMIC_RECURSIVE_SHAPES, ids=["dynamic-anchor", "recursive-anchor"]
+)
+def test_canonical_dynamic_recursion_is_drawn_at_any_depth(validator_cls, schema):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls)
+    assert built is not None
+    is_valid = validator_cls(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+    def depth(value):
+        return 1 + depth(value["child"]) if isinstance(value, dict) and "child" in value else 0
+
+    find(built, lambda value: depth(value) >= 3, settings=settings(max_examples=2000, database=None))
+
+
 def test_canonical_all_of_through_a_pointer_is_folded():
     # Following the pointer gives the intersection back, so the draw is exact rather than filtered.
     schema = {
@@ -3320,6 +3363,13 @@ def object_schemas(draw, children):
         schema["minProperties"] = draw(st.integers(0, 3))
     if draw(st.booleans()):
         schema["maxProperties"] = draw(st.integers(0, 4))
+    if len(names) > 1:
+        if draw(st.booleans()):
+            schema["dependentRequired"] = {names[0]: names[1:]}
+        if draw(st.booleans()):
+            schema["dependentSchemas"] = {names[0]: {"required": names[1:]}}
+    if draw(st.booleans()):
+        schema["unevaluatedProperties"] = draw(st.one_of(st.just(False), children))
     return schema
 
 
@@ -3338,7 +3388,26 @@ def array_schemas(draw, children):
         schema["minItems"] = draw(st.integers(0, 2 if unique else 3))
     if draw(st.booleans()):
         schema["maxItems"] = draw(st.integers(0, 4))
+    if draw(st.booleans()):
+        schema["contains"] = draw(children)
+        if draw(st.booleans()):
+            schema["minContains"] = draw(st.integers(0, 2))
+        if draw(st.booleans()):
+            schema["maxContains"] = draw(st.integers(1, 3))
+    if draw(st.booleans()):
+        schema["unevaluatedItems"] = draw(st.one_of(st.just(False), children))
     return schema
+
+
+@st.composite
+def pointer_schemas(draw, children):
+    # Only sound at the document root: a nested copy would place its target where `#` cannot reach it.
+    target = draw(children)
+    if draw(st.booleans()):
+        return {"$defs": {"target": target}, "$ref": "#/$defs/target"}
+    if draw(st.booleans()):
+        return {"$defs": {"target": {"$anchor": "target", **target}}, "$ref": "#target"}
+    return {"$defs": {"target": {"$dynamicAnchor": "target", **target}}, "$dynamicRef": "#target"}
 
 
 ANY_SCHEMA = st.recursive(
@@ -3376,7 +3445,11 @@ def assert_generation_is_sound(
     )
     def test(schema, data):
         nonlocal validated
-        built = _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls)
+        try:
+            built = _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls)
+        except InvalidSchema:
+            # A schema left with no values to draw has nothing to check for soundness.
+            assume(False)
         # A schema this module declines to model is served by `hypothesis-jsonschema` instead.
         assume(built is not None)
         try:
@@ -3440,12 +3513,18 @@ def test_canonical_array_generation_soundness():
     assert_generation_is_sound(array_schemas(ANY_SCHEMA), max_examples=300, floor=50)
 
 
+def test_canonical_pointer_generation_soundness():
+    assert_generation_is_sound(pointer_schemas(ANY_SCHEMA), max_examples=300, floor=50)
+
+
 METASCHEMAS = [
     (jsonschema_rs.Draft4Validator, jsonschema.Draft4Validator.META_SCHEMA),
     (jsonschema_rs.Draft6Validator, jsonschema.Draft6Validator.META_SCHEMA),
     (jsonschema_rs.Draft7Validator, jsonschema.Draft7Validator.META_SCHEMA),
+    (jsonschema_rs.Draft201909Validator, jsonschema.Draft201909Validator.META_SCHEMA),
+    (jsonschema_rs.Draft202012Validator, jsonschema.Draft202012Validator.META_SCHEMA),
 ]
-METASCHEMA_IDS = ["draft4", "draft6", "draft7"]
+METASCHEMA_IDS = ["draft4", "draft6", "draft7", "draft2019-09", "draft2020-12"]
 
 
 @pytest.mark.parametrize(("validator_cls", "metaschema"), METASCHEMAS, ids=METASCHEMA_IDS)
