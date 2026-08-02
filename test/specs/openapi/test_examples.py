@@ -3699,3 +3699,51 @@ def test_pool_injected_body_with_multiple_media_types_does_not_crash(ctx):
     assert strategies
     for strategy in strategies:
         examples.generate_one(strategy)
+
+
+def test_generated_property_with_recursive_ref(ctx):
+    # The generated sibling carries an unresolvable self-reference; extraction must still produce the example.
+    schema = ctx.openapi.load_schema(
+        {
+            "/orders": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["Items", "Fulfilment"],
+                                    "properties": {
+                                        "Fulfilment": {
+                                            "type": "object",
+                                            "example": {"Method": "Delivery"},
+                                            "properties": {"Method": {"type": "string"}},
+                                        },
+                                        "Items": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
+                                    },
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {
+                    "type": "object",
+                    "properties": {
+                        "Name": {"type": "string"},
+                        "Items": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
+                    },
+                }
+            }
+        },
+    )
+
+    extracted = [example.value for example in extract_from_schemas(schema["/orders"]["POST"])]
+
+    assert len(extracted) == 1
+    assert extracted[0]["Fulfilment"] == {"Method": "Delivery"}
+    assert isinstance(extracted[0]["Items"], list)

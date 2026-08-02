@@ -244,6 +244,7 @@ def setup() -> None:
         schema: JsonSchema,
         *,
         root_schema: JsonSchemaObject | None = None,
+        in_progress: tuple[str, ...] = (),
     ) -> JsonSchemaObject:
         if schema is True:
             return {}
@@ -272,11 +273,17 @@ def setup() -> None:
         if "$ref" in schema:
             s = dict(schema)
             ref = s.pop("$ref")
+            # Inlining a pointer that leads back to itself never terminates. Admitting nothing at the
+            # point of return bottoms the value out: an optional position drops, a required one makes
+            # the whole schema unsatisfiable, which is what an endlessly deep value means.
+            if ref in in_progress:
+                return {"not": {}}
+            nested = in_progress + (ref,)
             resolved = _resolve_ref(root_schema, ref)
             result = _merged(
                 [
-                    _resolve_all_refs(s, root_schema=root_schema),
-                    _resolve_all_refs(deepclone(resolved), root_schema=root_schema),
+                    _resolve_all_refs(s, root_schema=root_schema, in_progress=nested),
+                    _resolve_all_refs(deepclone(resolved), root_schema=root_schema, in_progress=nested),
                 ]
             )
             if result is None:
@@ -290,13 +297,18 @@ def setup() -> None:
             if key in SCHEMA_KEYS:
                 if isinstance(value, list):
                     schema[key] = [
-                        _resolve_all_refs(v, root_schema=root_schema) if isinstance(v, dict) else v for v in value
+                        _resolve_all_refs(v, root_schema=root_schema, in_progress=in_progress)
+                        if isinstance(v, dict)
+                        else v
+                        for v in value
                     ]
                 elif isinstance(value, dict):
-                    schema[key] = _resolve_all_refs(value, root_schema=root_schema)
+                    schema[key] = _resolve_all_refs(value, root_schema=root_schema, in_progress=in_progress)
             if key in SCHEMA_OBJECT_KEYS:
                 schema[key] = {
-                    k: _resolve_all_refs(v, root_schema=root_schema) if isinstance(v, dict) else v
+                    k: _resolve_all_refs(v, root_schema=root_schema, in_progress=in_progress)
+                    if isinstance(v, dict)
+                    else v
                     for k, v in value.items()
                 }
         if cache_key is not None:

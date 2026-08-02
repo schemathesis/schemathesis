@@ -15,7 +15,7 @@ from hypothesis_jsonschema import from_schema
 from schemathesis.config import GenerationConfig
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
-from schemathesis.core.jsonschema import is_valid, make_validator_for
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.parameters import ContainerName, ParameterLocation
@@ -24,6 +24,7 @@ from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
+from schemathesis.generation.jsonschema import Alphabet, build
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, openapi_cases, snapped_float32_clone
@@ -688,8 +689,16 @@ def _yield_examples_from_properties(
                 subschema = dict(subschema)
                 subschema[BUNDLE_STORAGE_KEY] = bundle_storage
             try:
-                generated = _generate_single_example(subschema, config)
-            except (InvalidArgument, Unsatisfiable, jsonschema_rs.ValidationError, jsonschema_rs.ReferencingError):
+                generated = _generate_single_example(
+                    subschema, config, operation.schema.adapter.jsonschema_validator_cls
+                )
+            except (
+                InvalidArgument,
+                Unsatisfiable,
+                RefResolutionError,
+                jsonschema_rs.ValidationError,
+                jsonschema_rs.ReferencingError,
+            ):
                 continue
             if not is_valid(generated, subschema):
                 continue
@@ -858,13 +867,22 @@ def extract_from_schema(
 def _generate_single_example(
     schema: dict[str, Any],
     generation_config: GenerationConfig,
+    validator_cls: type[jsonschema_rs.Validator],
 ) -> Any:
-    strategy = from_schema(
+    custom_formats = {**get_default_format_strategies(), **STRING_FORMATS}
+    strategy = build(
         schema,
-        custom_formats={**get_default_format_strategies(), **STRING_FORMATS},
-        allow_x00=generation_config.allow_x00,
-        codec=generation_config.codec,
+        draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+        formats=custom_formats,
+        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
     )
+    if strategy is None:
+        strategy = from_schema(
+            schema,
+            custom_formats=custom_formats,
+            allow_x00=generation_config.allow_x00,
+            codec=generation_config.codec,
+        )
     return examples.generate_one(strategy)
 
 

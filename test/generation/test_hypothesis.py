@@ -2535,6 +2535,57 @@ def test_canonical_reference_straight_back_to_itself_admits_nothing():
     assert built.is_empty
 
 
+def test_recursion_next_to_a_schema_that_declines_canonicalization(ctx):
+    # `oneOf` routes the body to the other engine, which cannot follow the pointer back to itself.
+    schema = ctx.openapi.load_schema(
+        {
+            "/orders": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Order"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Order": {
+                    "type": "object",
+                    "required": ["Items", "Restaurant"],
+                    "properties": {
+                        "Restaurant": {"$ref": "#/components/schemas/Restaurant"},
+                        "Items": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
+                    },
+                },
+                "Restaurant": {
+                    "oneOf": [
+                        {"type": "object", "required": ["Id"], "properties": {"Id": {"type": "integer"}}},
+                        {"type": "object", "required": ["Reference"], "properties": {"Reference": {"type": "string"}}},
+                    ]
+                },
+                "Item": {
+                    "type": "object",
+                    "properties": {
+                        "Name": {"type": "string"},
+                        "Items": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
+                    },
+                },
+            }
+        },
+    )
+    operation = schema["/orders"]["POST"]
+    is_valid = jsonschema_rs.Draft202012Validator(operation.body[0].validation_schema).is_valid
+
+    @given(operation.as_strategy())
+    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert is_valid(case.body), case.body
+
+    test()
+
+
 UNSUPPORTED_SCHEMAS = [
     # A pattern Python `re` rejects can only filter; alone there is nothing to drive the draw.
     ({"type": "string", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
