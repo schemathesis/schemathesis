@@ -12,6 +12,7 @@
 - Generate strings honoring `contentEncoding` and `contentMediaType` under Draft 7.
 - Name the API operation that cannot be generated when its schema is unsatisfiable.
 - Runtime error in `negative_data_rejection` for empty array path parameters.
+- Coverage phase generating Unicode characters where the validator reads `\d` and `\w` as ASCII.
 
 ### :racing_car: Performance
 

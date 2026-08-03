@@ -1,3 +1,4 @@
+import re
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -24,6 +25,16 @@ FANCY_REGEX_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=150_000_000)
 
 # Draft 3 predates the keyword semantics every conversion here assumes and is rejected outright
 DRAFT_03_DIALECT = "http://json-schema.org/draft-03/schema#"
+
+
+def compile_ecma_pattern(pattern: str) -> re.Pattern[str] | None:
+    """The pattern under the validator's reading of it, or `None` when Python `re` rejects it."""
+    # `re.ASCII`: the validator's engine expands `\d`, `\w`, `\s` and `\b` over ASCII, Python over the
+    # whole of Unicode, so the default reading draws values the schema rejects.
+    try:
+        return re.compile(pattern, re.ASCII)
+    except (re.error, ValueError):
+        return None
 
 
 def _is_valid_uuid(value: object) -> bool:

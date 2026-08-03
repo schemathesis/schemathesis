@@ -20,6 +20,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
+    compile_ecma_pattern,
     make_validator,
     make_validator_for,
 )
@@ -845,7 +846,7 @@ def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) 
     # Arbitrary text practically never matches a `patternProperties` regex, so the patterns name keys too.
     sources = [_text(ctx)]
     for pattern in view.pattern_properties:
-        compiled = _compiled(pattern)
+        compiled = compile_ecma_pattern(pattern)
         if compiled is not None:
             sources.append(st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy()))
     return st.one_of(sources)
@@ -1117,7 +1118,7 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
         # Every value has to carry a match of each pattern, and one of them cannot fit under the
         # ceiling. Saying so up front spares the caller a filter that never passes.
         return st.nothing()
-    drivers = [pattern for pattern in view.patterns if _compiled(pattern) is not None]
+    drivers = [pattern for pattern in view.patterns if compile_ecma_pattern(pattern) is not None]
     if not drivers:
         # A pattern Python `re` rejects (e.g. ECMA `\p{L}`) can filter but not drive the draw.
         raise UnsupportedView("string")
@@ -1165,7 +1166,7 @@ def _pattern_driven(
     pattern: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """Values drawn from one pattern and filtered by the remaining ones."""
-    compiled = _compiled(pattern)
+    compiled = compile_ecma_pattern(pattern)
     assert compiled is not None
     # A pattern is a search, so the value may carry anything around the match; full matches only
     # would leave `^x` spelling a single string, starving `propertyNames` of distinct keys.
@@ -1214,16 +1215,6 @@ def _within_length(
     low = view.min_length or 0
     high = math.inf if view.max_length is None else view.max_length
     return strategy.filter(lambda value: low <= len(value) <= high)
-
-
-def _compiled(pattern: str) -> re.Pattern[str] | None:
-    """The pattern under the validator's reading of it, or `None` when Python `re` rejects it."""
-    # `re.ASCII`: the validator's engine expands `\d`, `\w`, `\s` and `\b` over ASCII, Python over the
-    # whole of Unicode, so the default reading draws values the schema rejects.
-    try:
-        return re.compile(pattern, re.ASCII)
-    except re.error:
-        return None
 
 
 def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:
