@@ -2096,6 +2096,35 @@ CANONICAL_CASES = [
         },
         (lambda value: len(value) > 2,),
     ),
+    # A demand carrying a pattern Python `re` rejects cannot drive the draw, so it filters the elements.
+    (
+        {"type": "array", "items": {"type": "string"}, "contains": {"pattern": "\\p{L}"}},
+        (lambda value: len(value) > 1,),
+    ),
+    # The same demand under a ceiling, where the filler also has to provably miss it.
+    (
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "contains": {"pattern": "\\p{L}"},
+            "maxContains": 1,
+            "minItems": 2,
+        },
+        (lambda value: len(value) == 2,),
+    ),
+    # Which branch applies depends on the value, so both have to be reachable.
+    (
+        {
+            "type": "object",
+            "if": {"required": ["a"]},
+            "then": {"required": ["b"]},
+            "else": {"required": ["c"]},
+            "properties": {"a": {"type": "integer"}, "b": {"type": "string"}, "c": {"type": "boolean"}},
+        },
+        (lambda value: "a" in value, lambda value: "a" not in value),
+    ),
+    ({"not": {"type": "string"}}, (lambda value: isinstance(value, list),)),
+    ({"type": "object", "properties": {"a": {"not": {"enum": [1, 2]}}}, "required": ["a"]}, ()),
     # Two formats on one value: every ipv4 is a hostname, so the pair is satisfiable.
     (
         {"allOf": [{"type": "string", "format": "hostname"}, {"type": "string", "format": "ipv4"}]},
@@ -2661,6 +2690,15 @@ CONTENT_STRING_CASES = [
     (
         {"type": "string", "contentEncoding": "base64", "minLength": 8},
         (lambda value: len(value) > 8,),
+    ),
+    # A pattern applies to the encoded text, not to what it decodes to.
+    (
+        {"type": "string", "contentEncoding": "base64", "pattern": "^[A-Za-z0-9+/=]*$"},
+        (lambda value: len(b64decode(value, validate=True)) > 2,),
+    ),
+    (
+        {"type": "string", "contentMediaType": "application/json", "pattern": "^\\{"},
+        (lambda value: len(json.loads(value)) > 0,),
     ),
 ]
 CONTENT_STRING_CASE_IDS = [str(schema) for schema, _ in CONTENT_STRING_CASES]
@@ -3492,6 +3530,9 @@ def content_string_schemas(draw):
         schema["contentEncoding"] = draw(st.sampled_from(["base64", "quoted-printable"]))
     if draw(st.booleans()):
         schema["contentMediaType"] = draw(st.sampled_from(["application/json", "text/plain"]))
+    if draw(st.booleans()):
+        # Loose enough that an encoded value still has a chance of matching.
+        schema["pattern"] = draw(st.sampled_from(["^.", "[a-zA-Z]", "^[!-~]*$", "="]))
     if draw(st.booleans()):
         schema["minLength"] = draw(st.integers(0, 4))
     if draw(st.booleans()):
