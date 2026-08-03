@@ -2288,6 +2288,111 @@ def test_canonical_generation_reaches(schema, reaches):
         find(built, predicate, settings=settings(max_examples=1000, database=None))
 
 
+def test_optional_properties_are_size_biased():
+    # Including each optional key on its own coin flip lands on half of them, and that compounds
+    # at every nesting level into payloads orders of magnitude larger than the schema calls for.
+    schema = {
+        "type": "object",
+        "properties": {f"p{index}": {"type": "boolean"} for index in range(30)},
+        "additionalProperties": False,
+    }
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    sizes = []
+
+    @given(built)
+    @settings(max_examples=30, deadline=None)
+    def test(value):
+        sizes.append(len(value))
+
+    test()
+
+    assert sum(sizes) / len(sizes) < 10, sizes
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string", "minLength": 2000},
+        {"type": "string", "minLength": 2000, "maxLength": 9000},
+        # Negating an upper bound is where multi-kilobyte strings come from in practice.
+        {"type": "string", "not": {"maxLength": 2000}},
+    ],
+    ids=["min-only", "min-and-max", "negated-max"],
+)
+def test_long_strings_are_padded(schema):
+    # Drawing thousands of characters one at a time costs Hypothesis a bignum index per value.
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=10, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+        assert len(set(value)) <= 32, len(set(value))
+
+    test()
+
+
+def test_short_strings_keep_their_variety():
+    built = _canonical_strategy_or_none(
+        {"type": "string", "minLength": 40}, GenerationConfig(), jsonschema_rs.Draft202012Validator
+    )
+    assert built is not None
+    counts = []
+
+    @given(built)
+    @settings(max_examples=20, deadline=None)
+    def test(value):
+        counts.append(len(set(value)))
+
+    test()
+
+    assert max(counts) > 8, counts
+
+
+# Past what a size can be counted in, so no collection can carry it.
+UNCOUNTABLE = 10**400
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "array", "minItems": UNCOUNTABLE},
+        {"type": "string", "minLength": UNCOUNTABLE},
+        {"type": "object", "minProperties": UNCOUNTABLE},
+    ],
+    ids=["array", "string", "object"],
+)
+def test_uncountable_size_floor_admits_no_value(schema):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    assert built.is_empty
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "array", "maxItems": UNCOUNTABLE},
+        {"type": "string", "maxLength": UNCOUNTABLE},
+        {"type": "object", "maxProperties": UNCOUNTABLE},
+    ],
+    ids=["array", "string", "object"],
+)
+def test_uncountable_size_ceiling_leaves_values_unbounded(schema):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=10, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
 @pytest.mark.parametrize("schema", CANONICAL_INTEGER_SCHEMAS, ids=str)
 def test_canonical_integer_generation_emits_python_ints(schema):
     # `1.0` satisfies `type: integer` in JSON terms, so the validator alone would accept a float here.

@@ -37,8 +37,7 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
-from schemathesis.generation._cache import schema_cache_key
-from schemathesis.generation.hypothesis import canonical_strategy_cache, custom_formats_cache
+from schemathesis.generation.hypothesis import custom_formats_cache
 from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_schema_error
 from schemathesis.generation.jsonschema import EMPTY_STRATEGY, Alphabet, build
 from schemathesis.generation.meta import (
@@ -1209,29 +1208,12 @@ def _canonical_strategy_or_none(
     schema: JsonSchema, generation_config: GenerationConfig, validator_cls: type[jsonschema_rs.Validator]
 ) -> st.SearchStrategy[JsonValue] | None:
     """Strategy for a fully modeled document; `None` when the schema is not one."""
-    try:
-        key = (
-            schema_cache_key(schema),
-            validator_cls,
-            generation_config.allow_x00,
-            generation_config.codec,
-            generation_config.exclude_header_characters,
-        )
-    except (TypeError, ValueError):
-        key = None
-    if key is not None:
-        cached = canonical_strategy_cache.get(key)
-        if cached is not MISSING:
-            return cached
-    strategy = build(
+    return build(
         schema,
         draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
         formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
         alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
     )
-    if key is not None:
-        canonical_strategy_cache[key] = strategy
-    return strategy
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:
