@@ -64,8 +64,6 @@ def resolve_all_refs(schema: JsonSchemaObject) -> dict[str, Any]:
 
 
 def resolve_all_refs_inner(schema: JsonSchema, *, resolve: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
-    from hypothesis_jsonschema._canonicalise import merged
-
     if schema is True:
         return {}
     if schema is False:
@@ -81,12 +79,8 @@ def resolve_all_refs_inner(schema: JsonSchema, *, resolve: Callable[[str], dict[
         del schema["$ref"]
         schema.pop(BUNDLE_STORAGE_KEY, None)
         schema.pop("example", None)
-        result = merged([resolve_all_refs_inner(schema, resolve=resolve), resolved])
-        # hypothesis_jsonschema's merged() can return None for irreconcilable schemas.
-        # For dependency analysis, fall back to the resolved ref which has the resource structure.
-        if result is None:
-            return resolved
-        return result
+        # Siblings win over the target they augment, and every property name survives either way.
+        return _flatten_all_of({"allOf": [resolve_all_refs_inner(schema, resolve=resolve), resolved]})
 
     for key, value in schema.items():
         if key in SCHEMA_KEYS:
