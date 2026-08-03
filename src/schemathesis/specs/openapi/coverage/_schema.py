@@ -19,6 +19,7 @@ from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
     VALIDATED_FORMATS_BY_DRAFT,
+    compile_ecma_pattern,
     is_valid,
     make_validator,
     make_validator_for,
@@ -650,7 +651,10 @@ class CoverageContext:
                     raise Unsatisfiable
                 if self.update_pattern is not None:
                     pattern = self.update_pattern(pattern, min_length, max_length)
-            strategy = st.from_regex(pattern, fullmatch=True)
+            compiled = compile_ecma_pattern(pattern)
+            if compiled is None:
+                raise Unsatisfiable from None
+            strategy = st.from_regex(compiled, fullmatch=True)
             if min_length is not None and max_length is not None:
                 strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
             elif min_length is not None:
@@ -2712,10 +2716,10 @@ def _negative_pattern_properties(
 ) -> Generator[GeneratedValue, None, None]:
     nctx = ctx.with_negative()
     for pattern, sub_schema in pattern_properties.items():
-        try:
-            key = ctx.generate_from(st.from_regex(pattern))
-        except re.error:
+        compiled = compile_ecma_pattern(pattern)
+        if compiled is None:
             continue
+        key = ctx.generate_from(st.from_regex(compiled))
         with nctx.at(pattern):
             for value in cover_schema_iter(nctx, sub_schema):
                 yield NegativeValue(

@@ -7043,6 +7043,19 @@ def test_coverage_positive_property_names_enum_respected(ctx):
     )
 
 
+def test_coverage_positive_pattern_character_classes_stay_ascii(ctx):
+    # Validators read `\d` and `\w` as ASCII only, so Unicode digits and letters are rejected.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "required": ["code"],
+            "properties": {"code": {"type": "string", "pattern": r"^(a|b)[\w-]+$", "minLength": 20}},
+        },
+        positive=True,
+    )
+
+
 def test_negative_data_rejection_no_crash_with_large_dfa_pattern(ctx, response_factory):
     # \S{1,8192} exceeds jsonschema_rs's default DFA size limit; FANCY_REGEX_OPTIONS must be
     # passed when building the multi-element-array validator inside the check.
