@@ -280,15 +280,15 @@ def setup() -> None:
                 return {"not": {}}
             nested = in_progress + (ref,)
             resolved = _resolve_ref(root_schema, ref)
-            result = _merged(
-                [
-                    _resolve_all_refs(s, root_schema=root_schema, in_progress=nested),
-                    _resolve_all_refs(deepclone(resolved), root_schema=root_schema, in_progress=nested),
-                ]
-            )
+            halves: list[JsonSchema] = [
+                _resolve_all_refs(s, root_schema=root_schema, in_progress=nested),
+                _resolve_all_refs(deepclone(resolved), root_schema=root_schema, in_progress=nested),
+            ]
+            result = _merged(halves)
             if result is None:
-                msg = f"$ref:{ref!r} had incompatible base schema {s!r}"
-                raise _canonicalise.HypothesisRefResolutionError(msg)
+                # The two halves have no single spelling - `pattern` against another `pattern`, one
+                # `format` against another. Keeping them side by side says the same thing.
+                result = {"allOf": halves}
             if cache_key is not None:
                 _resolve_result_cache[cache_key] = deepclone(result)
             return result

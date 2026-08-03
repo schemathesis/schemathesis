@@ -167,6 +167,17 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
         if opened:
             # Still an `allOf` where a followed branch pointed on; the next round follows those.
             return from_schema(_intersection(followed), ctx)
+        for index, branch in enumerate(followed):
+            branch_view = branch.view()
+            if isinstance(branch_view, canonical.OneOfView):
+                # `allOf[X, oneOf[A, B]]` admits what `oneOf[allOf[X, A], allOf[X, B]]` admits, and
+                # carrying the rest into every branch lets each one draw what it needs - where the
+                # loose half driving alone would have to land inside a branch by chance.
+                rest = followed[:index] + followed[index + 1 :]
+                return _exclusive(
+                    branch_view.branches,
+                    [from_schema(_intersection([*rest, sub]), ctx) for sub in branch_view.branches],
+                )
         # Every branch is a pointer back into the value being built, so none of them can drive a
         # draw on its own. The first one does, and the rest judge what it gives.
         driver, *rest = followed
@@ -180,16 +191,22 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
 
 def _one_of(view: jsonschema_rs.canonical.OneOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     """Values exactly one branch admits."""
-    validators = [jsonschema_rs.validator_for(branch.to_json_schema()) for branch in view.branches]
-    branches = []
-    for index, branch in enumerate(view.branches):
-        strategy = from_schema(branch, ctx)
+    return _exclusive(view.branches, [from_schema(branch, ctx) for branch in view.branches])
+
+
+def _exclusive(
+    branches: Sequence[jsonschema_rs.CanonicalSchema], strategies: list[SearchStrategy[JsonValue]]
+) -> SearchStrategy[JsonValue]:
+    """Values from each strategy that no branch other than its own admits."""
+    validators = [jsonschema_rs.validator_for(branch.to_json_schema()) for branch in branches]
+    narrowed = []
+    for index, strategy in enumerate(strategies):
         # What the other branches also admit belongs to no branch alone.
         others = validators[:index] + validators[index + 1 :]
-        branches.append(
+        narrowed.append(
             strategy.filter(lambda value, others=others: not any(other.is_valid(value) for other in others))
         )
-    return st.one_of(branches)
+    return st.one_of(narrowed)
 
 
 def _intersection(branches: list[jsonschema_rs.CanonicalSchema]) -> jsonschema_rs.CanonicalSchema:
