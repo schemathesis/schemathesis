@@ -19,7 +19,6 @@ from jsonschema_rs import canonical
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
-    FANCY_REGEX_OPTIONS,
     compile_ecma_pattern,
     make_validator,
     make_validator_for,
@@ -46,6 +45,7 @@ if TYPE_CHECKING:
 
 # Upper bound on properties drawn beyond the ones the schema names.
 _EXTRA_KEYS = 5
+_VALIDATOR_BY_CANONICALIZE_DRAFT = {draft: cls for cls, draft in CANONICALIZE_DRAFT_BY_VALIDATOR.items()}
 
 
 class UnsupportedView(Exception):
@@ -57,7 +57,7 @@ class _PatternProperty(NamedTuple):
 
     claims: Callable[[str], bool]
     values: SearchStrategy[JsonValue]
-    accepts: Callable[[JsonValue], bool]
+    schema: jsonschema_rs.CanonicalSchema
 
 
 class Unrepresentable:
@@ -126,13 +126,22 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     raise UnsupportedView(schema.kind)
 
 
+def _target(schema: jsonschema_rs.CanonicalSchema, uri: str, ctx: StrategyContext) -> jsonschema_rs.CanonicalSchema:
+    """The schema a pointer names."""
+    # `#` is the one pointer with no definition behind it: it names the document itself.
+    if uri == "#":
+        return ctx.root
+    target = schema.definition(uri)
+    # Canonicalization refuses a pointer it cannot resolve, so the target is here.
+    assert target is not None
+    return target
+
+
 def _reference(
     schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ReferenceView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """Values admitted by the schema the pointer names."""
-    # Canonicalization refuses a pointer it cannot resolve, so the target is here. `#` is the one
-    # pointer with no definition behind it: it names the document itself.
-    target = ctx.root if view.uri == "#" else schema.definitions()[view.uri]
+    target = _target(schema, view.uri, ctx)
     pending = ctx.pending.get(view.uri)
     if pending is not None:
         # A pointer back into what is still being built. Spelling the rest of the value lazily lets
@@ -161,7 +170,7 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
         if isinstance(branch_view, canonical.ReferenceView) and branch_view.uri not in ctx.following:
             ctx.following.add(branch_view.uri)
             opened.append(branch_view.uri)
-            followed.append(ctx.root if branch_view.uri == "#" else branch.definitions()[branch_view.uri])
+            followed.append(_target(branch, branch_view.uri, ctx))
         else:
             followed.append(branch)
     try:
@@ -212,30 +221,10 @@ def _exclusive(
 
 def _intersection(branches: list[jsonschema_rs.CanonicalSchema]) -> jsonschema_rs.CanonicalSchema:
     """One schema admitting what every branch admits."""
-    documents: list[JsonValue] = []
-    # A `$ref` resolves against the document root, which the wrapper below becomes, so the targets
-    # have to move up with it. The two keywords stay apart: a pointer names the one it goes through.
-    definitions: dict[str, dict[str, JsonValue]] = {}
-    for branch in branches:
-        document = branch.to_json_schema()
-        # A `true` node emits `{}` and a `false` one `{"not": {}}`, so a bare boolean never arrives.
-        assert isinstance(document, dict)
-        # The wrapper declares the dialect; a branch repeating it reads as an embedded resource.
-        document.pop("$schema", None)
-        for name in ("$defs", "definitions"):
-            found = document.pop(name, None)
-            if found:
-                assert isinstance(found, dict)
-                definitions.setdefault(name, {}).update(found)
-        documents.append(document)
-    merged: dict[str, JsonValue] = {"allOf": cast("JsonValue", documents)}
-    merged.update(definitions)
-    return jsonschema_rs.canonicalize(
-        merged,
-        draft=branches[0].draft,
-        pattern_options=FANCY_REGEX_OPTIONS,
-        validate_formats=True,
-    )
+    result = branches[0]
+    for branch in branches[1:]:
+        result = result.intersect(branch)
+    return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -579,7 +568,7 @@ def _matching(
     ctx: StrategyContext,
 ) -> tuple[SearchStrategy[JsonValue] | None, bool]:
     """Values clearing the element schema and the demand, and whether they provably stay off `avoid`."""
-    schema = _combine(items, demand, negate_right=False)
+    schema = _intersected(items, demand)
     if not schema.is_satisfiable():
         return None, True
     steered: jsonschema_rs.CanonicalSchema | None = schema
@@ -608,13 +597,14 @@ def _free(
         values = None if view.items is None else _finite_values(view.items)
         return _element(view.items, ctx), values
     # Filler that cannot match holds the ceiling without a counting filter.
-    schema = view.items
+    remaining = view.items
     for demand in bounded:
-        schema = _combine(schema, demand, negate_right=True)
-    try:
-        return from_schema(schema, ctx), _finite_values(schema)
-    except UnsupportedView:
-        pass
+        subtracted = _subtracted(remaining, demand)
+        if subtracted is None:
+            break
+        remaining = subtracted
+    else:
+        return from_schema(remaining, ctx), _finite_values(remaining)
     if any(_covers(demand, view.items) for demand in bounded):
         # A demand admits everything `items` does; the matches carry the array on their own.
         return st.nothing(), None
@@ -638,10 +628,8 @@ def _narrowed(
     left: jsonschema_rs.CanonicalSchema, right: jsonschema_rs.CanonicalSchema, *, negate: bool = False
 ) -> jsonschema_rs.CanonicalSchema | None:
     """`left` narrowed to — or away from — `right`, or `None` when nothing usable is left of it."""
-    schema = _combine(left, right, negate_right=negate)
-    # A difference like `integer and not integer` stays unfolded, and canonicalization calls it
-    # satisfiable; nothing can be drawn from it either way.
-    if schema.kind == "raw" or not schema.is_satisfiable():
+    schema = _subtracted(left, right) if negate else _intersected(left, right)
+    if schema is None or not schema.is_satisfiable():
         return None
     return schema
 
@@ -707,62 +695,21 @@ def _minimum_contains(demand: jsonschema_rs.canonical.ContainsView) -> int:
     return 1 if demand.min_contains is None else demand.min_contains
 
 
-def _combine(
-    left: jsonschema_rs.CanonicalSchema | None,
-    right: jsonschema_rs.CanonicalSchema,
-    *,
-    negate_right: bool,
+def _intersected(
+    left: jsonschema_rs.CanonicalSchema | None, right: jsonschema_rs.CanonicalSchema
 ) -> jsonschema_rs.CanonicalSchema:
-    """Both sides as one schema, spelled as a document and re-canonicalized.
-
-    No `intersect`/`negate` binding exists yet. Both sides come from one document, so the merge is
-    a valid document of the same draft; an unfoldable one comes back as `raw`, not as an error.
-    """
-    branches: list[dict[str, JsonValue]] = []
-    # A `$ref` resolves against the new root, so the definition maps move up with the branches,
-    # keeping `$defs` and `definitions` apart: a pointer names the one it goes through.
-    definitions: dict[str, dict[str, JsonValue]] = {}
-    schemas = (right,) if left is None else (left, right)
-    for schema in schemas:
-        branch = schema.to_json_schema()
-        # A `true` node emits `{}` and a `false` one `{"not": {}}`, so a bare boolean never arrives.
-        assert isinstance(branch, dict)
-        # The wrapper declares the dialect; a branch repeating it reads as an embedded resource and
-        # blocks the merge.
-        branch.pop("$schema", None)
-        for name in ("$defs", "definitions"):
-            found = branch.pop(name, None)
-            if found:
-                assert isinstance(found, dict)
-                definitions.setdefault(name, {}).update(found)
-        branches.append(branch)
-    if negate_right:
-        branches[-1] = {"not": branches[-1]}
-    merged: dict[str, JsonValue] = branches[0] if left is None else {"allOf": cast("JsonValue", branches)}
-    if any(_has_ref(branch) for branch in branches):
-        # The maps hold every target in the document, so they only ride along where one is pointed at.
-        merged.update(definitions)
-    return jsonschema_rs.canonicalize(
-        merged,
-        draft=right.draft if left is None else left.draft,
-        pattern_options=FANCY_REGEX_OPTIONS,
-        validate_formats=True,
-    )
+    """Both sides as one schema."""
+    return right if left is None else left.intersect(right)
 
 
-def _has_ref(schema: dict[str, JsonValue]) -> bool:
-    """Whether the schema carries a pointer at any depth."""
-    if "$ref" in schema:
-        return True
-    for value in schema.values():
-        if isinstance(value, dict):
-            if _has_ref(value):
-                return True
-        elif isinstance(value, list):
-            for item in value:
-                if isinstance(item, dict) and _has_ref(item):
-                    return True
-    return False
+def _subtracted(
+    left: jsonschema_rs.CanonicalSchema | None, right: jsonschema_rs.CanonicalSchema
+) -> jsonschema_rs.CanonicalSchema | None:
+    """`left` without what `right` admits, or `None` where the complement cannot be spelled."""
+    negated = right.negate()
+    if negated is None:
+        return None
+    return _intersected(left, negated)
 
 
 def _concat(parts: tuple[Sequence[JsonValue], ...]) -> JsonValue:
@@ -863,7 +810,7 @@ def _value_source(
         _PatternProperty(
             claims=jsonschema_rs.validator_for({"type": "string", "pattern": pattern}).is_valid,
             values=from_schema(schema, ctx),
-            accepts=jsonschema_rs.validator_for(schema.to_json_schema()).is_valid,
+            schema=schema,
         )
         for pattern, schema in view.pattern_properties.items()
     ]
@@ -873,24 +820,25 @@ def _value_source(
         matched = tuple(index for index, pattern in enumerate(patterns) if pattern.claims(name))
         strategy = cache.get(matched)
         if strategy is None:
-            strategy = cache[matched] = _pattern_values(matched, patterns, unnamed)
+            strategy = cache[matched] = _pattern_values(matched, patterns, unnamed, ctx)
         return strategy
 
     return value_for
 
 
 def _pattern_values(
-    matched: tuple[int, ...], patterns: list[_PatternProperty], unnamed: SearchStrategy[JsonValue]
+    matched: tuple[int, ...],
+    patterns: list[_PatternProperty],
+    unnamed: SearchStrategy[JsonValue],
+    ctx: StrategyContext,
 ) -> SearchStrategy[JsonValue]:
     # `additionalProperties` only reaches names no pattern claims.
     if not matched:
         return unnamed
-    strategy = patterns[matched[0]].values
-    for index in matched[1:]:
-        # Satisfying several patterns at once needs an intersection this module cannot build, so the
-        # first one drives the draw and the rest filter it. Overlapping patterns are rare.
-        strategy = strategy.filter(patterns[index].accepts)
-    return strategy
+    if len(matched) == 1:
+        return patterns[matched[0]].values
+    # A name several patterns claim answers to all of them at once.
+    return from_schema(_intersection([patterns[index].schema for index in matched]), ctx)
 
 
 @st.composite  # type: ignore[untyped-decorator]
@@ -1097,6 +1045,21 @@ def _combined_multiple_of(values: list[float]) -> Fraction | None:
 
 
 def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    strategy = _admitted_strings(view, ctx)
+    if view.excluded:
+        barred = frozenset(view.excluded)
+        strategy = strategy.filter(lambda value: value not in barred)
+    if view.excluded_formats:
+        # One `anyOf` covers the run: a string is barred as soon as it satisfies any of them.
+        matches_barred = make_validator(
+            {"anyOf": [{"type": "string", "format": name} for name in view.excluded_formats]},
+            _VALIDATOR_BY_CANONICALIZE_DRAFT[ctx.root.draft],
+        ).is_valid
+        strategy = strategy.filter(lambda value: not matches_barred(value))
+    return strategy
+
+
+def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     if view.content_media_types or view.content_encodings:
         return _content_string(view, ctx)
     # A name with no generator behind it is an annotation and leaves the strings unconstrained.

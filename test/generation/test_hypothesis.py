@@ -1711,6 +1711,9 @@ CANONICAL_CASES = [
     ({"type": "string", "pattern": "^\\d+"}, (lambda value: len(value) > 1,)),
     ({"type": "string", "pattern": "^[\\w]+"}, ()),
     ({"type": "string", "pattern": "\\s"}, ()),
+    # A barred value and a barred format each rule out strings the rest of the schema still admits.
+    ({"allOf": [{"type": "string", "pattern": "^[ab]$"}, {"not": {"const": "a"}}]}, (lambda value: value == "b",)),
+    ({"allOf": [{"type": "string", "maxLength": 3}, {"not": {"format": "regex"}}]}, ()),
     # A `$ref` names the schema to draw from, and repeats of it draw the same way.
     ({"$ref": "#/$defs/text", "$defs": {"text": {"type": "string", "minLength": 3}}}, ()),
     (
@@ -2206,7 +2209,6 @@ def test_degenerate_root_cycle(schema):
     test()
 
 
-@pytest.mark.xfail(reason="needs a validator built from the canonical node itself in jsonschema-rs", strict=True)
 def test_pattern_properties_root_reference_overlap():
     # A name claimed by both patterns must satisfy both schemas, `#` meaning the whole document.
     schema = {"type": "object", "patternProperties": {"^a": {"type": "integer"}, "a": {"$ref": "#"}}}
