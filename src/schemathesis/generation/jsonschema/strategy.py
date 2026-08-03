@@ -48,6 +48,12 @@ _EXTRA_KEYS = 5
 _VALIDATOR_BY_CANONICALIZE_DRAFT = {draft: cls for cls, draft in CANONICALIZE_DRAFT_BY_VALIDATOR.items()}
 
 
+def _countable(bound: int | None) -> int | None:
+    """A size bound Hypothesis can be handed, or `None` when it runs past what a size can count."""
+    # Sizes are averaged as floats, so a bound past this range fails the conversion before any check.
+    return bound if bound is None or bound <= sys.maxsize else None
+
+
 class UnsupportedView(Exception):
     """A canonical node this module cannot build from; the caller decides what to do instead."""
 
@@ -271,14 +277,18 @@ class _Layout:
 def _array(
     schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
+    if view.min_items is not None and _countable(view.min_items) is None:
+        # No array can be that long.
+        return st.nothing()
     if view.prefix_items or view.contains:
         return _with_fixed_elements(schema, view, ctx)
     element = _element(view.items, ctx)
     kwargs: dict[str, int] = {}
     if view.min_items is not None:
         kwargs["min_size"] = view.min_items
-    if view.max_items is not None:
-        kwargs["max_size"] = view.max_items
+    max_items = _countable(view.max_items)
+    if max_items is not None:
+        kwargs["max_size"] = max_items
     if view.unique_items:
         return st.lists(element, unique_by=_json_identity, **kwargs)
     return st.lists(element, **kwargs)
@@ -288,8 +298,9 @@ def _with_fixed_elements(
     schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """An array whose opening positions the schema names or demands, followed by free ones."""
+    max_items = _countable(view.max_items)
     # A schema past the length ceiling pins a position no array can have.
-    entries = list(view.prefix_items if view.max_items is None else view.prefix_items[: view.max_items])
+    entries = list(view.prefix_items if max_items is None else view.prefix_items[:max_items])
     demands = [_Demand(item.schema, _minimum_contains(item), item.max_contains) for item in view.contains]
     if view.unique_items:
         # One element can meet several demands at once; folding those spares a unique array a repeat.
@@ -384,11 +395,12 @@ def _from_layout(
 ) -> SearchStrategy[JsonValue]:
     """The arrays one layout admits, drawn as its parts laid end to end."""
     minimum = view.min_items or 0
+    max_items = _countable(view.max_items)
     fixed = _spelled_out(layout)
-    if view.max_items is not None and view.max_items < fixed:
+    if max_items is not None and max_items < fixed:
         # The spelled-out elements alone overflow the length ceiling.
         return st.nothing()
-    if layout.closed or view.max_items == fixed:
+    if layout.closed or max_items == fixed:
         free: SearchStrategy[JsonValue] = st.nothing()
         free_values = None
     else:
@@ -402,7 +414,7 @@ def _from_layout(
         if not _carry(layout.placements, minimum - fixed, unique=view.unique_items):
             return st.nothing()
         fixed = _spelled_out(layout)
-        headroom = None if view.max_items is None else view.max_items - fixed
+        headroom = None if max_items is None else max_items - fixed
         for placement in layout.placements:
             room = _room(placement, unique=view.unique_items)
             if placement.demand.element is None or not room:
@@ -429,8 +441,8 @@ def _from_layout(
         # No tail part: `st.lists` refuses a positive ceiling over an element strategy drawing nothing.
         return _joined(parts, unique=view.unique_items, checked=layout.counted, schema=schema)
     kwargs: dict[str, int] = {"min_size": max(0, minimum - fixed)}
-    if view.max_items is not None:
-        kwargs["max_size"] = view.max_items - fixed
+    if max_items is not None:
+        kwargs["max_size"] = max_items - fixed
     # `unique_by` settles the free positions; collisions across parts are left to the joined filter.
     distinct = {"unique_by": _json_identity} if view.unique_items else {}
     parts.append(st.lists(free, **distinct, **kwargs))
@@ -740,6 +752,9 @@ def _json_identity(value: JsonValue) -> object:
 
 
 def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    if view.min_properties is not None and _countable(view.min_properties) is None:
+        # No object can carry that many properties.
+        return st.nothing()
     entries = {key: from_schema(entry, ctx) for key, entry in view.properties.items()}
     # Whatever `properties` does not name answers to `additionalProperties`, and is otherwise free.
     unnamed = _anything(ctx) if view.additional_properties is None else from_schema(view.additional_properties, ctx)
@@ -761,12 +776,30 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
             extra = free_names.flatmap(lambda name: st.tuples(st.just(name), value_for(name)))
         else:
             extra = st.tuples(free_names, unnamed)
-    if view.min_properties is None and view.max_properties is None:
-        named = st.fixed_dictionaries(required, optional=optional)
+    max_properties = _countable(view.max_properties)
+    if view.min_properties is None and max_properties is None:
+        # A coin per optional key lands on half of them, which compounds at every nesting level.
+        # Built here rather than per draw, where it would be one strategy per generated value.
+        optional_keys = sorted(optional)
+        picker = st.sets(st.sampled_from(optional_keys), max_size=len(optional_keys)) if optional_keys else None
+        named = _named_object(required, optional, picker)
         if extra is None:
             return named
         return st.tuples(named, _collect(extra, 0, _EXTRA_KEYS)).map(lambda parts: {**parts[1], **parts[0]})
-    return _sized_object(required, optional, extra, view.min_properties or 0, view.max_properties)
+    return _sized_object(required, optional, extra, view.min_properties or 0, max_properties)
+
+
+@st.composite  # type: ignore[untyped-decorator]
+def _named_object(
+    draw: st.DrawFn,
+    required: dict[str, SearchStrategy[JsonValue]],
+    optional: dict[str, SearchStrategy[JsonValue]],
+    picker: SearchStrategy[set[str]] | None,
+) -> JsonValue:
+    """Every required key, plus a size-biased pick of the optional ones."""
+    # Sorted: set iteration order is not stable across processes, and draw order decides replays.
+    chosen = draw(picker) if picker is not None else ()
+    return draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in sorted(chosen)}}))
 
 
 def _collect(
@@ -856,7 +889,7 @@ def _sized_object(
     low = min(len(keys), max(0, minimum - len(required)))
     high = len(keys) if maximum is None else min(len(keys), maximum - len(required))
     chosen = draw(st.sets(st.sampled_from(keys), min_size=low, max_size=high)) if keys else set()
-    result = draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in chosen}}))
+    result = draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in sorted(chosen)}}))
     if entries is None:
         return result
     # The cap bounds the distance past the floor, not the total — capping the total would pin
@@ -1060,6 +1093,9 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
 
 
 def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    if view.min_length is not None and _countable(view.min_length) is None:
+        # No string can be that long.
+        return st.nothing()
     if view.content_media_types or view.content_encodings:
         return _content_string(view, ctx)
     # A name with no generator behind it is an annotation and leaves the strings unconstrained.
@@ -1069,11 +1105,15 @@ def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyCon
         # driver gets a branch and the dead ones reject their draws.
         return st.one_of([_formatted(name, [other for other in known if other != name], view, ctx) for name in known])
     if not view.patterns:
+        # Nothing here spells out what the characters have to be, so a value this long can be padded.
+        max_length = _countable(view.max_length)
+        if view.min_length is not None and view.min_length >= _PADDED_TEXT_THRESHOLD:
+            return _padded_text(ctx, view.min_length, max_length)
         kwargs: dict[str, int] = {}
         if view.min_length is not None:
             kwargs["min_size"] = view.min_length
-        if view.max_length is not None:
-            kwargs["max_size"] = view.max_length
+        if max_length is not None:
+            kwargs["max_size"] = max_length
         return _text(ctx, **kwargs)
     if view.max_length is not None and any(
         pattern_length_bounds(pattern)[0] > view.max_length for pattern in view.patterns
@@ -1091,6 +1131,24 @@ def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyCon
             for pattern in drivers
         ]
     )
+
+
+# Hypothesis indexes every drawn value, and for a string that index is a number with a digit per
+# character - work that outgrows the draw itself once a length floor runs into the thousands.
+_PADDED_TEXT_THRESHOLD = 256
+_PADDED_TEXT_HEAD = 16
+# How far past the floor a padded value may run; the floor is the interesting length.
+_PADDED_TEXT_SLACK = 8
+
+
+def _padded_text(ctx: StrategyContext, min_length: int, max_length: int | None) -> SearchStrategy[str]:
+    """A short head followed by one repeated character, cut to the drawn length."""
+    ceiling = min_length + _PADDED_TEXT_SLACK
+    if max_length is not None:
+        ceiling = min(ceiling, max_length)
+    return st.tuples(
+        st.integers(min_length, ceiling), _text(ctx, max_size=_PADDED_TEXT_HEAD), ctx.alphabet.as_strategy()
+    ).map(lambda parts: (parts[1] + parts[2] * parts[0])[: parts[0]])
 
 
 def _content_string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:

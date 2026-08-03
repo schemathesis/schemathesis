@@ -5,7 +5,10 @@ from typing import TYPE_CHECKING
 import jsonschema_rs
 from hypothesis import strategies as st
 
+from schemathesis.core.cache import MISSING
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
+from schemathesis.generation._cache import schema_cache_key
+from schemathesis.generation.hypothesis import canonical_strategy_cache
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.generation.jsonschema.strategy import UnsupportedView, from_schema
 
@@ -28,6 +31,32 @@ def build(
     alphabet: Alphabet | None = None,
 ) -> SearchStrategy[JsonValue] | None:
     """Values the schema admits, or `None` for a schema this engine does not fully model."""
+    alphabet = alphabet if alphabet is not None else Alphabet()
+    try:
+        # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on
+        # every draw; rebuilding its strategy each time is what the cache is for.
+        key = (schema_cache_key(schema), draft, id(formats), alphabet.allow_x00, alphabet.codec)
+    except (TypeError, ValueError):
+        key = None
+    if key is not None:
+        cached = canonical_strategy_cache.get(key)
+        if cached is not MISSING:
+            return cached[1]
+    strategy = _build(schema, draft=draft, formats=formats, alphabet=alphabet)
+    if key is not None:
+        # Keeping `formats` alive next to the strategy stops its `id` from being recycled
+        # into a stale hit once the caller drops it.
+        canonical_strategy_cache[key] = (formats, strategy)
+    return strategy
+
+
+def _build(
+    schema: JsonSchema,
+    *,
+    draft: int,
+    formats: dict[str, SearchStrategy],
+    alphabet: Alphabet,
+) -> SearchStrategy[JsonValue] | None:
     try:
         canonical_schema = jsonschema_rs.canonicalize(
             schema,
@@ -44,11 +73,7 @@ def build(
     # Spelled out so the caller reports an unsatisfiable schema; no other engine gets a say.
     if not canonical_schema.is_satisfiable():
         return EMPTY_STRATEGY
-    context = StrategyContext(
-        root=canonical_schema,
-        alphabet=alphabet if alphabet is not None else Alphabet(),
-        formats=formats,
-    )
+    context = StrategyContext(root=canonical_schema, alphabet=alphabet, formats=formats)
     try:
         strategy = from_schema(canonical_schema, context)
         if not context.cyclic:

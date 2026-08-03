@@ -549,6 +549,7 @@ def test_exception_during_test(testdir):
 def test_(request, case):
     pass
 """,
+        generation_modes=[GenerationMode.POSITIVE],
         paths={
             "/users": {
                 "get": {
@@ -569,7 +570,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1)
-    result.stdout.re_match_lines([r".*UnsatisfiableSchema: Cannot generate test data for GET /users"])
+    result.stdout.re_match_lines([r".*Unsatisfiable: Cannot generate test data for query parameter 'key5'"])
 
 
 def test_invalid_operation(testdir):

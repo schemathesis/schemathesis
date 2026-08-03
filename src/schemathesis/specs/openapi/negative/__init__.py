@@ -13,11 +13,18 @@ from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema import from_schema
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core.jsonschema import ALL_KEYWORDS, DRAFT4_SUPPLEMENTAL_FORMATS, FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema import (
+    ALL_KEYWORDS,
+    CANONICALIZE_DRAFT_BY_VALIDATOR,
+    DRAFT4_SUPPLEMENTAL_FORMATS,
+    FANCY_REGEX_OPTIONS,
+)
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.jsonschema import build
+from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi.adapter.parameters import _constant_values_at_draws, _prune_modified_constants
 from schemathesis.specs.openapi.negative.mutations import (
@@ -282,18 +289,28 @@ def negative_schema(
         def filter_values(value: Any) -> bool:
             return skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
 
+    alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
+
     def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
         schema, metadata = value
-        return (
-            from_schema(
+        # `propertyNames` pins the header name grammar, and it is Draft 6+: a Draft 4 document drops it
+        # during canonicalization, leaving names no header can carry. Until the grammar reaches the
+        # engine some other way, headers keep the generator that reads the keyword as written.
+        strategy = (
+            None
+            if location.is_in_header
+            else build(
+                schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
+            )
+        )
+        if strategy is None:
+            strategy = from_schema(
                 schema,
                 custom_formats=custom_formats,
                 allow_x00=generation_config.allow_x00,
                 codec=generation_config.codec,
             )
-            .filter(filter_values)
-            .map(lambda value: GeneratedValue(value, metadata))
-        )
+        return strategy.filter(filter_values).map(lambda value: GeneratedValue(value, metadata))
 
     if target_descriptors is None:
         target_descriptors = compute_mutation_targets(schema)

@@ -15,14 +15,14 @@ from schemathesis.generation.meta import FuzzingPhaseData
 
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
 def test_deep_leaf_bug_detected_via_negative_fuzzing(ctx, cli, snapshot_cli):
-    # Depth-3 `required` violation must reach the bug; the server accepts any payload.
+    # Depth-3 `required` violation must reach the bug; at 50 examples a quarter of seeds never draw one.
     api = ctx.openapi.apps.deep_leaf_bug()
     assert (
         cli.run(
             api.schema_url,
             "--mode=negative",
             "--phases=fuzzing",
-            "--max-examples=50",
+            "--max-examples=300",
             "--continue-on-failure",
             "--no-shrink",
             "--seed=0",
