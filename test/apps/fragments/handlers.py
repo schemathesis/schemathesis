@@ -290,6 +290,14 @@ def register_path_variable(app: Flask) -> None:
         return jsonify({"success": True})
 
 
+def register_array_path_variable(app: Flask) -> None:
+    # The empty route accepts the wire form of an empty array, which a real server would too.
+    @app.route("/api/array_path_variable/", methods=["GET"])
+    @app.route("/api/array_path_variable/<keys>", methods=["GET"])
+    def array_path_variable_endpoint(keys: str = "") -> Any:
+        return jsonify({"success": True})
+
+
 def register_custom_format(app: Flask) -> None:
     @app.route("/api/custom_format", methods=["GET"])
     def custom_format_endpoint() -> Any:

@@ -11,6 +11,7 @@
 - Generate string values satisfying every `pattern` and `format` in a conjunction.
 - Generate strings honoring `contentEncoding` and `contentMediaType` under Draft 7.
 - Name the API operation that cannot be generated when its schema is unsatisfiable.
+- Runtime error in `negative_data_rejection` for empty array path parameters.
 
 ### :racing_car: Performance
 

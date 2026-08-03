@@ -602,6 +602,25 @@ def path_variable() -> dict[str, Any]:
     }
 
 
+def array_path_variable() -> dict[str, Any]:
+    return {
+        "/api/array_path_variable/{keys}": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "keys",
+                        "in": "path",
+                        "required": True,
+                        "style": "simple",
+                        "schema": {"type": "array", "items": {"type": "integer"}},
+                    },
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
 def custom_format() -> dict[str, Any]:
     return {
         "/api/custom_format": {
