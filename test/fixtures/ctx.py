@@ -195,6 +195,9 @@ class OpenAPIApps:
     def success_failure_multiple_failures_custom_format(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_failure_multiple_failures_custom_format())
 
+    def array_path_variable(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.array_path_variable())
+
     def path_variable_and_custom_format(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.path_variable_and_custom_format())
 

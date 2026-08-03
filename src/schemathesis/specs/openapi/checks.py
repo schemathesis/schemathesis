@@ -544,7 +544,9 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
             validator = make_validator(schema, parameter.adapter.jsonschema_validator_cls)
         except Exception:
             return True
-        if validator.is_valid(unquote(value).split(",")):
+        # `unquote` keeps `str` subclasses intact, and splitting an empty string keeps the input
+        # object; the validator rejects anything but a plain `str`.
+        if validator.is_valid(unquote(str(value)).split(",")):
             return True
 
     return False

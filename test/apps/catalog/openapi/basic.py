@@ -358,6 +358,13 @@ def path_variable() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def array_path_variable() -> OpenAPIApp:
+    spec = build_schema(schemas.array_path_variable())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_array_path_variable(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def path_variable_and_custom_format() -> OpenAPIApp:
     spec = build_schema({**schemas.path_variable(), **schemas.custom_format()})
     app = make_flask_app_from_schema(spec)
