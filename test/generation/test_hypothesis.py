@@ -64,6 +64,21 @@ def test_canonicalish_keeps_bundle_when_bundled_ref_present():
     assert canonicalise.canonicalish(schema) == {"const": 1, BUNDLE_STORAGE_KEY: schema[BUNDLE_STORAGE_KEY]}
 
 
+def test_unmergeable_ref_siblings_keep_both_halves():
+    # Keywords beside a `$ref` that no single schema can spell together still describe a value.
+    setup()
+    schema = {
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+        "type": "object",
+        "additionalProperties": {"type": "string", "format": "uri"},
+        BUNDLE_STORAGE_KEY: {
+            "schema1": {"type": "object", "properties": {"when": {"type": "string", "format": "date-time"}}}
+        },
+    }
+
+    assert find(from_schema(schema), lambda _: True) == {}
+
+
 def test_from_schema_reflects_bundle_mutations():
     setup()
     schema = {
@@ -2512,6 +2527,32 @@ def test_canonical_one_of_admits_only_what_a_single_branch_takes():
     # Both ends stay reachable; only the overlap between them is gone.
     find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
     find(built, lambda value: value > 10, settings=settings(max_examples=1000, database=None))
+
+
+def test_canonical_one_of_beside_a_conjunction_drives_the_draw():
+    # Drawing from the loose half and hoping it lands inside a branch never gets there.
+    schema = {
+        "type": "object",
+        "required": ["mode"],
+        "oneOf": [{"$ref": "#/$defs/scheduled"}, {"$ref": "#/$defs/onDemand"}],
+        "$defs": {
+            "scheduled": {"properties": {"mode": {"const": "scheduled"}}, "required": ["interval"]},
+            "onDemand": {"properties": {"mode": {"const": "onDemand"}}},
+        },
+    }
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+    find(built, lambda value: value["mode"] == "onDemand", settings=settings(max_examples=1000, database=None))
 
 
 def test_canonical_array_shorter_than_the_positions_it_names():
