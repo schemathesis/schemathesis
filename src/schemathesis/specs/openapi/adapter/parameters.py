@@ -1085,7 +1085,13 @@ class OpenApiParameter(OpenApiComponent):
     @property
     def name(self) -> str:
         """Parameter name."""
-        return self.definition["name"]
+        name = self.definition["name"]
+        # A name is text on the wire, but a document converted from YAML 1.1 spells `on` as the
+        # boolean `true`, and a numeric one arrives as a number. Spelled as JSON writes it, so the
+        # name reads the same as in the document.
+        if not isinstance(name, str):
+            return jsonschema_rs.canonical.json.to_string(name)
+        return name
 
     @property
     def location(self) -> ParameterLocation:

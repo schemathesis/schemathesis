@@ -42,6 +42,40 @@ SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSc
 _V3_1 = version.parse("3.1")
 
 
+def _named_after_placeholder(parameters: list[OperationParameter], path: str) -> list[OperationParameter]:
+    """Give a path parameter whose name is not text the placeholder it stands for.
+
+    A document converted from YAML 1.1 spells a parameter named `on` as the boolean `true`, and the
+    path template is the only place the original name survives.
+    """
+    unnamed = [
+        parameter
+        for parameter in parameters
+        # A body is the other kind of parameter here, and it carries no `in`.
+        if isinstance(parameter, OpenApiParameter)
+        and parameter.location is ParameterLocation.PATH
+        and not isinstance(parameter.definition.get("name"), str)
+    ]
+    if len(unnamed) != 1:
+        # With several of them, no placeholder can be told from another.
+        return parameters
+    target = unnamed[0]
+    claimed = {
+        parameter.name
+        for parameter in parameters
+        if parameter.definition.get("in") == "path" and parameter is not target
+    }
+    unclaimed = get_template_fields(path) - claimed
+    if len(unclaimed) != 1:
+        return parameters
+    recovered = OpenApiParameter.from_definition(
+        definition={**target.definition, "name": next(iter(unclaimed))},
+        name_to_uri=target.name_to_uri,
+        adapter=target.adapter,
+    )
+    return [recovered if parameter is target else parameter for parameter in parameters]
+
+
 @dataclass(slots=True)
 class _FilterContext:
     """`HasAPIOperation` wrapper; the inner operation is mutated per candidate during filtering."""
@@ -333,7 +367,7 @@ class OperationLoader:
                 cookies=OpenApiParameterSet(ParameterLocation.COOKIE, adapter=schema.adapter),
             )
         )
-        for parameter in parameters:
+        for parameter in _named_after_placeholder(parameters, path):
             operation.add_parameter(parameter)
         missing_parameter_names = get_template_fields(operation.path) - {
             parameter.name for parameter in operation.path_parameters

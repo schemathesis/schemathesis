@@ -849,3 +849,49 @@ paths:
     cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}", "--max-examples=1", "--checks=not_a_server_error")
 
     assert {key for keys in received for key in keys} == {"on"}
+
+
+def test_non_string_parameter_name(ctx):
+    # Specs converted from YAML 1.1 carry `name: on` as the JSON boolean `true`; the name reaches
+    # the wire as text either way.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "get": {
+                    "parameters": [{"in": "query", "name": True, "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(case=schema["/foo"]["GET"].as_strategy())
+    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert set(case.query) == {"true"}
+
+    test()
+
+
+def test_non_string_path_parameter_name_recovered_from_template(ctx):
+    # The template is the only place the original name survives, and its schema must still drive the value.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo/{on}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": True, "required": True, "schema": {"type": "string", "enum": ["ALPHA"]}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(case=schema["/foo/{on}"]["GET"].as_strategy())
+    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert case.path_parameters == {"on": "ALPHA"}
+        assert case.formatted_path == "/foo/ALPHA"
+
+    test()
