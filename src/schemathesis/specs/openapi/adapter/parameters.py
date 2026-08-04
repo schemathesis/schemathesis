@@ -25,7 +25,7 @@ from schemathesis.core.jsonschema import (
     schema_with_bundle,
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
-from schemathesis.core.jsonschema.resolver import Resolver
+from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference_uri
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type
 from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
@@ -1556,13 +1556,17 @@ def _bundle_parameter(
     parameter: Mapping,
     resolver: Resolver,
     bundler: Bundler,
-    bundle_cache: dict[int, tuple[dict[str, Any], dict[str, str]]],
+    bundle_cache: BundleCache,
 ) -> tuple[dict[str, Any], dict[str, str]]:
     """Bundle a parameter definition to make it self-contained."""
-    param_id = id(parameter)
-    if param_id in bundle_cache:
-        cached_definition, cached_name_to_uri = bundle_cache[param_id]
-        return deepclone(cached_definition), dict(cached_name_to_uri)
+    # Key on the parameter's resolved `$ref` URI
+    reference = parameter.get("$ref")
+    cache_key = resolve_reference_uri(resolver.base_uri, reference) if isinstance(reference, str) else None
+    if cache_key is not None:
+        cached = bundle_cache.get(cache_key)
+        if cached is not None:
+            cached_definition, cached_name_to_uri = cached
+            return deepclone(cached_definition), dict(cached_name_to_uri)
 
     parameter_resolver, definition = maybe_resolve_with_resolver(parameter, resolver)
     schema = definition.get("schema")
@@ -1606,7 +1610,8 @@ def _bundle_parameter(
 
     definition_ = cast(dict, definition)
     result = definition_, name_to_uri
-    bundle_cache[param_id] = (deepclone(definition_), dict(name_to_uri))
+    if cache_key is not None:
+        bundle_cache[cache_key] = (deepclone(definition_), dict(name_to_uri))
     return result
 
 

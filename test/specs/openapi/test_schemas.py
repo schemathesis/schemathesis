@@ -189,3 +189,38 @@ def test_non_string_parameter_location(ctx):
     operation = schema["/test"]["PUT"]
     # Should not raise TypeError: unhashable type: 'dict'
     assert list(operation.iter_parameters()) == []
+
+
+def test_referenced_parameters_share_one_bundle_cache_entry(ctx):
+    # The bundle cache must key on the definition a parameter refers to, not on the
+    # identity of the dict that refers to it. Both operations below cite the same
+    # parameter, but each citation is a separate dict, so an `id()`-keyed cache stores
+    # two entries for one definition.
+    #
+    # That key is also unsound: it outlives the dict it names, and once the dict is
+    # freed CPython can reuse its address for an unrelated parameter, which then gets
+    # the wrong definition back -- silently dropping a path parameter and reporting a
+    # valid spec as invalid.
+    schema = ctx.openapi.load_schema(
+        {
+            "/alpha/{item_id}": {
+                "get": {
+                    "parameters": [{"$ref": "#/components/parameters/ItemId"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/beta/{item_id}": {
+                "get": {
+                    "parameters": [{"$ref": "#/components/parameters/ItemId"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version="3.0.0",
+        components={
+            "parameters": {"ItemId": {"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}}}
+        },
+    )
+    list(schema.get_all_operations())
+
+    assert len(schema._bundle_cache) == 1

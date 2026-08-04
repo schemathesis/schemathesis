@@ -14,10 +14,12 @@
 - Runtime error in `negative_data_rejection` for empty array path parameters.
 - Coverage phase generating Unicode characters where the validator reads `\d` and `\w` as ASCII.
 - Internal error on truncated runtime expressions like `$response.` in Open API links.
+- Intermittent `Path parameter is not defined` errors on multi-file schemas, caused by the parameter bundle cache being keyed on object identity. [#4414](https://github.com/schemathesis/schemathesis/issues/4414)
 
 ### :racing_car: Performance
 
 - Cache canonical-form strategies across operations.
+- Share bundled parameters between operations that reference the same definition.
 
 ### :wrench: Changed
 

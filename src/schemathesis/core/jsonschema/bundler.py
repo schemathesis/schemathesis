@@ -13,8 +13,8 @@ from schemathesis.core.transforms import decode_pointer
 
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
-# Cache for bundled parameters: parameter object id -> (bundled definition, name_to_uri mapping)
-BundleCache = dict[int, tuple[dict[str, Any], dict[str, str]]]
+# Cache for bundled parameters: resolved `$ref` URI -> (bundled definition, name_to_uri mapping)
+BundleCache = dict[str, tuple[dict[str, Any], dict[str, str]]]
 
 
 class BundleError(Exception):
