@@ -120,6 +120,14 @@ def canonicalize(
     return resolved
 
 
+def _combine_branch_values(existing: Any, incoming: Any) -> Any:
+    # A later branch specializing what the base only sketched must keep its own sub-fields;
+    # earlier branches still win on the plain keywords.
+    if isinstance(existing, dict) and isinstance(incoming, dict):
+        return _flatten_all_of({"allOf": [existing, incoming]})
+    return existing if existing is not None else incoming
+
+
 def _flatten_all_of(schema: JsonSchemaObject) -> JsonSchemaObject:
     # Merge `allOf` structurally: union `properties` and `required` across branches so every property name
     # survives for FK discovery.
@@ -134,11 +142,13 @@ def _flatten_all_of(schema: JsonSchemaObject) -> JsonSchemaObject:
             for key, value in _flatten_all_of(branch).items():
                 if key == "properties" and isinstance(value, dict):
                     for name, sub in value.items():
-                        properties.setdefault(name, sub)
+                        properties[name] = _combine_branch_values(properties.get(name), sub)
                 elif key == "required" and isinstance(value, list):
                     for name in value:
                         if name not in required:
                             required.append(name)
+                elif key == "items":
+                    rest["items"] = _combine_branch_values(rest.get("items"), value)
                 else:
                     rest.setdefault(key, value)
         result = dict(rest)
@@ -297,6 +307,8 @@ def unwrap_schema(schema: Mapping[str, Any], path: str, parent_ref: str | None, 
                     external_tag_, uses_parent_ref = external_tag
                     nested_properties = resolved_items["properties"][external_tag_]
                     _, resolved = maybe_resolve_with_resolver(nested_properties, resolver)
+                    resolved = try_unwrap_composition(resolved, resolver)
+                    _, resolved = maybe_resolve_with_resolver(resolved, resolver)
                     pointer += f"/{encode_pointer(external_tag_)}"
 
         ref = parent_ref if uses_parent_ref else array_schema.get("$ref")

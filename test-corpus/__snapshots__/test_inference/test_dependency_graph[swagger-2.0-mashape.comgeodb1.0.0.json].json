@@ -800,11 +800,6 @@
       ],
       "types": {
         "code": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
@@ -906,11 +901,6 @@
           "string"
         ],
         "type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "wikiDataId": [

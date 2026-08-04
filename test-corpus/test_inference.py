@@ -172,4 +172,5 @@ def test_overall_metrics(snapshot_json):
         "total_inputs": metrics.inputs,
         "total_outputs": metrics.outputs,
         "total_links": metrics.links,
+        "total_fieldless_resources": metrics.fieldless_resources,
     } == snapshot_json
