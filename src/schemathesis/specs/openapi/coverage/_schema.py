@@ -1133,11 +1133,22 @@ def _cover_positive_for_type(
             if len(all_of) == 1 and not outer_has_properties:
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
+                folded = False
                 with suppress(jsonschema_rs.ValidationError):
                     _inline_allof_refs(schema, ctx)
                     canonical = canonicalish(schema)
                     if "allOf" not in canonical:
                         yield from cover_schema_iter(ctx, canonical)
+                        folded = True
+                if not folded:
+                    # Members with no single flat spelling (two `pattern`s, two `format`s) leave the
+                    # walker nothing to cover; emit one conforming value instead of dropping the schema.
+                    with suppress(Unsatisfiable):
+                        yield PositiveValue(
+                            ctx.generate_from_schema(schema),
+                            scenario=CoverageScenario.DEFAULT_POSITIVE_TEST,
+                            description="Valid value",
+                        )
                 allof_handles_all = True
         if not allof_handles_all:
             if enum is not NOT_SET:

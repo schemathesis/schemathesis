@@ -5049,6 +5049,28 @@ def test_float_format_representable_example_still_emitted(pctx):
 
 
 @pytest.mark.parametrize(
+    "schema",
+    [
+        {"allOf": [{"type": "string", "pattern": "^a"}, {"type": "string", "pattern": "b$"}]},
+        {
+            "type": "object",
+            "properties": {"a": {"type": "string"}},
+            "required": ["a"],
+            "allOf": [{"properties": {"a": {"pattern": "^x"}}}, {"properties": {"a": {"pattern": "y$"}}}],
+        },
+    ],
+    ids=["two-patterns", "outer-properties"],
+)
+def test_satisfiable_allof_without_a_flat_form_still_emits_positive_values(pctx, schema):
+    # Two `pattern`s have no single spelling, which used to drop the whole schema from coverage.
+    values = [value.value for value in cover_schema_iter(pctx, schema, HashSet())]
+    assert values, schema
+    validator = make_validator_for(schema)
+    for value in values:
+        assert validator.is_valid(value), value
+
+
+@pytest.mark.parametrize(
     "modes",
     [[GenerationMode.POSITIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],
     ids=["positive", "mixed"],

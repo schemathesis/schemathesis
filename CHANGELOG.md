@@ -15,6 +15,7 @@
 - Coverage phase generating Unicode characters where the validator reads `\d` and `\w` as ASCII.
 - Internal error on truncated runtime expressions like `$response.` in Open API links.
 - Read unquoted `on`, `off`, `yes` and `no` in YAML documents as strings, per YAML 1.2.
+- Coverage phase emitting nothing for `allOf` schemas with no equivalent flat form.
 
 ### :racing_car: Performance
 
