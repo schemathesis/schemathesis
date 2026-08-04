@@ -26,10 +26,10 @@ from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.generation.jsonschema import Alphabet, build
 from schemathesis.generation.meta import TestPhase
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, openapi_cases, snapped_float32_clone
+from schemathesis.specs.openapi._hypothesis import _build_custom_formats, openapi_cases, snapped_float32_clone
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
-from schemathesis.specs.openapi.formats import STRING_FORMATS
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -869,7 +869,7 @@ def _generate_single_example(
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema_rs.Validator],
 ) -> Any:
-    custom_formats = {**get_default_format_strategies(), **STRING_FORMATS}
+    custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
     strategy = build(
         schema,
         draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],

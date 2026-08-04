@@ -49,7 +49,6 @@ from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError, canonicalish
-from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.cache import MISSING, BoundedCache
@@ -256,10 +255,6 @@ def _unexpected_property_key(schema: dict, existing_keys: set[str]) -> str | Non
         if candidate not in existing_keys and not any(pattern.search(candidate) for pattern in patterns):
             return candidate
     return None
-
-
-def _supports_format_generation(format: str, custom_formats: dict[str, st.SearchStrategy]) -> bool:
-    return format in BUILT_IN_STRING_FORMATS or format in custom_formats
 
 
 @dataclass
@@ -592,8 +587,6 @@ class CoverageContext:
             fmt = schema["format"]
             if fmt in self.custom_formats:
                 return cached_draw(self.custom_formats[fmt])
-            if fmt in BUILT_IN_STRING_FORMATS:
-                return cached_draw(BUILT_IN_STRING_FORMATS[fmt])
         if (keys == ["maxLength", "minLength", "type"] or keys == ["maxLength", "type"]) and schema["type"] == "string":
             return cached_draw(st.text(min_size=schema.get("minLength", 0), max_size=schema["maxLength"]))
         if (
@@ -742,7 +735,7 @@ class CoverageContext:
         if (
             isinstance(schema, dict)
             and (fmt := schema.get("format")) in VALIDATED_FORMATS
-            and _supports_format_generation(fmt, self.custom_formats)
+            and fmt in self.custom_formats
         ):
             validator = _get_format_validator(fmt, self.validator_cls)
             strategy = strategy.filter(lambda v: not isinstance(v, str) or validator.is_valid(v))
@@ -2081,9 +2074,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     max_length = schema.get("maxLength")
     if ctx.location == "path" and not ("format" in schema and schema["format"] in ctx.custom_formats):
         schema = _ensure_valid_path_parameter_schema(schema)
-    elif ctx.location in ("header", "cookie") and not (
-        "format" in schema and (schema["format"] in ctx.custom_formats or schema["format"] in BUILT_IN_STRING_FORMATS)
-    ):
+    elif ctx.location in ("header", "cookie") and not ("format" in schema and schema["format"] in ctx.custom_formats):
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and pattern_requires_char_outside(pattern, HEADER_ALLOWED_CHARS):
             return
