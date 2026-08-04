@@ -95,6 +95,19 @@ def from_schema(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> 
     return cached
 
 
+def _simplest_first(value: JsonValue) -> tuple[int, float, str]:
+    """Sort key putting the value a shrunk failure should report first: scalars, then short before long."""
+    if value is None:
+        return (0, 0, "")
+    if isinstance(value, bool):
+        return (1, int(value), "")
+    if isinstance(value, (int, float)):
+        return (2 if int(value) == value else 3, abs(value), "" if value >= 0 else "-")
+    if isinstance(value, str):
+        return (4, len(value), value)
+    return (5 if isinstance(value, list) else 6, len(value), jsonschema_rs.canonical.json.to_string(value))
+
+
 def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     view = schema.view()
     if isinstance(view, canonical.TrueView):
@@ -104,7 +117,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canonical.ConstView):
         return st.just(cast("JsonValue", view.value))
     if isinstance(view, canonical.EnumView):
-        return st.sampled_from(view.values)
+        return st.sampled_from(sorted(view.values, key=_simplest_first))
     if isinstance(view, canonical.MultiTypeView):
         return st.one_of([_bare_type(name, ctx) for name in view.types])
     if isinstance(view, canonical.TypedGroupView):

@@ -2679,8 +2679,8 @@ def test_no_property_nesting_with_ref_oneof():
     assert_conform(covered, schema)
     # Each oneOf branch generates its own type; no config key inside config values
     assert covered == [
-        {"config": {"name": ""}},
         {"config": {"value": 0}},
+        {"config": {"name": ""}},
     ]
 
 
