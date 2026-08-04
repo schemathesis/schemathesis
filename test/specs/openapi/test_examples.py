@@ -2817,6 +2817,21 @@ def test_property_without_example_is_generated(ctx, body_schema, expected):
     assert _extract_json_body_examples(ctx, body_schema) == expected
 
 
+def test_generated_property_honors_its_format(ctx):
+    # A value its own format rejects is dropped, leaving the property missing from the example.
+    assert _extract_json_body_examples(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "example": "Alice"},
+                "pointer": {"type": "string", "format": "relative-json-pointer"},
+            },
+            "required": ["name", "pointer"],
+        },
+    ) == [{"media_type": "application/json", "value": {"name": "Alice", "pointer": "0#"}}]
+
+
 @pytest.mark.parametrize(
     "body_schema",
     [
