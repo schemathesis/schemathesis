@@ -136,9 +136,21 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
 
     cls: type[yaml.SafeLoader] = type("YAMLLoader", (SafeLoader,), {})
     cls.yaml_implicit_resolvers = {
-        key: [(tag, regexp) for tag, regexp in mapping if tag != "tag:yaml.org,2002:timestamp"]
+        key: [
+            (tag, regexp)
+            for tag, regexp in mapping
+            if tag not in ("tag:yaml.org,2002:timestamp", "tag:yaml.org,2002:bool")
+        ]
         for key, mapping in cls.yaml_implicit_resolvers.copy().items()
     }
+
+    # These documents are YAML 1.2, where `true` and `false` are the only booleans. YAML 1.1 also
+    # reads `on`, `off`, `yes` and `no`, turning a parameter named `on` into a boolean.
+    cls.add_implicit_resolver(  # type: ignore[no-untyped-call]
+        "tag:yaml.org,2002:bool",
+        re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$"),
+        list("tTfF"),
+    )
 
     # Fix pyyaml scientific notation parse bug
     # See PR: https://github.com/yaml/pyyaml/pull/174 for upstream fix

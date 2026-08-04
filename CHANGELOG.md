@@ -14,6 +14,7 @@
 - Runtime error in `negative_data_rejection` for empty array path parameters.
 - Coverage phase generating Unicode characters where the validator reads `\d` and `\w` as ASCII.
 - Internal error on truncated runtime expressions like `$response.` in Open API links.
+- Read unquoted `on`, `off`, `yes` and `no` in YAML documents as strings, per YAML 1.2.
 
 ### :racing_car: Performance
 

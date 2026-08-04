@@ -1,7 +1,7 @@
 import datetime
 
 import pytest
-from flask import jsonify
+from flask import Flask, jsonify, request
 from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
 
@@ -812,3 +812,40 @@ def test_parameter_type_detection(ctx, cli, snapshot_cli):
         cli.run(str(schema_path), f"--url={api.base_url}/api", "--checks=not_a_server_error", "--max-examples=5")
         == snapshot_cli
     )
+
+
+def test_yaml_boolean_parameter_name(tmp_path, app_runner, cli):
+    # YAML 1.1 reads an unquoted `on` as a boolean, but the API still expects the query key `on`.
+    schema_path = tmp_path / "schema.yaml"
+    schema_path.write_text(
+        """
+openapi: 3.0.2
+info:
+  title: Example
+  version: 1.0.0
+paths:
+  /foo:
+    get:
+      parameters:
+        - in: query
+          name: on
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+"""
+    )
+    received = []
+    app = Flask(__name__)
+
+    @app.route("/foo")
+    def foo():
+        received.append(sorted(request.args))
+        return jsonify({})
+
+    port = app_runner.run_flask_app(app)
+    cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}", "--max-examples=1", "--checks=not_a_server_error")
+
+    assert {key for keys in received for key in keys} == {"on"}
