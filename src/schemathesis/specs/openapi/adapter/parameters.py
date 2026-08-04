@@ -1562,12 +1562,13 @@ def _bundle_parameter(
     parameter: Mapping,
     resolver: Resolver,
     bundler: Bundler,
-    bundle_cache: dict[int, tuple[dict[str, Any], dict[str, str]]],
+    bundle_cache: BundleCache,
 ) -> tuple[dict[str, Any], dict[str, str]]:
     """Bundle a parameter definition to make it self-contained."""
     param_id = id(parameter)
-    if param_id in bundle_cache:
-        cached_definition, cached_name_to_uri = bundle_cache[param_id]
+    cached = bundle_cache.get(param_id)
+    if cached is not None:
+        _, cached_definition, cached_name_to_uri = cached
         return deepclone(cached_definition), dict(cached_name_to_uri)
 
     parameter_resolver, definition = maybe_resolve_with_resolver(parameter, resolver)
@@ -1612,7 +1613,9 @@ def _bundle_parameter(
 
     definition_ = cast(dict, definition)
     result = definition_, name_to_uri
-    bundle_cache[param_id] = (deepclone(definition_), dict(name_to_uri))
+    # Keeping `parameter` alive reserves its address, so no later parameter can be allocated onto it
+    # and pick up this entry.
+    bundle_cache[param_id] = (parameter, deepclone(definition_), dict(name_to_uri))
     return result
 
 

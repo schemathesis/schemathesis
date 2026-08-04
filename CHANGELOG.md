@@ -17,6 +17,7 @@
 - Internal error on truncated runtime expressions like `$response.` in Open API links.
 - Read unquoted `on`, `off`, `yes` and `no` in YAML documents as strings, per YAML 1.2.
 - Coverage phase emitting nothing for `allOf` schemas with no equivalent flat form.
+- Intermittent "Path parameter is not defined" on specs split across many external files. [#4414](https://github.com/schemathesis/schemathesis/issues/4414)
 
 ### :racing_car: Performance
 

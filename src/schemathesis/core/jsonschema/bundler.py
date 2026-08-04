@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -13,8 +14,10 @@ from schemathesis.core.transforms import decode_pointer
 
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
-# Cache for bundled parameters: parameter object id -> (bundled definition, name_to_uri mapping)
-BundleCache = dict[int, tuple[dict[str, Any], dict[str, str]]]
+# Cache for bundled parameters: parameter object id -> (parameter, bundled definition, name_to_uri mapping).
+# The parameter is stored so that its address stays reserved - otherwise a freed parameter's address can be
+# handed to an unrelated one, which would then hit the wrong entry.
+BundleCache = dict[int, tuple[Mapping[str, Any], dict[str, Any], dict[str, str]]]
 
 
 class BundleError(Exception):
