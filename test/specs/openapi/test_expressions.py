@@ -170,6 +170,13 @@ def test_dynamic_body(output, expr, expected):
         "$response.header.unknown#regex:[",
         "$response.header.unknown#regex:(.+)(.+)",
         "$response}",
+        "$request",
+        "$response",
+        "$request.",
+        "$response.",
+        "$request.query",
+        "$request.query.",
+        "$response.header.",
     ],
 )
 def test_invalid_expression(output, expr):
