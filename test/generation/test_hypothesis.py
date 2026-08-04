@@ -2371,6 +2371,39 @@ def test_uncountable_size_floor_admits_no_value(schema):
     assert built.is_empty
 
 
+UNFILLABLE_ELEMENT = {
+    "type": "array",
+    "items": {"type": "string"},
+    "prefixItems": [{}],
+    "uniqueItems": True,
+    "contains": {"enum": [None]},
+}
+
+
+@pytest.mark.parametrize(
+    "array_schema",
+    [
+        {"type": "array", "items": UNFILLABLE_ELEMENT, "maxItems": 1},
+        {"type": "array", "items": UNFILLABLE_ELEMENT, "minItems": 1},
+        {"type": "array", "items": UNFILLABLE_ELEMENT, "uniqueItems": True, "maxItems": 2},
+    ],
+    ids=["ceiling", "floor", "unique"],
+)
+def test_array_size_bounds_over_unfillable_element(array_schema):
+    # Size bounds around an element nothing can fill still leave the empty array to draw.
+    schema = {"type": "object", "properties": {"a": {}}, "unevaluatedProperties": array_schema}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=10, deadline=None, database=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
 @pytest.mark.parametrize(
     "schema",
     [

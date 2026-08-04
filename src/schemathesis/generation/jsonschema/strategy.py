@@ -289,6 +289,12 @@ def _array(
     max_items = _countable(view.max_items)
     if max_items is not None:
         kwargs["max_size"] = max_items
+    # `st.lists` refuses either bound over an element strategy drawing nothing, so the bounds are
+    # answered here instead. Skipped while a pointer target is still being built, where `is_empty`
+    # would force a strategy that is not there yet.
+    if kwargs and not ctx.pending and element.is_empty:
+        # No position can be filled, so the empty array is the only value the bounds may allow.
+        return st.nothing() if kwargs.get("min_size") else st.just([])
     if view.unique_items:
         return st.lists(element, unique_by=_json_identity, **kwargs)
     return st.lists(element, **kwargs)
