@@ -114,7 +114,6 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
 @pytest.mark.parametrize(
     "definition",
     [
-        USER_REFERENCE,
         {
             "type": "object",
             "additionalProperties": False,
@@ -151,6 +150,23 @@ def test_recursion_with_no_finite_value(ctx, definition):
 
     with pytest.raises(Unsatisfiable):
         test()
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
+def test_recursion_asserting_nothing(ctx):
+    # A definition that is only a pointer back to itself never asserts anything, so any body clears it.
+    raw_schema = ctx.openapi.build_schema({})
+    build_schema_with_recursion(raw_schema, USER_REFERENCE)
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    drawn = []
+
+    @given(case=schema["/users"]["POST"].as_strategy())
+    @settings(max_examples=1, deadline=None)
+    def test(case):
+        drawn.append(case.body)
+
+    test()
+    assert drawn
 
 
 def test_nested_recursive_references(ctx):
