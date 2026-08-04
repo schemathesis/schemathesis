@@ -51,7 +51,7 @@ def _parse_variable(tokens: lexer.TokenGenerator, token: lexer.Token, expr: str)
 
 def _parse_request(tokens: lexer.TokenGenerator, expr: str) -> nodes.BodyRequest | nodes.NonBodyRequest:
     skip_dot(tokens, "$request")
-    location = next(tokens)
+    location = take_token(tokens, expr)
     if location.value in ("query", "path", "header"):
         skip_dot(tokens, f"$request.{location.value}")
         parameter = take_string(tokens, expr)
@@ -69,7 +69,7 @@ def _parse_request(tokens: lexer.TokenGenerator, expr: str) -> nodes.BodyRequest
 
 def _parse_response(tokens: lexer.TokenGenerator, expr: str) -> nodes.HeaderResponse | nodes.BodyResponse:
     skip_dot(tokens, "$response")
-    location = next(tokens)
+    location = take_token(tokens, expr)
     if location.value == "header":
         skip_dot(tokens, f"$response.{location.value}")
         parameter = take_string(tokens, expr)
@@ -85,14 +85,23 @@ def _parse_response(tokens: lexer.TokenGenerator, expr: str) -> nodes.HeaderResp
     raise RuntimeExpressionError(f"Invalid expression: {expr}")
 
 
+def take_token(tokens: lexer.TokenGenerator, expr: str) -> lexer.Token:
+    token = next(tokens, None)
+    if token is None:
+        raise RuntimeExpressionError(f"Invalid expression: {expr}")
+    return token
+
+
 def skip_dot(tokens: lexer.TokenGenerator, name: str) -> None:
-    token = next(tokens)
+    token = next(tokens, None)
+    if token is None:
+        raise RuntimeExpressionError(f"`{name}` expression should be followed by a dot (`.`)")
     if not token.is_dot:
         raise RuntimeExpressionError(f"`{name}` expression should be followed by a dot (`.`). Got: {token.value}")
 
 
 def take_string(tokens: lexer.TokenGenerator, expr: str) -> lexer.Token:
-    parameter = next(tokens)
+    parameter = take_token(tokens, expr)
     if not parameter.is_string:
         raise RuntimeExpressionError(f"Invalid expression: {expr}")
     return parameter
