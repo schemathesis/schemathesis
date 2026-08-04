@@ -2163,6 +2163,22 @@ CANONICAL_CASES = [
         {"type": "string", "format": "uuid", "pattern": "\\p{L}"},
         (lambda value: any(character.isalpha() for character in value),),
     ),
+    (
+        {"type": "string", "minLength": 1, "not": {"pattern": "[^a-z]"}},
+        (lambda value: len(value) > 3 and len(set(value)) > 1,),
+    ),
+    (
+        {"type": "integer", "minimum": 0, "maximum": 20, "not": {"multipleOf": 3}},
+        (lambda value: value % 3 == 1, lambda value: value % 3 == 2, lambda value: value == 20),
+    ),
+    (
+        {"type": "number", "minimum": 0, "maximum": 5, "not": {"multipleOf": 0.5}},
+        (lambda value: 0 < value < 0.5, lambda value: value > 4.5),
+    ),
+    (
+        {"type": "number", "minimum": 0, "maximum": 5, "not": {"type": "integer"}},
+        (lambda value: 0 < value < 1, lambda value: value > 4),
+    ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
@@ -2185,7 +2201,6 @@ def test_canonical_generation(schema, reaches):
     test()
 
 
-@pytest.mark.xfail(reason="pure reference cycles fold to `true` in an upcoming jsonschema-rs release", strict=True)
 @pytest.mark.parametrize(
     "schema",
     [
@@ -2778,14 +2793,20 @@ def test_canonical_reference_with_no_finite_value_admits_nothing():
     assert built.is_empty
 
 
-def test_canonical_reference_straight_back_to_itself_admits_nothing():
-    # The pointer names a schema that is only that same pointer again.
+def test_canonical_reference_straight_back_to_itself_admits_every_value():
+    # The pointer names a schema that is only that same pointer again, so nothing is ever asserted.
     schema = {"$ref": "#/$defs/node", "$defs": {"node": {"$ref": "#/$defs/node"}}}
 
     built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
-
     assert built is not None
-    assert built.is_empty
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
 
 
 def test_recursion_next_to_a_schema_that_declines_canonicalization(ctx):
@@ -2911,6 +2932,23 @@ def test_canonical_number_generation_without_representable_values():
 
     with pytest.raises(Unsatisfiable):
         find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+
+
+def test_canonical_number_excluding_integers_under_draft4():
+    # Draft 4 spells "not an integer" on the leaf itself rather than as a barred divisor of one, and a
+    # half-integer grid is where that shows: every other point on it is a whole number.
+    schema = {"type": "number", "multipleOf": 0.5, "minimum": 0, "maximum": 5, "not": {"type": "integer"}}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+    find(built, lambda value: value > 4, settings=settings(max_examples=1000, database=None))
 
 
 def test_canonical_integer_grid_without_a_multiple_in_range():

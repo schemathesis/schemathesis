@@ -929,33 +929,69 @@ def _closed_names(schema: jsonschema_rs.CanonicalSchema) -> set[str] | None:
 
 def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonValue]:
     multiple_of = _combined_multiple_of(view.multiple_of)
+    barred = _barred_divisors(view.not_multiple_of)
+    if _every_step_is_barred(multiple_of or Fraction(1), barred):
+        return st.nothing()
     if multiple_of is None:
-        return st.integers(min_value=view.minimum, max_value=view.maximum)
-    # On a `p/q` grid only multiples of `p` are whole, `q` being coprime to it.
-    stride = multiple_of.numerator
-    low = None if view.minimum is None else -(-view.minimum // stride)
-    high = None if view.maximum is None else view.maximum // stride
-    return _steps(low, high).map(lambda step: step * stride)
+        strategy: SearchStrategy[JsonValue] = st.integers(min_value=view.minimum, max_value=view.maximum)
+    else:
+        # On a `p/q` grid only multiples of `p` are whole, `q` being coprime to it.
+        stride = multiple_of.numerator
+        low = None if view.minimum is None else -(-view.minimum // stride)
+        high = None if view.maximum is None else view.maximum // stride
+        strategy = _steps(low, high).map(lambda step: step * stride)
+    return _outside_divisors(strategy, barred)
+
+
+def _barred_divisors(values: list[Numeric]) -> list[Fraction]:
+    # Exact rationals, for the reason `_combined_multiple_of` needs them.
+    return [Fraction(str(value)) for value in values]
+
+
+def _every_step_is_barred(step: Fraction, barred: list[Fraction]) -> bool:
+    """Whether the grid the schema admits lands on a barred divisor at every point."""
+    return any(step % divisor == 0 for divisor in barred)
+
+
+def _outside_divisors(strategy: SearchStrategy[JsonValue], barred: list[Fraction]) -> SearchStrategy[JsonValue]:
+    if not barred:
+        return strategy
+
+    def is_admitted(value: JsonValue) -> bool:
+        spelled = Fraction(str(value))
+        return all(spelled % divisor != 0 for divisor in barred)
+
+    return strategy.filter(is_admitted)
 
 
 def _number(view: jsonschema_rs.canonical.NumberView) -> SearchStrategy[JsonValue]:
+    barred = _barred_divisors(view.not_multiple_of)
+    if view.excludes_integers:
+        # Draft 4 spells "not an integer" on the leaf; a barred divisor of one says the same thing.
+        barred = [*barred, Fraction(1)]
     multiple_of = _combined_multiple_of(view.multiple_of)
     if multiple_of is not None:
+        if _every_step_is_barred(multiple_of, barred):
+            return st.nothing()
         steps = _steps(
             _lower_step(view.minimum, view.exclusive_minimum, multiple_of),
             _upper_step(view.maximum, view.exclusive_maximum, multiple_of),
         )
         # Grid points that no float represents round to a neighbour off the grid or outside the bounds.
         is_valid = _grid_check(view, multiple_of)
-        return steps.map(lambda step: _fraction_to_json_number(step * multiple_of)).filter(is_valid)
+        strategy = steps.map(lambda step: _fraction_to_json_number(step * multiple_of)).filter(is_valid)
+        return _outside_divisors(strategy, barred)
 
     bounds = _representable_float_bounds(view)
     if bounds is not None:
         float_low, float_high = bounds
-        return st.floats(min_value=float_low, max_value=float_high, allow_nan=False, allow_infinity=False).map(
+        floats = st.floats(min_value=float_low, max_value=float_high, allow_nan=False, allow_infinity=False).map(
             lambda value: value or 0.0
         )
+        return _outside_divisors(floats, barred)
     # No float lies within the bounds, leaving the integers that do.
+    if _every_step_is_barred(Fraction(1), barred):
+        return st.nothing()
     return _steps(
         _lower_step(view.minimum, view.exclusive_minimum, Fraction(1)),
         _upper_step(view.maximum, view.exclusive_maximum, Fraction(1)),
@@ -1095,7 +1131,35 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
             _VALIDATOR_BY_CANONICALIZE_DRAFT[ctx.root.draft],
         ).is_valid
         strategy = strategy.filter(lambda value: not matches_barred(value))
+    if view.excluded_patterns:
+        matches_barred = make_validator(
+            {"anyOf": [{"type": "string", "pattern": pattern} for pattern in view.excluded_patterns]},
+            _VALIDATOR_BY_CANONICALIZE_DRAFT[ctx.root.draft],
+        ).is_valid
+        strategy = strategy.filter(lambda value: not matches_barred(value))
     return strategy
+
+
+# A pattern that is one character class and nothing else, so the characters it bars are the ones it names.
+_BARE_CHARACTER_CLASS = re.compile(r"\[\^?(?:[^\\\]]|\\.)+\]")
+
+
+def _outside_class(pattern: str) -> str | None:
+    """A class naming what a bare character class does not, or `None` when the pattern is not one."""
+    if _BARE_CHARACTER_CLASS.fullmatch(pattern) is None:
+        return None
+    return f"[{pattern[2:]}" if pattern.startswith("[^") else f"[^{pattern[1:]}"
+
+
+def _characters_outside(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[str]:
+    """Characters no barred pattern names, so drawing does not lean on the filter to choose."""
+    characters = ctx.alphabet.as_strategy()
+    for pattern in view.excluded_patterns:
+        admitted = _outside_class(pattern)
+        if admitted is not None:
+            # One class can drive the alphabet; anything else the barred run names still filters above.
+            return st.from_regex(admitted, fullmatch=True, alphabet=characters)
+    return characters
 
 
 def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
@@ -1113,14 +1177,15 @@ def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyCon
     if not view.patterns:
         # Nothing here spells out what the characters have to be, so a value this long can be padded.
         max_length = _countable(view.max_length)
+        characters = _characters_outside(view, ctx)
         if view.min_length is not None and view.min_length >= _PADDED_TEXT_THRESHOLD:
-            return _padded_text(ctx, view.min_length, max_length)
+            return _padded_text(ctx, view.min_length, max_length, characters)
         kwargs: dict[str, int] = {}
         if view.min_length is not None:
             kwargs["min_size"] = view.min_length
         if max_length is not None:
             kwargs["max_size"] = max_length
-        return _text(ctx, **kwargs)
+        return _text(ctx, characters=characters, **kwargs)
     if view.max_length is not None and any(
         pattern_length_bounds(pattern)[0] > view.max_length for pattern in view.patterns
     ):
@@ -1147,13 +1212,15 @@ _PADDED_TEXT_HEAD = 16
 _PADDED_TEXT_SLACK = 8
 
 
-def _padded_text(ctx: StrategyContext, min_length: int, max_length: int | None) -> SearchStrategy[str]:
+def _padded_text(
+    ctx: StrategyContext, min_length: int, max_length: int | None, characters: SearchStrategy[str]
+) -> SearchStrategy[str]:
     """A short head followed by one repeated character, cut to the drawn length."""
     ceiling = min_length + _PADDED_TEXT_SLACK
     if max_length is not None:
         ceiling = min(ceiling, max_length)
     return st.tuples(
-        st.integers(min_length, ceiling), _text(ctx, max_size=_PADDED_TEXT_HEAD), ctx.alphabet.as_strategy()
+        st.integers(min_length, ceiling), _text(ctx, characters=characters, max_size=_PADDED_TEXT_HEAD), characters
     ).map(lambda parts: (parts[1] + parts[2] * parts[0])[: parts[0]])
 
 
@@ -1263,8 +1330,8 @@ def _anything_for(allow_x00: bool, codec: str | None) -> SearchStrategy[JsonValu
     )
 
 
-def _text(ctx: StrategyContext, **kwargs: int) -> SearchStrategy[str]:
-    return st.text(alphabet=ctx.alphabet.as_strategy(), **kwargs)
+def _text(ctx: StrategyContext, *, characters: SearchStrategy[str] | None = None, **kwargs: int) -> SearchStrategy[str]:
+    return st.text(alphabet=characters if characters is not None else ctx.alphabet.as_strategy(), **kwargs)
 
 
 # What each JSON type name admits. `True == 1` in Python, but `true` is not a JSON number, and a
