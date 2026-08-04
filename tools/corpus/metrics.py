@@ -14,6 +14,8 @@ class DependencyMetrics:
     inputs: int = 0
     outputs: int = 0
     links: int = 0
+    # Resources with no fields at all, which mean schema extraction failed for them
+    fieldless_resources: int = 0
 
 
 def collect_dependency_metrics(raw_schema: JsonSchemaObject) -> DependencyMetrics:
@@ -34,6 +36,7 @@ def collect_dependency_metrics(raw_schema: JsonSchemaObject) -> DependencyMetric
         inputs=inputs,
         outputs=outputs,
         links=links,
+        fieldless_resources=sum(1 for resource in graph.resources.values() if not resource.fields),
     )
 
 
@@ -42,9 +45,17 @@ def add_dependency_metrics(items: Iterable[DependencyMetrics]) -> DependencyMetr
     inputs = 0
     outputs = 0
     links = 0
+    fieldless_resources = 0
     for item in items:
         resources += item.resources
         inputs += item.inputs
         outputs += item.outputs
         links += item.links
-    return DependencyMetrics(resources=resources, inputs=inputs, outputs=outputs, links=links)
+        fieldless_resources += item.fieldless_resources
+    return DependencyMetrics(
+        resources=resources,
+        inputs=inputs,
+        outputs=outputs,
+        links=links,
+        fieldless_resources=fieldless_resources,
+    )
