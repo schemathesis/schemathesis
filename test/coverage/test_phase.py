@@ -1023,12 +1023,12 @@ def test_negative_type_violations_for_enum_property_under_allof(ctx):
             {"body": False},
             {"body": 0},
             {"body": {}},
+            {"body": {"color": "AAA"}},
             {"body": {"color": {}}},
             {"body": {"color": [None, None]}},
             {"body": {"color": None}},
             {"body": {"color": False}},
             {"body": {"color": 0}},
-            {"body": {"color": "AAA"}},
             {"body": {"color": "blue"}},
             {"body": {"color": "red"}},
         ],
@@ -4937,9 +4937,7 @@ def test_duration_format_generates_required_query_positive_cases(ctx, version):
 )
 def test_hostname_negative_format_respects_validator_draft(monkeypatch, validator_cls, should_generate):
     # `XN--9krT00a` is valid in Draft 4 but invalid in Draft 2020-12.
-    monkeypatch.setattr(
-        "schemathesis.specs.openapi.coverage._schema.from_schema", lambda *_args, **_kwargs: st.just("XN--9krT00a")
-    )
+    monkeypatch.setattr(CoverageContext, "build_strategy", lambda *_args, **_kwargs: st.just("XN--9krT00a"))
     ctx = CoverageContext(
         root_schema={"type": "string", "format": "hostname"},
         location=ParameterLocation.QUERY,
@@ -5069,6 +5067,76 @@ def test_satisfiable_allof_without_a_flat_form_still_emits_positive_values(pctx,
     validator = make_validator_for(schema)
     for value in values:
         assert validator.is_valid(value), value
+
+
+@pytest.mark.parametrize(
+    "conditional",
+    [
+        {"if": {"minLength": 3}, "then": {"pattern": "\\p{L}"}},
+        {"if": {"minLength": 3}, "then": {"pattern": "\\p{L}"}, "else": {"maxLength": 9}},
+    ],
+    ids=["then", "then-else"],
+)
+def test_negative_format_around_a_conditional_the_engine_cannot_follow(ctx_factory, conditional):
+    # `\p{L}` has no Python spelling, so the guarded branch cannot drive a draw; dropping the guard
+    # leaves a wider schema that can, with the validator ruling out what it over-admits.
+    schema = {"type": "string", "format": "date", "minLength": 1, **conditional}
+    ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], validator_cls=jsonschema_rs.Draft202012Validator)
+    scenarios = {value.scenario for value in cover_schema_iter(ctx, schema, HashSet())}
+    assert CoverageScenario.INVALID_FORMAT in scenarios, scenarios
+
+
+def test_all_of_keeps_the_tightest_upper_bound(pctx):
+    schema = {"allOf": [{"type": "string", "maxLength": 5}, {"maxLength": 3}]}
+    values = [value.value for value in cover_schema_iter(pctx, schema, HashSet())]
+    assert values and all(len(value) <= 3 for value in values), values
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"allOf": [{"allOf": [{"type": "string", "pattern": "^a"}, {"pattern": "b$"}]}]},
+        {"allOf": [{"allOf": [{"type": "string", "pattern": "^a"}, {"pattern": "b$"}]}, {"type": "string"}]},
+    ],
+    ids=["sole-branch", "beside-a-sibling"],
+)
+def test_nested_all_of_without_a_flat_form_emits_a_conforming_value(pctx, schema):
+    values = [value.value for value in cover_schema_iter(pctx, schema, HashSet())]
+    assert values and all(value.startswith("a") and value.endswith("b") for value in values), values
+
+
+def test_all_of_with_a_boolean_branch_emits_a_conforming_value(pctx):
+    values = [value.value for value in cover_schema_iter(pctx, {"allOf": [{"type": "string"}, True]}, HashSet())]
+    assert values and all(isinstance(value, str) for value in values), values
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"type": "object", "properties": {"a": {"type": "string"}}, "allOf": {"a": 1}}, []),
+        ({"allOf": {"type": "string"}}, []),
+        ({"allOf": "nope"}, []),
+        ({"allOf": [{"enum": [1, 2]}, {"enum": 5}]}, [1, 2]),
+    ],
+    ids=["all-of-not-a-list", "all-of-a-single-key-dict", "all-of-a-string", "enum-not-a-list"],
+)
+def test_malformed_all_of_covers_only_what_parses(pctx, schema, expected):
+    # Real documents carry these shapes; the walk keeps going instead of taking the run down.
+    assert [value.value for value in cover_schema_iter(pctx, schema, HashSet())] == expected
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [{}, {"not": {"maxLength": 2}}],
+    ids=["plain", "with-not"],
+)
+def test_negative_format_without_a_buildable_base(ctx_factory, extra):
+    # Stripping `format` leaves a pattern with no Python spelling, so no violation can be drawn from
+    # it - and widening past the `not` does not bring one back.
+    schema = {"type": "string", "format": "date", "pattern": "\\p{L}", **extra}
+    ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], validator_cls=jsonschema_rs.Draft202012Validator)
+    scenarios = {value.scenario for value in cover_schema_iter(ctx, schema, HashSet())}
+    assert CoverageScenario.INVALID_FORMAT not in scenarios, scenarios
 
 
 @pytest.mark.parametrize(
