@@ -2951,6 +2951,18 @@ def test_canonical_number_excluding_integers_under_draft4():
     find(built, lambda value: value > 4, settings=settings(max_examples=1000, database=None))
 
 
+@pytest.mark.parametrize("pattern", ["[\\d\\D]", "[\\s\\S]", "[\\w\\W]"], ids=["digit", "space", "word"])
+def test_barred_pattern_naming_every_character(pattern):
+    # Flipping such a class names no character at all, so the draw has to bottom out here rather
+    # than fail inside Hypothesis on an empty alphabet.
+    schema = {"type": "string", "minLength": 1, "not": {"pattern": pattern}}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+
+    with pytest.raises(Unsatisfiable):
+        find(built, lambda _: True, settings=settings(max_examples=10, database=None))
+
+
 def test_canonical_integer_grid_without_a_multiple_in_range():
     # No integer between 1 and 2.5 is a multiple of 1.5, and canonicalization does not rule it out.
     schema = {"type": "integer", "minimum": 1, "maximum": 2.5, "multipleOf": 1.5}
