@@ -342,26 +342,25 @@ class RejectedSchemaDefinition(InvalidSchema):
 
 def parse_regex_warning(message: str) -> tuple[str, str] | None:
     """The pattern and the reason a regex warning names, or `None` when it names neither."""
-    match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
+    # The quote is whichever one the `repr` picked, so a pattern containing one flips it.
+    match = re.search(
+        r"=(['\"])(.*)\1, but this is not valid syntax for a Python regular expression \((.*?)\)", message
+    )
     if match is None:
         return None
     try:
         # The warning carries the pattern as a `repr`, so it arrives escaped.
-        pattern = match.group(1).encode().decode("unicode_escape")
+        pattern = match.group(2).encode().decode("unicode_escape")
     except UnicodeDecodeError:
-        pattern = match.group(1)
-    return pattern, match.group(2)
+        pattern = match.group(2)
+    return pattern, match.group(3)
 
 
 class InvalidRegexPattern(InvalidSchema):
     """Raised when a string pattern is not a valid regular expression."""
 
     @classmethod
-    def from_hypothesis_jsonschema_message(cls, message: str) -> InvalidRegexPattern:
-        parsed = parse_regex_warning(message)
-        if parsed is None:
-            return cls(message)
-        pattern, reason = parsed
+    def from_pattern_and_reason(cls, pattern: str, reason: str) -> InvalidRegexPattern:
         return cls(f"Invalid regular expression. Pattern `{pattern}` is not recognized - `{reason}`")
 
     @classmethod

@@ -1377,7 +1377,7 @@ def test_reserved_characters_in_operation_name(ctx, cli, snapshot_cli):
 
 
 def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
-    def make_definition(min_items):
+    def make_definition(min_items, pattern=r"\p{Greek}"):
         return {
             "post": {
                 "requestBody": {
@@ -1387,7 +1387,7 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
                             "schema": {
                                 "type": "array",
                                 # Java-style regular expression
-                                "items": {"type": "string", "pattern": r"\p{Greek}"},
+                                "items": {"type": "string", "pattern": pattern},
                                 "maxItems": 3,
                                 "minItems": min_items,
                             }
@@ -1404,6 +1404,8 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
         "/foo": make_definition(min_items=1),
         # Can generate an empty array
         "/bar": make_definition(min_items=0),
+        # A quote inside the pattern changes how it is quoted when reported
+        "/baz": make_definition(min_items=1, pattern=r"\p{Greek}'"),
     }
     schema = ctx.openapi.build_schema(paths)
     app = ctx.openapi.make_permissive_flask_app(schema)

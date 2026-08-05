@@ -9,7 +9,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
+     Operations:       3 selected / 3 total
 
 
  ✅  API capabilities:
@@ -19,23 +19,28 @@ Schemathesis dev
 
  ⏭   Examples (in 0.00s)
 
-     ⏭  2 skipped
+     ⏭  3 skipped
 
  ⏭   Coverage (in 0.00s)
 
-     ⏭  2 skipped
+     ⏭  3 skipped
 
  🚫  Fuzzing (in 0.00s)
 
-     ✅ 1 passed  🚫 1 error
+     ✅ 1 passed  🚫 2 errors
 
 ==================================== ERRORS ====================================
+__________________________________ POST /baz ___________________________________
+Schema Error
+
+Failed to generate test cases for this API operation because of unsupported regular expression `\p{Greek}'`
+
+Tip: The pattern is valid - values matching it are what cannot be built.
+Narrow it, or supply examples for this operation.
 __________________________________ POST /foo ___________________________________
 Schema Error
 
 Failed to generate test cases for this API operation because of unsupported regular expression `\p{Greek}`
-
-    schemathesis.core.errors.UnsupportedRegexPattern: Failed to generate test cases for this API operation because of unsupported regular expression `\p{Greek}`
 
 Tip: The pattern is valid - values matching it are what cannot be built.
 Narrow it, or supply examples for this operation.
@@ -44,10 +49,13 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== WARNINGS ===================================
 
-Unsupported regex patterns: 2 operations contain regex patterns no value can be generated for
+Unsupported regex patterns: 3 operations contain regex patterns no value can be generated for
 
   - POST /bar
     No value can be generated for `\p{Greek}`
+
+  - POST /baz
+    No value can be generated for `\p{Greek}'`
 
   - POST /foo
     No value can be generated for `\p{Greek}`
@@ -57,9 +65,9 @@ Unsupported regex patterns: 2 operations contain regex patterns no value can be 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
+  Selected: 3/3
   Tested: 1
-  Errored: 1
+  Errored: 2
 
 Test Phases:
   ⏭  Examples
@@ -68,14 +76,14 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Errors:
-  🚫 Schema Error: 1
+  🚫 Schema Error: 2
 
 Warnings:
-  ⚠️ Unsupported regex: 2 operations had ungeneratable regex patterns
+  ⚠️ Unsupported regex: 3 operations had ungeneratable regex patterns
 
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-========================= 1 error, 1 warning in 1.00s ==========================
+========================= 2 errors, 1 warning in 1.00s =========================

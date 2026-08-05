@@ -2256,6 +2256,8 @@ CANONICAL_CASES = [
     ({"type": "string", "pattern": r"^[\p{Alnum}]+$"}, (lambda value: len(value) > 1,)),
     ({"type": "string", "pattern": r"[\p{Zs}]"}, ()),
     ({"type": "object", "patternProperties": {r"[\p{L}]+": {"type": "string"}}}, (lambda value: len(value) > 0,)),
+    # A pattern nothing can be drawn against binds strings only; every other type stays available.
+    ({"pattern": r"[\p{Greek}]+"}, (lambda value: isinstance(value, list), lambda value: isinstance(value, dict))),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
@@ -3047,6 +3049,11 @@ UNSUPPORTED_SCHEMAS = [
     # A node behind a pattern is only reached on a draw, and must still be refused up front.
     (
         {"type": "object", "patternProperties": {"^a": {"type": "string", "pattern": r"\p{Han}"}}},
+        jsonschema_rs.Draft202012Validator,
+    ),
+    # Every alternative undrawable leaves nothing to draw from, unlike one that still has a sibling.
+    (
+        {"anyOf": [{"type": "string", "pattern": r"\p{Han}"}, {"type": "string", "pattern": r"\p{Greek}"}]},
         jsonschema_rs.Draft202012Validator,
     ),
 ]
