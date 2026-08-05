@@ -327,12 +327,16 @@ def negative_schema(
 
     positive_strategy: st.SearchStrategy | None = None
     if location == ParameterLocation.BODY:
-        _candidate = from_schema(
-            schema,
-            custom_formats=custom_formats,
-            allow_x00=generation_config.allow_x00,
-            codec=generation_config.codec,
+        _candidate = build(
+            schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
         )
+        if _candidate is None:
+            _candidate = from_schema(
+                schema,
+                custom_formats=custom_formats,
+                allow_x00=generation_config.allow_x00,
+                codec=generation_config.codec,
+            )
         try:
             _candidate.validate()
         except InvalidArgument:
