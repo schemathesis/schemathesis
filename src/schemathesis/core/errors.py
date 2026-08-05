@@ -340,21 +340,45 @@ class RejectedSchemaDefinition(InvalidSchema):
     """Raised when a definition does not hold up as a JSON Schema under its own draft."""
 
 
+def parse_regex_warning(message: str) -> tuple[str, str] | None:
+    """The pattern and the reason a regex warning names, or `None` when it names neither."""
+    match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
+    if match is None:
+        return None
+    try:
+        # The warning carries the pattern as a `repr`, so it arrives escaped.
+        pattern = match.group(1).encode().decode("unicode_escape")
+    except UnicodeDecodeError:
+        pattern = match.group(1)
+    return pattern, match.group(2)
+
+
 class InvalidRegexPattern(InvalidSchema):
     """Raised when a string pattern is not a valid regular expression."""
 
     @classmethod
     def from_hypothesis_jsonschema_message(cls, message: str) -> InvalidRegexPattern:
-        match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
-        if match:
-            message = f"Invalid regular expression. Pattern `{match.group(1)}` is not recognized - `{match.group(2)}`"
-        return cls(message)
+        parsed = parse_regex_warning(message)
+        if parsed is None:
+            return cls(message)
+        pattern, reason = parsed
+        return cls(f"Invalid regular expression. Pattern `{pattern}` is not recognized - `{reason}`")
 
     @classmethod
     def from_jsonschema_rs_error(cls, error: ValidationError) -> InvalidRegexPattern:
         return cls(
             "Failed to generate test cases for this API operation because of "
             f"unsupported regular expression `{error.instance}`"
+        )
+
+
+class UnsupportedRegexPattern(InvalidRegexPattern):
+    """Raised when a valid pattern names constructs no value can be drawn from."""
+
+    @classmethod
+    def from_pattern(cls, pattern: str) -> UnsupportedRegexPattern:
+        return cls(
+            f"Failed to generate test cases for this API operation because of unsupported regular expression `{pattern}`"
         )
 
 

@@ -22,6 +22,7 @@ from schemathesis.core.errors import (
     TransitionValidationError,
     UnboundPrefix,
     UnresolvableReference,
+    UnsupportedRegexPattern,
 )
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     "InvalidHeadersExample",
     "InvalidRateLimit",
     "InvalidRegexPattern",
+    "UnsupportedRegexPattern",
     "InvalidRegexType",
     "InvalidSchema",
     "InvalidStateMachine",

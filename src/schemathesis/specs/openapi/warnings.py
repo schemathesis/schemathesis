@@ -152,7 +152,7 @@ class UnsupportedRegexWarning:
 
     @property
     def message(self) -> str:
-        return f"Unsupported regex `{self.pattern}` was removed"
+        return f"No value can be generated for `{self.pattern}`"
 
     @property
     def group(self) -> str | None:

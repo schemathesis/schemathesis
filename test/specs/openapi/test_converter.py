@@ -542,6 +542,21 @@ def test_pattern_translation_invalid_result():
     assert result == {"type": "string"}
 
 
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"^[A-Za-z \p{Han}\p{Katakana}]*$",
+        r"[\p{Print}&&[^|:/]]+",
+        r"^([$\-._+!*\x{60}(),;/?:@=&\w]|%([0-9a-fA-F?]{2}))+$",
+    ],
+)
+def test_pattern_the_validator_enforces_is_kept(pattern):
+    # Dropping it would draw values the API turns down, and nothing downstream would notice.
+    schema = {"type": "string", "pattern": pattern}
+    result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
+    assert result["pattern"] == pattern
+
+
 def test_nested_object_required_array_not_duplicated():
     # GH-3460: Nested `required` arrays should not cause duplicates in parent's `required`
     schema = {
