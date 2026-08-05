@@ -181,7 +181,7 @@ def test_valid_headers():
     strategy = make_positive_strategy(
         {
             "type": "object",
-            "properties": {"X-Foo": {"type": "string", "pattern": r"\A[A-F0-9]{12}\Z"}},
+            "properties": {"X-Foo": {"type": "string", "pattern": "^[A-F0-9]{12}$"}},
             "required": ["X-Foo"],
             "additionalProperties": False,
         },

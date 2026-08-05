@@ -7,6 +7,7 @@
 - Run aborting with an internal error on parameters whose name is not a string, such as `true`.
 - Hypothesis warning about an overly large representation when generating unrestricted JSON values.
 - Report schemas rejected by their JSON Schema draft as a schema error.
+- Report a `pattern` the validator cannot compile as an invalid regular expression.
 - Values violating a `pattern` with possessive quantifiers like `0++0` when a length bound is set.
 - Coverage phase recursing without end on a reference cycle through a `oneOf` / `anyOf` branch.
 - Spurious tracebacks printed on exit after interrupting the coverage phase.

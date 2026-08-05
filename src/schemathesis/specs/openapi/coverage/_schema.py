@@ -51,7 +51,7 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_STRING_LENGTH, NOT_SET
 from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import RejectedSchemaDefinition
+from schemathesis.core.errors import InvalidRegexPattern, RejectedSchemaDefinition
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
 from schemathesis.core.media_types import is_form_parts, is_xml_parts
@@ -529,7 +529,7 @@ class CoverageContext:
         # rejects - the caller's or one of these rewrites - leaves the branch uncovered, not the run failed.
         try:
             return build(schema, draft=draft, formats=self.custom_formats)
-        except RejectedSchemaDefinition:
+        except (RejectedSchemaDefinition, InvalidRegexPattern):
             return None
 
     def _generate_around_conditionals(self, schema: JsonSchemaObject, described: JsonSchemaObject) -> Any:
