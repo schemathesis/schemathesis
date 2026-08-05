@@ -19,7 +19,7 @@ from hypothesis_jsonschema import from_schema
 import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import InvalidSchema, RejectedSchemaDefinition
+from schemathesis.core.errors import InvalidRegexPattern, InvalidSchema, RejectedSchemaDefinition
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
@@ -2778,6 +2778,24 @@ META_INVALID_SCHEMAS = [
 def test_canonical_meta_invalid_schema_is_reported(schema, keyword):
     with pytest.raises(RejectedSchemaDefinition, match=f"Invalid `{keyword}` definition"):
         _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+
+# Real-world spellings the validator's engine turns down: a character class with `\w` as a range
+# bound, a lone surrogate range, Python's open-ended `{,2}`, and its `\Z` anchor.
+UNCOMPILABLE_PATTERNS = [
+    r"^[\w-.+]+@[\w-.+]+$",
+    r"[ -퟿-�\uD800\uDBFF-\uDC00\uDFFF\t]*",
+    r"^(?:[a-z]{,2})$",
+    r"\A[A-F0-9]{12}\Z",
+]
+
+
+@pytest.mark.parametrize("pattern", UNCOMPILABLE_PATTERNS)
+def test_canonical_pattern_the_validator_cannot_compile_is_reported(pattern):
+    with pytest.raises(InvalidRegexPattern):
+        _canonical_strategy_or_none(
+            {"type": "string", "pattern": pattern}, GenerationConfig(), jsonschema_rs.Draft4Validator
+        )
 
 
 def test_canonical_pattern_naming_a_character_outside_the_alphabet(ctx):
