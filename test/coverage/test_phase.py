@@ -4996,6 +4996,41 @@ def test_multi_type_union_yields_numeric_branch(types, expected_kind):
     assert any(isinstance(v, expected_kind) and not isinstance(v, bool) for v in values), values
 
 
+def test_anyof_null_branch_filtered_when_allof_sibling_requires_object():
+    # A nullable-derived anyOf branch must not yield null when an allOf sibling pins `type: object`,
+    # even when the merged schema holds nested bundled refs the parent validator must resolve.
+    root_schema = {
+        "x-bundled": {
+            "request": {
+                "additionalProperties": True,
+                "allOf": [{"$ref": "#/x-bundled/base"}, {"type": "object"}],
+                "required": ["start_date"],
+            },
+            "base": {
+                "anyOf": [
+                    {
+                        "additionalProperties": True,
+                        "properties": {"start_date": {"$ref": "#/x-bundled/start"}},
+                    },
+                    {"type": "null"},
+                ]
+            },
+            "start": {"type": "string"},
+        }
+    }
+    ctx = CoverageContext(
+        root_schema=root_schema,
+        location=ParameterLocation.BODY,
+        media_type=("application", "json"),
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats={},
+        validator_cls=jsonschema_rs.Draft4Validator,
+    )
+    values = [v.value for v in cover_schema_iter(ctx, {"$ref": "#/x-bundled/request"})]
+    assert None not in values, values
+
+
 def test_cover_schema_iter_does_not_mutate_root_schema():
     # A self-recursive `allOf` $ref used to grow the shared root document until cloning hit its recursion limit.
     root_schema = {
