@@ -2222,6 +2222,13 @@ CANONICAL_CASES = [
         {"type": "object", "patternProperties": {r"\w{1,100000}": {"type": "string"}}},
         (lambda value: len(value) > 0,),
     ),
+    ({"type": "string", "pattern": r"[\p{L}\p{N}]+"}, (lambda value: len(value) > 1,)),
+    ({"type": "string", "pattern": r"[\p{L}\p{M}\p{S}\p{N}\p{P}]+"}, (lambda value: len(value) > 1,)),
+    # `\P{M}` inside a class cannot become `[^...]`; the complement has to be spelled as ranges.
+    ({"type": "string", "pattern": r"[\P{M}\p{M}]{1,10}"}, (lambda value: len(value) > 1,)),
+    ({"type": "string", "pattern": r"^[\p{Alnum}]+$"}, (lambda value: len(value) > 1,)),
+    ({"type": "string", "pattern": r"[\p{Zs}]"}, ()),
+    ({"type": "object", "patternProperties": {r"[\p{L}]+": {"type": "string"}}}, (lambda value: len(value) > 0,)),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
@@ -2997,11 +3004,11 @@ def test_recursion_next_to_a_schema_that_declines_canonicalization(ctx):
 
 
 UNSUPPORTED_SCHEMAS = [
-    # A pattern Python `re` rejects can only filter; alone there is nothing to drive the draw.
-    ({"type": "string", "pattern": r"\p{L}"}, jsonschema_rs.Draft202012Validator),
+    # A script has no spelling in codepoints here, so it can only filter; nothing drives the draw.
+    ({"type": "string", "pattern": r"\p{Han}"}, jsonschema_rs.Draft202012Validator),
     # A node behind a pattern is only reached on a draw, and must still be refused up front.
     (
-        {"type": "object", "patternProperties": {"^a": {"type": "string", "pattern": r"\p{L}"}}},
+        {"type": "object", "patternProperties": {"^a": {"type": "string", "pattern": r"\p{Han}"}}},
         jsonschema_rs.Draft202012Validator,
     ),
 ]

@@ -26,7 +26,7 @@ from schemathesis.core.jsonschema import (
     make_validator_for,
 )
 from schemathesis.generation.jsonschema.context import Alphabet
-from schemathesis.specs.openapi.patterns import pattern_length_bounds
+from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -48,6 +48,19 @@ if TYPE_CHECKING:
 # Upper bound on properties drawn beyond the ones the schema names.
 _EXTRA_KEYS = 5
 _VALIDATOR_BY_CANONICALIZE_DRAFT = {draft: cls for cls, draft in CANONICALIZE_DRAFT_BY_VALIDATOR.items()}
+
+
+def _compiled_pattern(pattern: str) -> re.Pattern[str] | None:
+    """The pattern as Python reads it, translating property escapes the validator alone understands."""
+    compiled = compile_ecma_pattern(pattern)
+    if compiled is not None:
+        return compiled
+    translated = normalize_regex(pattern)
+    if translated is None:
+        return None
+    # No `re.ASCII`: the translation spells properties out as ranges, and the flag would refuse every
+    # non-ASCII one of them. The translation only comes back once it has compiled, so this cannot fail.
+    return re.compile(translated)
 
 
 def _countable(bound: int | None) -> int | None:
@@ -875,7 +888,7 @@ def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) 
     # Arbitrary text practically never matches a `patternProperties` regex, so the patterns name keys too.
     sources = [_text(ctx)]
     for pattern in view.pattern_properties:
-        compiled = compile_ecma_pattern(pattern)
+        compiled = _compiled_pattern(pattern)
         if compiled is not None:
             sources.append(st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy()))
     return st.one_of(sources)
@@ -1245,9 +1258,10 @@ def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyCon
         # Every value has to carry a match of each pattern, and one of them cannot fit under the
         # ceiling. Saying so up front spares the caller a filter that never passes.
         return st.nothing()
-    drivers = [pattern for pattern in view.patterns if compile_ecma_pattern(pattern) is not None]
+    drivers = [pattern for pattern in view.patterns if _compiled_pattern(pattern) is not None]
     if not drivers:
-        # A pattern Python `re` rejects (e.g. ECMA `\p{L}`) can filter but not drive the draw.
+        # What is left are the properties with no spelling in codepoints - a script name, say. Those
+        # can filter but not drive the draw.
         raise UnsupportedView("string")
     return st.one_of(
         [
@@ -1313,7 +1327,7 @@ def _pattern_driven(
     pattern: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """Values drawn from one pattern and filtered by the remaining ones."""
-    compiled = compile_ecma_pattern(pattern)
+    compiled = _compiled_pattern(pattern)
     assert compiled is not None
     # A pattern is a search, so the value may carry anything around the match; full matches only
     # would leave `^x` spelling a single string, starving `propertyNames` of distinct keys.
@@ -1322,8 +1336,14 @@ def _pattern_driven(
         strategy.validate()
     except InvalidArgument:
         # ASCII is the validator's reading, but it leaves characters spelled above that range
-        # unreachable; the wider reading draws those, the narrow one still decides what counts.
-        strategy = st.from_regex(re.compile(pattern), alphabet=ctx.alphabet.as_strategy()).filter(compiled.search)
+        # unreachable; the wider reading of the same source draws those, the narrow one still decides.
+        strategy = st.from_regex(re.compile(compiled.pattern), alphabet=ctx.alphabet.as_strategy()).filter(
+            compiled.search
+        )
+    if compiled.pattern != pattern:
+        # Property escapes were spelled out to drive the draw, and that reading is only an
+        # approximation of the validator's - so it decides what the draw is worth.
+        strategy = strategy.filter(_facet_check("pattern", pattern))
     if "$" in pattern:
         # Python also matches `$` before a trailing newline, where the validator means end of string;
         # telling literal `$`s apart costs more than dropping the newline-terminated values.

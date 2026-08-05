@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, Literal, TypeAlias, TypeGuard
@@ -35,52 +36,8 @@ _PRINT_CLASS = rf" {_GRAPH_CLASS}"
 # Blank (horizontal whitespace)
 _BLANK_CLASS = r" \t"
 
-# Order matters - check bracketed forms first to avoid double-bracketing
+# Escapes standing on their own; the ones inside a class are inlined before these run.
 _UNICODE_PROPERTY_MAP = (
-    # Bracketed forms (must come first)
-    (r"[\p{L}]", f"[{_LETTER_CLASS}]"),
-    (r"[\p{Lu}]", f"[{_LETTER_UPPER_CLASS}]"),
-    (r"[\p{Ll}]", f"[{_LETTER_LOWER_CLASS}]"),
-    (r"[\p{Lo}]", f"[{_OTHER_LETTER_CLASS}]"),
-    (r"[\p{N}]", f"[{_DIGIT_CLASS}]"),
-    (r"[\p{Nd}]", f"[{_DIGIT_CLASS}]"),
-    (r"[\p{Alpha}]", f"[{_LETTER_CLASS}]"),
-    (r"[\p{Digit}]", f"[{_DIGIT_CLASS}]"),
-    (r"[\p{XDigit}]", f"[{_XDIGIT_CLASS}]"),
-    (r"[\p{Alnum}]", f"[{_ALNUM_CLASS}]"),
-    (r"[\p{Space}]", f"[{_SPACE_CLASS}]"),
-    (r"[\p{Z}]", f"[{_SPACE_CLASS}]"),
-    (r"[\p{Zs}]", f"[{_SPACE_CLASS}]"),
-    (r"[\p{P}]", f"[{_PUNCT_CLASS}]"),
-    (r"[\p{Punct}]", f"[{_PUNCT_CLASS}]"),
-    (r"[\p{M}]", f"[{_MARK_CLASS}]"),
-    (r"[\p{S}]", f"[{_SYMBOL_CLASS}]"),
-    (r"[\p{C}]", f"[{_CONTROL_CLASS}]"),
-    (r"[\p{Cntrl}]", f"[{_CONTROL_CLASS}]"),
-    (r"[\p{ASCII}]", f"[{_ASCII_CLASS}]"),
-    (r"[\p{Graph}]", f"[{_GRAPH_CLASS}]"),
-    (r"[\p{Print}]", f"[{_PRINT_CLASS}]"),
-    (r"[\p{Blank}]", f"[{_BLANK_CLASS}]"),
-    (r"[\p{Upper}]", f"[{_LETTER_UPPER_CLASS}]"),
-    (r"[\p{IsLetter}]", f"[{_LETTER_CLASS}]"),
-    (r"[\P{L}]", f"[^{_LETTER_CLASS}]"),
-    (r"[\P{N}]", f"[^{_DIGIT_CLASS}]"),
-    (r"[\P{Nd}]", f"[^{_DIGIT_CLASS}]"),
-    (r"[\P{C}]", f"[^{_CONTROL_CLASS}]"),
-    (r"[\P{M}]", f"[^{_MARK_CLASS}]"),
-    # Shorthand forms in brackets (single-letter properties without braces)
-    (r"[\pL]", f"[{_LETTER_CLASS}]"),
-    (r"[\pN]", f"[{_DIGIT_CLASS}]"),
-    (r"[\pP]", f"[{_PUNCT_CLASS}]"),
-    (r"[\pM]", f"[{_MARK_CLASS}]"),
-    (r"[\pS]", f"[{_SYMBOL_CLASS}]"),
-    (r"[\pC]", f"[{_CONTROL_CLASS}]"),
-    (r"[\pZ]", f"[{_SPACE_CLASS}]"),
-    (r"[\PL]", f"[^{_LETTER_CLASS}]"),
-    (r"[\PN]", f"[^{_DIGIT_CLASS}]"),
-    (r"[\PC]", f"[^{_CONTROL_CLASS}]"),
-    (r"[\PM]", f"[^{_MARK_CLASS}]"),
-    # Standalone forms with braces
     (r"\p{L}", f"[{_LETTER_CLASS}]"),
     (r"\p{Lu}", f"[{_LETTER_UPPER_CLASS}]"),
     (r"\p{Ll}", f"[{_LETTER_LOWER_CLASS}]"),
@@ -185,9 +142,39 @@ _POSIX_CLASS_RAW_MAP: dict[str, str] = {
 
 _PCRE_CLASS_SET_OPERATORS = ("||", "&&", "~~")
 
+_MAX_CODEPOINT = sys.maxunicode
+_SURROGATES = (0xD800, 0xDFFF)
+
+
+def _complement_class(raw: str) -> str:
+    """Raw class contents admitting every codepoint `raw` turns down."""
+    parsed = _parse_regex(f"[{raw}]")
+    # Every class this is called with is spelled as literals and ranges, so it reads back as one set.
+    assert parsed is not None and len(parsed) == 1 and parsed[0][0] == sre.IN, raw
+    # Surrogates join the set being complemented, so no gap can carry one: no JSON string holds them,
+    # and Hypothesis turns them down as literals.
+    intervals: list[tuple[int, int]] = [_SURROGATES]
+    for op, value in parsed[0][1]:
+        assert op in (LITERAL, sre.RANGE), raw
+        intervals.append((value, value) if op == LITERAL else value)
+    out: list[str] = []
+    cursor = 0
+    for low, high in sorted(intervals):
+        if low > cursor:
+            out.append(_serialize_range(cursor, low - 1))
+        cursor = max(cursor, high + 1)
+    out.append(_serialize_range(cursor, _MAX_CODEPOINT))
+    return "".join(out)
+
+
+def _serialize_range(low: int, high: int) -> str:
+    if low == high:
+        return _serialize_literal_in_class(low)
+    return f"{_serialize_literal_in_class(low)}-{_serialize_literal_in_class(high)}"
+
 
 def _inline_unicode_in_classes(pattern: str) -> str | None:
-    r"""Inline `\p{X}` and `[:X:]` raw class contents inside `[...]`; bail out on `\P{X}` / `[:^X:]` (uncomposable)."""
+    r"""Inline `\p{X}`, `\P{X}` and `[:X:]` class contents inside `[...]`; bail out on `[:^X:]` (uncomposable)."""
     out: list[str] = []
     i = 0
     in_class = False
@@ -196,7 +183,16 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
         ch = pattern[i]
         if ch == "\\" and i + 1 < n:
             next_ch = pattern[i + 1]
-            # `[^contents]` cannot compose with sibling class members in standard regex.
+            # `[^contents]` cannot compose with sibling class members, so the complement is spelled out.
+            if in_class and next_ch == "P" and i + 2 < n and pattern[i + 2] == "{":
+                end = pattern.find("}", i + 3)
+                raw = _UNICODE_PROPERTY_RAW_MAP.get(pattern[i + 3 : end]) if end != -1 else None
+                # An unknown name has no contents to turn inside out.
+                if raw is None:
+                    return None
+                out.append(_complement_class(raw))
+                i = end + 1
+                continue
             if in_class and next_ch == "P":
                 return None
             if in_class and next_ch == "p" and i + 2 < n:
