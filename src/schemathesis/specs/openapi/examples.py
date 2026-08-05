@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Any, cast, overload
 import jsonschema_rs
 import requests
 from hypothesis.errors import InvalidArgument, Unsatisfiable
-from hypothesis_jsonschema import from_schema
 
 from schemathesis.config import GenerationConfig
+from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
 from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, is_valid, make_validator_for
@@ -700,7 +700,7 @@ def _yield_examples_from_properties(
                 jsonschema_rs.ReferencingError,
             ):
                 continue
-            if not is_valid(generated, subschema):
+            if generated is NOT_SET or not is_valid(generated, subschema):
                 continue
             variants[name] = [generated]
 
@@ -869,20 +869,15 @@ def _generate_single_example(
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema_rs.Validator],
 ) -> Any:
-    custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
     strategy = build(
         schema,
         draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
-        formats=custom_formats,
+        formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
         alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
     )
+    # A schema with no values to draw from contributes nothing rather than a value it does not admit.
     if strategy is None:
-        strategy = from_schema(
-            schema,
-            custom_formats=custom_formats,
-            allow_x00=generation_config.allow_x00,
-            codec=generation_config.codec,
-        )
+        return NOT_SET
     return examples.generate_one(strategy)
 
 
