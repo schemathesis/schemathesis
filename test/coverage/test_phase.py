@@ -35,6 +35,7 @@ from schemathesis.generation.hypothesis.builder import (
 from schemathesis.generation.meta import CoverageScenario, TestPhase
 from schemathesis.resources import PoolDraw, PoolPick
 from schemathesis.specs.openapi.checks import negative_data_rejection
+from schemathesis.specs.openapi.coverage import _schema
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._schema import (
     CoverageContext,
@@ -9393,3 +9394,12 @@ def test_coverage_recursion_around_a_node_that_cannot_be_built(ctx):
     for body in positives:
         assert validator.is_valid(body), body
         assert "stamp" not in body, body
+
+
+def test_closing_generator_after_module_globals_are_cleared(pctx, monkeypatch):
+    # Interpreter finalization nulls module globals before suspended generators are closed.
+    generator = cover_schema_iter(pctx, {"type": "string"}, HashSet())
+    next(generator)
+    monkeypatch.setattr(_schema, "jsonschema_rs", None)
+
+    generator.close()

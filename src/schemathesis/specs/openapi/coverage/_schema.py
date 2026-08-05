@@ -1234,6 +1234,10 @@ def _ignore_unfixable(
 ) -> Generator:
     try:
         yield
+    except GeneratorExit:
+        # Interpreter shutdown clears module globals before closing suspended generators, so the
+        # clauses below can no longer be evaluated.
+        raise
     except (Unsatisfiable, ref_error, jsonschema_rs.ValidationError):
         pass
     except InvalidArgument as exc:
