@@ -42,7 +42,7 @@ def build(
     try:
         # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on
         # every draw; rebuilding its strategy each time is what the cache is for.
-        key = (schema_cache_key(schema), draft, id(formats), alphabet.allow_x00, alphabet.codec)
+        key = (schema_cache_key(schema), draft, id(formats), alphabet)
     except (TypeError, ValueError):
         key = None
     if key is not None:
