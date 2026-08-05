@@ -47,3 +47,5 @@ class StrategyContext:
     # Pointer targets already followed while folding an `allOf`, which stops a cyclic one from
     # unrolling forever.
     following: set[str] = field(default_factory=set)
+    # Schemas whose complement is currently being built, so a bar reaching back is spotted.
+    complementing: set[jsonschema_rs.CanonicalSchema] = field(default_factory=set)

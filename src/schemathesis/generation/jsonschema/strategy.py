@@ -25,7 +25,7 @@ from schemathesis.core.jsonschema import (
     make_validator,
     make_validator_for,
 )
-from schemathesis.generation.jsonschema.context import Alphabet
+from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
 
 if TYPE_CHECKING:
@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.core.jsonschema.types import JsonValue
-    from schemathesis.generation.jsonschema.context import StrategyContext
 
     # A bound arrives as `Decimal` when no float spells it back.
     Numeric = int | float | Decimal
@@ -202,10 +201,26 @@ def _not(
     if isinstance(barred_view, canonical.ReferenceView):
         barred = _target(barred, barred_view.uri, ctx)
     complement = barred.negate()
-    # A complement that points on reads at a depth the schema never meant, so what it admits is not
-    # what the schema admits; folding one is a job for canonicalization.
-    if complement is None or _points_on(complement.to_json_schema()):
+    if complement is None:
         raise UnsupportedView(schema.kind)
+    if _points_on(complement.to_json_schema()):
+        # A pointer naming a carried definition reads against the complement; one naming the document
+        # still means where the bar appeared, which the complement is not.
+        if _names_document(complement.to_json_schema()):
+            raise UnsupportedView(schema.kind)
+        # A bar reached back through its own complement names a value no finite draw settles on.
+        if barred in ctx.complementing:
+            raise UnsupportedView(schema.kind)
+        nested = StrategyContext(
+            root=complement, alphabet=ctx.alphabet, formats=ctx.formats, complementing=ctx.complementing
+        )
+        ctx.complementing.add(barred)
+        try:
+            strategy = from_schema(complement, nested)
+        finally:
+            ctx.complementing.discard(barred)
+        ctx.cyclic = ctx.cyclic or nested.cyclic
+        return strategy
     return from_schema(complement, ctx)
 
 
@@ -216,6 +231,13 @@ def _points_on(schema: JsonValue) -> bool:
             _points_on(value) for key, value in schema.items() if key not in ("$defs", "definitions")
         )
     return isinstance(schema, list) and any(_points_on(item) for item in schema)
+
+
+def _names_document(schema: JsonValue) -> bool:
+    """Whether the schema names the document itself, rather than a definition it carries."""
+    if isinstance(schema, dict):
+        return schema.get("$ref") == "#" or any(_names_document(value) for value in schema.values())
+    return isinstance(schema, list) and any(_names_document(item) for item in schema)
 
 
 def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
