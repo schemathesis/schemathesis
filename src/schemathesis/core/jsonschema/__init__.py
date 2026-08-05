@@ -210,6 +210,11 @@ def make_validator_for(schema: JsonSchema) -> jsonschema_rs.Validator:
     return make_validator(schema, jsonschema_rs.validator_cls_for(schema))
 
 
+def build_validator_for(schema: JsonSchema) -> jsonschema_rs.Validator:
+    """Like `make_validator_for`, but for callers already memoized on a cheaper key."""
+    return _build_validator(schema, jsonschema_rs.validator_cls_for(schema))
+
+
 def schema_with_bundle(schema: JsonSchema, root_schema: JsonSchema) -> JsonSchema:
     """Splice `x-bundled` from `root_schema` into `schema` so nested `$ref`s resolve at the per-schema root."""
     if not isinstance(schema, dict) or not isinstance(root_schema, dict):
