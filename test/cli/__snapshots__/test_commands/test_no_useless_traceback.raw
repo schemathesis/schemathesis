@@ -21,9 +21,9 @@ Schemathesis dev
 
      ❌ 1 failed
 
- ⏭   Coverage (in 0.00s)
+ ❌  Coverage (in 0.00s)
 
-     ⏭  1 skipped
+     ❌ 1 failed
 
  ❌  Fuzzing (in 0.00s)
 
@@ -70,7 +70,7 @@ API Operations:
 
 Test Phases:
   ❌ Examples
-  ⏭  Coverage
+  ❌ Coverage
   ❌ Fuzzing
   ⏭  Stateful (not applicable)
 

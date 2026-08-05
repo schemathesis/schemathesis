@@ -162,6 +162,7 @@ class EngineErrorInfo:
         return self._kind not in (
             RuntimeErrorKind.CONFIG_ERROR,
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
+            RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE,
             RuntimeErrorKind.SCHEMA_INVALID_UNRESOLVABLE_REFERENCE,
             RuntimeErrorKind.SCHEMA_INVALID_INFINITE_RECURSION,

@@ -41,14 +41,14 @@ def compile_ecma_pattern(pattern: str) -> re.Pattern[str] | None:
 def regex_pattern_error(message: str) -> InvalidRegexPattern:
     """What a regex warning amounts to: a pattern no value can be drawn from, or an invalid one."""
     parsed = parse_regex_warning(message)
-    if parsed is not None:
-        pattern, _ = parsed
-        try:
-            jsonschema_rs.Draft202012Validator({"pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS)
-            return UnsupportedRegexPattern.from_pattern(pattern)
-        except jsonschema_rs.ValidationError:
-            pass
-    return InvalidRegexPattern.from_hypothesis_jsonschema_message(message)
+    if parsed is None:
+        return InvalidRegexPattern(message)
+    pattern, reason = parsed
+    try:
+        make_validator({"pattern": pattern}, jsonschema_rs.Draft202012Validator)
+    except jsonschema_rs.ValidationError:
+        return InvalidRegexPattern.from_pattern_and_reason(pattern, reason)
+    return UnsupportedRegexPattern.from_pattern(pattern)
 
 
 def _is_valid_uuid(value: object) -> bool:

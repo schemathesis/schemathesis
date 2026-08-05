@@ -12,6 +12,8 @@
 - Report a `pattern` the validator cannot compile as an invalid regular expression.
 - Generate values for patterns using Unicode property escapes like `\p{L}`.
 - Keep a `pattern` the API enforces instead of dropping it when Python cannot read it.
+- Generate values for the other `anyOf` branches when one names an ungeneratable `pattern`.
+- Internal warning text shown for unreadable `patternProperties` regexes and patterns containing a quote.
 - Values violating a `pattern` with possessive quantifiers like `0++0` when a length bound is set.
 - Coverage phase recursing without end on a reference cycle through a `oneOf` / `anyOf` branch.
 - Spurious tracebacks printed on exit after interrupting the coverage phase.

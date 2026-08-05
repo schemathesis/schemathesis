@@ -140,7 +140,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         # so this is a net, not the filter doing the work.
         return from_schema(view.body, ctx).filter(_TYPE_CHECKS[view.type_name])
     if isinstance(view, canonical.AnyOfView):
-        return st.one_of([from_schema(branch, ctx) for branch in view.branches])
+        return _any_of(view, ctx)
     if isinstance(view, canonical.IntegerView):
         return _integer(view)
     if isinstance(view, canonical.NumberView):
@@ -160,6 +160,20 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canonical.OneOfView):
         return _one_of(view, ctx)
     raise UnsupportedView(schema.kind)
+
+
+def _any_of(view: jsonschema_rs.canonical.AnyOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+    """Values any of the branches admits."""
+    strategies = []
+    for branch in view.branches:
+        try:
+            strategies.append(from_schema(branch, ctx))
+        except UnsupportedView:
+            # A branch nothing can be drawn from is one alternative short, not a schema to give up on.
+            pass
+    if not strategies:
+        raise UnsupportedView("any_of")
+    return st.one_of(strategies)
 
 
 def _target(schema: jsonschema_rs.CanonicalSchema, uri: str, ctx: StrategyContext) -> jsonschema_rs.CanonicalSchema:

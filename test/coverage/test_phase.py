@@ -2111,13 +2111,15 @@ def test_generate_empty_headers_too(ctx):
             {
                 "type": "array",
                 "items": {
-                    # The API enforces this one, so elements cannot be drawn and no length
-                    # violation is reachable - only the whole-body ones below.
+                    # No type, so the pattern binds strings only - every other type is a valid element.
                     "pattern": "[\\p{Greek}]+",
                 },
                 "maxItems": 50,
             },
             [
+                {
+                    "body": [None] * 51,
+                },
                 {
                     "body": {},
                 },
