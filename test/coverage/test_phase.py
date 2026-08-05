@@ -5086,6 +5086,21 @@ def test_negative_format_around_a_conditional_the_engine_cannot_follow(ctx_facto
     assert CoverageScenario.INVALID_FORMAT in scenarios, scenarios
 
 
+@pytest.mark.parametrize("hint", ["example", "default"], ids=["example", "default"])
+def test_property_hint_pinned_under_draft4(ctx_factory, hint):
+    # Draft 4 has no `const`, so pinning a hint with one leaves the property free to draw anything.
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"default": {"type": "boolean", hint: True}, "other": {"type": "string"}},
+    }
+    ctx = ctx_factory(location=ParameterLocation.BODY, validator_cls=jsonschema_rs.Draft4Validator)
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema_iter(ctx, schema, HashSet()):
+        if value.generation_mode == GenerationMode.POSITIVE:
+            assert validator.is_valid(value.value), value.value
+
+
 def test_all_of_keeps_the_tightest_upper_bound(pctx):
     schema = {"allOf": [{"type": "string", "maxLength": 5}, {"maxLength": 3}]}
     values = [value.value for value in cover_schema_iter(pctx, schema, HashSet())]
@@ -5137,6 +5152,101 @@ def test_negative_format_without_a_buildable_base(ctx_factory, extra):
     ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], validator_cls=jsonschema_rs.Draft202012Validator)
     scenarios = {value.scenario for value in cover_schema_iter(ctx, schema, HashSet())}
     assert CoverageScenario.INVALID_FORMAT not in scenarios, scenarios
+
+
+def test_all_of_branch_judging_outer_properties_as_additional(ctx):
+    # The branch sees the outer schema's own properties as additional, so folding the two property
+    # sets together would admit values the branch rejects.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Outer"}}},
+                    },
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Base": {
+                    "type": "object",
+                    "additionalProperties": {"type": "object"},
+                    "properties": {"a": {"type": "string"}},
+                },
+                "Outer": {
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                    "type": "object",
+                    "properties": {"b": {"type": "boolean"}},
+                },
+            }
+        },
+    )
+    operation = schema["/x"]["POST"]
+    validator = _body_validator(operation)
+    for case in _iter_cases(operation, GenerationMode.POSITIVE):
+        assert validator.is_valid(case.body), case.body
+
+
+@pytest.mark.parametrize(
+    "branches",
+    [
+        [{"$ref": "#/components/schemas/Node"}],
+        [{"$ref": "#/components/schemas/Node"}, {"type": "object"}],
+    ],
+    ids=["sole-branch", "beside-a-sibling"],
+)
+def test_reference_cycle_through_an_all_of_branch(ctx, branches):
+    # Branches are resolved before the value is built, so the pointer never reaches the cycle counter.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
+                    },
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        },
+        components={"schemas": {"Node": {"type": "object", "properties": {"child": {"allOf": branches}}}}},
+    )
+    assert _iter_cases(schema["/x"]["POST"], GenerationMode.NEGATIVE)
+
+
+@pytest.mark.parametrize("combinator", ["oneOf", "anyOf"], ids=["one-of", "any-of"])
+def test_reference_cycle_through_a_combinator_branch(ctx, combinator):
+    # A branch resolved before the walk carries no `$ref` for the cycle guard to count.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Block"}}},
+                    },
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Block": {
+                    "type": "object",
+                    "properties": {
+                        "calls": {
+                            "type": "array",
+                            "items": {combinator: [{"$ref": "#/components/schemas/Block"}]},
+                        }
+                    },
+                }
+            }
+        },
+    )
+    assert _iter_cases(schema["/x"]["POST"], GenerationMode.POSITIVE)
 
 
 @pytest.mark.parametrize(

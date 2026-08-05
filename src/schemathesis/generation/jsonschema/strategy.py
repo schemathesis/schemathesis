@@ -1157,11 +1157,21 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
 _BARE_CHARACTER_CLASS = re.compile(r"\[\^?(?:[^\\\]]|\\.)+\]")
 
 
+# Characters spanning the categories a class is usually written against. A flip naming none of them
+# is empty or too exotic to drive a draw, and the filter on the node still has the last word.
+_CLASS_PROBE = "a0 _\n#\xe9中"
+
+
 def _outside_class(pattern: str) -> str | None:
     """A class naming what a bare character class does not, or `None` when the pattern is not one."""
     if _BARE_CHARACTER_CLASS.fullmatch(pattern) is None:
         return None
-    return f"[{pattern[2:]}" if pattern.startswith("[^") else f"[^{pattern[1:]}"
+    flipped = f"[{pattern[2:]}" if pattern.startswith("[^") else f"[^{pattern[1:]}"
+    try:
+        compiled = re.compile(flipped)
+    except re.error:
+        return None
+    return flipped if any(compiled.fullmatch(character) for character in _CLASS_PROBE) else None
 
 
 def _characters_outside(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[str]:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 import string
-from contextlib import contextmanager, nullcontext, suppress
+from contextlib import ExitStack, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache, partial
@@ -734,13 +734,21 @@ class CoverageContext:
         if keys == ["allOf"]:
             # Resolve refs into a fresh list so the caller's schema is not mutated; the
             # validator cache relies on schemas remaining structurally stable after first use.
+            references = [item["$ref"] for item in schema["allOf"] if isinstance(item, dict) and "$ref" in item]
+            if any(self.is_exhausted(reference, counters=self.generating) for reference in references):
+                raise Unsatisfiable
             resolved_all_of = [
                 self.resolve_ref(item["$ref"]) if isinstance(item, dict) and "$ref" in item else item
                 for item in schema["allOf"]
             ]
             merged = _merge_all_of({**schema, "allOf": resolved_all_of})
             if merged is not None:
-                return self.generate_from_schema(merged)
+                # Resolving above leaves no pointer to count, so the branches stay counted while the
+                # value they lead to is built - a branch pointing back here would never bottom out.
+                with ExitStack() as stack:
+                    for reference in references:
+                        stack.enter_context(self.expand(reference, counters=self.generating))
+                    return self.generate_from_schema(merged)
             schema = {**schema, "allOf": resolved_all_of}
 
         if isinstance(schema, dict) and "examples" in schema:
@@ -982,6 +990,13 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     if merged.get("type") == [] or merged.get("enum") == []:
         # The branches leave no type or no value in common, so nothing satisfies all of them.
         return {"not": {}}
+    merged_names = set(merged.get("properties", {}))
+    for branch in folded_branches:
+        extra = branch.get("additionalProperties")
+        # A branch judging every name it does not declare still judges the names its siblings
+        # declare; folding the property sets together would let those escape it.
+        if isinstance(extra, dict) and extra and merged_names - set(branch.get("properties", {})):
+            return None
     _restrict_closed_properties(merged, folded_branches)
     # Keyword order drives the order coverage walks constraints in; keep it independent of
     # which branch each one came from.
@@ -1278,6 +1293,11 @@ def _cover_positive_for_type(
                     and _has_array_sibling(sub_schemas)
                 )
                 for idx, sub_schema in enumerate(sub_schemas):
+                    # Resolving the branch here leaves no pointer for the walk to count, so a branch
+                    # leading back into the value being covered has to be counted before it is opened.
+                    reference = sub_schema.get("$ref") if isinstance(sub_schema, dict) else None
+                    if reference is not None and ctx.is_exhausted(reference):
+                        continue
                     effective = _resolve_sub_schema(ctx, sub_schema)
                     if (
                         disambiguate_string_branch
@@ -1325,20 +1345,21 @@ def _cover_positive_for_type(
                         # See GH-3520
                         # Additive constraint — merge parent context so sub-schema knows field definitions
                         gen = cover_schema_iter(ctx, _merge_with_parent_context(schema, effective))
-                    if one_of_validators is not None:
-                        # Only yield values valid for exactly this one branch
-                        for v in gen:
-                            if not is_valid_for_others(v.value, idx, one_of_validators):
+                    with ctx.expand(reference) if reference is not None else nullcontext():
+                        if one_of_validators is not None:
+                            # Only yield values valid for exactly this one branch
+                            for v in gen:
+                                if not is_valid_for_others(v.value, idx, one_of_validators):
+                                    if parent_validator is None or (
+                                        not contains_binary(v.value) and parent_validator.is_valid(v.value)
+                                    ):
+                                        yield v
+                        else:
+                            for v in gen:
                                 if parent_validator is None or (
                                     not contains_binary(v.value) and parent_validator.is_valid(v.value)
                                 ):
                                     yield v
-                    else:
-                        for v in gen:
-                            if parent_validator is None or (
-                                not contains_binary(v.value) and parent_validator.is_valid(v.value)
-                            ):
-                                yield v
         all_of = schema.get("allOf")
         # Set when the merged form is used for allOf: the canonical schema covers the full merged
         # constraints, so the outer schema's type/properties generation must be skipped to avoid
@@ -1589,7 +1610,9 @@ def cover_schema_iter(
                 inferred_types = sorted({to_json_type_name(v) for v in schema["enum"]})
             elif "const" in schema:
                 inferred_types = [to_json_type_name(schema["const"])]
-        for key, value in schema.items():
+        # Snapshot: walking a keyword can push examples down into a schema shared with this one,
+        # and a key landing here mid-walk is not one this pass was meant to cover anyway.
+        for key, value in list(schema.items()):
             with _ignore_unfixable(), ctx.at(key):
                 if _negation_ignored_by_dialect(ctx, key):
                     continue
@@ -2091,14 +2114,16 @@ def _make_branch_validators(schemas: list[JsonSchema], ctx: CoverageContext) -> 
 
 def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
     if isinstance(schema, dict):
+        # A single-valued `enum` pins the same value as `const` and, unlike it, is a keyword in
+        # every draft - Draft 4 drops `const`, leaving the property free to draw anything.
         if "example" in schema:
             example = schema["example"]
             if _is_valid_with_formats(example, schema, ctx):
-                return {"const": example}
+                return {"enum": [example]}
         if "default" in schema:
             default = schema["default"]
             if _is_valid_with_formats(default, schema, ctx):
-                return {"const": default}
+                return {"enum": [default]}
         if schema.get("examples"):
             valid = [ex for ex in schema["examples"] if _is_valid_with_formats(ex, schema, ctx)]
             if valid:
