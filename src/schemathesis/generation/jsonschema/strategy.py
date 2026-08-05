@@ -651,8 +651,8 @@ def _covers(demand: jsonschema_rs.CanonicalSchema, items: jsonschema_rs.Canonica
     """Whether the demand admits every value the element schema does."""
     if items is None:
         return isinstance(demand.view(), canonical.TrueView)
-    narrowed = _narrowed(items, demand)
-    return narrowed is not None and narrowed.to_json_schema() == items.to_json_schema()
+    # Undecided reads as "not covered", the same conservative answer the layouts already expect.
+    return items.is_subset_of(demand) is True
 
 
 @lru_cache(maxsize=512)
