@@ -48,7 +48,7 @@ import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 
-from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
+from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_STRING_LENGTH, NOT_SET
 from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
@@ -179,9 +179,6 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
 
 
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
-# Upper bound on the size of strings synthesized to violate `maxLength`. Above this,
-# the negative case is skipped to avoid materializing huge payloads (e.g. in NDJSON).
-NEGATIVE_MODE_MAX_LENGTH_CAP = 1024 * 1024
 NEGATIVE_MODE_MAX_ITEMS = 15
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
@@ -1168,7 +1165,7 @@ def _generate_oversized_string(
         except (InvalidArgument, Unsatisfiable):
             # Format constrains the length (e.g. uuid is fixed at 36); synthesize a plain
             # string that violates maxLength regardless.
-            if target_length < NEGATIVE_MODE_MAX_LENGTH_CAP:
+            if target_length < MAX_STRING_LENGTH:
                 return "a" * target_length
             return None
     min_length = max_length = target_length
@@ -1737,7 +1734,7 @@ def cover_schema_iter(
                 elif (
                     key == "maxLength"
                     and isinstance(value, int)
-                    and value < NEGATIVE_MODE_MAX_LENGTH_CAP
+                    and value < MAX_STRING_LENGTH
                     and "string" in get_type(schema)
                 ):
                     try:

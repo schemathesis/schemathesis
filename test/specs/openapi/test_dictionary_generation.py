@@ -637,8 +637,9 @@ def test_body_binding_field_under_combinator(ctx, combinator):
     operation = schema["/items"]["POST"]
     seen: set[str] = set()
 
+    # 20: ten draws leave one of the three values out on some seeds.
     @given(case=operation.as_strategy())
-    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    @settings(max_examples=20, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
     def collect(case):
         seen.add(case.body.get("region") if isinstance(case.body, dict) else None)
 

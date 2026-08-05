@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Run aborting with an internal error on parameters whose name is not a string, such as `true`.
+- Hypothesis warning about an overly large representation when generating unrestricted JSON values.
 - Coverage phase recursing without end on a reference cycle through a `oneOf` / `anyOf` branch.
 - Spurious tracebacks printed on exit after interrupting the coverage phase.
 - Strings longer than a single-character `pattern` like `^[a-z]$` allows when `maxLength` is set.

@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 INTERNAL_BUFFER_SIZE = 32 * 1024
+# Longest string worth building; specs spell "no real limit" as `Integer.MAX_VALUE`.
+MAX_STRING_LENGTH = 1024 * 1024
 DEFAULT_MAX_SCENARIO_STEPS = 6
 INJECTED_PATH_PARAMETER_KEY = "x-schemathesis-injected"
 
