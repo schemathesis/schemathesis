@@ -1285,8 +1285,13 @@ def _cover_positive_for_type(
                 if ctx.location == ParameterLocation.BODY and (
                     "type" in schema or "properties" in schema or "required" in schema
                 ):
+                    # Nested `$ref`s point into the root's bundle; without it the validator
+                    # fails to compile and branch values pass unfiltered.
+                    full_schema: JsonSchema = schema
+                    if BUNDLE_STORAGE_KEY in ctx.root_schema:
+                        full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
                     try:
-                        parent_validator = make_validator_for(schema)
+                        parent_validator = make_validator_for(full_schema)
                     except Exception:
                         pass
                 # For non-body params, an empty bare string serializes to the same wire form as an
