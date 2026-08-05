@@ -533,13 +533,19 @@ def update_pattern_in_schema(schema: dict[str, Any]) -> None:
         # A bound the schema states in the thousands becomes a quantifier the validator's regex
         # engine refuses to compile; the pattern it started from is the one that still works.
         if new_pattern != pattern and is_valid_jsonschema_rs_regex(new_pattern):
-            # Pop a bound only if the rewrite encodes it; rewrites with unbounded slots can't absorb `maxLength`.
-            new_min, new_max = pattern_length_bounds(new_pattern)
-            schema["pattern"] = new_pattern
-            if min_length is not None and new_min >= min_length:
-                schema.pop("minLength", None)
-            if max_length is not None and new_max is not None and new_max <= max_length:
-                schema.pop("maxLength", None)
+            apply_rewritten_pattern(schema, new_pattern, min_length, max_length)
+
+
+def apply_rewritten_pattern(
+    schema: dict[str, Any], new_pattern: str, min_length: int | None, max_length: int | None
+) -> None:
+    """Install a rewritten pattern, keeping every bound it does not encode on its own."""
+    new_min, new_max = pattern_length_bounds(new_pattern)
+    schema["pattern"] = new_pattern
+    if min_length is not None and new_min >= min_length:
+        schema.pop("minLength", None)
+    if max_length is not None and new_max is not None and new_max <= max_length:
+        schema.pop("maxLength", None)
 
 
 def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, Any]], bool]) -> None:

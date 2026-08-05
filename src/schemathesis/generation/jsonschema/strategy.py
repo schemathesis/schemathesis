@@ -841,7 +841,7 @@ def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) 
     if view.property_names is not None:
         # Python `re` and the validator's engine disagree on several constructs — `\d` is Unicode here
         # and ASCII there — so a drawn name is checked before it becomes a key.
-        is_valid = jsonschema_rs.validator_for(view.property_names.to_json_schema()).is_valid
+        is_valid = make_validator_for(view.property_names.to_json_schema()).is_valid
         return from_schema(view.property_names, ctx).map(_key).filter(is_valid)
     # Arbitrary text practically never matches a `patternProperties` regex, so the patterns name keys too.
     sources = [_text(ctx)]
@@ -861,7 +861,7 @@ def _value_source(
     # can still fall back.
     patterns = [
         _PatternProperty(
-            claims=jsonschema_rs.validator_for({"type": "string", "pattern": pattern}).is_valid,
+            claims=make_validator_for({"type": "string", "pattern": pattern}).is_valid,
             values=from_schema(schema, ctx),
             schema=schema,
         )

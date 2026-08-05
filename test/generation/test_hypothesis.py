@@ -2179,6 +2179,11 @@ CANONICAL_CASES = [
         {"type": "number", "minimum": 0, "maximum": 5, "not": {"type": "integer"}},
         (lambda value: 0 < value < 1, lambda value: value > 4),
     ),
+    # A quantifier only the project-wide regex options admit; the key grammar has to survive it.
+    (
+        {"type": "object", "patternProperties": {r"\w{1,100000}": {"type": "string"}}},
+        (lambda value: len(value) > 0,),
+    ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
@@ -2190,7 +2195,9 @@ CANONICAL_CASE_IDS = [str(schema) for schema, _ in CANONICAL_CASES]
 def test_canonical_generation(schema, reaches):
     built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     assert built is not None
-    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+    is_valid = jsonschema_rs.Draft202012Validator(
+        schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
+    ).is_valid
 
     # A format generator cannot be steered by a pattern or a length, so those draws are discarded.
     @given(built)

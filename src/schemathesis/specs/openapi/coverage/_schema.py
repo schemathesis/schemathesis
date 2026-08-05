@@ -64,6 +64,7 @@ from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, s
 from schemathesis.generation.jsonschema import build
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
+from schemathesis.specs.openapi.converter import apply_rewritten_pattern
 from schemathesis.specs.openapi.patterns import (
     pattern_length_bounds,
     pattern_requires_char_outside,
@@ -810,9 +811,7 @@ def _update_schema_pattern(
     if min_length or max_length:
         new_pattern = update_pattern(pattern, min_length, max_length)
         if new_pattern != pattern:
-            schema.pop("minLength", None)
-            schema.pop("maxLength", None)
-            schema["pattern"] = new_pattern
+            apply_rewritten_pattern(schema, new_pattern, min_length, max_length)
 
 
 def _apply_pattern_optimizations(
