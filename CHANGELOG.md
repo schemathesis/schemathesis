@@ -29,6 +29,7 @@
 - Intermittent "Path parameter is not defined" on specs split across many external files. [#4414](https://github.com/schemathesis/schemathesis/issues/4414)
 - Runtime error in the coverage phase on a reference cycle through `allOf`.
 - Coverage phase generating `null` for nullable schemas an `allOf` sibling restricts to objects.
+- False positive `positive_data_acceptance` for `not` clauses in schemas using references.
 
 ### :racing_car: Performance
 
