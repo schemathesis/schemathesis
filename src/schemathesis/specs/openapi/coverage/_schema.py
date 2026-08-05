@@ -1378,18 +1378,22 @@ def _cover_positive_for_type(
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
                 folded = False
+                inlined = schema
                 with suppress(jsonschema_rs.ValidationError):
-                    _inline_allof_refs(schema, ctx)
-                    merged = _merge_all_of(schema)
+                    inlined, inlined_refs = _inline_allof_refs(schema, ctx)
+                    merged = _merge_all_of(inlined)
                     if merged is not None:
-                        yield from cover_schema_iter(ctx, merged)
+                        with ExitStack() as stack:
+                            for reference in inlined_refs:
+                                stack.enter_context(ctx.expand(reference))
+                            yield from cover_schema_iter(ctx, merged)
                         folded = True
                 if not folded:
                     # Members with no single flat spelling (two `pattern`s, two `format`s) leave the
                     # walker nothing to cover; emit one conforming value instead of dropping the schema.
                     with suppress(Unsatisfiable):
                         yield PositiveValue(
-                            ctx.generate_from_schema(schema),
+                            ctx.generate_from_schema(inlined),
                             scenario=CoverageScenario.DEFAULT_POSITIVE_TEST,
                             description="Valid value",
                         )
@@ -1453,22 +1457,38 @@ def _cover_positive_for_type(
                 yield flipped
 
 
-def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] = frozenset()) -> None:
-    # canonicalish merges two $ref-only siblings by keeping the first and dropping the second,
-    # losing required fields from the dropped ref.  Resolving refs first gives it concrete schemas.
+def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] = frozenset()) -> tuple[dict, set[str]]:
+    # Resolve refs before merging so required fields from $ref-only siblings survive. Never writes to the input
+    # (it shares sub-schemas with the root document); the caller counts the returned inlined refs as expansions.
     all_of = schema.get("allOf")
     if not all_of:
-        return
-    for idx, sub_schema in enumerate(all_of):
+        return schema, set()
+    new_all_of = []
+    inlined_refs: set[str] = set()
+    changed = False
+    for sub_schema in all_of:
         if isinstance(sub_schema, dict) and "$ref" in sub_schema:
             ref = sub_schema["$ref"]
-            if ref not in seen:
+            if ref not in seen and not ctx.is_exhausted(ref):
                 resolved = deepclone(ctx.resolve_ref(ref))
-                all_of[idx] = resolved
+                inlined_refs.add(ref)
                 if isinstance(resolved, dict):
-                    _inline_allof_refs(resolved, ctx, seen | {ref})
+                    resolved, nested = _inline_allof_refs(resolved, ctx, seen | {ref})
+                    inlined_refs |= nested
+                new_all_of.append(resolved)
+                changed = True
+            else:
+                new_all_of.append(sub_schema)
         elif isinstance(sub_schema, dict):
-            _inline_allof_refs(sub_schema, ctx, seen)
+            inlined, nested = _inline_allof_refs(sub_schema, ctx, seen)
+            changed = changed or inlined is not sub_schema
+            inlined_refs |= nested
+            new_all_of.append(inlined)
+        else:
+            new_all_of.append(sub_schema)
+    if not changed:
+        return schema, inlined_refs
+    return {**schema, "allOf": new_all_of}, inlined_refs
 
 
 @contextmanager

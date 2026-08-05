@@ -24,6 +24,7 @@ from schemathesis.core.failures import AcceptedNegativeData
 from schemathesis.core.jsonschema import make_validator_for
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
+from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.drivers import CoverageGenerator
 from schemathesis.generation.feedback import FeedbackSources
@@ -4993,6 +4994,40 @@ def test_multi_type_union_yields_numeric_branch(types, expected_kind):
     )
     values = [v.value for v in cover_schema_iter(ctx, {"type": types})]
     assert any(isinstance(v, expected_kind) and not isinstance(v, bool) for v in values), values
+
+
+def test_cover_schema_iter_does_not_mutate_root_schema():
+    # A self-recursive `allOf` $ref used to grow the shared root document until cloning hit its recursion limit.
+    root_schema = {
+        "components": {
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "properties": {
+                        "child": {
+                            "allOf": [
+                                {"$ref": "#/components/schemas/Node"},
+                                {"description": "child node"},
+                            ]
+                        }
+                    },
+                }
+            }
+        }
+    }
+    snapshot = deepclone(root_schema)
+    ctx = CoverageContext(
+        root_schema=root_schema,
+        location=ParameterLocation.QUERY,
+        media_type=None,
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats={},
+        validator_cls=jsonschema_rs.validator_for({}).__class__,
+    )
+    for _ in cover_schema_iter(ctx, {"$ref": "#/components/schemas/Node"}):
+        pass
+    assert root_schema == snapshot
 
 
 @pytest.mark.parametrize(
