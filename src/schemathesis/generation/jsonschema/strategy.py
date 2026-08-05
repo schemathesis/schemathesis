@@ -25,6 +25,7 @@ from schemathesis.core.jsonschema import (
     make_validator,
     make_validator_for,
 )
+from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
 
@@ -912,7 +913,7 @@ def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) 
     for pattern in view.pattern_properties:
         compiled = _compiled_pattern(pattern)
         if compiled is not None:
-            sources.append(st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy()))
+            sources.append(_from_pattern(compiled, ctx))
     return st.one_of(sources)
 
 
@@ -1246,7 +1247,13 @@ def _characters_outside(view: jsonschema_rs.canonical.StringView, ctx: StrategyC
         admitted = _outside_class(pattern)
         if admitted is not None:
             # One class can drive the alphabet; anything else the barred run names still filters above.
-            return st.from_regex(admitted, fullmatch=True, alphabet=characters)
+            narrowed = st.from_regex(admitted, fullmatch=True, alphabet=characters)
+            try:
+                narrowed.validate()
+            except InvalidArgument:
+                # Nothing this class admits is in the alphabet; the filter above still has the say.
+                continue
+            return narrowed
     return characters
 
 
@@ -1308,9 +1315,11 @@ def _padded_text(
     ceiling = min_length + _PADDED_TEXT_SLACK
     if max_length is not None:
         ceiling = min(ceiling, max_length)
-    return st.tuples(
+    strategy = st.tuples(
         st.integers(min_length, ceiling), _text(ctx, characters=characters, max_size=_PADDED_TEXT_HEAD), characters
     ).map(lambda parts: (parts[1] + parts[2] * parts[0])[: parts[0]])
+    # An empty head leaves the padding character opening the value.
+    return _leading_whitespace_check(strategy, ctx.alphabet)
 
 
 def _content_string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
@@ -1345,23 +1354,38 @@ def _content_check(ctx: StrategyContext, keyword: str, value: str) -> Callable[[
     return make_validator({"type": "string", keyword: value}, validator_cls).is_valid
 
 
+def _from_pattern(compiled: re.Pattern[str], ctx: StrategyContext) -> SearchStrategy[str]:
+    """Values a pattern matches, drawn from as much of the alphabet as the pattern leaves."""
+    characters = ctx.alphabet.as_strategy()
+    # A pattern is a search, so the value may carry anything around the match; full matches only
+    # would leave `^x` spelling a single string, starving `propertyNames` of distinct keys.
+    strategy = st.from_regex(compiled, alphabet=characters)
+    try:
+        strategy.validate()
+        return strategy
+    except InvalidArgument:
+        pass
+    # ASCII is the validator's reading, but it leaves characters spelled above that range
+    # unreachable; the wider reading of the same source draws those, the narrow one still decides.
+    wider = re.compile(compiled.pattern)
+    strategy = st.from_regex(wider, alphabet=characters)
+    try:
+        strategy.validate()
+        return strategy.filter(compiled.search)
+    except InvalidArgument:
+        pass
+    # The alphabet bars every character a class in the pattern names. The schema outranks the
+    # alphabet, so the value is drawn without it, and whoever cannot carry it says so downstream.
+    return st.from_regex(wider).filter(compiled.search)
+
+
 def _pattern_driven(
     pattern: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """Values drawn from one pattern and filtered by the remaining ones."""
     compiled = _compiled_pattern(pattern)
     assert compiled is not None
-    # A pattern is a search, so the value may carry anything around the match; full matches only
-    # would leave `^x` spelling a single string, starving `propertyNames` of distinct keys.
-    strategy = st.from_regex(compiled, alphabet=ctx.alphabet.as_strategy())
-    try:
-        strategy.validate()
-    except InvalidArgument:
-        # ASCII is the validator's reading, but it leaves characters spelled above that range
-        # unreachable; the wider reading of the same source draws those, the narrow one still decides.
-        strategy = st.from_regex(re.compile(compiled.pattern), alphabet=ctx.alphabet.as_strategy()).filter(
-            compiled.search
-        )
+    strategy = _from_pattern(compiled, ctx)
     if compiled.pattern != pattern:
         # Property escapes were spelled out to drive the draw, and that reading is only an
         # approximation of the validator's - so it decides what the draw is worth.
@@ -1407,14 +1431,14 @@ def _within_length(
 
 
 def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    return _anything_for(ctx.alphabet.allow_x00, ctx.alphabet.codec)
+    return _anything_for(ctx.alphabet)
 
 
 @lru_cache
-def _anything_for(allow_x00: bool, codec: str | None) -> SearchStrategy[JsonValue]:
+def _anything_for(alphabet: Alphabet) -> SearchStrategy[JsonValue]:
     # Arbitrary JSON value; containers bounded to keep draws cheap. Assembling the recursive strategy
     # costs far more than every other lifter combined, and it depends only on the alphabet.
-    text = st.text(alphabet=Alphabet(allow_x00=allow_x00, codec=codec).as_strategy())
+    text = _leading_whitespace_check(st.text(alphabet=alphabet.as_strategy()), alphabet)
     return st.recursive(
         st.none()
         | st.booleans()
@@ -1427,7 +1451,15 @@ def _anything_for(allow_x00: bool, codec: str | None) -> SearchStrategy[JsonValu
 
 
 def _text(ctx: StrategyContext, *, characters: SearchStrategy[str] | None = None, **kwargs: int) -> SearchStrategy[str]:
-    return st.text(alphabet=characters if characters is not None else ctx.alphabet.as_strategy(), **kwargs)
+    strategy = st.text(alphabet=characters if characters is not None else ctx.alphabet.as_strategy(), **kwargs)
+    return _leading_whitespace_check(strategy, ctx.alphabet)
+
+
+def _leading_whitespace_check(strategy: SearchStrategy[str], alphabet: Alphabet) -> SearchStrategy[str]:
+    """Reject an opening whitespace character, close to the draw that produced it."""
+    if alphabet.allow_leading_whitespace:
+        return strategy
+    return strategy.filter(lambda value: not has_leading_whitespace(value))
 
 
 # What each JSON type name admits. `True == 1` in Python, but `true` is not a JSON number, and a

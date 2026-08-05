@@ -24,6 +24,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.jsonschema import strategy
+from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
@@ -3401,7 +3402,7 @@ def test_typed_group_checks(type_name, admitted, rejected):
 def test_arbitrary_json_repr_stays_cheap():
     # Hypothesis renders the strategy it draws from on its error paths, and nesting an
     # unrestricted JSON value doubles that text at every level.
-    assert len(repr(strategy._anything_for(True, "utf-8").strategy)) < 30_000
+    assert len(repr(strategy._anything_for(Alphabet()).strategy)) < 30_000
 
 
 def test_canonical_typed_group_keeps_the_type():
@@ -3735,6 +3736,21 @@ def test_canonical_object_keeps_declared_names_outside_the_alphabet():
     @settings(max_examples=10, deadline=None)
     def test(value):
         assert "é" in value, value
+
+    test()
+
+
+def test_canonical_pattern_outside_the_alphabet():
+    # A pattern naming characters the alphabet bars still has to draw; the schema outranks the alphabet.
+    schema = {"type": "string", "pattern": "^[Ѐ-ӿ]+$"}
+    built = _canonical_strategy_or_none(schema, GenerationConfig(codec="ascii"), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=10, deadline=None)
+    def test(value):
+        assert is_valid(value), value
 
     test()
 

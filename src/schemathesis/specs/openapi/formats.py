@@ -10,6 +10,7 @@ from base64 import b64encode
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -109,8 +110,9 @@ def header_values(
         alphabet=st.characters(
             min_codepoint=0, max_codepoint=MAX_HEADER_CODEPOINT, codec=codec, exclude_characters=exclude_characters
         )
-        # Header values with leading non-visible chars can't be sent with `requests`
-    ).map(str.lstrip)
+        # `requests` refuses a value opening with whitespace. Rejecting it keeps the drawn length,
+        # where trimming it afterwards silently returned a shorter value than the one asked for.
+    ).filter(lambda value: not has_leading_whitespace(value))
 
 
 HEADER_FORMAT = "_header_value"

@@ -5,9 +5,9 @@ from pathlib import Path
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, Phase, assume, given, settings
+from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
-from hypothesis.errors import FailedHealthCheck, Unsatisfiable
+from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
 from jsonschema_rs import Draft4Validator
 
 import schemathesis
@@ -265,6 +265,91 @@ def test_configure_headers():
         assert set(headers["X-Foo"]) - {"A", "B", "C"} == set()
 
     test()
+
+
+CONSTRAINED_HEADER_SCHEMAS = [
+    {"type": "string", "minLength": 5},
+    {"type": "string", "minLength": 20, "maxLength": 30},
+    {"type": "string", "maxLength": 10},
+    {"type": "string", "description": "annotated, but still a plain header"},
+    {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    {"type": "object", "additionalProperties": {"type": "string"}, "minProperties": 1},
+]
+
+
+def _strings_in(value):
+    # Arrays and objects reach the wire joined into one header value, so every string inside
+    # one of them has to be carryable on its own.
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, list):
+        for item in value:
+            yield from _strings_in(item)
+    elif isinstance(value, dict):
+        for name, item in value.items():
+            yield name
+            yield from _strings_in(item)
+
+
+@pytest.mark.parametrize("subschema", CONSTRAINED_HEADER_SCHEMAS, ids=str)
+def test_constrained_headers_are_valid(subschema):
+    strategy = make_positive_strategy(
+        {
+            "type": "object",
+            "properties": {"X-Foo": subschema},
+            "required": ["X-Foo"],
+            "additionalProperties": False,
+        },
+        "GET /users/",
+        ParameterLocation.HEADER,
+        None,
+        GenerationConfig(),
+        Draft4Validator,
+    )
+
+    @given(strategy)
+    @settings(max_examples=25, deadline=None)
+    def test(headers):
+        for value in _strings_in(headers["X-Foo"]):
+            assert is_valid_header({"X-Foo": value}), repr(value)
+
+    test()
+
+
+def test_header_length_floor_is_reachable():
+    # Header values used to come from a generator that trimmed leading whitespace after the draw,
+    # so a length floor starved on the values it shortened.
+    strategy = make_positive_strategy(
+        {
+            "type": "object",
+            "properties": {"X-Foo": {"type": "string", "format": formats.HEADER_FORMAT, "minLength": 40}},
+            "required": ["X-Foo"],
+            "additionalProperties": False,
+        },
+        "GET /users/",
+        ParameterLocation.HEADER,
+        None,
+        GenerationConfig(),
+        Draft4Validator,
+    )
+
+    @given(strategy)
+    @settings(max_examples=25, deadline=None)
+    def test(headers):
+        assert len(headers["X-Foo"]) >= 40, headers
+        assert is_valid_header(headers), headers
+
+    test()
+
+
+def test_header_values_never_start_with_whitespace():
+    # `requests` refuses to send a value whose first character is whitespace.
+    with pytest.raises(NoSuchExample):
+        find(
+            formats.header_values(exclude_characters=formats.INVALID_HEADER_CHARS),
+            lambda value: value[:1].strip() != value[:1],
+            settings=settings(max_examples=1000, database=None),
+        )
 
 
 @pytest.mark.hypothesis_nested

@@ -9,25 +9,33 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Alphabet:
     """Character-set control for generated strings and property names."""
 
     allow_x00: bool = True
     codec: str | None = "utf-8"
+    max_codepoint: int | None = None
+    exclude_characters: str = ""
+    # Whether a drawn string may open with whitespace. Header values cannot, and that is a property
+    # of the value rather than of its characters, so it rides along here as a filter on each leaf.
+    allow_leading_whitespace: bool = True
 
     def as_strategy(self) -> SearchStrategy[str]:
-        return _characters(self.allow_x00, self.codec)
+        return _characters(self.allow_x00, self.codec, self.max_codepoint, self.exclude_characters)
 
 
 @lru_cache
-def _characters(allow_x00: bool, codec: str | None) -> SearchStrategy[str]:
+def _characters(
+    allow_x00: bool, codec: str | None, max_codepoint: int | None, exclude_characters: str
+) -> SearchStrategy[str]:
     from hypothesis import strategies as st
 
-    exclude_characters = "" if allow_x00 else "\x00"
-    if codec is not None:
-        return st.characters(codec=codec, exclude_characters=exclude_characters)
-    return st.characters(exclude_characters=exclude_characters)
+    if not allow_x00 and "\x00" not in exclude_characters:
+        exclude_characters += "\x00"
+    if codec is None:
+        return st.characters(max_codepoint=max_codepoint, exclude_characters=exclude_characters)
+    return st.characters(codec=codec, max_codepoint=max_codepoint, exclude_characters=exclude_characters)
 
 
 @dataclass(slots=True)
