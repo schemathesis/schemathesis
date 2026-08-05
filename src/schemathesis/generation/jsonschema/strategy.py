@@ -16,6 +16,7 @@ from hypothesis.errors import InvalidArgument
 from hypothesis.strategies._internal.deferred import DeferredStrategy
 from jsonschema_rs import canonical
 
+from schemathesis.core import MAX_STRING_LENGTH
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
@@ -1186,7 +1187,7 @@ def _characters_outside(view: jsonschema_rs.canonical.StringView, ctx: StrategyC
 
 
 def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
-    if view.min_length is not None and _countable(view.min_length) is None:
+    if view.min_length is not None and view.min_length > MAX_STRING_LENGTH:
         # No string can be that long.
         return st.nothing()
     if view.content_media_types or view.content_encodings:
@@ -1350,6 +1351,7 @@ def _anything_for(allow_x00: bool, codec: str | None) -> SearchStrategy[JsonValu
         | st.floats(allow_nan=False, allow_infinity=False).map(lambda x: x or 0.0)
         | text,
         lambda children: st.lists(children, max_size=3) | st.dictionaries(text, children, max_size=3),
+        max_leaves=5,
     )
 
 

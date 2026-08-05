@@ -2386,6 +2386,15 @@ def test_uncountable_size_floor_admits_no_value(schema):
     assert built.is_empty
 
 
+def test_string_floor_past_what_fits_in_memory_admits_no_value():
+    # A gigabyte floor is countable, and padding one out would exhaust memory mid-draw.
+    built = _canonical_strategy_or_none(
+        {"type": "string", "minLength": 10**12}, GenerationConfig(), jsonschema_rs.Draft202012Validator
+    )
+    assert built is not None
+    assert built.is_empty
+
+
 UNFILLABLE_ELEMENT = {
     "type": "array",
     "items": {"type": "string"},
@@ -3216,6 +3225,12 @@ def test_typed_group_checks(type_name, admitted, rejected):
     check = strategy._TYPE_CHECKS[type_name]
     assert all(check(value) for value in admitted)
     assert not any(check(value) for value in rejected)
+
+
+def test_arbitrary_json_repr_stays_cheap():
+    # Hypothesis renders the strategy it draws from on its error paths, and nesting an
+    # unrestricted JSON value doubles that text at every level.
+    assert len(repr(strategy._anything_for(True, "utf-8").strategy)) < 30_000
 
 
 def test_canonical_typed_group_keeps_the_type():
