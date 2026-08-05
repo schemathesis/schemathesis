@@ -17,6 +17,7 @@ import schemathesis
 from schemathesis.core.errors import InternalError
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import (
+    _UNICODE_PROPERTY_RAW_MAP,
     _serialize,
     is_valid_jsonschema_rs_regex,
     normalize_regex,
@@ -416,10 +417,9 @@ def test_update_pattern_in_schema_keeps_unenforced_bounds(schema, expected):
             r"^([01]\d|2[0-3])(\[[[:alnum:]\/\_]+\])?$",
             r"^([01]\d|2[0-3])(\[[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9\/\_]+\])?$",
         ),
-        # `\P{X}` inside a class has no safe single-class equivalent \u2014 bail out.
-        (r"[\P{Alnum}_]+", None),
-        (r"[\P{L}_]", None),
+        # Only the braced form of a known name carries contents to complement.
         (r"[\PL_]", None),
+        (r"[\P{Greek}_]", None),
         (r"[\p{Greek}_]+", None),
         # Negated POSIX class `[:^X:]` and unknown POSIX names \u2014 bail out.
         (r"[[:^alnum:]_]", None),
@@ -448,6 +448,33 @@ def test_normalize_regex(pattern, expected):
         with warnings.catch_warnings():
             warnings.simplefilter("error", FutureWarning)
             re.compile(expected)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "matching", "rejected"),
+    [
+        (r"[\P{L}_]", "_1 ", "aZ"),
+        (r"[\P{Alnum}_]+", "_-!", "a1"),
+        (r"[\P{M}\p{M}]", "a1́", ""),
+    ],
+)
+def test_negated_property_inside_class(pattern, matching, rejected):
+    compiled = re.compile(normalize_regex(pattern))
+    for char in matching:
+        assert compiled.fullmatch(char), char
+    for char in rejected:
+        assert not compiled.fullmatch(char), char
+
+
+_COMPLEMENT_PROBE = "aZ0_ -!.\t\néÀ́ €中\U0001f600"
+
+
+@pytest.mark.parametrize("name", sorted(_UNICODE_PROPERTY_RAW_MAP))
+def test_negated_property_is_the_exact_complement(name):
+    positive = re.compile(f"[{_UNICODE_PROPERTY_RAW_MAP[name]}]")
+    negated = re.compile(normalize_regex(rf"[\P{{{name}}}]"))
+    for char in _COMPLEMENT_PROBE:
+        assert bool(negated.fullmatch(char)) is not bool(positive.fullmatch(char)), char
 
 
 _PROPERTY_NAMES = ("L", "Lu", "Ll", "N", "Nd", "Alpha", "Digit", "XDigit", "Alnum", "Space", "Punct", "Upper", "ASCII")

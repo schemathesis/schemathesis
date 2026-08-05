@@ -5148,7 +5148,7 @@ def test_malformed_all_of_covers_only_what_parses(pctx, schema, expected):
 def test_negative_format_without_a_buildable_base(ctx_factory, extra):
     # Stripping `format` leaves a pattern with no Python spelling, so no violation can be drawn from
     # it - and widening past the `not` does not bring one back.
-    schema = {"type": "string", "format": "date", "pattern": "\\p{L}", **extra}
+    schema = {"type": "string", "format": "date", "pattern": "\\p{Han}", **extra}
     ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], validator_cls=jsonschema_rs.Draft202012Validator)
     scenarios = {value.scenario for value in cover_schema_iter(ctx, schema, HashSet())}
     assert CoverageScenario.INVALID_FORMAT not in scenarios, scenarios
