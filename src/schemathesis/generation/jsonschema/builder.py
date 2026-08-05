@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING
 import jsonschema_rs
 from hypothesis import strategies as st
 
+from schemathesis.config import OutputConfig
 from schemathesis.core.cache import MISSING
+from schemathesis.core.errors import RejectedSchemaDefinition, is_regex_validation_error
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import canonical_strategy_cache
@@ -66,7 +68,10 @@ def _build(
             # `format`-carrying schema generating arbitrary strings on this path.
             validate_formats=True,
         )
-    except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError):
+    except jsonschema_rs.ValidationError as exc:
+        _report_if_broken(exc)
+        return None
+    except jsonschema_rs.canonical.CanonicalizationError:
         return None
     if canonical_schema.kind == "raw":
         return None
@@ -83,9 +88,21 @@ def _build(
         # A cycle can also leave a schema whose every value would have to be infinitely deep. The
         # strategies form the same cycle, so Hypothesis works that out here.
         empty = strategy.is_empty
-    # Folding an `allOf` canonicalizes again, so this covers both spellings of "not modeled here".
-    except (jsonschema_rs.ValidationError, jsonschema_rs.canonical.CanonicalizationError, UnsupportedView):
+    # Folding an `allOf` canonicalizes again, so a rejected schema and both spellings of
+    # "not modeled here" can arrive from this block too.
+    except jsonschema_rs.ValidationError as exc:
+        _report_if_broken(exc)
+        return None
+    except (jsonschema_rs.canonical.CanonicalizationError, UnsupportedView):
         return None
     # Spelling it out keeps the caller reporting an unsatisfiable schema, where a strategy that
     # only fails on a draw would surface as whatever Hypothesis raises first.
     return EMPTY_STRATEGY if empty else strategy
+
+
+def _report_if_broken(error: jsonschema_rs.ValidationError) -> None:
+    r"""Raise for a schema its own draft rejects - but not for a pattern only the regex engine refuses, like `\Z`."""
+    if not is_regex_validation_error(error):
+        raise RejectedSchemaDefinition.from_jsonschema_error(
+            error, path=None, method=None, config=OutputConfig()
+        ) from None

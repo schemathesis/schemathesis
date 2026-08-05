@@ -14,6 +14,8 @@ from schemathesis.core.errors import (
     InvalidRegexPattern,
     InvalidRegexType,
     InvalidSchema,
+    RejectedSchemaDefinition,
+    SchemaLocation,
     SerializationNotPossible,
     UnresolvableReference,
     is_regex_validation_error,
@@ -95,6 +97,23 @@ def iter_controller_error_events(
         yield non_fatal_error(exc)
 
 
+def prefer_spec_error(exc: Exception, operation: APIOperation) -> Exception:
+    """Prefer the specification's own error - it names the offending object and where it sits in the document."""
+    if not isinstance(exc, RejectedSchemaDefinition):
+        return exc
+    try:
+        operation.schema.validate()
+    except ValidationError as error:
+        return InvalidSchema.from_jsonschema_error(
+            error,
+            path=operation.path,
+            method=operation.method,
+            config=operation.schema.config.output,
+            location=SchemaLocation.maybe_from_error_path(error.instance_path, operation.schema.specification.version),
+        )
+    return exc
+
+
 def translate_iteration_exception(
     exc: Exception,
     *,
@@ -122,7 +141,7 @@ def translate_iteration_exception(
         | UnresolvableReference
         | InvalidHeadersExample,
     ):
-        return non_fatal_error(exc)
+        return non_fatal_error(prefer_spec_error(exc, operation))
     clear_hypothesis_notes(exc)
     if str(exc) == "first argument must be string or compiled pattern":
         return non_fatal_error(

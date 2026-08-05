@@ -38,7 +38,7 @@ from schemathesis.engine.errors import (
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import record_extra_data_from_recorder
-from schemathesis.engine.run.unit._errors import iter_mark_error_events
+from schemathesis.engine.run.unit._errors import iter_mark_error_events, prefer_spec_error
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
@@ -264,7 +264,7 @@ def run_test(
             )
         else:
             code_sample = state.get_code_sample_for(exc)
-            yield non_fatal_error(exc, code_sample=code_sample)
+            yield non_fatal_error(prefer_spec_error(exc, operation), code_sample=code_sample)
 
     if status == Status.SUCCESS and any(
         check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks
