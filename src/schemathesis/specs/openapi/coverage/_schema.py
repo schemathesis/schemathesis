@@ -1448,8 +1448,11 @@ def _cover_positive_for_type(
             # other constraints (type, properties, etc.); validate before yielding.
             nctx = ctx.with_negative()
             outer_validator: jsonschema_rs.Validator | None = None
+            full_schema = schema
+            if BUNDLE_STORAGE_KEY in ctx.root_schema:
+                full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
             try:
-                outer_validator = make_validator_for(schema)
+                outer_validator = make_validator_for(full_schema)
             except Exception:
                 pass
             for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen)):

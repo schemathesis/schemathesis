@@ -5031,6 +5031,29 @@ def test_anyof_null_branch_filtered_when_allof_sibling_requires_object():
     assert None not in values, values
 
 
+def test_not_schema_flipped_values_respect_outer_type_with_bundled_refs():
+    # Flipped `not`-violations must satisfy the outer `type`, also when nested bundled refs
+    # make the outer schema unverifiable without the bundle.
+    root_schema = {"x-bundled": {"name": {"type": "string"}}}
+    ctx = CoverageContext(
+        root_schema=root_schema,
+        location=ParameterLocation.BODY,
+        media_type=("application", "json"),
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats={},
+        validator_cls=jsonschema_rs.Draft4Validator,
+    )
+    schema = {
+        "type": "object",
+        "properties": {"name": {"$ref": "#/x-bundled/name"}},
+        "not": {"type": "string"},
+    }
+    positives = [v.value for v in cover_schema_iter(ctx, schema) if v.generation_mode == GenerationMode.POSITIVE]
+    non_objects = [v for v in positives if not isinstance(v, dict)]
+    assert not non_objects, non_objects
+
+
 def test_cover_schema_iter_does_not_mutate_root_schema():
     # A self-recursive `allOf` $ref used to grow the shared root document until cloning hit its recursion limit.
     root_schema = {
