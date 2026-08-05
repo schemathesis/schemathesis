@@ -21,9 +21,9 @@ Schemathesis dev
 
      ❌ 1 failed
 
- ❌  Coverage (in 0.00s)
+ ⏭   Coverage (in 0.00s)
 
-     ❌ 1 failed
+     ⏭  1 skipped
 
  ❌  Fuzzing (in 0.00s)
 
@@ -55,12 +55,12 @@ Reproduce with:
 
 =================================== WARNINGS ===================================
 
-Unsupported regex patterns: 1 operation contain regex patterns not supported by Python and were removed
+Unsupported regex patterns: 1 operation contain regex patterns no value can be generated for
 
   - POST /success
-    Unsupported regex `^[\p{Han}]+$` was removed
+    No value can be generated for `^[\p{Han}]+$`
 
-💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html
+💡 Supply examples for these operations, or narrow the pattern
 
 =================================== SUMMARY ====================================
 
@@ -70,7 +70,7 @@ API Operations:
 
 Test Phases:
   ❌ Examples
-  ❌ Coverage
+  ⏭  Coverage
   ❌ Fuzzing
   ⏭  Stateful (not applicable)
 
@@ -79,7 +79,7 @@ Failures:
   ❌ Undocumented HTTP status code: 1
 
 Warnings:
-  ⚠️ Unsupported regex: 1 operation had regex patterns removed
+  ⚠️ Unsupported regex: 1 operation had ungeneratable regex patterns
 
 Test cases:
   N generated, N found N unique failures

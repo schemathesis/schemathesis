@@ -996,8 +996,8 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 title="Unsupported regex patterns",
                 warnings=self.warnings.unsupported_regex,
                 entity_name="operation",
-                suffix_text=" contain regex patterns not supported by Python and were removed",
-                tips=["💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html"],
+                suffix_text=" contain regex patterns no value can be generated for",
+                tips=["💡 Supply examples for these operations, or narrow the pattern"],
             )
 
         if self.warnings.constants_extraction:
@@ -1269,7 +1269,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 suffix = "" if count == 1 else "s"
                 click.echo(
                     _style(
-                        f"  ⚠️ Unsupported regex: {bold(str(count))} operation{suffix} had regex patterns removed",
+                        f"  ⚠️ Unsupported regex: {bold(str(count))} operation{suffix} had ungeneratable regex patterns",
                         fg="yellow",
                     )
                 )

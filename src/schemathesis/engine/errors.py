@@ -99,6 +99,7 @@ class EngineErrorInfo:
 
         if self._kind in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
+            RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
         ):
@@ -133,6 +134,7 @@ class EngineErrorInfo:
 
         if self._kind in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
+            RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
         ):
             return self._error.message  # type: ignore[attr-defined]
@@ -259,6 +261,8 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
         RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Review your endpoint filters to include linked operations",
         RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex follows ECMA 262 (JavaScript) syntax.\n"
         "For guidance, visit: https://json-schema.org/understanding-json-schema/reference/regular_expressions",
+        RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION: "The pattern is valid - values matching it are what "
+        "cannot be built.\nNarrow it, or supply examples for this operation.",
         RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Define a custom strategy for it.\n"
         "For guidance, visit: https://schemathesis.readthedocs.io/en/stable/guides/graphql-custom-scalars/",
         RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE: _format_health_check_suggestion("data_too_large"),
@@ -295,6 +299,7 @@ class RuntimeErrorKind(str, enum.Enum):
     HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE = "hypothesis_health_check_large_base_example"
 
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
+    SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION = "schema_unsupported_regular_expression"
     SCHEMA_INVALID_STATE_MACHINE = "schema_invalid_state_machine"
     SCHEMA_INVALID_INFINITE_RECURSION = "schema_invalid_infinite_recursion"
     SCHEMA_INVALID_UNRESOLVABLE_REFERENCE = "schema_invalid_unresolvable_reference"
@@ -362,6 +367,8 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
 
     # Schema errors
     if isinstance(error, errors.InvalidSchema):
+        if isinstance(error, errors.UnsupportedRegexPattern):
+            return RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION
         if isinstance(error, errors.InvalidRegexPattern):
             return RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION
         return RuntimeErrorKind.SCHEMA_GENERIC

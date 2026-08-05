@@ -2111,15 +2111,13 @@ def test_generate_empty_headers_too(ctx):
             {
                 "type": "array",
                 "items": {
-                    # Use an untranslatable PCRE pattern to test unsupported regex handling
+                    # The API enforces this one, so elements cannot be drawn and no length
+                    # violation is reachable - only the whole-body ones below.
                     "pattern": "[\\p{Greek}]+",
                 },
                 "maxItems": 50,
             },
             [
-                {
-                    "body": [None] * 51,
-                },
                 {
                     "body": {},
                 },

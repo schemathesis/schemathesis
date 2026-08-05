@@ -143,17 +143,15 @@ def _to_json_schema(
             translated = normalize_regex(pattern)
             if translated is not None:
                 schema["pattern"] = translated
-            else:
-                del schema["pattern"]
         elif pattern.startswith(r"\A") or pattern.endswith(r"\Z"):
             # Pattern uses Python-specific anchors that need Rust translation for jsonschema-rs
             translated = normalize_regex(pattern)
             if translated is not None:
                 schema["pattern"] = translated
-        # A pattern the validator cannot compile constrains nothing, and keeping it only stops the
-        # rest of the schema from being modeled.
+        # One the validator compiles is kept even where Python cannot read it - the API enforces it,
+        # so dropping it would draw values the API turns down.
         current = schema.get("pattern")
-        if isinstance(current, str) and not is_valid_jsonschema_rs_regex(current):
+        if not isinstance(current, str) or not is_valid_jsonschema_rs_regex(current):
             del schema["pattern"]
     if update_quantifiers:
         update_pattern_in_schema(schema)

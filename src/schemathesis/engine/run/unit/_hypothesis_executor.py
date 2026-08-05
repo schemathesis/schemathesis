@@ -25,6 +25,7 @@ from schemathesis.core.errors import (
     is_regex_validation_error,
 )
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.jsonschema import regex_pattern_error
 from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
@@ -232,7 +233,7 @@ def run_test(
         message = get_invalid_regular_expression_message(warnings)
         if message:
             # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
-            yield non_fatal_error(InvalidRegexPattern.from_hypothesis_jsonschema_message(message))
+            yield non_fatal_error(regex_pattern_error(message))
         elif is_empty_strategy_error(exc):
             yield non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
         else:
