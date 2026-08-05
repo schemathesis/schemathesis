@@ -1,11 +1,13 @@
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, find, given, settings
 from hypothesis import strategies as st
+from hypothesis.errors import NoSuchExample
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import deepclone
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.negative import _strip_binary, negative_schema
@@ -219,3 +221,50 @@ def test_value_channel_falls_back_when_violator_is_a_noop(data):
     assert isinstance(result, GeneratedValue)
     if not isinstance(result.value, bytes):
         assert not validator.is_valid(result.value)
+
+
+def _restore(body, path, original):
+    if not path:
+        return original
+    restored = deepclone(body)
+    target = restored
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = original
+    return restored
+
+
+def test_value_channel_base_body_is_valid():
+    # Undoing the reported mutation must leave a valid body — otherwise the case is invalid
+    # for a reason the report never mentions.
+    schema = {
+        "type": "object",
+        "properties": {"a": {"type": "integer", "maximum": 100}, "b": {"type": "integer"}},
+        "dependentRequired": {"a": ["b"]},
+        "additionalProperties": False,
+    }
+    validator = jsonschema_rs.Draft202012Validator(schema, validate_formats=True)
+
+    def is_invalid_before_mutation(result: GeneratedValue) -> bool:
+        if isinstance(result.value, bytes) or result.meta is None:
+            return False
+        return any(
+            not validator.is_valid(_restore(result.value, mutation.path, mutation.original_value))
+            for mutation in result.meta.mutations
+            if mutation.channel == MutationChannel.VALUE
+        )
+
+    with pytest.raises(NoSuchExample):
+        find(
+            negative_schema(
+                schema,
+                operation_name="POST /widgets/",
+                location=ParameterLocation.BODY,
+                media_type="application/json",
+                custom_formats=get_default_format_strategies(),
+                generation_config=GenerationConfig(),
+                validator_cls=jsonschema_rs.Draft202012Validator,
+            ),
+            is_invalid_before_mutation,
+            settings=settings(max_examples=1000, database=None, deadline=None, suppress_health_check=_SUPPRESSED),
+        )
