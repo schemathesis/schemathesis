@@ -279,6 +279,40 @@ def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx
     assert 5e-324 in values
 
 
+def test_examples_phase_skips_properties_it_cannot_generate(ctx):
+    # Negating a closed object has no form to draw from, so that property contributes nothing.
+    undrawable = {
+        "type": "object",
+        "properties": {"x": {"type": "integer"}},
+        "not": {"additionalProperties": False, "properties": {"x": {"type": "integer"}}},
+    }
+    operation = ctx.openapi.load_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "a": {"type": "string", "examples": ["given"]},
+                                        "b": undrawable,
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )["/r"]["POST"]
+    assert [example.value for example in extract_from_schemas(operation)] == [{"a": "given"}]
+
+
 def test_extract_top_level(operation):
     top_level_examples = list(extract_top_level(operation))
     extracted = [example_to_dict(example) for example in top_level_examples]
