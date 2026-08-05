@@ -20,6 +20,7 @@ from schemathesis.core import MAX_STRING_LENGTH
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
+    build_validator_for,
     compile_ecma_pattern,
     make_validator,
     make_validator_for,
@@ -691,7 +692,7 @@ def _element(items: jsonschema_rs.CanonicalSchema | None, ctx: StrategyContext) 
 # engine — so the filter judges a value exactly the way conformance checks do.
 @lru_cache(maxsize=4096)
 def _validator(schema: jsonschema_rs.CanonicalSchema) -> Callable[[JsonValue], bool]:
-    return make_validator_for(schema.to_json_schema()).is_valid
+    return build_validator_for(schema.to_json_schema()).is_valid
 
 
 def _supply(
@@ -841,7 +842,7 @@ def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) 
     if view.property_names is not None:
         # Python `re` and the validator's engine disagree on several constructs — `\d` is Unicode here
         # and ASCII there — so a drawn name is checked before it becomes a key.
-        is_valid = make_validator_for(view.property_names.to_json_schema()).is_valid
+        is_valid = _validator(view.property_names)
         return from_schema(view.property_names, ctx).map(_key).filter(is_valid)
     # Arbitrary text practically never matches a `patternProperties` regex, so the patterns name keys too.
     sources = [_text(ctx)]
