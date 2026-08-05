@@ -1752,6 +1752,32 @@ CANONICAL_CASES = [
         },
         (lambda value: len(value) > 0,),
     ),
+    # Barring a target that points on again: the complement names definitions it carries with it.
+    (
+        {
+            "not": {"$ref": "#/$defs/outer"},
+            "$defs": {
+                "outer": {
+                    "type": "object",
+                    "properties": {"inner": {"$ref": "#/$defs/inner"}},
+                    "required": ["inner"],
+                },
+                "inner": {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"]},
+            },
+        },
+        (lambda value: isinstance(value, dict) and isinstance(value.get("inner"), dict),),
+    ),
+    (
+        {
+            "not": {"$ref": "#/$defs/a"},
+            "$defs": {
+                "a": {"type": "object", "properties": {"b": {"$ref": "#/$defs/b"}}, "required": ["b"]},
+                "b": {"type": "object", "properties": {"c": {"$ref": "#/$defs/c"}}, "required": ["c"]},
+                "c": {"type": "object", "properties": {"d": {"type": "integer"}}, "required": ["d"]},
+            },
+        },
+        (lambda value: isinstance(value, dict) and isinstance(value.get("b"), dict),),
+    ),
     # A `$ref` names the schema to draw from, and repeats of it draw the same way.
     ({"$ref": "#/$defs/text", "$defs": {"text": {"type": "string", "minLength": 3}}}, ()),
     (
@@ -2259,8 +2285,19 @@ def test_canonical_generation(schema, reaches):
         {"anyOf": [{"type": "integer"}, {"not": {"$ref": "#"}}]},
         {"not": {"allOf": [{"type": "object", "required": ["x"]}, {"$ref": "#"}]}},
         {"not": {"$ref": "#/$defs/a"}, "$defs": {"a": {"allOf": [{"type": "null"}, {"$ref": "#"}]}}},
+        {
+            "not": {"$ref": "#/$defs/node"},
+            "$defs": {
+                "node": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "object", "properties": {"next": {"$ref": "#/$defs/node"}}, "required": ["next"]},
+                    ]
+                }
+            },
+        },
     ],
-    ids=["root-under-any-of", "root-under-all-of", "root-via-definition"],
+    ids=["root-under-any-of", "root-under-all-of", "root-via-definition", "target-leads-back"],
 )
 def test_barred_pointer_cycle_never_unsound(schema):
     # A complement that points on reads at whatever depth it is reached from, not the one the schema
