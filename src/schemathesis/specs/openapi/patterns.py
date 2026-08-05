@@ -339,10 +339,13 @@ except ImportError:
 
 ANCHOR = sre.AT
 REPEATS: tuple[int, ...]
+POSSESSIVE_REPEATS: tuple[int, ...]
 if hasattr(sre, "POSSESSIVE_REPEAT"):
     REPEATS = (sre.MIN_REPEAT, sre.MAX_REPEAT, sre.POSSESSIVE_REPEAT)
+    POSSESSIVE_REPEATS = (sre.POSSESSIVE_REPEAT,)
 else:
     REPEATS = (sre.MIN_REPEAT, sre.MAX_REPEAT)
+    POSSESSIVE_REPEATS = ()
 LITERAL = sre.LITERAL
 NOT_LITERAL = sre.NOT_LITERAL
 IN = sre.IN
@@ -874,6 +877,10 @@ def _transform_anchored_multi(
 
 def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) -> list[_Node] | None:
     """Distribute a length budget across the quantified parts; the caller adds any anchors."""
+    if any(op in POSSESSIVE_REPEATS for op, _ in parts):
+        # A possessive part keeps everything it took, so what follows it never gets those characters
+        # back - a rewritten count would admit strings the pattern itself rejects.
+        return None
     fixed_length = 0
     quantifier_bounds = []
     repetition_lengths = []

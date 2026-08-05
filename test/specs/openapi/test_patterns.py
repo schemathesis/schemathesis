@@ -268,6 +268,12 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         # absorb the remaining min-length budget — both distributors must bail rather
         # than crash, and the original pattern is kept.
         (r"^(.|a+){1,3}\d{1,3}$", 100, 100, r"^(.|a+){1,3}\d{1,3}$"),
+        # A possessive part keeps everything it took, so any rewritten count admits strings the
+        # original rejects - `0++0` matches nothing at all, while `0{1,3}0` matches "00".
+        pytest.param("0++0", None, 4, "0++0", marks=SKIP_BEFORE_PY11),
+        pytest.param("a{1,3}+a", None, 4, "a{1,3}+a", marks=SKIP_BEFORE_PY11),
+        pytest.param("(?:ab)++ab", None, 4, "(?:ab)++ab", marks=SKIP_BEFORE_PY11),
+        pytest.param("a+b++c", 1, 4, "a+b++c", marks=SKIP_BEFORE_PY11),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
@@ -342,6 +348,11 @@ def test_update_quantifier_admits_uneven_slot_distributions(min_length, max_leng
         (
             {"type": "string", "pattern": r"^([a-z]+-){2,3}\d+$", "minLength": 1, "maxLength": 32},
             {"type": "string", "pattern": r"^([a-z]{1,}-){2,3}\d{1,}$", "maxLength": 32},
+        ),
+        # Each slot's max is allocated as if it were the only one, so together they outrun the budget.
+        (
+            {"type": "string", "pattern": r"^0+0+$", "maxLength": 3},
+            {"type": "string", "pattern": r"^0{1,2}0{1,2}$", "maxLength": 3},
         ),
         (
             {"type": "string", "pattern": r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$", "minLength": 1, "maxLength": 30},
@@ -501,14 +512,15 @@ def test_update_quantifier_random(data):
     # Generate a string matching the modified pattern
     generated = data.draw(st.from_regex(modified_pattern, fullmatch=True, alphabet=st.characters(codec=None)))
 
-    # Assert that the generated string meets the length constraints
-    if min_length is not None:
-        assert len(generated) >= min_length, (
-            f"Generated string '{generated}' is shorter than min_length {min_length}\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
-        )
-    if max_length is not None:
-        assert len(generated) <= max_length, (
-            f"Generated string '{generated}' is longer than max_length {max_length}.\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
+    # A bound the rewrite cannot fold into the quantifiers stays with the schema, so only what the
+    # pattern claims on its own has to hold here - that claim is what decides whether a bound is dropped.
+    claimed_min, claimed_max = pattern_length_bounds(modified_pattern)
+    assert len(generated) >= claimed_min, (
+        f"Generated string '{generated}' is shorter than the claimed {claimed_min}\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
+    )
+    if claimed_max is not None:
+        assert len(generated) <= claimed_max, (
+            f"Generated string '{generated}' is longer than the claimed {claimed_max}.\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
         )
     assert re.search(pattern, generated), (
         f"Generated string '{generated}' does not match the pattern.\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
