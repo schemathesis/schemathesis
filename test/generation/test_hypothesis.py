@@ -19,7 +19,7 @@ from hypothesis_jsonschema import from_schema
 import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import InvalidSchema, RejectedSchemaDefinition
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
@@ -2753,6 +2753,24 @@ def test_canonical_reference_without_a_target_is_refused_by_canonicalization():
         jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft202012, pattern_options=FANCY_REGEX_OPTIONS)
 
     assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is None
+
+
+META_INVALID_SCHEMAS = [
+    ({"type": "str"}, "type"),
+    ({"type": "string", "minLength": -1}, "minLength"),
+    ({"type": "string", "maxLength": "10"}, "maxLength"),
+    ({"type": "object", "required": "x"}, "required"),
+    ({"multipleOf": -3}, "multipleOf"),
+    ({"oneOf": []}, "oneOf"),
+]
+
+
+@pytest.mark.parametrize(
+    ("schema", "keyword"), META_INVALID_SCHEMAS, ids=[str(schema) for schema, _ in META_INVALID_SCHEMAS]
+)
+def test_canonical_meta_invalid_schema_is_reported(schema, keyword):
+    with pytest.raises(RejectedSchemaDefinition, match=f"Invalid `{keyword}` definition"):
+        _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
 
 def test_canonical_pattern_naming_a_character_outside_the_alphabet(ctx):

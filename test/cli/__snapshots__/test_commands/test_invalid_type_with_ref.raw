@@ -25,7 +25,18 @@ Schemathesis dev
 __________________________________ POST /test __________________________________
 Schema Error
 
-Unknown type: `invalid`. Should be one of null, boolean, integer, number, string, array, object
+Invalid `type` definition
+
+Location:
+    properties -> h -> type
+
+Problematic definition:
+    "invalid"
+
+Error details:
+    The provided definition doesn't match any of the expected formats or types.
+
+Ensure that the definition complies with the OpenAPI specification
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

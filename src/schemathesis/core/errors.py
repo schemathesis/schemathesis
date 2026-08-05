@@ -336,6 +336,10 @@ class MalformedMediaType(ValueError):
     """Raised on parsing of incorrect media type."""
 
 
+class RejectedSchemaDefinition(InvalidSchema):
+    """Raised when a definition does not hold up as a JSON Schema under its own draft."""
+
+
 class InvalidRegexPattern(InvalidSchema):
     """Raised when a string pattern is not a valid regular expression."""
 

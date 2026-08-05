@@ -51,6 +51,7 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_STRING_LENGTH, NOT_SET
 from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.errors import RejectedSchemaDefinition
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
 from schemathesis.core.media_types import is_form_parts, is_xml_parts
@@ -509,18 +510,26 @@ class CoverageContext:
     def build_strategy(self, schema: JsonSchema) -> st.SearchStrategy | None:
         draft = CANONICALIZE_DRAFT_BY_VALIDATOR[self.validator_cls]
         prepared = _prepared(schema, draft4=draft == jsonschema_rs.Draft4)
-        strategy = build(prepared, draft=draft, formats=self.custom_formats)
+        strategy = self._build(prepared, draft)
         if strategy is not None or not isinstance(prepared, dict):
             return strategy
         wider = _without_conditionals(prepared)
         if wider is None:
             return None
-        strategy = build(wider, draft=draft, formats=self.custom_formats)
+        strategy = self._build(wider, draft)
         validator = _judge(schema)
         if strategy is None or validator is None:
             return None
         # The wider form admits values the schema rules out, so the validator has the last word.
         return strategy.filter(validator.is_valid)
+
+    def _build(self, schema: JsonSchema, draft: int) -> st.SearchStrategy | None:
+        # This phase reshapes what it is given and covers whatever parses, so a definition the draft
+        # rejects - the caller's or one of these rewrites - leaves the branch uncovered, not the run failed.
+        try:
+            return build(schema, draft=draft, formats=self.custom_formats)
+        except RejectedSchemaDefinition:
+            return None
 
     def _generate_around_conditionals(self, schema: JsonSchemaObject, described: JsonSchemaObject) -> Any:
         """A value for `schema` drawn from the part of it that describes values, or `NOT_SET`."""
