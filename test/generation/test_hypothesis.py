@@ -27,7 +27,11 @@ from schemathesis.generation.jsonschema import strategy
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
-from schemathesis.specs.openapi._hypothesis import _canonical_strategy_or_none, jsonify_python_specific_types
+from schemathesis.specs.openapi._hypothesis import (
+    _canonical_strategy_or_none,
+    jsonify_python_specific_types,
+    make_positive_strategy,
+)
 from schemathesis.specs.openapi.adapter import v2
 from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiBody,
@@ -1714,6 +1718,40 @@ CANONICAL_CASES = [
     # A barred value and a barred format each rule out strings the rest of the schema still admits.
     ({"allOf": [{"type": "string", "pattern": "^[ab]$"}, {"not": {"const": "a"}}]}, (lambda value: value == "b",)),
     ({"allOf": [{"type": "string", "maxLength": 3}, {"not": {"format": "regex"}}]}, ()),
+    # Barring what a pointer names: the complement is whatever the target rejects, wherever it sits.
+    (
+        {"not": {"$ref": "#/$defs/text"}, "$defs": {"text": {"type": "string"}}},
+        (lambda value: isinstance(value, list),),
+    ),
+    (
+        {"not": {"$ref": "#/$defs/tagged"}, "$defs": {"tagged": {"type": "object", "required": ["x"]}}},
+        (lambda value: isinstance(value, dict) and "x" not in value,),
+    ),
+    (
+        {
+            "type": "object",
+            "properties": {"a": {"not": {"$ref": "#/$defs/text"}}},
+            "required": ["a"],
+            "$defs": {"text": {"type": "string"}},
+        },
+        (lambda value: isinstance(value["a"], dict),),
+    ),
+    (
+        {
+            "type": "array",
+            "items": {"not": {"$ref": "#/$defs/text"}},
+            "minItems": 1,
+            "$defs": {"text": {"type": "string"}},
+        },
+        (lambda value: isinstance(value[0], list),),
+    ),
+    (
+        {
+            "allOf": [{"type": "object"}, {"not": {"$ref": "#/$defs/tagged"}}],
+            "$defs": {"tagged": {"type": "object", "required": ["x"]}},
+        },
+        (lambda value: len(value) > 0,),
+    ),
     # A `$ref` names the schema to draw from, and repeats of it draw the same way.
     ({"$ref": "#/$defs/text", "$defs": {"text": {"type": "string", "minLength": 3}}}, ()),
     (
@@ -2206,6 +2244,52 @@ def test_canonical_generation(schema, reaches):
         assert is_valid(value), value
 
     test()
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"anyOf": [{"type": "integer"}, {"not": {"$ref": "#"}}]},
+        {"not": {"allOf": [{"type": "object", "required": ["x"]}, {"$ref": "#"}]}},
+        {"not": {"$ref": "#/$defs/a"}, "$defs": {"a": {"allOf": [{"type": "null"}, {"$ref": "#"}]}}},
+    ],
+    ids=["root-under-any-of", "root-under-all-of", "root-via-definition"],
+)
+def test_barred_pointer_cycle_never_unsound(schema):
+    # A complement that points on reads at whatever depth it is reached from, not the one the schema
+    # means, so it must not be the thing that decides which values are drawn.
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(
+        make_positive_strategy(
+            schema, "test", ParameterLocation.BODY, None, GenerationConfig(), jsonschema_rs.Draft202012Validator
+        )
+    )
+    @settings(max_examples=50, deadline=None, suppress_health_check=list(HealthCheck), database=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_barred_cycle_admits_nothing():
+    # A bar over a schema that bars itself through a pointer rejects every value, objects included.
+    schema = {
+        "not": {"$ref": "#/$defs/node"},
+        "$defs": {"node": {"not": {"allOf": [{"type": "object"}, {"$ref": "#/$defs/node"}]}}},
+    }
+
+    @given(
+        make_positive_strategy(
+            schema, "test", ParameterLocation.BODY, None, GenerationConfig(), jsonschema_rs.Draft202012Validator
+        )
+    )
+    @settings(max_examples=25, deadline=None, suppress_health_check=list(HealthCheck), database=None)
+    def test(value):
+        raise AssertionError(value)
+
+    with pytest.raises(Unsatisfiable):
+        test()
 
 
 @pytest.mark.parametrize(

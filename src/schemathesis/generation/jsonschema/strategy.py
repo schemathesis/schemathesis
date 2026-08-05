@@ -140,6 +140,8 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _array(schema, view, ctx)
     if isinstance(view, canonical.ReferenceView):
         return _reference(schema, view, ctx)
+    if isinstance(view, canonical.NotView):
+        return _not(schema, view, ctx)
     if isinstance(view, canonical.AllOfView):
         return _all_of(view, ctx)
     if isinstance(view, canonical.OneOfView):
@@ -175,6 +177,32 @@ def _reference(
         return from_schema(target, ctx)
     finally:
         del ctx.pending[view.uri]
+
+
+def _not(
+    schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.NotView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
+    """Values the barred schema rejects."""
+    # A bar is left standing where what it bars is a pointer; following it gives something to complement.
+    barred = view.schema
+    barred_view = barred.view()
+    if isinstance(barred_view, canonical.ReferenceView):
+        barred = _target(barred, barred_view.uri, ctx)
+    complement = barred.negate()
+    # A complement that points on reads at a depth the schema never meant, so what it admits is not
+    # what the schema admits; folding one is a job for canonicalization.
+    if complement is None or _points_on(complement.to_json_schema()):
+        raise UnsupportedView(schema.kind)
+    return from_schema(complement, ctx)
+
+
+def _points_on(schema: JsonValue) -> bool:
+    """Whether the schema names a pointer outside the definitions it carries."""
+    if isinstance(schema, dict):
+        return "$ref" in schema or any(
+            _points_on(value) for key, value in schema.items() if key not in ("$defs", "definitions")
+        )
+    return isinstance(schema, list) and any(_points_on(item) for item in schema)
 
 
 def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
