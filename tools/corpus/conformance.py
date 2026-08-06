@@ -73,7 +73,7 @@ def check_body_conformance(case: Case) -> BodyViolation | None:
     return evaluate_body_conformance(
         body=case.body,
         media_type=alternative.media_type,
-        schema=alternative.optimized_schema,
+        schema=alternative.unoptimized_schema,
         validator_cls=schema.adapter.jsonschema_validator_cls,
         is_negative_body=is_negative_body,
     )
