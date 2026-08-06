@@ -9674,3 +9674,16 @@ def test_closing_generator_after_module_globals_are_cleared(pctx, monkeypatch):
     monkeypatch.setattr(_schema, "jsonschema_rs", None)
 
     generator.close()
+
+
+def test_closing_reference_generator_after_module_globals_are_cleared(ctx_factory, monkeypatch):
+    # Interpreter finalization nulls module globals before suspended generators are closed.
+    ctx = ctx_factory(
+        generation_modes=[GenerationMode.POSITIVE],
+        root_schema={"definitions": {"Item": {"type": "string"}}},
+    )
+    generator = cover_schema_iter(ctx, {"$ref": "#/definitions/Item"}, HashSet())
+    next(generator)
+    monkeypatch.setattr(_schema, "RefResolutionError", None)
+
+    generator.close()

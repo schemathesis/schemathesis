@@ -19,9 +19,10 @@ def ctx_factory():
         is_required: bool = True,
         allow_extra_parameters: bool = True,
         validator_cls: type[jsonschema_rs.Validator] = jsonschema_rs.Draft4Validator,
+        root_schema: dict | None = None,
     ) -> CoverageContext:
         return CoverageContext(
-            root_schema={},
+            root_schema=root_schema or {},
             location=location,
             media_type=None,
             generation_modes=generation_modes,
