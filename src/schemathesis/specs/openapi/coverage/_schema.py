@@ -1606,6 +1606,10 @@ def cover_schema_iter(
                 with ctx.expand(reference):
                     yield from cover_schema_iter(ctx, resolved, seen)
             return
+        except GeneratorExit:
+            # Interpreter shutdown clears module globals before closing suspended generators, so the
+            # clause below can no longer be evaluated.
+            raise
         except RefResolutionError:
             # Can't resolve a reference - at this point, we can't generate anything useful as `$ref` is in the current schema root
             return
