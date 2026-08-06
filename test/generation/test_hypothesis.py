@@ -3567,6 +3567,15 @@ UNSATISFIABLE_ARRAY_SCHEMAS = [
         "minItems": 3,
         "uniqueItems": True,
     },
+    # Every position must match the pattern and one of them must not; behind a reference the
+    # contradiction survives canonicalization, leaving the demand nothing to draw.
+    {
+        "$defs": {"tag": {"type": "string", "pattern": "^a+$", "maxLength": 8}},
+        "type": "array",
+        "items": {"$ref": "#/$defs/tag"},
+        "minItems": 1,
+        "not": {"items": {"$ref": "#/$defs/tag"}},
+    },
 ]
 
 
