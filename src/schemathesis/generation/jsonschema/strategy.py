@@ -1016,17 +1016,20 @@ def _collect(
 
 def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> SearchStrategy[str]:
     """Names for keys the schema does not spell out."""
+    minimum = ctx.alphabet.min_name_length
     if view.property_names is not None:
         # Python `re` and the validator's engine disagree on several constructs — `\d` is Unicode here
         # and ASCII there — so a drawn name is checked before it becomes a key.
         is_valid = _validator(view.property_names)
-        return from_schema(view.property_names, ctx).map(_key).filter(is_valid)
+        named = from_schema(view.property_names, ctx).map(_key).filter(is_valid)
+        return named if not minimum else named.filter(lambda name: len(name) >= minimum)
     # Arbitrary text practically never matches a `patternProperties` regex, so the patterns name keys too.
-    sources = [_text(ctx)]
+    sources = [_text(ctx, characters=ctx.alphabet.names_as_strategy(), min_size=minimum)]
     for pattern in view.pattern_properties:
         compiled = _compiled_pattern(pattern)
         if compiled is not None:
-            sources.append(_from_pattern(compiled, ctx))
+            drawn = _from_pattern(compiled, ctx)
+            sources.append(drawn if not minimum else drawn.filter(lambda name: len(name) >= minimum))
     return st.one_of(sources)
 
 

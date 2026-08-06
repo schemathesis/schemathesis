@@ -29,12 +29,28 @@ class Alphabet:
     # Whether a drawn string may open with whitespace. Header values cannot, and that is a property
     # of the value rather than of its characters, so it rides along here as a filter on each leaf.
     allow_leading_whitespace: bool = True
+    # Shortest name a drawn key may carry. Header names cannot be empty, and that is a property of
+    # the key rather than of its characters, so it rides along here too.
+    min_name_length: int = 0
+    # Characters a drawn key may carry, where a key answers to a narrower grammar than a value.
+    name_characters: str | None = None
 
     def as_strategy(self) -> SearchStrategy[str]:
         return _characters(self.allow_x00, self.codec, self.max_codepoint, self.exclude_characters)
 
+    def names_as_strategy(self) -> SearchStrategy[str]:
+        if self.name_characters is None:
+            return self.as_strategy()
+        return _sampled(self.name_characters)
+
 
 @lru_cache
+def _sampled(characters: str) -> SearchStrategy[str]:
+    from hypothesis import strategies as st
+
+    return st.sampled_from(characters)
+
+
 def _characters(
     allow_x00: bool, codec: str | None, max_codepoint: int | None, exclude_characters: str
 ) -> SearchStrategy[str]:
