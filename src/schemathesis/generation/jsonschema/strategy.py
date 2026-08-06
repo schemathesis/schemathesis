@@ -757,6 +757,10 @@ def _repeated(placement: _Placement, *, unique: bool) -> SearchStrategy[list[Jso
     # A placement only ever takes positions the demand can fill; `_laid_out` gives up otherwise.
     assert element is not None
     count = placement.placed
+    if element.is_empty:
+        # A contradiction canonicalization could not see: nothing meets the demand, so no array clears
+        # the schema this way. Other layouts, and the schema's other branches, may still.
+        return st.nothing()
     kwargs = {"unique_by": _json_identity} if unique else {}
     repeated = st.lists(element, min_size=count, max_size=count + placement.slack, **kwargs)
     try:
