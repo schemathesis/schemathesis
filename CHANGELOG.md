@@ -23,6 +23,7 @@
 - `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
 - Generate string values satisfying every `pattern` and `format` in a conjunction.
 - Generate strings honoring `contentEncoding` and `contentMediaType` under Draft 7.
+- Generate valid data for `oneOf` / `anyOf` branches whose `discriminator` property is nullable.
 - Name the API operation that cannot be generated when its schema is unsatisfiable.
 - Runtime error in `negative_data_rejection` for empty array path parameters.
 - Coverage phase generating Unicode characters where the validator reads `\d` and `\w` as ASCII.

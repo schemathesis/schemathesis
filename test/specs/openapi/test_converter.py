@@ -686,6 +686,90 @@ def test_non_nullable_type_enum_still_rejects_null():
     assert not validator.is_valid(None)
 
 
+def test_discriminator_pin_reads_nullable_anyof_tag(ctx):
+    # OpenAPI 3.1 spells a nullable tag as `anyOf`, putting its literal one level below the property.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [{"$ref": "#/components/schemas/ItemReference"}],
+                                    "discriminator": {"propertyName": "type"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "ItemReference": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "anyOf": [
+                                {"type": "string", "enum": ["item_reference"], "default": "item_reference"},
+                                {"type": "null"},
+                            ]
+                        }
+                    },
+                    "required": ["type"],
+                }
+            }
+        },
+    )
+    validator = make_validator(
+        schema["/items"]["POST"].body[0].optimized_schema, schema.adapter.jsonschema_validator_cls
+    )
+    assert validator.is_valid({"type": "item_reference"})
+
+
+def test_discriminator_pin_falls_back_when_tag_has_several_candidates(ctx):
+    # Two literals under one tag are ambiguous, so neither may be picked over the schema name.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [{"$ref": "#/components/schemas/Ambiguous"}],
+                                    "discriminator": {"propertyName": "type"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Ambiguous": {
+                    "type": "object",
+                    "properties": {"type": {"anyOf": [{"const": "first"}, {"const": "second"}]}},
+                    "required": ["type"],
+                }
+            }
+        },
+    )
+    validator = make_validator(
+        schema["/items"]["POST"].body[0].optimized_schema, schema.adapter.jsonschema_validator_cls
+    )
+    assert not validator.is_valid({"type": "first"})
+    assert not validator.is_valid({"type": "second"})
+
+
 def test_discriminator_pin_skipped_for_polymorphic_branch_target(ctx):
     # Schema-name fallback is wrong when the $ref target is itself polymorphic.
     schema = ctx.openapi.load_schema(
