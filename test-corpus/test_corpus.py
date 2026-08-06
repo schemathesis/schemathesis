@@ -525,6 +525,10 @@ KNOWN_BODY_VIOLATIONS: set[tuple[str, str]] = {
         "amazonaws.com/translate/2017-07-01.json",
         "POST /#X-Amz-Target=AWSShineFrontendService_20170701.StartTextTranslationJob",
     ),
+    # Pre-existing empty-object coverage case for a `oneOf` of a string enum and a required-property
+    # object — surfaced once the discriminator pin stopped blocking the earlier ops on this schema.
+    ("openai.com/2.3.0.json", "POST /threads/runs"),
+    ("openai.com/2.3.0.json", "POST /threads/{thread_id}/runs"),
     ("restleague/market.json", "POST /register"),
     ("restleague/market.json", "PUT /customer/contacts"),
 }

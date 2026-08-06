@@ -334,6 +334,16 @@ def _branch_discriminator_value(ref: str, property_name: str, bundle: dict[str, 
     sub = properties.get(property_name) if isinstance(properties, dict) else None
     if not isinstance(sub, dict):
         return None
+    # A nullable tag is spelled as a two-branch union in OpenAPI 3.1, putting its literal one level down.
+    for keyword in ("anyOf", "oneOf"):
+        variants = sub.get(keyword)
+        if isinstance(variants, list):
+            non_null = [
+                variant for variant in variants if not (isinstance(variant, dict) and variant.get("type") == "null")
+            ]
+            if len(non_null) == 1 and isinstance(non_null[0], dict):
+                sub = non_null[0]
+            break
     const = sub.get("const")
     if isinstance(const, str):
         return const
