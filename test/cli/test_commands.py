@@ -893,7 +893,7 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli):
                                     "properties": {
                                         "region": {
                                             "nullable": True,
-                                            "pattern": "^[\\p{Han}]+$",
+                                            "pattern": "^[\\p{Greek}]+$",
                                             "type": "string",
                                         },
                                     },

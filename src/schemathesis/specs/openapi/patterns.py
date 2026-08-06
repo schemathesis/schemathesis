@@ -35,6 +35,17 @@ _GRAPH_CLASS = r"!-~\u00A1-\u00AC\u00AE-\u00FF"
 _PRINT_CLASS = rf" {_GRAPH_CLASS}"
 # Blank (horizontal whitespace)
 _BLANK_CLASS = r" \t"
+# Scripts, kept to the blocks the validating engine agrees are part of them
+_HAN_CLASS = (
+    r"\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303B"
+    r"\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFA6D\uFA70-\uFAD9"
+)
+_HIRAGANA_CLASS = r"\u3041-\u3096\u309D-\u309F"
+_KATAKANA_CLASS = r"\u30A1-\u30FA\u30FD-\u30FF\u31F0-\u31FF\uFF66-\uFF6F\uFF71-\uFF9D"
+_HANGUL_CLASS = (
+    r"\u1100-\u11FF\u3131-\u318E\uA960-\uA97C\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB"
+    r"\uFFA0-\uFFBE\uFFC2-\uFFC7\uFFCA-\uFFCF\uFFD2-\uFFD7\uFFDA-\uFFDC"
+)
 
 # Escapes standing on their own; the ones inside a class are inlined before these run.
 _UNICODE_PROPERTY_MAP = (
@@ -63,6 +74,10 @@ _UNICODE_PROPERTY_MAP = (
     (r"\p{Blank}", f"[{_BLANK_CLASS}]"),
     (r"\p{Upper}", f"[{_LETTER_UPPER_CLASS}]"),
     (r"\p{IsLetter}", f"[{_LETTER_CLASS}]"),
+    (r"\p{Han}", f"[{_HAN_CLASS}]"),
+    (r"\p{Hiragana}", f"[{_HIRAGANA_CLASS}]"),
+    (r"\p{Katakana}", f"[{_KATAKANA_CLASS}]"),
+    (r"\p{Hangul}", f"[{_HANGUL_CLASS}]"),
     (r"\P{L}", f"[^{_LETTER_CLASS}]"),
     (r"\P{N}", f"[^{_DIGIT_CLASS}]"),
     (r"\P{Nd}", f"[^{_DIGIT_CLASS}]"),
@@ -109,6 +124,10 @@ _UNICODE_PROPERTY_RAW_MAP: dict[str, str] = {
     "Blank": _BLANK_CLASS,
     "Upper": _LETTER_UPPER_CLASS,
     "IsLetter": _LETTER_CLASS,
+    "Han": _HAN_CLASS,
+    "Hiragana": _HIRAGANA_CLASS,
+    "Katakana": _KATAKANA_CLASS,
+    "Hangul": _HANGUL_CLASS,
 }
 # Single-letter shorthand (`\pL`, `\pN`, ...) raw equivalents.
 _UNICODE_SHORTHAND_RAW_MAP: dict[str, str] = {
@@ -140,37 +159,235 @@ _POSIX_CLASS_RAW_MAP: dict[str, str] = {
 }
 
 
-_PCRE_CLASS_SET_OPERATORS = ("||", "&&", "~~")
+# `||` is absent here on purpose: the engine behind validation has no such operator, so the two
+# characters name a literal `|` and Python reads them the same way.
+_PCRE_CLASS_SET_OPERATORS = ("&&", "~~")
 
 _MAX_CODEPOINT = sys.maxunicode
 _SURROGATES = (0xD800, 0xDFFF)
 
+_Interval: TypeAlias = tuple[int, int]
+
+
+def _merged(intervals: list[_Interval]) -> list[_Interval]:
+    out: list[_Interval] = []
+    for low, high in sorted(intervals):
+        if out and low <= out[-1][1] + 1:
+            out[-1] = (out[-1][0], max(out[-1][1], high))
+        else:
+            out.append((low, high))
+    return out
+
+
+def _complemented(intervals: list[_Interval]) -> list[_Interval]:
+    # Surrogates join the set being complemented, so no gap can carry one: no JSON string holds them,
+    # and Hypothesis turns them down as literals.
+    out: list[_Interval] = []
+    cursor = 0
+    for low, high in _merged([*intervals, _SURROGATES]):
+        if low > cursor:
+            out.append((cursor, low - 1))
+        cursor = max(cursor, high + 1)
+    if cursor <= _MAX_CODEPOINT:
+        out.append((cursor, _MAX_CODEPOINT))
+    return out
+
+
+def _intersected(left: list[_Interval], right: list[_Interval]) -> list[_Interval]:
+    out: list[_Interval] = []
+    for low, high in _merged(left):
+        for other_low, other_high in _merged(right):
+            start, end = max(low, other_low), min(high, other_high)
+            if start <= end:
+                out.append((start, end))
+    return _merged(out)
+
+
+def _symmetric_difference(left: list[_Interval], right: list[_Interval]) -> list[_Interval]:
+    only_left = _intersected(left, _complemented(right))
+    only_right = _intersected(right, _complemented(left))
+    return _merged([*only_left, *only_right])
+
+
+def _serialize_intervals(intervals: list[_Interval]) -> str:
+    return "".join(_serialize_range(low, high) for low, high in _merged(intervals))
+
 
 def _complement_class(raw: str) -> str:
     """Raw class contents admitting every codepoint `raw` turns down."""
-    parsed = _parse_regex(f"[{raw}]")
+    intervals = _class_intervals(f"[{raw}]")
     # Every class this is called with is spelled as literals and ranges, so it reads back as one set.
-    assert parsed is not None and len(parsed) == 1 and parsed[0][0] == sre.IN, raw
-    # Surrogates join the set being complemented, so no gap can carry one: no JSON string holds them,
-    # and Hypothesis turns them down as literals.
-    intervals: list[tuple[int, int]] = [_SURROGATES]
-    for op, value in parsed[0][1]:
-        assert op in (LITERAL, sre.RANGE), raw
-        intervals.append((value, value) if op == LITERAL else value)
-    out: list[str] = []
-    cursor = 0
-    for low, high in sorted(intervals):
-        if low > cursor:
-            out.append(_serialize_range(cursor, low - 1))
-        cursor = max(cursor, high + 1)
-    out.append(_serialize_range(cursor, _MAX_CODEPOINT))
-    return "".join(out)
+    assert intervals is not None, raw
+    return _serialize_intervals(_complemented(intervals))
+
+
+def _class_intervals(cls: str) -> list[_Interval] | None:
+    """The codepoints a flat `[...]` admits, or `None` when it names something beyond literals and ranges."""
+    parsed = _parse_regex(cls)
+    if parsed is None or len(parsed) != 1:
+        return None
+    op, value = parsed[0]
+    # A one-member class is optimized down to the member itself.
+    if op == LITERAL:
+        return [(value, value)]
+    if op != sre.IN:
+        return None
+    items = list(value)
+    negated = bool(items) and items[0][0] == sre.NEGATE
+    intervals: list[_Interval] = []
+    for item_op, item_value in items[1:] if negated else items:
+        if item_op == LITERAL:
+            intervals.append((item_value, item_value))
+        elif item_op == sre.RANGE:
+            intervals.append(item_value)
+        else:
+            return None
+    return _complemented(intervals) if negated else _merged(intervals)
 
 
 def _serialize_range(low: int, high: int) -> str:
     if low == high:
         return _serialize_literal_in_class(low)
     return f"{_serialize_literal_in_class(low)}-{_serialize_literal_in_class(high)}"
+
+
+def _class_extent(pattern: str, start: int) -> int | None:
+    """Index just past the `]` closing the class opened at `start`, or `None` when it never closes."""
+    i = start + 1
+    if pattern[i : i + 1] == "^":
+        i += 1
+    # A `]` opening the contents is a member, not the close.
+    if pattern[i : i + 1] == "]":
+        i += 1
+    depth = 0
+    n = len(pattern)
+    while i < n:
+        ch = pattern[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "[":
+            if pattern[i + 1 : i + 2] == ":":
+                end = pattern.find(":]", i + 2)
+                if end == -1:
+                    return None
+                i = end + 2
+                continue
+            depth += 1
+        elif ch == "]":
+            if depth == 0:
+                return i + 1
+            depth -= 1
+        i += 1
+    return None
+
+
+def _has_set_algebra(body: str) -> bool:
+    """Whether the class body leans on constructs Python `re` reads differently, if at all."""
+    i = 0
+    n = len(body)
+    while i < n:
+        if body[i] == "\\":
+            i += 2
+            continue
+        if body[i : i + 2] in _PCRE_CLASS_SET_OPERATORS:
+            return True
+        if body[i] == "[" and body[i + 1 : i + 2] != ":":
+            return True
+        i += 1
+    return False
+
+
+def _split_class_operands(body: str) -> tuple[list[str], list[str]]:
+    """The class body cut at its set operators, and the operators themselves."""
+    operands: list[str] = []
+    operators: list[str] = []
+    start = 0
+    i = 0
+    n = len(body)
+    while i < n:
+        ch = body[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "[":
+            end = body.find(":]", i + 2) + 2 if body[i + 1 : i + 2] == ":" else _class_extent(body, i)
+            if end is None or end <= i:
+                return [body], []
+            i = end
+            continue
+        if body[i : i + 2] in _PCRE_CLASS_SET_OPERATORS:
+            operands.append(body[start:i])
+            operators.append(body[i : i + 2])
+            i += 2
+            start = i
+            continue
+        i += 1
+    operands.append(body[start:])
+    return operands, operators
+
+
+def _operand_intervals(operand: str) -> list[_Interval] | None:
+    """The codepoints one side of a set operator admits; its members add up."""
+    intervals: list[_Interval] = []
+    chunk: list[str] = []
+    i = 0
+    n = len(operand)
+    while i < n:
+        ch = operand[i]
+        if ch == "\\":
+            chunk.append(operand[i : i + 2])
+            i += 2
+            continue
+        if ch == "[" and operand[i + 1 : i + 2] != ":":
+            end = _class_extent(operand, i)
+            if end is None:
+                return None
+            nested = _resolved_class(operand[i + 1 : end - 1])
+            if nested is None:
+                return None
+            nested_intervals = _class_intervals(nested)
+            if nested_intervals is None:
+                return None
+            intervals.extend(nested_intervals)
+            i = end
+            continue
+        chunk.append(ch)
+        i += 1
+    if chunk:
+        flat = _inline_unicode_in_classes(f"[{''.join(chunk)}]")
+        if flat is None:
+            return None
+        own = _class_intervals(flat)
+        if own is None:
+            return None
+        intervals.extend(own)
+    return _merged(intervals)
+
+
+def _resolved_class(body: str) -> str | None:
+    """A class body with set operators and nested classes worked out, spelled as a flat `[...]`."""
+    negated = body.startswith("^")
+    if negated:
+        body = body[1:]
+    operands, operators = _split_class_operands(body)
+    intervals = _operand_intervals(operands[0])
+    if intervals is None:
+        return None
+    for operator, operand in zip(operators, operands[1:], strict=True):
+        current = _operand_intervals(operand)
+        if current is None:
+            return None
+        intervals = _intersected(intervals, current) if operator == "&&" else _symmetric_difference(intervals, current)
+    if negated:
+        intervals = _complemented(intervals)
+    if not intervals:
+        # Python has no spelling for a class admitting nothing.
+        return None
+    return f"[{_serialize_intervals(intervals)}]"
+
+
+_BRACE_HEX_DIGITS = re.compile(r"[0-9A-Fa-f]{1,6}\Z")
 
 
 def _inline_unicode_in_classes(pattern: str) -> str | None:
@@ -211,6 +428,18 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
                         out.append(raw)
                         i += 3
                         continue
+            # `\x{...}` is how PCRE spells a codepoint; Python wants a fixed-width escape.
+            if next_ch == "x" and pattern[i + 2 : i + 3] == "{":
+                end = pattern.find("}", i + 3)
+                digits = pattern[i + 3 : end] if end != -1 else ""
+                if not _BRACE_HEX_DIGITS.match(digits):
+                    return None
+                code = int(digits, 16)
+                if code > _MAX_CODEPOINT:
+                    return None
+                out.append(f"\\u{code:04x}" if code <= 0xFFFF else f"\\U{code:08x}")
+                i = end + 1
+                continue
             # Other escapes (`\[`, `\]`, `\\`, unknown `\p{Greek}`) pass through unchanged.
             out.append(pattern[i : i + 2])
             i += 2
@@ -219,6 +448,13 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
         # would change semantics (`||` becomes a literal `|`, `&&` a literal `&`, etc.).
         if in_class and pattern[i : i + 2] in _PCRE_CLASS_SET_OPERATORS:
             return None
+        # A run of pipes names one literal `|` here, but Python reserves the spelling for a set
+        # operator it does not have yet and warns about it.
+        if in_class and ch == "|" and pattern[i + 1 : i + 2] == "|":
+            while i < n and pattern[i] == "|":
+                i += 1
+            out.append("\\|")
+            continue
         # POSIX character class `[:name:]` nested inside `[...]`.
         if in_class and ch == "[" and i + 1 < n and pattern[i + 1] == ":":
             end = pattern.find(":]", i + 2)
@@ -239,6 +475,14 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
         if in_class and ch == "[":
             return None
         if ch == "[" and not in_class:
+            class_end = _class_extent(pattern, i)
+            if class_end is not None and _has_set_algebra(pattern[i + 1 : class_end - 1]):
+                resolved = _resolved_class(pattern[i + 1 : class_end - 1])
+                if resolved is None:
+                    return None
+                out.append(resolved)
+                i = class_end
+                continue
             in_class = True
         elif ch == "]" and in_class:
             in_class = False
@@ -269,10 +513,13 @@ def normalize_regex(pattern: object) -> str | None:
     )
     # Check for POSIX character classes like `[:alnum:]` (only valid inside `[...]`)
     has_posix = "[:" in pattern and ":]" in pattern
+    # PCRE class-set operators and brace hex escapes, neither of which Python `re` reads
+    has_class_algebra = any(operator in pattern for operator in _PCRE_CLASS_SET_OPERATORS)
+    has_brace_hex = r"\x{" in pattern
     # Check for Python-specific anchors that need Rust translation
     has_python_anchors = pattern.startswith(r"\A") or pattern.endswith(r"\Z")
 
-    if not has_braced and not has_shorthand and not has_posix and not has_python_anchors:
+    if not any((has_braced, has_shorthand, has_posix, has_python_anchors, has_class_algebra, has_brace_hex)):
         return None  # No translation needed
 
     translated = _inline_unicode_in_classes(pattern)

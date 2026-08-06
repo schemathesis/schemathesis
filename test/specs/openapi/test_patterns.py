@@ -3,6 +3,7 @@ import string
 import sys
 import warnings
 
+import jsonschema_rs
 import pytest
 from flask import jsonify
 from hypothesis import HealthCheck, assume, given, settings
@@ -15,6 +16,7 @@ except ImportError:
 
 import schemathesis
 from schemathesis.core.errors import InternalError
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import (
     _UNICODE_PROPERTY_RAW_MAP,
@@ -424,15 +426,24 @@ def test_update_pattern_in_schema_keeps_unenforced_bounds(schema, expected):
         # Negated POSIX class `[:^X:]` and unknown POSIX names \u2014 bail out.
         (r"[[:^alnum:]_]", None),
         (r"[[:greek:]_]", None),
-        # PCRE/Java class-set operators have no Python `re` equivalent; bail out so the
-        # translator doesn't silently change semantics (`||` becomes literal `|`, etc.).
-        (r"[\p{L}||\p{N}]+", None),
-        (r"[\p{N}||\p{P}]+", None),
-        (r"[\p{L}||\p{M}||\p{Z}||\p{S}||\p{N}||\p{P}]+", None),
-        (r"[\p{Print}&&[^|:/]]+", None),
-        (r"[\p{L}~~\p{N}]", None),
-        # Nested class `[[...]]` inside an outer class has no safe Python equivalent.
-        (r"[[\p{L}]\p{N}]", None),
+        # A nested class stands for one side of an operator.
+        (r"[\p{N}&&[5]]", r"[5]"),
+        # A side spelled with a shorthand class carries no codepoints to work out.
+        (r"[\p{L}&&\w]", None),
+        (r"[\p{L}&&[\w]]", None),
+        # A nested class opening on `]` names it as a member, leaving the operator's side unreadable.
+        (r"[\p{L}&&[]]", None),
+        # A negated POSIX class cannot compose with the members beside it, on either side.
+        (r"[\p{L}&&[:^alnum:]]", None),
+        # Nothing is left for the class to admit.
+        (r"[\p{L}&&\p{N}]", None),
+        # Brace hex naming no digits, or a codepoint past the last one.
+        (r"[a\x{}b]", None),
+        (r"[a\x{110000}]", None),
+        # A class that never closes, with and without an operator inside it.
+        (r"[\p{L}&&[a]", None),
+        (r"[\p{L}&&[:alpha]", None),
+        (r"[\p{L}[a]", None),
         # No translation needed (already valid Python regex)
         (r"[a-z]+", None),
         (r"^\d+$", None),
@@ -464,6 +475,41 @@ def test_negated_property_inside_class(pattern, matching, rejected):
         assert compiled.fullmatch(char), char
     for char in rejected:
         assert not compiled.fullmatch(char), char
+
+
+_ENGINE_AGREEMENT = [
+    # `||` is not an operator in the engine behind validation - it names a literal `|`.
+    (r"^[\p{L}||\p{N}]$", "a1|", "!"),
+    (r"^[\p{L}||\p{M}||\p{Z}||\p{S}||\p{N}||\p{P}]$", "a1 .$|", "\x01"),
+    # `&&` keeps what both sides admit, and a class nested inside another adds to it.
+    (r"^[\p{Print}&&[^|:/]]$", "a& ", "|:/"),
+    (r"^[[\p{L}]\p{N}]$", "a1", "[]!"),
+    # `~~` keeps what only one side admits.
+    (r"^[\p{L}~~\p{N}]$", "a1", "~!"),
+    # A class reaching the last codepoint leaves no gap above it.
+    (r"^[\p{L}\x{10FFFF}~~[a]]$", "b\U0010ffff", "a"),
+    # PCRE brace hex escapes.
+    (r"^[a\x{60}]$", "a`", "b"),
+    (r"^([$\-._+!*\x{60}(),;/?:@=&\w]|%([0-9a-fA-F?]{2}|[0-9a-fA-F?]?[*]))+$", "a`$_", " \t"),
+    # Unicode script names.
+    (r"^[A-Za-z \p{Han}\p{Katakana}\p{Hiragana}\p{Hangul}-]$", "aZ -中アあ가", "1!"),
+]
+
+
+@pytest.mark.parametrize(
+    ("pattern", "matching", "rejected"), _ENGINE_AGREEMENT, ids=[item[0] for item in _ENGINE_AGREEMENT]
+)
+def test_translation_agrees_with_the_validator(pattern, matching, rejected):
+    translated = normalize_regex(pattern)
+    assert translated is not None
+    compiled = re.compile(translated)
+    validator = jsonschema_rs.validator_for({"type": "string", "pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS)
+    for char in matching:
+        assert compiled.fullmatch(char), char
+        assert validator.is_valid(char), char
+    for char in rejected:
+        assert not compiled.fullmatch(char), char
+        assert not validator.is_valid(char), char
 
 
 _COMPLEMENT_PROBE = "aZ0_ -!.\t\néÀ́ €中\U0001f600"
