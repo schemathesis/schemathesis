@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import jsonschema_rs
     from hypothesis.strategies import SearchStrategy
+
+
+class Distinctness(str, Enum):
+    """Whether an array's elements may coincide."""
+
+    UNCONSTRAINED = "unconstrained"
+    ALL_DISTINCT = "all_distinct"
+    SOME_REPEATED = "some_repeated"
 
 
 @dataclass(slots=True, frozen=True)

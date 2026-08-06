@@ -20,13 +20,14 @@ from schemathesis.core import MAX_STRING_LENGTH
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
+    FANCY_REGEX_OPTIONS,
     build_validator_for,
     compile_ecma_pattern,
     make_validator,
     make_validator_for,
 )
 from schemathesis.core.validation import has_leading_whitespace
-from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
+from schemathesis.generation.jsonschema.context import Alphabet, Distinctness, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
 
 if TYPE_CHECKING:
@@ -375,6 +376,7 @@ def _array(
         return st.nothing()
     if view.prefix_items or view.contains:
         return _with_fixed_elements(schema, view, ctx)
+    all_distinct = view.distinctness == Distinctness.ALL_DISTINCT
     element = _element(view.items, ctx)
     kwargs: dict[str, int] = {}
     if view.min_items is not None:
@@ -388,8 +390,10 @@ def _array(
     if kwargs and not ctx.pending and element.is_empty:
         # No position can be filled, so the empty array is the only value the bounds may allow.
         return st.nothing() if kwargs.get("min_size") else st.just([])
-    if view.unique_items:
+    if all_distinct:
         return st.lists(element, unique_by=_json_identity, **kwargs)
+    if view.distinctness == Distinctness.SOME_REPEATED:
+        return st.lists(element, **kwargs).map(_repeat_one)
     return st.lists(element, **kwargs)
 
 
@@ -397,11 +401,12 @@ def _with_fixed_elements(
     schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """An array whose opening positions the schema names or demands, followed by free ones."""
+    all_distinct = view.distinctness == Distinctness.ALL_DISTINCT
     max_items = _countable(view.max_items)
     # A schema past the length ceiling pins a position no array can have.
     entries = list(view.prefix_items if max_items is None else view.prefix_items[:max_items])
     demands = [_Demand(item.schema, _minimum_contains(item), item.max_contains) for item in view.contains]
-    if view.unique_items:
+    if all_distinct:
         # One element can meet several demands at once; folding those spares a unique array a repeat.
         demands = _merged(demands, view.items)
     # Placing the demanded elements beats filtering: `items` on its own may match rarely, or never.
@@ -410,12 +415,12 @@ def _with_fixed_elements(
     for demand in demands:
         avoid = [other for other in bounded if other is not demand.schema]
         element, counted = _matching(view.items, demand.schema, avoid, ctx)
-        supply = _supply(view.items, demand.schema) if view.unique_items else None
+        supply = _supply(view.items, demand.schema) if all_distinct else None
         resolved.append(replace(demand, element=element, supply=supply, counted=counted))
     demands = resolved
 
     closed = False
-    if view.unique_items:
+    if all_distinct:
         # One element can count for several demands, and matches can always be appended, so a demand
         # only needs its own domain to hold enough distinct values.
         if any(demand.supply is not None and len(demand.supply) < demand.minimum for demand in demands):
@@ -493,6 +498,7 @@ def _from_layout(
     ctx: StrategyContext,
 ) -> SearchStrategy[JsonValue]:
     """The arrays one layout admits, drawn as its parts laid end to end."""
+    all_distinct = view.distinctness == Distinctness.ALL_DISTINCT
     minimum = view.min_items or 0
     max_items = _countable(view.max_items)
     fixed = _spelled_out(layout)
@@ -510,20 +516,20 @@ def _from_layout(
             return st.nothing()
     elif free.is_empty:
         # The demanded elements carry the length: the shortfall first, then slack under the ceilings.
-        if not _carry(layout.placements, minimum - fixed, unique=view.unique_items):
+        if not _carry(layout.placements, minimum - fixed, unique=all_distinct):
             return st.nothing()
         fixed = _spelled_out(layout)
         headroom = None if max_items is None else max_items - fixed
         for placement in layout.placements:
-            room = _room(placement, unique=view.unique_items)
+            room = _room(placement, unique=all_distinct)
             if placement.demand.element is None or not room:
                 continue
             placement.slack = room if headroom is None else min(room, headroom)
             if headroom is not None:
                 headroom -= placement.slack
-    elif view.unique_items and free_values is not None and minimum - fixed > len(free_values):
+    elif all_distinct and free_values is not None and minimum - fixed > len(free_values):
         # The tail holds fewer distinct values than the floor asks; the demanded elements carry the rest.
-        if not _carry(layout.placements, minimum - fixed - len(free_values), unique=view.unique_items):
+        if not _carry(layout.placements, minimum - fixed - len(free_values), unique=all_distinct):
             return st.nothing()
         fixed = _spelled_out(layout)
 
@@ -532,20 +538,20 @@ def _from_layout(
     if layout.entries:
         parts.append(st.tuples(*[from_schema(entry, ctx) for entry in layout.entries]))
     parts.extend(
-        _repeated(placement, unique=view.unique_items)
+        _repeated(placement, unique=all_distinct)
         for placement in layout.placements
         if placement.placed or placement.slack
     )
     if free.is_empty:
         # No tail part: `st.lists` refuses a positive ceiling over an element strategy drawing nothing.
-        return _joined(parts, unique=view.unique_items, checked=layout.counted, schema=schema)
+        return _joined(parts, unique=all_distinct, checked=layout.counted, schema=schema)
     kwargs: dict[str, int] = {"min_size": max(0, minimum - fixed)}
     if max_items is not None:
         kwargs["max_size"] = max_items - fixed
     # `unique_by` settles the free positions; collisions across parts are left to the joined filter.
-    distinct = {"unique_by": _json_identity} if view.unique_items else {}
+    distinct = {"unique_by": _json_identity} if all_distinct else {}
     parts.append(st.lists(free, **distinct, **kwargs))
-    return _joined(parts, unique=view.unique_items, checked=layout.counted, schema=schema)
+    return _joined(parts, unique=all_distinct, checked=layout.counted, schema=schema)
 
 
 def _spelled_out(layout: _Layout) -> int:
@@ -838,6 +844,16 @@ def _parts_unique(parts: tuple[Sequence[JsonValue], ...]) -> bool:
     return True
 
 
+def _repeat_one(value: list[JsonValue]) -> list[JsonValue]:
+    """One drawn array, with an element repeated where every one of them differs."""
+    # A repeat needs two positions to sit in, and the demand carries that floor with it.
+    assert len(value) >= 2
+    seen = {_json_identity(item) for item in value}
+    if len(seen) < len(value):
+        return value
+    return [value[0], *value[:-1]]
+
+
 def _json_identity(value: JsonValue) -> object:
     """What `uniqueItems` counts as the same value."""
     # `True == 1` in Python, but `true` and `1` are different JSON values.
@@ -861,6 +877,7 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
     # A key can be required without `properties` saying anything about its value.
     required = {key: entries[key] if key in entries else value_for(key) for key in view.required}
     optional = {key: entry for key, entry in entries.items() if key not in view.required}
+    known = set(view.properties) | set(view.required)
     names = None if view.property_names is None else _closed_names(view.property_names)
     if names is not None:
         # A closed name set admits nothing else, so its names are the only optional keys.
@@ -868,7 +885,6 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
         optional.update({name: value_for(name) for name in sorted(names - set(required) - set(optional))})
         extra = None
     else:
-        known = set(view.properties) | set(view.required)
         free_names = _free_names(view, ctx).filter(lambda key: key not in known)
         if view.pattern_properties:
             # Which schemas a key answers to is decided by its own name, so name and value are one draw.
@@ -876,16 +892,99 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
         else:
             extra = st.tuples(free_names, unnamed)
     max_properties = _countable(view.max_properties)
+    if view.violations and max_properties is not None:
+        # Injected violation entries land on top of the base draw; leave them room under the leaf's
+        # own ceiling instead of the total - the floor stays as-is, since violations only ever add keys.
+        max_properties -= len(view.violations)
+        if max_properties < len(required):
+            # A fresh violation key can never coincide with a required one, so the ceiling has to fit
+            # both. The canonicalizer does not yet fold that need into `maxProperties` satisfiability
+            # the way `contains` demands are folded into a length floor, so this combo can still
+            # reach here despite `is_satisfiable()` saying otherwise.
+            return st.nothing()
     if view.min_properties is None and max_properties is None:
         # A coin per optional key lands on half of them, which compounds at every nesting level.
         # Built here rather than per draw, where it would be one strategy per generated value.
         optional_keys = sorted(optional)
         picker = st.sets(st.sampled_from(optional_keys), max_size=len(optional_keys)) if optional_keys else None
         named = _named_object(required, optional, picker)
-        if extra is None:
-            return named
-        return st.tuples(named, _collect(extra, 0, _EXTRA_KEYS)).map(lambda parts: {**parts[1], **parts[0]})
-    return _sized_object(required, optional, extra, view.min_properties or 0, max_properties)
+        base = (
+            named
+            if extra is None
+            else st.tuples(named, _collect(extra, 0, _EXTRA_KEYS)).map(lambda parts: {**parts[1], **parts[0]})
+        )
+    else:
+        base = _sized_object(required, optional, extra, view.min_properties or 0, max_properties)
+    if not view.violations:
+        return base
+    entries_to_inject = [_violation_entry(violation, view, value_for, known, ctx) for violation in view.violations]
+    return _with_violations(base, entries_to_inject)
+
+
+@lru_cache
+def _string_domain(draft: int) -> jsonschema_rs.CanonicalSchema:
+    """The canonical `{"type": "string"}` for one draft, built once to narrow key complements onto."""
+    # Matches the kwargs `builder.py` canonicalizes the document with - `intersect` refuses operands
+    # that disagree on whether `format` asserts.
+    return jsonschema_rs.canonicalize(
+        {"type": "string"}, draft=draft, pattern_options=FANCY_REGEX_OPTIONS, validate_formats=True
+    )
+
+
+def _violation_entry(
+    violation: canonical.NameFailsView | canonical.UndeclaredValueFailsView,
+    view: jsonschema_rs.canonical.ObjectView,
+    value_for: Callable[[str], SearchStrategy[JsonValue]],
+    known: set[str],
+    ctx: StrategyContext,
+) -> SearchStrategy[tuple[str, JsonValue]]:
+    """One demand from `ObjectView.violations`, as a key/value pair the object injects last."""
+    if isinstance(violation, canonical.NameFailsView):
+        complement = violation.schema.negate()
+        # A name demand is a string schema, and canonicalization spells every one of those complements.
+        assert complement is not None
+        key_schema = complement.intersect(_string_domain(ctx.root.draft))
+        # The key still lands in this object, so the names it admits bound the barred one too.
+        if view.property_names is not None:
+            key_schema = key_schema.intersect(view.property_names)
+        key = from_schema(key_schema, ctx).map(_key)
+        # A name equal to a declared property would need that property's schema intersected in too;
+        # a fresh key sidesteps that at the cost of never reusing a declared name for the injected key.
+        key = key.filter(lambda candidate: candidate not in known)
+        # The leaf's own per-key schema (`patternProperties`/`additionalProperties`) still applies to
+        # whatever key lands here, so key and value are one draw.
+        return key.flatmap(lambda name: st.tuples(st.just(name), value_for(name)))
+    names = frozenset(violation.names)
+    # The exact per-key validator judges pattern membership, like `_PatternProperty.claims` - no
+    # Python-re/ECMA divergence, since nothing here drives generation from the pattern's source.
+    claims = [_facet_check("pattern", pattern) for pattern in (*violation.patterns, *view.pattern_properties)]
+    # The key still lands in this object, so the names it admits bound the undeclared one too.
+    drawn = _text(ctx) if view.property_names is None else from_schema(view.property_names, ctx).map(_key)
+    key = drawn.filter(
+        lambda candidate: (
+            candidate not in names and candidate not in known and not any(claim(candidate) for claim in claims)
+        )
+    )
+    complement = violation.additional.negate()
+    # The demand reaches here only where canonicalization spelled its complement.
+    assert complement is not None
+    if view.additional_properties is not None:
+        complement = complement.intersect(view.additional_properties)
+    return st.tuples(key, from_schema(complement, ctx))
+
+
+@st.composite  # type: ignore[untyped-decorator]
+def _with_violations(
+    draw: st.DrawFn, base: SearchStrategy[JsonValue], entries: list[SearchStrategy[tuple[str, JsonValue]]]
+) -> JsonValue:
+    """The base object plus one entry per violation demand, each injected last so it always lands."""
+    drawn = draw(base)
+    assert isinstance(drawn, dict), drawn
+    result = dict(drawn)
+    for entry in entries:
+        key, value = draw(entry)
+        result[key] = value
+    return result
 
 
 @st.composite  # type: ignore[untyped-decorator]
