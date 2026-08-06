@@ -77,8 +77,8 @@ from schemathesis.specs.openapi.negative import (
     wrap_flatmap_hook_for_generated_value,
     wrap_map_hook_for_generated_value,
 )
-from schemathesis.specs.openapi.negative.mutations import MutationMetadata
-from schemathesis.specs.openapi.negative.utils import can_negate, is_binary_format
+from schemathesis.specs.openapi.negative.mutations import MutationMetadata, has_negatable_target
+from schemathesis.specs.openapi.negative.utils import is_binary_format
 from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
@@ -967,7 +967,16 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
     parameters = cast(OpenApiParameterSet, operation.path_parameters).schema["properties"]
     if not parameters:
         return True
-    return any(can_negate(parameter) for parameter in parameters.values())
+    # A path value always serializes to a string, so a type change is invisible on the wire and the
+    # constraint keywords the mutator will accept are the whole negatable surface.
+    return any(
+        has_negatable_target(
+            parameter,
+            location=ParameterLocation.PATH,
+            allow_extra_parameters=operation.schema.config.generation.allow_extra_parameters,
+        )
+        for parameter in parameters.values()
+    )
 
 
 def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> bool:

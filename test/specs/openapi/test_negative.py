@@ -1422,3 +1422,54 @@ NEGATABLE_SCHEMAS = [
 @pytest.mark.parametrize(("schema", "expected"), NEGATABLE_SCHEMAS, ids=str)
 def test_can_negate(schema, expected):
     assert can_negate(schema) is expected
+
+
+def _operation_with_parameters(ctx, parameters):
+    schema = ctx.openapi.load_schema(
+        {"/items/{itemId}": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}}
+    )
+    return schema["/items/{itemId}"]["GET"]
+
+
+PLAIN_STRING_PARAMETER = {"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}
+PATTERN_HEADER = {
+    "name": "Authorization",
+    "in": "header",
+    "required": True,
+    "schema": {"type": "string", "pattern": r"^Bearer\s[\w-]+$"},
+}
+ANNOTATED_HEADER = {
+    "name": "Accept",
+    "in": "header",
+    "required": True,
+    "schema": {"type": "string", "example": "application/json;version=2018-01-01"},
+}
+
+
+# A path value is always a string once serialized, so no mutation operator accepts a plain string there;
+# treating it as negatable spends the whole budget on cases that can never be negative.
+def test_plain_string_path_parameter_does_not_exhaust_generation(ctx):
+    operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, PATTERN_HEADER])
+    cases = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    def test(case):
+        cases.append(case)
+
+    test()
+    assert cases
+
+
+def test_unnegatable_path_falls_back_to_positive(ctx):
+    operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, ANNOTATED_HEADER])
+    modes = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    def test(case):
+        modes.append({location.value: component.mode.value for location, component in case.meta.components.items()})
+
+    test()
+    assert modes
+    assert all(entry["path"] == "positive" and entry["header"] == "negative" for entry in modes), modes
