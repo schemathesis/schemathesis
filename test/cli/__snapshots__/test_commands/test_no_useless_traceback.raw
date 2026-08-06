@@ -58,7 +58,7 @@ Reproduce with:
 Unsupported regex patterns: 1 operation contain regex patterns no value can be generated for
 
   - POST /success
-    No value can be generated for `^[\p{Han}]+$`
+    No value can be generated for `^[\p{Greek}]+$`
 
 💡 Supply examples for these operations, or narrow the pattern
 

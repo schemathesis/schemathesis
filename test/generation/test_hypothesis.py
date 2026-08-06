@@ -3118,16 +3118,16 @@ def test_recursion_next_to_a_schema_that_declines_canonicalization(ctx):
 
 
 UNSUPPORTED_SCHEMAS = [
-    # A script has no spelling in codepoints here, so it can only filter; nothing drives the draw.
-    ({"type": "string", "pattern": r"\p{Han}"}, jsonschema_rs.Draft202012Validator),
+    # A script with no spelling in codepoints here can only filter; nothing drives the draw.
+    ({"type": "string", "pattern": r"\p{Greek}"}, jsonschema_rs.Draft202012Validator),
     # A node behind a pattern is only reached on a draw, and must still be refused up front.
     (
-        {"type": "object", "patternProperties": {"^a": {"type": "string", "pattern": r"\p{Han}"}}},
+        {"type": "object", "patternProperties": {"^a": {"type": "string", "pattern": r"\p{Greek}"}}},
         jsonschema_rs.Draft202012Validator,
     ),
     # Every alternative undrawable leaves nothing to draw from, unlike one that still has a sibling.
     (
-        {"anyOf": [{"type": "string", "pattern": r"\p{Han}"}, {"type": "string", "pattern": r"\p{Greek}"}]},
+        {"anyOf": [{"type": "string", "pattern": r"\p{Greek}"}, {"type": "string", "pattern": r"\p{Cyrillic}"}]},
         jsonschema_rs.Draft202012Validator,
     ),
 ]

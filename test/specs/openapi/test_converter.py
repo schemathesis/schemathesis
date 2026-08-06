@@ -545,9 +545,9 @@ def test_pattern_translation_invalid_result():
 @pytest.mark.parametrize(
     "pattern",
     [
-        r"^[A-Za-z \p{Han}\p{Katakana}]*$",
-        r"[\p{Print}&&[^|:/]]+",
-        r"^([$\-._+!*\x{60}(),;/?:@=&\w]|%([0-9a-fA-F?]{2}))+$",
+        r"^[A-Za-z \p{Greek}\p{Cyrillic}]*$",
+        r"[\p{Greek}&&[^|:/]]+",
+        r"\p{Script=Latin}",
     ],
 )
 def test_pattern_the_validator_enforces_is_kept(pattern):
