@@ -3774,6 +3774,54 @@ def test_positive_body_generated_when_required_excludes_forbidden_properties(ctx
     )
 
 
+def test_positive_body_omits_property_forbidden_by_all_of_sibling(ctx):
+    # A property carrying an `example` stays out of the body when another `allOf` branch marks it `readOnly`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/volumes": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {"$ref": "#/components/schemas/Volume"},
+                                        {"type": "object", "properties": {"linode_id": {"readOnly": True}}},
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Volume": {
+                    "type": "object",
+                    "properties": {
+                        "label": {"type": "string", "example": "my-volume"},
+                        "linode_id": {"type": "integer", "nullable": True, "example": 12346},
+                        "tags": {"$ref": "#/components/schemas/Tags"},
+                    },
+                },
+                # Second component forces bundling so the `$ref` + sibling shape survives into generation.
+                "Tags": {"type": "array", "items": {"type": "string"}},
+            }
+        },
+    )
+    operation = schema["/volumes"]["PUT"]
+    positive_bodies = [
+        case.body
+        for case in _iter_cases(operation, GenerationMode.POSITIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY
+    ]
+    assert positive_bodies, "Expected at least one positive body case"
+    assert [body for body in positive_bodies if "linode_id" in body] == []
+
+
 def test_parameter_positive_coverage_when_body_fallback_negative(ctx):
     # An unsatisfiable body must not suppress positive coverage of unrelated parameters.
     schema = ctx.openapi.load_schema(
