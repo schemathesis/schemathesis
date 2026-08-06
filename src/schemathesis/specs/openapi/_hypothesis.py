@@ -64,10 +64,10 @@ from schemathesis.specs.openapi.formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
     HEADER_FORMAT,
     INVALID_HEADER_CHARS,
-    MAX_HEADER_CODEPOINT,
     STRING_FORMATS,
     get_alphabet_format_strategies,
     get_default_format_strategies,
+    header_alphabet,
     header_values,
 )
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS, get_header_format_strategies
@@ -1216,7 +1216,7 @@ def _canonical_strategy_or_none(
     if location is not None and location.is_in_header:
         # What a header may carry is a rule about characters, so it is spelled as one: every string
         # in the container obeys it, and the length and pattern keywords around it keep working.
-        alphabet = _header_alphabet(generation_config)
+        alphabet = header_alphabet(generation_config)
         formats = _build_header_formats(generation_config, GenerationMode.POSITIVE)
     else:
         alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
@@ -1226,22 +1226,6 @@ def _canonical_strategy_or_none(
         draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
         formats=formats,
         alphabet=alphabet,
-    )
-
-
-def _header_alphabet(generation_config: GenerationConfig) -> Alphabet:
-    """Characters a header value may carry, under the caller's generation settings."""
-    excluded = generation_config.exclude_header_characters
-    if excluded is None:
-        excluded = DEFAULT_HEADER_EXCLUDE_CHARACTERS
-    # A codec the user asked for wins; the default one is widened to everything a header may carry.
-    codec = generation_config.codec if generation_config.codec not in (None, "utf-8") else "ascii"
-    return Alphabet(
-        allow_x00=generation_config.allow_x00,
-        codec=codec,
-        max_codepoint=MAX_HEADER_CODEPOINT,
-        exclude_characters="".join(sorted(set(excluded + INVALID_HEADER_CHARS))),
-        allow_leading_whitespace=False,
     )
 
 

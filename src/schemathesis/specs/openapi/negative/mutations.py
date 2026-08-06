@@ -636,7 +636,6 @@ class MutationContext:
                 continue
             new_schema[key] = value
         if self.location.is_in_header:
-            new_schema["propertyNames"] = {"type": "string", "format": "_header_name"}
             for sub_schema in new_schema.get("properties", {}).values():
                 sub_schema["type"] = "string"
                 # `_header_value` keeps generated values within RFC 9110 codepoints so `is_valid_header` doesn't
@@ -652,10 +651,13 @@ class MutationContext:
         # turning a "negative" case into a positive one — force at least one element.
         if "array" in get_type(new_schema) and new_schema.get("items") and "minItems" not in new_schema.get("not", {}):
             new_schema.setdefault("minItems", 1)
+        # A barred `required` already rules the empty object out, and demanding a property on top of it
+        # asks a closed shape for a key it does not admit.
         if (
             "object" in get_type(new_schema)
             and new_schema.get("properties")
             and "minProperties" not in new_schema.get("not", {})
+            and "required" not in new_schema.get("not", {})
         ):
             new_schema.setdefault("minProperties", 1)
 

@@ -27,6 +27,7 @@ from schemathesis.generation.jsonschema import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi.adapter.parameters import _constant_values_at_draws, _prune_modified_constants
+from schemathesis.specs.openapi.formats import HEADER_FORMAT, header_alphabet
 from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
     MutationChannel,
@@ -289,19 +290,17 @@ def negative_schema(
         def filter_values(value: Any) -> bool:
             return skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
 
-    alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
+    if location.is_in_header:
+        # Header names and values answer to the same character rules whoever asks for them.
+        alphabet = header_alphabet(generation_config)
+        custom_formats = {name: strategy for name, strategy in custom_formats.items() if name != HEADER_FORMAT}
+    else:
+        alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
 
     def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
         schema, metadata = value
-        # `propertyNames` pins the header name grammar, and it is Draft 6+: a Draft 4 document drops it
-        # during canonicalization, leaving names no header can carry. Until the grammar reaches the
-        # engine some other way, headers keep the generator that reads the keyword as written.
-        strategy = (
-            None
-            if location.is_in_header
-            else build(
-                schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
-            )
+        strategy = build(
+            schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
         )
         if strategy is None:
             strategy = from_schema(

@@ -10,7 +10,9 @@ from base64 import b64encode
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from schemathesis.config import GenerationConfig
 from schemathesis.core.validation import has_leading_whitespace
+from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -402,3 +404,21 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
         "_basic_auth": st.tuples(latin1_text, latin1_text).map(lambda item: _basic_auth_str(*item)),
         "_bearer_auth": header_value.map("Bearer {}".format),
     }
+
+
+def header_alphabet(generation_config: GenerationConfig) -> Alphabet:
+    """Characters and shape a header name or value may carry, under the caller's generation settings."""
+    excluded = generation_config.exclude_header_characters
+    if excluded is None:
+        excluded = DEFAULT_HEADER_EXCLUDE_CHARACTERS
+    # A codec the user asked for wins; the default one is widened to everything a header may carry.
+    codec = generation_config.codec if generation_config.codec not in (None, "utf-8") else "ascii"
+    return Alphabet(
+        allow_x00=generation_config.allow_x00,
+        codec=codec,
+        max_codepoint=MAX_HEADER_CODEPOINT,
+        exclude_characters="".join(sorted(set(excluded + INVALID_HEADER_CHARS))),
+        allow_leading_whitespace=False,
+        min_name_length=1,
+        name_characters="!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters,
+    )
