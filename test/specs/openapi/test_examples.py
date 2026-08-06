@@ -280,12 +280,8 @@ def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx
 
 
 def test_examples_phase_skips_properties_it_cannot_generate(ctx):
-    # Negating a closed object has no form to draw from, so that property contributes nothing.
-    undrawable = {
-        "type": "object",
-        "properties": {"x": {"type": "integer"}},
-        "not": {"additionalProperties": False, "properties": {"x": {"type": "integer"}}},
-    }
+    # Barring a keyed shape has no form to draw from, so that property contributes nothing.
+    undrawable = {"not": {"type": "object", "patternProperties": {"^a": {"type": "string"}}}}
     operation = ctx.openapi.load_schema(
         {
             "/r": {

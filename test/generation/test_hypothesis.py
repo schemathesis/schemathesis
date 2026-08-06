@@ -1779,6 +1779,55 @@ CANONICAL_CASES = [
         },
         (lambda value: isinstance(value, dict) and isinstance(value.get("b"), dict),),
     ),
+    # Barring distinctness demands a repeat, which no drawn array may be missing.
+    (
+        {"not": {"type": "array", "uniqueItems": True}},
+        (lambda value: isinstance(value, list) and len(value) > 2,),
+    ),
+    (
+        {"not": {"type": "array", "uniqueItems": True, "minItems": 2}},
+        (lambda value: isinstance(value, list),),
+    ),
+    # A key barred from a demand still answers to the shape governing where it lands.
+    (
+        {
+            "type": "array",
+            "contains": {"type": "object", "properties": {"a": {}}, "propertyNames": {"enum": ["a", "zz"]}},
+            "minContains": 0,
+            "maxContains": 1,
+            "unevaluatedItems": {
+                "type": "object",
+                "properties": {"a": {}, "b": {}},
+                "additionalProperties": False,
+            },
+        },
+        (lambda value: len(value) > 0,),
+    ),
+    (
+        {
+            "type": "array",
+            "contains": {"type": "object", "additionalProperties": {"type": "string"}},
+            "maxContains": 1,
+            "unevaluatedItems": {
+                "type": "object",
+                "propertyNames": {"enum": ["a", "zz"]},
+                "maxProperties": 1,
+            },
+        },
+        (lambda value: len(value) > 0,),
+    ),
+    # An undeclared key barred from a demand still answers to the value schema governing it.
+    (
+        {
+            "not": {
+                "type": "object",
+                "propertyNames": {"enum": ["a", "zz"]},
+                "additionalProperties": {"type": "string"},
+            },
+            "additionalProperties": {"type": "integer"},
+        },
+        (lambda value: isinstance(value, dict) and len(value) > 0,),
+    ),
     # A `$ref` names the schema to draw from, and repeats of it draw the same way.
     ({"$ref": "#/$defs/text", "$defs": {"text": {"type": "string", "minLength": 3}}}, ()),
     (
@@ -2258,6 +2307,31 @@ CANONICAL_CASES = [
     ({"type": "object", "patternProperties": {r"[\p{L}]+": {"type": "string"}}}, (lambda value: len(value) > 0,)),
     # A pattern nothing can be drawn against binds strings only; every other type stays available.
     ({"pattern": r"[\p{Greek}]+"}, (lambda value: isinstance(value, list), lambda value: isinstance(value, dict))),
+    # `not` over a closed map demands a key the declared shape forbids; the draw must inject one.
+    (
+        {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {"filter": {"type": "string"}},
+            "not": {"additionalProperties": False, "properties": {"filter": {"type": "string"}}},
+        },
+        (lambda value: any(key != "filter" for key in value), lambda value: "filter" in value and len(value) > 1),
+    ),
+    (
+        {"not": {"type": "object", "propertyNames": {"enum": ["a", "b"]}}},
+        (
+            lambda value: isinstance(value, dict) and any(key not in ("a", "b") for key in value),
+            lambda value: not isinstance(value, dict),
+        ),
+    ),
+    (
+        {"not": {"type": "object", "additionalProperties": {"type": "string"}}},
+        (lambda value: isinstance(value, dict) and any(not isinstance(item, str) for item in value.values()),),
+    ),
+    (
+        {"not": {"type": "object", "propertyNames": {"pattern": "^a"}}},
+        (lambda value: isinstance(value, dict) and any(not key.startswith("a") for key in value),),
+    ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and
