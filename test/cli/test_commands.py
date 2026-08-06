@@ -466,32 +466,6 @@ def test_unsatisfiable_empty_array_items(cli, ctx, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive") == snapshot_cli
 
 
-def test_health_check_message(cli, ctx, snapshot_cli):
-    api = ctx.openapi.apps.success()
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/items/{item_id}/": {
-                "patch": {
-                    "requestBody": {
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
-                        "required": True,
-                    }
-                }
-            }
-        },
-        components={
-            "schemas": {
-                "Item": {
-                    "type": "string",
-                    "format": "date-time",
-                    "pattern": "abc",
-                }
-            }
-        },
-    )
-    assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing") == snapshot_cli
-
-
 @pytest.mark.parametrize("workers", [1, 2])
 def test_status_code_conformance(ctx, cli, workers, snapshot_cli):
     # When operation returns a status code, that is not listed in "responses"

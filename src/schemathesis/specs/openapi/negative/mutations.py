@@ -911,6 +911,61 @@ def drop_not_type_specific_keywords(schema: Schema, new_type: str) -> None:
             schema.pop(keyword, None)
 
 
+def is_negatable_keyword(key: str, value: Any, *, location: ParameterLocation, allow_extra_parameters: bool) -> bool:
+    """Whether barring this keyword changes what reaches the server."""
+    if key == "required":
+        return value != []
+    if key in ("example", "examples", BUNDLE_STORAGE_KEY):
+        return False
+    if location == ParameterLocation.PATH and key == "minLength" and value == 1:
+        # Negating `minLength: 1` produces empty paths that the transport drops anyway.
+        return False
+    if (
+        not allow_extra_parameters
+        and key == "additionalProperties"
+        and location in (ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE)
+    ):
+        return False
+    return not (
+        key in ("type", "properties", "items", "minItems") or (key == "additionalProperties" and location.is_in_header)
+    )
+
+
+def has_negatable_target(
+    schema: Schema, *, location: ParameterLocation, allow_extra_parameters: bool, depth: int = 0
+) -> bool:
+    """Whether any operator would find something to bar here or at a target nested below.
+
+    Mirrors what the mutation walk reaches, so a parameter is only ruled out when every
+    reachable target is one both operators decline.
+    """
+    if not isinstance(schema, dict) or depth > MAX_WALK_DEPTH:
+        return False
+    # `change_type` only declines where the value serializes to a string anyway.
+    if "type" in schema and "string" not in get_type(schema):
+        return True
+    if any(
+        is_negatable_keyword(key, value, location=location, allow_extra_parameters=allow_extra_parameters)
+        for key, value in schema.items()
+    ):
+        return True
+    nested: list[Any] = []
+    for keyword in ("properties", "patternProperties"):
+        value = schema.get(keyword)
+        if isinstance(value, dict):
+            nested.extend(value.values())
+    for keyword in ("items", "additionalProperties"):
+        nested.append(schema.get(keyword))
+    for keyword in ("oneOf", "anyOf", "allOf"):
+        value = schema.get(keyword)
+        if isinstance(value, list):
+            nested.extend(value)
+    return any(
+        has_negatable_target(child, location=location, allow_extra_parameters=allow_extra_parameters, depth=depth + 1)
+        for child in nested
+    )
+
+
 def negate_constraints(
     ctx: MutationContext, draw: Draw, schema: Schema
 ) -> tuple[MutationResult, MutationMetadata | None]:
@@ -928,23 +983,7 @@ def negate_constraints(
     negated_keys = []
 
     def is_mutation_candidate(k: str, v: Any) -> bool:
-        if k == "required":
-            return v != []
-        if k in ("example", "examples", BUNDLE_STORAGE_KEY):
-            return False
-        if ctx.is_path_location and k == "minLength" and v == 1:
-            # Negating `minLength: 1` produces empty paths that the transport drops anyway.
-            return False
-        if (
-            not ctx.allow_extra_parameters
-            and k == "additionalProperties"
-            and ctx.location in (ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE)
-        ):
-            return False
-        return not (
-            k in ("type", "properties", "items", "minItems")
-            or (k == "additionalProperties" and ctx.location.is_in_header)
-        )
+        return is_negatable_keyword(k, v, location=ctx.location, allow_extra_parameters=ctx.allow_extra_parameters)
 
     enabled_keywords = draw(st.shared(FeatureStrategy(), key="keywords"))
     candidates = []

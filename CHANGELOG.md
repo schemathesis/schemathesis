@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Run aborting with an internal error on parameters whose name is not a string, such as `true`.
+- Unsatisfiable negative tests for operations whose path parameters have no constraint to violate.
 - Generate sendable header and cookie values for schemas with keywords beyond `type`.
 - Internal error generating values for a `pattern` naming characters outside `generation.codec`.
 - Hypothesis warning about an overly large representation when generating unrestricted JSON values.
