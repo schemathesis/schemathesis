@@ -33,6 +33,7 @@
 - Runtime error in the coverage phase on a reference cycle through `allOf`.
 - Coverage phase generating `null` for nullable schemas an `allOf` sibling restricts to objects.
 - False positive `positive_data_acceptance` for `not` clauses in schemas using references.
+- Coverage phase sending read-only properties an `allOf` sibling forbids.
 
 ### :racing_car: Performance
 

@@ -995,6 +995,9 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     if merged.get("type") == [] or merged.get("enum") == []:
         # The branches leave no type or no value in common, so nothing satisfies all of them.
         return {"not": {}}
+    if merged.get("not") == {}:
+        # A branch rejects every value, so the keywords folded in around it cannot make one fit.
+        return {"not": {}}
     merged_names = set(merged.get("properties", {}))
     for branch in folded_branches:
         extra = branch.get("additionalProperties")
