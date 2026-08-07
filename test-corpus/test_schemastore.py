@@ -24,6 +24,8 @@ REF_FILE = CACHE_DIR / "REF"
 DEFAULT_SCHEMASTORE_REF = "49de45f91f2f8e6be4108d61b44ccd392da0815f"
 TARBALL_URL_TEMPLATE = "https://github.com/SchemaStore/schemastore/archive/{ref}.tar.gz"
 PER_SCHEMA_TIMEOUT_SECONDS = 20
+DRAFT_04_DIALECT = "http://json-schema.org/draft-04/schema#"
+LEGACY_DIALECTS = {"http://json-schema.org/draft-06/schema#", "http://json-schema.org/draft-07/schema#"}
 
 XFAIL_SCHEMAS: dict[str, str] = {
     "anywork-ac-1.0.json": "external $ref",
@@ -196,6 +198,59 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize("schema_path", params)
 
 
+# Sub-schemas live under names the author picks, so keyword rules do not apply to these keys.
+_SCHEMA_MAPS = ("properties", "patternProperties", "definitions", "$defs", "dependencies", "dependentSchemas")
+# Instance data, not schemas.
+_OPAQUE = ("enum", "const", "default", "example", "examples")
+
+
+def _upgrade_to_2020_12(schema: dict[str, Any]) -> dict[str, Any]:
+    renamed: list[str] = []
+
+    def convert(node: Any, pointer: str) -> Any:
+        if isinstance(node, dict):
+            upgraded: dict[str, Any] = {}
+            for key, value in node.items():
+                if key == "$id" or (key == "deprecated" and not isinstance(value, bool)):
+                    continue
+                if key in _OPAQUE:
+                    upgraded[key] = value
+                elif key in _SCHEMA_MAPS and isinstance(value, dict):
+                    upgraded[key] = {name: convert(child, f"{pointer}/{key}/{name}") for name, child in value.items()}
+                elif key == "items" and isinstance(value, list):
+                    renamed.append(f"{pointer}/items")
+                    upgraded["prefixItems"] = [
+                        convert(item, f"{pointer}/items/{index}") for index, item in enumerate(value)
+                    ]
+                elif key == "additionalItems" and isinstance(node.get("items"), list):
+                    upgraded["items"] = convert(value, f"{pointer}/additionalItems")
+                else:
+                    upgraded[key] = convert(value, f"{pointer}/{key}")
+            return upgraded
+        if isinstance(node, list):
+            return [convert(item, f"{pointer}/{index}") for index, item in enumerate(node)]
+        return node
+
+    def move_pointers(node: Any) -> Any:
+        if isinstance(node, dict):
+            moved: dict[str, Any] = {}
+            for key, value in node.items():
+                if key == "$ref" and isinstance(value, str) and value.startswith("#"):
+                    pointer = value[1:]
+                    for source in renamed:
+                        if pointer == source or pointer.startswith(f"{source}/"):
+                            value = f"#{source[: -len('items')]}prefixItems{pointer[len(source) :]}"
+                            break
+                moved[key] = move_pointers(value)
+            return moved
+        if isinstance(node, list):
+            return [move_pointers(item) for item in node]
+        return node
+
+    upgraded = convert(schema, "")
+    return move_pointers(upgraded) if renamed else upgraded
+
+
 def _rewrite_references(node: Any) -> Any:
     if isinstance(node, dict):
         rewritten: dict[str, Any] = {}
@@ -212,7 +267,7 @@ def _rewrite_references(node: Any) -> Any:
     return node
 
 
-def _wrap_as_openapi(schema: dict[str, Any]) -> dict[str, Any]:
+def _wrap_as_openapi(schema: dict[str, Any], version: str) -> dict[str, Any]:
     components_schemas: dict[str, Any] = {}
     for source_key in ("definitions", "$defs"):
         block = schema.pop(source_key, None)
@@ -221,7 +276,7 @@ def _wrap_as_openapi(schema: dict[str, Any]) -> dict[str, Any]:
     schema = _rewrite_references(schema)
     components_schemas = _rewrite_references(components_schemas)
     document: dict[str, Any] = {
-        "openapi": "3.1.0",
+        "openapi": version,
         "info": {"title": "schemastore probe", "version": "0.0.1"},
         "paths": {
             "/probe": {
@@ -252,7 +307,16 @@ def test_can_draw_example(schema_path: pathlib.Path) -> None:
     schema = json.loads(schema_path.read_bytes())
     if not isinstance(schema, dict):
         pytest.skip("Top-level JSON is not an object schema")
-    document = _wrap_as_openapi(schema)
+    declared = schema.get("$schema")
+    if declared == DRAFT_04_DIALECT:
+        # 3.0 canonicalizes under Draft 4 - the schema's own dialect, no conversion needed.
+        document = _wrap_as_openapi(schema, "3.0.2")
+    else:
+        # No OpenAPI version maps to Draft 6/7, so they go through 3.1 with the constructs
+        # 2020-12 spells differently rewritten.
+        if declared in LEGACY_DIALECTS:
+            schema = _upgrade_to_2020_12(schema)
+        document = _wrap_as_openapi(schema, "3.1.0")
     api = schemathesis.openapi.from_dict(document)
     operation = api["/probe"]["POST"]
     strategy = operation.as_strategy()
