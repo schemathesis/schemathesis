@@ -32,7 +32,7 @@ jobs:
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@f22792bfac16f3e14eb9fbea76f4a48e9cc22b93 # v4.19.1
+        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "simulation"
