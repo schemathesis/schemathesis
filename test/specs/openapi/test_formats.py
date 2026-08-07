@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 from schemathesis.config import GenerationConfig
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.specs.openapi._hypothesis import _build_custom_formats, _canonical_strategy_or_none
+from schemathesis.specs.openapi._hypothesis import _build_custom_formats, _canonical_strategy
 from schemathesis.specs.openapi.coverage._schema import is_valid_header_value
 from schemathesis.specs.openapi.formats import register_string_format
 from schemathesis.transport.serialization import Binary
@@ -98,10 +98,10 @@ def test_header_name_format_is_a_token(value):
 def test_registering_a_format_invalidates_built_strategies():
     # Strategies are cached across operations, and the cache key cannot see the format registry.
     schema = {"type": "string", "format": "test-digits"}
-    assert _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is not None
+    assert _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator) is not None
 
     register_string_format("test-digits", st.text(alphabet="0123456789", min_size=1))
-    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
     @given(built)
     @SETTINGS
@@ -112,7 +112,7 @@ def test_registering_a_format_invalidates_built_strategies():
 
 
 def test_regex_format_respects_generation_alphabet():
-    built = _canonical_strategy_or_none(
+    built = _canonical_strategy(
         {"type": "string", "format": "regex"},
         GenerationConfig(allow_x00=False, codec="ascii"),
         jsonschema_rs.Draft202012Validator,
@@ -141,8 +141,8 @@ def test_canonical_strategy_cache_respects_header_exclusions():
 
     first_config = generation_config("A")
     second_config = generation_config("B")
-    _canonical_strategy_or_none(schema, first_config, jsonschema_rs.Draft4Validator)
-    built = _canonical_strategy_or_none(schema, second_config, jsonschema_rs.Draft4Validator)
+    _canonical_strategy(schema, first_config, jsonschema_rs.Draft4Validator)
+    built = _canonical_strategy(schema, second_config, jsonschema_rs.Draft4Validator)
 
     @given(built)
     @SETTINGS

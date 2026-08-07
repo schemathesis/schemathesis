@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.config import ProjectConfig, SchemathesisWarning
-from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder

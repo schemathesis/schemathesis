@@ -182,7 +182,7 @@ def _to_json_schema(
 
     ensure_required_properties(schema)
 
-    # Convert prefixItems -> items[array] for hypothesis-jsonschema (Draft 4/7-only).
+    # Draft 4/7 spells a tuple as `items: [...]`, which is what generation reads there.
     # Skipped when the consumer needs `prefixItems` to stay intact (e.g. for Draft 2020-12 validators).
     if convert_prefix_items and "prefixItems" in schema:
         prefix_items = schema.pop("prefixItems")
@@ -280,8 +280,8 @@ def _pin_discriminator_property(
     """Pin the discriminator property to its expected value in each oneOf/anyOf branch.
 
     When a schema has a `discriminator`, each branch in oneOf/anyOf is wrapped in
-    `allOf` with an `enum` constraint on the discriminator property. This ensures
-    hypothesis-jsonschema generates the correct discriminator value for each branch.
+    `allOf` with an `enum` constraint on the discriminator property, so each branch
+    carries the discriminator value that names it.
     """
     discriminator = schema.get("discriminator")
     if not isinstance(discriminator, dict):

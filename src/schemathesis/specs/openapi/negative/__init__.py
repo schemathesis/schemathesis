@@ -10,9 +10,9 @@ from urllib.parse import urlencode
 import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
-from hypothesis_jsonschema import from_schema
 
 from schemathesis.config import GenerationConfig
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
     ALL_KEYWORDS,
     CANONICALIZE_DRAFT_BY_VALIDATOR,
@@ -302,13 +302,6 @@ def negative_schema(
         strategy = build(
             schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
         )
-        if strategy is None:
-            strategy = from_schema(
-                schema,
-                custom_formats=custom_formats,
-                allow_x00=generation_config.allow_x00,
-                codec=generation_config.codec,
-            )
         return strategy.filter(filter_values).map(lambda value: GeneratedValue(value, metadata))
 
     if target_descriptors is None:
@@ -326,19 +319,12 @@ def negative_schema(
 
     positive_strategy: st.SearchStrategy | None = None
     if location == ParameterLocation.BODY:
-        _candidate = build(
-            schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
-        )
-        if _candidate is None:
-            _candidate = from_schema(
-                schema,
-                custom_formats=custom_formats,
-                allow_x00=generation_config.allow_x00,
-                codec=generation_config.codec,
-            )
         try:
+            _candidate = build(
+                schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
+            )
             _candidate.validate()
-        except InvalidArgument:
+        except (InvalidArgument, InvalidSchema):
             pass
         else:
             if not _candidate.is_empty:

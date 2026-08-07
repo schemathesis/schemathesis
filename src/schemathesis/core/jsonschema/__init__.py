@@ -6,7 +6,6 @@ from typing import Any
 import jsonschema_rs
 
 from schemathesis.core.cache import MISSING, BoundedCache
-from schemathesis.core.errors import InvalidRegexPattern, UnsupportedRegexPattern, parse_regex_warning
 from schemathesis.core.jsonschema.bundler import (
     BUNDLE_STORAGE_KEY,
     REFERENCE_TO_BUNDLE_PREFIX,
@@ -36,19 +35,6 @@ def compile_ecma_pattern(pattern: str) -> re.Pattern[str] | None:
         return re.compile(pattern, re.ASCII)
     except (re.error, ValueError):
         return None
-
-
-def regex_pattern_error(message: str) -> InvalidRegexPattern:
-    """What a regex warning amounts to: a pattern no value can be drawn from, or an invalid one."""
-    parsed = parse_regex_warning(message)
-    if parsed is None:
-        return InvalidRegexPattern(message)
-    pattern, reason = parsed
-    try:
-        make_validator({"pattern": pattern}, jsonschema_rs.Draft202012Validator)
-    except jsonschema_rs.ValidationError:
-        return InvalidRegexPattern.from_pattern_and_reason(pattern, reason)
-    return UnsupportedRegexPattern.from_pattern(pattern)
 
 
 def _is_valid_uuid(value: object) -> bool:

@@ -836,7 +836,7 @@ def test_unsupported_regex_removed_with_warning(ctx):
                                     "properties": {
                                         "region": {
                                             "nullable": True,
-                                            "pattern": "^[\\w\\s\\-\\/\\p{Greek},.#;:()']+$",
+                                            "pattern": "^[\\w\\s\\-\\/\\p{Tibetan},.#;:()']+$",
                                             "type": "string",
                                         },
                                     },
@@ -855,7 +855,7 @@ def test_unsupported_regex_removed_with_warning(ctx):
     # Then the pattern is removed and a warning is emitted
     warnings = list(schema.analysis.iter_warnings())
     assert len(warnings) > 0
-    assert any("^[\\w\\s\\-\\/\\p{Greek},.#;:()']+$" in w.message for w in warnings)
+    assert any("^[\\w\\s\\-\\/\\p{Tibetan},.#;:()']+$" in w.message for w in warnings)
 
 
 def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
@@ -869,7 +869,7 @@ def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
                             "name": "id",
                             "in": "path",
                             "required": True,
-                            "schema": {"type": "string", "pattern": "\\p{Greek}+"},
+                            "schema": {"type": "string", "pattern": "\\p{Tibetan}+"},
                         }
                     ],
                     "responses": {"200": {"description": "OK"}},
@@ -880,7 +880,7 @@ def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
     # Then the pattern is removed and a warning is emitted
     warnings = list(schema.analysis.iter_warnings())
     assert len(warnings) > 0
-    assert any("\\p{Greek}+" in w.message for w in warnings)
+    assert any("\\p{Tibetan}+" in w.message for w in warnings)
 
 
 def test_invalid_header_in_example(ctx):

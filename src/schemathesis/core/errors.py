@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from requests import RequestException
 
     from schemathesis.config import OutputConfig
-    from schemathesis.core.compat import RefResolutionError
     from schemathesis.core.jsonschema import BundleError
 
 
@@ -340,28 +339,16 @@ class RejectedSchemaDefinition(InvalidSchema):
     """Raised when a definition does not hold up as a JSON Schema under its own draft."""
 
 
-def parse_regex_warning(message: str) -> tuple[str, str] | None:
-    """The pattern and the reason a regex warning names, or `None` when it names neither."""
-    # The quote is whichever one the `repr` picked, so a pattern containing one flips it.
-    match = re.search(
-        r"=(['\"])(.*)\1, but this is not valid syntax for a Python regular expression \((.*?)\)", message
-    )
-    if match is None:
-        return None
-    try:
-        # The warning carries the pattern as a `repr`, so it arrives escaped.
-        pattern = match.group(2).encode().decode("unicode_escape")
-    except UnicodeDecodeError:
-        pattern = match.group(2)
-    return pattern, match.group(3)
+class UnsupportedSchema(InvalidSchema):
+    """Raised when a definition is valid but describes values no generator here can produce."""
+
+    @classmethod
+    def from_reason(cls, reason: str) -> UnsupportedSchema:
+        return cls(f"Failed to generate test cases for this API operation. Schemathesis does not support {reason}")
 
 
 class InvalidRegexPattern(InvalidSchema):
     """Raised when a string pattern is not a valid regular expression."""
-
-    @classmethod
-    def from_pattern_and_reason(cls, pattern: str, reason: str) -> InvalidRegexPattern:
-        return cls(f"Invalid regular expression. Pattern `{pattern}` is not recognized - `{reason}`")
 
     @classmethod
     def from_jsonschema_rs_error(cls, error: ValidationError) -> InvalidRegexPattern:
@@ -483,6 +470,10 @@ class UnboundPrefix(SerializationError):
 
     def __init__(self, prefix: str):
         super().__init__(UNBOUND_PREFIX_MESSAGE_TEMPLATE.format(prefix=prefix))
+
+
+class RefResolutionError(SchemathesisError):
+    """A reference the resolver could not follow."""
 
 
 class UnresolvableReference(SchemathesisError):

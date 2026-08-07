@@ -4,8 +4,7 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import OperationNotFound
+from schemathesis.core.errors import OperationNotFound, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.transforms import decode_pointer, encode_pointer
 

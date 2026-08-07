@@ -4,7 +4,7 @@ import unittest
 import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
-from warnings import WarningMessage, catch_warnings
+from warnings import catch_warnings
 
 from hypothesis.errors import InvalidArgument
 from jsonschema_rs import ValidationError
@@ -25,7 +25,6 @@ from schemathesis.core.errors import (
     is_regex_validation_error,
 )
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.jsonschema import regex_pattern_error
 from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
@@ -117,7 +116,7 @@ def run_test(
     pending_events: list[events.EngineEvent] = []
     try:
         setup_hypothesis_database_key(test_function, operation, generation=generation)
-        with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
+        with catch_warnings(record=True), ignore_hypothesis_output():
             test_function(
                 ctx=ctx,
                 state=state,
@@ -196,28 +195,18 @@ def run_test(
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
         return
-    except AssertionError as exc:  # May come from `hypothesis-jsonschema` or `hypothesis`
+    except AssertionError as exc:  # Comes from `hypothesis`
         status = Status.ERROR
         try:
             operation.schema.validate()
-            # JSON Schema validation can miss it if there is `$ref` adjacent to `type` on older specifications
-            if str(exc).startswith("Unknown type"):
-                yield non_fatal_error(
-                    InvalidSchema(
-                        message=str(exc),
-                        path=operation.path,
-                        method=operation.method,
-                    )
-                )
-            else:
-                msg = "Unexpected error during testing of this API operation"
-                exc_msg = str(exc)
-                if exc_msg:
-                    msg += f": {exc_msg}"
-                try:
-                    raise InternalError(msg) from exc
-                except InternalError as exc:
-                    yield non_fatal_error(exc)
+            msg = "Unexpected error during testing of this API operation"
+            exc_msg = str(exc)
+            if exc_msg:
+                msg += f": {exc_msg}"
+            try:
+                raise InternalError(msg) from exc
+            except InternalError as exc:
+                yield non_fatal_error(exc)
         except ValidationError as exc:
             yield non_fatal_error(
                 InvalidSchema.from_jsonschema_error(
@@ -230,11 +219,7 @@ def run_test(
             )
     except InvalidArgument as exc:
         status = Status.ERROR
-        message = get_invalid_regular_expression_message(warnings)
-        if message:
-            # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
-            yield non_fatal_error(regex_pattern_error(message))
-        elif is_empty_strategy_error(exc):
+        if is_empty_strategy_error(exc):
             yield non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
         else:
             health_check = build_health_check_error(operation, exc, with_tip=False)
@@ -300,11 +285,3 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation, gener
         test._hypothesis_internal_database_key = None  # type: ignore[attr-defined]
         return
     test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore[attr-defined]
-
-
-def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> str | None:
-    for warning in warnings:
-        message = str(warning.message)
-        if "is not valid syntax for a Python regular expression" in message:
-            return message
-    return None

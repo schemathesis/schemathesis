@@ -16,7 +16,6 @@ from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
 from schemathesis.config import HealthCheck
-from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
     IncorrectUsage,
     InvalidSchema,
@@ -24,6 +23,7 @@ from schemathesis.core.errors import (
     LoaderError,
     MalformedMediaType,
     OperationNotFound,
+    RefResolutionError,
     format_exception,
 )
 from schemathesis.core.failures import Failure, FailureGroup

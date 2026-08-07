@@ -19,6 +19,7 @@ from schemathesis.core.errors import InternalError
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import (
+    _PARTIAL_SCRIPT_CLASSES,
     _UNICODE_PROPERTY_RAW_MAP,
     _serialize,
     is_valid_jsonschema_rs_regex,
@@ -432,8 +433,16 @@ def test_update_pattern_in_schema_keeps_unenforced_bounds(schema, expected):
         ),
         # Only the braced form of a known name carries contents to complement.
         (r"[\PL_]", None),
+        (r"[\P{Tibetan}_]", None),
+        # A script class is a subset of the script, so its complement would admit characters the
+        # validator still counts as part of it.
         (r"[\P{Greek}_]", None),
-        (r"[\p{Greek}_]+", None),
+        (r"[\P{Cyrillic}_]", None),
+        (r"[\P{Katakana}_]", None),
+        (r"[\P{Hangul}_]", None),
+        (r"[\P{Han}_]", None),
+        (r"[\P{Hiragana}_]", None),
+        (r"[\p{Tibetan}_]+", None),
         # Negated POSIX class `[:^X:]` and unknown POSIX names \u2014 bail out.
         (r"[[:^alnum:]_]", None),
         (r"[[:greek:]_]", None),
@@ -459,7 +468,7 @@ def test_update_pattern_in_schema_keeps_unenforced_bounds(schema, expected):
         (r"[a-z]+", None),
         (r"^\d+$", None),
         # Unsupported escapes (no translation available)
-        (r"\p{Greek}", None),
+        (r"\p{Tibetan}", None),
         (r"\p{Script=Latin}", None),
     ],
 )
@@ -526,7 +535,7 @@ def test_translation_agrees_with_the_validator(pattern, matching, rejected):
 _COMPLEMENT_PROBE = "aZ0_ -!.\t\néÀ́ €中\U0001f600"
 
 
-@pytest.mark.parametrize("name", sorted(_UNICODE_PROPERTY_RAW_MAP))
+@pytest.mark.parametrize("name", sorted(set(_UNICODE_PROPERTY_RAW_MAP) - _PARTIAL_SCRIPT_CLASSES))
 def test_negated_property_is_the_exact_complement(name):
     positive = re.compile(f"[{_UNICODE_PROPERTY_RAW_MAP[name]}]")
     negated = re.compile(normalize_regex(rf"[\P{{{name}}}]"))

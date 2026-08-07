@@ -9,12 +9,12 @@ from packaging import version
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY
 from schemathesis.core.adapter import OperationParameter
-from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
     SCHEMA_ERROR_SUGGESTION,
     HookExecutionError,
     InfiniteRecursiveReference,
     InvalidSchema,
+    RefResolutionError,
     SchemaLocation,
 )
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference

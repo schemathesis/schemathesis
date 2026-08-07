@@ -13,8 +13,12 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
-from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
+from schemathesis.core.errors import (
+    InfiniteRecursiveReference,
+    InvalidSchema,
+    RefResolutionError,
+    UnresolvableReference,
+)
 from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
@@ -869,14 +873,15 @@ def _generate_single_example(
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema_rs.Validator],
 ) -> Any:
-    strategy = build(
-        schema,
-        draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
-        formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
-        alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
-    )
     # A schema with no values to draw from contributes nothing rather than a value it does not admit.
-    if strategy is None:
+    try:
+        strategy = build(
+            schema,
+            draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+            formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
+            alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
+        )
+    except InvalidSchema:
         return NOT_SET
     return examples.generate_one(strategy)
 
