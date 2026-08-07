@@ -288,8 +288,28 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
                     branch_view.branches,
                     [from_schema(_intersection([*rest, sub]), ctx) for sub in branch_view.branches],
                 )
-        # Every branch is a pointer back into the value being built, so none of them can drive a
-        # draw on its own. The first one does, and the rest judge what it gives.
+        # Every branch is a pointer back into the value being built, so the value comes from what they
+        # name together. Meeting the same intersection again is the cycle, and a placeholder ends it.
+        resolved = []
+        for branch in followed:
+            branch_view = branch.view()
+            if isinstance(branch_view, canonical.ReferenceView):
+                resolved.append(_target(branch, branch_view.uri, ctx))
+            else:
+                resolved.append(branch)
+        merged = _intersection(resolved)
+        if not isinstance(merged.view(), canonical.AllOfView):
+            placeholder = ctx.folding.get(merged)
+            if placeholder is not None:
+                ctx.cyclic = True
+                return placeholder
+            ctx.folding[merged] = st.deferred(lambda: from_schema(merged, ctx))
+            try:
+                return from_schema(merged, ctx)
+            finally:
+                del ctx.folding[merged]
+        # Nothing folded, so what the pointers name is only spelled by the draw one branch drives and
+        # the rest judge.
         driver, *rest = followed
         strategy = from_schema(driver, ctx)
         for other in rest:

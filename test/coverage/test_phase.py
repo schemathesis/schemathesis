@@ -9735,3 +9735,85 @@ def test_closing_reference_generator_after_module_globals_are_cleared(ctx_factor
     monkeypatch.setattr(_schema, "RefResolutionError", None)
 
     generator.close()
+
+
+def test_mutually_recursive_pointers_do_not_multiply_the_walk(ctx):
+    # Every pointer doubling on its own multiplies the paths through a cycle graph; ending the walk
+    # at the first doubling keeps the position that points back covered without the product.
+    names = [f"Node{index}" for index in range(4)]
+    schema = ctx.openapi.load_schema(
+        {
+            "/nodes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": f"#/components/schemas/{names[0]}"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                name: {
+                    "type": "object",
+                    "properties": {
+                        **{f"to{other}": {"$ref": f"#/components/schemas/{other}"} for other in names if other != name},
+                        "leaf": {"type": "string"},
+                    },
+                }
+                for name in names
+            }
+        },
+    )
+    operation = schema["/nodes"]["POST"]
+
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE)
+
+    assert len(cases) < 1000
+
+
+def test_pointer_reached_twice_still_carries_what_it_names(ctx):
+    # The envelope pointer reappears below itself, and a nested value that ignores what it names
+    # is one nothing can accept - the position has to be built from both, not judged after.
+    schema = ctx.openapi.load_schema(
+        {
+            "/connections": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Connection"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Resource": {
+                    "type": "object",
+                    "required": ["location"],
+                    "properties": {"location": {"type": "string"}},
+                },
+                "Api": {
+                    "allOf": [{"$ref": "#/components/schemas/Resource"}],
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                },
+                "Connection": {
+                    "allOf": [{"$ref": "#/components/schemas/Resource"}],
+                    "type": "object",
+                    "properties": {"api": {"$ref": "#/components/schemas/Api"}},
+                },
+            }
+        },
+    )
+    operation = schema["/connections"]["POST"]
+    validator = _body_validator(operation)
+
+    positives = [case.body for case in _iter_cases(operation, GenerationMode.POSITIVE) if isinstance(case.body, dict)]
+
+    assert positives
+    for body in positives:
+        assert validator.is_valid(body), body
+    assert any("api" in body for body in positives)
