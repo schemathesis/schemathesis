@@ -6,6 +6,7 @@
 
 - Run aborting with an internal error on parameters whose name is not a string, such as `true`.
 - Coverage phase stalling and using gigabytes on a `pattern` with optional parts and `maxLength`.
+- Slow generation for a `pattern` with a group or only a leading anchor under a length bound.
 - Unsatisfiable negative tests for operations whose path parameters have no constraint to violate.
 - Generate sendable header and cookie values for schemas with keywords beyond `type`.
 - Internal error generating values for a `pattern` naming characters outside `generation.codec`.
