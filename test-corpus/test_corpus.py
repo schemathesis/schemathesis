@@ -56,6 +56,8 @@ RESPONSE = Response(
     elapsed=0.1,
     verify=False,
 )
+
+
 def _mock_case_call(case, *args, **kwargs):
     # Real `Case.call()` freezes metadata right before sending the request; mirror that here so
     # `case.meta` doesn't re-hash containers on every check access for large bodies.
