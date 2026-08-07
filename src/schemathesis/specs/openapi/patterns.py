@@ -978,6 +978,14 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
         case ("anchored_multi", leading, parts, trailing):
             return _transform_anchored_multi(leading, parts, trailing, min_length, max_length)
 
+        case ("leading_anchor_multi", leading, parts):
+            distributed = _distribute_multi(parts, min_length, max_length)
+            if distributed is None:
+                return None
+            if max_length is not None:
+                return [leading, *distributed, _AT_END]
+            return [leading, *distributed]
+
         case ("unanchored_multi", parts):
             distributed = _distribute_multi(parts, min_length, max_length)
             if distributed is None:
@@ -997,6 +1005,7 @@ _Structure: TypeAlias = (
     | tuple[Literal["trailing_anchor"], _Node, _Node]
     | tuple[Literal["both_anchors"], _Node, _Node, _Node]
     | tuple[Literal["anchored_multi"], _Node, list[_Node], _Node]
+    | tuple[Literal["leading_anchor_multi"], _Node, list[_Node]]
     | tuple[Literal["unanchored_multi"], list[_Node]]
     | tuple[Literal["unknown"]]
 )
@@ -1004,7 +1013,7 @@ _Structure: TypeAlias = (
 
 def _classify_structure(nodes: list[_Node]) -> _Structure:
     """Classify pattern structure for dispatch."""
-    _CONTENT_OPS = (LITERAL, NOT_LITERAL, IN, sre.ANY, *REPEATS)
+    _CONTENT_OPS = (LITERAL, NOT_LITERAL, IN, sre.ANY, sre.SUBPATTERN, *REPEATS)
     match nodes:
         case [content]:
             return ("single", content)
@@ -1016,6 +1025,8 @@ def _classify_structure(nodes: list[_Node]) -> _Structure:
             return ("both_anchors", leading, content, trailing)
         case [(sre.AT, _) as leading, *parts, (sre.AT, _) as trailing] if all(op in _CONTENT_OPS for op, _ in parts):
             return ("anchored_multi", leading, parts, trailing)
+        case [(sre.AT, _) as leading, *parts] if len(parts) >= 2 and all(op in _CONTENT_OPS for op, _ in parts):
+            return ("leading_anchor_multi", leading, parts)
         case [*parts] if len(parts) >= 2 and all(op in _CONTENT_OPS for op, _ in parts):
             return ("unanchored_multi", parts)
         case _:
@@ -1130,6 +1141,9 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
     repetition_max_lengths = []
     quantified_indices = []
 
+    # Slots reached through a group, by part index, so the rewrite puts them back inside it.
+    group_headers: dict[int, tuple[int, int, int]] = {}
+
     for idx, (op, value) in enumerate(parts):
         if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
             fixed_length += 1
@@ -1139,6 +1153,22 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
             repetition_lengths.append(_calculate_min_repetition_length(subpattern))
             repetition_max_lengths.append(_calculate_max_repetition_length(list(subpattern)))
             quantified_indices.append(idx)
+        elif op == sre.SUBPATTERN:
+            group, add_flags, del_flags, inner = value
+            inner_nodes = list(inner)
+            if len(inner_nodes) == 1 and inner_nodes[0][0] in REPEATS:
+                min_repeat, max_repeat, subpattern = inner_nodes[0][1]
+                quantifier_bounds.append((min_repeat, max_repeat))
+                repetition_lengths.append(_calculate_min_repetition_length(subpattern))
+                repetition_max_lengths.append(_calculate_max_repetition_length(list(subpattern)))
+                quantified_indices.append(idx)
+                group_headers[idx] = (group, add_flags, del_flags)
+                continue
+            inner_min = _calculate_min_repetition_length(inner_nodes)
+            if inner_min != _calculate_max_repetition_length(inner_nodes):
+                # Only a group of a known length can be paid for out of the budget.
+                return None
+            fixed_length += inner_min
 
     adj_min = None if min_l is None else min_l - fixed_length
     adj_max = None if max_l is None else max_l - fixed_length
@@ -1168,8 +1198,7 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
     pinned: set[int] = set()
     has_unbounded_pinned = False
     for dist_idx in range(len(quantifier_bounds)):
-        part_idx = quantified_indices[dist_idx]
-        _, (orig_min, orig_max, inner_subpattern) = parts[part_idx]
+        orig_min, orig_max = quantifier_bounds[dist_idx]
         rep_len_max = repetition_max_lengths[dist_idx]
         rep_len_min = repetition_lengths[dist_idx]
         inner_variable = rep_len_min != rep_len_max
@@ -1239,8 +1268,7 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
     for dist_idx, (new_min, new_max) in enumerate(distribution):
         if dist_idx in pinned:
             continue
-        part_idx = quantified_indices[dist_idx]
-        _, (orig_min, orig_max, inner_subpattern) = parts[part_idx]
+        orig_min, orig_max = quantifier_bounds[dist_idx]
         if (new_min, new_max) == (orig_min, orig_max):
             continue
         # For exact-length cases the rewrite picks one concrete shape. Collapsing
@@ -1254,6 +1282,13 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
     for dist_idx, part_idx in enumerate(quantified_indices):
         op, value = parts[part_idx]
         new_min, new_max = distribution[dist_idx]
+        header = group_headers.get(part_idx)
+        if header is not None:
+            _, _, _, inner = value
+            _, _, subpattern = list(inner)[0][1]
+            repeat = (sre.MAX_REPEAT, (new_min, new_max, subpattern))
+            new_parts[part_idx] = (sre.SUBPATTERN, (*header, [repeat]))
+            continue
         _, _, subpattern = value
         new_parts[part_idx] = (sre.MAX_REPEAT, (new_min, new_max, subpattern))
 

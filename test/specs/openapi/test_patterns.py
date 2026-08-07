@@ -277,6 +277,17 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         pytest.param("a{1,3}+a", None, 4, "a{1,3}+a", marks=SKIP_BEFORE_PY11),
         pytest.param("(?:ab)++ab", None, 4, "(?:ab)++ab", marks=SKIP_BEFORE_PY11),
         pytest.param("a+b++c", 1, 4, "a+b++c", marks=SKIP_BEFORE_PY11),
+        # Anchored only at the start, with more than one part: the budget still lands, and encoding
+        # a maximum closes the pattern so longer strings stop matching.
+        ("^[a-zA-Z][a-zA-Z0-9_]*", 63, 63, "^[a-zA-Z][a-zA-Z0-9_]{62}$"),
+        ("^[a-zA-Z][a-zA-Z0-9_]*", 1, 63, "^[a-zA-Z][a-zA-Z0-9_]{0,62}$"),
+        ("^[a-z][0-9]+", 3, 6, "^[a-z][0-9]{2,5}$"),
+        ("^foo[a-z]+", 4, 8, "^foo[a-z]{1,5}$"),
+        ("^[a-z][0-9]+", 5, None, "^[a-z][0-9]{4,}"),
+        # A group is a part like any other, and its own repeat is where its share of the budget goes.
+        ("arn:([a-z0-9-]+):forecast:.*:.*:.+", 20, 40, r"^arn:([a-z0-9\-]{2,23}):forecast:.{0,22}:.{0,22}:.{2,23}$"),
+        ("^prefix-([a-z]+)-[0-9]+$", 12, 24, "^prefix-([a-z]{2,15})-[0-9]{2,15}$"),
+        ("^([a-z]+)-([0-9]+)$", 6, 12, "^([a-z]{3,10})-([0-9]{2,10})$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
