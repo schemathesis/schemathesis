@@ -3439,6 +3439,40 @@ def test_canonical_object_unsatisfiable_when_required_name_is_not_admitted():
     assert built.is_empty
 
 
+UNSPELLABLE_OBJECT_DEMANDS = [
+    # Draft 7 asserts content facets, which no complement can spell.
+    (
+        {"not": {"type": "object", "propertyNames": {"contentEncoding": "base64"}}},
+        jsonschema_rs.Draft7Validator,
+    ),
+    ({"not": {"type": "object", "additionalProperties": {"const": [1]}}}, jsonschema_rs.Draft202012Validator),
+]
+
+
+@pytest.mark.parametrize(
+    ("schema", "validator_cls"),
+    UNSPELLABLE_OBJECT_DEMANDS,
+    ids=[str(schema) for schema, _ in UNSPELLABLE_OBJECT_DEMANDS],
+)
+def test_canonical_object_demand_without_a_spellable_complement(schema, validator_cls):
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), validator_cls)
+    assert built is not None
+    is_valid = validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+    # Objects are the only shape the demand governs; the other branches are off-type values.
+    find(
+        built,
+        lambda value: isinstance(value, dict) and bool(value),
+        settings=settings(max_examples=1000, database=None),
+    )
+
+
 def test_canonical_object_respects_alphabet():
     built = _canonical_strategy_or_none(
         {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]},

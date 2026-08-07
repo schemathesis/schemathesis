@@ -945,13 +945,15 @@ def _violation_entry(
     """One demand from `ObjectView.violations`, as a key/value pair the object injects last."""
     if isinstance(violation, canonical.NameFailsView):
         complement = violation.schema.negate()
-        # A name demand is a string schema, and canonicalization spells every one of those complements.
-        assert complement is not None
-        key_schema = complement.intersect(_string_domain(ctx.root.draft))
-        # The key still lands in this object, so the names it admits bound the barred one too.
-        if view.property_names is not None:
-            key_schema = key_schema.intersect(view.property_names)
-        key = from_schema(key_schema, ctx).map(_key)
+        if complement is not None:
+            key_schema = complement.intersect(_string_domain(ctx.root.draft))
+            # The key still lands in this object, so the names it admits bound the barred one too.
+            if view.property_names is not None:
+                key_schema = key_schema.intersect(view.property_names)
+            key = from_schema(key_schema, ctx).map(_key)
+        else:
+            admitted = _text(ctx) if view.property_names is None else from_schema(view.property_names, ctx).map(_key)
+            key = _rejected_by(admitted, violation.schema)
         # A name equal to a declared property would need that property's schema intersected in too;
         # a fresh key sidesteps that at the cost of never reusing a declared name for the injected key.
         key = key.filter(lambda candidate: candidate not in known)
@@ -970,11 +972,24 @@ def _violation_entry(
         )
     )
     complement = violation.additional.negate()
-    # The demand reaches here only where canonicalization spelled its complement.
-    assert complement is not None
+    if complement is None:
+        admitted = (
+            _anything(ctx) if view.additional_properties is None else from_schema(view.additional_properties, ctx)
+        )
+        return st.tuples(key, _rejected_by(admitted, violation.additional))
     if view.additional_properties is not None:
         complement = complement.intersect(view.additional_properties)
     return st.tuples(key, from_schema(complement, ctx))
+
+
+def _rejected_by(
+    admitted: SearchStrategy[JsonValue], schema: jsonschema_rs.CanonicalSchema
+) -> SearchStrategy[JsonValue]:
+    """A demand met by filtering, for a schema whose complement the canonical form cannot spell."""
+    # `to_json_schema` carries the draft the node was canonicalized under, so the facets that only
+    # assert on some drafts - `contentEncoding` and friends - are judged the same way here.
+    admits = make_validator_for(schema.to_json_schema()).is_valid
+    return admitted.filter(lambda value: not admits(value))
 
 
 @st.composite  # type: ignore[untyped-decorator]
