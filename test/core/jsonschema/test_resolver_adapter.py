@@ -5,7 +5,7 @@ import json
 import jsonschema_rs
 import pytest
 
-from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.jsonschema.resolver import (
     IN_MEMORY_BASE_URI,
     build_registry,

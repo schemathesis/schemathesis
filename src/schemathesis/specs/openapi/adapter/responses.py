@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 import jsonschema_rs
 
 from schemathesis.core import NOT_SET, NotSet, media_types
-from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InvalidSchema, MalformedMediaType
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType, RefResolutionError
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.resolver import Resolver

@@ -867,7 +867,7 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli):
                                     "properties": {
                                         "region": {
                                             "nullable": True,
-                                            "pattern": "^[\\p{Greek}]+$",
+                                            "pattern": "^[\\p{Tibetan}]+$",
                                             "type": "string",
                                         },
                                     },
@@ -1351,7 +1351,7 @@ def test_reserved_characters_in_operation_name(ctx, cli, snapshot_cli):
 
 
 def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
-    def make_definition(min_items, pattern=r"\p{Greek}"):
+    def make_definition(min_items, pattern=r"\p{Tibetan}"):
         return {
             "post": {
                 "requestBody": {
@@ -1379,7 +1379,7 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
         # Can generate an empty array
         "/bar": make_definition(min_items=0),
         # A quote inside the pattern changes how it is quoted when reported
-        "/baz": make_definition(min_items=1, pattern=r"\p{Greek}'"),
+        "/baz": make_definition(min_items=1, pattern=r"\p{Tibetan}'"),
     }
     schema = ctx.openapi.build_schema(paths)
     app = ctx.openapi.make_permissive_flask_app(schema)

@@ -545,8 +545,8 @@ def test_pattern_translation_invalid_result():
 @pytest.mark.parametrize(
     "pattern",
     [
-        r"^[A-Za-z \p{Greek}\p{Cyrillic}]*$",
-        r"[\p{Greek}&&[^|:/]]+",
+        r"^[A-Za-z \p{Tibetan}\p{Thaana}]*$",
+        r"[\p{Tibetan}&&[^|:/]]+",
         r"\p{Script=Latin}",
     ],
 )

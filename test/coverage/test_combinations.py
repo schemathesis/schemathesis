@@ -281,7 +281,7 @@ def test_body_unexpected_parameters_control(ctx_factory, allow_extra_parameters)
         ({"type": "string", "minLength": 5, "maxLength": 5}, {5}),
         ({"type": "string", "minLength": 0, "maxLength": 512, "pattern": r"^[\w\W]+$"}, {1}),
         # Nullable string: union type must not leak into boundary generation,
-        # otherwise hypothesis-jsonschema may pick null and skip both length variants.
+        # otherwise generation may pick null and skip both length variants.
         ({"type": ["string", "null"], "maxLength": 10}, {9, 10}),
         ({"type": ["string", "null"], "minLength": 5, "maxLength": 10}, {5, 6, 9, 10}),
         # Falsy `default`/`example` are still set: empty string must be exercised.

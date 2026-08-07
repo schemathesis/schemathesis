@@ -16,8 +16,13 @@ from hypothesis.errors import InvalidArgument
 from hypothesis.strategies._internal.deferred import DeferredStrategy
 from jsonschema_rs import canonical
 
+from schemathesis.config import OutputConfig
 from schemathesis.core import MAX_STRING_LENGTH
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import (
+    InvalidSchema,
+    UnsupportedRegexPattern,
+    UnsupportedSchema,
+)
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     FANCY_REGEX_OPTIONS,
@@ -26,6 +31,7 @@ from schemathesis.core.jsonschema import (
     make_validator,
     make_validator_for,
 )
+from schemathesis.core.output import truncate_json
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, Distinctness, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
@@ -70,8 +76,8 @@ def _countable(bound: int | None) -> int | None:
     return bound if bound is None or bound <= sys.maxsize else None
 
 
-class UnsupportedView(Exception):
-    """A canonical node this module cannot build from; the caller decides what to do instead."""
+# What a builder raises when it cannot draw for a node, and a caller may route around it.
+DECLINED = (UnsupportedSchema, UnsupportedRegexPattern)
 
 
 class _PatternProperty(NamedTuple):
@@ -160,20 +166,32 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
         return _all_of(view, ctx)
     if isinstance(view, canonical.OneOfView):
         return _one_of(view, ctx)
-    raise UnsupportedView(schema.kind)
+    raise UnsupportedSchema.from_reason(f"this part of it:\n\n{_displayed(schema)}")
+
+
+def _displayed(schema: jsonschema_rs.CanonicalSchema) -> str:
+    """The node as the user wrote it, short enough to read in an error."""
+    raw = schema.to_json_schema()
+    if isinstance(raw, dict):
+        # Bundle scaffolding the user never wrote.
+        raw = {key: value for key, value in raw.items() if key not in ("$schema", "$defs", "definitions")}
+    return truncate_json(raw, config=OutputConfig())
 
 
 def _any_of(view: jsonschema_rs.canonical.AnyOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     """Values any of the branches admits."""
     strategies = []
+    declined: Exception | None = None
     for branch in view.branches:
         try:
             strategies.append(from_schema(branch, ctx))
-        except UnsupportedView:
+        except DECLINED as exc:
             # A branch nothing can be drawn from is one alternative short, not a schema to give up on.
-            pass
+            declined = exc
     if not strategies:
-        raise UnsupportedView("any_of")
+        # Every alternative declined, so the last reason is the one worth reporting.
+        assert declined is not None
+        raise declined
     return st.one_of(strategies)
 
 
@@ -218,15 +236,19 @@ def _not(
         barred = _target(barred, barred_view.uri, ctx)
     complement = barred.negate()
     if complement is None:
-        raise UnsupportedView(schema.kind)
+        # No complement is spelled for a branch set that points on, so the bar judges the draw itself.
+        # Only the document can be judged that way: below it, a pointer to `#` names something else.
+        if schema != ctx.root:
+            raise UnsupportedSchema.from_reason("a `not` over branches that point on, below the document root")
+        return _anything(ctx).filter(_validator(schema))
     if _points_on(complement.to_json_schema()):
         # A pointer naming a carried definition reads against the complement; one naming the document
         # still means where the bar appeared, which the complement is not.
         if _names_document(complement.to_json_schema()):
-            raise UnsupportedView(schema.kind)
+            raise UnsupportedSchema.from_reason("a `not` whose complement names the whole document")
         # A bar reached back through its own complement names a value no finite draw settles on.
         if barred in ctx.complementing:
-            raise UnsupportedView(schema.kind)
+            raise UnsupportedSchema.from_reason("a `not` reaching back into its own complement")
         nested = StrategyContext(
             root=complement, alphabet=ctx.alphabet, formats=ctx.formats, complementing=ctx.complementing
         )
@@ -397,7 +419,13 @@ def _array(
     if view.prefix_items or view.contains:
         return _with_fixed_elements(schema, view, ctx)
     all_distinct = view.distinctness == Distinctness.ALL_DISTINCT
-    element = _element(view.items, ctx)
+    try:
+        element = _element(view.items, ctx)
+    except DECLINED:
+        # Nothing fills a position, but an array that needs none of them is still a value.
+        if view.min_items:
+            raise
+        return st.builds(list)
     kwargs: dict[str, int] = {}
     if view.min_items is not None:
         kwargs["min_size"] = view.min_items
@@ -409,7 +437,7 @@ def _array(
     # would force a strategy that is not there yet.
     if kwargs and not ctx.pending and element.is_empty:
         # No position can be filled, so the empty array is the only value the bounds may allow.
-        return st.nothing() if kwargs.get("min_size") else st.just([])
+        return st.nothing() if kwargs.get("min_size") else st.builds(list)
     if all_distinct:
         return st.lists(element, unique_by=_json_identity, **kwargs)
     if view.distinctness == Distinctness.SOME_REPEATED:
@@ -714,12 +742,12 @@ def _matching(
     if steered is not None:
         try:
             return from_schema(steered, ctx), True
-        except UnsupportedView:
+        except DECLINED:
             pass
     counted = not avoid
     try:
         return from_schema(schema, ctx), counted
-    except UnsupportedView:
+    except DECLINED:
         pass
     # The intersection is not one this builds from, so the demand narrows the elements by filter.
     return _element(items, ctx).filter(_validator(demand)), counted
@@ -1444,9 +1472,9 @@ def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyCon
         return st.nothing()
     drivers = [pattern for pattern in view.patterns if _compiled_pattern(pattern) is not None]
     if not drivers:
-        # What is left are the properties with no spelling in codepoints - a script name, say. Those
-        # can filter but not drive the draw.
-        raise UnsupportedView("string")
+        # Every pattern here names something with no spelling in codepoints - a script this build
+        # carries no ranges for. Naming the pattern is what the caller can act on.
+        raise UnsupportedRegexPattern.from_pattern(view.patterns[0])
     return st.one_of(
         [
             _pattern_driven(pattern, [other for other in view.patterns if other != pattern], view, ctx)

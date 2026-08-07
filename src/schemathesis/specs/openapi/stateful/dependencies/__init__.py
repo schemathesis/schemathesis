@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET
-from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver

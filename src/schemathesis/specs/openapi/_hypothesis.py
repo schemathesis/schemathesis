@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, cast
 import jsonschema_rs
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
-from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
@@ -1201,27 +1200,18 @@ def make_positive_strategy(
     target_descriptors: tuple | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
-    custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
     schema = snapped_float32_clone(schema)
-    strategy = _canonical_strategy_or_none(schema, generation_config, validator_cls, location=location)
-    if strategy is not None:
-        return strategy
-    return from_schema(
-        schema,
-        custom_formats=custom_formats,
-        allow_x00=generation_config.allow_x00,
-        codec=generation_config.codec,
-    )
+    return _canonical_strategy(schema, generation_config, validator_cls, location=location)
 
 
-def _canonical_strategy_or_none(
+def _canonical_strategy(
     schema: JsonSchema,
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema_rs.Validator],
     *,
     location: ParameterLocation | None = None,
-) -> st.SearchStrategy[JsonValue] | None:
-    """Strategy for a fully modeled document; `None` when the schema is not one."""
+) -> st.SearchStrategy[JsonValue]:
+    """Strategy for a fully modeled document; raises `UnsupportedSchema` when the schema is not one."""
     if location is not None and location.is_in_header:
         # What a header may carry is a rule about characters, so it is spelled as one: every string
         # in the container obeys it, and the length and pattern keywords around it keep working.

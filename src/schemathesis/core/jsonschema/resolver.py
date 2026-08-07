@@ -12,9 +12,8 @@ from urllib.request import urlopen
 import jsonschema_rs
 import requests
 
-from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.deserialization import deserialize_yaml
-from schemathesis.core.errors import RemoteDocumentError
+from schemathesis.core.errors import RefResolutionError, RemoteDocumentError
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -249,7 +248,8 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
         if sys.version_info >= (3, 11):
             error.add_note(reference)
         else:
-            error.__notes__ = [reference]
+            # `add_note` is 3.11+, and this error is ours, so mypy has no `__notes__` to see.
+            error.__notes__ = [reference]  # type: ignore[attr-defined]
         raise error from exc
     # Bind `resolved.contents` so subsequent local-fragment walks land in the right document.
     return resolved_uri, Resolver(resolved.resolver, resolved.contents), resolved.contents

@@ -11,13 +11,14 @@ from schemathesis.core.errors import (
     InvalidRegexPattern,
     InvalidSchema,
     RejectedSchemaDefinition,
+    UnsupportedSchema,
     is_regex_validation_error,
 )
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import canonical_strategy_cache
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
-from schemathesis.generation.jsonschema.strategy import UnsupportedView, from_schema
+from schemathesis.generation.jsonschema.strategy import _displayed, from_schema
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -36,8 +37,8 @@ def build(
     draft: int,
     formats: dict[str, SearchStrategy],
     alphabet: Alphabet | None = None,
-) -> SearchStrategy[JsonValue] | None:
-    """Values the schema admits, or `None` for a schema this engine does not fully model."""
+) -> SearchStrategy[JsonValue]:
+    """Values the schema admits; `UnsupportedSchema` when this engine does not fully model it."""
     alphabet = alphabet if alphabet is not None else Alphabet()
     try:
         # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on
@@ -63,7 +64,7 @@ def _build(
     draft: int,
     formats: dict[str, SearchStrategy],
     alphabet: Alphabet,
-) -> SearchStrategy[JsonValue] | None:
+) -> SearchStrategy[JsonValue]:
     try:
         canonical_schema = jsonschema_rs.canonicalize(
             schema,
@@ -75,10 +76,12 @@ def _build(
         )
     except jsonschema_rs.ValidationError as exc:
         raise _schema_error(exc) from None
-    except jsonschema_rs.canonical.CanonicalizationError:
-        return None
+    except jsonschema_rs.canonical.InvalidPattern as exc:
+        raise InvalidRegexPattern(f"Failed to generate test cases for this API operation: {exc}") from None
+    except jsonschema_rs.canonical.CanonicalizationError as exc:
+        raise InvalidSchema(f"Failed to generate test cases for this API operation: {exc}") from None
     if canonical_schema.kind == "raw":
-        return None
+        raise UnsupportedSchema.from_reason(f"this part of it:\n\n{_displayed(canonical_schema)}")
     # Spelled out so the caller reports an unsatisfiable schema; no other engine gets a say.
     if not canonical_schema.is_satisfiable():
         return EMPTY_STRATEGY
@@ -96,8 +99,10 @@ def _build(
     # "not modeled here" can arrive from this block too.
     except jsonschema_rs.ValidationError as exc:
         raise _schema_error(exc) from None
-    except (jsonschema_rs.canonical.CanonicalizationError, UnsupportedView):
-        return None
+    except jsonschema_rs.canonical.InvalidPattern as exc:
+        raise InvalidRegexPattern(f"Failed to generate test cases for this API operation: {exc}") from None
+    except jsonschema_rs.canonical.CanonicalizationError as exc:
+        raise InvalidSchema(f"Failed to generate test cases for this API operation: {exc}") from None
     # Spelling it out keeps the caller reporting an unsatisfiable schema, where a strategy that
     # only fails on a draw would surface as whatever Hypothesis raises first.
     return EMPTY_STRATEGY if empty else strategy

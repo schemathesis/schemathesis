@@ -50,8 +50,7 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_STRING_LENGTH, NOT_SET
 from schemathesis.core.cache import MISSING, BoundedCache
-from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InvalidRegexPattern, RejectedSchemaDefinition
+from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
 from schemathesis.core.media_types import is_form_parts, is_xml_parts
@@ -534,7 +533,7 @@ class CoverageContext:
         # rejects - the caller's or one of these rewrites - leaves the branch uncovered, not the run failed.
         try:
             return build(schema, draft=draft, formats=self.custom_formats)
-        except (RejectedSchemaDefinition, InvalidRegexPattern):
+        except InvalidSchema:
             return None
 
     def _generate_around_conditionals(self, schema: JsonSchemaObject, described: JsonSchemaObject) -> Any:
@@ -2206,7 +2205,7 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
         _schema = deepclone(schema)
         if ctx.update_pattern is not None:
             _update_schema_pattern(_schema, ctx.update_pattern)
-        # Strip format-invalid hints so hypothesis-jsonschema does not use them as generation seeds.
+        # Drop hints their own `format` rejects, so none of them seeds a value the schema rules out.
         if "default" in _schema and not _is_valid_with_formats(_schema["default"], _schema, ctx):
             del _schema["default"]
         if "example" in _schema and not _is_valid_with_formats(_schema["example"], _schema, ctx):

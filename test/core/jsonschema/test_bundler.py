@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler, bundle
 from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
 from schemathesis.core.jsonschema.resolver import make_root_resolver

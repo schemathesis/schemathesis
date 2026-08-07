@@ -8,16 +8,15 @@ from _pytest.main import ExitCode
 from flask import jsonify
 from hypothesis import HealthCheck, given, seed, settings
 from hypothesis import strategies as st
-from hypothesis_jsonschema import from_schema
-from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 
 import schemathesis
 from schemathesis.config import GenerationConfig
-from schemathesis.core.jsonschema import _is_valid_uuid
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, _is_valid_uuid
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.jsonschema import build
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
@@ -64,6 +63,16 @@ INTEGER_SCHEMA = {
 def validate_schema(schema):
     """Validate schema by constructing a Draft4Validator (which validates the schema on construction)."""
     jsonschema_rs.Draft4Validator(schema)
+
+
+def from_schema(schema):
+    return build(schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[jsonschema_rs.Draft4Validator], formats={})
+
+
+def admits_a_value(schema):
+    return jsonschema_rs.canonicalize(
+        schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[jsonschema_rs.Draft4Validator]
+    ).is_satisfiable()
 
 
 @pytest.mark.parametrize(
@@ -361,7 +370,7 @@ def test_no_unsatisfiable_schemas(data):
             target_descriptors=compute_mutation_targets(schema),
         )
     )
-    assert canonicalish(mutated_schema) != FALSEY
+    assert admits_a_value(mutated_schema)
 
 
 @given(data=st.data())
@@ -713,7 +722,7 @@ def test_negative_query_respects_allow_extra_parameter_toggle(data):
 )
 def test_prevent_unsatisfiable_schema(schema, new_type):
     prevent_unsatisfiable_schema(schema, new_type)
-    assert canonicalish(schema) != FALSEY
+    assert admits_a_value(schema)
 
 
 ARRAY_PARAMETER = {"type": "array", "minItems": 1, "items": {"type": "string", "format": "ipv4"}}

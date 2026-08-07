@@ -76,7 +76,7 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
     if not isinstance(strategy, SearchStrategy):
         raise TypeError(f"strategy must be of type {SearchStrategy}, not {type(strategy)}")
 
-    # Wrap bytes in Binary so hypothesis-jsonschema can process binary data from user-provided formats
+    # Wrap bytes in `Binary` so a user-provided format can carry binary data through generation
     def wrap_bytes(value: bytes | str | Binary) -> Binary | str:
         if isinstance(value, bytes):
             return Binary(value)
@@ -151,8 +151,7 @@ def duration_values() -> st.SearchStrategy[str]:
 
 
 # The generators below cover the JSON Schema `format` vocabulary, written from the grammars the
-# formats name. `hypothesis-jsonschema` covers the same vocabulary and was the reference for which
-# names need a generator at all.
+# formats name.
 # Lower case only: host names are case-insensitive, so case variety exercises nothing, and a
 # 62-character alphabet costs ~1.7x more to draw from across a `format`-heavy schema.
 _LABEL_CHARACTERS = string.ascii_lowercase + string.digits

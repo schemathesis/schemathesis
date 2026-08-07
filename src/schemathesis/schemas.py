@@ -586,7 +586,7 @@ class BaseSchema(Mapping):
     def get_custom_format_strategies(
         self, generation_config: GenerationConfig, mode: GenerationMode
     ) -> dict[str, SearchStrategy]:
-        """Return spec-specific format strategies (mode-aware) for hypothesis-jsonschema generation."""
+        """Return spec-specific format strategies (mode-aware)."""
         return {}
 
     def as_strategy(

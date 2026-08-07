@@ -40,6 +40,11 @@ _HAN_CLASS = (
     r"\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303B"
     r"\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFA6D\uFA70-\uFAD9"
 )
+_GREEK_CLASS = (
+    r"\u0370-\u0373\u0375-\u0377\u037A-\u037D\u0384\u0386\u0388-\u038A\u038C\u038E-\u03A1"
+    r"\u03A3-\u03E1\u03F0-\u03FF\u1F00-\u1F15\u1F18-\u1F1D\u1F20-\u1F45"
+)
+_CYRILLIC_CLASS = r"\u0400-\u0481\u048A-\u052F\u1C80-\u1C88\u2DE0-\u2DFF\uA640-\uA69F"
 _HIRAGANA_CLASS = r"\u3041-\u3096\u309D-\u309F"
 _KATAKANA_CLASS = r"\u30A1-\u30FA\u30FD-\u30FF\u31F0-\u31FF\uFF66-\uFF6F\uFF71-\uFF9D"
 _HANGUL_CLASS = (
@@ -74,6 +79,8 @@ _UNICODE_PROPERTY_MAP = (
     (r"\p{Blank}", f"[{_BLANK_CLASS}]"),
     (r"\p{Upper}", f"[{_LETTER_UPPER_CLASS}]"),
     (r"\p{IsLetter}", f"[{_LETTER_CLASS}]"),
+    (r"\p{Greek}", f"[{_GREEK_CLASS}]"),
+    (r"\p{Cyrillic}", f"[{_CYRILLIC_CLASS}]"),
     (r"\p{Han}", f"[{_HAN_CLASS}]"),
     (r"\p{Hiragana}", f"[{_HIRAGANA_CLASS}]"),
     (r"\p{Katakana}", f"[{_KATAKANA_CLASS}]"),
@@ -124,11 +131,16 @@ _UNICODE_PROPERTY_RAW_MAP: dict[str, str] = {
     "Blank": _BLANK_CLASS,
     "Upper": _LETTER_UPPER_CLASS,
     "IsLetter": _LETTER_CLASS,
+    "Greek": _GREEK_CLASS,
+    "Cyrillic": _CYRILLIC_CLASS,
     "Han": _HAN_CLASS,
     "Hiragana": _HIRAGANA_CLASS,
     "Katakana": _KATAKANA_CLASS,
     "Hangul": _HANGUL_CLASS,
 }
+# Script classes are the blocks the validating engine agrees are part of a script, not the whole of
+# it, so complementing one would admit characters the script still claims.
+_PARTIAL_SCRIPT_CLASSES = frozenset({"Greek", "Cyrillic", "Han", "Hiragana", "Katakana", "Hangul"})
 # Single-letter shorthand (`\pL`, `\pN`, ...) raw equivalents.
 _UNICODE_SHORTHAND_RAW_MAP: dict[str, str] = {
     "L": _LETTER_CLASS,
@@ -403,8 +415,9 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
             # `[^contents]` cannot compose with sibling class members, so the complement is spelled out.
             if in_class and next_ch == "P" and i + 2 < n and pattern[i + 2] == "{":
                 end = pattern.find("}", i + 3)
-                raw = _UNICODE_PROPERTY_RAW_MAP.get(pattern[i + 3 : end]) if end != -1 else None
-                # An unknown name has no contents to turn inside out.
+                name = pattern[i + 3 : end] if end != -1 else ""
+                raw = None if name in _PARTIAL_SCRIPT_CLASSES else _UNICODE_PROPERTY_RAW_MAP.get(name)
+                # An unknown name, or one standing for part of a script, has nothing to turn inside out.
                 if raw is None:
                     return None
                 out.append(_complement_class(raw))
