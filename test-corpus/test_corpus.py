@@ -56,7 +56,14 @@ RESPONSE = Response(
     elapsed=0.1,
     verify=False,
 )
-patch("schemathesis.Case.call", return_value=RESPONSE).start()
+def _mock_case_call(case, *args, **kwargs):
+    # Real `Case.call()` freezes metadata right before sending the request; mirror that here so
+    # `case.meta` doesn't re-hash containers on every check access for large bodies.
+    object.__setattr__(case, "_freeze_metadata", True)
+    return RESPONSE
+
+
+patch("schemathesis.Case.call", new=_mock_case_call).start()
 
 
 def pytest_generate_tests(metafunc):
