@@ -3879,3 +3879,37 @@ def test_metaschema_generation_soundness(validator_cls, metaschema):
     # 250: metaschema draws are mostly shallow, so a smaller budget leaves the 50-validation floor flaky.
     # A metaschema admits bounds no draw can meet, like `minItems` past what a single draw holds.
     assert_generation_is_sound(schemas, max_examples=250, floor=50, validator_cls=validator_cls, allow_unbuildable=True)
+
+
+def test_every_alternative_declining_reports_the_reason():
+    # The `anyOf` has nothing left to draw from, and the pattern is what the user has to change.
+    schema = {
+        "anyOf": [
+            {"type": "string", "pattern": r"\p{Tibetan}"},
+            {"type": "string", "pattern": r"\p{Thaana}"},
+        ]
+    }
+
+    with pytest.raises(UnsupportedRegexPattern, match=r"Tibetan|Thaana"):
+        _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+
+def test_array_with_undrawable_items_and_no_floor_is_empty():
+    # No value fills a position, but an array that needs none of them is still a value.
+    schema = {"type": "array", "items": {"type": "string", "pattern": r"\p{Tibetan}"}}
+
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+    @given(built)
+    @settings(max_examples=5, deadline=None)
+    def test(value):
+        assert value == []
+
+    test()
+
+
+def test_array_with_undrawable_items_and_a_floor_declines():
+    schema = {"type": "array", "items": {"type": "string", "pattern": r"\p{Tibetan}"}, "minItems": 1}
+
+    with pytest.raises(UnsupportedRegexPattern, match="Tibetan"):
+        _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
