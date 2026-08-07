@@ -410,9 +410,14 @@ class CoverageContext:
 
         A cycle has no end, so the walk needs one. Going around it twice leaves the position that
         points back carrying the schema it names, which is what a negative case there has to break.
+        That second pass is where this walk ends: pointers below it stay closed, because letting each
+        one open again multiplies the walks through a graph of cycles instead of adding to them.
         """
         counters = self.expanding if counters is None else counters
-        return counters.get(reference, 0) >= 2
+        depth = counters.get(reference, 0)
+        if depth >= 2:
+            return True
+        return any(other >= 2 for other in counters.values())
 
     @contextmanager
     def at(self, key: str | int) -> Generator[None, None, None]:

@@ -2880,6 +2880,42 @@ def test_canonical_all_of_with_a_pointer_back_into_the_value():
     find(built, lambda value: "parent" in value, settings=settings(max_examples=1000, database=None))
 
 
+def test_canonical_all_of_pointer_met_again_below_itself():
+    # The envelope pointer names what every level carries, so a level that draws without it is one
+    # nothing accepts - the position has to be built from both, not judged after the draw.
+    schema = {
+        "$defs": {
+            "envelope": {
+                "anyOf": [
+                    {"type": ["null", "boolean", "number", "string", "array"]},
+                    {"type": "object", "required": ["location"], "properties": {"location": {"type": "string"}}},
+                ]
+            },
+            "api": {
+                "allOf": [{"$ref": "#/$defs/envelope"}],
+                "type": "object",
+                "required": ["payload"],
+                "properties": {"payload": {"type": "object", "properties": {"name": {"type": "string"}}}},
+            },
+        },
+        "allOf": [{"$ref": "#/$defs/envelope"}],
+        "type": "object",
+        "required": ["api"],
+        "properties": {"api": {"$ref": "#/$defs/api"}},
+    }
+
+    built = _canonical_strategy_or_none(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built is not None
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None)
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
 def test_canonical_one_of_admits_only_what_a_single_branch_takes():
     # Canonicalization keeps a `oneOf` whose branches are pointers, since folding one means
     # unrolling what it names.
