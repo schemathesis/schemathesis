@@ -176,8 +176,8 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         # Variable-length inner: outer count alone cannot encode maxLength (each
         # tick may be arbitrarily long), so we pin the variable slot and tighten
         # the leading slot for minLength only.
-        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{3994,}(?:,prefix\|{1,}){0,}$"),
-        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1,}(?:,bar\.spam\.[^,]{1,}){0,}$"),
+        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{3994}(?:,prefix\|{1,}){0,}$"),
+        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1}(?:,bar\.spam\.[^,]{1,}){0,}$"),
         # Optional finite group `()?` is preserved while `8+` tightens to use the budget.
         (r"^\008+()?$", None, 2, r"^\x008{1}(){0,1}$"),
         (r"^\008+()?$", 2, None, r"^\x008{1,}(){0,1}$"),
@@ -252,7 +252,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
             r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$",
             1,
             30,
-            r"^[a-zA-Z]{1,}([ '\-][a-zA-Z]{1,}){0,2}\.{0,1}$",
+            r"^[a-zA-Z]{1,30}([ '\-][a-zA-Z]{1,}){0,2}\.{0,1}$",
         ),
         # Required-only siblings whose combined max can't reach the target minLength —
         # both greedy and balanced bail and the original schema is kept.
@@ -350,7 +350,7 @@ def test_update_quantifier_admits_uneven_slot_distributions(min_length, max_leng
         # Unbounded `{1,}` survives the rewrite; `maxLength` must stay so length is still enforced.
         (
             {"type": "string", "pattern": r"^([a-z]+-){2,3}\d+$", "minLength": 1, "maxLength": 32},
-            {"type": "string", "pattern": r"^([a-z]{1,}-){2,3}\d{1,}$", "maxLength": 32},
+            {"type": "string", "pattern": r"^([a-z]{1,}-){2,3}\d{1,28}$", "maxLength": 32},
         ),
         # Each slot's max is allocated as if it were the only one, so together they outrun the budget.
         (
@@ -361,7 +361,7 @@ def test_update_quantifier_admits_uneven_slot_distributions(min_length, max_leng
             {"type": "string", "pattern": r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$", "minLength": 1, "maxLength": 30},
             {
                 "type": "string",
-                "pattern": r"^[a-zA-Z]{1,}([ '\-][a-zA-Z]{1,}){0,2}\.{0,1}$",
+                "pattern": r"^[a-zA-Z]{1,30}([ '\-][a-zA-Z]{1,}){0,2}\.{0,1}$",
                 "maxLength": 30,
             },
         ),
@@ -1231,3 +1231,17 @@ def test_quantifier_rewrite_within_reach_is_taken():
     update_pattern_in_schema(schema)
 
     assert schema == {"type": "string", "pattern": "^.{1,10}$"}
+
+
+def test_rewrite_keeps_the_upper_bound_finite_when_parts_cannot_be_pinned():
+    # Optional alternations block exact length, and an open-ended rewrite then aims generation at
+    # strings orders of magnitude past the bound, which the length check throws away.
+    pattern = r"^arn:aws(-cn|-us-gov)?:[a-z0-9-]*:[a-z0-9-]*:([0-9]{12})?:.+$"
+
+    rewritten = update_quantifier(pattern, 1000, 1000)
+
+    bounds = re.findall(r"\{(\d+),(\d*)\}", rewritten)
+    assert bounds
+    for low, high in bounds:
+        assert high != "", f"open-ended quantifier {{{low},}} in {rewritten}"
+        assert int(high) <= 1000, f"quantifier upper bound {high} exceeds the requested length in {rewritten}"

@@ -1195,11 +1195,10 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
             sum_pinned_max += max_r * rep_len
 
         np_adj_min = None if adj_min is None else max(0, adj_min - sum_pinned_min)
-        # Pinned slots with unbounded contribution mean we cannot enforce maxLength
-        # via the rewrite. Drop the upper budget; minLength still holds because
-        # each pinned slot's minimum contribution is finite.
+        # A pinned slot can carry more than its minimum, so the total cannot be pinned to maxLength -
+        # but leaving the rest open-ended aims generation orders of magnitude past it, for nothing.
         if has_unbounded_pinned:
-            np_adj_max = None
+            np_adj_max = None if adj_max is None else max(0, adj_max - sum_pinned_min)
         else:
             np_adj_max = None if adj_max is None else adj_max - sum_pinned_max
         if np_adj_max is not None and np_adj_max < 0:
