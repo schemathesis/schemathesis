@@ -20,6 +20,21 @@ REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
 BundleCache = dict[int, tuple[Mapping[str, Any], dict[str, Any], dict[str, str]]]
 
 
+IDENTITY_KEYWORDS = ("$id", "id")
+
+
+def _without_identity(schema: JsonSchema | list[JsonSchema]) -> JsonSchema | list[JsonSchema]:
+    """The schema without the name it gave itself.
+
+    A bundled definition is reachable only as `#/x-bundled/<name>`, and a name it kept would set a
+    base URI that every later pointer resolves against - a bare fragment breaks them outright.
+    """
+    if not isinstance(schema, dict) or ("$id" not in schema and "id" not in schema):
+        return schema
+    # A non-string sits under a property named `$id`/`id`, not under the keyword.
+    return {key: value for key, value in schema.items() if key not in IDENTITY_KEYWORDS or not isinstance(value, str)}
+
+
 class BundleError(Exception):
     def __init__(self, reference: str, value: object) -> None:
         self.reference = reference
@@ -124,7 +139,7 @@ class Bundler:
                         finally:
                             scope_stack.pop()
 
-                        defs[def_name] = bundled_resolved
+                        defs[def_name] = _without_identity(bundled_resolved)
 
                         return {
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
