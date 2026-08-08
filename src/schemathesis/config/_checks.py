@@ -269,6 +269,12 @@ class ChecksConfig(DiffBase):
             existing = self._unknown.get(name)
             return existing if existing is not None else SimpleCheckConfig()
 
+    def _set_enabled(self, name: str, *, known_names: set[str], enabled: bool) -> None:
+        if name in known_names:
+            self.get_by_name(name=name).enabled = enabled
+        else:
+            self._unknown[name] = SimpleCheckConfig(enabled=enabled)
+
     def update(
         self,
         *,
@@ -276,28 +282,26 @@ class ChecksConfig(DiffBase):
         excluded_check_names: list[str] | None = None,
         max_response_time: float | None = None,
     ) -> None:
+        from schemathesis.checks import CHECKS
+
         known_names = {f.name for f in fields(self) if not f.name.startswith("_")}
-        for name in known_names:
+        # Registered custom checks aren't dataclass fields; apply the same include/exclude rules to
+        # them so `included_check_names` disables unlisted custom checks too, not just built-in ones.
+        custom_names = set(CHECKS.get_all_names()) - known_names
+        all_names = known_names | custom_names | set(included_check_names or []) | set(excluded_check_names or [])
+        all_names.discard("all")
+
+        for name in all_names:
             # Check in explicitly excluded or not in explicitly included
             if name in (excluded_check_names or []) or (
                 included_check_names is not None
                 and "all" not in included_check_names
                 and name not in included_check_names
             ):
-                config = self.get_by_name(name=name)
-                config.enabled = False
+                self._set_enabled(name, known_names=known_names, enabled=False)
             elif included_check_names is not None and name in included_check_names:
-                config = self.get_by_name(name=name)
-                config.enabled = True
+                self._set_enabled(name, known_names=known_names, enabled=True)
 
         if max_response_time is not None:
             self.max_response_time.enabled = True
             self.max_response_time.limit = max_response_time
-
-        for name in included_check_names or []:
-            if name not in known_names and name != "all":
-                self._unknown[name] = SimpleCheckConfig(enabled=True)
-
-        for name in excluded_check_names or []:
-            if name not in known_names and name != "all":
-                self._unknown[name] = SimpleCheckConfig(enabled=False)
