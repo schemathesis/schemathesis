@@ -46,6 +46,7 @@
 
 - Cache canonical-form strategies across operations.
 - Cache canonical schema forms across operations.
+- Reuse the canonical-form cache for negative testing's negatability check.
 
 ### :wrench: Changed
 
