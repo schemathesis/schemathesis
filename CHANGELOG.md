@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Disable unlisted custom checks when `--checks` selects only specific checks.
 - Run aborting with an internal error on parameters whose name is not a string, such as `true`.
 - Coverage phase stalling and using gigabytes on a `pattern` with optional parts and `maxLength`.
 - Slow generation for a `pattern` with a group or only a leading anchor under a length bound.

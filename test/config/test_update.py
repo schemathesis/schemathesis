@@ -1,5 +1,6 @@
 import pytest
 
+import schemathesis
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.generation import GenerationMode
 
@@ -35,6 +36,21 @@ def test_unknown_generation_mode_rejected(config):
 def test_non_integer_max_examples_rejected(config):
     with pytest.raises(ConfigError, match="max-examples"):
         config.generation.update(max_examples="ten")
+
+
+def test_included_check_names_disables_unlisted_custom_checks(config, restore_checks):
+    @schemathesis.check
+    def custom_check_a(ctx, response, case):
+        pass
+
+    @schemathesis.check
+    def custom_check_b(ctx, response, case):
+        pass
+
+    config.checks.update(included_check_names=["custom_check_a"])
+
+    assert config.checks.get_by_name(name="custom_check_a").enabled is True
+    assert config.checks.get_by_name(name="custom_check_b").enabled is False
 
 
 def test_update_keeps_flags_set_by_earlier_update(config):

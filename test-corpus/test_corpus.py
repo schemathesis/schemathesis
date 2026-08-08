@@ -593,9 +593,7 @@ def test_default(corpus, filename):
     schema = _load_schema(corpus, filename)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["examples", "fuzzing"])
-    schema.config.checks.update(
-        included_check_names=[combined_check.__name__], excluded_check_names=[combined_check_coverage.__name__]
-    )
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
 
     handlers = [
         JunitXMLHandler(output=StringIO()),
@@ -627,9 +625,7 @@ def test_coverage_phase(corpus, filename, mode):
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["coverage"])
     schema.config.generation.update(modes=[mode])
-    schema.config.checks.update(
-        included_check_names=[combined_check_coverage.__name__], excluded_check_names=[combined_check.__name__]
-    )
+    schema.config.checks.update(included_check_names=[combined_check_coverage.__name__])
     for event in from_schema(schema).execute():
         if isinstance(event, events.Interrupted):
             pytest.exit("Keyboard Interrupt")
@@ -808,9 +804,7 @@ def test_graphql(filename):
     schema.config.output.sanitization.update(enabled=False)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["fuzzing"])
-    schema.config.checks.update(
-        included_check_names=[combined_check.__name__], excluded_check_names=[combined_check_coverage.__name__]
-    )
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
 
     handlers = [
         JunitXMLHandler(output=StringIO()),
