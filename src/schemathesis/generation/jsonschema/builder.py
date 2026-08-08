@@ -16,7 +16,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.generation._cache import schema_cache_key
-from schemathesis.generation.hypothesis import canonical_strategy_cache
+from schemathesis.generation.hypothesis import canonical_form_cache, canonical_strategy_cache
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.generation.jsonschema.strategy import _displayed, from_schema
 
@@ -41,16 +41,17 @@ def build(
     """Values the schema admits; `UnsupportedSchema` when this engine does not fully model it."""
     alphabet = alphabet if alphabet is not None else Alphabet()
     try:
-        # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on
-        # every draw; rebuilding its strategy each time is what the cache is for.
-        key = (schema_cache_key(schema), draft, id(formats), alphabet)
+        schema_key = schema_cache_key(schema)
     except (TypeError, ValueError):
-        key = None
+        schema_key = None
+    # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on
+    # every draw; rebuilding its strategy each time is what the cache is for.
+    key = (schema_key, draft, id(formats), alphabet) if schema_key is not None else None
     if key is not None:
         cached = canonical_strategy_cache.get(key)
         if cached is not MISSING:
             return cached[1]
-    strategy = _build(schema, draft=draft, formats=formats, alphabet=alphabet)
+    strategy = _build(schema, draft=draft, formats=formats, alphabet=alphabet, schema_key=schema_key)
     if key is not None:
         # Keeping `formats` alive next to the strategy stops its `id` from being recycled
         # into a stale hit once the caller drops it.
@@ -64,22 +65,32 @@ def _build(
     draft: int,
     formats: dict[str, SearchStrategy],
     alphabet: Alphabet,
+    schema_key: tuple[str, ...] | None = None,
 ) -> SearchStrategy[JsonValue]:
-    try:
-        canonical_schema = jsonschema_rs.canonicalize(
-            schema,
-            draft=draft,
-            pattern_options=FANCY_REGEX_OPTIONS,
-            # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a
-            # `format`-carrying schema generating arbitrary strings on this path.
-            validate_formats=True,
-        )
-    except jsonschema_rs.ValidationError as exc:
-        raise _schema_error(exc) from None
-    except jsonschema_rs.canonical.InvalidPattern as exc:
-        raise InvalidRegexPattern(f"Failed to generate test cases for this API operation: {exc}") from None
-    except jsonschema_rs.canonical.CanonicalizationError as exc:
-        raise InvalidSchema(f"Failed to generate test cases for this API operation: {exc}") from None
+    # The canonical form answers to the schema and draft alone, so a differing alphabet or format map reuses it.
+    canonical_key = (schema_key, draft) if schema_key is not None else None
+    cached_form = canonical_form_cache.get(canonical_key) if canonical_key is not None else MISSING
+    canonical_schema: jsonschema_rs.CanonicalSchema
+    if cached_form is not MISSING:
+        canonical_schema = cached_form
+    else:
+        try:
+            canonical_schema = jsonschema_rs.canonicalize(
+                schema,
+                draft=draft,
+                pattern_options=FANCY_REGEX_OPTIONS,
+                # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a
+                # `format`-carrying schema generating arbitrary strings on this path.
+                validate_formats=True,
+            )
+        except jsonschema_rs.ValidationError as exc:
+            raise _schema_error(exc) from None
+        except jsonschema_rs.canonical.InvalidPattern as exc:
+            raise InvalidRegexPattern(f"Failed to generate test cases for this API operation: {exc}") from None
+        except jsonschema_rs.canonical.CanonicalizationError as exc:
+            raise InvalidSchema(f"Failed to generate test cases for this API operation: {exc}") from None
+        if canonical_key is not None:
+            canonical_form_cache[canonical_key] = canonical_schema
     if canonical_schema.kind == "raw":
         raise UnsupportedSchema.from_reason(f"this part of it:\n\n{_displayed(canonical_schema)}")
     # Spelled out so the caller reports an unsatisfiable schema; no other engine gets a say.

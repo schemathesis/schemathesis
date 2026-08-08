@@ -1050,7 +1050,7 @@ def _rejected_by(
     """A demand met by filtering, for a schema whose complement the canonical form cannot spell."""
     # `to_json_schema` carries the draft the node was canonicalized under, so the facets that only
     # assert on some drafts - `contentEncoding` and friends - are judged the same way here.
-    admits = make_validator_for(schema.to_json_schema()).is_valid
+    admits = _validator(schema.to_json_schema())
     return admitted.filter(lambda value: not admits(value))
 
 
