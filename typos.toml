@@ -12,6 +12,7 @@ extend-ignore-re = [
 
 [default.extend-words]
 Nd = "Nd"
+ninjs = "ninjs"
 
 [files]
 extend-exclude = ["test-corpus/__snapshots__/*/*.json", "test/config/__snapshots__/*/*.raw"]
