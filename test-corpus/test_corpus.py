@@ -543,16 +543,17 @@ KNOWN_BODY_VIOLATIONS: set[tuple[str, str]] = {
 }
 
 
-@schemathesis.check
-def combined_check(ctx, response, case):
-    case.as_curl_command()
+def _run_registered_checks(ctx, response, case):
     for check in CHECKS.get_all():
-        if check is combined_check:
+        if check in (combined_check, combined_check_coverage):
             continue
         try:
             check(ctx, response, case)
         except (Failure, FailureGroup):
             pass
+
+
+def _check_body_conformance_violation(case):
     if case.meta is None or case.meta.phase.name != TestPhase.COVERAGE:
         return
     violation = check_body_conformance(case)
@@ -573,11 +574,28 @@ def combined_check(ctx, response, case):
     )
 
 
+@schemathesis.check
+def combined_check(ctx, response, case):
+    case.as_curl_command()
+    _run_registered_checks(ctx, response, case)
+    _check_body_conformance_violation(case)
+
+
+@schemathesis.check
+def combined_check_coverage(ctx, response, case):
+    # Coverage-phase case counts are orders of magnitude higher than fuzzing/examples, and
+    # `as_curl_command` scans the whole body per case; skip it here to keep the test runnable.
+    _run_registered_checks(ctx, response, case)
+    _check_body_conformance_violation(case)
+
+
 def test_default(corpus, filename):
     schema = _load_schema(corpus, filename)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["examples", "fuzzing"])
-    schema.config.checks.update(included_check_names=[combined_check.__name__])
+    schema.config.checks.update(
+        included_check_names=[combined_check.__name__], excluded_check_names=[combined_check_coverage.__name__]
+    )
 
     handlers = [
         JunitXMLHandler(output=StringIO()),
@@ -609,7 +627,9 @@ def test_coverage_phase(corpus, filename, mode):
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["coverage"])
     schema.config.generation.update(modes=[mode])
-    schema.config.checks.update(included_check_names=[combined_check.__name__])
+    schema.config.checks.update(
+        included_check_names=[combined_check_coverage.__name__], excluded_check_names=[combined_check.__name__]
+    )
     for event in from_schema(schema).execute():
         if isinstance(event, events.Interrupted):
             pytest.exit("Keyboard Interrupt")
@@ -788,7 +808,9 @@ def test_graphql(filename):
     schema.config.output.sanitization.update(enabled=False)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["fuzzing"])
-    schema.config.checks.update(included_check_names=[combined_check.__name__])
+    schema.config.checks.update(
+        included_check_names=[combined_check.__name__], excluded_check_names=[combined_check_coverage.__name__]
+    )
 
     handlers = [
         JunitXMLHandler(output=StringIO()),
