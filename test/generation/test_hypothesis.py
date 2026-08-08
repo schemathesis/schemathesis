@@ -2680,6 +2680,74 @@ def test_canonical_one_of_admits_only_what_a_single_branch_takes():
     find(built, lambda value: value > 10, settings=settings(max_examples=1000, database=None))
 
 
+def test_canonical_one_of_branches_told_apart_by_format():
+    # Every date is also a string over one character, so only what `format` rejects belongs to a branch alone.
+    schema = {
+        "oneOf": [{"$ref": "#/$defs/dated"}, {"$ref": "#/$defs/text"}],
+        "$defs": {"dated": {"type": "string", "format": "date"}, "text": {"type": "string", "minLength": 1}},
+    }
+
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    is_valid = jsonschema_rs.Draft202012Validator(schema, validate_formats=True).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
+def test_canonical_one_of_branches_naming_draft_4_definitions():
+    # Draft 4 spells the carried definitions `definitions`, and the branches still have to find them.
+    schema = {
+        "oneOf": [{"$ref": "#/definitions/small"}, {"$ref": "#/definitions/large"}],
+        "definitions": {"small": {"type": "integer", "maximum": 10}, "large": {"type": "integer", "minimum": 0}},
+    }
+
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
+    is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+    find(built, lambda value: value < 0, settings=settings(max_examples=1000, database=None))
+    find(built, lambda value: value > 10, settings=settings(max_examples=1000, database=None))
+
+
+def test_canonical_conjunction_judges_with_the_project_regex_engine():
+    # The pattern only compiles under the size limit the rest of the engine raises.
+    schema = {
+        "$ref": "#/$defs/node",
+        "$defs": {
+            "node": {
+                "allOf": [
+                    {"$ref": "#/$defs/node"},
+                    {
+                        "type": "object",
+                        "properties": {"a": {"type": "string", "pattern": "^[\\s\\S]{1,100000}$"}},
+                        "required": ["a"],
+                    },
+                ]
+            }
+        },
+    }
+
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    is_valid = jsonschema_rs.Draft202012Validator(schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid
+
+    @given(built)
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
 def test_canonical_one_of_beside_a_conjunction_drives_the_draw():
     # Drawing from the loose half and hoping it lands inside a branch never gets there.
     schema = {
