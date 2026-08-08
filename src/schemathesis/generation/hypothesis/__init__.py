@@ -14,6 +14,8 @@ schema_generation_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)
 custom_formats_cache: Final[BoundedCache] = BoundedCache(maxsize=32)
 # Cross-operation cache for the canonical-form strategy keyed on (schema, validator, alphabet).
 canonical_strategy_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
+# Cross-operation cache for the canonical form itself, which answers to (schema, draft) only.
+canonical_form_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
 # `is_first_param_referenced_in_function` re-parses a function's AST per call; cache by code object.
 _first_param_cache: Final[BoundedCache] = BoundedCache(maxsize=1024)
 

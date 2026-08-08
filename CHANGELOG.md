@@ -45,6 +45,7 @@
 ### :racing_car: Performance
 
 - Cache canonical-form strategies across operations.
+- Cache canonical schema forms across operations.
 
 ### :wrench: Changed
 
