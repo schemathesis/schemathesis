@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+    from schemathesis.core.jsonschema.types import JsonValue
 
     # A bound arrives as `Decimal` when no float spells it back.
     Numeric = int | float | Decimal
@@ -165,7 +165,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canonical.AllOfView):
         return _all_of(view, ctx)
     if isinstance(view, canonical.OneOfView):
-        return _one_of(view, ctx)
+        return _one_of(schema, view, ctx)
     raise UnsupportedSchema.from_reason(f"this part of it:\n\n{_displayed(schema)}")
 
 
@@ -307,7 +307,7 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
                 # loose half driving alone would have to land inside a branch by chance.
                 rest = followed[:index] + followed[index + 1 :]
                 return _exclusive(
-                    branch_view.branches,
+                    branch,
                     [from_schema(_intersection([*rest, sub]), ctx) for sub in branch_view.branches],
                 )
         # Every branch is a pointer back into the value being built, so the value comes from what they
@@ -341,21 +341,21 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
         ctx.following.difference_update(opened)
 
 
-def _one_of(view: jsonschema_rs.canonical.OneOfView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
+def _one_of(
+    schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.OneOfView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
     """Values exactly one branch admits."""
-    return _exclusive(view.branches, [from_schema(branch, ctx) for branch in view.branches])
+    return _exclusive(schema, [from_schema(branch, ctx) for branch in view.branches])
 
 
 def _exclusive(
-    branches: Sequence[jsonschema_rs.CanonicalSchema], strategies: list[SearchStrategy[JsonValue]]
+    node: jsonschema_rs.CanonicalSchema, strategies: list[SearchStrategy[JsonValue]]
 ) -> SearchStrategy[JsonValue]:
     """Values from each strategy that no branch other than its own admits."""
-    narrowed = []
-    for index, strategy in enumerate(strategies):
-        # What the other branches also admit belongs to no branch alone.
-        others = (*branches[:index], *branches[index + 1 :])
-        narrowed.append(strategy.filter(_rejected_by_all(others)))
-    return st.one_of(narrowed)
+    # A value its own branch drew already clears that branch, so "no other branch admits it" and
+    # "exactly one branch admits it" are the same test - one validator for the node, not one per branch.
+    exactly_one = _validator(node)
+    return st.one_of([strategy.filter(exactly_one) for strategy in strategies])
 
 
 def _intersection(branches: list[jsonschema_rs.CanonicalSchema]) -> jsonschema_rs.CanonicalSchema:
@@ -826,23 +826,6 @@ def _element(items: jsonschema_rs.CanonicalSchema | None, ctx: StrategyContext) 
 @lru_cache(maxsize=4096)
 def _validator(schema: jsonschema_rs.CanonicalSchema) -> Callable[[JsonValue], bool]:
     return build_validator_for(schema.to_json_schema()).is_valid
-
-
-# One document, so a drawn value is judged once instead of once per branch. Every branch carries
-# the document it was written in, so what they name moves up to the root they nest under.
-@lru_cache(maxsize=512)
-def _rejected_by_all(branches: tuple[jsonschema_rs.CanonicalSchema, ...]) -> Callable[[JsonValue], bool]:
-    """Whether no branch admits the value."""
-    documents = [branch.to_json_schema() for branch in branches]
-    carried: dict[str, dict[str, JsonSchema]] = {}
-    schema_uri = documents[0]["$schema"]
-    for document in documents:
-        del document["$schema"]
-        for key in ("$defs", "definitions"):
-            section = document.pop(key, None)
-            if section is not None:
-                carried.setdefault(key, {}).update(section)
-    return build_validator_for({"$schema": schema_uri, **carried, "not": {"anyOf": documents}}).is_valid
 
 
 def _supply(
