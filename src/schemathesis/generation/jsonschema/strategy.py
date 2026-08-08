@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.core.jsonschema.types import JsonValue
+    from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 
     # A bound arrives as `Decimal` when no float spells it back.
     Numeric = int | float | Decimal
@@ -335,7 +335,7 @@ def _all_of(view: jsonschema_rs.canonical.AllOfView, ctx: StrategyContext) -> Se
         driver, *rest = followed
         strategy = from_schema(driver, ctx)
         for other in rest:
-            strategy = strategy.filter(jsonschema_rs.validator_for(other.to_json_schema()).is_valid)
+            strategy = strategy.filter(_validator(other))
         return strategy
     finally:
         ctx.following.difference_update(opened)
@@ -350,14 +350,11 @@ def _exclusive(
     branches: Sequence[jsonschema_rs.CanonicalSchema], strategies: list[SearchStrategy[JsonValue]]
 ) -> SearchStrategy[JsonValue]:
     """Values from each strategy that no branch other than its own admits."""
-    validators = [jsonschema_rs.validator_for(branch.to_json_schema()) for branch in branches]
     narrowed = []
     for index, strategy in enumerate(strategies):
         # What the other branches also admit belongs to no branch alone.
-        others = validators[:index] + validators[index + 1 :]
-        narrowed.append(
-            strategy.filter(lambda value, others=others: not any(other.is_valid(value) for other in others))
-        )
+        others = (*branches[:index], *branches[index + 1 :])
+        narrowed.append(strategy.filter(_rejected_by_all(others)))
     return st.one_of(narrowed)
 
 
@@ -829,6 +826,23 @@ def _element(items: jsonschema_rs.CanonicalSchema | None, ctx: StrategyContext) 
 @lru_cache(maxsize=4096)
 def _validator(schema: jsonschema_rs.CanonicalSchema) -> Callable[[JsonValue], bool]:
     return build_validator_for(schema.to_json_schema()).is_valid
+
+
+# One document, so a drawn value is judged once instead of once per branch. Every branch carries
+# the document it was written in, so what they name moves up to the root they nest under.
+@lru_cache(maxsize=512)
+def _rejected_by_all(branches: tuple[jsonschema_rs.CanonicalSchema, ...]) -> Callable[[JsonValue], bool]:
+    """Whether no branch admits the value."""
+    documents = [branch.to_json_schema() for branch in branches]
+    carried: dict[str, dict[str, JsonSchema]] = {}
+    schema_uri = documents[0]["$schema"]
+    for document in documents:
+        del document["$schema"]
+        for key in ("$defs", "definitions"):
+            section = document.pop(key, None)
+            if section is not None:
+                carried.setdefault(key, {}).update(section)
+    return build_validator_for({"$schema": schema_uri, **carried, "not": {"anyOf": documents}}).is_valid
 
 
 def _supply(
