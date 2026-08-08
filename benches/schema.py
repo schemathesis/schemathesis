@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 import requests
+from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
@@ -13,7 +14,8 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine import events, from_schema
-from schemathesis.generation.hypothesis import setup
+from schemathesis.generation.hypothesis import canonical_form_cache, canonical_strategy_cache, setup
+from schemathesis.generation.jsonschema import strategy
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.reporting.har import HarWriter
 from schemathesis.reporting.vcr import VcrWriter
@@ -330,5 +332,68 @@ def test_as_state_machine(benchmark, raw_schema):
     def _build():
         schema = schemathesis.openapi.from_dict(deepclone(raw_schema))
         schema.as_state_machine()
+
+    benchmark(_build)
+
+
+WIDE_ONE_OF = {
+    "openapi": "3.1.0",
+    "info": {"title": "wide oneOf", "version": "1.0"},
+    "paths": {
+        "/p": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object",
+                                        "properties": {"kind": {"const": f"k{index}"}, f"f{index}": {"type": "string"}},
+                                    }
+                                    for index in range(64)
+                                ]
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    },
+}
+
+
+def _clear_generation_caches():
+    """Drop what a previous iteration memoized, so each one pays for a cold build."""
+    for cache in (canonical_form_cache, canonical_strategy_cache):
+        cache.clear()
+    for value in vars(strategy).values():
+        clear = getattr(value, "cache_clear", None)
+        if clear is not None:
+            clear()
+
+
+@pytest.mark.benchmark(group="wide-one-of-strategy")
+def test_wide_one_of_strategy(benchmark):
+    def _build():
+        _clear_generation_caches()
+        operation = schemathesis.openapi.from_dict(deepclone(WIDE_ONE_OF))["/p"]["POST"]
+
+        @seed(0)
+        @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+        @settings(
+            max_examples=3,
+            database=None,
+            deadline=None,
+            verbosity=Verbosity.quiet,
+            phases=(Phase.generate,),
+            suppress_health_check=list(HealthCheck),
+        )
+        def _draw(case):
+            pass
+
+        _draw()
 
     benchmark(_build)
