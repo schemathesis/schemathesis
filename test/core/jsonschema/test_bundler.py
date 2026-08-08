@@ -693,3 +693,28 @@ def test_unbundle_path_decodes_pointer_escaping():
         "properties",
         "id",
     ]
+
+
+def test_bundle_resolves_reference_by_declared_id():
+    # A subschema that names itself is reachable by that name in-document, with nothing fetched.
+    resolver = make_root_resolver(
+        {"definitions": {"Text": {"$id": "https://example.invalid/text.json", "type": "string"}}}
+    )
+    assert Bundler().bundle({"$ref": "https://example.invalid/text.json"}, resolver).schema == {"type": "string"}
+
+
+def test_bundle_drops_id_from_bundled_definitions():
+    # A legacy fragment-only `$id` sets a base URI that later `#/x-bundled/...` lookups cannot resolve against.
+    resolver = make_root_resolver({"definitions": {"Text": {"$id": "#/definitions/text", "type": "string"}}})
+    schema = {
+        "type": "object",
+        "properties": {"a": {"$ref": "#/definitions/Text"}, "b": {"$ref": "#/definitions/Text"}},
+    }
+    assert Bundler().bundle(schema, resolver).schema == {
+        "type": "object",
+        "properties": {
+            "a": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
+            "b": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
+        },
+        BUNDLE_STORAGE_KEY: {"schema1": {"type": "string"}},
+    }
