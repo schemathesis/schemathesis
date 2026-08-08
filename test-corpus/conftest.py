@@ -1,11 +1,42 @@
 import json
+import socket
 import warnings
 
 import pytest
 
+LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
 
 def pytest_configure(config):
     warnings.filterwarnings("ignore", category=pytest.PytestDeprecationWarning)
+
+
+def _is_loopback(address):
+    # Anything that is not a host/port pair is a local channel (Unix socket, and so on).
+    if not isinstance(address, tuple):
+        return True
+    return address[0] in LOOPBACK_HOSTS
+
+
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    # A schema reaching for a remote `$ref` must fail the same way on every machine, and the corpus
+    # is pinned to a commit while the documents it points at are not.
+    getaddrinfo = socket.getaddrinfo
+    connect = socket.socket.connect
+
+    def guarded_getaddrinfo(host, *args, **kwargs):
+        if host not in LOOPBACK_HOSTS:
+            raise OSError(f"Corpus tests run without network access, and something asked for {host!r}")
+        return getaddrinfo(host, *args, **kwargs)
+
+    def guarded_connect(self, address):
+        if not _is_loopback(address):
+            raise OSError(f"Corpus tests run without network access, and something asked for {address!r}")
+        return connect(self, address)
+
+    monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
