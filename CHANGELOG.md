@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Coverage phase rewriting booleans in a schema's own example into strings for every later case.
 - Resolve a reference naming the schema's own `$id` in place, without fetching it.
 - Schema error on references inside a schema whose `$id` is a bare fragment like `#/definitions/text`.
 - Disable unlisted custom checks when `--checks` selects only specific checks.

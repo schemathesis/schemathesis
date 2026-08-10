@@ -3910,6 +3910,50 @@ def test_parameter_mutation_cases_do_not_inherit_negative_body(ctx):
     assert bad == []
 
 
+def test_duplicate_items_case_leaves_the_declared_example_alone(ctx):
+    # The duplicated-items value is built from the declared example, so rewriting its booleans into
+    # their wire form must not reach back into the example every other case is built from.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [{"in": "header", "name": "X-Token", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "rules": {
+                                            "type": "array",
+                                            "uniqueItems": True,
+                                            "minItems": 1,
+                                            "example": [{"enabled": True}],
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {"enabled": {"type": "boolean"}},
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    operation = schema["/foo"]["POST"]
+    validator = _body_validator(operation)
+
+    for case in _iter_cases(operation, GenerationMode.NEGATIVE):
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY:
+            continue
+        assert validator.is_valid(case.body), case.body
+
+
 def test_positive_number_near_boundary_respects_multiple_of(ctx):
     # IEEE-754 subtraction `maximum - multipleOf` drifts (e.g. `99999.99 - 0.01 = 99999.98000000001`).
     # The validator rejects the drifted value as not a multiple. Decimal-based arithmetic stays exact.
