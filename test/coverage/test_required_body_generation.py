@@ -485,3 +485,25 @@ def test_enum_in_allof_base_with_sibling_ref_property_covers_every_value(ctx):
         if isinstance(pub, dict) and isinstance(pub.get("storageType"), str):
             seen.add(pub["storageType"])
     assert seen == {"A", "B"}, f"Expected both enum values covered, got {seen!r}"
+
+
+def test_single_branch_allof_keeps_outer_additional_properties(ctx):
+    # `additionalProperties: false` beside `allOf` judges the branch's own property names too.
+    operation = _load_json_body_operation(
+        ctx,
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "allOf": [{"$ref": "#/components/schemas/Inner"}],
+        },
+        components={
+            "schemas": {
+                "Inner": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"ids": {"type": "array", "items": {"type": "string"}}},
+                }
+            }
+        },
+    )
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)

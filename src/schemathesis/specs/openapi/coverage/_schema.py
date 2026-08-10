@@ -1388,10 +1388,10 @@ def _cover_positive_for_type(
         # producing cases that violate allOf's required fields.
         allof_handles_all = False
         if all_of is not None:
-            # When the outer schema also has its own properties or required fields, those constraints
-            # must be merged with allOf to avoid generating cases that violate allOf's required fields.
-            outer_has_properties = bool(schema.get("properties") or schema.get("required"))
-            if isinstance(all_of, list) and len(all_of) == 1 and not outer_has_properties:
+            # Covering a lone branch on its own drops every constraint sitting beside `allOf`, so that
+            # shortcut only holds when the outer schema carries none of them.
+            outer_constrains = any(key != "allOf" and key in ALL_KEYWORDS for key in schema)
+            if isinstance(all_of, list) and len(all_of) == 1 and not outer_constrains:
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
                 folded = False
