@@ -3279,32 +3279,15 @@ def is_valid_header_value(value: object) -> bool:
 
 
 def jsonify(value: Any) -> Any:
+    # Builds a new value: the input may be a spec-declared example that every other case reuses.
     if isinstance(value, bool):
         return "true" if value else "false"
-    elif value is None:
+    if value is None:
         return "null"
-
-    stack: list = [value]
-    while stack:
-        item = stack.pop()
-        if isinstance(item, dict):
-            for key, sub_item in item.items():
-                if isinstance(sub_item, bool):
-                    item[key] = "true" if sub_item else "false"
-                elif sub_item is None:
-                    item[key] = "null"
-                elif isinstance(sub_item, dict):
-                    stack.append(sub_item)
-                elif isinstance(sub_item, list):
-                    stack.extend(item)
-        elif isinstance(item, list):
-            for idx, sub_item in enumerate(item):
-                if isinstance(sub_item, bool):
-                    item[idx] = "true" if sub_item else "false"
-                elif sub_item is None:
-                    item[idx] = "null"
-                else:
-                    stack.extend(item)
+    if isinstance(value, dict):
+        return {key: jsonify(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [jsonify(item) for item in value]
     return value
 
 
