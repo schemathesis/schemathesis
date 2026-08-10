@@ -60,6 +60,7 @@
 - New data generation engine: up to 2x faster fuzzing and coverage on large schemas.
 - Up to 8x lower peak memory on large schemas. [#4305](https://github.com/schemathesis/schemathesis/issues/4305)
 - Cache canonical schema forms and generation strategies across operations.
+- Coverage phase peak memory on large schemas cut from gigabytes to hundreds of megabytes.
 
 ### :wrench: Changed
 

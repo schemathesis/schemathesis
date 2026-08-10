@@ -148,14 +148,9 @@ VALIDATED_FORMATS_BY_DRAFT: dict[type[jsonschema_rs.Validator], frozenset[str]] 
 }
 
 
-# Negative-property recursion in the coverage phase builds a validator per sub-schema per call;
-# without this LRU, the same schema shape recompiles thousands of times on schemas like k8s Pods.
 validator_cache: BoundedCache = BoundedCache(maxsize=1024)
-# Builds fail deterministically but slowly (fancy-regex compiles giant quantifiers before
-# rejecting them); cache the failure so the same schema isn't recompiled on every call.
 _validator_failure_cache: BoundedCache = BoundedCache(maxsize=1024)
-# Entries pin the schemas whose `id()` is part of the cache key so GC can't reuse the id.
-_seeded_validator_cache: BoundedCache = BoundedCache(maxsize=1024)
+_seeded_validator_cache: BoundedCache = BoundedCache(maxsize=16)
 
 
 def _build_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Validator:

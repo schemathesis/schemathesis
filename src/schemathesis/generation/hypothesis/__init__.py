@@ -7,16 +7,10 @@ from schemathesis.core.cache import MISSING, BoundedCache
 
 # Sentinel cached when generation raised `Unsatisfiable`.
 UNSATISFIABLE_RESULT: Final = object()
-# Cross-operation cache for `CoverageContext.generate_from_schema`.
 schema_generation_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)
-# Stable identity for per-(generation_config, mode) custom-format dicts, so downstream caches
-# keyed on `id(custom_formats)` actually hit instead of seeing a fresh dict per call.
 custom_formats_cache: Final[BoundedCache] = BoundedCache(maxsize=32)
-# Cross-operation cache for the canonical-form strategy keyed on (schema, validator, alphabet).
-canonical_strategy_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
-# Cross-operation cache for the canonical form itself, which answers to (schema, draft) only.
-canonical_form_cache: Final[BoundedCache] = BoundedCache(maxsize=512)
-# `is_first_param_referenced_in_function` re-parses a function's AST per call; cache by code object.
+canonical_strategy_cache: Final[BoundedCache] = BoundedCache(maxsize=128)
+canonical_form_cache: Final[BoundedCache] = BoundedCache(maxsize=128)
 _first_param_cache: Final[BoundedCache] = BoundedCache(maxsize=1024)
 
 

@@ -117,18 +117,19 @@ def _remove_examples(schema: dict[str, Any]) -> dict[str, Any]:
     # caching saves rewalking shared definitions (e.g. k8s ObjectMeta referenced everywhere).
     cached = _REMOVE_EXAMPLES_CACHE.get(id(schema))
     if cached is not MISSING:
-        return cached
-    result = {}
+        return cached[0]
+    result: dict[str, Any] = {}
     for key, value in schema.items():
         if key == "examples":
             continue
         if isinstance(value, dict):
             result[key] = _remove_examples(value)
         elif isinstance(value, list):
-            result[key] = [_remove_examples(item) if isinstance(item, dict) else item for item in value]  # type: ignore[assignment]
+            result[key] = [_remove_examples(item) if isinstance(item, dict) else item for item in value]
         else:
             result[key] = value
-    _REMOVE_EXAMPLES_CACHE[id(schema)] = result
+    # The second element pins `schema`, so its `id` cannot be recycled into a stale hit.
+    _REMOVE_EXAMPLES_CACHE[id(schema)] = (result, schema)
     return result
 
 
