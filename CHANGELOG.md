@@ -45,6 +45,7 @@
 - Generating `null` for nullable schemas an `allOf` sibling restricts to objects.
 - Emitting nothing for `allOf` schemas with no equivalent flat form.
 - Dropping `required` from `allOf` branches that sit beside an unresolved `$ref`.
+- Ignoring constraints beside a single-branch `allOf`, like `additionalProperties: false`.
 - Sending read-only properties an `allOf` sibling forbids.
 - Spurious tracebacks printed on exit after interruption.
 
