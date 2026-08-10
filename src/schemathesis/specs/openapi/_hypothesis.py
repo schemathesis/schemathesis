@@ -1018,23 +1018,19 @@ def get_parameters_strategy(
     return _NONE_STRATEGY
 
 
-def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:
-    """Convert Python-specific values to their JSON equivalents."""
-    stack: list = [value]
-    while stack:
-        item = stack.pop()
-        if isinstance(item, dict):
-            for key, sub_item in item.items():
-                if isinstance(sub_item, bool):
-                    item[key] = "true" if sub_item else "false"
-                elif sub_item is None:
-                    item[key] = "null"
-                elif isinstance(sub_item, dict):
-                    stack.append(sub_item)
-                elif isinstance(sub_item, list):
-                    stack.extend(item)
-        elif isinstance(item, list):
-            stack.extend(item)
+def jsonify_python_specific_types(value: Any) -> Any:
+    """Convert Python-specific values to their JSON equivalents.
+
+    Builds a new value: the input may be a spec-declared example that every other case reuses.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    if isinstance(value, dict):
+        return {key: jsonify_python_specific_types(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [jsonify_python_specific_types(item) for item in value]
     return value
 
 

@@ -998,10 +998,20 @@ def test_date_format(data):
         ({"foo": None}, {"foo": "null"}),
         ([{"foo": None}], [{"foo": "null"}]),
         ([{"foo": {"bar": True}}], [{"foo": {"bar": "true"}}]),
+        ({"foo": [True, None]}, {"foo": ["true", "null"]}),
+        ({"foo": [[False]]}, {"foo": [["false"]]}),
+        ({"foo": [{"bar": True}]}, {"foo": [{"bar": "true"}]}),
     ],
 )
 def test_jsonify_python_specific_types(value, expected):
     assert jsonify_python_specific_types(value) == expected
+
+
+def test_jsonify_python_specific_types_leaves_input_alone():
+    # The value may be a spec-declared example that later cases are built from.
+    value = {"foo": True, "bar": [None]}
+    assert jsonify_python_specific_types(value) == {"foo": "true", "bar": ["null"]}
+    assert value == {"foo": True, "bar": [None]}
 
 
 def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
