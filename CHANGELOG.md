@@ -41,6 +41,7 @@
 - Coverage phase generating `null` for nullable schemas an `allOf` sibling restricts to objects.
 - False positive `positive_data_acceptance` for `not` clauses in schemas using references.
 - Coverage phase sending read-only properties an `allOf` sibling forbids.
+- Coverage phase dropping `required` from `allOf` branches that sit beside an unresolved `$ref`.
 
 ### :racing_car: Performance
 

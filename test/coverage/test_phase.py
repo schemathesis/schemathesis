@@ -5331,6 +5331,46 @@ def test_all_of_branch_judging_outer_properties_as_additional(ctx):
         assert validator.is_valid(case.body), case.body
 
 
+def test_all_of_branch_that_stays_a_reference(ctx):
+    # A branch left as a bare reference cannot carry its siblings' constraints - `$ref` wins over them.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"data": {"$ref": "#/components/schemas/Outer"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "ok"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Inner": {"allOf": [{"type": "object"}]},
+                "Middle": {"allOf": [{"$ref": "#/components/schemas/Inner"}]},
+                "Outer": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Middle"},
+                        {"properties": {"workspace": {"type": "string"}}, "required": ["workspace"]},
+                    ]
+                },
+            }
+        },
+    )
+    operation = schema["/x"]["POST"]
+    validator = _body_validator(operation)
+    for case in _iter_cases(operation, GenerationMode.POSITIVE):
+        assert validator.is_valid(case.body), case.body
+
+
 @pytest.mark.parametrize(
     "branches",
     [

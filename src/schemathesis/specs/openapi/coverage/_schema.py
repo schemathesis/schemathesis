@@ -1002,6 +1002,10 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     if merged.get("not") == {}:
         # A branch rejects every value, so the keywords folded in around it cannot make one fit.
         return {"not": {}}
+    if "$ref" in merged and any(key != "$ref" and key not in _ANNOTATION_KEYWORDS for key in merged):
+        # A reference that stays unresolved overrides everything folded in beside it, so those
+        # constraints would silently vanish from the value.
+        return None
     merged_names = set(merged.get("properties", {}))
     for branch in folded_branches:
         extra = branch.get("additionalProperties")
