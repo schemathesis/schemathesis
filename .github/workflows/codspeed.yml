@@ -37,3 +37,26 @@ jobs:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "simulation"
           run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio --test-group=${{ matrix.shard }} --test-group-count=4
+
+  memory:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    name: "Track memory usage"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      # Whole-engine runs, too slow for the Valgrind job above but the only shape that catches
+      # memory blowups in the engine rather than in a single generator. They sit under
+      # `benches/memory/` so the job above collects nothing from them: it globs `benches/*`, and a
+      # directory is walked with the default `test_*.py` filter these modules deliberately fail.
+      - name: Run memory benchmarks
+        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          mode: "memory"
+          run: uvx --from=pytest --with=".[bench]" pytest benches/memory/engine_run.py --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
