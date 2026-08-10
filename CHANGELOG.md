@@ -4,60 +4,65 @@
 
 ### :bug: Fixed
 
-- Coverage phase rewriting booleans in a schema's own example into strings for every later case.
-- Resolve a reference naming the schema's own `$id` in place, without fetching it.
-- Schema error on references inside a schema whose `$id` is a bare fragment like `#/definitions/text`.
-- Disable unlisted custom checks when `--checks` selects only specific checks.
-- Run aborting with an internal error on parameters whose name is not a string, such as `true`.
-- Coverage phase stalling and using gigabytes on a `pattern` with optional parts and `maxLength`.
-- Slow generation for a `pattern` with a group or only a leading anchor under a length bound.
-- Unsatisfiable negative tests for operations whose path parameters have no constraint to violate.
-- Generate sendable header and cookie values for schemas with keywords beyond `type`.
-- Internal error generating values for a `pattern` naming characters outside `generation.codec`.
-- Hypothesis warning about an overly large representation when generating unrestricted JSON values.
-- Report schemas rejected by their JSON Schema draft as a schema error.
-- Report a `pattern` the validator cannot compile as an invalid regular expression.
-- Generate values for patterns using Unicode property escapes like `\p{L}`.
-- Keep a `pattern` the API enforces instead of dropping it when Python cannot read it.
-- Generate values for the other `anyOf` branches when one names an ungeneratable `pattern`.
-- Internal warning text shown for unreadable `patternProperties` regexes and patterns containing a quote.
-- Values violating a `pattern` with possessive quantifiers like `0++0` when a length bound is set.
-- Coverage phase recursing without end on a reference cycle through a `oneOf` / `anyOf` branch.
-- Spurious tracebacks printed on exit after interrupting the coverage phase.
-- Send `true`/`false`/`null` instead of Python spellings for booleans and nulls nested in array query parameters.
+#### Data generation
+
+- Slow generation for a grouped or anchored `pattern` under a length bound.
 - Strings longer than a single-character `pattern` like `^[a-z]$` allows when `maxLength` is set.
+- Values violating a `pattern` with possessive quantifiers like `0++0` when a length bound is set.
+- Internal error generating values for a `pattern` naming characters outside `generation.codec`.
+- Generate values for patterns using Unicode property escapes like `\p{L}`.
+- Generate values for the other `anyOf` branches when one names an ungeneratable `pattern`.
+- Keep a `pattern` the API enforces when Python cannot read it.
 - Honor `format` when generating string values for Open API 3.1.
 - Generate `hostname` and `idn-hostname` values that validators accept.
-- `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
 - Generate string values satisfying every `pattern` and `format` in a conjunction.
 - Generate strings honoring `contentEncoding` and `contentMediaType` under Draft 7.
+- Generate sendable header and cookie values for schemas with keywords beyond `type`.
 - Generate valid data for `oneOf` / `anyOf` branches whose `discriminator` property is nullable.
+- Unsatisfiable negative tests for operations whose path parameters have no constraint to violate.
 - Name the API operation that cannot be generated when its schema is unsatisfiable.
-- Runtime error in `negative_data_rejection` for empty array path parameters.
-- Coverage phase generating Unicode characters where the validator reads `\d` and `\w` as ASCII.
+- Hypothesis warning about an overly large representation when generating unrestricted JSON values.
+- Send `true`/`false`/`null` for booleans and nulls nested in array query parameters.
+
+#### Schema handling
+
+- Resolve a reference naming the schema's own `$id` in place, without fetching it.
+- Schema error on references inside a schema whose `$id` is a bare fragment like `#/definitions/text`.
+- Intermittent "Path parameter is not defined" on specs split across many external files. [#4414](https://github.com/schemathesis/schemathesis/issues/4414)
+- Report schemas rejected by their JSON Schema draft as a schema error.
+- Report a `pattern` the validator cannot compile as an invalid regular expression.
+- Internal warning text shown for unreadable `patternProperties` regexes and patterns containing a quote.
+- Run aborting with an internal error on non-string parameter names like `true`.
 - Internal error on truncated runtime expressions like `$response.` in Open API links.
 - Read unquoted `on`, `off`, `yes` and `no` in YAML documents as strings, per YAML 1.2.
-- Coverage phase emitting nothing for `allOf` schemas with no equivalent flat form.
-- Intermittent "Path parameter is not defined" on specs split across many external files. [#4414](https://github.com/schemathesis/schemathesis/issues/4414)
-- Runtime error in the coverage phase on a reference cycle through `allOf`.
-- Coverage phase generating `null` for nullable schemas an `allOf` sibling restricts to objects.
+
+#### Coverage phase
+
+- Stalling and using gigabytes on a `pattern` with optional parts and `maxLength`.
+- Endless recursion and runtime errors on reference cycles through `allOf`, `oneOf`, or `anyOf`.
+- Rewriting booleans in a schema's own example into strings for every later case.
+- Generating Unicode characters where the validator reads `\d` and `\w` as ASCII.
+- Generating `null` for nullable schemas an `allOf` sibling restricts to objects.
+- Emitting nothing for `allOf` schemas with no equivalent flat form.
+- Dropping `required` from `allOf` branches that sit beside an unresolved `$ref`.
+- Sending read-only properties an `allOf` sibling forbids.
+- Spurious tracebacks printed on exit after interruption.
+
+#### Others
+
 - False positive `positive_data_acceptance` for `not` clauses in schemas using references.
-- Coverage phase sending read-only properties an `allOf` sibling forbids.
-- Coverage phase dropping `required` from `allOf` branches that sit beside an unresolved `$ref`.
+- Runtime error in `negative_data_rejection` for empty array path parameters.
+- Disable unlisted custom checks when `--checks` selects only specific checks.
+- `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
 
 ### :racing_car: Performance
 
-- Cache canonical-form strategies across operations.
-- Cache canonical schema forms across operations.
-- Reuse the canonical-form cache for negative testing's negatability check.
+- New data generation engine: up to 2x faster fuzzing and coverage on large schemas.
+- Up to 8x lower peak memory on large schemas. [#4305](https://github.com/schemathesis/schemathesis/issues/4305)
+- Cache canonical schema forms and generation strategies across operations.
 
 ### :wrench: Changed
 
-- **INTERNAL**: Match the canonicalization regex engine to the validator's.
-- **INTERNAL**: Data generation for `number`, `object`, `array`, `format`, and `$ref` schemas built from the `jsonschema-rs` canonical form.
-- **INTERNAL**: Own all `format` value generators instead of delegating to `hypothesis-jsonschema`.
-- **INTERNAL**: Build negative-mode base bodies from the `jsonschema-rs` canonical form.
-- **INTERNAL**: Generate examples-phase values from the `jsonschema-rs` canonical form.
 - Drop the `hypothesis-jsonschema` dependency.
 
 ## [4.24.3](https://github.com/schemathesis/schemathesis/compare/v4.24.2...v4.24.3) - 2026-07-26
