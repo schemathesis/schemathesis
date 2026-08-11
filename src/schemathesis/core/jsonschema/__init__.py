@@ -154,6 +154,8 @@ _validator_failure_cache: BoundedCache = BoundedCache(maxsize=1024)
 _seeded_validator_cache: BoundedCache = BoundedCache(maxsize=16)
 # Entries pin the bundle whose `id()` is part of the key so GC can't reuse the id.
 _bundle_registry_cache: BoundedCache = BoundedCache(maxsize=16)
+# Same for the schema; fuzzing compiles the same one per case, and rewriting it every time is what costs.
+_split_bundle_cache: BoundedCache = BoundedCache(maxsize=32)
 _bundle_uri_counter = count()
 _REFERENCE_INTO_BUNDLE = f"{REFERENCE_TO_BUNDLE_PREFIX}/"
 
@@ -184,35 +186,45 @@ def _absolute_bundle_refs(node: JsonValue, uri: str) -> JsonValue:
     return node
 
 
-def _bundle_registry(bundled: dict[str, Any], validator_cls: type) -> tuple[str, jsonschema_rs.Registry]:
+def _bundle_registry(bundled: dict[str, Any], draft: int) -> tuple[str, jsonschema_rs.Registry]:
     """The registry holding `bundled`, built once per bundle and draft."""
-    cache_key = (id(bundled), validator_cls)
+    cache_key = (id(bundled), draft)
     cached = _bundle_registry_cache.get(cache_key)
     if cached is not MISSING:
         return cached[0], cached[1]
     uri = f"urn:schemathesis:bundle:{next(_bundle_uri_counter)}"
-    registry = jsonschema_rs.Registry(
-        [(uri, {BUNDLE_STORAGE_KEY: bundled})],
-        draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
-    )
+    registry = jsonschema_rs.Registry([(uri, {BUNDLE_STORAGE_KEY: bundled})], draft=draft)
     _bundle_registry_cache[cache_key] = (uri, registry, bundled)
     return uri, registry
 
 
-def _split_bundle(schema: JsonSchema, validator_cls: type) -> tuple[JsonSchema, jsonschema_rs.Registry | None]:
+def split_bundle(schema: JsonSchema, draft: int) -> tuple[JsonSchema, jsonschema_rs.Registry | None]:
     """Move the bundle out of the schema, so compiling it does not copy the whole bundle in.
 
-    Spliced in, every validator compiles the entire bundle whether or not it references it -
-    a shared registry compiles it once for all of them.
+    Spliced in, every compile takes the entire bundle whether or not it references it -
+    a shared registry takes it once for all of them.
     """
     if not isinstance(schema, dict):
         return schema, None
     bundled = schema.get(BUNDLE_STORAGE_KEY)
-    if not isinstance(bundled, dict) or validator_cls not in CANONICALIZE_DRAFT_BY_VALIDATOR:
+    if not isinstance(bundled, dict):
         return schema, None
-    uri, registry = _bundle_registry(bundled, validator_cls)
+    cache_key = (id(schema), draft)
+    cached = _split_bundle_cache.get(cache_key)
+    if cached is not MISSING:
+        return cached[0], cached[1]
+    uri, registry = _bundle_registry(bundled, draft)
     without_bundle = {key: value for key, value in schema.items() if key != BUNDLE_STORAGE_KEY}
-    return cast("JsonSchema", _absolute_bundle_refs(without_bundle, uri)), registry
+    split = cast("JsonSchema", _absolute_bundle_refs(without_bundle, uri))
+    _split_bundle_cache[cache_key] = (split, registry, schema)
+    return split, registry
+
+
+def _split_bundle(schema: JsonSchema, validator_cls: type) -> tuple[JsonSchema, jsonschema_rs.Registry | None]:
+    draft = CANONICALIZE_DRAFT_BY_VALIDATOR.get(validator_cls)
+    if draft is None:
+        return schema, None
+    return split_bundle(schema, draft)
 
 
 def _build_validator(
@@ -337,6 +349,7 @@ __all__ = [
     "maybe_resolve_bundled",
     "bundle",
     "schema_with_bundle",
+    "split_bundle",
     "REFERENCE_TO_BUNDLE_PREFIX",
     "BUNDLE_STORAGE_KEY",
     "get_type",

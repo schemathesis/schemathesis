@@ -14,7 +14,7 @@ from schemathesis.core.errors import (
     UnsupportedSchema,
     is_regex_validation_error,
 )
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, split_bundle
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import canonical_form_cache, canonical_strategy_cache
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
@@ -40,6 +40,7 @@ def build(
 ) -> SearchStrategy[JsonValue]:
     """Values the schema admits; `UnsupportedSchema` when this engine does not fully model it."""
     alphabet = alphabet if alphabet is not None else Alphabet()
+    schema, registry = split_bundle(schema, draft)
     try:
         schema_key = schema_cache_key(schema)
     except (TypeError, ValueError):
@@ -51,7 +52,7 @@ def build(
         cached = canonical_strategy_cache.get(key)
         if cached is not MISSING:
             return cached[1]
-    strategy = _build(schema, draft=draft, formats=formats, alphabet=alphabet, schema_key=schema_key)
+    strategy = _build(schema, draft=draft, formats=formats, alphabet=alphabet, schema_key=schema_key, registry=registry)
     if key is not None:
         # Keeping `formats` alive next to the strategy stops its `id` from being recycled
         # into a stale hit once the caller drops it.
@@ -66,6 +67,7 @@ def _build(
     formats: dict[str, SearchStrategy],
     alphabet: Alphabet,
     schema_key: tuple[str, ...] | None = None,
+    registry: jsonschema_rs.Registry | None = None,
 ) -> SearchStrategy[JsonValue]:
     # The canonical form answers to the schema and draft alone, so a differing alphabet or format map reuses it.
     canonical_key = (schema_key, draft) if schema_key is not None else None
@@ -78,6 +80,7 @@ def _build(
             canonical_schema = jsonschema_rs.canonicalize(
                 schema,
                 draft=draft,
+                registry=registry,
                 pattern_options=FANCY_REGEX_OPTIONS,
                 # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a
                 # `format`-carrying schema generating arbitrary strings on this path.
