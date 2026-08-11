@@ -2792,6 +2792,44 @@ def test_array_with_unique_items_enum_not_violated(pctx):
     assert first_elements == {"A", "B", "C"}
 
 
+def test_oneof_branch_honors_sibling_items(ctx_factory):
+    pctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    schema = {
+        "type": "object",
+        "required": ["entrypoint"],
+        "properties": {
+            "entrypoint": {
+                "items": {"type": "string"},
+                "oneOf": [{"type": "array", "items": {}}, {"type": "string"}],
+            }
+        },
+    }
+    covered = cover_schema(pctx, schema)
+    assert_conform(covered, schema)
+    assert covered == [{"entrypoint": ""}, {"entrypoint": []}, {"entrypoint": [""]}]
+
+
+def test_anyof_branch_honors_sibling_additional_properties(ctx_factory):
+    pctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    schema = {
+        "type": "object",
+        "required": ["data"],
+        "properties": {
+            "data": {
+                "additionalProperties": False,
+                "anyOf": [
+                    {"properties": {"last_name": {"type": "string"}}, "required": ["last_name"]},
+                    {"properties": {"nickname": {"type": "string"}}, "required": ["nickname"]},
+                ],
+            }
+        },
+    }
+    covered = cover_schema(pctx, schema)
+    assert_conform(covered, schema)
+    # Every object shape a branch proposes carries a key the parent forbids, leaving only `null`.
+    assert covered == [{"data": None}]
+
+
 def test_positive_if_then_else_emits_only_conforming_cases(ctx_factory):
     # Body context applies the parent-validator gate; query context skips it.
     pctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])

@@ -48,6 +48,7 @@
 - Ignoring constraints beside a single-branch `allOf`, like `additionalProperties: false`.
 - Sending read-only properties an `allOf` sibling forbids.
 - False positive `positive_data_acceptance` for values a sibling `not` excludes.
+- Ignoring constraints beside `anyOf` / `oneOf` in bodies, like `items` or `additionalProperties`.
 - Spurious tracebacks printed on exit after interruption.
 
 #### Others

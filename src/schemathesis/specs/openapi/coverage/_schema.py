@@ -1340,8 +1340,8 @@ def _cover_positive_for_type(
                 # header/query/cookie/path adapters inject type:string for serialization, which
                 # would incorrectly filter null values from nullable anyOf branches.
                 parent_validator: jsonschema_rs.Validator | None = None
-                if ctx.location == ParameterLocation.BODY and (
-                    "type" in schema or "properties" in schema or "required" in schema
+                if ctx.location == ParameterLocation.BODY and any(
+                    key in ALL_KEYWORDS and key not in _COMBINATOR_KEYS for key in schema
                 ):
                     # Nested `$ref`s point into the root's bundle; without it the validator
                     # fails to compile and branch values pass unfiltered.
