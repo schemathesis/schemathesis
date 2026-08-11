@@ -47,6 +47,7 @@
 - Dropping `required` from `allOf` branches that sit beside an unresolved `$ref`.
 - Ignoring constraints beside a single-branch `allOf`, like `additionalProperties: false`.
 - Sending read-only properties an `allOf` sibling forbids.
+- False positive `positive_data_acceptance` for values a sibling `not` excludes.
 - Spurious tracebacks printed on exit after interruption.
 
 #### Others

@@ -2974,3 +2974,35 @@ def test_get_properties_preserves_required_outside_properties(pctx):
     nested_objects = [c["nested"] for c in cases if isinstance(c, dict) and isinstance(c.get("nested"), dict)]
     assert nested_objects, f"no nested object emitted: {cases}"
     assert all("name" in n for n in nested_objects), f"required key dropped: {nested_objects}"
+
+
+def test_positive_number_boundary_respects_sibling_not(pctx):
+    schema = {"type": "integer", "minimum": 1, "maximum": 65535, "not": {"minimum": 65534, "maximum": 65534}}
+    covered = cover_schema(pctx, schema)
+    assert_conform(covered, schema)
+    assert 65535 in covered
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "number", "minimum": 0, "maximum": 10, "not": {"minimum": 10, "maximum": 10}},
+        {"type": "boolean", "not": {"const": False}},
+        {"type": ["null", "integer"], "not": {"type": "null"}},
+        {"type": "array", "items": {"type": "integer"}, "minItems": 1, "maxItems": 3, "not": {"maxItems": 1}},
+        {
+            "type": "object",
+            "properties": {"a": {"type": "string"}, "b": {"type": "string"}},
+            "required": ["a"],
+            "not": {"required": ["a", "b"]},
+        },
+        {
+            "type": "object",
+            "properties": {"a": {"type": "string"}, "b": {"type": "string"}},
+            "not": {"maxProperties": 0},
+        },
+    ],
+    ids=["number", "boolean", "multi-type", "array", "object-required", "object-min-properties"],
+)
+def test_positive_values_respect_sibling_not(pctx, schema):
+    assert_conform(cover_schema(pctx, schema), schema)
