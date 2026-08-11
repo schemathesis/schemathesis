@@ -61,6 +61,7 @@
 - Up to 8x lower peak memory on large schemas. [#4305](https://github.com/schemathesis/schemathesis/issues/4305)
 - Cache canonical schema forms and generation strategies across operations.
 - Coverage phase peak memory on large schemas cut from gigabytes to hundreds of megabytes.
+- Coverage phase up to 7x faster on schemas reusing the same `pattern` across operations.
 
 ### :wrench: Changed
 
