@@ -1,7 +1,8 @@
 import re
 import uuid
 from collections.abc import Callable
-from typing import Any
+from itertools import count
+from typing import Any, cast
 
 import jsonschema_rs
 
@@ -17,7 +18,7 @@ from schemathesis.core.jsonschema.bundler import (
     unbundle_path,
 )
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
-from schemathesis.core.jsonschema.types import JsonSchema, get_type
+from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
 
 # Support ECMA-262 lookahead/lookbehind. The limit fits legit large quantifiers but fast-fails
 # degenerate ones (e.g. `{0,10000000}` from a huge `maxLength`) instead of burning seconds + ~1GB.
@@ -151,17 +152,83 @@ VALIDATED_FORMATS_BY_DRAFT: dict[type[jsonschema_rs.Validator], frozenset[str]] 
 validator_cache: BoundedCache = BoundedCache(maxsize=1024)
 _validator_failure_cache: BoundedCache = BoundedCache(maxsize=1024)
 _seeded_validator_cache: BoundedCache = BoundedCache(maxsize=16)
+# Entries pin the bundle whose `id()` is part of the key so GC can't reuse the id.
+_bundle_registry_cache: BoundedCache = BoundedCache(maxsize=16)
+_bundle_uri_counter = count()
+_REFERENCE_INTO_BUNDLE = f"{REFERENCE_TO_BUNDLE_PREFIX}/"
 
 
-def _build_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Validator:
+def _absolute_bundle_refs(node: JsonValue, uri: str) -> JsonValue:
+    """Point `#/x-bundled/...` at `uri` so it resolves in the registry rather than in this document."""
+    if isinstance(node, dict):
+        result: dict[str, JsonValue] = {}
+        changed = False
+        for key, value in node.items():
+            if key == "$ref" and isinstance(value, str) and value.startswith(_REFERENCE_INTO_BUNDLE):
+                result[key] = f"{uri}{value}"
+                changed = True
+            else:
+                rewritten = _absolute_bundle_refs(value, uri)
+                result[key] = rewritten
+                changed = changed or rewritten is not value
+        return result if changed else node
+    if isinstance(node, list):
+        items: list[JsonValue] = []
+        changed = False
+        for item in node:
+            rewritten = _absolute_bundle_refs(item, uri)
+            items.append(rewritten)
+            changed = changed or rewritten is not item
+        if changed:
+            return items
+    return node
+
+
+def _bundle_registry(bundled: dict[str, Any], validator_cls: type) -> tuple[str, jsonschema_rs.Registry]:
+    """The registry holding `bundled`, built once per bundle and draft."""
+    cache_key = (id(bundled), validator_cls)
+    cached = _bundle_registry_cache.get(cache_key)
+    if cached is not MISSING:
+        return cached[0], cached[1]
+    uri = f"urn:schemathesis:bundle:{next(_bundle_uri_counter)}"
+    registry = jsonschema_rs.Registry(
+        [(uri, {BUNDLE_STORAGE_KEY: bundled})],
+        draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+    )
+    _bundle_registry_cache[cache_key] = (uri, registry, bundled)
+    return uri, registry
+
+
+def _split_bundle(schema: JsonSchema, validator_cls: type) -> tuple[JsonSchema, jsonschema_rs.Registry | None]:
+    """Move the bundle out of the schema, so compiling it does not copy the whole bundle in.
+
+    Spliced in, every validator compiles the entire bundle whether or not it references it -
+    a shared registry compiles it once for all of them.
+    """
+    if not isinstance(schema, dict):
+        return schema, None
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
+    if not isinstance(bundled, dict) or validator_cls not in CANONICALIZE_DRAFT_BY_VALIDATOR:
+        return schema, None
+    uri, registry = _bundle_registry(bundled, validator_cls)
+    without_bundle = {key: value for key, value in schema.items() if key != BUNDLE_STORAGE_KEY}
+    return cast("JsonSchema", _absolute_bundle_refs(without_bundle, uri)), registry
+
+
+def _build_validator(
+    schema: JsonSchema, validator_cls: type, registry: jsonschema_rs.Registry | None = None
+) -> jsonschema_rs.Validator:
     kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS}
     if validator_cls is jsonschema_rs.Draft4Validator:
         kwargs["formats"] = DRAFT4_SUPPLEMENTAL_FORMATS
+    if registry is not None:
+        kwargs["registry"] = registry
     return validator_cls(schema, **kwargs)
 
 
 def make_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Validator:
     """Build a validator with project-wide kwargs: format/pattern checks and Draft 4 supplements."""
+    schema, registry = _split_bundle(schema, validator_cls)
     try:
         cache_key: tuple[str, type] | None = (jsonschema_rs.canonical.json.to_string(schema), validator_cls)
     except (TypeError, ValueError):
@@ -174,7 +241,7 @@ def make_validator(schema: JsonSchema, validator_cls: type) -> jsonschema_rs.Val
         if failure is not MISSING:
             raise failure.with_traceback(None)
     try:
-        validator = _build_validator(schema, validator_cls)
+        validator = _build_validator(schema, validator_cls, registry)
     except jsonschema_rs.ValidationError as exc:
         if cache_key is not None:
             _validator_failure_cache[cache_key] = exc
@@ -195,7 +262,8 @@ def make_validator_with_seed(
     cached = _seeded_validator_cache.get(cache_key)
     if cached is not MISSING:
         return cached[0]
-    validator = _build_validator(schema_builder(), validator_cls)
+    schema, registry = _split_bundle(schema_builder(), validator_cls)
+    validator = _build_validator(schema, validator_cls, registry)
     _seeded_validator_cache[cache_key] = (validator, keep_alive)
     return validator
 
@@ -207,7 +275,9 @@ def make_validator_for(schema: JsonSchema) -> jsonschema_rs.Validator:
 
 def build_validator_for(schema: JsonSchema) -> jsonschema_rs.Validator:
     """Like `make_validator_for`, but for callers already memoized on a cheaper key."""
-    return _build_validator(schema, jsonschema_rs.validator_cls_for(schema))
+    validator_cls = jsonschema_rs.validator_cls_for(schema)
+    schema, registry = _split_bundle(schema, validator_cls)
+    return _build_validator(schema, validator_cls, registry)
 
 
 def schema_with_bundle(schema: JsonSchema, root_schema: JsonSchema) -> JsonSchema:
