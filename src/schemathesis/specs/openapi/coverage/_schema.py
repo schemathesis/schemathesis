@@ -299,6 +299,28 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
     return examples.generate_one(strategy)
 
 
+@lru_cache(maxsize=128)
+def _pattern_strategy(
+    pattern: str, min_length: int | None, max_length: int | None, fmt: str | None
+) -> st.SearchStrategy | None:
+    """Strings the pattern matches within the length bounds, or `None` when Python `re` cannot read it."""
+    # Memoized because `cached_draw` keys on the strategy itself: a pattern rebuilt per draw arrives as
+    # a fresh object every time, so the same regex gets drawn from again instead of answering from cache.
+    compiled = compile_ecma_pattern(pattern)
+    if compiled is None:
+        return None
+    strategy = st.from_regex(compiled, fullmatch=True)
+    if min_length is not None and max_length is not None:
+        strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
+    elif min_length is not None:
+        strategy = strategy.filter(lambda s: len(s) >= min_length)
+    elif max_length is not None:
+        strategy = strategy.filter(lambda s: len(s) <= max_length)
+    if fmt is not None:
+        strategy = strategy.filter(make_validator_for({"type": "string", "format": fmt}).is_valid)
+    return strategy
+
+
 @dataclass
 class CoverageContext:
     root_schema: dict[str, Any]
@@ -693,19 +715,10 @@ class CoverageContext:
                     raise Unsatisfiable
                 if self.update_pattern is not None:
                     pattern = self.update_pattern(pattern, min_length, max_length)
-            compiled = compile_ecma_pattern(pattern)
-            if compiled is None:
+            fmt = schema.get("format")
+            strategy = _pattern_strategy(pattern, min_length, max_length, fmt if fmt in VALIDATED_FORMATS else None)
+            if strategy is None:
                 raise Unsatisfiable from None
-            strategy = st.from_regex(compiled, fullmatch=True)
-            if min_length is not None and max_length is not None:
-                strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
-            elif min_length is not None:
-                strategy = strategy.filter(lambda s: len(s) >= min_length)
-            elif max_length is not None:
-                strategy = strategy.filter(lambda s: len(s) <= max_length)
-            if (fmt := schema.get("format")) in VALIDATED_FORMATS:
-                validator = make_validator_for({"type": "string", "format": fmt})
-                strategy = strategy.filter(validator.is_valid)
             return cached_draw(strategy)
         if (
             (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
