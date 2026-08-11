@@ -10,6 +10,10 @@ if TYPE_CHECKING:
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 INTERNAL_BUFFER_SIZE = 32 * 1024
+# Generation gives up on a value that outgrows half the buffer, spending one unit per array item and
+# two per character matched against a `pattern`. Past these sizes it never returns a value.
+MAX_GENERATED_ITEMS = INTERNAL_BUFFER_SIZE // 2
+MAX_GENERATED_PATTERN_LENGTH = INTERNAL_BUFFER_SIZE // 4
 # Longest string worth building; specs spell "no real limit" as `Integer.MAX_VALUE`.
 MAX_STRING_LENGTH = 1024 * 1024
 DEFAULT_MAX_SCENARIO_STEPS = 6

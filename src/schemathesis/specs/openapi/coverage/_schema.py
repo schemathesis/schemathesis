@@ -48,7 +48,13 @@ import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 
-from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_STRING_LENGTH, NOT_SET
+from schemathesis.core import (
+    INTERNAL_BUFFER_SIZE,
+    MAX_GENERATED_ITEMS,
+    MAX_GENERATED_PATTERN_LENGTH,
+    MAX_STRING_LENGTH,
+    NOT_SET,
+)
 from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
@@ -570,6 +576,19 @@ class CoverageContext:
             return NOT_SET
         return candidate
 
+    def _long_string_matching(self, schema: JsonSchemaObject, length: int) -> str:
+        """A string this long the `pattern` accepts, for lengths matching it cannot draw."""
+        # A pattern that does not restrict characters is satisfied by a plain string of that length,
+        # which costs nothing to build; a stricter one has no value at this size at all.
+        compiled = compile_ecma_pattern(schema["pattern"])
+        if compiled is None:
+            raise Unsatisfiable
+        without_pattern = {key: value for key, value in schema.items() if key != "pattern"}
+        candidate = self.generate_from_schema({**without_pattern, "minLength": length, "maxLength": length})
+        if not isinstance(candidate, str) or not compiled.search(candidate):
+            raise Unsatisfiable
+        return candidate
+
     def generate_from_schema(self, schema: JsonSchema) -> Any:
         if isinstance(schema, dict) and "$ref" in schema:
             reference = schema["$ref"]
@@ -715,6 +734,8 @@ class CoverageContext:
                     raise Unsatisfiable
                 if self.update_pattern is not None:
                     pattern = self.update_pattern(pattern, min_length, max_length)
+            if min_length is not None and min_length > MAX_GENERATED_PATTERN_LENGTH:
+                return self._long_string_matching(schema, min_length)
             fmt = schema.get("format")
             strategy = _pattern_strategy(pattern, min_length, max_length, fmt if fmt in VALIDATED_FORMATS else None)
             if strategy is None:
@@ -2703,7 +2724,11 @@ def _positive_array(
         # Do not generate an array with `minItems` length, because it is already covered by `template`
         # One item more than minimum if possible
         larger = min_items + 1
-        if (max_items is None or larger <= max_items) and larger not in seen_constraints:
+        if (
+            larger <= MAX_GENERATED_ITEMS
+            and (max_items is None or larger <= max_items)
+            and larger not in seen_constraints
+        ):
             seen_constraints.add(larger)
             value = ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger})
             if seen.insert(value):
@@ -2712,7 +2737,7 @@ def _positive_array(
                 )
 
     if max_items is not None:
-        if max_items < INTERNAL_BUFFER_SIZE and max_items not in seen_constraints:
+        if max_items <= MAX_GENERATED_ITEMS and max_items not in seen_constraints:
             seen_constraints.add(max_items)
             value = ctx.generate_from_schema({**schema, "minItems": max_items})
             if seen.insert(value):
@@ -2723,7 +2748,7 @@ def _positive_array(
         # One item smaller than maximum if possible
         smaller = max_items - 1
         if (
-            INTERNAL_BUFFER_SIZE > smaller > 0
+            MAX_GENERATED_ITEMS >= smaller > 0
             and (min_items is None or smaller >= min_items)
             and smaller not in seen_constraints
         ):
