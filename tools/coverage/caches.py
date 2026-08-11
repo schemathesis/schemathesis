@@ -6,7 +6,7 @@ from schemathesis.specs.openapi.coverage import _schema as coverage_internals
 
 
 def clear_internal_caches() -> None:
-    coverage_internals.cached_draw.cache_clear()
+    coverage_internals._draw_outcome.cache_clear()
     coverage_internals._FORMAT_VALIDATORS.clear()
     coverage_internals._REMOVE_EXAMPLES_CACHE.clear()
     patterns.normalize_regex.cache_clear()
