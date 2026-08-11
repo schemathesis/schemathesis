@@ -65,6 +65,7 @@
 - Coverage phase peak memory on large schemas cut from gigabytes to hundreds of megabytes.
 - Coverage phase up to 7x faster on schemas reusing the same `pattern` across operations.
 - Coverage phase up to 13x faster on `pattern` strings with `maxLength` above 8192.
+- Coverage phase skips repeating a value generation attempt that already came up empty.
 
 ### :wrench: Changed
 

@@ -301,8 +301,20 @@ NegativeValue = GeneratedValue.with_negative
 
 
 @lru_cache(maxsize=128)
+def _draw_outcome(strategy: st.SearchStrategy) -> tuple[Any, Unsatisfiable | None]:
+    # Draws are seeded, so a strategy that yields nothing yields nothing every time - and finding
+    # that out costs the whole generation budget, which is far too much to pay twice.
+    try:
+        return examples.generate_one(strategy), None
+    except Unsatisfiable as exc:
+        return None, exc
+
+
 def cached_draw(strategy: st.SearchStrategy) -> Any:
-    return examples.generate_one(strategy)
+    value, failure = _draw_outcome(strategy)
+    if failure is not None:
+        raise failure.with_traceback(None)
+    return value
 
 
 @lru_cache(maxsize=128)
