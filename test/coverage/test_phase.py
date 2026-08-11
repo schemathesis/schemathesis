@@ -18,7 +18,7 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config import ChecksConfig, SanitizationConfig
 from schemathesis.config._projects import ProjectConfig
-from schemathesis.core import NOT_SET
+from schemathesis.core import MAX_GENERATED_PATTERN_LENGTH, NOT_SET
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData
 from schemathesis.core.jsonschema import make_validator_for
@@ -9901,3 +9901,22 @@ def test_pointer_reached_twice_still_carries_what_it_names(ctx):
     for body in positives:
         assert validator.is_valid(body), body
     assert any("api" in body for body in positives)
+
+
+def test_boundary_length_string_at_the_drawable_limit(pctx):
+    # An off-by-one in the guard silently drops the maximum-length case for the whole band.
+    schema = {"type": "string", "pattern": "^[a-z]+$", "maxLength": MAX_GENERATED_PATTERN_LENGTH}
+
+    lengths = {len(value.value) for value in cover_schema_iter(pctx, schema, HashSet())}
+
+    assert MAX_GENERATED_PATTERN_LENGTH in lengths
+
+
+def test_boundary_length_string_beyond_the_drawable_limit_kept_when_pattern_allows_any_character(pctx):
+    # A permissive pattern keeps its maximum-length case even past the length matching can draw.
+    length = MAX_GENERATED_PATTERN_LENGTH * 2
+    schema = {"type": "string", "pattern": ".*", "maxLength": length}
+
+    lengths = {len(value.value) for value in cover_schema_iter(pctx, schema, HashSet())}
+
+    assert length in lengths
