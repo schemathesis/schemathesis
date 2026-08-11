@@ -1675,10 +1675,10 @@ def cover_schema_iter(
         types = [types]  # type: ignore[unreachable]
     if not types:
         with _ignore_unfixable():
-            yield from _cover_positive_for_type(ctx, schema, None)
+            yield from _filter_against_not(_cover_positive_for_type(ctx, schema, None), schema, ctx)
     for ty in types:
         with _ignore_unfixable():
-            yield from _cover_positive_for_type(ctx, schema, ty)
+            yield from _filter_against_not(_cover_positive_for_type(ctx, schema, ty), schema, ctx)
     if GenerationMode.NEGATIVE in ctx.generation_modes:
         template = None
         if not ctx.can_be_negated(schema):
@@ -2163,6 +2163,22 @@ def _filter_against_combinators(
             if validator.is_valid(case.value):
                 yield case
         except Exception:
+            yield case
+
+
+def _filter_against_not(
+    cases: Generator[GeneratedValue, None, None], schema: JsonSchema, ctx: CoverageContext
+) -> Generator[GeneratedValue, None, None]:
+    """Drop values that a sibling `not` rules out.
+
+    Values are built from the describing keywords alone (bounds, `items`, `properties`, ...), so a
+    `not` beside them can still reject what those keywords allow.
+    """
+    if not isinstance(schema, dict) or not isinstance(schema.get("not"), (dict, bool)):
+        yield from cases
+        return
+    for case in cases:
+        if _is_valid_with_formats(case.value, schema, ctx):
             yield case
 
 
