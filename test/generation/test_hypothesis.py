@@ -4,6 +4,7 @@ import re
 import sys
 import uuid
 from base64 import b64decode
+from fractions import Fraction
 
 import jsonschema_rs
 import pytest
@@ -43,7 +44,6 @@ from schemathesis.specs.openapi.adapter.parameters import (
     form_data_to_json_schema,
 )
 from schemathesis.transport.serialization import Binary, quote_all
-from test.generation import metaschemas
 from test.utils import assert_requests_call
 
 
@@ -1491,6 +1491,25 @@ CANONICAL_CASES = [
     # A barred value and a barred format each rule out strings the rest of the schema still admits.
     ({"allOf": [{"type": "string", "pattern": "^[ab]$"}, {"not": {"const": "a"}}]}, (lambda value: value == "b",)),
     ({"allOf": [{"type": "string", "maxLength": 3}, {"not": {"format": "regex"}}]}, ()),
+    # A barred format and a barred pattern at once: each run has to keep filtering on its own.
+    (
+        {"allOf": [{"type": "string"}, {"not": {"format": "ipv4"}}, {"not": {"pattern": "^z"}}]},
+        (lambda value: value.startswith("a"),),
+    ),
+    # Both violations need a key of their own, and the ceiling has to leave room for them while the
+    # floor still reaches. Room for each is what the bounds on the base draw are computed against.
+    (
+        {
+            "type": "object",
+            "minProperties": 3,
+            "maxProperties": 4,
+            "allOf": [
+                {"not": {"additionalProperties": {"type": "string"}}},
+                {"not": {"propertyNames": {"pattern": "^a"}}},
+            ],
+        },
+        (),
+    ),
     # Barring what a pointer names: the complement is whatever the target rejects, wherever it sits.
     (
         {"not": {"$ref": "#/$defs/text"}, "$defs": {"text": {"type": "string"}}},
@@ -3427,6 +3446,14 @@ UNSATISFIABLE_ARRAY_SCHEMAS = [
         "minItems": 3,
         "uniqueItems": True,
     },
+    # Two positions pinned to the same value. The prefix as a whole has three values to draw from,
+    # so only looking at a subset of it finds the pair that cannot be told apart.
+    {
+        "type": "array",
+        "prefixItems": [{"const": 1}, {"const": 1}, {"enum": [2, 3]}],
+        "uniqueItems": True,
+        "minItems": 3,
+    },
     # Every position must match the pattern and one of them must not; behind a reference the
     # contradiction survives canonicalization, leaving the demand nothing to draw.
     {
@@ -3437,6 +3464,32 @@ UNSATISFIABLE_ARRAY_SCHEMAS = [
         "not": {"items": {"$ref": "#/$defs/tag"}},
     },
 ]
+
+
+def test_canonical_object_violations_leave_no_room_under_the_ceiling():
+    # Each violation lands on a key of its own, and a fresh key never coincides with a required one,
+    # so the ceiling has to fit both. Canonicalization does not fold that into `maxProperties`.
+    schema = {
+        "type": "object",
+        "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
+        "required": ["a", "b"],
+        "maxProperties": 2,
+        "allOf": [
+            {"not": {"additionalProperties": {"type": "string"}}},
+            {"not": {"propertyNames": {"pattern": "^q"}}},
+        ],
+    }
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    assert built.is_empty
+
+
+def test_grid_point_past_the_float_range_is_not_a_json_value():
+    # The stand-in for an unspellable grid point must not be `null`, which every one of these schemas
+    # admits nowhere but which would serialize just fine if it ever leaked past the filter.
+    value = strategy._fraction_to_json_number(Fraction(10**400) / 3)
+    assert value is strategy._UNREPRESENTABLE
+    assert not isinstance(value, (int, float, str, bool, list, dict))
+    assert value is not None
 
 
 @pytest.mark.parametrize("schema", UNSATISFIABLE_ARRAY_SCHEMAS, ids=str)
@@ -3926,11 +3979,11 @@ def test_canonical_pointer_generation_soundness():
 
 
 METASCHEMAS = [
-    (jsonschema_rs.Draft4Validator, metaschemas.DRAFT_04),
-    (jsonschema_rs.Draft6Validator, metaschemas.DRAFT_06),
-    (jsonschema_rs.Draft7Validator, metaschemas.DRAFT_07),
-    (jsonschema_rs.Draft201909Validator, metaschemas.DRAFT_2019_09),
-    (jsonschema_rs.Draft202012Validator, metaschemas.DRAFT_2020_12),
+    (jsonschema_rs.Draft4Validator, {"$ref": "http://json-schema.org/draft-04/schema#"}),
+    (jsonschema_rs.Draft6Validator, {"$ref": "http://json-schema.org/draft-06/schema#"}),
+    (jsonschema_rs.Draft7Validator, {"$ref": "http://json-schema.org/draft-07/schema#"}),
+    (jsonschema_rs.Draft201909Validator, {"$ref": "https://json-schema.org/draft/2019-09/schema"}),
+    (jsonschema_rs.Draft202012Validator, {"$ref": "https://json-schema.org/draft/2020-12/schema"}),
 ]
 METASCHEMA_IDS = ["draft4", "draft6", "draft7", "draft2019-09", "draft2020-12"]
 
