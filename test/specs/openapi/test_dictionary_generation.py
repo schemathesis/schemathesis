@@ -1114,20 +1114,22 @@ def test_body_binding_drops_indexed_mutation_under_wildcard_overwrite(ctx):
     saw_sibling_mutation = False
 
     @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
-    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    # Generous, because the guard below is a distributional claim rather than a property of any one
+    # case: it holds only once enough draws land on the sibling. Every change to the generator re-rolls
+    # which examples this seed produces, and at a thin margin that re-roll is a CI failure, not a bug.
+    @settings(max_examples=300, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
     def collect(case):
         nonlocal overwrites_seen, saw_sibling_mutation
         if case._meta is None:
             return
-        overrides = [d for d in case._meta.dictionary_draws if d.body_path == "/items/*"]
-        if not overrides:
+        if not any(draw.body_path == "/items/*" for draw in case._meta.dictionary_draws):
             return
         overwrites_seen += 1
         for mutation in case._meta.phase.data.mutations:
             assert not (
                 len(mutation.path) >= 2 and mutation.path[0] == "items" and isinstance(mutation.path[1], int)
             ), f"indexed mutation under /items/* overwrite not dropped: path={mutation.path!r}"
-            if mutation.path and mutation.path[:1] == ("sibling",):
+            if mutation.path[:1] == ("sibling",):
                 saw_sibling_mutation = True
 
     collect()

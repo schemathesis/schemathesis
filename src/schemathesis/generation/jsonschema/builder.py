@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 import jsonschema_rs
@@ -21,6 +22,8 @@ from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.generation.jsonschema.strategy import _displayed, from_schema
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
@@ -74,7 +77,7 @@ def _build(
     if cached_form is not MISSING:
         canonical_schema = cached_form
     else:
-        try:
+        with _reported():
             canonical_schema = jsonschema_rs.canonicalize(
                 schema,
                 draft=draft,
@@ -83,12 +86,6 @@ def _build(
                 # `format`-carrying schema generating arbitrary strings on this path.
                 validate_formats=True,
             )
-        except jsonschema_rs.ValidationError as exc:
-            raise _schema_error(exc) from None
-        except jsonschema_rs.canonical.InvalidPattern as exc:
-            raise InvalidRegexPattern(f"Failed to generate test cases for this API operation: {exc}") from None
-        except jsonschema_rs.canonical.CanonicalizationError as exc:
-            raise InvalidSchema(f"Failed to generate test cases for this API operation: {exc}") from None
         if canonical_key is not None:
             canonical_form_cache[canonical_key] = canonical_schema
     if canonical_schema.kind == "raw":
@@ -97,7 +94,9 @@ def _build(
     if not canonical_schema.is_satisfiable():
         return EMPTY_STRATEGY
     context = StrategyContext(root=canonical_schema, alphabet=alphabet, formats=formats)
-    try:
+    # Folding an `allOf` canonicalizes again, so a rejected schema and both spellings of
+    # "not modeled here" can arrive from this block too.
+    with _reported():
         strategy = from_schema(canonical_schema, context)
         if not context.cyclic:
             return strategy
@@ -106,17 +105,22 @@ def _build(
         # A cycle can also leave a schema whose every value would have to be infinitely deep. The
         # strategies form the same cycle, so Hypothesis works that out here.
         empty = strategy.is_empty
-    # Folding an `allOf` canonicalizes again, so a rejected schema and both spellings of
-    # "not modeled here" can arrive from this block too.
+    # Spelling it out keeps the caller reporting an unsatisfiable schema, where a strategy that
+    # only fails on a draw would surface as whatever Hypothesis raises first.
+    return EMPTY_STRATEGY if empty else strategy
+
+
+@contextmanager
+def _reported() -> Iterator[None]:
+    """Canonicalization failures, as the errors reported against the operation."""
+    try:
+        yield
     except jsonschema_rs.ValidationError as exc:
         raise _schema_error(exc) from None
     except jsonschema_rs.canonical.InvalidPattern as exc:
         raise InvalidRegexPattern(f"Failed to generate test cases for this API operation: {exc}") from None
     except jsonschema_rs.canonical.CanonicalizationError as exc:
         raise InvalidSchema(f"Failed to generate test cases for this API operation: {exc}") from None
-    # Spelling it out keeps the caller reporting an unsatisfiable schema, where a strategy that
-    # only fails on a draw would surface as whatever Hypothesis raises first.
-    return EMPTY_STRATEGY if empty else strategy
 
 
 def _schema_error(error: jsonschema_rs.ValidationError) -> InvalidSchema:

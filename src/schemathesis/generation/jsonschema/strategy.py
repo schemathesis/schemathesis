@@ -7,7 +7,7 @@ import re
 import sys
 from dataclasses import dataclass, replace
 from fractions import Fraction
-from functools import lru_cache
+from functools import lru_cache, partial
 from typing import TYPE_CHECKING, NamedTuple, cast
 
 import jsonschema_rs
@@ -80,19 +80,20 @@ def _countable(bound: int | None) -> int | None:
 DECLINED = (UnsupportedSchema, UnsupportedRegexPattern)
 
 
+class _Unrepresentable:
+    """A grid point with no JSON number to carry it; the caller filters it out."""
+
+
+# Not `None`: that is a JSON value in its own right, so a leak would read as a valid `null`.
+_UNREPRESENTABLE = _Unrepresentable()
+
+
 class _PatternProperty(NamedTuple):
     """One `patternProperties` entry: the names it claims, and the values it admits."""
 
     claims: Callable[[str], bool]
     values: SearchStrategy[JsonValue]
     schema: jsonschema_rs.CanonicalSchema
-
-
-class Unrepresentable:
-    """A grid point with no JSON number to carry it; the caller filters it out."""
-
-
-UNREPRESENTABLE = Unrepresentable()
 
 
 class _Node(DeferredStrategy):
@@ -241,10 +242,11 @@ def _not(
         if schema != ctx.root:
             raise UnsupportedSchema.from_reason("a `not` over branches that point on, below the document root")
         return _anything(ctx).filter(_validator(schema))
-    if _points_on(complement.to_json_schema()):
+    spelled = complement.to_json_schema()
+    if _points_on(spelled):
         # A pointer naming a carried definition reads against the complement; one naming the document
         # still means where the bar appeared, which the complement is not.
-        if _names_document(complement.to_json_schema()):
+        if _names_document(spelled):
             raise UnsupportedSchema.from_reason("a `not` whose complement names the whole document")
         # A bar reached back through its own complement names a value no finite draw settles on.
         if barred in ctx.complementing:
@@ -676,8 +678,8 @@ def _appended_needs(values: list[frozenset[object] | None], demands: list[_Deman
 
 def _feasible(needs: list[Need]) -> bool:
     """Whether every position can be handed a value of its own."""
-    # Only a finite value set can force a repeat. Exact bipartite matching: greedy assignment misses
-    # shapes like `{1,2} {1,2} {3,4} {1,3}`, calling a satisfiable schema empty.
+    # Only a finite value set can force a repeat. Exact bipartite matching: counting the union misses
+    # shapes like `{1} {1} {2,3}`, where the whole set fits but a subset of it does not.
     units = [values for values, count in needs if values is not None for _ in range(count)]
     universe = {value for values in units for value in values}
     if len(units) > 16 or len(universe) > 64:
@@ -941,29 +943,41 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
         else:
             extra = st.tuples(free_names, unnamed)
     max_properties = _countable(view.max_properties)
-    if view.violations and max_properties is not None:
-        # Injected violation entries land on top of the base draw; leave them room under the leaf's
-        # own ceiling instead of the total - the floor stays as-is, since violations only ever add keys.
-        max_properties -= len(view.violations)
-        if max_properties < len(required):
-            # A fresh violation key can never coincide with a required one, so the ceiling has to fit
-            # both. The canonicalizer does not yet fold that need into `maxProperties` satisfiability
-            # the way `contains` demands are folded into a length floor, so this combo can still
-            # reach here despite `is_satisfiable()` saying otherwise.
-            return st.nothing()
-    if view.min_properties is None and max_properties is None:
-        # A coin per optional key lands on half of them, which compounds at every nesting level.
-        # Built here rather than per draw, where it would be one strategy per generated value.
-        optional_keys = sorted(optional)
-        picker = st.sets(st.sampled_from(optional_keys), max_size=len(optional_keys)) if optional_keys else None
-        named = _named_object(required, optional, picker)
-        base = (
-            named
-            if extra is None
-            else st.tuples(named, _collect(extra, 0, _EXTRA_KEYS)).map(lambda parts: {**parts[1], **parts[0]})
+    minimum = view.min_properties or 0
+    if view.violations:
+        # Injected violation entries land on top of the base draw, each with a key of its own, so the
+        # base answers to the leaf's own bounds with that many keys already spoken for.
+        minimum = max(0, minimum - len(view.violations))
+        if max_properties is not None:
+            max_properties -= len(view.violations)
+            if max_properties < len(required):
+                # A fresh violation key can never coincide with a required one, so the ceiling has to fit
+                # both. The canonicalizer does not yet fold that need into `maxProperties` satisfiability
+                # the way `contains` demands are folded into a length floor, so this combo can still
+                # reach here despite `is_satisfiable()` saying otherwise.
+                return st.nothing()
+    # Sorted: set iteration order is not stable across processes, and draw order decides replays.
+    keys = sorted(optional)
+    # Documented keys fill the floor first; names drawn out of nowhere only cover what they cannot.
+    low = min(len(keys), max(0, minimum - len(required)))
+    high = len(keys) if max_properties is None else min(len(keys), max_properties - len(required))
+    if high < low:
+        # The required keys alone overrun the ceiling.
+        return st.nothing()
+    # A coin per optional key lands on half of them, which compounds at every nesting level. Built
+    # here rather than per draw, where it would be one strategy per generated value.
+    picker = st.sets(st.sampled_from(keys), min_size=low, max_size=high) if keys else None
+    if extra is not None and minimum == 0 and max_properties is None:
+        # Nothing here moves with the drawn key count, so the free keys are one strategy built once
+        # instead of a lookup and a fresh draw on every value. This is the common shape by far.
+        base = st.tuples(_named_object(required, optional, picker), _collect(extra, 0, _EXTRA_KEYS)).map(
+            lambda parts: {**parts[1], **parts[0]}
         )
     else:
-        base = _sized_object(required, optional, extra, view.min_properties or 0, max_properties)
+        # Past a floor or under a ceiling the bounds do move with it, so the draws are memoized per
+        # object rather than rebuilt every value. Bound to this strategy, so nothing outlives it.
+        collect = None if extra is None else lru_cache(maxsize=8)(partial(_collect, extra))
+        base = _drawn_object(required, optional, picker, collect, minimum, max_properties)
     if not view.violations:
         return base
     entries_to_inject = [_violation_entry(violation, view, value_for, known, ctx) for violation in view.violations]
@@ -1046,22 +1060,10 @@ def _with_violations(
     assert isinstance(drawn, dict), drawn
     result = dict(drawn)
     for entry in entries:
-        key, value = draw(entry)
+        # A key of its own per violation, which is what the size bounds were computed against.
+        key, value = draw(entry.filter(lambda pair: pair[0] not in result))
         result[key] = value
     return result
-
-
-@st.composite  # type: ignore[untyped-decorator]
-def _named_object(
-    draw: st.DrawFn,
-    required: dict[str, SearchStrategy[JsonValue]],
-    optional: dict[str, SearchStrategy[JsonValue]],
-    picker: SearchStrategy[set[str]] | None,
-) -> JsonValue:
-    """Every required key, plus a size-biased pick of the optional ones."""
-    # Sorted: set iteration order is not stable across processes, and draw order decides replays.
-    chosen = draw(picker) if picker is not None else ()
-    return draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in sorted(chosen)}}))
 
 
 def _collect(
@@ -1140,28 +1142,37 @@ def _pattern_values(
 
 
 @st.composite  # type: ignore[untyped-decorator]
-def _sized_object(
+def _named_object(
     draw: st.DrawFn,
     required: dict[str, SearchStrategy[JsonValue]],
     optional: dict[str, SearchStrategy[JsonValue]],
-    entries: SearchStrategy[tuple[str, JsonValue]] | None,
+    picker: SearchStrategy[set[str]] | None,
+) -> JsonValue:
+    """Every required key, plus a size-biased pick of the optional ones."""
+    chosen = draw(picker) if picker is not None else ()
+    return draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in sorted(chosen)}}))
+
+
+@st.composite  # type: ignore[untyped-decorator]
+def _drawn_object(
+    draw: st.DrawFn,
+    required: dict[str, SearchStrategy[JsonValue]],
+    optional: dict[str, SearchStrategy[JsonValue]],
+    picker: SearchStrategy[set[str]] | None,
+    collect: Callable[[int, int], SearchStrategy[dict[str, JsonValue]]] | None,
     minimum: int,
     maximum: int | None,
 ) -> JsonValue:
-    """An object whose property count answers to `minProperties` / `maxProperties`."""
-    keys = sorted(optional)
-    # Documented keys fill the floor first; names drawn out of nowhere only cover what they cannot.
-    low = min(len(keys), max(0, minimum - len(required)))
-    high = len(keys) if maximum is None else min(len(keys), maximum - len(required))
-    chosen = draw(st.sets(st.sampled_from(keys), min_size=low, max_size=high)) if keys else set()
+    """Every required key, a pick of the optional ones, and free keys where the floor asks for more."""
+    chosen = draw(picker) if picker is not None else ()
     result = draw(st.fixed_dictionaries({**required, **{key: optional[key] for key in sorted(chosen)}}))
-    if entries is None:
+    if collect is None:
         return result
     # The cap bounds the distance past the floor, not the total — capping the total would pin
     # every object with a floor at or above it to exactly that floor.
     extra_low = max(0, minimum - len(result))
     extra_high = extra_low + _EXTRA_KEYS if maximum is None else min(extra_low + _EXTRA_KEYS, maximum - len(result))
-    extra = draw(_collect(entries, extra_low, extra_high))
+    extra = draw(collect(extra_low, extra_high))
     return {**extra, **result}
 
 
@@ -1259,15 +1270,15 @@ def _number(view: jsonschema_rs.canonical.NumberView) -> SearchStrategy[JsonValu
 
 def _grid_check(
     view: jsonschema_rs.canonical.NumberView, multiple_of: Fraction
-) -> Callable[[int | float | Unrepresentable], bool]:
+) -> Callable[[int | float | _Unrepresentable], bool]:
     """Accept only what every reading of the emitted number clears."""
     minimum = None if view.minimum is None else _spelled(view.minimum)
     maximum = None if view.maximum is None else _spelled(view.maximum)
     exclusive_minimum = view.exclusive_minimum
     exclusive_maximum = view.exclusive_maximum
 
-    def is_valid(value: int | float | Unrepresentable) -> bool:
-        if value is UNREPRESENTABLE:
+    def is_valid(value: int | float | _Unrepresentable) -> bool:
+        if value is _UNREPRESENTABLE:
             return False
         number = cast("int | float", value)
         spelled = _spelled(number)
@@ -1319,14 +1330,14 @@ def _spelled(value: Numeric) -> Fraction:
     return Fraction(str(value))
 
 
-def _fraction_to_json_number(value: Fraction) -> int | float | Unrepresentable:
+def _fraction_to_json_number(value: Fraction) -> int | float | _Unrepresentable:
     if value.denominator == 1:
         return value.numerator
     try:
         return float(value)
     except OverflowError:
         # Whole grid points ride out as exact integers, fractional ones need a float to land in.
-        return UNREPRESENTABLE
+        return _UNREPRESENTABLE
 
 
 def _representable_float_bounds(
@@ -1383,18 +1394,14 @@ def _string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> S
     if view.excluded:
         barred = frozenset(view.excluded)
         strategy = strategy.filter(lambda value: value not in barred)
-    if view.excluded_formats:
-        # One `anyOf` covers the run: a string is barred as soon as it satisfies any of them.
-        matches_barred = make_validator(
-            {"anyOf": [{"type": "string", "format": name} for name in view.excluded_formats]},
-            _VALIDATOR_BY_CANONICALIZE_DRAFT[ctx.root.draft],
-        ).is_valid
-        strategy = strategy.filter(lambda value: not matches_barred(value))
-    if view.excluded_patterns:
-        matches_barred = make_validator(
-            {"anyOf": [{"type": "string", "pattern": pattern} for pattern in view.excluded_patterns]},
-            _VALIDATOR_BY_CANONICALIZE_DRAFT[ctx.root.draft],
-        ).is_valid
+    # One `anyOf` covers both runs: a string is barred as soon as it satisfies any of them.
+    barred_by = [
+        {"type": "string", keyword: value}
+        for keyword, values in (("format", view.excluded_formats), ("pattern", view.excluded_patterns))
+        for value in values or ()
+    ]
+    if barred_by:
+        matches_barred = make_validator({"anyOf": barred_by}, _VALIDATOR_BY_CANONICALIZE_DRAFT[ctx.root.draft]).is_valid
         strategy = strategy.filter(lambda value: not matches_barred(value))
     return strategy
 
@@ -1530,8 +1537,7 @@ def _base64_text(value: str) -> str:
 def _content_check(ctx: StrategyContext, keyword: str, value: str) -> Callable[[JsonValue], bool]:
     # Content facets assert only in the drafts where the validator says so; the check has to be
     # built for the document's own draft to agree with it.
-    validator_cls = next(cls for cls, draft in CANONICALIZE_DRAFT_BY_VALIDATOR.items() if draft == ctx.root.draft)
-    return make_validator({"type": "string", keyword: value}, validator_cls).is_valid
+    return make_validator({"type": "string", keyword: value}, _VALIDATOR_BY_CANONICALIZE_DRAFT[ctx.root.draft]).is_valid
 
 
 def _from_pattern(compiled: re.Pattern[str], ctx: StrategyContext) -> SearchStrategy[str]:
