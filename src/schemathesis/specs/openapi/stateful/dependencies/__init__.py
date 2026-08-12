@@ -155,30 +155,45 @@ def inject_links(schema: OpenApiSchema) -> int:
     injected = 0
     # Shared by producers and targets; the same operations recur across thousands of links.
     operation_cache: dict[str, APIOperation] = {}
+    # A response is visited once per inferred link, so normalize its links once and index them by
+    # target - only same-target links can be subsets. Values keep the mapping alive so `id` is unique.
+    normalized_cache: dict[int, tuple[dict[str, Any], dict[tuple[str, str], list[NormalizedLink]]]] = {}
     for response_links in schema.analysis.dependency_graph.iter_links():
         operation = _find_operation_by_reference(schema, response_links.producer_operation_ref, operation_cache)
         response = operation.responses.get(response_links.status_code)
         links = response.definition.setdefault(schema.adapter.links_keyword, {})
 
-        # Normalize existing links once
-        if links:
-            normalized_existing = [_normalize_link(link, schema, operation_cache) for link in links.values()]
+        entry = normalized_cache.get(id(links))
+        if entry is None:
+            index: dict[tuple[str, str], list[NormalizedLink]] = {}
+            for link in links.values():
+                normalized = _normalize_link(link, schema, operation_cache)
+                index.setdefault((normalized.path, normalized.method), []).append(normalized)
+            normalized_cache[id(links)] = (links, index)
         else:
-            normalized_existing = []
+            index = entry[1]
 
+        # Compared against what was known before this response, not against each other.
+        pending: list[NormalizedLink] = []
         for link_name, definition in response_links.links.items():
             inferred_link = definition.to_openapi()
 
             # Check if duplicate / subsets exists
-            if normalized_existing:
-                normalized = _normalize_link(inferred_link, schema, operation_cache)
-                if any(_is_subset_link(normalized, existing) for existing in normalized_existing):
-                    continue
+            normalized = _normalize_link(inferred_link, schema, operation_cache)
+            if any(
+                _is_subset_link(normalized, existing)
+                for existing in index.get((normalized.path, normalized.method), ())
+            ):
+                continue
 
             # Find unique name if collision exists
             final_name = _resolve_link_name_collision(link_name, links)
             links[final_name] = inferred_link
+            pending.append(normalized)
             injected += 1
+
+        for normalized in pending:
+            index.setdefault((normalized.path, normalized.method), []).append(normalized)
     return injected
 
 
