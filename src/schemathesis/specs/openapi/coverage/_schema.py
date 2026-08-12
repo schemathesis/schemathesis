@@ -188,6 +188,9 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
 
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
 NEGATIVE_MODE_MAX_ITEMS = 15
+# Longest array still drawn element by element; a pattern-matched element spends budget per
+# character, so past this the draw stops being affordable.
+MAX_DRAWN_ARRAY_ITEMS = 64
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
@@ -588,6 +591,16 @@ class CoverageContext:
             return NOT_SET
         return candidate
 
+    def _tiled_array(self, schema: JsonSchemaObject, length: int) -> list:
+        """An array of this length, repeated from a one-element draw rather than drawn whole."""
+        # A one-element array rather than a bare element: drawing the element on its own skips how
+        # the schema's `pattern` gets reconciled with the configured alphabet.
+        item = self.generate_from_schema({**schema, "minItems": 1, "maxItems": 1})[0]
+        # A shared element would let one caller's edit show up at every other index.
+        if isinstance(item, (dict, list)):
+            return [deepclone(item) for _ in range(length)]
+        return [item] * length
+
     def _long_string_matching(self, schema: JsonSchemaObject, length: int) -> str:
         """A string this long the `pattern` accepts, for lengths matching it cannot draw."""
         # A pattern that does not restrict characters is satisfied by a plain string of that length,
@@ -753,6 +766,17 @@ class CoverageContext:
             if strategy is None:
                 raise Unsatisfiable from None
             return cached_draw(strategy)
+        min_items = schema.get("minItems")
+        if (
+            isinstance(min_items, int)
+            and min_items > MAX_DRAWN_ARRAY_ITEMS
+            and isinstance(schema.get("items"), dict)
+            and "array" in get_type(schema)
+            # Repeating one element cannot satisfy either of these.
+            and not schema.get("uniqueItems")
+            and "contains" not in schema
+        ):
+            return self._tiled_array(schema, min_items)
         if (
             (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
             and isinstance(schema["items"], dict)
