@@ -558,7 +558,17 @@ class CoverageContext:
 
     def build_strategy(self, schema: JsonSchema) -> st.SearchStrategy | None:
         draft = CANONICALIZE_DRAFT_BY_VALIDATOR[self.validator_cls]
-        prepared = _prepared(schema, draft4=draft == jsonschema_rs.Draft4)
+        draft4 = draft == jsonschema_rs.Draft4
+        if not isinstance(schema, dict) or (bundle := schema.get(BUNDLE_STORAGE_KEY)) is None:
+            prepared = _prepared(schema, draft4=draft4)
+        else:
+            # The bundle carries every definition in the document and is the same for all values,
+            # so it is reshaped once instead of rewalked for each one.
+            rest = {key: value for key, value in schema.items() if key != BUNDLE_STORAGE_KEY}
+            prepared = {
+                **_prepared(rest, draft4=draft4),
+                BUNDLE_STORAGE_KEY: _ready_bundle(bundle, self.update_pattern, draft4),
+            }
         strategy = self._build(prepared, draft)
         if strategy is not None or not isinstance(prepared, dict):
             return strategy
@@ -844,15 +854,11 @@ class CoverageContext:
             for key in schema["required"]:
                 properties.setdefault(key, {})
 
-        # Add bundled schemas if any
-        if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in self.root_schema:
-            schema = dict(schema)
-            schema[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
-
         # Deep clone so the pattern rewrite below leaves the original schema alone
         cloned = deepclone(schema)
-        if isinstance(cloned, dict) and BUNDLE_STORAGE_KEY in cloned:
-            _apply_pattern_optimizations(cloned[BUNDLE_STORAGE_KEY], self.update_pattern)
+        # Add bundled schemas if any; they are shared and reshaped once, not cloned per value.
+        if isinstance(cloned, dict) and BUNDLE_STORAGE_KEY in self.root_schema:
+            cloned[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
         strategy = self.build_strategy(cloned)
         if strategy is None:
             raise Unsatisfiable
@@ -901,6 +907,29 @@ def _apply_pattern_optimizations(
     elif isinstance(obj, list):
         for item in obj:
             _apply_pattern_optimizations(item, update_pattern)
+
+
+_READY_BUNDLE_CACHE: BoundedCache = BoundedCache(maxsize=64)
+
+
+def _ready_bundle(
+    bundle: dict[str, Any], update_pattern: Callable[[str, int | None, int | None], str] | None, draft4: bool
+) -> dict[str, Any]:
+    """The bundled definitions with pattern rewrites and draft spellings already applied."""
+    key = (id(bundle), id(update_pattern), draft4)
+    cached = _READY_BUNDLE_CACHE.get(key)
+    if cached is not MISSING:
+        return cached[0]
+    if update_pattern is None:
+        result = _prepared(bundle, draft4=draft4)
+    else:
+        # Rewriting in place, so on a copy the caller's document does not share.
+        result = deepclone(bundle)
+        _apply_pattern_optimizations(result, update_pattern)
+        result = _prepared(result, draft4=draft4)
+    # The trailing elements pin the keyed objects, so their `id`s cannot be recycled into a stale hit.
+    _READY_BUNDLE_CACHE[key] = (result, bundle, update_pattern)
+    return result
 
 
 T = TypeVar("T")
@@ -3516,8 +3545,7 @@ def _negative_type(
     schema = _remove_examples(schema)
 
     try:
-        validator = ctx.validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS)
-        is_valid = validator.is_valid
+        is_valid = make_validator(schema, ctx.validator_cls).is_valid
         is_valid(None)
         apply_validation = True
     except Exception:
