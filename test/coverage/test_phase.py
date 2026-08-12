@@ -39,6 +39,7 @@ from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage import _schema
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._schema import (
+    MAX_DRAWN_ARRAY_ITEMS,
     CoverageContext,
     HashSet,
     _negative_format,
@@ -9920,3 +9921,74 @@ def test_boundary_length_string_beyond_the_drawable_limit_kept_when_pattern_allo
     lengths = {len(value.value) for value in cover_schema_iter(pctx, schema, HashSet())}
 
     assert length in lengths
+
+
+UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+
+
+def test_maximum_items_array_of_costly_elements(pctx):
+    # Drawing every element as a pattern match outruns the budget and comes back empty.
+    size = MAX_DRAWN_ARRAY_ITEMS * 4
+    schema = {"type": "array", "items": {"type": "string", "pattern": UUID_PATTERN}, "maxItems": size}
+
+    sizes = {len(value.value) for value in cover_schema_iter(pctx, schema, HashSet())}
+
+    assert size in sizes
+
+
+def test_maximum_items_array_of_costly_elements_stays_valid(pctx):
+    size = MAX_DRAWN_ARRAY_ITEMS * 4
+    schema = {"type": "array", "items": {"type": "string", "pattern": UUID_PATTERN}, "maxItems": size}
+    validator = make_validator_for(schema)
+
+    for value in cover_schema_iter(pctx, schema, HashSet()):
+        assert validator.is_valid(value.value), value.value[:3]
+
+
+def test_maximum_items_array_at_the_drawn_limit(pctx):
+    # An off-by-one in the threshold drops the maximum-items case for arrays right at it.
+    schema = {"type": "array", "items": {"type": "integer"}, "maxItems": MAX_DRAWN_ARRAY_ITEMS}
+
+    sizes = {len(value.value) for value in cover_schema_iter(pctx, schema, HashSet())}
+
+    assert MAX_DRAWN_ARRAY_ITEMS in sizes
+
+
+def test_repeated_object_elements_are_independent(pctx):
+    # Each index has to hold its own object, or editing one request field edits every other.
+    size = MAX_DRAWN_ARRAY_ITEMS * 4
+    schema = {
+        "type": "array",
+        "items": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+        "maxItems": size,
+    }
+
+    for value in cover_schema_iter(pctx, schema, HashSet()):
+        if len(value.value) < 2:
+            continue
+        value.value[0]["name"] = "edited"
+        assert value.value[1]["name"] != "edited", value.value[:2]
+
+
+def test_contains_array_is_not_filled_by_repetition(pctx):
+    # Repeating one element cannot make an array hold both a match and a non-match.
+    size = MAX_DRAWN_ARRAY_ITEMS * 4
+    schema = {
+        "type": "array",
+        "items": {"type": "integer"},
+        "contains": {"type": "integer", "minimum": 10},
+        "maxItems": size,
+    }
+    validator = make_validator_for(schema)
+
+    for value in cover_schema_iter(pctx, schema, HashSet()):
+        assert validator.is_valid(value.value), value.value[:3]
+
+
+def test_unique_items_array_is_not_filled_by_repetition(pctx):
+    # Repeating one element would duplicate it, which `uniqueItems` forbids.
+    size = MAX_DRAWN_ARRAY_ITEMS * 4
+    schema = {"type": "array", "items": {"type": "integer"}, "maxItems": size, "uniqueItems": True}
+
+    for value in cover_schema_iter(pctx, schema, HashSet()):
+        assert len(set(value.value)) == len(value.value), value.value[:3]
