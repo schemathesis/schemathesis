@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.jsonschema.resolver import (
     Resolver,
     resolve_reference_uri,
@@ -220,6 +221,33 @@ def unbundle_path(path: list[str | int], name_to_uri: dict[str, str]) -> list[st
     return result
 
 
+_UNBUNDLED_COMPONENTS_CACHE: BoundedCache = BoundedCache(maxsize=32)
+
+
+def _unbundled_components(bundled: dict[str, Any], name_to_uri: dict[str, str]) -> dict[str, dict[str, Any]]:
+    """Every definition in the document under its original name, for display."""
+    # The same storage dict is unbundled again for every reported failure, and it holds the whole
+    # document; callers only read the result, so one expansion is shared between them.
+    cache_key = (id(bundled), id(name_to_uri))
+    cached = _UNBUNDLED_COMPONENTS_CACHE.get(cache_key)
+    if cached is not MISSING:
+        return cached[0]
+    schemas: dict[str, Any] = {}
+    for bundled_name, bundled_schema in bundled.items():
+        original_uri = name_to_uri.get(bundled_name)
+        if original_uri is not None and "#/components/schemas/" in original_uri:
+            name = decode_pointer(original_uri.split("#/components/schemas/")[1])
+        elif original_uri is not None and "#/definitions/" in original_uri:
+            name = decode_pointer(original_uri.split("#/definitions/")[1])
+        else:
+            name = bundled_name
+        schemas[name] = unbundle(bundled_schema, name_to_uri)
+    components = {"schemas": schemas}
+    # The trailing elements pin the keyed objects, so their `id`s cannot be recycled into a stale hit.
+    _UNBUNDLED_COMPONENTS_CACHE[cache_key] = (components, bundled, name_to_uri)
+    return components
+
+
 def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str]) -> JsonSchema:
     """Restore original $ref paths in a bundled schema for display purposes."""
     if isinstance(schema, dict):
@@ -236,21 +264,7 @@ def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str])
                 else:
                     result[key] = value
             elif key == BUNDLE_STORAGE_KEY and isinstance(value, dict):
-                components: dict[str, dict[str, Any]] = {"schemas": {}}
-                for bundled_name, bundled_schema in value.items():
-                    if bundled_name in name_to_uri:
-                        original_uri = name_to_uri[bundled_name]
-                        if "#/components/schemas/" in original_uri:
-                            schema_name = decode_pointer(original_uri.split("#/components/schemas/")[1])
-                            components["schemas"][schema_name] = unbundle(bundled_schema, name_to_uri)
-                        elif "#/definitions/" in original_uri:
-                            schema_name = decode_pointer(original_uri.split("#/definitions/")[1])
-                            components["schemas"][schema_name] = unbundle(bundled_schema, name_to_uri)
-                        else:
-                            components["schemas"][bundled_name] = unbundle(bundled_schema, name_to_uri)
-                    else:
-                        components["schemas"][bundled_name] = unbundle(bundled_schema, name_to_uri)
-                result["components"] = components
+                result["components"] = _unbundled_components(value, name_to_uri)
             elif isinstance(value, (dict, list)):
                 result[key] = unbundle(value, name_to_uri)
             else:
