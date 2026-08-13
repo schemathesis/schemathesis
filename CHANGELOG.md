@@ -57,6 +57,7 @@
 - Runtime error in `negative_data_rejection` for empty array path parameters.
 - Disable unlisted custom checks when `--checks` selects only specific checks.
 - `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
+- Report oversized minimum examples as a health check failure on recent Hypothesis versions.
 
 ### :racing_car: Performance
 

@@ -239,10 +239,10 @@ def _extract_health_check_reason(exc: FailedHealthCheck | InvalidArgument) -> He
         return HealthCheck.filter_too_much
     elif "too_slow" in message or "too slow" in message:
         return HealthCheck.too_slow
-    elif ("large_base_example" in message or "can never generate an example, because min_size" in message) or (
-        isinstance(exc, InvalidArgument)
-        and message.endswith("larger than hypothesis is designed to handle")
-        or "can never generate an example, because min_size is larger than hypothesis supports" in message
+    elif (
+        "large_base_example" in message
+        or "because min_size is larger than hypothesis supports" in message
+        or (isinstance(exc, InvalidArgument) and message.endswith("larger than hypothesis is designed to handle"))
     ):
         return HealthCheck.large_base_example
 
