@@ -71,6 +71,7 @@
 - Coverage phase up to 1000x faster on large arrays whose items carry a `pattern`.
 - Link injection up to 8x faster on schemas where inference finds many links per response.
 - Coverage phase up to 2x faster on schemas with many shared component definitions.
+- Response conformance failures up to 15x faster to report on schemas with many definitions.
 
 ### :wrench: Changed
 

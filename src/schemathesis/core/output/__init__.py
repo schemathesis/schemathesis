@@ -19,24 +19,37 @@ def escape_surrogates(text: str) -> str:
 def truncate_json(data: Any, *, config: OutputConfig, max_lines: int | None = None) -> str:
     # Convert JSON to string with indentation
     indent = 4
-    serialized = json.dumps(data, indent=indent)
     if not config.truncation.enabled:
-        return serialized
+        return json.dumps(data, indent=indent)
 
     max_lines = max_lines if max_lines is not None else config.truncation.max_lines
-    # Split string by lines
-    lines = [
-        line[: config.truncation.max_width - 3] + "..." if len(line) > config.truncation.max_width else line
-        for line in serialized.split("\n")
-    ]
+    max_width = config.truncation.max_width
+    # Encoded incrementally and abandoned once there are enough lines: a large API's schema
+    # serializes to megabytes, and all but the first few lines are thrown away.
+    lines: list[str] = []
+    pending = ""
+    exhausted = True
+    for chunk in json.JSONEncoder(indent=indent).iterencode(data):
+        pending += chunk
+        if "\n" not in pending:
+            continue
+        *ready, pending = pending.split("\n")
+        lines.extend(ready)
+        if len(lines) > max_lines:
+            exhausted = False
+            break
+    if exhausted:
+        lines.append(pending)
+    lines = [line[: max_width - 3] + "..." if len(line) > max_width else line for line in lines]
 
-    if len(lines) <= max_lines:
+    if exhausted and len(lines) <= max_lines:
         return "\n".join(lines)
 
     truncated_lines = lines[: max_lines - 1]
     indentation = " " * indent
     truncated_lines.append(f"{indentation}{TRUNCATED}")
-    truncated_lines.append(lines[-1])
+    # The dropped tail always ends with the top-level container's closing delimiter.
+    truncated_lines.append("]" if isinstance(data, list) else "}")
 
     return "\n".join(truncated_lines)
 
