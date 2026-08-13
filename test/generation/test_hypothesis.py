@@ -26,6 +26,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.jsonschema import strategy
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
@@ -57,6 +58,43 @@ def make_operation(schema, **kwargs) -> APIOperation:
         security=schema._parse_security({}),
         **kwargs,
     )
+
+
+def test_fuzzing_phase_uses_its_generation_config(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "integer"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    schema.config.phases.fuzzing.generation.update(modes=[GenerationMode.NEGATIVE])
+    operation = schema["/data"]["POST"]
+    generated = []
+
+    def collect(case):
+        generated.append(case)
+
+    test = create_test(
+        operation=operation,
+        test_func=collect,
+        config=HypothesisTestConfig(
+            modes=[HypothesisTestMode.FUZZING],
+            project=schema.config,
+            settings=settings(max_examples=1, database=InMemoryExampleDatabase()),
+        ),
+    )
+
+    test()
+
+    assert [case.meta.generation.mode for case in generated] == [GenerationMode.NEGATIVE]
 
 
 def test_ref_with_sibling_anyof_against_anyof_target(ctx):

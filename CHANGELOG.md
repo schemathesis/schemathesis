@@ -53,6 +53,7 @@
 
 #### Others
 
+- Ignoring phase-level config like `phases.fuzzing.generation.modes`.
 - False positive `positive_data_acceptance` for `not` clauses in schemas using references.
 - Runtime error in `negative_data_rejection` for empty array path parameters.
 - Disable unlisted custom checks when `--checks` selects only specific checks.
