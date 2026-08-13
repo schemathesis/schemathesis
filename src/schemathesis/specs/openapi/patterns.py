@@ -1051,6 +1051,16 @@ def _transform_node(node: _Node, min_l: int | None, max_l: int | None, *, anchor
     op, value = node
     if op in REPEATS:
         return _transform_repeat(op, value, min_l, max_l)
+    if op == sre.SUBPATTERN:
+        # A group around a single item just relabels it - rewrite the item and put it back inside the group.
+        group, add_flags, del_flags, inner = value
+        inner_nodes = list(inner)
+        if len(inner_nodes) != 1:
+            return None
+        result = _transform_node(inner_nodes[0], min_l, max_l, anchored=anchored)
+        if result is None:
+            return None
+        return (sre.SUBPATTERN, (group, add_flags, del_flags, [result]))
     if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
         if anchored:
             return _transform_repeat(sre.MAX_REPEAT, (1, 1, [node]), min_l, max_l)
