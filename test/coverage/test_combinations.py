@@ -1456,6 +1456,70 @@ def test_negative_type_reuse_stamps_current_location(nctx):
     ]
 
 
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        (".*", []),
+        ("[\\s\\S]", []),
+        ("a\\Z", ["0"]),
+        ("^[a-z]+$", ["0"]),
+    ],
+    ids=["matched-by-everything", "matched-by-every-non-empty-string", "unreadable-by-the-validator", "violable"],
+)
+def test_pattern_violations_only_where_a_value_can_break_the_pattern(nctx, pattern, expected):
+    assert [
+        value.value
+        for value in cover_schema_iter(nctx, {"type": "string", "minLength": 1, "pattern": pattern})
+        if value.scenario is CoverageScenario.INVALID_PATTERN
+    ] == expected
+
+
+def test_no_pattern_violation_for_either_property_sharing_an_unbreakable_pattern(nctx):
+    # The second property answers from the first one's exhausted search rather than repeating it.
+    inner = {"type": "string", "minLength": 1, "pattern": "[\\s\\S]"}
+    assert [
+        value.value
+        for value in cover_schema_iter(nctx, {"type": "object", "properties": {"alpha": inner, "beta": dict(inner)}})
+        if value.scenario is CoverageScenario.INVALID_PATTERN
+    ] == []
+
+
+def _type_violations(ctx, schema: dict) -> list:
+    return [
+        value.value for value in cover_schema_iter(ctx, schema) if value.scenario is CoverageScenario.INCORRECT_TYPE
+    ]
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string"},
+        {"type": "string", "maxLength": 2147483647},
+        {"type": "string", "minLength": 1, "description": "text", "xml": {"name": "X"}},
+    ],
+    ids=["bare-string", "huge-max-length", "annotations-only"],
+)
+def test_no_type_violation_when_the_schema_accepts_every_stringified_value(nctx, schema):
+    # A query value reaches the server as text, so a schema accepting every string has no type violation.
+    assert _type_violations(nctx, schema) == []
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string", "minLength": 2},
+        {"type": "string", "maxLength": 8},
+        {"type": "string", "enum": ["a"]},
+        {"type": "integer"},
+    ],
+    ids=["min-length", "max-length", "enum", "non-string"],
+)
+def test_type_violations_break_the_schema_once_stringified(nctx, schema):
+    values = _type_violations(nctx, schema)
+    validator = jsonschema_rs.Draft4Validator(schema)
+    assert values and not any(validator.is_valid(str(value)) for value in values)
+
+
 def test_negative_pattern_with_incompatible_length(nctx):
     schema = {
         "minLength": 6,

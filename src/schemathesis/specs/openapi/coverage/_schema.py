@@ -3447,6 +3447,26 @@ def quote_path_parameter(value: Any) -> str:
     return str(value)
 
 
+# Far above any text a wrong-type value turns into, so a limit this large rules nothing out.
+MAX_STRINGIFIED_TYPE_VIOLATION_LENGTH = 2**20
+
+
+def _accepts_every_stringified_value(schema: dict[str, Any], types: list[str]) -> bool:
+    """Whether this schema accepts the text every wrong-type value turns into."""
+    if "string" not in types:
+        return False
+    for key, value in schema.items():
+        if key in _ANNOTATION_KEYWORDS or key in ("type", BUNDLE_STORAGE_KEY):
+            continue
+        # The shortest violation is a single character, so only a longer minimum can reject one.
+        if key == "minLength" and isinstance(value, int) and value <= 1:
+            continue
+        if key == "maxLength" and isinstance(value, int) and value >= MAX_STRINGIFIED_TYPE_VIOLATION_LENGTH:
+            continue
+        return False
+    return True
+
+
 def _negative_type(
     ctx: CoverageContext, ty: str | list[str], seen: HashSet, schema: dict[str, Any]
 ) -> Generator[GeneratedValue, None, None]:
@@ -3589,6 +3609,10 @@ def _negative_type(
             strategies[ty] = strategy.map(jsonify)
 
     if apply_validation and ctx.will_be_serialized_to_string():
+        if _accepts_every_stringified_value(schema, types):
+            # Nothing this draws could break the schema once it reaches the wire as text, so the
+            # search below can only spend the whole generation budget and come back empty-handed.
+            return
         for ty, strategy in strategies.items():
             strategies[ty] = strategy.filter(_does_not_match_the_original_schema)
     # Materialize before yielding so the cache fills even when the consumer stops mid-iteration.
