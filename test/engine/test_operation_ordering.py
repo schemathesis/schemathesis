@@ -129,6 +129,52 @@ def test_layered_scheduler_multiple_layers(ctx):
     assert result is None
 
 
+def test_layered_scheduler_holds_consumers_until_producers_finish(ctx):
+    loaded = ctx.openapi.load_schema(
+        {
+            "/users": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/users/{id}": {
+                "get": {
+                    "parameters": [_path_param()],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    operations = _operations(loaded)
+    scheduler = LayeredScheduler([_ops_by_method(operations, "POST"), _ops_by_method(operations, "GET")])
+    producer_started = threading.Event()
+    allow_producer_to_finish = threading.Event()
+    consumer_waiting = threading.Event()
+    consumer_dispatched = threading.Event()
+
+    def run_producer():
+        assert scheduler.next_operation().ok().method.upper() == "POST"
+        producer_started.set()
+        assert allow_producer_to_finish.wait(timeout=5)
+        scheduler.release()
+
+    def run_consumer():
+        assert producer_started.wait(timeout=5)
+        consumer_waiting.set()
+        assert scheduler.next_operation().ok().method.upper() == "GET"
+        consumer_dispatched.set()
+
+    producer = threading.Thread(target=run_producer)
+    consumer = threading.Thread(target=run_consumer)
+    producer.start()
+    consumer.start()
+
+    # The next layer must not start while the POST is still running
+    assert consumer_waiting.wait(timeout=5)
+    assert not consumer_dispatched.wait(timeout=0.2)
+
+    allow_producer_to_finish.set()
+    assert consumer_dispatched.wait(timeout=5)
+    producer.join()
+    consumer.join()
+
+
 def test_layered_scheduler_multi_worker_coordination(ctx):
     loaded = ctx.openapi.load_schema(
         {

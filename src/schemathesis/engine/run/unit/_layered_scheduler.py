@@ -13,15 +13,21 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
+class _Dispatched(threading.local):
+    """Whether the calling worker holds an operation from the current layer."""
+
+    active = False
+
+
 class LayeredScheduler:
     """Schedules operations in dependency layers.
 
     Operations are grouped into layers and dispatched sequentially by layer.
-    All operations from Layer N are dispatched before Layer N + 1 operations.
+    Layer N + 1 is not dispatched until every Layer N operation has finished, so
+    dependent operations observe the resources their producers created.
 
-    Note: With multiple workers, Layer N+1 operations may start executing before
-    Layer N operations finish. Additional synchronization could enforce strict
-    layer completion but is not currently implemented.
+    A worker signals completion by asking for its next operation; `release` covers
+    workers that stop without asking again.
     """
 
     def __init__(
@@ -40,7 +46,10 @@ class LayeredScheduler:
         self.layers = layers
         self.current_layer_index = 0
         self.current_layer_iterator: Iterator[APIOperation] | None = None
-        self.lock = threading.Lock()
+        self.lock = threading.Condition()
+        # Operations dispatched from the current layer that are still running
+        self.in_flight = 0
+        self._dispatched = _Dispatched()
         self.errors = errors or []
         self.error_iterator: Iterator[InvalidSchema] | None = None
 
@@ -51,8 +60,9 @@ class LayeredScheduler:
     def next_operation(self) -> Result[APIOperation, InvalidSchema] | None:
         """Get next API operation in a thread-safe manner.
 
-        Advances through layers sequentially. When a layer is exhausted, automatically
-        moves to the next layer. After all layers are exhausted, returns schema errors.
+        Advances through layers sequentially. When a layer is exhausted, blocks until
+        its operations finish, then moves to the next layer. After all layers are
+        exhausted, returns schema errors.
 
         Returns:
             Ok(operation) if operation available, Err() for schema errors,
@@ -60,20 +70,28 @@ class LayeredScheduler:
 
         """
         with self.lock:
+            # Asking for more work means the previously dispatched operation is done
+            self._release()
             # Try to get operation from current layer
             while self.current_layer_iterator is not None:
                 try:
-                    return Ok(next(self.current_layer_iterator))
+                    operation = next(self.current_layer_iterator)
                 except StopIteration:
-                    # Current layer exhausted - advance to next layer
-                    self.current_layer_index += 1
-                    if self.current_layer_index < len(self.layers):
-                        self.current_layer_iterator = iter(self.layers[self.current_layer_index])
-                        # Continue loop to try next layer
-                    else:
+                    layer_index = self.current_layer_index
+                    if layer_index + 1 >= len(self.layers):
                         # No more layers
                         self.current_layer_iterator = None
                         break
+                    # Wait for the layer to drain, unless another worker already advanced it
+                    while self.in_flight and layer_index == self.current_layer_index:
+                        self.lock.wait()
+                    if layer_index == self.current_layer_index:
+                        self.current_layer_index += 1
+                        self.current_layer_iterator = iter(self.layers[self.current_layer_index])
+                    continue
+                self.in_flight += 1
+                self._dispatched.active = True
+                return Ok(operation)
 
             # All layers exhausted - return schema errors if any
             if self.error_iterator is None and self.errors:
@@ -86,3 +104,15 @@ class LayeredScheduler:
                     return None
 
             return None
+
+    def release(self) -> None:
+        """Mark this worker's operation as finished, for workers that stop asking for more."""
+        with self.lock:
+            self._release()
+
+    def _release(self) -> None:
+        if self._dispatched.active:
+            self._dispatched.active = False
+            self.in_flight -= 1
+            if not self.in_flight:
+                self.lock.notify_all()

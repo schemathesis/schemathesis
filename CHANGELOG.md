@@ -126,6 +126,7 @@
 - False positive `positive_data_acceptance` for array `items` with `enum` entries violating the item schema.
 - Undercounted stateful link totals for schemas sharing a response definition across operations.
 - Operations with unresolvable `$ref`s silently skipped when dependency ordering applies.
+- Dependent operations tested before the operations they depend on finish when running with multiple workers.
 - False `missing_deserializer` warning for media types whose own schema is unstructured.
 - Skip reasons in the summary borrowed from operations that were tested in another phase.
 
