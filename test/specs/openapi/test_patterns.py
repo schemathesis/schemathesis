@@ -1269,6 +1269,10 @@ def test_pattern_requires_char_outside(pattern, allowed, expected):
         (r"(?:(a)\1)*", False),
         ("(a*)", False),
         ("[", False),
+        ("(?:ab|cd)*", True),
+        ("(?:ab|cd)x*", False),
+        ("(^a)*", False),
+        ("(?:^ab|cd)*", False),
     ],
 )
 def test_matches_every_string(pattern, expected):

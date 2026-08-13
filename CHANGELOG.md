@@ -76,6 +76,7 @@
 - Response conformance failures up to 15x faster to report on schemas with many definitions.
 - Coverage phase up to 100x faster on `pattern` strings whose quantifier sits inside a group.
 - Coverage phase up to 9x faster on schemas with a `pattern` no value can violate.
+- Coverage phase up to 8x faster on schemas whose string parameters accept any text.
 
 ### :wrench: Changed
 
