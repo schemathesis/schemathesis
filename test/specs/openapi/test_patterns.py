@@ -23,6 +23,7 @@ from schemathesis.specs.openapi.patterns import (
     _UNICODE_PROPERTY_RAW_MAP,
     _serialize,
     is_valid_jsonschema_rs_regex,
+    matches_every_string,
     normalize_regex,
     pattern_length_bounds,
     pattern_requires_char_outside,
@@ -1246,6 +1247,32 @@ ALNUM = string.ascii_letters + string.digits
 )
 def test_pattern_requires_char_outside(pattern, allowed, expected):
     assert pattern_requires_char_outside(pattern, allowed) == expected
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        (".*", True),
+        (r"[\S\s]*", True),
+        (r"[\w\W]*", True),
+        ("a*", True),
+        ("(?:abc)*", True),
+        ("a*b?", True),
+        ("", True),
+        (".+", False),
+        ("^$", False),
+        # `^.*$` rejects "a\nb" — the anchors make the match position-dependent.
+        ("^.*$", False),
+        ("[a-z]*x", False),
+        ("(?=x).*", False),
+        ("(?!x)a*", False),
+        (r"(?:(a)\1)*", False),
+        ("(a*)", False),
+        ("[", False),
+    ],
+)
+def test_matches_every_string(pattern, expected):
+    assert matches_every_string(pattern) is expected
 
 
 @pytest.mark.parametrize(

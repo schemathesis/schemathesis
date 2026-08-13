@@ -661,6 +661,40 @@ def pattern_length_bounds(pattern: str) -> tuple[int, int | None]:
     return (min_length, None if max_length == MAXREPEAT else max_length)
 
 
+# Anchors, lookaround and back-references make a match depend on where in the string it is tried,
+# so an empty match at position 0 is no longer guaranteed.
+_POSITION_DEPENDENT_OPS = frozenset({sre.AT, sre.ASSERT, sre.ASSERT_NOT, sre.GROUPREF, sre.GROUPREF_EXISTS})
+
+
+def _is_position_dependent(nodes: list[_Node]) -> bool:
+    for op, value in nodes:
+        if op in _POSITION_DEPENDENT_OPS:
+            return True
+        if op == sre.SUBPATTERN:
+            if _is_position_dependent(list(value[3])):
+                return True
+        elif op in REPEATS:
+            if _is_position_dependent(list(value[2])):
+                return True
+        elif op == sre.BRANCH:
+            if any(_is_position_dependent(list(alternative)) for alternative in value[1]):
+                return True
+    return False
+
+
+@lru_cache
+def matches_every_string(pattern: str) -> bool:
+    """Return True if every string contains a match, so no value can violate `pattern`.
+
+    JSON Schema `pattern` is a substring search, so a pattern that accepts the empty string
+    matches at position 0 of anything. Conservative: unknown constructs answer False.
+    """
+    parsed = _parse_regex(pattern)
+    if parsed is None or _is_position_dependent(parsed):
+        return False
+    return all(op in REPEATS and value[0] == 0 for op, value in parsed)
+
+
 @lru_cache
 def pattern_requires_literal(pattern: str, chars: str) -> bool:
     """Return True if every string matching `pattern` must contain at least one char from `chars`."""

@@ -71,6 +71,7 @@ from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.converter import apply_rewritten_pattern
 from schemathesis.specs.openapi.patterns import (
+    matches_every_string,
     pattern_length_bounds,
     pattern_requires_char_outside,
     pattern_requires_literal,
@@ -3217,21 +3218,38 @@ def _negative_pattern(
         compiled = re.compile(pattern)
     except re.error:
         return
-    try:
-        validator: jsonschema_rs.Validator | None = ctx.validator_cls(
-            {"type": "string", "pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS
+    # Every string already contains a match, so no value can violate the pattern - searching for
+    # one burns the whole generation budget only to come up empty.
+    if matches_every_string(pattern):
+        return
+    # The same regex recurs verbatim across operations; one Hypothesis search covers the whole audit.
+    # `is_valid_for_location` makes the outcome location-dependent, so the location is part of the key.
+    cache_key = ("negative_pattern", pattern, min_length, max_length, ctx.location, ctx.validator_cls)
+    value = schema_generation_cache.get(cache_key)
+    if value is UNSATISFIABLE_RESULT:
+        raise Unsatisfiable
+    if value is MISSING:
+        try:
+            validator: jsonschema_rs.Validator | None = ctx.validator_cls(
+                {"type": "string", "pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS
+            )
+        except Exception:
+            validator = None
+        strategy = (
+            st.text(min_size=min_length or 0, max_size=max_length)
+            .filter(partial(_not_matching_pattern, pattern=compiled))
+            .filter(ctx.is_valid_for_location)
         )
-    except Exception:
-        validator = None
-    strategy = (
-        st.text(min_size=min_length or 0, max_size=max_length)
-        .filter(partial(_not_matching_pattern, pattern=compiled))
-        .filter(ctx.is_valid_for_location)
-    )
-    if validator is not None:
-        strategy = strategy.filter(lambda v, _v=validator: not _v.is_valid(v))
+        if validator is not None:
+            strategy = strategy.filter(lambda v, _v=validator: not _v.is_valid(v))
+        try:
+            value = ctx.generate_from(strategy)
+        except Unsatisfiable:
+            schema_generation_cache[cache_key] = UNSATISFIABLE_RESULT
+            raise
+        schema_generation_cache[cache_key] = value
     yield NegativeValue(
-        ctx.generate_from(strategy),
+        value,
         scenario=CoverageScenario.INVALID_PATTERN,
         description=f"Value not matching the '{pattern}' pattern",
         location=ctx.current_path,
