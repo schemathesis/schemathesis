@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Callable
 from queue import Queue
 from types import TracebackType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
@@ -31,6 +31,9 @@ class DefaultScheduler:
         """Get next API operation in a thread-safe manner."""
         with self.lock:
             return next(self.operations, None)
+
+    def release(self) -> None:
+        """No layers, hence nothing to release."""
 
 
 def split_results(
@@ -70,11 +73,18 @@ class WorkerPool:
         self.workers: list[threading.Thread] = []
         self.events_queue: Queue = Queue()
 
+    def _run_worker(self, **kwargs: Any) -> None:
+        try:
+            self.worker_factory(**kwargs)
+        finally:
+            # A worker stopping mid-operation must not block the layer barrier forever
+            self.scheduler.release()
+
     def start(self) -> None:
         """Start all worker threads."""
         for i in range(self.workers_num):
             worker = threading.Thread(
-                target=self.worker_factory,
+                target=self._run_worker,
                 kwargs={
                     "ctx": self.ctx,
                     "mode": self.mode,
