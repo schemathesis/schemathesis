@@ -84,7 +84,7 @@ def create_test(
         "constants_value_source": config.feedback.constants_value_source,
         **config.as_strategy_kwargs,
     }
-    generation = config.project.generation_for(operation=operation)
+    generation = config.project.generation_for(operation=operation, phase=HypothesisTestMode.FUZZING.value)
     strategy = st.one_of(operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in generation.modes)
 
     hypothesis_test = create_base_test(
@@ -189,14 +189,17 @@ def create_test(
         and not config.given_args
         and not config.given_kwargs
     ):
+        coverage_generation = config.project.generation_for(
+            operation=operation, phase=HypothesisTestMode.COVERAGE.value
+        )
         hypothesis_test = add_coverage(
             hypothesis_test,
             operation,
-            generation.modes,
+            coverage_generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
             feedback=config.feedback,
-            generation_config=generation,
+            generation_config=coverage_generation,
         )
 
     injected_path_parameter_names = [
