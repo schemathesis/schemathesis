@@ -341,7 +341,7 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
     if (
         isinstance(error, hypothesis.errors.InvalidArgument)
         and str(error).endswith("larger than Hypothesis is designed to handle")
-        or "can never generate an example, because min_size is larger than Hypothesis supports" in str(error)
+        or "because min_size is larger than Hypothesis supports" in str(error)
     ):
         return RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE
     if isinstance(error, hypothesis.errors.Unsatisfiable):
