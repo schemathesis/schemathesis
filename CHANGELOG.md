@@ -74,6 +74,7 @@
 - Link injection up to 8x faster on schemas where inference finds many links per response.
 - Coverage phase up to 2x faster on schemas with many shared component definitions.
 - Response conformance failures up to 15x faster to report on schemas with many definitions.
+- Coverage phase up to 100x faster on `pattern` strings whose quantifier sits inside a group.
 
 ### :wrench: Changed
 

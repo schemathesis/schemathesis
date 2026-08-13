@@ -290,6 +290,17 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("arn:([a-z0-9-]+):forecast:.*:.*:.+", 20, 40, r"^arn:([a-z0-9\-]{2,23}):forecast:.{0,22}:.{0,22}:.{2,23}$"),
         ("^prefix-([a-z]+)-[0-9]+$", 12, 24, "^prefix-([a-z]{2,15})-[0-9]{2,15}$"),
         ("^([a-z]+)-([0-9]+)$", 6, 12, "^([a-z]{3,10})-([0-9]{2,10})$"),
+        # A group wrapping the whole pattern is transparent to the budget - the quantifier inside it still tightens.
+        ("^([a-zA-Z0-9]*)$", 5, 5, "^([a-zA-Z0-9]{5})$"),
+        ("^([a-zA-Z0-9]*)$", 1, 10, "^([a-zA-Z0-9]{1,10})$"),
+        ("^([a-z]+)$", None, 7, "^([a-z]{1,7})$"),
+        ("([a-z]*)", 4, 4, "^([a-z]{4})$"),
+        ("^(?i:[a-z]*)$", 3, 3, "^(?i:[a-z]{3})$"),
+        ("^(?i:([a-z]*))$", 2, 6, "^(?i:([a-z]{2,6}))$"),
+        ("^((a*))$", 2, 2, "^((a{2}))$"),
+        # A group holding anything but one quantifiable item has no single place for the budget to land.
+        ("^(a|bb)$", 2, 2, "^(a|bb)$"),
+        ("^([a-z][0-9]*)$", 3, 3, "^([a-z][0-9]*)$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
@@ -304,11 +315,33 @@ def test_update_quantifier(pattern, min_length, max_length, expected):
         (r"^prefix[|]+(?:,prefix[|]+)*$", 4000),
         (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10),
         (r"^[a-zA-Z0-9]+(-*[a-zA-Z0-9])*$", 25),
+        (r"^([a-zA-ZÀ-ÖØ-öø-ɏ \t\n\r\f\v0-9_.:/=+\-@]*)$", 256),
+        (r"^(?i:[a-z_]*)$", 128),
     ],
 )
 def test_update_quantifier_exact_length_is_bounded(pattern, length):
     # An open-ended repeat here leaves only zero-repetition matches at this length, which generation never finds.
     assert pattern_length_bounds(update_quantifier(pattern, length, length)) == (length, length)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "min_length", "max_length"),
+    [
+        (r"^([a-zA-Z0-9]*)$", 5, 5),
+        (r"^([a-zA-Z0-9_.-]+)$", 3, 12),
+        (r"^(?i:[a-z]*)$", 4, 4),
+        (r"^(?i:([a-z-]+))$", 2, 9),
+        (r"^([a-zA-ZÀ-ÖØ-öø-ɏ \t\n\r\f\v0-9_.:/=+\-@]*)$", 256, 256),
+    ],
+)
+@settings(max_examples=30, suppress_health_check=list(HealthCheck))
+@given(data=st.data())
+def test_group_rewrite_stays_within_the_original_language(pattern, min_length, max_length, data):
+    rewritten = update_quantifier(pattern, min_length, max_length)
+    assert rewritten != pattern
+    value = data.draw(st.from_regex(rewritten, fullmatch=True, alphabet=st.characters(codec=None)))
+    assert re.search(pattern, value), f"{value!r} does not match {pattern}"
+    assert min_length <= len(value) <= max_length
 
 
 def test_update_quantifier_keeps_repeat_matching_empty():
