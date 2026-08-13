@@ -1209,13 +1209,18 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
     # bounds that actually enforce maxLength.
     exact_length = adj_min == adj_max
     pinned: set[int] = set()
+    # Slots dropped to zero repetitions; left open-ended, generation hunts forever for the only matches that fit.
+    collapsed: set[int] = set()
     has_unbounded_pinned = False
     for dist_idx in range(len(quantifier_bounds)):
         orig_min, orig_max = quantifier_bounds[dist_idx]
         rep_len_max = repetition_max_lengths[dist_idx]
         rep_len_min = repetition_lengths[dist_idx]
         inner_variable = rep_len_min != rep_len_max
-        if inner_variable and rep_len_max == MAXREPEAT:
+        if exact_length and inner_variable and orig_min == 0 and rep_len_min > 0:
+            # Every repetition costs a character the other slots already spent - unless it can match empty.
+            collapsed.add(dist_idx)
+        elif inner_variable and rep_len_max == MAXREPEAT:
             pinned.add(dist_idx)
             has_unbounded_pinned = True
         elif inner_variable and exact_length:
@@ -1227,7 +1232,7 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
         elif not exact_length and orig_min == 0 and 0 < orig_max < MAXREPEAT and not inner_variable:
             pinned.add(dist_idx)
 
-    if pinned:
+    if pinned or collapsed:
         sum_pinned_min = 0
         sum_pinned_max = 0
         for dist_idx in pinned:
@@ -1246,7 +1251,7 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
         if np_adj_max is not None and np_adj_max < 0:
             return None
 
-        np_indices = [i for i in range(len(quantifier_bounds)) if i not in pinned]
+        np_indices = [i for i in range(len(quantifier_bounds)) if i not in pinned and i not in collapsed]
         if not np_indices:
             # All slots pinned — the rewrite would just re-emit the original bounds.
             return None
@@ -1262,7 +1267,9 @@ def _distribute_multi(parts: list[_Node], min_l: int | None, max_l: int | None) 
         distribution: list[tuple[int, int]] = []
         np_iter = iter(np_distribution)
         for dist_idx in range(len(quantifier_bounds)):
-            if dist_idx in pinned:
+            if dist_idx in collapsed:
+                distribution.append((0, 0))
+            elif dist_idx in pinned:
                 distribution.append(quantifier_bounds[dist_idx])
             else:
                 distribution.append(next(np_iter))
@@ -1572,6 +1579,9 @@ def _calculate_max_repetition_length(subpattern: list[_Node]) -> int:
             total += inner_max
         elif op in REPEATS:
             _, max_repeat, inner_pattern = value
+            if max_repeat == 0:
+                # Never repeated, so however long the inner pattern could get, none of it is matched.
+                continue
             if max_repeat == MAXREPEAT:
                 return MAXREPEAT
             inner_max = _calculate_max_repetition_length(list(inner_pattern))

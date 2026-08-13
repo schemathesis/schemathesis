@@ -177,8 +177,9 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         # Variable-length inner: outer count alone cannot encode maxLength (each
         # tick may be arbitrarily long), so we pin the variable slot and tighten
         # the leading slot for minLength only.
-        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{3994}(?:,prefix\|{1,}){0,}$"),
-        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1}(?:,bar\.spam\.[^,]{1,}){0,}$"),
+        # At an exact length the leading slot spends the whole budget, so the trailing repeat drops out.
+        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{3994}(?:,prefix\|{1,}){0}$"),
+        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1}(?:,bar\.spam\.[^,]{1,}){0}$"),
         # Optional finite group `()?` is preserved while `8+` tightens to use the budget.
         (r"^\008+()?$", None, 2, r"^\x008{1}(){0,1}$"),
         (r"^\008+()?$", 2, None, r"^\x008{1,}(){0,1}$"),
@@ -294,6 +295,25 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
 def test_update_quantifier(pattern, min_length, max_length, expected):
     assert update_quantifier(pattern, min_length, max_length) == expected
     re.compile(expected)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "length"),
+    [
+        (r"^[ \t]*[\x20-\x7E]+([ \t]+[\x20-\x7E]+)*[ \t]*$", 512),
+        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000),
+        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10),
+        (r"^[a-zA-Z0-9]+(-*[a-zA-Z0-9])*$", 25),
+    ],
+)
+def test_update_quantifier_exact_length_is_bounded(pattern, length):
+    # An open-ended repeat here leaves only zero-repetition matches at this length, which generation never finds.
+    assert pattern_length_bounds(update_quantifier(pattern, length, length)) == (length, length)
+
+
+def test_update_quantifier_keeps_repeat_matching_empty():
+    # This repeat spends none of the length budget, so dropping it would lose the strings that use it.
+    assert update_quantifier(r"^[a-z]+(b*)*$", 4, 4) == r"^[a-z]{4}(b{0,}){0,}$"
 
 
 def test_update_quantifier_invalid_pattern():
@@ -1258,10 +1278,4 @@ def test_rewrite_keeps_the_upper_bound_finite_when_parts_cannot_be_pinned():
     # strings orders of magnitude past the bound, which the length check throws away.
     pattern = r"^arn:aws(-cn|-us-gov)?:[a-z0-9-]*:[a-z0-9-]*:([0-9]{12})?:.+$"
 
-    rewritten = update_quantifier(pattern, 1000, 1000)
-
-    bounds = re.findall(r"\{(\d+),(\d*)\}", rewritten)
-    assert bounds
-    for low, high in bounds:
-        assert high != "", f"open-ended quantifier {{{low},}} in {rewritten}"
-        assert int(high) <= 1000, f"quantifier upper bound {high} exceeds the requested length in {rewritten}"
+    assert pattern_length_bounds(update_quantifier(pattern, 1000, 1000)) == (1000, 1000)

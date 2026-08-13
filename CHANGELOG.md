@@ -7,6 +7,7 @@
 #### Data generation
 
 - Slow generation for a grouped or anchored `pattern` under a length bound.
+- Generation hanging on a `pattern` whose repeated group cannot fit an exact length bound.
 - Strings longer than a single-character `pattern` like `^[a-z]$` allows when `maxLength` is set.
 - Values violating a `pattern` with possessive quantifiers like `0++0` when a length bound is set.
 - Internal error generating values for a `pattern` naming characters outside `generation.codec`.
