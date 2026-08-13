@@ -1430,6 +1430,32 @@ def test_apply_pattern_optimizations_skips_non_keyword_property_names():
     _apply_pattern_optimizations(bundle, update_quantifier)
 
 
+def test_negative_pattern_reuse_stamps_current_location(nctx):
+    # Two properties share a regex, so the second answers from the first's search - with its own pointer.
+    inner = {"type": "string", "pattern": "^[QZ]{4}-memo-probe$"}
+    assert [
+        (value.value, value.location)
+        for value in cover_schema_iter(nctx, {"type": "object", "properties": {"alpha": inner, "beta": dict(inner)}})
+        if value.scenario is CoverageScenario.INVALID_PATTERN
+    ] == [
+        ({"alpha": "", "beta": "QQQQ-memo-probe"}, "/properties/alpha/pattern"),
+        ({"alpha": "QQQQ-memo-probe", "beta": ""}, "/properties/beta/pattern"),
+    ]
+
+
+def test_negative_type_reuse_stamps_current_location(nctx):
+    # The same property schema recurs at two pointers; the reused type violation must carry its own.
+    inner = {"type": "string", "minLength": 3}
+    assert [
+        (value.value, value.location)
+        for value in cover_schema_iter(nctx, {"type": "object", "properties": {"alpha": inner, "beta": dict(inner)}})
+        if value.scenario is CoverageScenario.INCORRECT_TYPE and isinstance(value.value, dict)
+    ] == [
+        ({"alpha": 0, "beta": "000"}, "/properties/alpha/type"),
+        ({"alpha": "000", "beta": 0}, "/properties/beta/type"),
+    ]
+
+
 def test_negative_pattern_with_incompatible_length(nctx):
     schema = {
         "minLength": 6,
