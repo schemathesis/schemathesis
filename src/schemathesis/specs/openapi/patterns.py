@@ -1666,3 +1666,261 @@ def _build_quantifier(minimum: int | None, maximum: int | None) -> str:
     if minimum == maximum:
         return f"{{{minimum}}}"
     return f"{{{minimum or 0},{maximum}}}"
+
+
+# Every length a pattern can match is tracked as one bit of an integer, so lengths past this point
+# would make the walk cost more than the search it is meant to replace.
+_MAX_ANALYSED_LENGTH = 4096
+
+
+def _length_analysis_limit(min_length: int | None, max_length: int | None) -> int | None:
+    """The highest length worth walking for this window, or `None` when the window is out of reach."""
+    ceiling = min_length if max_length is None else max_length
+    if ceiling is None or ceiling > _MAX_ANALYSED_LENGTH:
+        return None
+    return ceiling
+
+
+def _window_mask(min_length: int | None, max_length: int | None, limit: int) -> int:
+    low = min_length or 0
+    high = limit if max_length is None else min(max_length, limit)
+    if low > high:
+        return 0
+    return ((1 << (high - low + 1)) - 1) << low
+
+
+def _concat_lengths(left: int, right: int, limit: int) -> int:
+    """Lengths reachable by putting a `left` match in front of a `right` one."""
+    if left == 0 or right == 0:
+        return 0
+    full = (1 << (limit + 1)) - 1
+    # An unbroken run of reachable lengths at the top shifts as one block, so only the gapped
+    # part below it costs a step - which is what keeps this affordable on `.*`-style patterns.
+    dense_from = (full & ~left).bit_length()
+    lowest_right = (right & -right).bit_length() - 1
+    result = (full << (dense_from + lowest_right)) & full
+    head = left & ((1 << dense_from) - 1)
+    while head:
+        result |= right << ((head & -head).bit_length() - 1)
+        head &= head - 1
+    return result & full
+
+
+def _power_lengths(base: int, exponent: int, limit: int) -> int:
+    """Lengths reachable by putting `exponent` matches of `base` in a row.
+
+    Callers cap the exponent so the shortest run still fits under `limit`, which is what keeps
+    every intermediate product non-empty.
+    """
+    result = 1
+    while exponent:
+        if exponent & 1:
+            result = _concat_lengths(result, base, limit)
+        exponent >>= 1
+        if exponent:
+            base = _concat_lengths(base, base, limit)
+    return result
+
+
+def _repeat_lengths(inner: int, min_repeat: int, max_repeat: int, limit: int) -> int:
+    if inner == 0:
+        # The body matches nothing, so skipping it entirely is all that is left.
+        return 1 if min_repeat == 0 else 0
+    if inner == 1:
+        return 1
+    lowest = (inner & -inner).bit_length() - 1
+    if lowest > 0 and min_repeat > limit // lowest:
+        return 0
+    base = _power_lengths(inner, min(min_repeat, limit), limit)
+    extra = limit if max_repeat == MAXREPEAT else min(max_repeat - min_repeat, limit)
+    if extra <= 0:
+        return base
+    # Letting the body match empty turns "up to `extra` more repetitions" into a single power.
+    return _concat_lengths(base, _power_lengths(inner | 1, extra, limit), limit)
+
+
+def _node_lengths(node: _Node, limit: int) -> int | None:
+    """Lengths a single node can match, or `None` when it names something the walk cannot follow."""
+    op, value = node
+    if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
+        return 0b10
+    # Anchors and lookaround match no characters of their own; ignoring what they demand of the
+    # surrounding text only ever admits more lengths, never fewer.
+    if op in (sre.AT, sre.ASSERT, sre.ASSERT_NOT):
+        return 0b1
+    if op == sre.SUBPATTERN:
+        return _nodes_lengths(list(value[3]), limit)
+    if op in REPEATS:
+        min_repeat, max_repeat, subpattern = value
+        inner = _nodes_lengths(list(subpattern), limit)
+        if inner is None:
+            return None
+        return _repeat_lengths(inner, min_repeat, max_repeat, limit)
+    if op == sre.BRANCH:
+        total = 0
+        for alternative in value[1]:
+            current = _nodes_lengths(list(alternative), limit)
+            if current is None:
+                return None
+            total |= current
+        return total
+    if op == getattr(sre, "ATOMIC_GROUP", None):
+        return _nodes_lengths(list(value), limit)
+    return None
+
+
+def _nodes_lengths(nodes: list[_Node], limit: int) -> int | None:
+    result = 1
+    for node in nodes:
+        current = _node_lengths(node, limit)
+        if current is None:
+            return None
+        result = _concat_lengths(result, current, limit)
+        if result == 0:
+            return 0
+    return result
+
+
+@lru_cache(maxsize=256)
+def _pattern_lengths(pattern: str, limit: int) -> int | None:
+    parsed = _parse_regex(pattern)
+    if parsed is None:
+        return None
+    return _nodes_lengths(parsed, limit)
+
+
+@lru_cache(maxsize=256)
+def pattern_length_is_unreachable(pattern: str, min_length: int | None, max_length: int | None) -> bool:
+    """Whether no string of a length inside the window matches the pattern end to end.
+
+    A min/max pair cannot see that a length falls in a hole between two reachable sizes, which is
+    where generation spends its whole budget before giving up. Unknown constructs answer False.
+    """
+    limit = _length_analysis_limit(min_length, max_length)
+    if limit is None:
+        return False
+    reachable = _pattern_lengths(pattern, limit)
+    if reachable is None:
+        return False
+    return not reachable & _window_mask(min_length, max_length, limit)
+
+
+def _pick_length(available: int, rest: int, remaining: int) -> int | None:
+    """The shortest this node can be while leaving the rest of the pattern a length it can reach."""
+    candidates = available & ((1 << (remaining + 1)) - 1)
+    while candidates:
+        choice = (candidates & -candidates).bit_length() - 1
+        if rest >> (remaining - choice) & 1:
+            return choice
+        candidates &= candidates - 1
+    return None
+
+
+def _restrict_nodes(nodes: list[_Node], target: int, limit: int) -> list[_Node] | None:
+    """The nodes narrowed to matches of exactly `target` characters, or `None` when the shape resists."""
+    lengths = []
+    for node in nodes:
+        current = _node_lengths(node, limit)
+        # Reached only after the walk vetted these very nodes, so a length is always there.
+        assert current is not None
+        lengths.append(current)
+    # What the nodes after each position can still absorb, so no choice strands the remainder.
+    suffixes = [1] * (len(nodes) + 1)
+    for index in range(len(nodes) - 1, -1, -1):
+        suffixes[index] = _concat_lengths(lengths[index], suffixes[index + 1], limit)
+    result: list[_Node] = []
+    remaining = target
+    for index, node in enumerate(nodes):
+        choice = _pick_length(lengths[index], suffixes[index + 1], remaining)
+        if choice is None:
+            return None
+        restricted = _restrict_node(node, choice, limit)
+        if restricted is None:
+            return None
+        result.extend(restricted)
+        remaining -= choice
+    return result if remaining == 0 else None
+
+
+def _restrict_node(node: _Node, length: int, limit: int) -> list[_Node] | None:
+    op, value = node
+    if op in (sre.AT, sre.ASSERT, sre.ASSERT_NOT):
+        return [node] if length == 0 else None
+    if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
+        return [node] if length == 1 else None
+    if op == sre.SUBPATTERN:
+        group, add_flags, del_flags, inner = value
+        restricted = _restrict_nodes(list(inner), length, limit)
+        if restricted is None:
+            return None
+        return [(sre.SUBPATTERN, (group, add_flags, del_flags, restricted))]
+    if op == sre.BRANCH:
+        for alternative in value[1]:
+            restricted = _restrict_nodes(list(alternative), length, limit)
+            if restricted is not None:
+                return [(sre.BRANCH, (None, [restricted]))]
+        return None
+    # A possessive part keeps every character it took, so what follows it never gets those back -
+    # a rewritten count would admit strings the pattern itself rejects.
+    if op in REPEATS and op not in POSSESSIVE_REPEATS:
+        return _restrict_repeat(value, length, limit)
+    return None
+
+
+def _restrict_repeat(value: _RepeatValue, length: int, limit: int) -> list[_Node] | None:
+    min_repeat, max_repeat, subpattern = value
+    body = list(subpattern)
+    inner = _nodes_lengths(body, limit)
+    if inner is None or inner == 0:
+        # A body matching nothing leaves only the option of skipping the repeat altogether.
+        return [] if inner == 0 and min_repeat == 0 else None
+    lowest = (inner & -inner).bit_length() - 1
+    highest = inner.bit_length() - 1
+    if length == 0:
+        # Repetitions that match no characters add nothing to the text, so dropping them is exact.
+        return [] if min_repeat == 0 or lowest == 0 else None
+    # Only a body whose reachable lengths run without gaps lets a budget be split evenly across
+    # repetitions; anything else needs a search this walk deliberately does not do.
+    if highest == 0 or inner != ((1 << (highest - lowest + 1)) - 1) << lowest:
+        return None
+    # `length` came off this repeat's own reachable set, so a count that fits always exists.
+    count = max(min_repeat, 1, -(-length // highest))
+    base, remainder = divmod(length, count)
+    parts: list[_Node] = []
+    for piece_length, piece_count in ((base + 1, remainder), (base, count - remainder)):
+        if piece_count == 0 or piece_length == 0:
+            continue
+        piece = _restrict_nodes(body, piece_length, limit)
+        if piece is None:
+            return None
+        parts.append((sre.MAX_REPEAT, (piece_count, piece_count, piece)))
+    return parts
+
+
+@lru_cache(maxsize=256)
+def pin_pattern_length(pattern: str, min_length: int | None, max_length: int | None) -> str:
+    """Rewrite the pattern so every match has one length inside the window.
+
+    Rejection sampling never lands on a window far from the sizes a pattern emits on its own, so the
+    length has to be spelled into the pattern. Shapes that resist the rewrite come back unchanged.
+    """
+    limit = _length_analysis_limit(min_length, max_length)
+    if limit is None:
+        return pattern
+    try:
+        parsed = sre_parse.parse(pattern)
+        nodes = list(parsed)
+        reachable = _nodes_lengths(nodes, limit)
+        if reachable is None:
+            return pattern
+        window = reachable & _window_mask(min_length, max_length, limit)
+        if window == 0:
+            return pattern
+        restricted = _restrict_nodes(nodes, (window & -window).bit_length() - 1, limit)
+        if restricted is None:
+            return pattern
+        updated = _serialize(restricted, global_flags=parsed.state.flags & ~_DEFAULT_FLAGS)
+        re.compile(updated)
+        return updated
+    except (re.error, InternalError):
+        return pattern

@@ -2,6 +2,7 @@ import re
 import string
 import sys
 import warnings
+from itertools import product
 
 import jsonschema_rs
 import pytest
@@ -26,13 +27,15 @@ from schemathesis.specs.openapi.patterns import (
     matches_every_string,
     normalize_regex,
     pattern_length_bounds,
+    pattern_length_is_unreachable,
     pattern_requires_char_outside,
     pattern_requires_literal,
+    pin_pattern_length,
     update_quantifier,
 )
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="Possessive repeat is only available in Python 3.11+"
+    sys.version_info < (3, 11), reason="Possessive repeats and atomic groups are only available in Python 3.11+"
 )
 
 
@@ -436,6 +439,101 @@ def test_update_quantifier_admits_uneven_slot_distributions(min_length, max_leng
 def test_update_pattern_in_schema_keeps_unenforced_bounds(schema, expected):
     update_pattern_in_schema(schema)
     assert schema == expected
+
+
+# Ten optional characters plus a dash, then a fixed 36-character tail: 36 or 47 characters, never anything between.
+SPLIT_UUID = r"^([0-9a-f]{10}-|)[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$"
+# A long ARN, or a `$` followed by any number of two-character-or-longer segments: one character, or three and up.
+SECRET_REFERENCE = r"(^arn:aws([a-z]|\-)*:secretsmanager:[a-z0-9-.]+:.*)|(\$(\.[\w_-]+(\[(\d+|\*)\])*)*)"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "min_length", "max_length", "expected"),
+    [
+        (SPLIT_UUID, 46, 46, True),
+        (SPLIT_UUID, 36, 36, False),
+        (SPLIT_UUID, 47, 47, False),
+        (SPLIT_UUID, 46, 47, False),
+        (SPLIT_UUID, 37, 45, True),
+        (SECRET_REFERENCE, 2, 2, True),
+        (SECRET_REFERENCE, 1, 1, False),
+        (SECRET_REFERENCE, 3, 3, False),
+        (r"^(ab)+$", 5, 5, True),
+        (r"^(ab)+$", 4, 4, False),
+        (r"^[a-z]{3}$", 1, 2, True),
+        (r"^[a-z]+$", 5, 5, False),
+        (r"^[a-z]+$", 0, 0, True),
+        # Back-references carry a length the walk cannot follow, so nothing is ruled out.
+        (r"^(a+)\1$", 3, 3, False),
+    ],
+)
+def test_pattern_length_is_unreachable(pattern, min_length, max_length, expected):
+    assert pattern_length_is_unreachable(pattern, min_length, max_length) is expected
+
+
+PIN_CASES = [
+    (r"aws\.partner(/[\.\-_A-Za-z0-9]+){2,}", 256),
+    (r"^[a-zA-Z0-9](-*[a-zA-Z0-9])*$", 256),
+    (r"^(https?):\/\/([^\s]*)", 2048),
+    (r"^(?!\s).+@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$", 256),
+    (SECRET_REFERENCE, 1599),
+    (r"^([A-Za-z](-|_|.)?)+$", 101),
+    (r"^[a-z]+$", 40),
+    (SPLIT_UUID, 47),
+]
+
+
+@pytest.mark.parametrize(("pattern", "length"), PIN_CASES)
+def test_pin_pattern_length(pattern, length):
+    # A quantifier left spanning a range multiplies into catastrophic backtracking, so pin one length.
+    assert pattern_length_bounds(pin_pattern_length(pattern, length, length)) == (length, length)
+
+
+@pytest.mark.parametrize(("pattern", "length"), PIN_CASES)
+@settings(max_examples=5, suppress_health_check=list(HealthCheck), deadline=None)
+@given(data=st.data())
+def test_pinned_pattern_stays_within_the_original_language(pattern, length, data):
+    pinned = pin_pattern_length(pattern, length, length)
+    value = data.draw(st.from_regex(pinned, fullmatch=True, alphabet=st.characters(codec=None)))
+    assert len(value) == length
+    assert re.search(pattern, value), f"{value!r} does not match {pattern}"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "min_length", "max_length"),
+    [
+        # Back-references are not analysable.
+        (r"^(a+)\1$", 6, 6),
+        # Nothing of that length exists.
+        (SPLIT_UUID, 46, 46),
+        # No bound to aim at.
+        (r"^[a-z]+$", None, None),
+        # Further than the walk goes.
+        (r"^[a-z]+$", 100_000, 100_000),
+    ],
+)
+def test_pin_pattern_length_leaves_unsupported_shapes_alone(pattern, min_length, max_length):
+    assert pin_pattern_length(pattern, min_length, max_length) == pattern
+
+
+@given(st.data())
+# Most drawn patterns come back unpinned and get filtered out, so the count carries the few that do.
+@settings(suppress_health_check=list(HealthCheck), max_examples=200, deadline=None)
+def test_pin_pattern_length_random(data):
+    pattern = data.draw(st.text(min_size=1).filter(is_valid_regex))
+    length = data.draw(st.integers(min_value=0, max_value=40))
+    pinned = pin_pattern_length(pattern, length, length)
+    assume(pinned != pattern)
+    value = data.draw(st.from_regex(pinned, fullmatch=True, alphabet=st.characters(codec=None)))
+    assert len(value) == length
+    assert re.fullmatch(pattern, value), f"{value!r} does not match {pattern}"
+
+
+@SKIP_BEFORE_PY11
+def test_pin_pattern_length_leaves_possessive_repeats_alone():
+    # A possessive run keeps what it took, so a count the following part could otherwise share
+    # would let strings through that the pattern turns down.
+    assert pin_pattern_length("^[a-z]++[a-z]$", 5, 5) == "^[a-z]++[a-z]$"
 
 
 @pytest.mark.parametrize(
@@ -1343,3 +1441,89 @@ def test_rewrite_keeps_the_upper_bound_finite_when_parts_cannot_be_pinned():
     pattern = r"^arn:aws(-cn|-us-gov)?:[a-z0-9-]*:[a-z0-9-]*:([0-9]{12})?:.+$"
 
     assert pattern_length_bounds(update_quantifier(pattern, 1000, 1000)) == (1000, 1000)
+
+
+# Shapes chosen so every string over `ab` up to a handful of characters can be enumerated, which
+# turns the length walk's answers into something checkable rather than merely plausible.
+BRUTE_FORCE_PATTERNS = [
+    r"^(?:ab|abab)+$",
+    r"^(?:a|bb)+$",
+    r"^(ab)+$",
+    r"^a{2,3}b*$",
+    r"^a*b?a*$",
+    r"^(?:a(?:b)?){2}$",
+    r"^(?=a)ab*$",
+    r"^a(?:bb)*$",
+    r"^(?:aa|b){1,3}$",
+    r"^(a+)\1$",
+    pytest.param(r"^(?>a+)b*$", marks=SKIP_BEFORE_PY11),
+    pytest.param(r"^(?:ab)++$", marks=SKIP_BEFORE_PY11),
+    r"^(?:^)*a+$",
+    r"^(?:ab){3}$",
+    r"^(?:aab){2,4}$",
+    r"^(?:(a)\1)+$",
+    r"^((?:ab|abab)+)$",
+    r"^(?:(?:ab|abab)+|(?:ba|baba)+)$",
+    r"^(?:b|(a)\1)$",
+    pytest.param(r"^(?>a+)*$", marks=SKIP_BEFORE_PY11),
+]
+BRUTE_FORCE_ALPHABET = "ab"
+BRUTE_FORCE_MAX_LENGTH = 9
+
+
+def _strings_of_length(length):
+    return ("".join(letters) for letters in product(BRUTE_FORCE_ALPHABET, repeat=length))
+
+
+@pytest.mark.parametrize("pattern", BRUTE_FORCE_PATTERNS)
+def test_unreachable_length_never_rules_out_a_length_the_pattern_matches(pattern):
+    # The walk over-approximates, so keeping a length nothing matches is fine; dropping one that
+    # matches silently throws away the coverage a schema asked for.
+    compiled = re.compile(pattern)
+    for length in range(BRUTE_FORCE_MAX_LENGTH):
+        if any(compiled.fullmatch(text) for text in _strings_of_length(length)):
+            assert not pattern_length_is_unreachable(pattern, length, length), (pattern, length)
+
+
+@pytest.mark.parametrize("pattern", BRUTE_FORCE_PATTERNS)
+def test_pinned_pattern_admits_only_original_matches_of_the_pinned_length(pattern):
+    original = re.compile(pattern)
+    for length in range(1, BRUTE_FORCE_MAX_LENGTH):
+        pinned = pin_pattern_length(pattern, length, length)
+        if pinned == pattern:
+            continue
+        compiled = re.compile(pinned)
+        admitted = [
+            text
+            for size in range(BRUTE_FORCE_MAX_LENGTH)
+            for text in _strings_of_length(size)
+            if compiled.fullmatch(text)
+        ]
+        assert admitted, (pattern, length)
+        for text in admitted:
+            assert len(text) == length, (pattern, length, text)
+            assert original.fullmatch(text), (pattern, length, text)
+
+
+@pytest.mark.parametrize("pattern", BRUTE_FORCE_PATTERNS)
+def test_pin_leaves_a_length_alone_when_the_pattern_cannot_reach_it(pattern):
+    compiled = re.compile(pattern)
+    for length in range(1, BRUTE_FORCE_MAX_LENGTH):
+        if not any(compiled.fullmatch(text) for text in _strings_of_length(length)):
+            assert pin_pattern_length(pattern, length, length) == pattern, (pattern, length)
+
+
+@pytest.mark.parametrize(
+    ("min_length", "max_length"),
+    [(6, 4), (10, 0)],
+    ids=["min-above-max", "max-zero"],
+)
+def test_contradictory_length_window_is_unreachable(min_length, max_length):
+    assert pattern_length_is_unreachable(r"^[a-z]+$", min_length, max_length) is True
+
+
+@pytest.mark.parametrize("pattern", ["[", "a{2,1}", "(?P<>a)"], ids=["open-class", "reversed-bounds", "empty-name"])
+def test_unreadable_pattern_rules_nothing_out(pattern):
+    # A pattern Python cannot read says nothing about length, so generation keeps its own path.
+    assert pattern_length_is_unreachable(pattern, 1, 5) is False
+    assert pin_pattern_length(pattern, 1, 5) == pattern

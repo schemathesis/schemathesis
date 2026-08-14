@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from math import inf, nextafter
 from unittest.mock import ANY
 
@@ -29,6 +30,10 @@ from schemathesis.specs.openapi.coverage._schema import (
 )
 from schemathesis.specs.openapi.formats import get_default_format_strategies
 from schemathesis.specs.openapi.patterns import update_quantifier
+
+SKIP_BEFORE_PY11 = pytest.mark.skipif(
+    sys.version_info < (3, 11), reason="Possessive repeats and atomic groups are only available in Python 3.11+"
+)
 
 PATTERN = "^\\d+$"
 
@@ -1482,6 +1487,72 @@ def test_no_pattern_violation_for_either_property_sharing_an_unbreakable_pattern
         for value in cover_schema_iter(nctx, {"type": "object", "properties": {"alpha": inner, "beta": dict(inner)}})
         if value.scenario is CoverageScenario.INVALID_PATTERN
     ] == []
+
+
+# Ten optional characters plus a dash, then a fixed 36-character tail: 36 or 47 characters, never anything between.
+SPLIT_UUID_PATTERN = r"^([0-9a-f]{10}-|)[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}$"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "length"),
+    [
+        (r"aws\.partner(/[\.\-_A-Za-z0-9]+){2,}", 256),
+        (r"^[a-zA-Z0-9](-*[a-zA-Z0-9])*$", 256),
+        (r"^(https?):\/\/([^\s]*)", 2048),
+        (r"^(?!\s).+@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$", 256),
+        (SPLIT_UUID_PATTERN, 47),
+        # A repeat spanning two lengths blows up into catastrophic backtracking unless the rewrite pins one.
+        (r"^([A-Za-z](-|_|.)?)+$", 101),
+    ],
+)
+def test_positive_string_reaches_lengths_far_from_what_the_pattern_emits_naturally(pctx, pattern, length):
+    values = cover_schema(pctx, {"type": "string", "pattern": pattern, "minLength": length, "maxLength": length})
+    assert values
+    for value in values:
+        assert len(value) == length, value
+        assert re.search(pattern, value), value
+
+
+@pytest.mark.parametrize(
+    ("pattern", "length"),
+    [
+        (r"^(a+)\1$", 8),
+        (r"^(a)(?:\1)*$", 40),
+        (r"^(?:ab|abcd)+$", 8),
+        (r"^(?:ab|abcd){2}$", 8),
+        pytest.param(r"^(?:ab)++$", 40, marks=SKIP_BEFORE_PY11),
+        (r"^(?:^)*[a-z]+$", 8),
+        (r"^(?:abc){1,2}$", 6),
+    ],
+)
+def test_positive_string_conforms_for_a_pattern_the_length_walk_cannot_pin(pctx, pattern, length):
+    # Back-references, possessive runs and gapped repeats resist the rewrite, so the length is drawn
+    # for rather than spelled out - and every length here sits above what the pattern emits on its own.
+    schema = {"type": "string", "pattern": pattern, "minLength": length, "maxLength": length}
+    values = cover_schema(pctx, schema)
+    assert values
+    assert_conform(values, schema)
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [pytest.param(r"^(?>[a-z]+)[0-9]$", marks=SKIP_BEFORE_PY11), r"^(?=[a-z]{3})[a-z]+$"],
+    ids=["atomic", "lookahead"],
+)
+def test_positive_string_absent_where_a_length_bound_meets_a_shape_neither_path_handles(pctx, pattern):
+    # Both patterns generate freely on their own; adding a length the rewrite cannot spell out leaves
+    # only drawing and discarding, which never lands.
+    assert cover_schema(pctx, {"type": "string", "pattern": pattern}) != []
+    assert cover_schema(pctx, {"type": "string", "pattern": pattern, "minLength": 8, "maxLength": 8}) == []
+
+
+def test_positive_string_skips_a_window_no_length_can_satisfy(pctx):
+    # `minLength` above `maxLength` leaves nothing to aim at, and searching for it never ends.
+    assert cover_schema(pctx, {"type": "string", "pattern": r"^[a-z]+$", "minLength": 40, "maxLength": 8}) == []
+
+
+def test_positive_string_skips_a_length_the_pattern_cannot_produce(pctx):
+    assert cover_schema(pctx, {"type": "string", "pattern": SPLIT_UUID_PATTERN, "minLength": 46, "maxLength": 46}) == []
 
 
 def _type_violations(ctx, schema: dict) -> list:
