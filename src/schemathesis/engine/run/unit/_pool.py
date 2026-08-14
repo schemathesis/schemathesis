@@ -109,4 +109,7 @@ class WorkerPool:
         return self
 
     def __exit__(self, ty: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> None:
+        if ty is not None:
+            # The consumer stopped reading events, so wind workers down instead of running the phase to the end.
+            self.ctx.stop()
         self.stop()

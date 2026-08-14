@@ -62,6 +62,8 @@
 - Disable unlisted custom checks when `--checks` selects only specific checks.
 - `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.
 - Report oversized minimum examples as a health check failure on recent Hypothesis versions.
+- Stop worker threads when the event stream is abandoned instead of running the phase to the end.
+- `RuntimeError: generator ignored GeneratorExit` when an interrupt arrives while the event stream closes.
 
 ### :racing_car: Performance
 
