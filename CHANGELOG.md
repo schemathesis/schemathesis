@@ -52,6 +52,7 @@
 - Ignoring constraints beside `anyOf` / `oneOf` in bodies, like `items` or `additionalProperties`.
 - Spurious tracebacks printed on exit after interruption.
 - Skipping a path parameter's only negative value, leaving the operation without negative cases.
+- Dropping the remaining wrong-type cases for a parameter once one type had no violation to send.
 
 #### Others
 
@@ -79,6 +80,7 @@
 - Coverage phase up to 9x faster on schemas with a `pattern` no value can violate.
 - Coverage phase up to 8x faster on schemas whose string parameters accept any text.
 - Coverage phase up to 30x faster on `pattern` strings with a high `minLength`.
+- Coverage phase up to 10x faster generating wrong-type values for query, path and header parameters.
 
 ### :wrench: Changed
 
