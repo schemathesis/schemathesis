@@ -154,9 +154,12 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                 engine.stop()
                 status = Status.INTERRUPTED
                 yield events.Interrupted(phase=phase.name)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as exc:
         # Hard stop, don't wait for worker threads
-        pass
+        if isinstance(exc.__context__, GeneratorExit):
+            # The consumer abandoned the event stream and the interrupt arrived while workers were winding
+            # down. Honor the close instead of emitting the events below into a generator that is going away.
+            raise exc.__context__ from None
 
     if not is_executed:
         phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
