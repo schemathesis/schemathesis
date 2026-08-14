@@ -210,6 +210,19 @@ NEGATIVE_STRING_STRATEGY: st.SearchStrategy = st.text(
     alphabet=st.characters(min_codepoint=65, max_codepoint=122, categories=["L"]),
     min_size=3,
 )
+# What a draw settles on once it shrinks. Where only the text reaches the server, these stand in
+# for a search. Alternatives are tried in order until one breaks the schema.
+STRINGIFIED_TYPE_PROBES: dict[str, tuple[Any, ...]] = {
+    # `2` stands in where a boolean is declared, since `0` reads as one on the wire.
+    "integer": (0, 2),
+    # Non-integer, so it stays distinct from the integer above.
+    "number": (0.5,),
+    "boolean": (True, False),
+    "null": (None,),
+    "string": ("AAA",),
+    "array": ([None, None],),
+    "object": ({},),
+}
 
 
 STRATEGIES_FOR_TYPE = {
@@ -3490,6 +3503,34 @@ def _accepts_every_stringified_value(schema: dict[str, Any], types: list[str]) -
     return True
 
 
+def _stringified_type_violations(
+    ctx: CoverageContext,
+    names: list[str],
+    rules: dict[str, list[Callable[[Any], bool]]],
+    breaks_the_schema: Callable[[Any], bool],
+) -> list[Any]:
+    """One value per wrong type whose rendering the schema turns down.
+
+    Only text reaches the server here, so whether a rendering breaks the schema is a question one
+    member answers for the whole type - no need to draw for it.
+    """
+    values = []
+    for name in names:
+        for candidate in STRINGIFIED_TYPE_PROBES[name]:
+            if not all(rule(candidate) for rule in rules.get(name, ())):
+                continue
+            if isinstance(candidate, (dict, list)):
+                candidate = deepclone(candidate)
+            if ctx.location == ParameterLocation.PATH:
+                candidate = quote_path_parameter(jsonify(candidate))
+            elif ctx.location == ParameterLocation.QUERY:
+                candidate = jsonify(candidate)
+            if breaks_the_schema(candidate):
+                values.append(candidate)
+                break
+    return values
+
+
 def _negative_type(
     ctx: CoverageContext, ty: str | list[str], seen: HashSet, schema: dict[str, Any]
 ) -> Generator[GeneratedValue, None, None]:
@@ -3546,6 +3587,12 @@ def _negative_type(
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
     if "string" in strategies:
         strategies["string"] = NEGATIVE_STRING_STRATEGY
+    # Rules kept per type, so a probe can be held to the same ones without drawing.
+    rules: dict[str, list[Callable[[Any], bool]]] = {}
+
+    def restrict(name: str, rule: Callable[[Any], bool]) -> None:
+        strategies[name] = strategies[name].filter(rule)
+        rules.setdefault(name, []).append(rule)
 
     filter_func = {
         "path": lambda x: not is_invalid_path_parameter(x),
@@ -3557,18 +3604,19 @@ def _negative_type(
     if "number" in types:
         strategies.pop("integer", None)
     if "integer" in types:
-        strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
+        strategies["number"] = FLOAT_STRATEGY
+        restrict("number", _is_non_integer_float)
     # For path/query parameters, numeric strings like "9" serialize identically to integer 9 in the URL,
     # making them indistinguishable and causing false positive failures
     if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and ("integer" in types or "number" in types):
         if "string" in strategies:
-            strategies["string"] = strategies["string"].filter(_is_not_numeric_string)
+            restrict("string", _is_not_numeric_string)
     # For path/query parameters, 0/1/true/false serialize to wire values lenient parsers
     # accept as booleans, making them indistinguishable from a valid boolean.
     if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and "boolean" in types:
         for ty in ("integer", "number", "string"):
             if ty in strategies:
-                strategies[ty] = strategies[ty].filter(_is_not_boolean_coercible)
+                restrict(ty, _is_not_boolean_coercible)
     if ctx.location in (ParameterLocation.QUERY, ParameterLocation.PATH):
         strategies.pop("object", None)
     # Form-urlencoded property-level mutations with null/array/object serialize to empty
@@ -3587,8 +3635,8 @@ def _negative_type(
         strategies.pop("null", None)
         strategies.pop("string", None)
     if filter_func is not None:
-        for ty, strategy in strategies.items():
-            strategies[ty] = strategy.filter(filter_func)
+        for ty in list(strategies):
+            restrict(ty, filter_func)
 
     pattern = schema.get("pattern")
     if pattern is not None:
@@ -3631,20 +3679,21 @@ def _negative_type(
         for ty, strategy in strategies.items():
             strategies[ty] = strategy.map(jsonify)
 
-    if apply_validation and ctx.will_be_serialized_to_string():
-        if _accepts_every_stringified_value(schema, types):
-            # Nothing this draws could break the schema once it reaches the wire as text, so the
-            # search below can only spend the whole generation budget and come back empty-handed.
-            return
-        for ty, strategy in strategies.items():
-            strategies[ty] = strategy.filter(_does_not_match_the_original_schema)
     # Materialize before yielding so the cache fills even when the consumer stops mid-iteration.
     generated_values: list[Any] = []
-    for strategy in strategies.values():
-        try:
-            generated_values.append(ctx.generate_from(strategy))
-        except Unsatisfiable:
-            break
+    if apply_validation and ctx.will_be_serialized_to_string():
+        if _accepts_every_stringified_value(schema, types):
+            # Nothing here could break the schema once it reaches the wire as text.
+            return
+        generated_values = _stringified_type_violations(
+            ctx, list(strategies), rules, _does_not_match_the_original_schema
+        )
+    else:
+        for strategy in strategies.values():
+            try:
+                generated_values.append(ctx.generate_from(strategy))
+            except Unsatisfiable:
+                break
     if cache_key is not None:
         schema_generation_cache[cache_key] = generated_values
     for value in generated_values:
