@@ -1650,6 +1650,28 @@ def test_path_parameter_dots(ctx):
     )
 
 
+def test_parameters_only_negative_value_reaches_the_operations_own_method(ctx):
+    # The template takes the first negative value and is only ever sent under some other method,
+    # so a parameter with exactly one of them would otherwise go untested under its own.
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "id",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string", "minLength": 1, "maxLength": 255},
+            },
+        ],
+        path="/foo/{id}",
+    )
+    assert_negative_coverage(
+        schema,
+        [{"path_parameters": {"id": Pattern("0{256}$")}}],
+        path=("/foo/{id}", "post"),
+    )
+
+
 def test_required_header(ctx):
     schema = build_schema(
         ctx,

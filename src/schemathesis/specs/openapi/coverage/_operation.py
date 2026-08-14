@@ -133,6 +133,15 @@ class TemplateValue:
     components: dict[ParameterLocation, ComponentInfo]
 
 
+def _replay(
+    first: GeneratedValue, rest: Generator[GeneratedValue, None, None] | None = None
+) -> Generator[GeneratedValue, None, None]:
+    """Hand a value back to the front of the generator it came off."""
+    yield first
+    if rest is not None:
+        yield from rest
+
+
 def _stringify_value(val: Any, container_name: str) -> Any:
     if val is None:
         return "null"
@@ -566,6 +575,11 @@ def iter_coverage_cases(
         if parameter.is_required and value.generation_mode == GenerationMode.NEGATIVE:
             has_unsatisfiable_required_parameter = True
         template.add_parameter(location, name, value)
+        if value.generation_mode == GenerationMode.NEGATIVE:
+            # The seeded value only ever ships under some other method, so a parameter left with
+            # nothing else would go untested under its own.
+            following = next(gen, None)
+            gen = _replay(value) if following is None else _replay(following, gen)
         generators[(location, name)] = gen
     template_time = instant.elapsed
     has_required_body = operation.body and any(b.is_required for b in operation.body)
