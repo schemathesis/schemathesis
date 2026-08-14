@@ -1303,7 +1303,7 @@ SCHEMA_WITH_PATTERN = {"minLength": 2, "pattern": "^A{2}$"}
             ],
         ),
         # Pattern in combination with other keywords
-        ({"pattern": "^A{2}$", "minLength": 3, "maxLength": 20}, ["000", "AA", "AA0000000000000000000"]),
+        ({"pattern": "^A{2}$", "minLength": 3, "maxLength": 20}, ["000", "AA", "a" * 21]),
         # Pattern inside allOf
         ({"allOf": [SCHEMA_WITH_PATTERN, {"minLength": 5}]}, ["AA", "00000"]),
     ],
@@ -1585,7 +1585,7 @@ def test_negative_pattern_with_incompatible_length(nctx):
         "pattern": "^[a-zA-Z]{4}-\\d{4,15}$",
     }
     covered = cover_schema(nctx, schema)
-    assert covered == ["AAAA-", "AAAA-0000000000000000", "000000"]
+    assert covered == ["AAAA-", "a" * 21, "000000"]
     assert_unique(covered)
     assert_not_conform(covered, schema)
 
@@ -1878,6 +1878,21 @@ def test_generate_very_large_string(nctx):
         for item in cover_schema(nctx, schema)
         if isinstance(item, dict) and isinstance(item.get("name"), str)
     }
+
+
+def test_oversized_string_still_matches_an_ambiguous_pattern(nctx):
+    # A group spanning two lengths has no quantifier range that pins one, so the length has to be
+    # worked into the pattern rather than padded on after generating a shorter match.
+    pattern = "^([a-z]{2}|[a-z]{3})+$"
+    values = [
+        value.value
+        for value in cover_schema_iter(nctx, {"type": "string", "pattern": pattern, "maxLength": 10})
+        if value.scenario is CoverageScenario.STRING_ABOVE_MAX_LENGTH
+    ]
+    assert values
+    for value in values:
+        assert len(value) == 11, value
+        assert re.search(pattern, value), value
 
 
 def test_large_string_with_complex_pattern(nctx):

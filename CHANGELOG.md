@@ -53,6 +53,7 @@
 - Spurious tracebacks printed on exit after interruption.
 - Skipping a path parameter's only negative value, leaving the operation without negative cases.
 - Dropping the remaining wrong-type cases for a parameter once one type had no violation to send.
+- Generation hanging on a `maxLength` violation for a pattern whose repeated group spans two lengths.
 
 #### Others
 

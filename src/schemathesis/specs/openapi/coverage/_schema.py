@@ -1324,17 +1324,13 @@ def _generate_oversized_string(
             if target_length < MAX_STRING_LENGTH:
                 return "a" * target_length
             return None
-    min_length = max_length = target_length
     try:
         if target_length - 1 > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
             # Pattern combined with a large length is too slow; drop it.
             return ctx.generate_from_schema({k: v for k, v in new_schema.items() if k != "pattern"})
-        if ctx.update_pattern is not None:
-            updated = ctx.update_pattern(pattern, min_length, max_length)
-            if updated != pattern:
-                return ctx.generate_from_schema({**new_schema, "pattern": updated})
-            stripped = {k: v for k, v in new_schema.items() if k not in ("minLength", "maxLength")}
-            return ctx.generate_from_schema(stripped).ljust(max_length, "0")
+        # Hand the pattern over as it stands. Working the length into it happens during generation,
+        # where the sizes the pattern reaches on its own are still in view - which is what tells an
+        # ambiguous rewrite apart from one that already lands on a single length.
         return ctx.generate_from_schema(new_schema)
     except (InvalidArgument, Unsatisfiable):
         # Pattern intrinsically unsatisfiable: synthesize a fixed-length string so the
