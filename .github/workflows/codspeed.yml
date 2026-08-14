@@ -32,7 +32,7 @@ jobs:
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
+        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "simulation"
@@ -55,7 +55,7 @@ jobs:
       # `benches/memory/` so the job above collects nothing from them: it globs `benches/*`, and a
       # directory is walked with the default `test_*.py` filter these modules deliberately fail.
       - name: Run memory benchmarks
-        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
+        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "memory"
