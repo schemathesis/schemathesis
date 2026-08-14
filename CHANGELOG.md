@@ -51,6 +51,7 @@
 - False positive `positive_data_acceptance` for values a sibling `not` excludes.
 - Ignoring constraints beside `anyOf` / `oneOf` in bodies, like `items` or `additionalProperties`.
 - Spurious tracebacks printed on exit after interruption.
+- Skipping a path parameter's only negative value, leaving the operation without negative cases.
 
 #### Others
 
