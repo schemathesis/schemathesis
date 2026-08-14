@@ -73,8 +73,10 @@ from schemathesis.specs.openapi.converter import apply_rewritten_pattern
 from schemathesis.specs.openapi.patterns import (
     matches_every_string,
     pattern_length_bounds,
+    pattern_length_is_unreachable,
     pattern_requires_char_outside,
     pattern_requires_literal,
+    pin_pattern_length,
 )
 from schemathesis.transport.serialization import contains_binary
 
@@ -319,6 +321,14 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
     if failure is not None:
         raise failure.with_traceback(None)
     return value
+
+
+def _keeps_length_within(pattern: str, min_length: int | None, max_length: int | None) -> bool:
+    """Whether every string the pattern matches already lands inside the length window."""
+    pattern_min, pattern_max = pattern_length_bounds(pattern)
+    if min_length is not None and pattern_min < min_length:
+        return False
+    return max_length is None or (pattern_max is not None and pattern_max <= max_length)
 
 
 @lru_cache(maxsize=128)
@@ -768,8 +778,21 @@ class CoverageContext:
                     raise Unsatisfiable
                 if min_length is not None and pattern_max is not None and min_length > pattern_max:
                     raise Unsatisfiable
+                # A floor above the sizes the pattern emits on its own is where drawing and
+                # discarding never lands, so the length gets worked out rather than searched for.
+                doomed = min_length is not None and min_length > pattern_min
+                if doomed and pattern_length_is_unreachable(pattern, min_length, max_length):
+                    raise Unsatisfiable
+                updated = pattern
                 if self.update_pattern is not None:
-                    pattern = self.update_pattern(pattern, min_length, max_length)
+                    updated = self.update_pattern(pattern, min_length, max_length)
+                if doomed and not _keeps_length_within(updated, min_length, max_length):
+                    # The quantifier rewrite left the window open, so one length gets spelled into
+                    # the pattern outright; shapes it cannot rewrite keep whatever it managed.
+                    pinned = pin_pattern_length(pattern, min_length, max_length)
+                    if pinned != pattern:
+                        updated = pinned
+                pattern = updated
             if min_length is not None and min_length > MAX_GENERATED_PATTERN_LENGTH:
                 return self._long_string_matching(schema, min_length)
             fmt = schema.get("format")

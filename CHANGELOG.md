@@ -77,6 +77,7 @@
 - Coverage phase up to 100x faster on `pattern` strings whose quantifier sits inside a group.
 - Coverage phase up to 9x faster on schemas with a `pattern` no value can violate.
 - Coverage phase up to 8x faster on schemas whose string parameters accept any text.
+- Coverage phase up to 30x faster on `pattern` strings with a high `minLength`.
 
 ### :wrench: Changed
 

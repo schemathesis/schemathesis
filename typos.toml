@@ -8,6 +8,8 @@ extend-ignore-re = [
     "\\{Nd\\}",
     # UUID-shaped literals
     "[0-9a-fg-]{36}",
+    # Regex fixtures spelled out of the letters `a` and `b`
+    "\\(\\?:[ab|]+\\)",
 ]
 
 [default.extend-words]
