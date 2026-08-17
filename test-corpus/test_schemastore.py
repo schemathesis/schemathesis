@@ -57,6 +57,7 @@ XFAIL_SCHEMAS: dict[str, str] = {
     "clang-format-21.x.json": "external $ref",
     "clangd.json": "external $ref",
     "clasp.json": "external $ref",
+    "cloudify.json": "conjunction over unions past the canonicalization ceiling",
     "compilerconfig.json": "external $ref",
     "databricks-asset-bundles.json": "external $ref",
     "declarative-automation-bundles.json": "external $ref",
@@ -88,9 +89,11 @@ XFAIL_SCHEMAS: dict[str, str] = {
     "kestra-0.19.0.json": "timeout (>20s)",
     "ksp-avc.json": "external $ref",
     "ksp-ckan.json": "external $ref",
+    "kya.json": "conjunction over unions past the canonicalization ceiling",
     "lazygit.json": "external $ref",
     "lsdlschema.json": "external $ref",
     "markdownlint.json": "external $ref",
+    "metaschema-draft-07-unofficial-strict.json": "conjunction over unions past the canonicalization ceiling",
     "minecraft-advancement.json": "external $ref",
     "minecraft-item-modifier.json": "timeout (>20s)",
     "minecraft-pack-mcmeta.json": "external $ref",
@@ -116,6 +119,7 @@ XFAIL_SCHEMAS: dict[str, str] = {
     "partial-tox.json": "external $ref",
     "pep-723.json": "external $ref",
     "poetry.json": "external $ref",
+    "popxf-1.0.json": "conjunction over unions past the canonicalization ceiling",
     "pre-commit-config.json": "external $ref",
     "prisma.json": "external $ref",
     "problem_package_generators.json": "external $ref",
@@ -153,6 +157,7 @@ XFAIL_SCHEMAS: dict[str, str] = {
     "tox.json": "external $ref",
     "tsoa.json": "external $ref",
     "utcm-monitor.json": "malformed `description: null` in source schema",
+    "vector.json": "`unevaluatedProperties` beside a disjunction",
     "vega.json": "external $ref",
     "vs-2017.3.host.json": "external $ref",
     "web-manifest-app-info.json": "external $ref",
@@ -160,6 +165,7 @@ XFAIL_SCHEMAS: dict[str, str] = {
     "xunit-2.2.json": "external $ref",
     "xunit-2.3.json": "external $ref",
     "xunit.runner.schema.json": "external $ref",
+    "yamllint.json": "`unevaluatedProperties` beside a disjunction",
 }
 
 

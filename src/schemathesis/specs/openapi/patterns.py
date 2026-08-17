@@ -504,6 +504,33 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
     return "".join(out)
 
 
+def _python_named_groups(pattern: str) -> str:
+    """`(?<name>...)` as Python spells it, leaving lookbehind and literal text alone."""
+    out: list[str] = []
+    in_class = False
+    i = 0
+    n = len(pattern)
+    while i < n:
+        ch = pattern[i]
+        if ch == "\\" and i + 1 < n:
+            out.append(pattern[i : i + 2])
+            i += 2
+            continue
+        if in_class:
+            if ch == "]":
+                in_class = False
+        elif ch == "[":
+            in_class = True
+        # `(?<=` and `(?<!` open a lookbehind, which Python reads as it is.
+        elif pattern.startswith("(?<", i) and pattern[i + 3 : i + 4] not in ("=", "!"):
+            out.append("(?P<")
+            i += 3
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 @lru_cache(maxsize=256)
 def normalize_regex(pattern: object) -> str | None:
     r"""Translate PCRE-style Unicode property escapes and Python-specific anchors.
@@ -512,12 +539,15 @@ def normalize_regex(pattern: object) -> str | None:
     - PCRE Unicode property escapes (\p{L}, \pL, etc.) -> Python equivalents
     - POSIX character classes ([:alnum:], [:digit:], etc.) -> Python equivalents
     - Python anchors (\A, \Z) -> Rust-compatible equivalents (^, $)
+    - Named groups ((?<name>...)) -> Python equivalents
 
     Returns the translated pattern if successful, None if translation failed
     or the result is not a valid Python regex.
     """
     if not isinstance(pattern, str):
         return None
+    named_groups = _python_named_groups(pattern)
+    has_named_group = named_groups != pattern
     # Check for both braced (\p{L}) and shorthand (\pL) forms
     has_braced = r"\p{" in pattern or r"\P{" in pattern
     has_shorthand = any(
@@ -532,10 +562,12 @@ def normalize_regex(pattern: object) -> str | None:
     # Check for Python-specific anchors that need Rust translation
     has_python_anchors = pattern.startswith(r"\A") or pattern.endswith(r"\Z")
 
-    if not any((has_braced, has_shorthand, has_posix, has_python_anchors, has_class_algebra, has_brace_hex)):
+    if not any(
+        (has_braced, has_shorthand, has_posix, has_python_anchors, has_class_algebra, has_brace_hex, has_named_group)
+    ):
         return None  # No translation needed
 
-    translated = _inline_unicode_in_classes(pattern)
+    translated = _inline_unicode_in_classes(named_groups)
     if translated is None:
         return None
     for pcre_escape, python_equiv in _UNICODE_PROPERTY_MAP:

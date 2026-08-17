@@ -12,6 +12,7 @@
 - Values violating a `pattern` with possessive quantifiers like `0++0` when a length bound is set.
 - Internal error generating values for a `pattern` naming characters outside `generation.codec`.
 - Generate values for patterns using Unicode property escapes like `\p{L}`.
+- Generate values for patterns using named capture groups like `(?<name>...)`.
 - Generate values for the other `anyOf` branches when one names an ungeneratable `pattern`.
 - Keep a `pattern` the API enforces when Python cannot read it.
 - Honor `format` when generating string values for Open API 3.1.

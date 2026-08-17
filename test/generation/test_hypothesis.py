@@ -3038,6 +3038,19 @@ def test_canonical_unknown_script_property_is_named():
         _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
 
+def test_canonical_named_group_pattern():
+    schema = {"type": "string", "pattern": r"^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)$"}
+    built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+    is_valid = jsonschema_rs.Draft202012Validator(schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid
+
+    @given(built)
+    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(value):
+        assert is_valid(value), value
+
+    test()
+
+
 # Draft 7 asserts content facets, and only there does the canonical view carry them; Draft 2020-12
 # treats them as annotations and drops them before generation.
 CONTENT_STRING_CASES = [
