@@ -616,6 +616,18 @@ def test_pin_pattern_length_leaves_possessive_repeats_alone():
         (r"[\p{L}&&[a]", None),
         (r"[\p{L}&&[:alpha]", None),
         (r"[\p{L}[a]", None),
+        # A named group spells differently in Python.
+        (r"^(?<major>\d+)\.(?<minor>\d+)$", r"^(?P<major>\d+)\.(?P<minor>\d+)$"),
+        (r"(?<word>\w+)-(?<rest>.*)", r"(?P<word>\w+)-(?P<rest>.*)"),
+        # Lookbehind opens the same way but names no group.
+        (r"(?<=a)b", None),
+        (r"(?<!a)b", None),
+        # An escaped paren, and a class, leave the sequence as literal characters.
+        (r"\(?<a>", None),
+        (r"[(?<a>]", None),
+        # A name Python cannot carry, and a name reused across alternatives, which it rejects.
+        (r"(?<1st>a)", None),
+        (r"(?<x>a)|(?<x>b)", None),
         # No translation needed (already valid Python regex)
         (r"[a-z]+", None),
         (r"^\d+$", None),
