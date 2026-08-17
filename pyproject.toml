@@ -105,7 +105,7 @@ addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
 truncation_limit_lines = 0
 truncation_limit_chars = 0
-testpaths = "tests"
+testpaths = "test"
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
 filterwarnings = [
     "error::pytest.PytestUnraisableExceptionWarning",

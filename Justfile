@@ -11,15 +11,15 @@ alias tch := test-cov-html
 
 # Run all tests
 test *ARGS:
-    python -m pytest test/ --ignore=test/tooling --snapshot-warn-unused {{ARGS}}
+    python -m pytest --ignore=test/tooling --snapshot-warn-unused {{ARGS}}
 
 test-dist *ARGS:
-    python -m pytest test/ --ignore=test/tooling --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}}
+    python -m pytest --ignore=test/tooling --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}}
 
 # Run tests with coverage
 test-cov *ARGS:
     @rm -f .coverage*
-    COVERAGE_PROCESS_START="$(pwd)/pyproject.toml" COVERAGE_FILE="$(pwd)/.coverage" uv run python -m coverage run -m pytest test/ --ignore=test/tooling --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}} || true
+    COVERAGE_PROCESS_START="$(pwd)/pyproject.toml" COVERAGE_FILE="$(pwd)/.coverage" uv run python -m coverage run -m pytest --ignore=test/tooling --snapshot-warn-unused -n auto --dist=worksteal {{ARGS}} || true
     uv run python -m coverage combine
     uv run python -m coverage report
 
@@ -31,11 +31,11 @@ test-cov-html *ARGS:
 
 # Run tests matching pattern
 test-k PATTERN *ARGS:
-    python -m pytest test/ --ignore=test/tooling -k "{{PATTERN}}" {{ARGS}}
+    python -m pytest --ignore=test/tooling -k "{{PATTERN}}" {{ARGS}}
 
 # Update test snapshots
 snapshot-update *ARGS:
-    python -m pytest test/ --ignore=test/tooling --snapshot-update -n auto --dist=worksteal {{ARGS}}
+    python -m pytest --ignore=test/tooling --snapshot-update -n auto --dist=worksteal {{ARGS}}
 
 # Run corpus tests
 test-corpus:
