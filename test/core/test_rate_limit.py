@@ -27,6 +27,7 @@ def test_maximum_requests(ctx, loader, make_url, kind):
     schema = loader(make_url(ctx))
     schema.config.update(rate_limit="5/h")
     counter = 0
+    limit_reached = threading.Event()
 
     def run():
         nonlocal counter
@@ -39,10 +40,12 @@ def test_maximum_requests(ctx, loader, make_url, kind):
                     case = operation.Case()
                 case.call()
                 counter += 1
+                if counter == 5:
+                    limit_reached.set()
 
-    thread = threading.Thread(target=run)
-    thread.start()
-    thread.join(timeout=15)
+    # The 6th call blocks until the hourly window resets, so the thread is abandoned mid-call
+    threading.Thread(target=run, daemon=True).start()
+    assert limit_reached.wait(15)
     assert counter == 5
 
 
