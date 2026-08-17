@@ -9903,3 +9903,44 @@ def test_unique_items_array_is_not_filled_by_repetition(pctx):
 
     for value in cover_schema_iter(pctx, schema, HashSet()):
         assert len(set(value.value)) == len(value.value), value.value[:3]
+
+
+def test_ref_parameter_schema_keeps_combination_coverage(ctx):
+    # Parameter combinations are generated from a synthesized schema, where a `$ref` still has to resolve.
+    enum = {"type": "string", "enum": ["a", "b"]}
+
+    def descriptions(first, second):
+        raw = ctx.openapi.build_schema(
+            {
+                "/r": {
+                    "get": {
+                        "parameters": [
+                            {"name": "q", "in": "query", "required": True, "schema": first},
+                            {"name": "r", "in": "query", "required": False, "schema": second},
+                        ],
+                        "responses": {"default": {"description": "OK"}},
+                    }
+                }
+            },
+            components={"schemas": {"E": enum}},
+        )
+        operation = schemathesis.openapi.from_dict(raw)["/r"]["GET"]
+        return sorted(
+            case.meta.phase.data.description
+            for case in iter_coverage_cases(
+                operation=operation,
+                generation_modes=list(GenerationMode),
+                generate_duplicate_query_parameters=False,
+                unexpected_methods=set(),
+                generation_config=operation.schema.config.generation,
+            )
+        )
+
+    reference = {"$ref": "#/components/schemas/E"}
+    assert descriptions(
+        {"type": "object", "properties": {"t": reference}, "required": ["t"], "additionalProperties": False},
+        reference,
+    ) == descriptions(
+        {"type": "object", "properties": {"t": enum}, "required": ["t"], "additionalProperties": False},
+        enum,
+    )
