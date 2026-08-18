@@ -56,6 +56,7 @@
 - Dropping the remaining wrong-type cases for a parameter once one type had no violation to send.
 - Generation hanging on a `maxLength` violation for a pattern whose repeated group spans two lengths.
 - Missing negative cases for parameter combinations when a parameter's schema uses `$ref`. [#4499](https://github.com/schemathesis/schemathesis/issues/4499)
+- False positive `unsupported_method` when a templated path returns 404 instead of 405. [#4503](https://github.com/schemathesis/schemathesis/issues/4503)
 
 #### Others
 
