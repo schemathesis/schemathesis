@@ -12,7 +12,7 @@ from contextlib import ExitStack, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache, partial
-from itertools import combinations, count
+from itertools import combinations, count, islice
 from math import inf, nextafter
 
 from schemathesis.core.jsonschema import (
@@ -1965,8 +1965,16 @@ def cover_schema_iter(
                         if "items" in schema and isinstance(schema["items"], dict):
                             # The schema may have another large array nested, therefore generate covering cases
                             # and use them to build an array for the current schema
-                            negative = [case.value for case in cover_schema_iter(ctx, schema["items"])]
-                            positive = [case.value for case in cover_schema_iter(ctx.with_positive(), schema["items"])]
+                            negative = [
+                                case.value
+                                for case in islice(cover_schema_iter(ctx, schema["items"]), NEGATIVE_MODE_MAX_ITEMS)
+                            ]
+                            positive = [
+                                case.value
+                                for case in islice(
+                                    cover_schema_iter(ctx.with_positive(), schema["items"]), NEGATIVE_MODE_MAX_ITEMS
+                                )
+                            ]
                             # Interleave positive & negative values. Empty if either list is empty —
                             # fall back to direct generation below so the yielded array is non-empty.
                             array_value = [value for pair in zip(positive, negative, strict=False) for value in pair][
