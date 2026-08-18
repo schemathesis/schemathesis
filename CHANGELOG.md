@@ -79,6 +79,7 @@
 - Coverage phase up to 13x faster on `pattern` strings with `maxLength` above 8192.
 - Coverage phase skips repeating a value generation attempt that already came up empty.
 - Coverage phase up to 1000x faster on large arrays whose items carry a `pattern`.
+- Coverage phase up to 9x lower peak memory and 4x faster on arrays with `maxItems` above 15.
 - Link injection up to 8x faster on schemas where inference finds many links per response.
 - Coverage phase up to 2x faster on schemas with many shared component definitions.
 - Response conformance failures up to 15x faster to report on schemas with many definitions.
