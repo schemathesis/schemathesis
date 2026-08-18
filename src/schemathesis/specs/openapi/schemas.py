@@ -64,12 +64,10 @@ if TYPE_CHECKING:
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
-    from schemathesis.core.spec import ApiSchema
-    from schemathesis.engine.context import EngineContext
+    from schemathesis.core.spec import ApiSchema, Scheduler
+    from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
-    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-    from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful import APIStateMachine
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.specs.openapi.adapter import OpenApiResponses
@@ -302,7 +300,7 @@ class OpenApiSchema(BaseSchema):
         self,
         operations: list[Result[APIOperation, InvalidSchema]],
         phase: Phase,
-    ) -> DefaultScheduler | LayeredScheduler:
+    ) -> Scheduler:
         from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
         from schemathesis.engine.run.unit._pool import DefaultScheduler, split_results
         from schemathesis.specs.openapi._ordering import compute_operation_layers
@@ -332,10 +330,10 @@ class OpenApiSchema(BaseSchema):
         return LayeredScheduler(layers, errors=errors)
 
     @override
-    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference:
+    def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
         injected = 0
-        if ctx.observations is not None and ctx.observations.location_headers:
-            for operation, entries in ctx.observations.location_headers.items():
+        if observations is not None and observations.location_headers:
+            for operation, entries in observations.location_headers.items():
                 injected += self.analysis.inferencer.inject_links(operation.responses, entries)
         if self.analysis.should_inject_links():
             injected += self.analysis.inject_links()

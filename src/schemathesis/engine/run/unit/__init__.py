@@ -27,12 +27,12 @@ from schemathesis.core.errors import (
     is_regex_validation_error,
 )
 from schemathesis.core.result import Ok, Result
+from schemathesis.core.spec import Scheduler
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.unit._direct_executor import run_driver
-from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
+from schemathesis.engine.run.unit._pool import WorkerPool
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import overrides
 from schemathesis.generation.drivers import CoverageGenerator, ExamplesGenerator
@@ -74,7 +74,7 @@ def _build_examples_generator(
     )
 
 
-def _create_scheduler(engine: EngineContext, phase: Phase) -> DefaultScheduler | LayeredScheduler:
+def _create_scheduler(engine: EngineContext, phase: Phase) -> Scheduler:
     """Create the appropriate scheduler via the schema's specification-aware override."""
     operations: list[Result[APIOperation, InvalidSchema]] = list(engine.schema.get_all_operations())
     return engine.schema.get_unit_scheduler(operations, phase)
@@ -174,7 +174,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 def worker_task(
     *,
     events_queue: Queue,
-    scheduler: DefaultScheduler | LayeredScheduler,
+    scheduler: Scheduler,
     ctx: EngineContext,
     mode: HypothesisTestMode,
     phase: PhaseName,

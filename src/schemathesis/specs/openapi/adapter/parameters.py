@@ -37,7 +37,7 @@ from schemathesis.generation.value import GeneratedValue
 from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool, ConstantType, ConstantValue, Origin
 from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
-from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
+from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
@@ -862,7 +862,7 @@ class OpenApiComponent(ABC):
     definition: JsonSchemaObject
     is_required: bool
     name_to_uri: dict[str, str]
-    adapter: SpecificationAdapter
+    adapter: ParameterAdapter
 
     @property
     @abstractmethod
@@ -1072,7 +1072,7 @@ class OpenApiParameter(OpenApiComponent):
 
     @classmethod
     def from_definition(
-        cls, *, definition: JsonSchemaObject, name_to_uri: dict[str, str], adapter: SpecificationAdapter
+        cls, *, definition: JsonSchemaObject, name_to_uri: dict[str, str], adapter: ParameterAdapter
     ) -> OpenApiParameter:
         is_required = definition.get("required", False)
         return cls(definition=definition, is_required=is_required, name_to_uri=name_to_uri, adapter=adapter)
@@ -1163,7 +1163,7 @@ class OpenApiBody(OpenApiComponent):
         media_type: str,
         resource_name: str | None,
         name_to_uri: dict[str, str],
-        adapter: SpecificationAdapter,
+        adapter: ParameterAdapter,
     ) -> OpenApiBody:
         return cls(
             definition=definition,
@@ -1181,7 +1181,7 @@ class OpenApiBody(OpenApiComponent):
         definition: JsonSchemaObject,
         media_type: str,
         name_to_uri: dict[str, str],
-        adapter: SpecificationAdapter,
+        adapter: ParameterAdapter,
     ) -> OpenApiBody:
         return cls(
             definition=definition,
@@ -1639,7 +1639,7 @@ def iter_parameters_v2(
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
     resolver: Resolver,
-    adapter: SpecificationAdapter,
+    adapter: ParameterAdapter,
     bundler: Bundler,
     bundle_cache: BundleCache,
 ) -> Iterator[OperationParameter]:
@@ -1711,7 +1711,7 @@ def iter_parameters_v3(
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
     resolver: Resolver,
-    adapter: SpecificationAdapter,
+    adapter: ParameterAdapter,
     bundler: Bundler,
     bundle_cache: BundleCache,
 ) -> Iterator[OperationParameter]:
@@ -1852,7 +1852,7 @@ class OpenApiParameterSet(ParameterSet):
         location: ParameterLocation,
         items: list[OpenApiParameter] | None = None,
         *,
-        adapter: SpecificationAdapter,
+        adapter: ParameterAdapter,
     ) -> None:
         self.location = location
         self.adapter = adapter

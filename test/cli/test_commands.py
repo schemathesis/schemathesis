@@ -711,7 +711,7 @@ def test_keyboard_interrupt(ctx, cli, mocker, swagger_20, workers, snapshot_cli)
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
-    from schemathesis.engine.run.unit import DefaultScheduler
+    from schemathesis.engine.run.unit._pool import DefaultScheduler
 
     api = ctx.openapi.apps.success_and_failure()
     original = DefaultScheduler.next_operation
@@ -724,7 +724,7 @@ def test_keyboard_interrupt_threaded(ctx, cli, mocker, snapshot_cli):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.engine.run.unit.DefaultScheduler.next_operation", wraps=mocked)
+    mocker.patch("schemathesis.engine.run.unit._pool.DefaultScheduler.next_operation", wraps=mocked)
     assert cli.run(api.schema_url, "--workers=2", "--generation-deterministic") == snapshot_cli
 
 

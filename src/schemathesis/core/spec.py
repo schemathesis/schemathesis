@@ -20,11 +20,9 @@ if TYPE_CHECKING:
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.statistic import ApiStatistic, StatefulInference
     from schemathesis.core.transport import HttpMethod, Response
-    from schemathesis.engine.context import EngineContext
     from schemathesis.engine.link_calibration import LinkCalibrationState
+    from schemathesis.engine.observations import Observations
     from schemathesis.engine.run import Phase
-    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-    from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation import GenerationMode
     from schemathesis.generation.case import Case
     from schemathesis.generation.meta import CaseMetadata
@@ -73,6 +71,14 @@ class SchemaWarnings(Protocol):
     def iter_schema_warnings(self) -> list[SchemaWarning]: ...  # pragma: no cover
 
 
+class Scheduler(Protocol):
+    """Decides which operation a unit-phase worker picks up next."""
+
+    def next_operation(self) -> Result[APIOperation, InvalidSchema] | None: ...  # pragma: no cover
+
+    def release(self) -> None: ...  # pragma: no cover
+
+
 class OperationsProvider(Protocol):
     """Operation enumeration, lookup, statistics, and unit-phase scheduling."""
 
@@ -91,7 +97,7 @@ class OperationsProvider(Protocol):
         self,
         operations: list[Result[APIOperation, InvalidSchema]],
         phase: Phase,
-    ) -> DefaultScheduler | LayeredScheduler: ...  # pragma: no cover
+    ) -> Scheduler: ...  # pragma: no cover
 
 
 class CaseFactory(Protocol):
@@ -165,7 +171,7 @@ class StatefulBackend(Protocol):
         constants_value_source: ConstantsPool | None = ...,
     ) -> type[APIStateMachine]: ...  # pragma: no cover
 
-    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference: ...  # pragma: no cover
+    def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference: ...  # pragma: no cover
 
     def iter_link_candidates(
         self,

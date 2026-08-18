@@ -12,8 +12,6 @@ from schemathesis.core.jsonschema import schema_with_bundle
 if TYPE_CHECKING:
     from collections.abc import Generator
 
-    from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
-
 
 class ContentSchemaViolation(Exception):
     """Raised when a contentSchema validation fails.
@@ -37,10 +35,10 @@ class SseValidator:
     the keyword instances read it via the back-reference to this object.
     """
 
-    def __init__(self, schema: dict[str, Any] | bool, adapter: SpecificationAdapter) -> None:
+    def __init__(self, schema: dict[str, Any] | bool, validator_cls: type[jsonschema_rs.Validator]) -> None:
         self._deserialize_payload: Callable[[str, str], Any] | None = None
-        keywords = _make_keywords(adapter.jsonschema_validator_cls, schema, self)
-        self._validator = adapter.jsonschema_validator_cls(schema, validate_formats=True, keywords=keywords)
+        keywords = _make_keywords(validator_cls, schema, self)
+        self._validator = validator_cls(schema, validate_formats=True, keywords=keywords)
 
     @contextmanager
     def with_deserializer(self, fn: Callable[[str, str], Any]) -> Generator[None, None, None]:

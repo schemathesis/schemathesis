@@ -19,16 +19,16 @@ from schemathesis.engine.run.unit._errors import (
     translate_iteration_exception,
 )
 from schemathesis.generation import overrides
-from schemathesis.generation.drivers import CoverageGenerator, ExamplesGenerator
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
+    from schemathesis.generation.drivers import CaseGenerator
 
 
 def run_driver(
     *,
-    generator: CoverageGenerator | ExamplesGenerator,
+    generator: CaseGenerator,
     ctx: EngineContext,
     phase: PhaseName,
     suite_id: uuid.UUID,
