@@ -1137,6 +1137,63 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
     def display_errors_summary(self) -> None:
         display_errors_summary(self.errors)
 
+    def display_warnings_summary(self) -> None:
+        click.echo(_style("Warnings:", bold=True))
+        missing_deserializer = {
+            label for operations in self.warnings.missing_deserializer.values() for label in operations
+        }
+        entries = (
+            (
+                sum(len(operations) for operations in self.warnings.missing_auth.values()),
+                "Missing authentication",
+                "operation",
+                "returned only 401/403 responses",
+            ),
+            (
+                len(self.warnings.missing_test_data),
+                "Missing valid test data",
+                "operation",
+                "repeatedly returned 404 responses",
+            ),
+            (
+                len(self.warnings.validation_mismatch),
+                "Schema validation mismatch",
+                "operation",
+                "mostly rejected generated data",
+            ),
+            (len(missing_deserializer), "Schema validation skipped", "operation", "cannot validate responses"),
+            (
+                len(self.warnings.unused_openapi_auth),
+                "Unused OpenAPI auth",
+                "configured auth scheme",
+                "not used in the schema",
+            ),
+            (
+                len(self.warnings.unsupported_regex),
+                "Unsupported regex",
+                "operation",
+                "had ungeneratable regex patterns",
+            ),
+            (
+                len(self.warnings.method_not_allowed),
+                "Method Not Allowed",
+                "operation",
+                "skipped after consistent 405 responses",
+            ),
+            (
+                len(self.warnings.constants_extraction),
+                "Constant reuse skipped",
+                "registered source",
+                "could not be scanned",
+            ),
+        )
+        for count, title, entity_name, suffix_text in entries:
+            if not count:
+                continue
+            plural = "" if count == 1 else "s"
+            click.echo(_style(f"  ⚠️ {title}: {bold(str(count))} {entity_name}{plural} {suffix_text}", fg="yellow"))
+        click.echo()
+
     def display_final_line(self, ctx: BaseExecutionContext, event: events.EngineFinished) -> None:
         unique_failures = sum(
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
@@ -1210,91 +1267,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             self.display_errors_summary()
 
         if not self.warnings.is_empty:
-            click.echo(_style("Warnings:", bold=True))
-
-            if self.warnings.missing_auth:
-                affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
-                suffix = "" if affected == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Missing authentication: {bold(str(affected))} operation{suffix} returned only 401/403 responses",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.missing_test_data:
-                count = len(self.warnings.missing_test_data)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Missing valid test data: {bold(str(count))} operation{suffix} repeatedly returned 404 responses",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.validation_mismatch:
-                count = len(self.warnings.validation_mismatch)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Schema validation mismatch: {bold(str(count))} operation{suffix} mostly rejected generated data",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.missing_deserializer:
-                count = len(
-                    {label for operations in self.warnings.missing_deserializer.values() for label in operations}
-                )
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Schema validation skipped: {bold(str(count))} operation{suffix} cannot validate responses",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.unused_openapi_auth:
-                count = len(self.warnings.unused_openapi_auth)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Unused OpenAPI auth: {bold(str(count))} configured auth scheme{suffix} not used in the schema",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.unsupported_regex:
-                count = len(self.warnings.unsupported_regex)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Unsupported regex: {bold(str(count))} operation{suffix} had ungeneratable regex patterns",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.method_not_allowed:
-                count = len(self.warnings.method_not_allowed)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Method Not Allowed: {bold(str(count))} operation{suffix} skipped after consistent 405 responses",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.constants_extraction:
-                count = len(self.warnings.constants_extraction)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Constant reuse skipped: {bold(str(count))} registered source{suffix} could not be scanned",
-                        fg="yellow",
-                    )
-                )
-
-            click.echo()
+            self.display_warnings_summary()
 
         if event.payload is not None:
             if event.payload.reauth_count > 0:

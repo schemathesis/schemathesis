@@ -8,8 +8,11 @@ from typing import TYPE_CHECKING, Protocol
 import hypothesis.errors
 from jsonschema_rs import ValidationError
 
+from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.errors import (
+    AuthenticationError,
     InfiniteRecursiveReference,
+    InternalError,
     InvalidHeadersExample,
     InvalidRegexPattern,
     InvalidRegexType,
@@ -20,8 +23,9 @@ from schemathesis.core.errors import (
     UnresolvableReference,
     is_regex_validation_error,
 )
+from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.engine import Status, events
-from schemathesis.engine.errors import TestingState, clear_hypothesis_notes
+from schemathesis.engine.errors import DeadlineExceeded, TestingState, UnexpectedError, clear_hypothesis_notes
 from schemathesis.generation.hypothesis.builder import (
     InfiniteRecursiveReferenceMark,
     InvalidHeadersExampleMark,
@@ -31,7 +35,11 @@ from schemathesis.generation.hypothesis.builder import (
     UnresolvableReferenceMark,
     UnsatisfiableExampleMark,
 )
-from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error
+from schemathesis.generation.hypothesis.reporting import (
+    build_health_check_error,
+    build_unsatisfiable_error,
+    is_empty_strategy_error,
+)
 
 if TYPE_CHECKING:
     from schemathesis.generation.drivers import Controller
@@ -152,3 +160,135 @@ def translate_iteration_exception(
         )
     code_sample = state.get_code_sample_for(exc)
     return non_fatal_error(exc, code_sample=code_sample)
+
+
+def classify_test_exception(
+    exc: Exception | BaseExceptionGroup,
+    *,
+    operation: APIOperation,
+    state: TestingState,
+    errors: list[Exception],
+    non_fatal_error: NonFatalErrorFactory,
+) -> tuple[Status, list[events.NonFatalError]]:
+    """Map an exception raised by a Hypothesis-driven test into a scenario status and events to report."""
+    if isinstance(exc, FailureGroup | Failure):
+        return Status.FAILURE, []
+    if isinstance(exc, UnexpectedError):
+        # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
+        return Status.ERROR, []
+    if isinstance(exc, hypothesis.errors.Flaky):
+        return _classify_flaky(exc, state=state, errors=errors, non_fatal_error=non_fatal_error)
+    if isinstance(exc, BaseExceptionGroup):
+        return Status.ERROR, list(_iter_group_errors(exc, state=state, non_fatal_error=non_fatal_error))
+    if isinstance(exc, hypothesis.errors.FailedHealthCheck):
+        return Status.ERROR, [non_fatal_error(build_health_check_error(operation, exc, with_tip=False))]
+    if isinstance(exc, hypothesis.errors.Unsatisfiable):
+        # We need more clear error message here
+        return Status.ERROR, [
+            non_fatal_error(
+                build_unsatisfiable_error(operation, with_tip=False, filter_tracker=operation.filter_case_tracker)
+            )
+        ]
+    if isinstance(exc, AuthenticationError):
+        return Status.ERROR, [non_fatal_error(exc)]
+    if isinstance(exc, AssertionError):
+        # Comes from `hypothesis`
+        return Status.ERROR, [_from_assertion_error(exc, operation=operation, non_fatal_error=non_fatal_error)]
+    if isinstance(exc, hypothesis.errors.InvalidArgument):
+        if is_empty_strategy_error(exc):
+            return Status.ERROR, [non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))]
+        health_check = build_health_check_error(operation, exc, with_tip=False)
+        if isinstance(health_check, hypothesis.errors.FailedHealthCheck):
+            return Status.ERROR, [non_fatal_error(health_check)]
+        return Status.ERROR, [non_fatal_error(exc)]
+    if isinstance(exc, hypothesis.errors.DeadlineExceeded):
+        return Status.ERROR, [non_fatal_error(DeadlineExceeded.from_exc(exc))]
+    if isinstance(exc, ValidationError):
+        if is_regex_validation_error(exc):
+            return Status.ERROR, [non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(exc))]
+        return Status.ERROR, [non_fatal_error(exc, code_sample=state.get_code_sample_for(exc))]
+    clear_hypothesis_notes(exc)
+    # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
+    if str(exc) == "first argument must be string or compiled pattern":
+        return Status.ERROR, [
+            non_fatal_error(
+                InvalidRegexType(
+                    "Invalid `pattern` value: expected a string. "
+                    "If your schema is in YAML, ensure `pattern` values are quoted",
+                )
+            )
+        ]
+    return Status.ERROR, [
+        non_fatal_error(prefer_spec_error(exc, operation), code_sample=state.get_code_sample_for(exc))
+    ]
+
+
+def _classify_flaky(
+    exc: hypothesis.errors.Flaky,
+    *,
+    state: TestingState,
+    errors: list[Exception],
+    non_fatal_error: NonFatalErrorFactory,
+) -> tuple[Status, list[events.NonFatalError]]:
+    if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
+        return Status.ERROR, [non_fatal_error(DeadlineExceeded.from_exc(exc.__cause__))]
+    if isinstance(exc, hypothesis.errors.FlakyFailure):
+        deadlines = [sub for sub in exc.exceptions if isinstance(sub, hypothesis.errors.DeadlineExceeded)]
+        if deadlines:
+            return Status.ERROR, [non_fatal_error(DeadlineExceeded.from_exc(sub)) for sub in deadlines]
+    if errors:
+        return Status.ERROR, []
+    # Unrecoverable network errors (e.g. timeouts) are not appended to `errors`
+    # and are re-raised so Hypothesis sees the original exception; surface them
+    # here so a replay-induced `Flaky` is not misclassified as a check failure.
+    unrecoverable = state.unrecoverable_network_error
+    if unrecoverable is not None:
+        return Status.ERROR, [non_fatal_error(unrecoverable.error, code_sample=unrecoverable.code_sample)]
+    # Hypothesis could not reproduce the result on replay. Real check failures are recorded when they happen,
+    # so an unreproducible result with no observed failure is generation noise, not a failure.
+    return Status.SUCCESS, []
+
+
+def _iter_group_errors(
+    exc: BaseExceptionGroup,
+    *,
+    state: TestingState,
+    non_fatal_error: NonFatalErrorFactory,
+) -> Iterator[events.NonFatalError]:
+    for sub_exc in exc.exceptions:
+        if is_regex_validation_error(sub_exc):
+            yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(sub_exc))
+        elif isinstance(sub_exc, InvalidSchema):
+            yield non_fatal_error(sub_exc)
+        else:
+            code_sample = state.get_code_sample_for(sub_exc)
+            if code_sample is not None:
+                clear_hypothesis_notes(sub_exc)
+                yield non_fatal_error(sub_exc, code_sample=code_sample)
+
+
+def _from_assertion_error(
+    exc: AssertionError, *, operation: APIOperation, non_fatal_error: NonFatalErrorFactory
+) -> events.NonFatalError:
+    try:
+        operation.schema.validate()
+        message = "Unexpected error during testing of this API operation"
+        text = str(exc)
+        if text:
+            message += f": {text}"
+        try:
+            raise InternalError(message) from exc
+        except InternalError as internal:
+            return non_fatal_error(internal)
+    except ValidationError as error:
+        return non_fatal_error(
+            InvalidSchema.from_jsonschema_error(
+                error,
+                path=operation.path,
+                method=operation.method,
+                config=operation.schema.config.output,
+                location=SchemaLocation.maybe_from_error_path(
+                    error.instance_path, operation.schema.specification.version
+                ),
+            )
+        )
