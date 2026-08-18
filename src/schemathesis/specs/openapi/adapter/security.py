@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthProvider
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
-    from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
+    from schemathesis.specs.openapi.adapter.protocol import SecurityAdapter
 
 ORIGINAL_SECURITY_TYPE_KEY = "x-original-security-type"
 
@@ -55,14 +55,14 @@ class OpenApiSecurity:
     """OpenAPI security scheme definitions and authentication logic."""
 
     raw_schema: Mapping[str, Any]
-    adapter: SpecificationAdapter
+    adapter: SecurityAdapter
     resolver: Resolver
     _auth_provider_cache: dict[str, AuthProvider]
     _resolved_definitions: Mapping[str, Mapping[str, Any]] | None
 
     __slots__ = ("raw_schema", "adapter", "resolver", "_auth_provider_cache", "_resolved_definitions")
 
-    def __init__(self, raw_schema: Mapping[str, Any], adapter: SpecificationAdapter, resolver: Resolver) -> None:
+    def __init__(self, raw_schema: Mapping[str, Any], adapter: SecurityAdapter, resolver: Resolver) -> None:
         self.raw_schema = raw_schema
         self.adapter = adapter
         self.resolver = resolver
@@ -180,7 +180,7 @@ class OpenApiSecurityParameters:
         schema: Mapping[str, Any],
         operation: Mapping[str, Any],
         resolver: Resolver,
-        adapter: SpecificationAdapter,
+        adapter: SecurityAdapter,
     ) -> OpenApiSecurityParameters:
         return cls(list(adapter.extract_security_parameters(schema, operation, resolver)))
 

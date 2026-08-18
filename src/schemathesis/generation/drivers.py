@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from hypothesis.errors import Unsatisfiable
 from jsonschema_rs import ValidationError
@@ -49,6 +49,18 @@ class Controller:
     """
 
     deferred_errors: list[Exception] = field(default_factory=list)
+
+
+class CaseGenerator(Protocol):
+    """Progressive source of test cases for a single API operation."""
+
+    @property
+    def operation(self) -> APIOperation: ...  # pragma: no cover
+
+    @property
+    def controller(self) -> Controller: ...  # pragma: no cover
+
+    def __iter__(self) -> Iterator[Case]: ...  # pragma: no cover
 
 
 def _apply_filter_and_map_hooks(

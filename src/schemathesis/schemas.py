@@ -62,12 +62,11 @@ if TYPE_CHECKING:
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
-    from schemathesis.engine.context import EngineContext
+    from schemathesis.core.spec import Scheduler
     from schemathesis.engine.link_calibration import LinkCalibrationState
+    from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
-    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-    from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource
@@ -529,13 +528,13 @@ class BaseSchema(Mapping):
         self,
         operations: list[Result[APIOperation, InvalidSchema]],
         phase: Phase,
-    ) -> DefaultScheduler | LayeredScheduler:
+    ) -> Scheduler:
         """Return the scheduler that decides operation execution order in the unit phase."""
         from schemathesis.engine.run.unit._pool import DefaultScheduler
 
         return DefaultScheduler(operations=operations)
 
-    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference:
+    def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
         """Discover spec-specific stateful transitions; return the counts available."""
         return StatefulInference(inferred=0, total=0, selected=0)
 

@@ -61,13 +61,11 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
-    from schemathesis.core.spec import ApiSchema
+    from schemathesis.core.spec import ApiSchema, Scheduler
     from schemathesis.core.transport import HttpMethod, Response
-    from schemathesis.engine.context import EngineContext
     from schemathesis.engine.link_calibration import LinkCalibrationState
+    from schemathesis.engine.observations import Observations
     from schemathesis.engine.run import Phase
-    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-    from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool
     from schemathesis.resources import ExtraDataSource
@@ -192,7 +190,7 @@ class GraphQLSchema(BaseSchema):
         return self.as_state_machine()
 
     @override
-    def apply_stateful_inference(self, ctx: EngineContext) -> StatefulInference:
+    def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
         # All GraphQL transitions are derived from schema structure (no `links` keyword equivalent),
         # so inference accounts for the entire population.
         count = self.analysis.transition_count
@@ -232,7 +230,7 @@ class GraphQLSchema(BaseSchema):
         self,
         operations: list[Result[APIOperation, InvalidSchema]],
         phase: Phase,
-    ) -> DefaultScheduler | LayeredScheduler:
+    ) -> Scheduler:
         from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
         from schemathesis.engine.run.unit._pool import DefaultScheduler, split_results
         from schemathesis.specs.graphql.ordering import compute_graphql_layers

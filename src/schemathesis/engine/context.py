@@ -138,7 +138,7 @@ class EngineContext:
 
     def apply_stateful_inference(self) -> StatefulInference:
         """Discover spec-specific stateful transitions; return the counts available."""
-        return self.schema.apply_stateful_inference(self)
+        return self.schema.apply_stateful_inference(self.observations)
 
     def extract_constants(self) -> ConstantsPool:
         """Force one-time constant extraction so later strategy builds hit a ready pool."""

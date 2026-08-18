@@ -15,8 +15,8 @@ from schemathesis.schemas import APIOperation
 if TYPE_CHECKING:
     from typing_extensions import Self
 
+    from schemathesis.core.spec import Scheduler
     from schemathesis.engine.context import EngineContext
-    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.generation.hypothesis.builder import HypothesisTestMode
 
 
@@ -56,7 +56,7 @@ class WorkerPool:
     def __init__(
         self,
         workers_num: int,
-        scheduler: DefaultScheduler | LayeredScheduler,
+        scheduler: Scheduler,
         worker_factory: Callable,
         ctx: EngineContext,
         mode: HypothesisTestMode,
