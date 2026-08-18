@@ -175,7 +175,7 @@ def test_crash_file_written_for_failures_in_errored_scenario(cli, ctx, tmp_path)
     checks = {
         check["name"] for f in crash_files for step in json.loads(f.read_text())["sequence"] for check in step["checks"]
     }
-    assert checks == {"status_code_conformance", "unsupported_method"}
+    assert checks == {"status_code_conformance"}
 
 
 def test_crash_file_uses_named_project_directory(cli, ctx, tmp_path):

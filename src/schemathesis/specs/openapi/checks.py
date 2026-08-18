@@ -824,6 +824,10 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
     data = meta.phase.data
     if data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
         if response.status_code != 405:
+            # Generated path parameters rarely point at an existing resource, and routing 404s before
+            # method dispatch. 405 is only guaranteed when the target resource exists.
+            if response.status_code == 404 and "{" in case.operation.path:
+                return None
             raise UnsupportedMethodResponse(
                 operation=case.operation.label,
                 method=cast(str, response.request.method),

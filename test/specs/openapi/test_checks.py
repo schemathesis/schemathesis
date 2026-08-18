@@ -34,6 +34,7 @@ from schemathesis.specs.openapi.checks import (
     negative_data_rejection,
     positive_data_acceptance,
     response_schema_conformance,
+    unsupported_method,
     use_after_free,
 )
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
@@ -1654,3 +1655,55 @@ def test_use_after_free_skips_recreation_via_put(ctx, response_factory, put_stat
         response_checks=None,
     )
     assert use_after_free(check_context, put_response, put_case) is None
+
+
+@pytest.mark.parametrize(
+    ("path", "path_parameters", "status_code", "should_raise"),
+    [
+        ("/items/{item_id}", {"item_id": "42"}, 404, False),
+        ("/items/{item_id}", {"item_id": "42"}, 200, True),
+        ("/items", None, 404, True),
+    ],
+)
+def test_unsupported_method_404_on_templated_path(
+    ctx, response_factory, path, path_parameters, status_code, should_raise
+):
+    # A generated path parameter rarely points at an existing resource, so routing 404s before method dispatch.
+    parameters = (
+        [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}}] if path_parameters else []
+    )
+    schema = ctx.openapi.load_schema(
+        {path: {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}}
+    )
+    operation = schema[path]["GET"]
+    case = operation.Case(
+        path_parameters=path_parameters,
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=0.1, mode=GenerationMode.NEGATIVE),
+            components={},
+            phase=PhaseInfo(
+                name=TestPhase.COVERAGE,
+                data=CoveragePhaseData(
+                    scenario=CoverageScenario.UNSPECIFIED_HTTP_METHOD,
+                    description="Unspecified HTTP method: POST",
+                    location=None,
+                    parameter=None,
+                    parameter_location=None,
+                ),
+            ),
+        ),
+    )
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        response_checks=None,
+    )
+    response = response_factory.requests(status_code=status_code)
+    if should_raise:
+        with pytest.raises(Failure):
+            unsupported_method(check_ctx, response, case)
+    else:
+        assert unsupported_method(check_ctx, response, case) is None
