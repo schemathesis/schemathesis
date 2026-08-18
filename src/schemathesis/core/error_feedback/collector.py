@@ -43,8 +43,26 @@ def record_response(
     cache_writer: CacheWriter | None = None,
 ) -> None:
     """Route a response through the parser pipeline into the store; buffer one cache entry per response."""
+    record_observations(
+        store=store,
+        operation=operation,
+        case=case,
+        observations=parse_observations(operation=operation, case=case, response=response),
+        cache_writer=cache_writer,
+    )
+
+
+def record_observations(
+    *,
+    store: ErrorFeedbackStore,
+    operation: APIOperation,
+    case: Case,
+    observations: tuple[Observation, ...],
+    cache_writer: CacheWriter | None = None,
+) -> None:
+    """Store already-parsed observations; buffer one cache entry per response."""
     keys: list[str] = []
-    for observation in parse_observations(operation=operation, case=case, response=response):
+    for observation in observations:
         store.record(observation)
         if cache_writer is not None:
             keys.append(observation_fingerprint(observation))

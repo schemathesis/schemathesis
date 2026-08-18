@@ -15,9 +15,7 @@ from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
-from schemathesis.core.cache import Kind, request_from_case
-from schemathesis.core.error_feedback import observation_fingerprint
-from schemathesis.core.error_feedback.collector import parse_observations
+from schemathesis.core.error_feedback.collector import parse_observations, record_observations
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
@@ -101,6 +99,94 @@ def _network_nonfatal_error(stored: UnrecoverableNetworkError) -> events.NonFata
         label=STATEFUL_TESTS_LABEL,
         related_to_operation=False,
         code_sample=stored.code_sample,
+    )
+
+
+def _classify_suite_error(
+    exc: Exception | KeyboardInterrupt | FailureGroup,
+    *,
+    ctx: StatefulContext,
+    engine: EngineContext,
+    state: TestingState,
+    settings: hypothesis.settings,
+) -> tuple[Status, bool, list[events.EngineEvent]]:
+    """Map a state machine failure into the suite status, whether to re-run it, and the events to emit."""
+    if isinstance(exc, KeyboardInterrupt):
+        # Raised in the state machine when the stop event is set or it is raised by the user's code
+        # that is placed in the base class of the state machine.
+        # Therefore, set the stop event to cover the latter case
+        engine.stop()
+        return Status.INTERRUPTED, False, [events.Interrupted(phase=PhaseName.STATEFUL_TESTING)]
+    if isinstance(exc, unittest.case.SkipTest):
+        # If `explicit` phase is used and there are no examples
+        return Status.SKIP, False, []
+    if isinstance(exc, FailureGroup):
+        # When a check fails, the state machine is stopped
+        # The failure is already sent to the queue by the state machine
+        # Here we need to either exit or re-run the state machine with this failure marked as known
+        if engine.has_reached_the_failure_limit:
+            return Status.FAILURE, False, []
+        for failure in exc.exceptions:
+            ctx.mark_as_seen_in_run(failure)
+        return Status.FAILURE, True, []
+    if isinstance(exc, Flaky):
+        # Ignore flakiness
+        if engine.has_reached_the_failure_limit:
+            return Status.SUCCESS, False, []
+        stored = state.unrecoverable_network_error
+        if stored is not None:
+            # Flakiness caused by a transient transport failure: surface it and stop rather than
+            # restarting the whole suite — a replayed drop won't reproduce, so re-running is wasted.
+            return Status.ERROR, False, [_network_nonfatal_error(stored)]
+        # Mark all failures in this suite as seen to prevent them being re-discovered
+        ctx.mark_current_suite_as_seen_in_run()
+        return Status.SUCCESS, True, []
+    if isinstance(exc, Unsatisfiable) and not isinstance(exc, UnsatisfiableSchema) and ctx.completed_scenarios > 0:
+        # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
+        # values are possible to generate based on the previous observations, we retry the generation,
+        # unless that many scenarios already ran - then further restarts would never end
+        return Status.SUCCESS, ctx.completed_scenarios < settings.max_examples, []
+    clear_hypothesis_notes(exc)
+    # Any other exception is an inner error and the test run should be stopped
+    stored = state.unrecoverable_network_error
+    if stored is not None:
+        return Status.ERROR, False, [_network_nonfatal_error(stored)]
+    return (
+        Status.ERROR,
+        False,
+        [
+            events.NonFatalError(
+                error=exc,
+                phase=PhaseName.STATEFUL_TESTING,
+                label=STATEFUL_TESTS_LABEL,
+                related_to_operation=False,
+                code_sample=None,
+            )
+        ],
+    )
+
+
+def _unrecoverable_network_error(
+    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
+) -> UnrecoverableNetworkError | None:
+    """Describe a fatal transport failure, or `None` when the health monitor absorbs it."""
+    now = time.monotonic()
+    engine.health.record_transport_failure(operation_label=case.operation.label, now=now)
+    reason: str | None = None
+    if isinstance(exc, requests.Timeout):
+        reason = engine.health.abort_reason(now=now)
+        if reason is None:
+            return None
+    transport_kwargs = engine.get_transport_kwargs(operation=case.operation)
+    if exc.request is not None:
+        headers = dict(exc.request.headers)
+    else:
+        headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
+    verify = transport_kwargs.get("verify", True)
+    return UnrecoverableNetworkError(
+        error=exc,
+        code_sample=case.as_curl_command(headers=headers, verify=verify),
+        reason=reason,
     )
 
 
@@ -222,26 +308,10 @@ def execute_state_machine_loop(
                 if isinstance(
                     exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
                 ) and is_unrecoverable_network_error(exc):
-                    now = time.monotonic()
-                    engine.health.record_transport_failure(operation_label=operation_label, now=now)
-                    reason: str | None = None
-                    if isinstance(exc, requests.Timeout):
-                        reason = engine.health.abort_reason(now=now)
-                        if reason is None:
-                            raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
-                    transport_kwargs = engine.get_transport_kwargs(operation=input.case.operation)
-                    if exc.request is not None:
-                        headers = dict(exc.request.headers)
-                    else:
-                        headers = {**dict(input.case.headers or {}), **transport_kwargs.get("headers", {})}
-                    verify = transport_kwargs.get("verify", True)
-                    state.store_unrecoverable_network_error(
-                        UnrecoverableNetworkError(
-                            error=exc,
-                            code_sample=input.case.as_curl_command(headers=headers, verify=verify),
-                            reason=reason,
-                        )
-                    )
+                    network_error = _unrecoverable_network_error(exc, case=input.case, engine=engine)
+                    if network_error is None:
+                        raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
+                    state.store_unrecoverable_network_error(network_error)
 
                 if generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
@@ -278,15 +348,13 @@ def execute_state_machine_loop(
 
             if engine.error_feedback is not None:
                 # Field-level observations steer subsequent positive-mode generation.
-                if observations:
-                    for observation in observations:
-                        engine.error_feedback.record(observation)
-                    engine.cache.record(
-                        Kind.ERROR_FEEDBACK,
-                        case.operation.label,
-                        request_from_case(case),
-                        observation_keys=[observation_fingerprint(observation) for observation in observations],
-                    )
+                record_observations(
+                    store=engine.error_feedback,
+                    operation=case.operation,
+                    case=case,
+                    observations=observations,
+                    cache_writer=engine.cache.writer,
+                )
                 # Schema-level cross-cutting observations (e.g. auth retries).
                 case.operation.schema.record_runtime_observations(
                     store=engine.error_feedback,
@@ -366,6 +434,7 @@ def execute_state_machine_loop(
             )
             break
         suite_status = Status.SUCCESS
+        retry = False
         InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
         # Predictably change the seed to avoid re-running the same sequences if tests fail
         # yet have reproducible results
@@ -374,71 +443,12 @@ def execute_state_machine_loop(
             with catch_warnings(), ignore_hypothesis_output():
                 filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
                 InstrumentedStateMachine.run(settings=hypothesis_settings)
-        except KeyboardInterrupt:
-            # Raised in the state machine when the stop event is set or it is raised by the user's code
-            # that is placed in the base class of the state machine.
-            # Therefore, set the stop event to cover the latter case
-            engine.stop()
-            suite_status = Status.INTERRUPTED
-            event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
-            break
-        except unittest.case.SkipTest:
-            # If `explicit` phase is used and there are no examples
-            suite_status = Status.SKIP
-            break
-        except FailureGroup as exc:
-            # When a check fails, the state machine is stopped
-            # The failure is already sent to the queue by the state machine
-            # Here we need to either exit or re-run the state machine with this failure marked as known
-            suite_status = Status.FAILURE
-            if engine.has_reached_the_failure_limit:
-                break
-            for failure in exc.exceptions:
-                ctx.mark_as_seen_in_run(failure)
-            continue
-        except Flaky:
-            # Ignore flakiness
-            if engine.has_reached_the_failure_limit:
-                break
-            stored = state.unrecoverable_network_error
-            if stored is not None:
-                # Flakiness caused by a transient transport failure: surface it and stop rather than
-                # restarting the whole suite — a replayed drop won't reproduce, so re-running is wasted.
-                suite_status = Status.ERROR
-                event_queue.put(_network_nonfatal_error(stored))
-                break
-            # Mark all failures in this suite as seen to prevent them being re-discovered
-            ctx.mark_current_suite_as_seen_in_run()
-            continue
-        except Exception as exc:
-            if (
-                isinstance(exc, Unsatisfiable)
-                and not isinstance(exc, UnsatisfiableSchema)
-                and ctx.completed_scenarios > 0
-            ):
-                # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
-                # values are possible to generate based on the previous observations, we retry the generation
-                if ctx.completed_scenarios >= hypothesis_settings.max_examples:
-                    # Avoid infinite restarts
-                    break
-                continue
-            clear_hypothesis_notes(exc)
-            # Any other exception is an inner error and the test run should be stopped
-            suite_status = Status.ERROR
-            stored = state.unrecoverable_network_error
-            if stored is not None:
-                event_queue.put(_network_nonfatal_error(stored))
-            else:
-                event_queue.put(
-                    events.NonFatalError(
-                        error=exc,
-                        phase=PhaseName.STATEFUL_TESTING,
-                        label=STATEFUL_TESTS_LABEL,
-                        related_to_operation=False,
-                        code_sample=None,
-                    )
-                )
-            break
+        except (Exception, KeyboardInterrupt, FailureGroup) as exc:
+            suite_status, retry, error_events = _classify_suite_error(
+                exc, ctx=ctx, engine=engine, state=state, settings=hypothesis_settings
+            )
+            for error_event in error_events:
+                event_queue.put(error_event)
         finally:
             # Drain this suite's recorders into the pool before the next iteration's strategies
             # are built; mirrors `record_extra_data_from_recorder` in the unit phase.
@@ -452,6 +462,8 @@ def execute_state_machine_loop(
                 )
             )
             ctx.reset()
+        if retry:
+            continue
         # Exit on the first successful state machine execution
         break
 

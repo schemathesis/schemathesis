@@ -6,46 +6,23 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 from warnings import catch_warnings
 
-from hypothesis.errors import InvalidArgument
-from jsonschema_rs import ValidationError
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import (
-    SERIALIZERS_SUGGESTION_MESSAGE,
-    AuthenticationError,
-    InternalError,
-    InvalidRegexPattern,
-    InvalidRegexType,
-    InvalidSchema,
-    SchemaLocation,
-    is_regex_validation_error,
-)
-from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE
 from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.errors import (
-    DeadlineExceeded,
-    TestingState,
-    UnexpectedError,
-    clear_hypothesis_notes,
-    deduplicate_errors,
-)
+from schemathesis.engine.errors import TestingState, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import record_extra_data_from_recorder
-from schemathesis.engine.run.unit._errors import iter_mark_error_events, prefer_spec_error
+from schemathesis.engine.run.unit._errors import classify_test_exception, iter_mark_error_events
 from schemathesis.generation import overrides
-from schemathesis.generation.hypothesis.reporting import (
-    build_health_check_error,
-    build_unsatisfiable_error,
-    ignore_hypothesis_output,
-    is_empty_strategy_error,
-)
+from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -61,8 +38,6 @@ def run_test(
     scenario_id: uuid.UUID,
 ) -> events.EventGenerator:
     """A single test run with all error handling needed."""
-    import hypothesis.errors
-
     errors: list[Exception] = []
     skip_reason = None
     error: Exception
@@ -135,122 +110,15 @@ def run_test(
         skip_reason = {"Hypothesis has been told to run no examples for this test.": "No examples in schema"}.get(
             str(exc), str(exc)
         )
-    except (FailureGroup, Failure):
-        status = Status.FAILURE
-    except UnexpectedError:
-        # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
-        status = Status.ERROR
-    except hypothesis.errors.Flaky as exc:
-        if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
-            status = Status.ERROR
-            yield non_fatal_error(DeadlineExceeded.from_exc(exc.__cause__))
-        elif isinstance(exc, hypothesis.errors.FlakyFailure) and any(
-            isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions
-        ):
-            for sub_exc in exc.exceptions:
-                if isinstance(sub_exc, hypothesis.errors.DeadlineExceeded):
-                    yield non_fatal_error(DeadlineExceeded.from_exc(sub_exc))
-            status = Status.ERROR
-        elif errors:
-            status = Status.ERROR
-        else:
-            # Unrecoverable network errors (e.g. timeouts) are not appended to `errors`
-            # and are re-raised so Hypothesis sees the original exception; surface them
-            # here so a replay-induced `Flaky` is not misclassified as a check failure.
-            unrecoverable = state.unrecoverable_network_error
-            if unrecoverable is not None:
-                status = Status.ERROR
-                yield non_fatal_error(unrecoverable.error, code_sample=unrecoverable.code_sample)
-            else:
-                # Hypothesis could not reproduce the result on replay. Real check failures are
-                # recorded when they happen and decide the status below; an unreproducible result
-                # with no observed failure is generation noise, not a failure.
-                status = Status.SUCCESS
-    except BaseExceptionGroup as exc:
-        status = Status.ERROR
-        # Check for errors in the exception group
-        for sub_exc in exc.exceptions:
-            if is_regex_validation_error(sub_exc):
-                yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(sub_exc))
-            elif isinstance(sub_exc, InvalidSchema):
-                yield non_fatal_error(sub_exc)
-            else:
-                code_sample = state.get_code_sample_for(sub_exc)
-                if code_sample is not None:
-                    clear_hypothesis_notes(sub_exc)
-                    yield non_fatal_error(sub_exc, code_sample=code_sample)
-    except hypothesis.errors.FailedHealthCheck as exc:
-        status = Status.ERROR
-        yield non_fatal_error(build_health_check_error(operation, exc, with_tip=False))
-    except hypothesis.errors.Unsatisfiable:
-        # We need more clear error message here
-        status = Status.ERROR
-        yield non_fatal_error(
-            build_unsatisfiable_error(operation, with_tip=False, filter_tracker=operation.filter_case_tracker)
-        )
-    except AuthenticationError as exc:
-        status = Status.ERROR
-        yield non_fatal_error(exc)
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
         return
-    except AssertionError as exc:  # Comes from `hypothesis`
-        status = Status.ERROR
-        try:
-            operation.schema.validate()
-            msg = "Unexpected error during testing of this API operation"
-            exc_msg = str(exc)
-            if exc_msg:
-                msg += f": {exc_msg}"
-            try:
-                raise InternalError(msg) from exc
-            except InternalError as exc:
-                yield non_fatal_error(exc)
-        except ValidationError as exc:
-            yield non_fatal_error(
-                InvalidSchema.from_jsonschema_error(
-                    exc,
-                    path=operation.path,
-                    method=operation.method,
-                    config=ctx.config.output,
-                    location=SchemaLocation.maybe_from_error_path(exc.instance_path, ctx.schema.specification.version),
-                )
-            )
-    except InvalidArgument as exc:
-        status = Status.ERROR
-        if is_empty_strategy_error(exc):
-            yield non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
-        else:
-            health_check = build_health_check_error(operation, exc, with_tip=False)
-            if isinstance(health_check, hypothesis.errors.FailedHealthCheck):
-                yield non_fatal_error(health_check)
-            else:
-                yield non_fatal_error(exc)
-    except hypothesis.errors.DeadlineExceeded as exc:
-        status = Status.ERROR
-        yield non_fatal_error(DeadlineExceeded.from_exc(exc))
-    except ValidationError as exc:
-        status = Status.ERROR
-        if is_regex_validation_error(exc):
-            yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(exc))
-        else:
-            code_sample = state.get_code_sample_for(exc)
-            yield non_fatal_error(exc, code_sample=code_sample)
-    except Exception as exc:
-        status = Status.ERROR
-        clear_hypothesis_notes(exc)
-        # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
-        if str(exc) == "first argument must be string or compiled pattern":
-            yield non_fatal_error(
-                InvalidRegexType(
-                    "Invalid `pattern` value: expected a string. "
-                    "If your schema is in YAML, ensure `pattern` values are quoted",
-                )
-            )
-        else:
-            code_sample = state.get_code_sample_for(exc)
-            yield non_fatal_error(prefer_spec_error(exc, operation), code_sample=code_sample)
+    except (Exception, BaseExceptionGroup) as exc:
+        status, error_events = classify_test_exception(
+            exc, operation=operation, state=state, errors=errors, non_fatal_error=non_fatal_error
+        )
+        yield from error_events
 
     if status == Status.SUCCESS and any(
         check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks

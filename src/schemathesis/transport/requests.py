@@ -134,15 +134,37 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
         return data
 
+    def _build_request_data(self, case: Case, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Merge the serialized case with transport settings from config and explicit keyword arguments."""
+        config = case.operation.schema.config
+        data = self.serialize_case(case, **kwargs)
+
+        verify = config.tls_verify_for(operation=case.operation)
+        if verify is not None:
+            data.setdefault("verify", verify)
+        timeout = config.request_timeout_for(operation=case.operation)
+        if timeout is not None:
+            data.setdefault("timeout", timeout)
+        cert = config.request_cert_for(operation=case.operation)
+        if cert is not None:
+            data.setdefault("cert", cert)
+
+        for key, value in kwargs.items():
+            if key == "base_url":
+                continue
+            if key not in ("headers", "cookies", "params") or key not in data:
+                data[key] = value
+        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
+        proxies = config.proxy_for(operation=case.operation)
+        if proxies is not None:
+            data.setdefault("proxies", {"all": proxies})
+        return data
+
     @override
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         config = case.operation.schema.config
 
         max_redirects = kwargs.pop("max_redirects", None) or config.max_redirects_for(operation=case.operation)
-        timeout = config.request_timeout_for(operation=case.operation)
-        verify = config.tls_verify_for(operation=case.operation)
-        cert = config.request_cert_for(operation=case.operation)
-        proxies = config.proxy_for(operation=case.operation)
 
         if session is not None and session.headers:
             # These headers are explicitly provided via config or CLI args.
@@ -152,22 +174,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 headers.setdefault(name, value)
             kwargs["headers"] = headers
 
-        data = self.serialize_case(case, **kwargs)
-
-        if verify is not None:
-            data.setdefault("verify", verify)
-        if timeout is not None:
-            data.setdefault("timeout", timeout)
-        if cert is not None:
-            data.setdefault("cert", cert)
-
-        kwargs.pop("base_url", None)
-        for key, value in kwargs.items():
-            if key not in ("headers", "cookies", "params") or key not in data:
-                data[key] = value
-        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
-        if proxies is not None:
-            data.setdefault("proxies", {"all": proxies})
+        data = self._build_request_data(case, kwargs)
 
         current_session_headers: MutableMapping[str, Any] = {}
         current_session_auth = None
