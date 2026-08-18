@@ -11,7 +11,7 @@ from schemathesis.cli.commands.run.handlers.base import WRITER_WORKER_JOIN_TIMEO
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.cache.io import effective_directory
 from schemathesis.engine import Status, events
-from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.recorder import RecordedScenario
 from schemathesis.reporting.crashes import CrashWriter, build_crashes_from_recorder
 
 if TYPE_CHECKING:
@@ -109,11 +109,11 @@ def _run(
         writer.remove_by_operation(operation)
 
 
-def _find_failing_case_ids(recorder: ScenarioRecorder) -> list[str]:
+def _find_failing_case_ids(recorder: RecordedScenario) -> list[str]:
     return [case_id for case_id, checks in recorder.checks.items() if any(c.status == Status.FAILURE for c in checks)]
 
 
-def _operation_labels(recorder: ScenarioRecorder, case_ids: Iterable[str]) -> set[str]:
+def _operation_labels(recorder: RecordedScenario, case_ids: Iterable[str]) -> set[str]:
     labels: set[str] = set()
     for case_id in case_ids:
         node = recorder.cases[case_id]
@@ -123,5 +123,5 @@ def _operation_labels(recorder: ScenarioRecorder, case_ids: Iterable[str]) -> se
 
 @dataclass(slots=True)
 class _Process:
-    recorder: ScenarioRecorder
+    recorder: RecordedScenario
     success: bool

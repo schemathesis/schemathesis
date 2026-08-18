@@ -45,7 +45,7 @@ from schemathesis.transport.prepare import prepare_path
 from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
-    from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -1281,7 +1281,7 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
     return True
 
 
-def resource_was_deleted(recorder: ScenarioRecorder, case: Case) -> bool:
+def resource_was_deleted(recorder: RecordedScenario, case: Case) -> bool:
     """Return True if a successful DELETE in the scenario covers this case's resource path.
 
     A DELETE path is considered to cover the current case when it is a prefix of the current

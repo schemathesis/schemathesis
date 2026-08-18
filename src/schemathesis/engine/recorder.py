@@ -3,9 +3,9 @@ from __future__ import annotations
 import base64
 import time
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Headers, Response
@@ -16,6 +16,36 @@ if TYPE_CHECKING:
     import requests
 
     from schemathesis.generation.stateful.state_machine import Transition
+
+
+class RecordedScenario(Protocol):
+    """Read-only view of a recorded scenario, for consumers that report on a run rather than drive it."""
+
+    @property
+    def label(self) -> str: ...  # pragma: no cover
+
+    @property
+    def cases(self) -> Mapping[str, CaseNode]: ...  # pragma: no cover
+
+    @property
+    def checks(self) -> Mapping[str, list[CheckNode]]: ...  # pragma: no cover
+
+    @property
+    def interactions(self) -> Mapping[str, Interaction]: ...  # pragma: no cover
+
+    def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData: ...  # pragma: no cover
+
+    def find_parent(self, *, case_id: str) -> Case | None: ...  # pragma: no cover
+
+    def find_related(self, *, case_id: str) -> Iterator[Case]: ...  # pragma: no cover
+
+    def find_all_cases(self) -> Iterator[Case]: ...  # pragma: no cover
+
+    def find_response(self, *, case_id: str) -> Response | None: ...  # pragma: no cover
+
+    def iter_chain_cases(
+        self, *, case_id: str, related_case_ids: tuple[str, ...] = ...
+    ) -> Iterator[Case]: ...  # pragma: no cover
 
 
 @dataclass

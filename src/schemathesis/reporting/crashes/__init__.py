@@ -21,7 +21,7 @@ from schemathesis.reporting.crashes.encoding import decode_case_body, encode_cas
 
 if TYPE_CHECKING:
     from schemathesis.config import SanitizationConfig
-    from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.engine.recorder import RecordedScenario
 
 
 CRASH_FORMAT_VERSION = 1
@@ -270,7 +270,7 @@ def load_manifest(directory: Path) -> CrashManifest | None:
 
 def build_crashes_from_recorder(
     *,
-    recorder: ScenarioRecorder,
+    recorder: RecordedScenario,
     failing_case_id: str,
     sanitization: SanitizationConfig,
 ) -> list[CrashFile]:

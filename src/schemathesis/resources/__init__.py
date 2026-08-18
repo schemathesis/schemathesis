@@ -52,16 +52,8 @@ class PoolPick:
     misses: tuple[tuple[str, str], ...] = ()
 
 
-class ExtraDataSource(Protocol):
-    """Provides extra data from captured API responses for test generation."""
-
-    def should_record(self, *, operation: str) -> bool:
-        """Check if responses should be recorded for this operation."""
-        ...  # pragma: no cover
-
-    def should_record_request(self, *, operation: str) -> bool:
-        """Check if request inputs should be captured for this operation."""
-        ...  # pragma: no cover
+class ResourcePool(Protocol):
+    """Draw side: hands out values captured from earlier responses."""
 
     def pick_captured_value(
         self,
@@ -79,6 +71,18 @@ class ExtraDataSource(Protocol):
         operation: APIOperation,
     ) -> PoolPick:
         """Return correlated pool values for all resource-bound slots in one operation, with provenance."""
+        ...  # pragma: no cover
+
+
+class ResourceRecorder(Protocol):
+    """Record side: captures values from responses and requests as they happen."""
+
+    def should_record(self, *, operation: str) -> bool:
+        """Check if responses should be recorded for this operation."""
+        ...  # pragma: no cover
+
+    def should_record_request(self, *, operation: str) -> bool:
+        """Check if request inputs should be captured for this operation."""
         ...  # pragma: no cover
 
     def record_response(
@@ -111,9 +115,15 @@ class ExtraDataSource(Protocol):
         ...  # pragma: no cover
 
 
+class ExtraDataSource(ResourcePool, ResourceRecorder, Protocol):
+    """Provides extra data from captured API responses for test generation."""
+
+
 __all__ = [
     "Cardinality",
     "ExtraDataSource",
+    "ResourcePool",
+    "ResourceRecorder",
     "PoolDraw",
     "PoolPick",
     "ResourceDescriptor",

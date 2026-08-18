@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.parameters import ContainerName
     from schemathesis.core.transport import HttpMethod
-    from schemathesis.resources import ExtraDataSource, PoolDraw
+    from schemathesis.resources import PoolDraw, ResourcePool
     from schemathesis.schemas import APIOperation, ParameterSet
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 
@@ -382,7 +382,7 @@ def iter_coverage_cases(
     generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
-    extra_data_source: ExtraDataSource | None = None,
+    extra_data_source: ResourcePool | None = None,
     unexpected_methods_seen: set[tuple[str, str]] | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
 ) -> Generator[Case, None, None]:

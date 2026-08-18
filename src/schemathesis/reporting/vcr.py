@@ -12,7 +12,7 @@ from schemathesis.core.output.sanitization import sanitize_url
 from schemathesis.core.transport import Headers, Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status
-from schemathesis.engine.recorder import CheckNode, Request, ScenarioRecorder
+from schemathesis.engine.recorder import CheckNode, RecordedScenario, Request
 from schemathesis.generation.meta import CoveragePhaseData
 
 if TYPE_CHECKING:
@@ -45,8 +45,8 @@ class VcrWriter:
             f"http_interactions:"
         )
 
-    def write(self, recorder: ScenarioRecorder) -> None:
-        """Write all interactions from a ScenarioRecorder to the cassette."""
+    def write(self, recorder: RecordedScenario) -> None:
+        """Write all interactions from a recorded scenario to the cassette."""
         stream = self._stream
         assert stream is not None
         config = self._config

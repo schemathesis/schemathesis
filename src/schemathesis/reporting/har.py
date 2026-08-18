@@ -15,7 +15,7 @@ from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Headers
-from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.recorder import RecordedScenario
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -46,7 +46,7 @@ class HarWriter:
         self._ctx = harfile.open(self._output)
         self._har = self._ctx.__enter__()
 
-    def write(self, recorder: ScenarioRecorder) -> None:
+    def write(self, recorder: RecordedScenario) -> None:
         """Write all interactions from a ScenarioRecorder to the HAR file."""
         har = self._har
         assert har is not None

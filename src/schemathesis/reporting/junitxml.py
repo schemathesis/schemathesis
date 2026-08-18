@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from schemathesis.config import OutputConfig
-    from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.engine.statistic import GroupedFailures
 
 
@@ -67,7 +67,7 @@ class JunitXmlWriter:
         elif skip_reason is not None:
             test_case.skipped.append(skip_reason)
 
-    def write(self, recorder: ScenarioRecorder, elapsed_sec: float = 0.0) -> None:
+    def write(self, recorder: RecordedScenario, elapsed_sec: float = 0.0) -> None:
         """Write all interactions from a ScenarioRecorder as a JUnit test case."""
         assert self._config is not None
         self.record_scenario(

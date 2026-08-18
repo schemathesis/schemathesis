@@ -8,7 +8,7 @@ from schemathesis.config import ProjectConfig, SchemathesisWarning
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.engine import Status, events
-from schemathesis.engine.recorder import Interaction, ScenarioRecorder
+from schemathesis.engine.recorder import Interaction, RecordedScenario
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
@@ -247,7 +247,7 @@ class WarningCollector:
                             ctx.exit_code = 1
 
         # Warn if all positive test cases got 4xx in return and no failure was found
-        def all_positive_are_rejected(recorder: ScenarioRecorder) -> bool:
+        def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
             seen_positive = False
             for case in recorder.cases.values():
                 if not (case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE):
