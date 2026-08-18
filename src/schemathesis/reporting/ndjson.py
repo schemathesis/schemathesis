@@ -19,7 +19,7 @@ from schemathesis.core.transforms import Unresolvable
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import events
-from schemathesis.engine.recorder import Request, ScenarioRecorder
+from schemathesis.engine.recorder import RecordedScenario, Request, ScenarioRecorder
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -219,7 +219,7 @@ class NdjsonWriter:
         stream.write("}}\n")
         stream.flush()
 
-    def _write_recorder(self, recorder: ScenarioRecorder) -> None:
+    def _write_recorder(self, recorder: RecordedScenario) -> None:
         # Emit the recorder as JSON, streaming each `dict` field's entries one at a
         # time instead of materializing the whole map first.
         stream = self._stream

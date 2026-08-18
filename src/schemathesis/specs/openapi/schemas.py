@@ -32,7 +32,7 @@ from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response, 
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
-from schemathesis.resources import ExtraDataSource
+from schemathesis.resources import ExtraDataSource, ResourcePool
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurity
@@ -210,7 +210,7 @@ class OpenApiSchema(BaseSchema):
         *,
         generation_modes: list[GenerationMode],
         generation_config: GenerationConfig,
-        extra_data_source: ExtraDataSource | None = None,
+        extra_data_source: ResourcePool | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
     ) -> Iterator[Case]:
         from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases

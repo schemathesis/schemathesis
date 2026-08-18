@@ -68,7 +68,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.run import Phase
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool
-    from schemathesis.resources import ExtraDataSource
+    from schemathesis.resources import ExtraDataSource, ResourcePool
 
 
 # Reused on every per-draw call; allocating once avoids ~600ns of `LazyStrategy` construction.
@@ -219,7 +219,7 @@ class GraphQLSchema(BaseSchema):
         *,
         generation_modes: list[GenerationMode],
         generation_config: GenerationConfig,
-        extra_data_source: ExtraDataSource | None = None,
+        extra_data_source: ResourcePool | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
     ) -> Iterator[Case]:
         # GraphQL has no coverage phase yet; the schema-level case enumerator is empty.

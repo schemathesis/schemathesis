@@ -9,7 +9,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
-from schemathesis.engine.recorder import CaseNode, ScenarioRecorder
+from schemathesis.engine.recorder import CaseNode, RecordedScenario
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 
@@ -57,7 +57,7 @@ class Statistic:
         self.cases_without_checks = 0
 
     def on_scenario_finished(
-        self, recorder: ScenarioRecorder, *, failure_label: Callable[[Case], str] | None = None
+        self, recorder: RecordedScenario, *, failure_label: Callable[[Case], str] | None = None
     ) -> None:
         """Update statistics and store failures from a new batch of checks."""
         from schemathesis.generation.stateful.state_machine import ExtractionFailure

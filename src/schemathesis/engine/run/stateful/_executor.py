@@ -49,10 +49,10 @@ from schemathesis.specs.openapi.stateful.link_calibration import record_link_out
 
 if TYPE_CHECKING:
     from schemathesis.core.error_feedback.store import Observation
-    from schemathesis.resources import ExtraDataSource
+    from schemathesis.resources import ResourceRecorder
 
 
-def _replay_recorders_into_pool(extra_data_source: ExtraDataSource, recorders: list[ScenarioRecorder]) -> None:
+def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: list[ScenarioRecorder]) -> None:
     """Feed every captured interaction from this suite into the pool.
 
     Mirrors `record_extra_data_from_recorder` in the unit phase: the pool stays frozen during

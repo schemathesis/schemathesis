@@ -17,7 +17,7 @@ from schemathesis.reporting.recorders import grouped_failures_from_recorder
 
 if TYPE_CHECKING:
     from schemathesis.config import OutputConfig
-    from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.engine.statistic import GroupedFailures
 
 
@@ -157,7 +157,7 @@ class AllureWriter:
             result.labels = [lbl for lbl in result.labels if lbl.name != "severity"]
             result.labels.append(Label(name="severity", value=worst_severity))
 
-    def write(self, recorder: ScenarioRecorder, elapsed_sec: float = 0.0, tags: list[str] | None = None) -> None:
+    def write(self, recorder: RecordedScenario, elapsed_sec: float = 0.0, tags: list[str] | None = None) -> None:
         assert self._config is not None
 
         grouped = grouped_failures_from_recorder(recorder)

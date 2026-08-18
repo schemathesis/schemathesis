@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from schemathesis.cli.commands.run.handlers.base import WRITER_WORKER_JOIN_TIMEOUT, EventHandler, TextOutput
 from schemathesis.config import OutputConfig
 from schemathesis.engine import events
-from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.recorder import RecordedScenario
 from schemathesis.reporting.har import HarWriter
 
 if TYPE_CHECKING:
@@ -84,7 +84,7 @@ class _Initialize:
 
 @dataclass(slots=True)
 class _Process:
-    recorder: ScenarioRecorder
+    recorder: RecordedScenario
 
 
 @dataclass(slots=True)

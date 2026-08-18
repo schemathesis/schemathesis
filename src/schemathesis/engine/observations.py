@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.recorder import RecordedScenario
 from schemathesis.schemas import APIOperation
 
 
@@ -21,7 +21,7 @@ class Observations:
     def __init__(self) -> None:
         self.location_headers = {}
 
-    def extract_observations_from(self, recorder: ScenarioRecorder) -> None:
+    def extract_observations_from(self, recorder: RecordedScenario) -> None:
         """Extract observations from completed test scenario."""
         for id, interaction in recorder.interactions.items():
             response = interaction.response
