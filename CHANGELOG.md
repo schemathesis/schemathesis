@@ -62,6 +62,7 @@
 
 - Ignoring phase-level config like `phases.fuzzing.generation.modes`.
 - False positive `positive_data_acceptance` for `not` clauses in schemas using references.
+- False positive `positive_data_acceptance` for credential-granting operations answering 400 or 422.
 - Runtime error in `negative_data_rejection` for empty array path parameters.
 - Disable unlisted custom checks when `--checks` selects only specific checks.
 - `--suppress-health-check` with a subset of checks re-enabling the rest in stateful tests.

@@ -46,6 +46,7 @@ from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
     from schemathesis.engine.recorder import RecordedScenario
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -757,6 +758,41 @@ def _additional_properties_hint(case: Case) -> str | None:
     return None
 
 
+# Statuses a credential-granting operation may answer to a well-formed request carrying credentials that do not exist.
+CREDENTIAL_REJECTION_STATUSES = frozenset({400, 422})
+
+
+def _token_urls(operation: APIOperation) -> Iterator[str]:
+    for definition in operation.schema.security.security_definitions.values():
+        # Swagger 2.0 puts `tokenUrl` on the scheme; Open API 3 nests it under each flow.
+        token_url = definition.get("tokenUrl")
+        if isinstance(token_url, str):
+            yield token_url
+        flows = definition.get("flows")
+        if isinstance(flows, Mapping):
+            for flow in flows.values():
+                token_url = flow.get("tokenUrl") if isinstance(flow, Mapping) else None
+                if isinstance(token_url, str):
+                    yield token_url
+    for scheme in operation.schema.config.auth.dynamic.schemes.values():
+        yield scheme.path
+
+
+def _grants_credentials(operation: APIOperation) -> bool:
+    """Whether this operation mints credentials, per the schema's own `tokenUrl` or a configured dynamic-auth path."""
+    for token_url in _token_urls(operation):
+        path = urlparse(token_url).path
+        # An empty token URL yields no path, which would otherwise normalize to "/" and claim a root operation.
+        if not path:
+            continue
+        if not path.startswith("/"):
+            path = f"/{path}"
+        # `operation.path` carries no `basePath`, so a prefixed token URL matches on a segment boundary.
+        if path == operation.path or path.endswith(f"/{operation.path.lstrip('/')}"):
+            return True
+    return False
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -769,6 +805,9 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
     allowed_statuses = expand_status_codes(config.expected_statuses or [])
 
     if meta.generation.mode.is_positive and response.status_code not in allowed_statuses:
+        # A schema promises which requests are well formed, not which credentials exist.
+        if response.status_code in CREDENTIAL_REJECTION_STATUSES and _grants_credentials(case.operation):
+            return None
         message = f"Valid data should have been accepted\nExpected: {', '.join(config.expected_statuses)}"
         hint = _additional_properties_hint(case)
         if hint:

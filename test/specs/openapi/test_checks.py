@@ -6,6 +6,7 @@ import yaml
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config import SchemathesisConfig
+from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
 from schemathesis.core.mutations import OperatorKind
@@ -1707,3 +1708,98 @@ def test_unsupported_method_404_on_templated_path(
             unsupported_method(check_ctx, response, case)
     else:
         assert unsupported_method(check_ctx, response, case) is None
+
+
+def _token_endpoint_paths():
+    return {
+        "/token": {"post": {"responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}}}},
+        "/items": {"post": {"responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}}}},
+    }
+
+
+def _check_context(config=None):
+    return CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=config or ChecksConfig(),
+        transport_kwargs=None,
+        response_checks=None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("token_url", "path", "status_code", "should_raise"),
+    [
+        ("/token", "/token", 400, False),
+        ("/token", "/token", 422, False),
+        ("https://example.com/token", "/token", 400, False),
+        ("token", "/token", 400, False),
+        ("/token", "/items", 400, True),
+        ("/token", "/token", 405, True),
+        ("/other", "/token", 400, True),
+    ],
+    ids=[
+        "token-endpoint-400",
+        "token-endpoint-422",
+        "absolute-token-url",
+        "relative-token-url-without-slash",
+        "other-operation-still-fails",
+        "unrelated-status-still-fails",
+        "token-url-elsewhere",
+    ],
+)
+def test_positive_data_acceptance_token_endpoint(ctx, response_factory, token_url, path, status_code, should_raise):
+    schema = ctx.openapi.load_schema(
+        _token_endpoint_paths(),
+        components={
+            "securitySchemes": {
+                "oauth2": {"type": "oauth2", "flows": {"password": {"tokenUrl": token_url, "scopes": {}}}}
+            }
+        },
+    )
+    case = schema[path]["POST"].Case(_meta=build_metadata())
+    response = response_factory.requests(status_code=status_code)
+
+    if should_raise:
+        with pytest.raises(Failure):
+            positive_data_acceptance(_check_context(), response, case)
+    else:
+        assert positive_data_acceptance(_check_context(), response, case) is None
+
+
+def test_positive_data_acceptance_configured_dynamic_auth_path(ctx, response_factory):
+    schema = ctx.openapi.load_schema(_token_endpoint_paths())
+    schema.config.auth.dynamic.schemes["oauth2"] = DynamicTokenAuthConfig(
+        path="/token", extract_from="body", extract_selector="/access_token"
+    )
+    response = response_factory.requests(status_code=400)
+
+    granting = schema["/token"]["POST"].Case(_meta=build_metadata())
+    assert positive_data_acceptance(_check_context(), response, granting) is None
+
+    other = schema["/items"]["POST"].Case(_meta=build_metadata())
+    with pytest.raises(Failure):
+        positive_data_acceptance(_check_context(), response, other)
+
+
+def test_positive_data_acceptance_token_url_carries_base_path(ctx, response_factory):
+    # Swagger 2.0 states the token URL with `basePath`, which operation paths do not carry.
+    schema = ctx.openapi.load_schema(
+        {"/token": {"post": {"responses": {"200": {"description": "OK"}}}}},
+        version="2.0",
+        basePath="/api/v1",
+        securityDefinitions={
+            "oauth2": {"type": "oauth2", "flow": "password", "tokenUrl": "/api/v1/token", "scopes": {}}
+        },
+    )
+    case = schema["/token"]["POST"].Case(_meta=build_metadata())
+    assert positive_data_acceptance(_check_context(), response_factory.requests(status_code=400), case) is None
+
+
+def test_positive_data_acceptance_empty_token_path_does_not_match_root(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/": {"post": {"responses": {"200": {"description": "OK"}}}}})
+    schema.config.auth.dynamic.schemes["oauth2"] = DynamicTokenAuthConfig(extract_from="body")
+    case = schema["/"]["POST"].Case(_meta=build_metadata())
+    with pytest.raises(Failure):
+        positive_data_acceptance(_check_context(), response_factory.requests(status_code=400), case)
