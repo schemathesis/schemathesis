@@ -472,6 +472,9 @@
         "allow_header_conformance": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
+        "invalid_location": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
         "max_response_time": {
           "$ref": "#/$defs/MaxResponseTimeConfig"
         }
