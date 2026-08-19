@@ -177,3 +177,111 @@ def assert_filtered(cli, schema_path, cassette_path, base_url, expected, *, args
     interactions = cassette.get("http_interactions") or []
     actual = [f"{entry['request']['method']} /{entry['request']['uri'].split('/')[-1]}" for entry in interactions]
     assert actual == expected, f"stdout:\n{result.stdout}\ncassette:\n{cassette}"
+
+
+def _run_with_filters(cli, ctx, api, *filters):
+    return cli.run(
+        str(ctx.openapi.write_schema(SCHEMA)),
+        "--checks=not_a_server_error",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        f"--url={api.base_url}/api",
+        *filters,
+    )
+
+
+@pytest.mark.parametrize(
+    "filters",
+    [
+        ["--include-name=GET /nope"],
+        ["--include-name=GET /b", "--include-name=GET /nope"],
+        ["--include-name=GET /b", "--include-name=POST /a"],
+        ["--exclude-name=GET /nope"],
+        ["--include-name=GET /b", "--exclude-name=GET /b"],
+        ["--include-name-regex=^[a-z]+ZZZ$"],
+    ],
+    ids=[
+        "dead-include-selects-nothing",
+        "dead-include-beside-a-live-one",
+        "every-include-matches",
+        "dead-exclude",
+        "includes-and-excludes-cancel-out",
+        "dead-regex-shown-verbatim",
+    ],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unmatched_filters(ctx, cli, snapshot_cli, filters):
+    api = ctx.openapi.apps.success()
+    assert _run_with_filters(cli, ctx, api, *filters) == snapshot_cli
+
+
+@pytest.mark.parametrize("name", ["Query.getNope", "Query.getBooks"], ids=["dead-filter", "live-filter"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unmatched_filters_for_graphql(ctx, cli, snapshot_cli, name):
+    api = ctx.graphql.apps.books()
+    assert cli.run(api.schema_url, "--max-examples=1", "--mode=positive", f"--include-name={name}") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_operation_id_filter_on_graphql(ctx, cli, snapshot_cli):
+    # GraphQL has no `operationId`, so such a filter matches nothing instead of erroring.
+    api = ctx.graphql.apps.books()
+    result = cli.run(
+        api.schema_url,
+        "--max-examples=1",
+        "--mode=positive",
+        "--include-name=Query.getBooks",
+        "--exclude-operation-id=nope",
+    )
+    assert "Traceback" not in result.stdout, result.stdout
+    assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unmatched_operations_config_block(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert (
+        cli.run(
+            str(ctx.openapi.write_schema(SCHEMA)),
+            "--checks=not_a_server_error",
+            "--max-examples=1",
+            "--phases=fuzzing",
+            f"--url={api.base_url}/api",
+            config={"operations": [{"include-name": "GET /nope", "headers": {"X-Key": "42"}}]},
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unmatched_filter_suggests_the_operation_it_nearly_names(ctx, cli, snapshot_cli):
+    api = ctx.graphql.apps.books()
+    assert (
+        cli.run(api.schema_url, "--max-examples=1", "--mode=positive", "--include-name=Query.getBook") == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_combined_regex_filters_are_reported_as_one(ctx, cli, snapshot_cli):
+    # Every `*-regex` option builds a single filter whose criteria must all hold.
+    api = ctx.openapi.apps.success()
+    assert (
+        _run_with_filters(cli, ctx, api, "--include-name-regex=^ZZZ$", "--include-method-regex=^QQQ$") == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_no_report_when_an_operation_is_skipped_while_walking(ctx, cli, snapshot_cli):
+    # An empty definition is tested but not counted, so a filter cannot be called dead on this schema.
+    api = ctx.openapi.apps.success()
+    assert (
+        cli.run(
+            str(ctx.openapi.write_schema({**SCHEMA, "/empty": {"get": {}}})),
+            "--checks=not_a_server_error",
+            "--max-examples=1",
+            "--phases=fuzzing",
+            f"--url={api.base_url}/api",
+            "--include-name=GET /nope",
+        )
+        == snapshot_cli
+    )

@@ -12,6 +12,7 @@ class SchemathesisWarning(str, enum.Enum):
     UNSUPPORTED_REGEX = "unsupported_regex"
     METHOD_NOT_ALLOWED = "method_not_allowed"
     CONSTANTS_EXTRACTION = "constants_extraction"
+    UNMATCHED_FILTER = "unmatched_filter"
 
     @classmethod
     def from_str(cls, value: str) -> SchemathesisWarning:
@@ -24,4 +25,5 @@ class SchemathesisWarning(str, enum.Enum):
             "unsupported_regex": cls.UNSUPPORTED_REGEX,
             "method_not_allowed": cls.METHOD_NOT_ALLOWED,
             "constants_extraction": cls.CONSTANTS_EXTRACTION,
+            "unmatched_filter": cls.UNMATCHED_FILTER,
         }[value.lower()]

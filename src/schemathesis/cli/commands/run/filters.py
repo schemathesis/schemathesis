@@ -7,6 +7,8 @@ from typing import Literal
 import click
 
 from schemathesis.cli.ext.groups import grouped_option
+from schemathesis.core.statistic import UnmatchedFilter
+from schemathesis.filters import SELECTION
 
 
 def _with_filter(*, by: str, mode: Literal["include", "exclude"], modifier: Literal["regex"] | None) -> Callable:
@@ -44,6 +46,20 @@ def validate_filter(
 
 
 _BY_VALUES = ("operation-id", "tag", "name", "method", "path")
+
+# Operations name their own attributes; these are the option spellings for them.
+_ATTRIBUTE_OPTIONS = {"label": "name", "method": "method", "path": "path", "tag": "tag", "operation_id": "operation-id"}
+
+
+def describe_filter(unmatched: UnmatchedFilter) -> str:
+    """Render a filter the way the user wrote it."""
+    prefix = "--" if unmatched.source == SELECTION else "[[operations]] "
+    mode = "include" if unmatched.include else "exclude"
+    return " ".join(
+        f"{prefix}{mode}-{_ATTRIBUTE_OPTIONS[criterion.attribute]}{'-regex' if criterion.is_regex else ''} "
+        f"{criterion.value!r}"
+        for criterion in unmatched.criteria
+    )
 
 
 def with_filters(command: Callable) -> Callable:

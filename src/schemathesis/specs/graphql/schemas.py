@@ -26,6 +26,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
+from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
@@ -267,7 +268,7 @@ class GraphQLSchema(BaseSchema):
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
         raw_schema = self.raw_schema["__schema"]
-        dummy_operation = APIOperation(
+        dummy_operation: APIOperation = APIOperation(
             base_url=self.get_base_url(),
             path=self.base_path,
             label="",
@@ -275,9 +276,10 @@ class GraphQLSchema(BaseSchema):
             schema=self,
             responses=GraphQLResponses(),
             security=None,
-            definition=None,  # type: ignore[arg-type, var-annotated]
+            definition=OperationDefinition(raw={}),
         )
 
+        usage = FilterUsage(self.filter_set) if not self.filter_set.is_empty() else None
         for type_name in ("queryType", "mutationType"):
             type_def = raw_schema.get(type_name)
             if type_def is not None:
@@ -289,6 +291,10 @@ class GraphQLSchema(BaseSchema):
                             dummy_operation.label = f"{query_type_name}.{field['name']}"
                             if not self._should_skip(dummy_operation):
                                 statistic.operations.selected += 1
+                            if usage is not None:
+                                usage.record(SimpleNamespace(operation=dummy_operation))
+        if usage is not None:
+            statistic.unmatched_filters = usage.results()
         return statistic
 
     @override
@@ -392,6 +398,10 @@ class GraphQLSchema(BaseSchema):
 
     @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:
+        return None
+
+    @override
+    def get_operation_id(self, operation: APIOperation) -> str | None:
         return None
 
     @override

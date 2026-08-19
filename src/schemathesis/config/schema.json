@@ -1050,7 +1050,8 @@
               "missing_deserializer",
               "unused_openapi_auth",
               "method_not_allowed",
-              "constants_extraction"
+              "constants_extraction",
+              "unmatched_filter"
             ]
           }
         },
@@ -1072,7 +1073,8 @@
                   "missing_deserializer",
                   "unused_openapi_auth",
                   "method_not_allowed",
-                  "constants_extraction"
+                  "constants_extraction",
+                  "unmatched_filter"
                 ]
               }
             },
@@ -1092,7 +1094,8 @@
                       "missing_deserializer",
                       "unused_openapi_auth",
                       "method_not_allowed",
-                      "constants_extraction"
+                      "constants_extraction",
+                      "unmatched_filter"
                     ]
                   }
                 }

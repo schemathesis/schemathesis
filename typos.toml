@@ -10,6 +10,8 @@ extend-ignore-re = [
     "[0-9a-fg-]{36}",
     # Regex fixtures spelled out of the letters `a` and `b`
     "\\(\\?:[ab|]+\\)",
+    # Deliberate typos, used to show that a filter suggests the operation it nearly names
+    "[Uu]esrs",
 ]
 
 [default.extend-words]

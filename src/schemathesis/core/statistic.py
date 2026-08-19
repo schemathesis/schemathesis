@@ -16,6 +16,26 @@ class FilteredCount:
 
 
 @dataclass(slots=True)
+class FilterCriterion:
+    """One condition a filter tests."""
+
+    attribute: str
+    value: str
+    is_regex: bool
+
+
+@dataclass(slots=True)
+class UnmatchedFilter:
+    """A filter the user wrote that no operation matched."""
+
+    include: bool
+    criteria: list[FilterCriterion]
+    suggestion: str | None
+    # Where the user wrote it: "selection" for include/exclude, "operations" for a per-operation config block.
+    source: str
+
+
+@dataclass(slots=True)
 class StatefulInference:
     """Transition counts measured after inference, over the edge population the state machine traverses."""
 
@@ -54,8 +74,11 @@ class ApiStatistic:
     operations: FilteredCount
     transitions: FilteredCount
     resource_pool: ResourcePoolInventory
+    # Filter expressions the user wrote that no operation in the schema matched.
+    unmatched_filters: list[UnmatchedFilter]
 
     def __init__(self) -> None:
         self.operations = FilteredCount()
         self.transitions = FilteredCount()
         self.resource_pool = ResourcePoolInventory()
+        self.unmatched_filters = []

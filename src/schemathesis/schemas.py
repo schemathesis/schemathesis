@@ -468,6 +468,9 @@ class BaseSchema(Mapping):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
+    def get_operation_id(self, operation: APIOperation) -> str | None:
+        raise NotImplementedError
+
     def create_extra_data_source(self) -> ExtraDataSource | None:
         """Create an extra data source for augmenting test generation with real data.
 

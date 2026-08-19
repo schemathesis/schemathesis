@@ -19,7 +19,15 @@ from schemathesis.config._rate_limit import build_limiter
 from schemathesis.config._servers import ServersConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core.errors import IncorrectUsage
-from schemathesis.filters import FilterSet, HasAPIOperation, expression_to_filter_function, is_deprecated
+from schemathesis.filters import (
+    OPERATIONS,
+    SELECTION,
+    DeclaredFilter,
+    FilterSet,
+    HasAPIOperation,
+    expression_to_filter_function,
+    is_deprecated,
+)
 
 if TYPE_CHECKING:
     from pyrate_limiter import Limiter
@@ -205,6 +213,18 @@ class OperationsConfig(DiffBase):
 
         # Add our priority function as the filter
         final.include(priority_filter)
+        # Matching is collapsed into `priority_filter`, which erases what the user wrote; keep it for reporting.
+        final._declared = [
+            *(DeclaredFilter(filter_, True, SELECTION) for filter_ in include._includes),
+            *(DeclaredFilter(filter_, False, SELECTION) for filter_ in include._excludes),
+            *(DeclaredFilter(filter_, False, SELECTION) for filter_ in exclude._includes),
+            *(DeclaredFilter(filter_, False, SELECTION) for filter_ in exclude._excludes),
+            *(
+                DeclaredFilter(filter_, True, OPERATIONS)
+                for op_config in operations
+                for filter_ in op_config._filter_set._includes
+            ),
+        ]
 
         return final
 

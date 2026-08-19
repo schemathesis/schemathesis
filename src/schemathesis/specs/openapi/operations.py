@@ -23,6 +23,7 @@ from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transforms import get_template_fields
 from schemathesis.core.transport import is_http_method_schema
+from schemathesis.filters import FilterUsage
 from schemathesis.hooks import HookContext, dispatch_before_init_operation, dispatch_before_process_path
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.adapter import OpenApiResponses
@@ -189,6 +190,9 @@ class OperationLoader:
         # configured, every operation is selected and we skip the per-call dispatch.
         filters_active = not schema.filter_set.is_empty()
         should_skip = self._should_skip
+        usage = FilterUsage(schema.filter_set) if filters_active else None
+        # This walk skips what `iter_all` still yields, so a filter can look dead while its operation runs.
+        complete_walk = not schema.hooks.get_all_by_name("before_process_path")
         links_keyword = schema.adapter.links_keyword
         root_resolver = schema.root_resolver
 
@@ -203,10 +207,15 @@ class OperationLoader:
                 else:
                     path_resolver = root_resolver
                 for method, definition in path_item.items():
-                    if method not in HTTP_METHODS or not definition:
+                    if method not in HTTP_METHODS:
+                        continue
+                    if not definition:
+                        complete_walk = False
                         continue
                     statistic.operations.total += 1
                     is_selected = not should_skip(path, method, definition) if filters_active else True
+                    if usage is not None:
+                        usage.record(self._filter_context)
                     if is_selected:
                         statistic.operations.selected += 1
                         if "operationId" in definition:
@@ -221,6 +230,7 @@ class OperationLoader:
                             if is_selected:
                                 collected_links.extend(defined_links.values())
             except SCHEMA_PARSING_ERRORS:
+                complete_walk = False
                 continue
 
         def is_link_selected(link: dict) -> bool:
@@ -268,6 +278,8 @@ class OperationLoader:
         statistic.resource_pool.consumer_labels = sorted(consumer_labels)
         statistic.resource_pool.resources = len(resource_names)
 
+        if usage is not None and complete_walk:
+            statistic.unmatched_filters = usage.results()
         return statistic
 
     def _should_skip(self, path: str, method: str, definition: OperationObject) -> bool:
