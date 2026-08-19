@@ -459,3 +459,42 @@ class UnsupportedMethodResponse(Failure):
     @property
     def _unique_key(self) -> str:
         return self.failure_reason
+
+
+class AllowHeaderMismatch(Failure):
+    """`Allow` header does not list the same methods as the schema."""
+
+    __slots__ = (
+        "operation",
+        "allow_header",
+        "missing_methods",
+        "undocumented_methods",
+        "message",
+        "title",
+        "case_id",
+        "severity",
+    )
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        allow_header: str,
+        missing_methods: list[str],
+        undocumented_methods: list[str],
+        message: str,
+        title: str = "Invalid Allow header",
+        case_id: str | None = None,
+    ) -> None:
+        self.operation = operation
+        self.allow_header = allow_header
+        self.missing_methods = missing_methods
+        self.undocumented_methods = undocumented_methods
+        self.message = message
+        self.title = title
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
+
+    @property
+    def _unique_key(self) -> str:
+        return f"{','.join(self.missing_methods)}|{','.join(self.undocumented_methods)}"

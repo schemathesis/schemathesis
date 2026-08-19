@@ -9941,3 +9941,30 @@ def test_ref_parameter_schema_keeps_combination_coverage(ctx):
         {"type": "object", "properties": {"t": enum}, "required": ["t"], "additionalProperties": False},
         enum,
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_allow_header_conformance(ctx, cli, snapshot_cli):
+    # Flask builds `Allow` from its own routing table, so a documented but unimplemented method is missing from it.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"201": {"description": "Created"}}},
+            }
+        }
+    )
+
+    @app.route("/items", methods=["GET"])
+    def items():
+        return jsonify([])
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=allow_header_conformance",
+            "--phases=coverage",
+            "--mode=negative",
+        )
+        == snapshot_cli
+    )

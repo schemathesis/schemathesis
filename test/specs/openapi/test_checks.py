@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 import yaml
@@ -24,12 +25,13 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
-from schemathesis.openapi.checks import JsonSchemaError, UseAfterFree
+from schemathesis.openapi.checks import AllowHeaderMismatch, JsonSchemaError, UseAfterFree
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _additional_properties_hint,
     _body_negation_becomes_valid_after_serialization,
     _is_prefix_operation,
+    allow_header_conformance,
     has_only_additional_properties_in_non_body_parameters,
     missing_required_header,
     negative_data_rejection,
@@ -1803,3 +1805,80 @@ def test_positive_data_acceptance_empty_token_path_does_not_match_root(ctx, resp
     case = schema["/"]["POST"].Case(_meta=build_metadata())
     with pytest.raises(Failure):
         positive_data_acceptance(_check_context(), response_factory.requests(status_code=400), case)
+
+
+ALLOW_SCHEMA_PATHS = {
+    "/items": {
+        "parameters": [{"name": "trace_id", "in": "header", "schema": {"type": "string"}}],
+        "get": {"responses": {"200": {"description": "OK"}}},
+        "post": {"responses": {"201": {"description": "Created"}}},
+    }
+}
+
+
+@pytest.mark.parametrize(
+    ("headers", "method", "expected"),
+    [
+        ({"Allow": "GET, POST, HEAD, OPTIONS"}, "OPTIONS", None),
+        ({"Allow": "get,post"}, "OPTIONS", None),
+        ({"Allow": "GET ,   POST"}, "OPTIONS", None),
+        ({"Allow": "GET, HEAD, OPTIONS"}, "OPTIONS", "missing documented methods: POST"),
+        (
+            {"Allow": "GET, POST, DELETE"},
+            "OPTIONS",
+            "undocumented methods advertised: DELETE",
+        ),
+        (
+            {"Allow": "GET, DELETE"},
+            "OPTIONS",
+            "missing documented methods: POST; undocumented methods advertised: DELETE",
+        ),
+        ({}, "OPTIONS", None),
+        ({"Allow": ""}, "OPTIONS", None),
+        ({"Allow": "GET"}, "GET", None),
+    ],
+    ids=[
+        "match",
+        "case-insensitive",
+        "whitespace",
+        "missing-method",
+        "undocumented-method",
+        "both",
+        "no-allow-header",
+        "empty-allow-header",
+        "not-an-options-request",
+    ],
+)
+def test_allow_header_conformance(ctx, response_factory, headers, method, expected):
+    schema = ctx.openapi.load_schema(ALLOW_SCHEMA_PATHS)
+    case = schema["/items"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(headers=headers, method=method), verify=True)
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        response_checks=None,
+    )
+    if expected is None:
+        assert allow_header_conformance(check_ctx, response, case) is None
+    else:
+        with pytest.raises(AllowHeaderMismatch, match=re.escape(expected)):
+            allow_header_conformance(check_ctx, response, case)
+
+
+def test_allow_header_conformance_repeated_header(ctx, response_factory):
+    raw = response_factory.requests(method="OPTIONS")
+    raw.raw.headers.add("Allow", "GET")
+    raw.raw.headers.add("Allow", "POST")
+    case = ctx.openapi.load_schema(ALLOW_SCHEMA_PATHS)["/items"]["GET"].Case()
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        response_checks=None,
+    )
+    assert allow_header_conformance(check_ctx, Response.from_requests(raw, verify=True), case) is None

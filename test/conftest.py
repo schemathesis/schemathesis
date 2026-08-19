@@ -431,6 +431,7 @@ def response_factory():
         content_type: str | None = "application/json",
         status_code: int = 200,
         headers: dict[str, Any] | None = None,
+        method: str = "POST",
     ) -> requests.Response:
         response = requests.Response()
         response._content = content
@@ -442,7 +443,7 @@ def response_factory():
         response.headers.update(headers)
         response.raw = HTTPResponse(body=BytesIO(content), status=status_code, headers=response.headers)
         response.request = requests.PreparedRequest()
-        response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
+        response.request.prepare(method=method, url="http://127.0.0.1", headers=headers)
         return response
 
     def werkzeug_factory(

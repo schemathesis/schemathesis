@@ -21,6 +21,7 @@ from schemathesis.core.transport import Response, expand_status_code
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData
 from schemathesis.openapi.checks import (
+    AllowHeaderMismatch,
     EnsureResourceAvailability,
     IgnoredAuth,
     JsonSchemaError,
@@ -886,6 +887,44 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
                 message=f"{response.request.method} returned 405 without required `Allow` header\n\nAdd `Allow` header listing supported methods (required by RFC 9110)",
             )
     return None
+
+
+# `HEAD` and `OPTIONS` are commonly handled by the HTTP framework rather than declared in the schema.
+IMPLICIT_METHODS = frozenset({"head", "options"})
+
+
+@schemathesis.check
+@requires_openapi_schema
+def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    from schemathesis.specs.openapi.operations import HTTP_METHODS
+
+    if response.request.method != "OPTIONS":
+        return None
+    values = response.headers.get("allow")
+    if not values:
+        return None
+    allow_header = ", ".join(values)
+    advertised = {method.strip().lower() for method in allow_header.split(",") if method.strip()}
+    if not advertised:
+        return None
+    declared = {method.lower() for method in case.operation.schema[case.operation.path]}
+    declared &= HTTP_METHODS
+    missing = sorted(declared - advertised - IMPLICIT_METHODS)
+    undocumented = sorted(advertised - declared - IMPLICIT_METHODS)
+    if not missing and not undocumented:
+        return None
+    parts = []
+    if missing:
+        parts.append(f"missing documented methods: {', '.join(method.upper() for method in missing)}")
+    if undocumented:
+        parts.append(f"undocumented methods advertised: {', '.join(method.upper() for method in undocumented)}")
+    raise AllowHeaderMismatch(
+        operation=case.operation.label,
+        allow_header=allow_header,
+        missing_methods=[method.upper() for method in missing],
+        undocumented_methods=[method.upper() for method in undocumented],
+        message=f"`Allow` header does not match the schema — {'; '.join(parts)}\n\nList exactly the methods this resource supports in `Allow`",
+    )
 
 
 def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
