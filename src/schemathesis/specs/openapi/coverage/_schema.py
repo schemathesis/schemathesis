@@ -12,6 +12,7 @@ from contextlib import ExitStack, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache, partial
+from hashlib import blake2b
 from itertools import combinations, count, islice
 from math import inf, nextafter
 
@@ -998,18 +999,29 @@ def _convert_bytes_for_hashing(value: Any) -> Any:
     return value
 
 
-def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
+_MAX_INLINE_KEY = 512
+
+
+def _digest(serialized: str) -> str | bytes:
+    # Keys answer membership only, so a long serialized form is dead weight - tens of KB per entry on nested bodies.
+    # Short ones stay inline; hashing them costs more than keeping them. A 128-bit collision is rare.
+    if len(serialized) <= _MAX_INLINE_KEY:
+        return serialized
+    return blake2b(serialized.encode(), digest_size=16).digest()
+
+
+def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | bytes | T]:
     if type(value) is dict or type(value) is list:
         # Plain JSON-shaped containers (the common case) canonicalize in Rust without
         # an intermediate Python-side deep-copy. Bytes inside the value reject the
         # native call; fall back to the bytes-aware path.
         try:
-            return type(value), jsonschema_rs.canonical.json.to_string(value)
+            return type(value), _digest(jsonschema_rs.canonical.json.to_string(value))
         except (TypeError, ValueError):
             pass
         converted = _convert_bytes_for_hashing(value)
         serialized = _encode(converted)
-        return type(value), serialized
+        return type(value), _digest(serialized)
     return type(value), value
 
 
