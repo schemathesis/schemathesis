@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.24.3...HEAD) - TBD
 
+### :rocket: Added
+
+- Report filter expressions that match no API operations, with the closest match as a suggestion.
+
 ### :bug: Fixed
 
 #### Data generation
@@ -60,6 +64,7 @@
 
 #### Others
 
+- Internal error filtering GraphQL operations by `operation-id`.
 - Ignoring phase-level config like `phases.fuzzing.generation.modes`.
 - False positive `positive_data_acceptance` for `not` clauses in schemas using references.
 - False positive `positive_data_acceptance` for credential-granting operations answering 400 or 422.

@@ -640,6 +640,10 @@ class OpenApiSchema(BaseSchema):
         return operation.definition.raw.get("tags")
 
     @override
+    def get_operation_id(self, operation: APIOperation) -> str | None:
+        return operation.definition.raw.get("operationId")
+
+    @override
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None
     ) -> tuple[list | None, dict[str, Any] | None]:

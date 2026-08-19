@@ -6,6 +6,7 @@ import pytest
 import schemathesis
 from schemathesis import filters
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
 from schemathesis.schemas import APIOperation
 
 RAW_SCHEMA = {
@@ -250,3 +251,46 @@ def test_forbid_value_and_auth():
     filter_set = filters.FilterSet()
     with pytest.raises(IncorrectUsage, match=filters.ERROR_EXPECTED_AND_REGEX):
         filter_set.include(method="POST", method_regex="GET")
+
+
+SUGGESTION_PATHS = {
+    "/users": {"get": {"tags": ["Admin"], "operationId": "getUsers", "responses": {"200": {"description": "OK"}}}},
+    "/orders": {"post": {"tags": ["Sales"], "operationId": "createOrder", "responses": {"200": {"description": "OK"}}}},
+}
+
+
+def _suggestion(ctx, **criteria):
+    schema = ctx.openapi.load_schema(SUGGESTION_PATHS).include(**criteria)
+    unmatched = schema.statistic.unmatched_filters
+    assert len(unmatched) == 1, unmatched
+    return unmatched[0].suggestion
+
+
+@pytest.mark.parametrize(
+    ("criteria", "expected"),
+    [
+        ({"name": "GET /uesrs"}, "GET /users"),
+        ({"name": "get /users"}, "GET /users"),
+        ({"name": "GET /nope"}, None),
+        ({"path": "/oredrs"}, "/orders"),
+        ({"method": "GTE"}, "GET"),
+        ({"tag": "Admni"}, "Admin"),
+        ({"operation_id": "getUesrs"}, "getUsers"),
+        ({"name_regex": "^ZZZ"}, None),
+    ],
+    ids=["name-typo", "name-wrong-case", "name-unrelated", "path", "method", "tag", "operation-id", "regex"],
+)
+def test_filter_suggestions(ctx, criteria, expected):
+    assert _suggestion(ctx, **criteria) == expected
+
+
+def test_unmatched_filter_carries_schema_terms_not_cli_spelling(ctx):
+    schema = ctx.openapi.load_schema(SUGGESTION_PATHS).exclude(name_regex="^ZZZ")
+    assert schema.statistic.unmatched_filters == [
+        UnmatchedFilter(
+            include=False,
+            criteria=[FilterCriterion(attribute="label", value="^ZZZ", is_regex=True)],
+            suggestion=None,
+            source="selection",
+        )
+    ]

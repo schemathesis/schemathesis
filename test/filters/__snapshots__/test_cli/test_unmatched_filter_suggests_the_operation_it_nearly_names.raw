@@ -21,7 +21,7 @@ Schemathesis dev
 
 Unmatched filters: 1 filter matched no API operations
 
-  - --include-name 'DoesNotExist'
+  - --include-name 'Query.getBook' (did you mean 'Query.getBooks'?)
 
 💡 Check the filter for a typo, or update it if the operation was renamed
 

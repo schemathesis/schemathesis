@@ -1,0 +1,53 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 4 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 2 passed
+
+=================================== WARNINGS ===================================
+
+Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /b
+  - POST /a
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/4
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ✅ Fuzzing
+  ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================== 1 warning in 1.00s ==============================

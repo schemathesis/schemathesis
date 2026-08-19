@@ -16,6 +16,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `unused_openapi_auth` | Configured OpenAPI auth scheme doesn't exist in schema | Check scheme name matches `securitySchemes` (check for typos) |
 | `method_not_allowed` | Operation consistently returned `405 Method Not Allowed` | Verify the server accepts this method, or remove the operation from the schema |
 | `constants_extraction` | A registered `@schemathesis.python.constants` source could not be scanned | Return your app or importable modules from the source |
+| `unmatched_filter` | A filter expression matched no API operation | Fix the typo, or update the filter if the operation was renamed |
 
 ## Available Warnings
 
@@ -140,6 +141,20 @@ Constant reuse skipped: 1 registered source could not be scanned
 **Trigger**: A source registered with `@schemathesis.python.constants` either raised while running or resolved to nothing importable, so no literals could be harvested from it.
 
 This fires only for explicitly registered sources — automatic extraction from an app loaded via `from_asgi`/`from_wsgi` stays silent when it simply finds no reusable values. Common causes: the source raises at call time, or names a module that fails to import. A source that resolves to real modules with no reusable literals is not reported.
+
+### `unmatched_filter`
+
+```
+Unmatched filters: 1 filter matched no API operations
+
+  - --include-name 'GET /uesrs' (did you mean 'GET /users'?)
+
+💡 Check the filter for a typo, or update it if the operation was renamed
+```
+
+**Trigger**: A filter expression you passed on the command line matched none of the operations in the schema. The closest operation name is suggested when one is close enough.
+
+Almost always a typo or an operation that was renamed in the schema while the filter kept the old name.
 
 ## Configuring Warnings
 

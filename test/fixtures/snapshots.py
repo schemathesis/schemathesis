@@ -302,12 +302,16 @@ class CliSnapshotConfig:
             ):
                 continue
             lines.append(line.rstrip())
-        if "Stop reason:" in data or "Empty test suite" in data:
+        if (
+            "Stop reason:" in data
+            or "Empty test suite" in data
+            # Same no-tests path, but a warning replaced the "Empty test suite" banner.
+            or ("No test cases were generated" in data and "Warnings:" in data)
+        ):
             # Rich Live progress widgets leave extra blank lines on non-TTY consoles;
             # collapse runs of consecutive blanks to one. Triggers on st fuzz output
-            # (after "Stop reason:") and on the st run "no tests ran" path
-            # ("Empty test suite") where the probing progress doesn't clean up
-            # identically across platforms.
+            # (after "Stop reason:") and on the st run path where nothing was generated,
+            # where the probing progress doesn't clean up identically across platforms.
             collapsed = []
             for line in lines:
                 if line == "" and collapsed and collapsed[-1] == "":

@@ -602,6 +602,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         self.console.print(message)
         self.console.print()
         self.loading_manager = None
+        self.warning_collector.on_unmatched_filters(ctx, event.statistic)
         self.statistic = event.statistic
 
         table = Table(
@@ -981,6 +982,15 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 entity_name="configured auth scheme",
             )
 
+        if self.warnings.unmatched_filter:
+            self._display_warning_block(
+                title="Unmatched filters",
+                operations=self.warnings.unmatched_filter,
+                suffix_text=" matched no API operations",
+                tips=["💡 Check the filter for a typo, or update it if the operation was renamed"],
+                entity_name="filter",
+            )
+
         if self.warnings.method_not_allowed:
             self._display_warning_block(
                 title="Method Not Allowed",
@@ -1173,6 +1183,12 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 "Unsupported regex",
                 "operation",
                 "had ungeneratable regex patterns",
+            ),
+            (
+                len(self.warnings.unmatched_filter),
+                "Unmatched filters",
+                "filter",
+                "matched no API operations",
             ),
             (
                 len(self.warnings.method_not_allowed),

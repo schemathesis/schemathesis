@@ -4,10 +4,10 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
- ✅  Loaded specification from http://127.0.0.1/graphql (in 0.00s)
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/graphql
-     Specification:    GraphQL
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
      Operations:       0 selected / 4 total
 
  ✅  API capabilities:
@@ -21,7 +21,7 @@ Schemathesis dev
 
 Unmatched filters: 1 filter matched no API operations
 
-  - --include-name 'DoesNotExist'
+  - --include-name-regex '^[a-z]+ZZZ$'
 
 💡 Check the filter for a typo, or update it if the operation was renamed
 
@@ -32,10 +32,10 @@ API Operations:
   Tested: 0
 
 Test Phases:
-  ⏭  Examples (not supported)
-  ⏭  Coverage (not supported)
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   ⏭  Fuzzing (nothing to test)
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Warnings:
   ⚠️ Unmatched filters: 1 filter matched no API operations

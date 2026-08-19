@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import json
 import re
 from collections.abc import Callable
@@ -11,6 +12,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Protocol
 
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.statistic import FilterCriterion, UnmatchedFilter
 from schemathesis.core.transforms import resolve_pointer
 
 if TYPE_CHECKING:
@@ -40,6 +42,9 @@ class Matcher:
     label: str = field(hash=False, compare=False)
     # Compare & hash matchers by a pre-computed hash value
     _hash: int
+    # What this matcher tests, kept so a filter can be named back in the terms the user wrote it.
+    attribute: str | None = field(default=None, hash=False, compare=False)
+    criterion: object = field(default=None, hash=False, compare=False)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.label}>"
@@ -57,7 +62,7 @@ class Matcher:
         else:
             func = partial(by_value, attribute=attribute, expected=expected)
         label = f"{attribute}={expected!r}"
-        return cls(func, label=label, _hash=hash(label))
+        return cls(func, label=label, _hash=hash(label), attribute=attribute, criterion=expected)
 
     @classmethod
     def for_regex(cls, attribute: str, regex: RegexValue) -> Matcher:
@@ -71,7 +76,7 @@ class Matcher:
             regex = re.compile(regex, flags=flags)
         func = partial(by_regex, attribute=attribute, regex=regex)
         label = f"{attribute}_regex={regex!r}"
-        return cls(func, label=label, _hash=hash(label))
+        return cls(func, label=label, _hash=hash(label), attribute=f"{attribute}_regex", criterion=regex.pattern)
 
     def match(self, ctx: HasAPIOperation) -> bool:
         """Whether matcher matches the given operation."""
@@ -82,7 +87,7 @@ def get_operation_attribute(operation: APIOperation, attribute: str) -> str | li
     if attribute == "tag":
         return operation.tags
     if attribute == "operation_id":
-        return operation.definition.raw.get("operationId")
+        return operation.schema.get_operation_id(operation)
     # Just uppercase `method`
     value = getattr(operation, attribute)
     if attribute == "method":
@@ -141,13 +146,25 @@ class FilterSet:
 
     _includes: set[Filter]
     _excludes: set[Filter]
+    # The filters as the user wrote them, kept when matching is collapsed into a single function.
+    _declared: list[DeclaredFilter] | None = field(default=None, repr=False, compare=False)
 
-    def __init__(self, _includes: set[Filter] | None = None, _excludes: set[Filter] | None = None) -> None:
+    def __init__(
+        self,
+        _includes: set[Filter] | None = None,
+        _excludes: set[Filter] | None = None,
+        _declared: list[DeclaredFilter] | None = None,
+    ) -> None:
         self._includes = _includes or set()
         self._excludes = _excludes or set()
+        self._declared = _declared
 
     def clone(self) -> Self:
-        return self.__class__(_includes=self._includes.copy(), _excludes=self._excludes.copy())
+        return self.__class__(
+            _includes=self._includes.copy(),
+            _excludes=self._excludes.copy(),
+            _declared=list(self._declared) if self._declared is not None else None,
+        )
 
     def applies_to(self, operation: APIOperation) -> bool:
         return self.match(SimpleNamespace(operation=operation))
@@ -392,3 +409,105 @@ def expression_to_filter_function(expression: str) -> Callable[[HasAPIOperation]
             return resolved != value
 
     return filter_function
+
+
+# Labels and paths share long prefixes, so near-misses need a high bar; methods are a short closed set.
+SELECTION = "selection"
+OPERATIONS = "operations"
+
+
+@dataclass(frozen=True, slots=True)
+class DeclaredFilter:
+    """A filter as the user wrote it, kept for reporting the ones that never matched."""
+
+    filter: Filter
+    include: bool
+    source: str
+
+
+SUGGESTION_CUTOFF = 0.8
+METHOD_SUGGESTION_CUTOFF = 0.6
+
+
+def _criteria(filter_: Filter) -> list[FilterCriterion] | None:
+    """The conditions a filter tests, or `None` when it is backed by a function rather than values."""
+    criteria = []
+    for matcher in filter_.matchers:
+        attribute = matcher.attribute
+        if attribute is None or not isinstance(matcher.criterion, str):
+            return None
+        is_regex = attribute.endswith("_regex")
+        criteria.append(
+            FilterCriterion(
+                attribute=attribute[: -len("_regex")] if is_regex else attribute,
+                value=matcher.criterion,
+                is_regex=is_regex,
+            )
+        )
+    return criteria
+
+
+class FilterUsage:
+    """Records which filters ever matched, so the ones that never did can be reported."""
+
+    __slots__ = ("_pending", "_candidates")
+
+    def __init__(self, filter_set: FilterSet) -> None:
+        # Keyed by direction too: an include and an exclude on the same criteria are equal as filters.
+        self._pending: dict[tuple[Filter, bool, str], list[FilterCriterion]] = {}
+        self._candidates: dict[str, set[str]] = {}
+        declared = filter_set._declared
+        if declared is None:
+            declared = [DeclaredFilter(filter_, True, SELECTION) for filter_ in filter_set._includes]
+            declared += [DeclaredFilter(filter_, False, SELECTION) for filter_ in filter_set._excludes]
+        for entry in declared:
+            criteria = _criteria(entry.filter)
+            if criteria is not None:
+                self._pending[(entry.filter, entry.include, entry.source)] = criteria
+
+    def record(self, ctx: HasAPIOperation) -> None:
+        if not self._pending:
+            return
+        for key in [key for key in self._pending if key[0].match(ctx)]:
+            del self._pending[key]
+        operation = ctx.operation
+        self._candidates.setdefault("label", set()).add(operation.label)
+        self._candidates.setdefault("path", set()).add(operation.path)
+        self._candidates.setdefault("method", set()).add(operation.method.upper())
+        self._candidates.setdefault("tag", set()).update(operation.tags or ())
+        operation_id = operation.definition.raw.get("operationId")
+        if operation_id is not None:
+            self._candidates.setdefault("operation_id", set()).add(operation_id)
+
+    def results(self) -> list[UnmatchedFilter]:
+        return sorted(
+            (
+                UnmatchedFilter(
+                    include=include,
+                    criteria=criteria,
+                    suggestion=self._suggestion_for(criteria),
+                    source=source,
+                )
+                for (_, include, source), criteria in self._pending.items()
+            ),
+            key=lambda entry: (
+                entry.source,
+                not entry.include,
+                [(item.attribute, item.value) for item in entry.criteria],
+            ),
+        )
+
+    def _suggestion_for(self, criteria: list[FilterCriterion]) -> str | None:
+        """The closest real operation value, for a filter that tests exactly one literal."""
+        if len(criteria) != 1:
+            return None
+        criterion = criteria[0]
+        if criterion.is_regex:
+            return None
+        # Operation labels share a method prefix, which alone clears a lower cutoff and suggests any of them.
+        candidates = {
+            candidate.lower(): candidate for candidate in sorted(self._candidates.get(criterion.attribute, ()))
+        }
+        cutoff = METHOD_SUGGESTION_CUTOFF if criterion.attribute == "method" else SUGGESTION_CUTOFF
+        matches = difflib.get_close_matches(criterion.value.lower(), list(candidates), n=1, cutoff=cutoff)
+        return candidates[matches[0]] if matches else None

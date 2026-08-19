@@ -2611,13 +2611,16 @@ def test_query_pattern_requiring_non_alnum_not_skipped(ctx_factory):
     assert covered
 
 
-def test_items_false_with_prefix_items(pctx):
+def test_items_false_with_prefix_items(ctx_factory):
+    # `prefixItems` arrived with 2020-12, which is the dialect the crash this guards was reported under.
+    ctx = ctx_factory(generation_modes=[GenerationMode.POSITIVE], validator_cls=jsonschema_rs.Draft202012Validator)
     schema = {
         "type": "array",
         "items": False,
         "prefixItems": [{"type": "string"}, {"type": "string"}],
     }
-    covered = cover_schema(pctx, schema)
+    covered = cover_schema(ctx, schema)
+    assert covered == [[]]
     assert_unique(covered)
     assert_conform(covered, schema)
 

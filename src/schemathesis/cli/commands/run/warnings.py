@@ -3,10 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
+from schemathesis.cli.commands.run.filters import describe_filter
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.config import ProjectConfig, SchemathesisWarning
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.statistic import ApiStatistic
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import Interaction, RecordedScenario
 from schemathesis.engine.run import PhaseName
@@ -24,6 +26,7 @@ class WarningData:
     unsupported_regex: dict[str, set[str]]
     method_not_allowed: set[str]
     constants_extraction: set[str]
+    unmatched_filter: set[str]
 
     def __init__(
         self,
@@ -35,6 +38,7 @@ class WarningData:
         unsupported_regex: dict[str, set[str]] | None = None,
         method_not_allowed: set[str] | None = None,
         constants_extraction: set[str] | None = None,
+        unmatched_filter: set[str] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
@@ -44,6 +48,7 @@ class WarningData:
         self.unsupported_regex = unsupported_regex or {}
         self.method_not_allowed = method_not_allowed or set()
         self.constants_extraction = constants_extraction or set()
+        self.unmatched_filter = unmatched_filter or set()
 
     @property
     def is_empty(self) -> bool:
@@ -56,6 +61,7 @@ class WarningData:
             or self.unsupported_regex
             or self.method_not_allowed
             or self.constants_extraction
+            or self.unmatched_filter
         )
 
     @property
@@ -72,6 +78,7 @@ class WarningData:
                 self.unsupported_regex,
                 self.method_not_allowed,
                 self.constants_extraction,
+                self.unmatched_filter,
             )
             if warnings
         )
@@ -334,6 +341,20 @@ class WarningCollector:
 
         def record() -> None:
             self.data.unsupported_regex.setdefault(operation_label, set()).add(message)
+
+        return record
+
+    def on_unmatched_filters(self, ctx: BaseExecutionContext, statistic: ApiStatistic) -> None:
+        """Record filter expressions that no operation matched."""
+        for entry in statistic.unmatched_filters:
+            message = describe_filter(entry)
+            if entry.suggestion is not None:
+                message += f" (did you mean {entry.suggestion!r}?)"
+            self._handle_warning(ctx, SchemathesisWarning.UNMATCHED_FILTER, self._record_unmatched_filter(message))
+
+    def _record_unmatched_filter(self, message: str) -> Callable[[], None]:
+        def record() -> None:
+            self.data.unmatched_filter.add(message)
 
         return record
 
