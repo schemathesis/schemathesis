@@ -666,7 +666,7 @@ These settings can only be applied at the project level.
     Schemathesis will limit negative testing of unexpected methods to those in the array; if omitted, all HTTP methods not specified in the spec are applied.
     Set to an empty array to disable unsupported method testing entirely.
 
-    Responses to these requests are validated by the [`unsupported_method`](checks.md#unsupported_method) check.
+    Responses to these requests are validated by the [`unsupported_method`](checks.md#unsupported_method) check, and the `OPTIONS` response additionally by [`allow_header_conformance`](checks.md#allow_header_conformance).
 
     ```toml
     [phases.coverage]
@@ -915,6 +915,7 @@ These settings can only be applied at the project level.
       - `missing_required_header`
       - `ignored_auth`
       - `unsupported_method`
+      - `allow_header_conformance`
 
     ```toml
     [checks]

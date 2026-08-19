@@ -469,6 +469,9 @@
         "unsupported_method": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
+        "allow_header_conformance": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
         "max_response_time": {
           "$ref": "#/$defs/MaxResponseTimeConfig"
         }

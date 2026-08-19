@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Report filter expressions that match no API operations, with the closest match as a suggestion.
+- `allow_header_conformance` check comparing the `Allow` header against the methods declared in the schema.
 
 ### :bug: Fixed
 

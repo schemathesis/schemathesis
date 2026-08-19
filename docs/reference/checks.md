@@ -238,6 +238,26 @@ Return 405 for methods not listed in the OpenAPI spec
 
 ---
 
+### `allow_header_conformance`
+
+Verifies the `Allow` header returned for `OPTIONS` requests lists the same methods as the schema. A mismatch means clients are told the resource supports a different set of operations than the one documented; extra methods may expose endpoints that were never meant to be public.
+
+```text
+- Invalid Allow header
+
+`Allow` header does not match the schema — missing documented methods: POST
+
+List exactly the methods this resource supports in `Allow`
+```
+
+`HEAD` and `OPTIONS` are ignored on both sides, since HTTP frameworks usually handle them without a schema declaration.
+
+!!! note "Coverage phase"
+    Uses the `OPTIONS` request the coverage phase already sends, so it costs no extra calls.
+    It is skipped if `OPTIONS` is removed from [`phases.coverage.unexpected-methods`](configuration.md#phasescoverageunexpected-methods) or if the response carries no `Allow` header.
+
+---
+
 
 ## Stateful behavior
 

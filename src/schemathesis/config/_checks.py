@@ -146,6 +146,7 @@ class ChecksConfig(DiffBase):
     missing_required_header: MissingRequiredHeaderConfig
     ignored_auth: SimpleCheckConfig
     unsupported_method: SimpleCheckConfig
+    allow_header_conformance: SimpleCheckConfig
     max_response_time: MaxResponseTimeConfig
     _unknown: dict[str, SimpleCheckConfig]
     # Kwargs forwarded to __init__ of class-based checks, keyed by check class name.
@@ -166,6 +167,7 @@ class ChecksConfig(DiffBase):
         missing_required_header: MissingRequiredHeaderConfig | None = None,
         ignored_auth: SimpleCheckConfig | None = None,
         unsupported_method: SimpleCheckConfig | None = None,
+        allow_header_conformance: SimpleCheckConfig | None = None,
         max_response_time: MaxResponseTimeConfig | None = None,
     ) -> None:
         self.not_a_server_error = not_a_server_error or NotAServerErrorConfig()
@@ -180,6 +182,7 @@ class ChecksConfig(DiffBase):
         self.missing_required_header = missing_required_header or MissingRequiredHeaderConfig()
         self.ignored_auth = ignored_auth or SimpleCheckConfig()
         self.unsupported_method = unsupported_method or SimpleCheckConfig()
+        self.allow_header_conformance = allow_header_conformance or SimpleCheckConfig()
         self.max_response_time = max_response_time or MaxResponseTimeConfig()
         self._unknown = {}
         self._custom_kwargs = {}
@@ -228,6 +231,7 @@ class ChecksConfig(DiffBase):
             ),
             ignored_auth=SimpleCheckConfig.from_dict(merge(data.get("ignored_auth", {}))),
             unsupported_method=SimpleCheckConfig.from_dict(merge(data.get("unsupported_method", {}))),
+            allow_header_conformance=SimpleCheckConfig.from_dict(merge(data.get("allow_header_conformance", {}))),
             max_response_time=MaxResponseTimeConfig(limit=data.get("max_response_time")),
         )
         for name, value in data.items():
