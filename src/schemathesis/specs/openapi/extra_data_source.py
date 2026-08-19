@@ -511,23 +511,6 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
         return values
 
-    def pick_captured_value(
-        self,
-        *,
-        operation: APIOperation,
-        location: ParameterLocation,
-        name: str,
-        context_constraints: dict[str, Any] | None = None,
-    ) -> Any | None:
-        """Return one weighted-selected pool value for a resource-bound parameter, or None."""
-        picked = self._pick_captured_with_provenance(
-            operation=operation,
-            location=location,
-            name=name,
-            context_constraints=context_constraints,
-        )
-        return picked[0] if picked is not None else None
-
     def _pick_captured_with_provenance(
         self,
         *,
@@ -536,7 +519,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         name: str,
         context_constraints: dict[str, Any] | None = None,
     ) -> tuple[Any, ResourceInstance] | None:
-        """Like `pick_captured_value` but also returns the `ResourceInstance` whose draw won.
+        """Return one weighted-selected pool value plus the `ResourceInstance` whose draw won.
 
         `context_constraints` keeps draws on the same parent chain; missing context keys
         match anything, and the filter falls through when no constrained instance exists.

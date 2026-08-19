@@ -55,16 +55,6 @@ class PoolPick:
 class ResourcePool(Protocol):
     """Draw side: hands out values captured from earlier responses."""
 
-    def pick_captured_value(
-        self,
-        *,
-        operation: APIOperation,
-        location: ParameterLocation,
-        name: str,
-    ) -> Any | None:
-        """Return one weighted-selected pool value for a resource-bound parameter."""
-        ...  # pragma: no cover
-
     def pick_correlated_values(
         self,
         *,
