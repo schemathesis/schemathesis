@@ -1,8 +1,14 @@
 import json
+import pathlib
 import socket
+import sys
 import warnings
 
 import pytest
+
+sys.path.append(str(pathlib.Path(__file__).parent.parent))
+
+from tools.coverage.caches import clear_internal_caches  # noqa: E402
 
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
@@ -37,6 +43,14 @@ def _no_network(monkeypatch):
 
     monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)
     monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+
+
+@pytest.fixture(autouse=True)
+def _release_internal_caches():
+    # Generation memoizes per schema and the entries are schema-sized, so a worker that keeps them
+    # peaks at the running total of every schema it drew instead of the largest single one.
+    yield
+    clear_internal_caches()
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
