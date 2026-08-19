@@ -8910,9 +8910,6 @@ def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
         def pick_correlated_values(self, *, operation):
             return PoolPick(values={(ParameterLocation.BODY, "address"): {"city": "London", "country": "UK"}})
 
-        def pick_captured_value(self, *, operation, location, name, context_constraints):
-            return None
-
     list(
         iter_coverage_cases(
             operation=operation,

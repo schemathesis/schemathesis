@@ -782,7 +782,7 @@ def test_record_successful_delete_evicts_pool_entry_and_filters_subsequent_draws
 
     get_operation = schema["/items/{itemId}"]["GET"]
     drawn = {
-        data_source.pick_captured_value(operation=get_operation, location=ParameterLocation.PATH, name="itemId")
+        data_source.pick_correlated_values(operation=get_operation).values.get((ParameterLocation.PATH, "itemId"))
         for _ in range(10)
     }
     assert drawn == {"alive"}, "tombstoned id must not be drawn even when it is the highest-weighted candidate"
@@ -838,7 +838,8 @@ def test_tombstoned_value_falls_through_when_pool_is_otherwise_empty(ctx):
     # Tombstone: even if the entry were to slip back in, the value is filtered at draw time.
     get_operation = schema["/items/{itemId}"]["GET"]
     assert (
-        data_source.pick_captured_value(operation=get_operation, location=ParameterLocation.PATH, name="itemId") is None
+        data_source.pick_correlated_values(operation=get_operation).values.get((ParameterLocation.PATH, "itemId"))
+        is None
     )
 
 
@@ -1774,16 +1775,7 @@ def test_primitive_integer_identifier(ctx):
     assert resources[0].data == {"id": 12345}
 
 
-def test_pick_captured_value_returns_none_for_unbound_parameter(user_schema_builder):
-    schema = user_schema_builder()
-    data_source = schema.create_extra_data_source()
-
-    operation = schema["/users"]["POST"]
-    result = data_source.pick_captured_value(operation=operation, location=ParameterLocation.PATH, name="user_id")
-    assert result is None
-
-
-def test_pick_captured_value_returns_none_for_empty_pool(user_schema_builder):
+def test_pick_correlated_values_returns_none_for_empty_pool(user_schema_builder):
     user_schema = {
         "type": "object",
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
@@ -1804,40 +1796,11 @@ def test_pick_captured_value_returns_none_for_empty_pool(user_schema_builder):
     data_source = schema.create_extra_data_source()
 
     get_operation = schema["/users/{user_id}"]["GET"]
-    result = data_source.pick_captured_value(operation=get_operation, location=ParameterLocation.PATH, name="user_id")
+    result = data_source.pick_correlated_values(operation=get_operation).values.get((ParameterLocation.PATH, "user_id"))
     assert result is None
 
 
-def test_pick_captured_value_returns_value_when_pool_has_data(user_schema_builder):
-    user_schema = {
-        "type": "object",
-        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
-        "required": ["id", "name"],
-    }
-    get_endpoint = {
-        "/users/{user_id}": {
-            "get": {
-                "operationId": "getUser",
-                "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
-                "responses": {
-                    "200": {"description": "Success", "content": {"application/json": {"schema": user_schema}}}
-                },
-            }
-        }
-    }
-    schema = user_schema_builder(response_schema=user_schema, extra_endpoints=get_endpoint)
-    data_source = schema.create_extra_data_source()
-
-    data_source.repository.record_response(
-        operation=POST_USERS, status_code=CREATED, payload={"id": "1", "name": "Alice"}
-    )
-
-    get_operation = schema["/users/{user_id}"]["GET"]
-    result = data_source.pick_captured_value(operation=get_operation, location=ParameterLocation.PATH, name="user_id")
-    assert result == "1"
-
-
-def test_pick_captured_value_rotates_across_consecutive_picks(user_schema_builder):
+def test_pick_correlated_values_rotate_across_consecutive_picks(user_schema_builder):
     user_schema = {
         "type": "object",
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
@@ -1864,7 +1827,7 @@ def test_pick_captured_value_rotates_across_consecutive_picks(user_schema_builde
 
     get_operation = schema["/users/{user_id}"]["GET"]
     picks = [
-        data_source.pick_captured_value(operation=get_operation, location=ParameterLocation.PATH, name="user_id")
+        data_source.pick_correlated_values(operation=get_operation).values.get((ParameterLocation.PATH, "user_id"))
         for _ in range(4)
     ]
     # Deterministic rotation: each draw deprioritizes the chosen variant, so
@@ -1990,5 +1953,5 @@ def test_correlated_and_per_slot_share_rotation_state(user_schema_builder):
     operation = schema["/users/{user_id}"]["GET"]
     correlated = data_source.pick_correlated_values(operation=operation)
     drawn_id = correlated.values[(ParameterLocation.PATH, "user_id")]
-    next_pick = data_source.pick_captured_value(operation=operation, location=ParameterLocation.PATH, name="user_id")
+    next_pick = data_source.pick_correlated_values(operation=operation).values.get((ParameterLocation.PATH, "user_id"))
     assert next_pick != drawn_id

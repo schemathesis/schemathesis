@@ -262,20 +262,6 @@ def _materialize_one(
     return MutationTarget(schema=current, path=tuple(steps))
 
 
-def _materialize_targets(
-    new_schema: JsonSchemaObject, descriptors: tuple[MutationTargetDescriptor, ...]
-) -> list[MutationTarget]:
-    """Replay every descriptor against `new_schema` and return the resolved targets."""
-    bundle = new_schema.get(BUNDLE_STORAGE_KEY)
-    bundle_map = bundle if isinstance(bundle, dict) else {}
-    targets: list[MutationTarget] = []
-    for descriptor in descriptors:
-        target = _materialize_one(new_schema, descriptor, bundle_map)
-        if target is not None:
-            targets.append(target)
-    return targets
-
-
 def _propagate_required_path(path: tuple[PathStep, ...]) -> None:
     """Force `required` (or equivalent) at each ancestor along `path`, mutating parents in place."""
     for step in path:

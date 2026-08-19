@@ -19,7 +19,6 @@ from schemathesis.specs.graphql.substitution import iter_operation_pool_values
 if TYPE_CHECKING:
     from random import Random
 
-    from schemathesis.core.parameters import ParameterLocation
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
@@ -108,16 +107,6 @@ class GraphQLResourcePool:
 
     def record_successful_delete(self, *, operation: APIOperation, case: Case) -> None:
         # Tombstoning runs from `record_response`; this engine hook has no extra work for GraphQL.
-        return None  # pragma: no cover
-
-    def pick_captured_value(
-        self,
-        *,
-        operation: APIOperation,
-        location: ParameterLocation,
-        name: str,
-    ) -> Any | None:
-        # Required by Protocol; GraphQL substitution calls draw() directly.
         return None  # pragma: no cover
 
     def pick_correlated_values(
