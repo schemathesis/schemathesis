@@ -258,6 +258,26 @@ List exactly the methods this resource supports in `Allow`
 
 ---
 
+### `invalid_location`
+
+Follows the URL in a `Location` header and verifies it leads somewhere. A response advertising a resource that answers `404`, `405`, `500`, or `501` gives clients a link they cannot use — typically a malformed path or an identifier the server never actually persisted.
+
+```text
+- Invalid Location
+
+`Location: /items/42` points at a resource that answered `404 Not Found`
+
+Return a `Location` that resolves to an existing resource
+```
+
+The link is followed with a single `GET`. Three situations are skipped instead of reported:
+
+- The URL points outside the tested API, so testing never sends traffic to third-party hosts.
+- The URL matches a documented path that has no `GET` — reaching it would require `DELETE`, `POST`, or `PUT`, which could modify the resource.
+- The operation that returned the header was already probed. Each operation is followed once, so this check does not scale with `max-examples`.
+
+---
+
 
 ## Stateful behavior
 
