@@ -150,3 +150,24 @@ def test_canonical_strategy_cache_respects_header_exclusions():
         assert value["X-Foo"] == "B"
 
     test()
+
+
+@pytest.mark.parametrize(
+    "keywords",
+    [{"pattern": "^a+$"}, {"minLength": 2}, {"maxLength": 4}],
+    ids=["pattern", "minLength", "maxLength"],
+)
+def test_binary_format_with_string_keywords(keywords):
+    # A binary payload is not a JSON string, so the keywords around it have no say over its bytes.
+    built = _canonical_strategy(
+        {"type": "string", "format": "binary", **keywords},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+
+    @given(built)
+    @SETTINGS
+    def test(value):
+        assert isinstance(value, Binary), value
+
+    test()
