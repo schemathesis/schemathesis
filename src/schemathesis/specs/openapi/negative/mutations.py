@@ -777,9 +777,11 @@ def change_type(
         candidate = draw(st.sampled_from(sorted(candidates)))
         candidates.remove(candidate)
         enabled_types = draw(st.shared(FeatureStrategy(), key="types"))
+        # Sorted before the filter: the first query for a name is what draws it, so an unordered
+        # query order makes the same seed generate different data from one process to the next.
         remaining_candidates = [
             candidate,
-            *sorted([candidate for candidate in candidates if enabled_types.is_enabled(candidate)]),
+            *[candidate for candidate in sorted(candidates) if enabled_types.is_enabled(candidate)],
         ]
         new_type = draw(st.sampled_from(remaining_candidates))
         schema["type"] = new_type
