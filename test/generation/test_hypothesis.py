@@ -13,6 +13,7 @@ from hypothesis import strategies as st
 from hypothesis.database import InMemoryExampleDatabase
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis.internal.observability import with_observability_callback
+from jsonschema_rs import canonical
 
 import schemathesis
 from schemathesis.config import GenerationConfig
@@ -3422,7 +3423,7 @@ def test_canonical_typed_group_keeps_the_type():
     # check, so the type has to be applied on top of whatever the body admits.
     schema = {"type": "integer", "oneOf": [{"enum": [1, "a"]}, {"enum": [2, None]}]}
     canonical_schema = jsonschema_rs.canonicalize(schema, draft=jsonschema_rs.Draft4)
-    assert canonical_schema.kind == "typed_group"
+    assert canonical_schema.kind is canonical.CanonicalKind.TYPED_GROUP
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft4Validator)
     is_valid = jsonschema_rs.Draft4Validator(schema).is_valid
 
