@@ -31,6 +31,7 @@
 - Hypothesis warning about an overly large representation when generating unrestricted JSON values.
 - Send `true`/`false`/`null` for booleans and nulls nested in array query parameters.
 - Negative test data differing between runs, and sometimes failing to generate, for the same seed.
+- Bodies exceeding `maxProperties` when a captured resource value is injected.
 
 #### Schema handling
 

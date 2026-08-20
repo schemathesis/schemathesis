@@ -1955,3 +1955,85 @@ def test_correlated_and_per_slot_share_rotation_state(user_schema_builder):
     drawn_id = correlated.values[(ParameterLocation.PATH, "user_id")]
     next_pick = data_source.pick_correlated_values(operation=operation).values.get((ParameterLocation.PATH, "user_id"))
     assert next_pick != drawn_id
+
+
+def test_pool_overlay_respects_max_properties(ctx):
+    # Injecting a captured value adds a key, and the body it lands in may already be at capacity.
+    schema = ctx.openapi.load_schema(
+        {
+            "/categories": {
+                "post": {
+                    "operationId": "createCategory",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"categoryId": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "CreatePost": {
+                                    "operationId": "createPost",
+                                    "parameters": {"categoryId": "$response.body#/categoryId"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/posts": {
+                "post": {
+                    "operationId": "createPost",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "maxProperties": 2,
+                                    "properties": {
+                                        "categoryId": {"type": "string"},
+                                        "title": {"type": "string"},
+                                        "tags": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+        }
+    )
+    data_source = schema.create_extra_data_source()
+
+    pooled_ids = [f"category-{index}" for index in range(5)]
+    for value in pooled_ids:
+        data_source.repository.record_response(
+            operation="POST /categories", status_code=201, payload={"categoryId": value}
+        )
+
+    operation = schema["/posts"]["POST"]
+    config = GenerationConfig()
+    strategy = operation.body[0].get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=data_source)
+
+    pool_hits = 0
+    oversized = []
+
+    @given(strategy)
+    @settings(max_examples=200, database=None, deadline=None)
+    def collect(value):
+        nonlocal pool_hits
+        if isinstance(value, GeneratedValue):
+            value = value.value
+        if not isinstance(value, dict):
+            return
+        if value.get("categoryId") in pooled_ids:
+            pool_hits += 1
+        if len(value) > 2:
+            oversized.append(value)
+
+    collect()
+
+    assert pool_hits > 0, "Pool's Category.categoryId values never landed in the body"
+    assert not oversized, f"`maxProperties` exceeded: {oversized[0]!r}"
