@@ -588,6 +588,8 @@ def build_hybrid_strategy(
     original_strategy: st.SearchStrategy,
     captured_variants: list[CapturedVariant],
     usage_tracker: VariantUsageTracker,
+    container_schema: JsonSchema | None = None,
+    validator_cls: type[jsonschema_rs.Validator] | None = None,
 ) -> st.SearchStrategy:
     """Combine original strategy with captured variants using weighted sampling.
 
@@ -599,8 +601,22 @@ def build_hybrid_strategy(
     parameters are present. When a variant is selected, the strategy returns a
     `GeneratedValue` carrying the pool-draw provenance; otherwise it returns the
     raw generated value (a dict or scalar).
+
+    ``container_schema`` is the consumer object schema. An overlay adds keys, which container-level
+    constraints (``maxProperties``, ``additionalProperties``, ``not``) can rule out even when every
+    injected value fits its own slot; the merge is reverted when the result is invalid.
     """
     from hypothesis import strategies as st
+
+    from schemathesis.specs.openapi.examples import _example_is_valid
+
+    container_validator: jsonschema_rs.Validator | None = None
+    if container_schema is not None and validator_cls is not None:
+        try:
+            container_validator = make_validator(container_schema, validator_cls)
+        except jsonschema_rs.ValidationError:
+            # Malformed container schema; the merge goes in unchecked, as it did before.
+            container_validator = None
 
     # Pre-compute keys for all variants
     variant_keys = [_variant_key(v.overlay) for v in captured_variants]
@@ -617,7 +633,7 @@ def build_hybrid_strategy(
         # Always generate base values first, then overlay captured values.
         # This ensures parameters without resource requirements (like `file_name`)
         # still get generated values while resource-linked params use captured data.
-        base = draw(original_strategy)
+        drawn = draw(original_strategy)
 
         # An upstream overlay (e.g. the constants overlay) may wrap the dict in
         # `GeneratedValue`. Unwrap so we can deep-merge captured values into the body,
@@ -627,13 +643,14 @@ def build_hybrid_strategy(
         base_semantic_draws: tuple = ()
         base_dictionary_draws: tuple = ()
         base_constants_draws: tuple = ()
-        if isinstance(base, GeneratedValue):
-            base_meta = base.meta
-            base_pool_draws = base.pool_draws
-            base_semantic_draws = base.semantic_draws
-            base_dictionary_draws = base.dictionary_draws
-            base_constants_draws = base.constants_draws
-            base = base.value
+        base = drawn
+        if isinstance(drawn, GeneratedValue):
+            base_meta = drawn.meta
+            base_pool_draws = drawn.pool_draws
+            base_semantic_draws = drawn.semantic_draws
+            base_dictionary_draws = drawn.dictionary_draws
+            base_constants_draws = drawn.constants_draws
+            base = drawn.value
 
         # Captured variants are partial dict overrides; meaningful only when the base is a dict.
         # Schemas without `type: object` can produce scalars/lists — leave those untouched.
@@ -642,16 +659,22 @@ def build_hybrid_strategy(
 
         # Single variant: no selection needed
         if n_variants == 1:
-            usage_tracker.record_draw(variant_keys[0])
-            chosen = captured_variants[0]
+            idx = 0
         else:
             # Shuffle indices before weighted selection to avoid Hypothesis's bias
             # toward early indices when using cumulative probability selection.
             idx = usage_tracker.weighted_select(variant_keys, random)
-            usage_tracker.record_draw(variant_keys[idx])
-            chosen = captured_variants[idx]
+        chosen = captured_variants[idx]
 
-        _deep_merge_overlay(base, chosen.overlay)
+        if container_validator is not None:
+            merged = deepclone(base)
+            _deep_merge_overlay(merged, chosen.overlay)
+            if not _example_is_valid(merged, container_validator):
+                return drawn
+            base = merged
+        else:
+            _deep_merge_overlay(base, chosen.overlay)
+        usage_tracker.record_draw(variant_keys[idx])
         return GeneratedValue(
             value=base,
             meta=base_meta,
@@ -1410,7 +1433,13 @@ class OpenApiBody(OpenApiComponent):
                     constants_value_source=constants_value_source,
                 )
             else:
-                strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
+                strategy = build_hybrid_strategy(
+                    strategy,
+                    captured_variants,
+                    usage_tracker,
+                    container_schema=schema if isinstance(schema, dict) else None,
+                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+                )
 
         from schemathesis.generation.body_overrides import (
             build_body_override_overlay_strategy,
