@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import jsonschema_rs
 from hypothesis import strategies as st
+from jsonschema_rs import canonical
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.cache import MISSING
@@ -88,10 +89,10 @@ def _build(
             )
         if canonical_key is not None:
             canonical_form_cache[canonical_key] = canonical_schema
-    if canonical_schema.kind == "raw":
+    if canonical_schema.kind is canonical.CanonicalKind.RAW:
         raise UnsupportedSchema.from_reason(f"this part of it:\n\n{_displayed(canonical_schema)}")
     # Spelled out so the caller reports an unsatisfiable schema; no other engine gets a say.
-    if not canonical_schema.is_satisfiable():
+    if canonical_schema.satisfiability() is canonical.Satisfiability.NO:
         return EMPTY_STRATEGY
     context = StrategyContext(root=canonical_schema, alphabet=alphabet, formats=formats)
     # Folding an `allOf` canonicalizes again, so a rejected schema and both spellings of

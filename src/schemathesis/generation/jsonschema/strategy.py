@@ -33,7 +33,7 @@ from schemathesis.core.jsonschema import (
 )
 from schemathesis.core.output import truncate_json
 from schemathesis.core.validation import has_leading_whitespace
-from schemathesis.generation.jsonschema.context import Alphabet, Distinctness, StrategyContext
+from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
 
 if TYPE_CHECKING:
@@ -102,12 +102,12 @@ class _Node(DeferredStrategy):
     # A schema reached from many places, or from itself, would otherwise spell out the same subtree at
     # every mention, growing what Hypothesis prints - a rejected filter, a failed draw - past any use.
 
-    def __init__(self, strategy: SearchStrategy[JsonValue], kind: str) -> None:
+    def __init__(self, strategy: SearchStrategy[JsonValue], kind: canonical.CanonicalKind) -> None:
         super().__init__(lambda: strategy)
         self.kind = kind
 
     def __repr__(self) -> str:
-        return f"schema({self.kind})"
+        return f"schema({self.kind.value})"
 
 
 def from_schema(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
@@ -235,7 +235,7 @@ def _not(
     barred_view = barred.view()
     if isinstance(barred_view, canonical.ReferenceView):
         barred = _target(barred, barred_view.uri, ctx)
-    complement = barred.negate()
+    complement = _negated(barred)
     if complement is None:
         # No complement is spelled for a branch set that points on, so the bar judges the draw itself.
         # Only the document can be judged that way: below it, a pointer to `#` names something else.
@@ -417,7 +417,7 @@ def _array(
         return st.nothing()
     if view.prefix_items or view.contains:
         return _with_fixed_elements(schema, view, ctx)
-    all_distinct = view.distinctness == Distinctness.ALL_DISTINCT
+    all_distinct = view.distinctness is canonical.Distinctness.ALL_DISTINCT
     try:
         element = _element(view.items, ctx)
     except DECLINED:
@@ -439,7 +439,7 @@ def _array(
         return st.nothing() if kwargs.get("min_size") else st.builds(list)
     if all_distinct:
         return st.lists(element, unique_by=_json_identity, **kwargs)
-    if view.distinctness == Distinctness.SOME_REPEATED:
+    if view.distinctness is canonical.Distinctness.SOME_REPEATED:
         return st.lists(element, **kwargs).map(_repeat_one)
     return st.lists(element, **kwargs)
 
@@ -448,7 +448,7 @@ def _with_fixed_elements(
     schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """An array whose opening positions the schema names or demands, followed by free ones."""
-    all_distinct = view.distinctness == Distinctness.ALL_DISTINCT
+    all_distinct = view.distinctness is canonical.Distinctness.ALL_DISTINCT
     max_items = _countable(view.max_items)
     # A schema past the length ceiling pins a position no array can have.
     entries = list(view.prefix_items if max_items is None else view.prefix_items[:max_items])
@@ -545,7 +545,7 @@ def _from_layout(
     ctx: StrategyContext,
 ) -> SearchStrategy[JsonValue]:
     """The arrays one layout admits, drawn as its parts laid end to end."""
-    all_distinct = view.distinctness == Distinctness.ALL_DISTINCT
+    all_distinct = view.distinctness is canonical.Distinctness.ALL_DISTINCT
     minimum = view.min_items or 0
     max_items = _countable(view.max_items)
     fixed = _spelled_out(layout)
@@ -733,7 +733,7 @@ def _matching(
 ) -> tuple[SearchStrategy[JsonValue] | None, bool]:
     """Values clearing the element schema and the demand, and whether they provably stay off `avoid`."""
     schema = _intersected(items, demand)
-    if not schema.is_satisfiable():
+    if schema.satisfiability() is canonical.Satisfiability.NO:
         return None, True
     steered: jsonschema_rs.CanonicalSchema | None = schema
     for other in avoid:
@@ -784,7 +784,7 @@ def _covers(demand: jsonschema_rs.CanonicalSchema, items: jsonschema_rs.Canonica
     if items is None:
         return isinstance(demand.view(), canonical.TrueView)
     # Undecided reads as "not covered", the same conservative answer the layouts already expect.
-    return items.is_subset_of(demand) is True
+    return demand.covers(items) is canonical.Containment.YES
 
 
 @lru_cache(maxsize=512)
@@ -793,7 +793,7 @@ def _narrowed(
 ) -> jsonschema_rs.CanonicalSchema | None:
     """`left` narrowed to — or away from — `right`, or `None` when nothing usable is left of it."""
     schema = _subtracted(left, right) if negate else _intersected(left, right)
-    if schema is None or not schema.is_satisfiable():
+    if schema is None or schema.satisfiability() is canonical.Satisfiability.NO:
         return None
     return schema
 
@@ -870,11 +870,19 @@ def _intersected(
     return right if left is None else left.intersect(right)
 
 
+def _negated(schema: jsonschema_rs.CanonicalSchema) -> jsonschema_rs.CanonicalSchema | None:
+    """Every value the schema rejects, or `None` when that cannot be expressed as a schema."""
+    try:
+        return schema.negate()
+    except canonical.CanonicalizationError:
+        return None
+
+
 def _subtracted(
     left: jsonschema_rs.CanonicalSchema | None, right: jsonschema_rs.CanonicalSchema
 ) -> jsonschema_rs.CanonicalSchema | None:
     """`left` without what `right` admits, or `None` where the complement cannot be spelled."""
-    negated = right.negate()
+    negated = _negated(right)
     if negated is None:
         return None
     return _intersected(left, negated)
@@ -954,7 +962,7 @@ def _object(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) -> S
                 # A fresh violation key can never coincide with a required one, so the ceiling has to fit
                 # both. The canonicalizer does not yet fold that need into `maxProperties` satisfiability
                 # the way `contains` demands are folded into a length floor, so this combo can still
-                # reach here despite `is_satisfiable()` saying otherwise.
+                # reach here despite satisfiability saying otherwise.
                 return st.nothing()
     # Sorted: set iteration order is not stable across processes, and draw order decides replays.
     keys = sorted(optional)
@@ -1003,7 +1011,7 @@ def _violation_entry(
 ) -> SearchStrategy[tuple[str, JsonValue]]:
     """One demand from `ObjectView.violations`, as a key/value pair the object injects last."""
     if isinstance(violation, canonical.NameFailsView):
-        complement = violation.schema.negate()
+        complement = _negated(violation.schema)
         if complement is not None:
             key_schema = complement.intersect(_string_domain(ctx.root.draft))
             # The key still lands in this object, so the names it admits bound the barred one too.
@@ -1030,7 +1038,7 @@ def _violation_entry(
             candidate not in names and candidate not in known and not any(claim(candidate) for claim in claims)
         )
     )
-    complement = violation.additional.negate()
+    complement = _negated(violation.additional)
     if complement is None:
         admitted = (
             _anything(ctx) if view.additional_properties is None else from_schema(view.additional_properties, ctx)

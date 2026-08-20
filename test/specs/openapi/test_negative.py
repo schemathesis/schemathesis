@@ -8,6 +8,7 @@ from _pytest.main import ExitCode
 from flask import jsonify
 from hypothesis import HealthCheck, given, seed, settings
 from hypothesis import strategies as st
+from jsonschema_rs import canonical
 
 import schemathesis
 from schemathesis.config import GenerationConfig
@@ -70,9 +71,12 @@ def from_schema(schema):
 
 
 def admits_a_value(schema):
-    return jsonschema_rs.canonicalize(
-        schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[jsonschema_rs.Draft4Validator]
-    ).is_satisfiable()
+    return (
+        jsonschema_rs.canonicalize(
+            schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[jsonschema_rs.Draft4Validator]
+        ).satisfiability()
+        is not canonical.Satisfiability.NO
+    )
 
 
 @pytest.mark.parametrize(
