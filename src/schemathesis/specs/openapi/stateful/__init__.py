@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 from hypothesis import strategies as st
-from hypothesis.stateful import Bundle, Rule, precondition, rule
+from hypothesis.stateful import RULE_MARKER, Bundle, Rule
 
 from schemathesis.checks import CheckFunction
 from schemathesis.core import NOT_SET
@@ -153,6 +153,13 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     return transitions
 
 
+@st.composite  # type: ignore[untyped-decorator]
+def _mixed_mode_case(draw: st.DrawFn, strategies: dict[GenerationMode, st.SearchStrategy]) -> Case:
+    if draw(st.integers(min_value=0, max_value=99)) < NEGATIVE_TEST_CASES_THRESHOLD:
+        return draw(strategies[GenerationMode.NEGATIVE])
+    return draw(strategies[GenerationMode.POSITIVE])
+
+
 def create_state_machine(
     schema: OpenApiSchema,
     *,
@@ -218,22 +225,21 @@ def create_state_machine(
                     bundle_name = f"{link.source.label} -> {link.status_code}"
                     name = _normalize_name(link.full_name)
                     assert name not in rules, name
-                    rules[name] = precondition(is_transition_allowed(bundle_name, link.source.label, target.label))(
-                        transition(
-                            name=name,
-                            target=catch_all,
-                            input=bundles[bundle_name].flatmap(
-                                into_step_input(
-                                    target=target,
-                                    link=link,
-                                    modes=config.modes,
-                                    error_feedback=error_feedback,
-                                    link_calibration=link_calibration,
-                                    extra_data_source=extra_data_source,
-                                    constants_value_source=constants_value_source,
-                                )
-                            ),
-                        )
+                    rules[name] = transition(
+                        name=name,
+                        target=catch_all,
+                        precondition=is_transition_allowed(bundle_name, link.source.label, target.label),
+                        input=bundles[bundle_name].flatmap(
+                            into_step_input(
+                                target=target,
+                                link=link,
+                                modes=config.modes,
+                                error_feedback=error_feedback,
+                                link_calibration=link_calibration,
+                                extra_data_source=extra_data_source,
+                                constants_value_source=constants_value_source,
+                            )
+                        ),
                     )
             if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
                 name = _normalize_name(f"RANDOM -> {target.label}")
@@ -246,29 +252,24 @@ def create_state_machine(
                         constants_value_source=constants_value_source,
                     )
                 else:
-                    _strategies = {
-                        method: target.as_strategy(
-                            generation_mode=method,
-                            phase=TestPhase.STATEFUL,
-                            error_feedback=error_feedback,
-                            extra_data_source=extra_data_source,
-                            constants_value_source=constants_value_source,
-                        )
-                        for method in config.modes
-                    }
+                    case_strategy = _mixed_mode_case(
+                        {
+                            method: target.as_strategy(
+                                generation_mode=method,
+                                phase=TestPhase.STATEFUL,
+                                error_feedback=error_feedback,
+                                extra_data_source=extra_data_source,
+                                constants_value_source=constants_value_source,
+                            )
+                            for method in config.modes
+                        }
+                    )
 
-                    @st.composite  # type: ignore[untyped-decorator]
-                    def case_strategy_factory(
-                        draw: st.DrawFn, strategies: dict[GenerationMode, st.SearchStrategy] = _strategies
-                    ) -> Case:
-                        if draw(st.integers(min_value=0, max_value=99)) < NEGATIVE_TEST_CASES_THRESHOLD:
-                            return draw(strategies[GenerationMode.NEGATIVE])
-                        return draw(strategies[GenerationMode.POSITIVE])
-
-                    case_strategy = case_strategy_factory()
-
-                rules[name] = precondition(is_root_allowed(target.label))(
-                    transition(name=name, target=catch_all, input=case_strategy.map(StepInput.initial))
+                rules[name] = transition(
+                    name=name,
+                    target=catch_all,
+                    precondition=is_root_allowed(target.label),
+                    input=case_strategy.map(StepInput.initial),
                 )
 
     return type(
@@ -470,7 +471,13 @@ def is_root_allowed(label: str) -> Callable[[OpenAPIStateMachine], bool]:
     return inner
 
 
-def transition(*, name: str, target: Bundle, input: st.SearchStrategy[StepInput]) -> Callable[[Callable], Rule]:
+def transition(
+    *,
+    name: str,
+    target: Bundle,
+    input: st.SearchStrategy[StepInput],
+    precondition: Callable[[OpenAPIStateMachine], bool],
+) -> Callable[..., StepOutput | None]:
     def step_function(self: OpenAPIStateMachine, input: StepInput) -> StepOutput | None:
         if input.transition is not None:
             self.recorder.record_case(
@@ -485,8 +492,21 @@ def transition(*, name: str, target: Bundle, input: st.SearchStrategy[StepInput]
         return APIStateMachine._step(self, input=input)
 
     step_function.__name__ = name
-
-    return rule(target=target, input=input)(step_function)
+    step_function.__qualname__ = name
+    # Hypothesis' `@rule` / `@precondition` each build their proxy by exec'ing generated source,
+    # and every one leaves a module behind for the lifetime of the process. Link-heavy schemas
+    # define rules by the thousands, so attach the rule directly instead.
+    setattr(
+        step_function,
+        RULE_MARKER,
+        Rule(
+            targets=(target.name,),
+            function=step_function,
+            arguments={"input": input},
+            preconditions=(precondition,),
+        ),
+    )
+    return step_function
 
 
 def make_response_matcher(matchers: list[tuple[str, FilterFunction]]) -> Callable[[StepOutput], str | None]:

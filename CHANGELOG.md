@@ -96,6 +96,7 @@
 - Coverage phase up to 8x faster on schemas whose string parameters accept any text.
 - Coverage phase up to 30x faster on `pattern` strings with a high `minLength`.
 - Coverage phase up to 10x faster generating wrong-type values for query, path and header parameters.
+- Up to 7x lower memory use building state machines for schemas with thousands of links.
 
 ### :wrench: Changed
 
