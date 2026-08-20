@@ -35,6 +35,7 @@ from schemathesis.core.output import truncate_json
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
+from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -1611,7 +1612,13 @@ def _formatted(
 # exactly; a name without a checker behind it passes everything, like the validator itself.
 @lru_cache(maxsize=512)
 def _facet_check(keyword: str, value: str) -> Callable[[JsonValue], bool]:
-    return make_validator_for({"type": "string", keyword: value}).is_valid
+    is_valid = make_validator_for({"type": "string", keyword: value}).is_valid
+
+    def check(drawn: JsonValue) -> bool:
+        # A binary payload carries bytes rather than a JSON string, so the facet has no say over it.
+        return contains_binary(drawn) or is_valid(drawn)
+
+    return check
 
 
 def _within_length(
@@ -1621,7 +1628,8 @@ def _within_length(
         return strategy
     low = view.min_length or 0
     high = math.inf if view.max_length is None else view.max_length
-    return strategy.filter(lambda value: low <= len(value) <= high)
+    # A binary payload spells its bytes outside the string, so its length is not the one to measure.
+    return strategy.filter(lambda value: contains_binary(value) or low <= len(value) <= high)
 
 
 def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:
