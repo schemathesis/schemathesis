@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from hypothesis.internal import reflection
+from hypothesis.stateful import RuleBasedStateMachine, RuleStrategy
+
 from schemathesis.core import jsonschema
 from schemathesis.core.jsonschema import bundler, resolver
 from schemathesis.generation import hypothesis
+from schemathesis.generation.stateful.state_machine import APIStateMachine
 from schemathesis.specs.openapi import patterns
 from schemathesis.specs.openapi.coverage import _schema
 
@@ -35,3 +39,7 @@ def clear_internal_caches() -> None:
     hypothesis.canonical_strategy_cache.clear()
     hypothesis.canonical_form_cache.clear()
     hypothesis._first_param_cache.clear()
+    APIStateMachine._to_test_case.cache_clear()
+    RuleBasedStateMachine._setup_state_per_class.clear()
+    RuleStrategy._setup_for.cache_clear()
+    reflection.eval_cache.clear()
