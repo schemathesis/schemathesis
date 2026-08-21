@@ -190,6 +190,10 @@ def get_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     )
 
 
+def _negates_format(metadata: MutationMetadata) -> bool:
+    return any("format" in mutation.keywords for mutation in metadata.mutations)
+
+
 @lru_cache
 def get_real_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     """A validator without the always-invalid format hook.
@@ -280,14 +284,14 @@ def negative_schema(
 
     if location == ParameterLocation.QUERY:
 
-        def filter_values(value: Any) -> bool:
+        def filter_values(value: Any, validator: jsonschema_rs.Validator) -> bool:
             return is_non_empty_query(value) and (
                 skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
             )
 
     else:
 
-        def filter_values(value: Any) -> bool:
+        def filter_values(value: Any, validator: jsonschema_rs.Validator) -> bool:
             return skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
 
     if location.is_in_header:
@@ -302,7 +306,12 @@ def negative_schema(
         strategy = build(
             schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
         )
-        return strategy.filter(filter_values).map(lambda value: GeneratedValue(value, metadata))
+        # Failing every format on principle only speaks for a negated `format`; elsewhere it hides
+        # that the mutation left the value conforming.
+        chosen = validator if _negates_format(metadata) else get_real_validator(validator_cache_key)
+        return strategy.filter(lambda value: filter_values(value, chosen)).map(
+            lambda value: GeneratedValue(value, metadata)
+        )
 
     if target_descriptors is None:
         target_descriptors = compute_mutation_targets(schema)
