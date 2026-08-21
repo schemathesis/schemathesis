@@ -10054,3 +10054,30 @@ def test_container_path_parameter_never_blanks_the_path_segment(ctx, item_schema
         generation_config=operation.schema.config.generation,
     ):
         assert case.formatted_path != "/p/", f"blank path segment from {case.path_parameters!r}"
+
+
+@pytest.mark.parametrize("location", ["header", "cookie"])
+@pytest.mark.parametrize("keyword", ["example", "default"])
+@pytest.mark.parametrize("value", ["application/json", "en-US", "application/vnd.github.v3+json"])
+def test_spec_hint_with_non_alphanumeric_characters(ctx, location, keyword, value):
+    schema = load_schema(
+        ctx,
+        parameters=[
+            {"in": location, "name": "X-Sample", "required": True, "schema": {"type": "string", keyword: value}}
+        ],
+    )
+    assert value in {
+        getattr(case, LOCATION_TO_CONTAINER[location]).get("X-Sample")
+        for case in _iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE)
+    }
+
+
+@pytest.mark.parametrize("max_length", [65535, 2147483647])
+def test_required_string_with_max_length_beyond_generation_buffer(ctx, max_length):
+    schema = load_schema(
+        ctx,
+        parameters=[
+            {"in": "query", "name": "key", "required": True, "schema": {"type": "string", "maxLength": max_length}}
+        ],
+    )
+    assert any("key" in case.query for case in _iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE))
