@@ -18,6 +18,7 @@ def test_aggregate_empty_input_returns_zeroed_summary():
         "apis_errored": 0,
         "cases_generated": 0,
         "duration_seconds": 0.0,
+        "wall_seconds": 0.0,
         "rates": {
             "operations": {"covered": 0, "total": 0, "pct": 0.0},
             "keywords_full_only": {"covered": 0, "total": 0, "pct": 0.0},
@@ -25,9 +26,11 @@ def test_aggregate_empty_input_returns_zeroed_summary():
             "parameters_partial_or_full": {"covered": 0, "total": 0, "pct": 0.0},
             "examples": {"covered": 0, "total": 0, "pct": 0.0},
         },
+        "examples_invalid": 0,
         "gap_kinds": [],
         "top_uncovered_paths": [],
         "worst_apis": [],
+        "top_rss_jumps": [],
     }
 
 
@@ -100,4 +103,4 @@ def test_render_markdown_includes_phase_and_metrics():
     summary = aggregate([_result(statistic={"operations": {"seen": 1, "total": 2}})])
     md = render_markdown(summary)
     assert "fuzzing phase" in md
-    assert "| operations | 1 | 2 | 50.0% |" in md
+    assert "| operations | 1 | 2 | 50.00% |" in md
