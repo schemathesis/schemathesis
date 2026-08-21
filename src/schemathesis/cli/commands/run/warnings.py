@@ -162,6 +162,41 @@ def aggregate_status_codes(interactions: Iterable[Interaction]) -> StatusCodeSta
     return StatusCodeStatistic(counts=counts, total=total)
 
 
+def auth_error_codes(statistic: StatusCodeStatistic, recorder: RecordedScenario) -> tuple[int, ...]:
+    """Auth status codes that dominate the scenario."""
+    cases = list(recorder.cases.values())
+    if len(cases) == 1:
+        meta = cases[0].value.meta
+        # A scenario that only omits `Authorization` is expected to be rejected.
+        if (
+            meta is not None
+            and isinstance(meta.phase.data, CoveragePhaseData)
+            and meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
+            and meta.phase.data.parameter == "Authorization"
+            and meta.phase.data.parameter_location == ParameterLocation.HEADER
+        ):
+            return ()
+    return tuple(code for code in (401, 403) if statistic.ratio_for(code) >= AUTH_ERRORS_THRESHOLD)
+
+
+def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
+    """Whether the scenario generated positive test cases and none of them got a 2xx response."""
+    seen_positive = False
+    for case in recorder.cases.values():
+        if not (case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE):
+            continue
+        seen_positive = True
+        interaction = recorder.interactions.get(case.value.id)
+        if not (interaction is not None and interaction.response is not None):
+            continue
+        # At least one positive response for positive test case
+        if 200 <= interaction.response.status_code < 300:
+            return False
+    # If there are positive test cases, and we ended up here, then there are no 2xx responses for them
+    # Otherwise, there are no positive test cases at all and this check should pass
+    return seen_positive
+
+
 class WarningCollector:
     config: ProjectConfig
     data: WarningData
@@ -234,42 +269,14 @@ class WarningCollector:
 
         warnings = self.config.warnings_for(operation=operation)
 
-        def has_only_missing_auth_case() -> bool:
-            case = list(event.recorder.cases.values())[0].value
-            return bool(
-                case.meta
-                and isinstance(case.meta.phase.data, CoveragePhaseData)
-                and case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
-                and case.meta.phase.data.parameter == "Authorization"
-                and case.meta.phase.data.parameter_location == ParameterLocation.HEADER
-            )
-
         if warnings.should_display(SchemathesisWarning.MISSING_AUTH):
-            if not (len(event.recorder.cases) == 1 and has_only_missing_auth_case()):
-                for status_code in (401, 403):
-                    if statistic.ratio_for(status_code) >= AUTH_ERRORS_THRESHOLD:
-                        self.data.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
-                        # Check if this warning should cause test failure
-                        if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
-                            ctx.exit_code = 1
+            for status_code in auth_error_codes(statistic, event.recorder):
+                self.data.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
+                # Check if this warning should cause test failure
+                if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
+                    ctx.exit_code = 1
 
         # Warn if all positive test cases got 4xx in return and no failure was found
-        def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
-            seen_positive = False
-            for case in recorder.cases.values():
-                if not (case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE):
-                    continue
-                seen_positive = True
-                interaction = recorder.interactions.get(case.value.id)
-                if not (interaction is not None and interaction.response is not None):
-                    continue
-                # At least one positive response for positive test case
-                if 200 <= interaction.response.status_code < 300:
-                    return False
-            # If there are positive test cases, and we ended up here, then there are no 2xx responses for them
-            # Otherwise, there are no positive test cases at all and this check should pass
-            return seen_positive
-
         if (
             event.status == Status.SUCCESS
             and (

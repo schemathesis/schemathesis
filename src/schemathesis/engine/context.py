@@ -10,6 +10,7 @@ from schemathesis.checks import RunChecks
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
+from schemathesis.core.error_feedback.collector import record_observations
 from schemathesis.core.statistic import StatefulInference
 from schemathesis.engine._lazy import LazyInit
 from schemathesis.engine.control import ExecutionControl
@@ -26,7 +27,9 @@ from schemathesis.schemas import APIOperation
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.core.error_feedback.store import Observation
     from schemathesis.core.spec import ApiSchema
+    from schemathesis.core.transport import Response
     from schemathesis.engine import StopReason
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.resources import ExtraDataSource
@@ -135,6 +138,33 @@ class EngineContext:
         """Add new observations from a scenario."""
         if self.observations is not None:
             self.observations.extract_observations_from(recorder)
+
+    def record_error_feedback(
+        self,
+        *,
+        case: Case,
+        response: Response,
+        recorder: ScenarioRecorder,
+        observations: tuple[Observation, ...],
+        transport_kwargs: dict[str, Any],
+    ) -> None:
+        """Route one response into the error-feedback store: field-level, then schema-level observations."""
+        assert self.error_feedback is not None
+        record_observations(
+            store=self.error_feedback,
+            operation=case.operation,
+            case=case,
+            observations=observations,
+            cache_writer=self.cache.writer,
+        )
+        case.operation.schema.record_runtime_observations(
+            store=self.error_feedback,
+            recorder=recorder,
+            case=case,
+            response=response,
+            transport_kwargs=transport_kwargs,
+            cache_writer=self.cache.writer,
+        )
 
     def apply_stateful_inference(self) -> StatefulInference:
         """Discover spec-specific stateful transitions; return the counts available."""

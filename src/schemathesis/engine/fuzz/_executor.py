@@ -27,6 +27,8 @@ from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
 
 if TYPE_CHECKING:
+    import hypothesis
+
     from schemathesis.config import FuzzConfig
     from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
@@ -119,6 +121,44 @@ def _preflight_operations(
     return active_operations, active_generation_modes_by_label
 
 
+@dataclass(frozen=True, slots=True)
+class FuzzPlan:
+    """Per-run scheduling data shared by every fuzz worker."""
+
+    hypothesis_settings: hypothesis.settings
+    operations: list[APIOperation]
+    # Each operation repeated by its weight; layer-0 producers appear more often.
+    weighted_operations: list[APIOperation]
+    operations_by_label: dict[str, APIOperation]
+    continue_on_failure_by_label: dict[str, bool]
+
+
+def build_fuzz_plan(ctx: EngineContext, *, operations: list[APIOperation]) -> FuzzPlan:
+    """Resolve settings, sampling weights and per-operation flags once for all workers."""
+    import hypothesis
+    from hypothesis import Phase
+
+    weights_by_label = ctx.schema.compute_fuzz_operation_weights(operations)
+    return FuzzPlan(
+        hypothesis_settings=hypothesis.settings(
+            ctx.config.get_hypothesis_settings(),
+            max_examples=FUZZ_MAX_EXAMPLES,
+            phases=[Phase.generate, Phase.reuse],
+            deadline=None,
+        ),
+        operations=operations,
+        weighted_operations=[op for op in operations for _ in range(weights_by_label[op.label])],
+        operations_by_label={operation.label: operation for operation in operations},
+        continue_on_failure_by_label={
+            op.label: bool(
+                ctx.config.operations.get_for_operation(operation=op).continue_on_failure
+                or ctx.config.continue_on_failure
+            )
+            for op in operations
+        },
+    )
+
+
 @dataclass(slots=True)
 class ActiveScenario:
     """Metadata about the currently running scenario, shared between the strategy and test body."""
@@ -168,6 +208,7 @@ def _run_forever(
         generation_modes_by_label=generation_modes_by_label,
         event_queue=event_queue,
     )
+    plan = build_fuzz_plan(ctx, operations=active_operations)
     threads = [
         threading.Thread(
             target=_run_forever_thread,
@@ -177,7 +218,7 @@ def _run_forever(
                 "config": config,
                 "event_queue": event_queue,
                 "worker_id": worker_id,
-                "operations": active_operations,
+                "plan": plan,
                 "strategy_kwargs_by_label": strategy_kwargs_by_label,
                 "generation_modes_by_label": active_generation_modes_by_label,
             },
@@ -215,46 +256,36 @@ def _run_forever_thread(
     config: FuzzConfig,
     event_queue: queue.Queue[events.EngineEvent],
     worker_id: int,
-    operations: list[APIOperation],
+    plan: FuzzPlan,
     strategy_kwargs_by_label: dict[str, dict[str, object]],
     generation_modes_by_label: dict[str, list],
 ) -> None:
     import hypothesis
     import hypothesis.strategies as st
-    from hypothesis import Phase
     from hypothesis.errors import Flaky, Unsatisfiable, UnsatisfiedAssumption
 
     from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
-    if not operations:
+    if not plan.operations:
         return
 
-    base_settings = ctx.config.get_hypothesis_settings()
-    hypothesis_settings = hypothesis.settings(
-        base_settings,
-        max_examples=FUZZ_MAX_EXAMPLES,
-        phases=[Phase.generate, Phase.reuse],
-        deadline=None,
-    )
+    hypothesis_settings = plan.hypothesis_settings
+    weighted_operations = plan.weighted_operations
+    operations_by_label = plan.operations_by_label
+    continue_on_failure_by_label = plan.continue_on_failure_by_label
 
     suite_id = uuid.uuid4()
     # Used to communicate scenario start time from hypothesis strategy to the test function
     scenario_cell: Cell = Cell(value=None)
     check_context_cache = CheckContextCache()
-    continue_on_failure_by_label: dict[str, bool] = {
-        op.label: bool(
-            ctx.config.operations.get_for_operation(operation=op).continue_on_failure or ctx.config.continue_on_failure
-        )
-        for op in operations
-    }
-    # Dependency-weighted sampling pool: each operation repeated by its weight.
-    # Layer-0 producers appear more often; consumers and non-OpenAPI ops get weight 1.
-    weights_by_label = ctx.schema.compute_fuzz_operation_weights(operations)
-    weighted_operations = [op for op in operations for _ in range(weights_by_label[op.label])]
-    operations_by_label: dict[str, APIOperation] = {operation.label: operation for operation in operations}
 
     # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
     seen_error_labels: set[str] = set()
+
+    def _report_once(exc: Exception, *, label: str) -> None:
+        if label not in seen_error_labels:
+            seen_error_labels.add(label)
+            event_queue.put(events.NonFatalError(error=exc, phase=None, label=label, related_to_operation=True))
 
     @st.composite  # type: ignore[untyped-decorator]
     def scheduler(draw: hypothesis.strategies.DrawFn) -> ScenarioRecorder:
@@ -300,16 +331,7 @@ def _run_forever_thread(
                 raise  # let Hypothesis handle filtered examples normally
             except Exception as exc:
                 excluded_operations.add(operation.label)
-                if operation.label not in seen_error_labels:
-                    seen_error_labels.add(operation.label)
-                    event_queue.put(
-                        events.NonFatalError(
-                            error=exc,
-                            phase=None,
-                            label=operation.label,
-                            related_to_operation=True,
-                        )
-                    )
+                _report_once(exc, label=operation.label)
                 continue
             recorder.record_case(
                 parent_id=None,
@@ -340,16 +362,7 @@ def _run_forever_thread(
                     on_delay=_on_delay,
                 )
             except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
-                if operation.label not in seen_error_labels:
-                    seen_error_labels.add(operation.label)
-                    event_queue.put(
-                        events.NonFatalError(
-                            error=exc,
-                            phase=None,
-                            label=operation.label,
-                            related_to_operation=True,
-                        )
-                    )
+                _report_once(exc, label=operation.label)
                 continue
             recorder.record_response(case_id=case.id, response=response)
             last_step = (operation, case, response)

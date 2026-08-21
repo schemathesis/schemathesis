@@ -34,6 +34,14 @@ class Override:
             if value:
                 yield key, value
 
+    def apply_to(self, case: Case) -> None:
+        """Merge the overridden parameters into the case's containers; `body` is not overridable this way."""
+        for location, entry in self.items():
+            name = location.container_name
+            container = getattr(case, name) or {}
+            container.update(entry)
+            setattr(case, name, container)
+
     @classmethod
     def from_components(cls, components: dict[ParameterLocation, StoredValue], case: Case) -> Override:
         return Override(
