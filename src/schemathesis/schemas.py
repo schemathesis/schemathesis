@@ -50,6 +50,7 @@ from .hooks import (
 )
 
 if TYPE_CHECKING:
+    import httpx
     import httpx2
     import requests
     from hypothesis.strategies import SearchStrategy
@@ -885,7 +886,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
 
     def validate_response(
         self,
-        response: Response | httpx2.Response | requests.Response | TestResponse,
+        response: Response | httpx.Response | httpx2.Response | requests.Response | TestResponse,
         *,
         case: Case | None = None,
     ) -> bool | None:
@@ -893,7 +894,7 @@ class APIOperation(Generic[P, R, S, SchemaT]):
 
         Args:
             response: The HTTP response to validate. Can be a `requests.Response`,
-                `httpx2.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
+                `httpx.Response`, `httpx2.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
             case: The generated test case related to the provided response.
 
         Raises:
@@ -902,12 +903,14 @@ class APIOperation(Generic[P, R, S, SchemaT]):
         """
         return self.schema.validate_response(self, Response.from_any(response), case=case)
 
-    def is_valid_response(self, response: Response | httpx2.Response | requests.Response | TestResponse) -> bool:
+    def is_valid_response(
+        self, response: Response | httpx.Response | httpx2.Response | requests.Response | TestResponse
+    ) -> bool:
         """Check if the provided response is valid against the API schema.
 
         Args:
             response: The HTTP response to validate. Can be a `requests.Response`,
-                `httpx2.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
+                `httpx.Response`, `httpx2.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
 
         Returns:
             `True` if response is valid, `False` otherwise.

@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.25.0...HEAD) - TBD
+### :rocket: Added
+- Support for validating `httpx2` responses in `Case.validate_response`.
+
 
 ### :bug: Fixed
 
