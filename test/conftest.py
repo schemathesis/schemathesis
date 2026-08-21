@@ -8,7 +8,7 @@ from io import BytesIO
 from textwrap import dedent
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 import requests
 import yaml
@@ -399,28 +399,28 @@ def testdir(testdir):
 
 @dataclass(frozen=True)
 class ResponseFactory:
-    httpx: Callable[..., httpx.Response]
+    httpx2: Callable[..., httpx2.Response]
     requests: Callable[..., requests.Response]
     wsgi: Callable[..., TestResponse]
 
 
 @pytest.fixture
 def response_factory():
-    def httpx_factory(
+    def httpx2_factory(
         *,
         content: bytes = b"{}",
         content_type: str | None = "application/json",
         status_code: int = 200,
         headers: dict[str, Any] | None = None,
-    ) -> httpx.Response:
+    ) -> httpx2.Response:
         headers = headers or {}
         if content_type:
             headers.setdefault("Content-Type", content_type)
-        response = httpx.Response(
+        response = httpx2.Response(
             status_code=status_code,
             headers=headers,
             content=content,
-            request=httpx.Request(method="POST", url="http://127.0.0.1", headers=headers),
+            request=httpx2.Request(method="POST", url="http://127.0.0.1", headers=headers),
         )
         response.elapsed = datetime.timedelta(seconds=1)
         return response
@@ -465,7 +465,7 @@ def response_factory():
         )
         return response
 
-    return ResponseFactory(httpx=httpx_factory, requests=requests_factory, wsgi=werkzeug_factory)
+    return ResponseFactory(httpx2=httpx2_factory, requests=requests_factory, wsgi=werkzeug_factory)
 
 
 @pytest.fixture

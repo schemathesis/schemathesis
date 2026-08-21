@@ -382,7 +382,7 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.parametrize("factory_type", ["httpx", "requests", "wsgi"])
+@pytest.mark.parametrize("factory_type", ["httpx2", "requests", "wsgi"])
 @pytest.mark.parametrize(
     ("response_schema", "payload", "schema_path", "instance", "instance_path"),
     [
@@ -552,7 +552,7 @@ def test_iter_parameters(ctx):
     assert params[1].name == "q"
 
 
-@pytest.mark.parametrize("factory_type", ["httpx", "requests", "wsgi"])
+@pytest.mark.parametrize("factory_type", ["httpx2", "requests", "wsgi"])
 def test_checks_errors_deduplication(ctx, response_factory, factory_type):
     # See GH-1394
     schema = ctx.openapi.load_schema(

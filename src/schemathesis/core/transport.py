@@ -36,7 +36,7 @@ StatusCodePattern: TypeAlias = str
 
 
 if TYPE_CHECKING:
-    import httpx
+    import httpx2
     import requests
     from werkzeug.test import TestResponse
 
@@ -151,9 +151,9 @@ class Response:
     def from_any(cls, response: Response) -> Response: ...
     @overload
     @classmethod
-    def from_any(cls, response: httpx.Response | requests.Response | TestResponse) -> Response: ...
+    def from_any(cls, response: httpx2.Response | requests.Response | TestResponse) -> Response: ...
     @classmethod
-    def from_any(cls, response: Response | httpx.Response | requests.Response | TestResponse) -> Response:
+    def from_any(cls, response: Response | httpx2.Response | requests.Response | TestResponse) -> Response:
         # Fast path for already-converted responses; avoids importing the optional transports.
         if isinstance(response, Response):
             return response
@@ -165,14 +165,14 @@ class Response:
             return Response.from_requests(response, verify=True)
         if isinstance(response, TestResponse):
             return Response.from_wsgi(response)
-        # `httpx` is optional; it is only needed to recognize its own response type.
+        # `httpx2` is optional; it is only needed to recognize its own response type.
         try:
-            import httpx
+            import httpx2
         except ImportError:
             pass
         else:
-            if isinstance(response, httpx.Response):
-                return Response.from_httpx(response, verify=True)
+            if isinstance(response, httpx2.Response):
+                return Response.from_httpx2(response, verify=True)
         return response
 
     @classmethod
@@ -197,7 +197,7 @@ class Response:
         )
 
     @classmethod
-    def from_httpx(cls, response: httpx.Response, verify: bool) -> Response:
+    def from_httpx2(cls, response: httpx2.Response, verify: bool) -> Response:
         import requests
 
         request = requests.Request(
