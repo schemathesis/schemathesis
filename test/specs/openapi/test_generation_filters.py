@@ -195,3 +195,13 @@ def test_invalid_urlencoded_fails_with_requests(invalid_data):
 )
 def test_is_valid_header_rejects_rfc9110_control_chars(headers, expected):
     assert is_valid_header(headers) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [([], False), ([""], False), (["", ""], True), (["a"], True), ([0], True)],
+    ids=["empty", "single-empty-item", "two-empty-items", "single-item", "zero"],
+)
+def test_filter_array_path_parameters(value, expected):
+    # Arrays render as their comma-joined items; an empty rendering blanks the path segment.
+    assert is_valid_path({"foo": value}) is expected

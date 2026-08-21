@@ -10019,3 +10019,38 @@ def test_allow_header_conformance(ctx, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    "item_schema",
+    [
+        {"type": "array", "items": {"type": "string"}},
+        {"type": "array", "items": {"type": "string"}, "minItems": 2},
+        {"type": "array", "items": {"type": "string"}, "maxItems": 0},
+        {"type": "array", "items": {"type": "string"}, "example": []},
+        {"type": "object", "properties": {"a": {"type": "string"}}},
+        {"type": "object", "additionalProperties": {"type": "string"}},
+    ],
+    ids=["unbounded", "min-items", "max-items-zero", "empty-example", "object", "free-form-object"],
+)
+def test_container_path_parameter_never_blanks_the_path_segment(ctx, item_schema):
+    # A blank segment collapses the URL onto another operation, so the case tests something else.
+    schema = ctx.openapi.load_schema(
+        {
+            "/p/{v}": {
+                "post": {
+                    "parameters": [{"name": "v", "in": "path", "required": True, "schema": item_schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/p/{v}"]["POST"]
+    for case in iter_coverage_cases(
+        operation=operation,
+        generation_modes=list(GenerationMode),
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=operation.schema.config.generation,
+    ):
+        assert case.formatted_path != "/p/", f"blank path segment from {case.path_parameters!r}"

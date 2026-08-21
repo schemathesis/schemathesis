@@ -2003,7 +2003,7 @@ def cover_schema_iter(
                                 relaxed = {k: v for k, v in new_schema.items() if k != "uniqueItems"}
                                 with suppress(InvalidArgument, Unsatisfiable):
                                     oversized = ctx.generate_from_schema(relaxed)
-                        if oversized is not None and seen.insert(oversized):
+                        if oversized is not None and ctx.is_valid_for_location(oversized) and seen.insert(oversized):
                             yield NegativeValue(
                                 oversized,
                                 scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
@@ -2014,7 +2014,7 @@ def cover_schema_iter(
                     if value == 1:
                         # The 0-item case is structurally trivial. Skip the Hypothesis round-trip
                         # so unresolvable / unsatisfiable `items` schemas don't drop the negative.
-                        if seen.insert([]):
+                        if ctx.is_valid_for_location([]) and seen.insert([]):
                             yield NegativeValue(
                                 [],
                                 scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
@@ -2031,7 +2031,7 @@ def cover_schema_iter(
                             }
                             new_schema.update({"minItems": value - 1, "maxItems": value - 1, "type": "array"})
                             array_value = ctx.generate_from_schema(new_schema)
-                            if seen.insert(array_value):
+                            if ctx.is_valid_for_location(array_value) and seen.insert(array_value):
                                 yield NegativeValue(
                                     array_value,
                                     scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
@@ -2246,14 +2246,34 @@ def _positive_for_describing_keywords(
     elif ty == "integer" or ty == "number":
         yield from _positive_number(ctx, schema)
     elif ty == "array":
-        yield from _positive_array(ctx, schema, cast(list, template))
+        yield from _drop_invalid_for_location(_positive_array(ctx, schema, cast(list, template)), ctx)
     elif ty == "object":
-        yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
+        yield from _drop_invalid_for_location(
+            _positive_object(ctx, _with_effective_required(schema), cast(dict, template)), ctx
+        )
     elif ty is None:
         if _implies_object_type(schema):
-            yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
+            yield from _drop_invalid_for_location(
+                _positive_object(ctx, _with_effective_required(schema), cast(dict, template)), ctx
+            )
         elif _implies_array_type(schema):
-            yield from _positive_array(ctx, schema, cast(list, template))
+            yield from _drop_invalid_for_location(_positive_array(ctx, schema, cast(list, template)), ctx)
+
+
+def _drop_invalid_for_location(
+    cases: Generator[GeneratedValue, None, None], ctx: CoverageContext
+) -> Generator[GeneratedValue, None, None]:
+    """Drop containers the location cannot carry, e.g. ones whose rendering blanks a path segment."""
+    for case in cases:
+        value = case.value
+        if isinstance(value, dict):
+            # `is_valid_for_location` judges a dict by its `repr`, which is not what a path
+            # parameter sends; only an empty object is unrepresentable there.
+            if ctx.location == ParameterLocation.PATH and not value:
+                continue
+        elif not ctx.is_valid_for_location(value):
+            continue
+        yield case
 
 
 def _filter_against_combinators(
