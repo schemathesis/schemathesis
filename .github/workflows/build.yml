@@ -62,13 +62,13 @@ jobs:
             **/uv.lock
           cache-suffix: corpus-tooling-3.14-v1
 
-      - run: uvx ruff check tools/corpus test/tooling/corpus
+      - run: uvx ruff check tools scripts/analyze test/tooling
 
-      - run: uvx ruff format --check tools/corpus test/tooling/corpus
+      - run: uvx ruff format --check tools scripts/analyze test/tooling
 
-      - run: uvx --with=".[tests]" --with=mypy --with=types-PyYAML mypy tools/corpus
+      - run: uvx --with=".[tests]" --with=mypy --with=types-PyYAML mypy tools/corpus scripts/analyze
 
-      - run: uv run --extra=tests pytest test/tooling/corpus -n auto -q
+      - run: uvx --with="tox" --with="tox-uv" tox -e tooling
 
   tests:
     strategy:
