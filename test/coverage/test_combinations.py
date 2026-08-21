@@ -3213,3 +3213,19 @@ def test_positive_number_boundary_respects_sibling_not(pctx):
 )
 def test_positive_values_respect_sibling_not(pctx, schema):
     assert_conform(cover_schema(pctx, schema), schema)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string", "pattern": "[0-9]+", "anyOf": [{"minLength": 2}]},
+        {"type": "integer", "minimum": 0, "maximum": 10, "anyOf": [{"multipleOf": 7, "minimum": 7}]},
+        {"type": "array", "items": {"type": "integer"}, "anyOf": [{"minItems": 3}]},
+        {"type": "boolean", "anyOf": [{"const": True}]},
+        {"type": "string", "pattern": "[0-9]+", "oneOf": [{"minLength": 2}]},
+        {"type": "array", "items": {"type": "integer"}, "oneOf": [{"minItems": 2}, {"maxItems": 0}]},
+    ],
+    ids=["string", "number", "array", "boolean", "one-of-string", "one-of-array"],
+)
+def test_positive_values_respect_sibling_combinators(pctx, schema):
+    assert_conform(cover_schema(pctx, schema), schema)

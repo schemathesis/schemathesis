@@ -1571,36 +1571,10 @@ def _cover_positive_for_type(
             elif const is not NOT_SET:
                 if is_valid(const, schema):
                     yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
-            elif ty is not None:
-                if ty == "null":
-                    yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Value null value")
-                elif ty == "boolean":
-                    yield PositiveValue(
-                        True, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value"
-                    )
-                    yield PositiveValue(
-                        False, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value"
-                    )
-                elif ty == "string":
-                    yield from _positive_string(ctx, schema)
-                elif ty == "integer" or ty == "number":
-                    yield from _positive_number(ctx, schema)
-                elif ty == "array":
-                    yield from _positive_array(ctx, schema, cast(list, template))
-                elif ty == "object":
-                    yield from _filter_against_combinators(
-                        _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
-                        schema,
-                        ctx,
-                    )
-            elif _implies_object_type(schema):
+            elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
                 yield from _filter_against_combinators(
-                    _positive_object(ctx, _with_effective_required(schema), cast(dict, template)),
-                    schema,
-                    ctx,
+                    _positive_for_describing_keywords(ctx, schema, ty, template), schema, ctx
                 )
-            elif _implies_array_type(schema):
-                yield from _positive_array(ctx, schema, cast(list, template))
         if "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
             # These violations are positive for the outer schema, so flip the mode.
@@ -2258,14 +2232,39 @@ def is_invalid_for_oneOf(value: object, idx: int, validators: list[jsonschema_rs
     return valid_count == 0
 
 
+def _positive_for_describing_keywords(
+    ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, template: object
+) -> Generator[GeneratedValue, None, None]:
+    """Positive values built from the describing keywords alone (type, bounds, `items`, `properties`, ...)."""
+    if ty == "null":
+        yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Value null value")
+    elif ty == "boolean":
+        yield PositiveValue(True, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
+        yield PositiveValue(False, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
+    elif ty == "string":
+        yield from _positive_string(ctx, schema)
+    elif ty == "integer" or ty == "number":
+        yield from _positive_number(ctx, schema)
+    elif ty == "array":
+        yield from _positive_array(ctx, schema, cast(list, template))
+    elif ty == "object":
+        yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
+    elif ty is None:
+        if _implies_object_type(schema):
+            yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
+        elif _implies_array_type(schema):
+            yield from _positive_array(ctx, schema, cast(list, template))
+
+
 def _filter_against_combinators(
     cases: Generator[GeneratedValue, None, None], schema: JsonSchema, ctx: CoverageContext
 ) -> Generator[GeneratedValue, None, None]:
-    """Drop outer-only object values that violate `anyOf`/`oneOf` on the same schema.
+    """Drop values that violate `anyOf`/`oneOf` on the same schema.
 
-    `_positive_object` generates from outer `properties` without consulting sibling `anyOf`/`oneOf`
-    constraints (e.g. a branch tightening a property's enum). When such a combinator is present,
-    validate each generated value against the full schema and drop the ones no branch accepts.
+    Values are built from the describing keywords alone, without consulting sibling `anyOf`/`oneOf`
+    constraints (e.g. a branch tightening a property's enum or a string's length). When such a
+    combinator is present, validate each generated value against the full schema and drop the ones
+    no branch accepts.
     """
     if not isinstance(schema, dict) or ("anyOf" not in schema and "oneOf" not in schema):
         yield from cases
