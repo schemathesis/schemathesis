@@ -1037,6 +1037,9 @@ class HashSet:
     def __init__(self) -> None:
         self._data: set[tuple] = set()
 
+    def __bool__(self) -> bool:
+        return bool(self._data)
+
     def insert(self, value: Any) -> bool:
         key = _to_hashable_key(value)
         before = len(self._data)
@@ -2570,8 +2573,12 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if min_length == 0:
         min_length = None
     max_length = schema.get("maxLength")
+    # Spec hints are checked against `declared`: the header/cookie narrowing below only simplifies
+    # generated values, and values the transport cannot send are rejected separately.
+    declared = schema
     if ctx.location == "path" and not ("format" in schema and schema["format"] in ctx.custom_formats):
         schema = _ensure_valid_path_parameter_schema(schema)
+        declared = schema
     elif ctx.location in ("header", "cookie") and not ("format" in schema and schema["format"] in ctx.custom_formats):
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and pattern_requires_char_outside(pattern, HEADER_ALLOWED_CHARS):
@@ -2580,6 +2587,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         schema = _ensure_valid_headers_schema(schema)
     elif _xml_string_needs_non_empty(ctx, schema):
         schema = {**schema, "minLength": 1}
+        declared = schema
         min_length = 1
 
     # Sentinel-based reads so falsy spec hints (`default: 0`, `example: ""`) and explicit
@@ -2596,7 +2604,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         has_valid_example = False
         if (
             example is not NOT_SET
-            and _is_valid_with_formats(example, schema, ctx)
+            and _is_valid_with_formats(example, declared, ctx)
             and ctx.is_valid_for_location(example)
             and seen_values.insert(example)
         ):
@@ -2605,7 +2613,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         if examples:
             for example in examples:
                 if (
-                    _is_valid_with_formats(example, schema, ctx)
+                    _is_valid_with_formats(example, declared, ctx)
                     and ctx.is_valid_for_location(example)
                     and seen_values.insert(example)
                 ):
@@ -2615,7 +2623,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             default is not NOT_SET
             and not (example is not NOT_SET and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
-            and _is_valid_with_formats(default, schema, ctx)
+            and _is_valid_with_formats(default, declared, ctx)
             and ctx.is_valid_for_location(default)
             and seen_values.insert(default)
         ):
@@ -2688,6 +2696,13 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
                         scenario=CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
                         description="Near-boundary length string",
                     )
+
+    if not seen_values:
+        # Length bounds past the internal generation buffer leave every boundary case above
+        # unreachable; without a plain value the parameter is absent from every generated case.
+        with _ignore_unfixable():
+            value = ctx.generate_from_schema(schema)
+            yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
 
 
 def closest_multiple_greater_than(y: int | float, x: int | float) -> int | float:
