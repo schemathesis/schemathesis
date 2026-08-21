@@ -12,7 +12,7 @@ from jsonschema_rs import canonical
 
 import schemathesis
 from schemathesis.config import GenerationConfig
-from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, _is_valid_uuid
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, _is_valid_uuid, make_validator
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -1486,3 +1486,48 @@ def test_unnegatable_path_falls_back_to_positive(ctx):
     test()
     assert modes
     assert all(entry["path"] == "positive" and entry["header"] == "negative" for entry in modes), modes
+
+
+def test_negative_body_stays_invalid_when_a_sibling_carries_a_format(ctx):
+    # A body the schema accepts must never ship as a negative case; the leak needs a few hundred draws to surface.
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["txnId", "payload"],
+                                    "properties": {
+                                        "txnId": {"type": "string", "format": "uuid"},
+                                        "payload": {
+                                            "properties": {"inner": {"type": "string", "minLength": 5}},
+                                            "required": ["inner"],
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/x"]["POST"]
+    body = operation.body[0]
+    validator = make_validator(body.unoptimized_schema, schema.adapter.jsonschema_validator_cls)
+
+    @given(body.get_strategy(operation, GenerationConfig(), GenerationMode.NEGATIVE))
+    @settings(max_examples=300, deadline=None, database=None, suppress_health_check=list(HealthCheck))
+    def test(value):
+        if isinstance(value, GeneratedValue):
+            value = value.value
+        if not isinstance(value, dict):
+            return
+        assert not validator.is_valid(value), f"Negative case conforms to the schema: {value!r}"
+
+    test()

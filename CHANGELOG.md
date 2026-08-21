@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.25.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for bodies whose schema declares a `format` anywhere.
+
 ## [4.25.0](https://github.com/schemathesis/schemathesis/compare/v4.24.3...v4.25.0) - 2026-08-21
 
 ### :rocket: Added
