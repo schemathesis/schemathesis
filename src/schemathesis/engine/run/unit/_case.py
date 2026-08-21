@@ -8,7 +8,7 @@ from requests.exceptions import ChunkedEncodingError
 from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import CheckContext
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.core.error_feedback.collector import record_response
+from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
 from schemathesis.engine import events
@@ -161,20 +161,12 @@ def _do_call_and_validate(
     response = reauth_and_replay(case, response, ctx.reauth, _perform_call)
     recorder.record_response(case_id=case.id, response=response)
     if ctx.error_feedback is not None:
-        record_response(
-            store=ctx.error_feedback,
-            operation=case.operation,
+        ctx.record_error_feedback(
             case=case,
             response=response,
-            cache_writer=ctx.cache.writer,
-        )
-        case.operation.schema.record_runtime_observations(
-            store=ctx.error_feedback,
             recorder=recorder,
-            case=case,
-            response=response,
+            observations=parse_observations(operation=case.operation, case=case, response=response),
             transport_kwargs=transport_kwargs,
-            cache_writer=ctx.cache.writer,
         )
     if _targets_declared_method(case):
         is_documented_status = case.operation.responses.find_by_status_code(response.status_code) is not None

@@ -15,7 +15,7 @@ from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
-from schemathesis.core.error_feedback.collector import parse_observations, record_observations
+from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
@@ -211,6 +211,10 @@ def execute_state_machine_loop(
     # suite finishes, before the next iteration's strategies are built.
     suite_recorders: list[ScenarioRecorder] = []
 
+    def remember_step_outcome(case: Case, outcome: BaseException | None) -> None:
+        if generation.unique_inputs:
+            ctx.store_step_outcome(case, outcome)
+
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
 
@@ -237,13 +241,7 @@ def execute_state_machine_loop(
             return ""
 
         def before_call(self, case: Case) -> None:
-            override = overrides.for_operation(engine.config, operation=case.operation)
-            for location in ("query", "headers", "cookies", "path_parameters"):
-                entry = getattr(override, location)
-                if entry:
-                    container = getattr(case, location) or {}
-                    container.update(entry)
-                    setattr(case, location, container)
+            overrides.for_operation(engine.config, operation=case.operation).apply_to(case)
             return super().before_call(case)
 
         def step(self, input: StepInput) -> StepOutput | None:
@@ -296,9 +294,8 @@ def execute_state_machine_loop(
                 raise
             except FailureGroup as exc:
                 engine.health.record_completion(operation_label=operation_label)
-                if generation.unique_inputs:
-                    for failure in exc.exceptions:
-                        ctx.store_step_outcome(input.case, failure)
+                for failure in exc.exceptions:
+                    remember_step_outcome(input.case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
@@ -313,20 +310,17 @@ def execute_state_machine_loop(
                         raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
                     state.store_unrecoverable_network_error(network_error)
 
-                if generation.unique_inputs:
-                    ctx.store_step_outcome(input.case, exc)
+                remember_step_outcome(input.case, exc)
                 ctx.step_errored()
                 raise
             except KeyboardInterrupt:
                 ctx.step_interrupted()
                 raise
             except BaseException as exc:
-                if generation.unique_inputs:
-                    ctx.store_step_outcome(input.case, exc)
+                remember_step_outcome(input.case, exc)
                 raise exc
             else:
-                if generation.unique_inputs:
-                    ctx.store_step_outcome(input.case, None)
+                remember_step_outcome(input.case, None)
             return result
 
         def validate_response(
@@ -347,22 +341,12 @@ def execute_state_machine_loop(
             ctx.current_response = response
 
             if engine.error_feedback is not None:
-                # Field-level observations steer subsequent positive-mode generation.
-                record_observations(
-                    store=engine.error_feedback,
-                    operation=case.operation,
-                    case=case,
-                    observations=observations,
-                    cache_writer=engine.cache.writer,
-                )
-                # Schema-level cross-cutting observations (e.g. auth retries).
-                case.operation.schema.record_runtime_observations(
-                    store=engine.error_feedback,
-                    recorder=self.recorder,
+                engine.record_error_feedback(
                     case=case,
                     response=response,
+                    recorder=self.recorder,
+                    observations=observations,
                     transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
-                    cache_writer=engine.cache.writer,
                 )
 
             cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")
