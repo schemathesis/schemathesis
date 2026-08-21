@@ -6118,6 +6118,57 @@ def test_spec_hint_recovers_after_dropping_readonly_stripped_keys(hint_extra):
     assert _positive_body_context().generate_from_schema(schema) == {"id": "X"}
 
 
+def test_object_example_with_readonly_key_ships_without_it(ctx):
+    # A curated body `example` naming a server-set field must still ship once, minus that field.
+    raw = ctx.openapi.build_schema(
+        {
+            "/r": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/File"}}},
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+        components={
+            "schemas": {
+                "File": {
+                    "type": "object",
+                    "example": {
+                        "content": "Zm9v",
+                        "content_path": "/v1/files/abc/content",
+                        "id": "abc",
+                        "name": "foo.txt",
+                        "size": 35,
+                    },
+                    "properties": {
+                        "content": {"type": "string"},
+                        "content_path": {"type": "string", "readOnly": True},
+                        "id": {"type": "string"},
+                        "name": {"type": "string"},
+                        "size": {"type": "integer"},
+                    },
+                },
+            },
+        },
+    )
+    operation = schemathesis.openapi.from_dict(raw)["/r"]["POST"]
+    bodies = [
+        case.body
+        for case in iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+    ]
+
+    assert {"content": "Zm9v", "id": "abc", "name": "foo.txt", "size": 35} in bodies
+
+
 def test_example_with_nested_ref_violation_is_not_used(ctx):
     # An `example` whose nested values violate an enum reachable via `$ref` must not
     # be emitted as a positive case. Without bundle-aware validation the ref cannot

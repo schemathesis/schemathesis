@@ -167,11 +167,9 @@ def _is_strictly_valid(value: Any, schema: dict[str, Any], ctx: CoverageContext)
         return False
 
 
-def _accept_spec_value(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> Any:
-    # Spec examples reflecting the response shape may carry `readOnly` keys that
-    # request-side schemas forbid; dropping those keys recovers the curated value.
-    if _is_strictly_valid(value, schema, ctx):
-        return value
+def _without_forbidden_keys(value: Any, schema: dict[str, Any]) -> Any:
+    # Spec hints reflecting the response shape may carry `readOnly` keys that request-side
+    # schemas forbid as `{"not": {}}`; dropping those keys recovers the curated value.
     if not isinstance(value, dict):
         return NOT_SET
     properties = schema.get("properties")
@@ -180,8 +178,14 @@ def _accept_spec_value(value: Any, schema: dict[str, Any], ctx: CoverageContext)
     forbidden = {k for k, sub in properties.items() if isinstance(sub, dict) and sub.get("not") == {}}
     if not forbidden or forbidden.isdisjoint(value):
         return NOT_SET
-    cleaned = {k: v for k, v in value.items() if k not in forbidden}
-    if _is_strictly_valid(cleaned, schema, ctx):
+    return {k: v for k, v in value.items() if k not in forbidden}
+
+
+def _accept_spec_value(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> Any:
+    if _is_strictly_valid(value, schema, ctx):
+        return value
+    cleaned = _without_forbidden_keys(value, schema)
+    if cleaned is not NOT_SET and _is_strictly_valid(cleaned, schema, ctx):
         return cleaned
     return NOT_SET
 
@@ -2955,6 +2959,15 @@ def _positive_object(
             yield generated
 
 
+def _accept_object_hint(value: Any, schema: JsonSchemaObject, ctx: CoverageContext) -> Any:
+    if _is_valid_with_formats(value, schema, ctx):
+        return value
+    cleaned = _without_forbidden_keys(value, schema)
+    if cleaned is not NOT_SET and _is_valid_with_formats(cleaned, schema, ctx):
+        return cleaned
+    return NOT_SET
+
+
 def _iter_positive_object(
     ctx: CoverageContext, schema: JsonSchemaObject, template: dict
 ) -> Generator[GeneratedValue, None, None]:
@@ -2974,19 +2987,23 @@ def _iter_positive_object(
     outer_seen = HashSet()
 
     if example is not NOT_SET or examples or default is not NOT_SET:
-        if example is not NOT_SET and _is_valid_with_formats(example, schema, ctx):
-            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
+        if example is not NOT_SET:
+            accepted = _accept_object_hint(example, schema, ctx)
+            if accepted is not NOT_SET:
+                yield PositiveValue(accepted, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if _is_valid_with_formats(example, schema, ctx):
-                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
+                accepted = _accept_object_hint(example, schema, ctx)
+                if accepted is not NOT_SET:
+                    yield PositiveValue(accepted, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default is not NOT_SET
             and not (example is not NOT_SET and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
-            and _is_valid_with_formats(default, schema, ctx)
         ):
-            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
+            accepted = _accept_object_hint(default, schema, ctx)
+            if accepted is not NOT_SET:
+                yield PositiveValue(accepted, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
     elif template_complete and (template or not (ctx.is_required and is_form_parts(ctx.media_type))):
         outer_seen.insert(template)
         yield PositiveValue(template, scenario=CoverageScenario.VALID_OBJECT, description="Valid object")
