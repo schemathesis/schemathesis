@@ -11,6 +11,7 @@
 - False positive `negative_data_rejection` for bodies whose schema declares a `format` anywhere.
 - Coverage phase skipping body examples that name a `readOnly` field.
 - False positive `positive_data_acceptance` for values with a sibling `anyOf`/`oneOf` in the coverage phase.
+- Coverage phase sending empty array and object path parameters that blank the path segment.
 
 ## [4.25.0](https://github.com/schemathesis/schemathesis/compare/v4.24.3...v4.25.0) - 2026-08-21
 

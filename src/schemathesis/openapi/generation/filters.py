@@ -36,6 +36,10 @@ def is_invalid_path_parameter(value: object, *, allow_encoded_slash: bool = Fals
     # routing the request to a different operation than the one declared.
     if value in ("/", "", ".", ".."):
         return True
+    # An array renders as its comma-joined items; when that rendering is empty the path
+    # segment disappears and the request lands on a different operation.
+    if isinstance(value, list) and (not value or value == [""]):
+        return True
     if contains_unicode_surrogate_pair(value):
         return True
 
