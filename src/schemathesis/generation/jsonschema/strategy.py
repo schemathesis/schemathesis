@@ -237,11 +237,12 @@ def _not(
     if isinstance(barred_view, canonical.ReferenceView):
         barred = _target(barred, barred_view.uri, ctx)
     complement = _negated(barred)
-    if complement is None:
-        # No complement is spelled for a branch set that points on, so the bar judges the draw itself.
-        # Only the document can be judged that way: below it, a pointer to `#` names something else.
+    if complement is None or _bars_its_input(complement, barred):
+        # Nothing to draw from where no complement is spelled, or where negation hands the bar back
+        # unchanged, so the bar judges the draw itself. Only the document can be judged that way:
+        # below it, a pointer to `#` names something else.
         if schema != ctx.root:
-            raise UnsupportedSchema.from_reason("a `not` over branches that point on, below the document root")
+            raise UnsupportedSchema.from_reason("a `not` whose complement is not spelled out, below the document root")
         return _anything(ctx).filter(_validator(schema))
     spelled = complement.to_json_schema()
     if _points_on(spelled):
@@ -263,6 +264,12 @@ def _not(
         ctx.cyclic = ctx.cyclic or nested.cyclic
         return strategy
     return from_schema(complement, ctx)
+
+
+def _bars_its_input(complement: jsonschema_rs.CanonicalSchema, barred: jsonschema_rs.CanonicalSchema) -> bool:
+    """Whether negation declined, handing back a bar over the very schema it was asked to complement."""
+    view = complement.view()
+    return isinstance(view, canonical.NotView) and view.schema == barred
 
 
 def _points_on(schema: JsonValue) -> bool:
