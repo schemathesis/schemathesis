@@ -11,6 +11,7 @@ import string
 from contextlib import ExitStack, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from decimal import Decimal
+from fractions import Fraction
 from functools import lru_cache, partial
 from hashlib import blake2b
 from itertools import combinations, count, islice
@@ -814,9 +815,6 @@ class CoverageContext:
             if not enum_values:
                 raise Unsatisfiable
             return cached_draw(st.sampled_from(enum_values))
-        if keys == ["multipleOf", "type"] and schema["type"] in ("integer", "number"):
-            step = schema["multipleOf"]
-            return cached_draw(st.integers().map(step.__mul__))
         if "pattern" in schema and "string" in get_type(schema):
             pattern = schema["pattern"]
             try:
@@ -2827,6 +2825,9 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         # Nothing representable past the bound, so emit no value.
         return
     multiple_of = schema.get("multipleOf")
+    if is_integer and multiple_of is not None and not isinstance(multiple_of, int):
+        # Integer multiples of `p/q` are exactly the multiples of `p`.
+        multiple_of = Fraction(Decimal(str(multiple_of))).numerator
     example = schema.get("example", NOT_SET)
     examples = schema.get("examples")
     default = schema.get("default", NOT_SET)

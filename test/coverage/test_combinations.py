@@ -3276,3 +3276,15 @@ def test_positive_values_follow_each_schema_own_reference_target():
             update_pattern=update_quantifier,
         )
         assert_conform(cover_schema(ctx, schema), schema)
+
+
+# Integer multiples of `p/q` are exactly the multiples of `p`; a float step must not leak into the values.
+@pytest.mark.parametrize(
+    "schema",
+    [{"type": "integer", "multipleOf": 0.5}, {"type": "integer", "multipleOf": 0.3, "minimum": 1, "maximum": 7}],
+    ids=["unbounded", "bounded"],
+)
+def test_positive_integer_with_fractional_multiple_of_stays_on_the_integer_grid(pctx, schema):
+    values = cover_schema(pctx, schema)
+    assert values and all(isinstance(value, int) for value in values), values
+    assert_conform(values, schema)
