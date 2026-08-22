@@ -15,6 +15,7 @@
 - Coverage phase repeating requests when different generated values serialize identically.
 - Coverage phase ignoring header and cookie `example`/`default` values with non-alphanumeric characters.
 - Coverage phase omitting string parameters with a very large `maxLength`.
+- Coverage phase generating no positive cases for objects with an ungeneratable property.
 
 ## [4.25.0](https://github.com/schemathesis/schemathesis/compare/v4.24.3...v4.25.0) - 2026-08-21
 

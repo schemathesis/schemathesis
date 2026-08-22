@@ -194,6 +194,8 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
     return st.lists(strategy, max_size=2) | st.dictionaries(st.text(), strategy, max_size=2)
 
 
+# Keywords that describe a schema without restricting the values it accepts.
+ANNOTATION_KEYWORDS = frozenset(("description", "example", "examples", "title", "deprecated", "externalDocs", "xml"))
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
 NEGATIVE_MODE_MAX_ITEMS = 15
 # Longest array still drawn element by element; a pattern-matched element spends budget per
@@ -619,6 +621,26 @@ class CoverageContext:
         except InvalidSchema:
             return None
 
+    def _without_unbuildable_optional_properties(self, schema: JsonSchemaObject) -> JsonSchemaObject | None:
+        """The same object without the optional properties nothing can be drawn for."""
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            return None
+        required = set(schema.get("required", []))
+        bundle = schema.get(BUNDLE_STORAGE_KEY)
+        kept = {}
+        for name, sub_schema in properties.items():
+            candidate = sub_schema
+            if bundle is not None and isinstance(candidate, dict):
+                candidate = {**candidate, BUNDLE_STORAGE_KEY: bundle}
+            if self.build_strategy(candidate) is not None:
+                kept[name] = sub_schema
+            elif name in required:
+                return None
+        if len(kept) == len(properties):
+            return None
+        return {**schema, "properties": kept}
+
     def _generate_around_conditionals(self, schema: JsonSchemaObject, described: JsonSchemaObject) -> Any:
         """A value for `schema` drawn from the part of it that describes values, or `NOT_SET`."""
         try:
@@ -728,7 +750,7 @@ class CoverageContext:
                 accepted = _accept_spec_value(default, schema, self)
                 if accepted is not NOT_SET:
                     return accepted
-        keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
+        keys = sorted([k for k in schema if not k.startswith("x-") and k not in ANNOTATION_KEYWORDS])
         if keys == ["type"]:
             return cached_draw(get_strategy_for_type(schema["type"]))
         if keys == ["format", "type"]:
@@ -902,6 +924,11 @@ class CoverageContext:
         if isinstance(cloned, dict) and BUNDLE_STORAGE_KEY in self.root_schema:
             cloned[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
         strategy = self.build_strategy(cloned)
+        if strategy is None and isinstance(cloned, dict):
+            # An optional property nothing can be drawn for otherwise takes every value of the object with it.
+            reduced = self._without_unbuildable_optional_properties(cloned)
+            if reduced is not None:
+                strategy = self.build_strategy(reduced)
         if strategy is None:
             raise Unsatisfiable
         # Keep generation consistent with the validator draft semantics used by this operation.
