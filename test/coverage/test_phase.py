@@ -10172,3 +10172,83 @@ def test_body_and_parameter_cases_yield_no_duplicate_requests(ctx):
         ({"X-Key": ""}, {"name": "app"}),
         ({"X-Key": "null"}, {"name": "app"}),
     ]
+
+
+def test_unbuildable_optional_property_does_not_erase_positive_cases(ctx):
+    # One property nothing can satisfy must not wipe out every positive case for the whole body.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "required": ["name"],
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "token": {
+                                            "type": "string",
+                                            "pattern": ".*",
+                                            "minLength": 0,
+                                            "maxLength": 2147483647,
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    cases = _iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE)
+    assert [case.body for case in cases] == [{"name": ""}, {"name": "", "token": ""}]
+
+
+@pytest.mark.parametrize(
+    ("keyword", "value"),
+    [
+        ("title", "Payload"),
+        ("deprecated", True),
+        ("externalDocs", {"url": "https://example.com"}),
+        ("xml", {"name": "payload"}),
+    ],
+)
+def test_annotation_keyword_does_not_erase_positive_cases(ctx, keyword, value):
+    # Keywords that describe an object rather than constrain it must not change what it generates.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    keyword: value,
+                                    "required": ["token"],
+                                    "properties": {
+                                        "token": {
+                                            "type": "string",
+                                            "pattern": ".*",
+                                            "minLength": 0,
+                                            "maxLength": 2147483647,
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    cases = _iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE)
+    assert [case.body for case in cases] == [{"token": ""}]
