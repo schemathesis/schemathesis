@@ -142,6 +142,23 @@ def _replay(
         yield from rest
 
 
+def _dedup_key(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Key cases by the request they send, not by the value that produced it."""
+    query = kwargs.get("query")
+    if not isinstance(query, dict):
+        return kwargs
+    normalized = {}
+    for key, value in query.items():
+        if type(value) is list:
+            # An empty list sends nothing; a one-item list sends what the bare value would.
+            if not value:
+                continue
+            if len(value) == 1:
+                value = value[0]
+        normalized[key] = value
+    return {**kwargs, "query": normalized}
+
+
 def _stringify_value(val: Any, container_name: str) -> Any:
     if val is None:
         return "null"
@@ -396,6 +413,14 @@ def iter_coverage_cases(
 
     seen_negative = HashSet()
     seen_positive = HashSet()
+
+    def _is_new_request(kwargs: dict[str, Any], mode: GenerationMode) -> bool:
+        # Repeating a request already sent tests nothing, whichever mode sent it first.
+        key = _dedup_key(kwargs)
+        if mode == GenerationMode.POSITIVE:
+            return seen_positive.insert(key)
+        return key not in seen_positive and seen_negative.insert(key)
+
     capabilities = operation.schema.get_coverage_capabilities()
     validator_cls = capabilities.validator_cls
     update_pattern = capabilities.update_pattern
@@ -745,6 +770,8 @@ def iter_coverage_cases(
                     else:
                         template.set_body(first_positive, body.media_type)
             data = template.with_body(value=value, media_type=body.media_type)
+            if not _is_new_request(data.kwargs, value.generation_mode):
+                continue
             yield operation.Case(
                 **data.kwargs,
                 _meta=_build_meta(
@@ -772,6 +799,8 @@ def iter_coverage_cases(
                         continue
 
                     data = template.with_body(value=next_value, media_type=body.media_type)
+                    if not _is_new_request(data.kwargs, next_value.generation_mode):
+                        continue
                     yield operation.Case(
                         **data.kwargs,
                         _meta=_build_meta(
@@ -798,7 +827,7 @@ def iter_coverage_cases(
         and not has_unsatisfiable_required_parameter
     ):
         data = template.unmodified()
-        seen_positive.insert(data.kwargs)
+        seen_positive.insert(_dedup_key(data.kwargs))
         yield operation.Case(
             **data.kwargs,
             _meta=_build_meta(
@@ -837,14 +866,15 @@ def iter_coverage_cases(
                 if template_body_is_fallback_negative:
                     # Skip: would emit a case with NEGATIVE body + NEGATIVE param.
                     continue
-                seen_negative.insert(kwargs)
+                if not _is_new_request(kwargs, GenerationMode.NEGATIVE):
+                    continue
             elif value.generation_mode == GenerationMode.POSITIVE:
                 if has_required_body and not has_generated_required_body and not is_content_type_mutation:
                     continue
                 if has_unsatisfiable_required_parameter:
                     # A required parameter has no positive value, so no positive case is valid.
                     continue
-                if not seen_positive.insert(kwargs):
+                if not _is_new_request(kwargs, GenerationMode.POSITIVE):
                     continue
 
             yield operation.Case(
@@ -944,7 +974,7 @@ def iter_coverage_cases(
                     kwargs = {k: v for k, v in kwargs.items() if k not in ("body", "media_type")}
                     raw = {k: v for k, v in raw.items() if k not in ("body", "media_type")}
 
-                if seen_negative.insert(kwargs):
+                if seen_negative.insert(_dedup_key(kwargs)):
                     yield operation.Case(
                         **kwargs,
                         _meta=_build_meta(
@@ -1069,7 +1099,7 @@ def iter_coverage_cases(
             if GenerationMode.POSITIVE in generation_modes and not (
                 has_required_body and not has_generated_required_body
             ):
-                yield make_case(
+                case = make_case(
                     only_required,
                     CoverageScenario.OBJECT_ONLY_REQUIRED,
                     "Only required properties",
@@ -1078,10 +1108,12 @@ def iter_coverage_cases(
                     GenerationMode.POSITIVE,
                     Instant(),
                 )
+                if _is_new_request(_case_to_kwargs(case), GenerationMode.POSITIVE):
+                    yield case
             if GenerationMode.NEGATIVE in generation_modes:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 for case in _yield_negative(subschema, location, is_required=bool(required)):
-                    kwargs = _case_to_kwargs(case)
+                    kwargs = _dedup_key(_case_to_kwargs(case))
                     if not seen_negative.insert(kwargs):
                         continue
                     assert case.meta is not None
@@ -1098,7 +1130,7 @@ def iter_coverage_cases(
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
             if combo != base_container and GenerationMode.POSITIVE in generation_modes:
                 if not (has_required_body and not has_generated_required_body):
-                    yield make_case(
+                    case = make_case(
                         combo,
                         CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
                         f"All required properties and optional '{opt_param}'",
@@ -1107,9 +1139,13 @@ def iter_coverage_cases(
                         GenerationMode.POSITIVE,
                         Instant(),
                     )
+                    if _is_new_request(_case_to_kwargs(case), GenerationMode.POSITIVE):
+                        yield case
                 if GenerationMode.NEGATIVE in generation_modes:
                     subschema = _combination_schema(combo, required, parameter_set)
                     for case in _yield_negative(subschema, location, is_required=bool(required)):
+                        if not _is_new_request(_case_to_kwargs(case), GenerationMode.NEGATIVE):
+                            continue
                         assert case.meta is not None
                         assert isinstance(case.meta.phase.data, CoveragePhaseData)
                         # Already generated in one of the blocks above
@@ -1129,7 +1165,7 @@ def iter_coverage_cases(
                 for combination in combinations(optional, size):
                     combo = {k: v for k, v in base_container.items() if k in required or k in combination}
                     if combo != base_container:
-                        yield make_case(
+                        case = make_case(
                             combo,
                             CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
                             f"All required and {size} optional properties",
@@ -1138,4 +1174,6 @@ def iter_coverage_cases(
                             GenerationMode.POSITIVE,
                             Instant(),
                         )
+                        if _is_new_request(_case_to_kwargs(case), GenerationMode.POSITIVE):
+                            yield case
                         break

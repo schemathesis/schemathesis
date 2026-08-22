@@ -1040,6 +1040,9 @@ class HashSet:
     def __bool__(self) -> bool:
         return bool(self._data)
 
+    def __contains__(self, value: Any) -> bool:
+        return _to_hashable_key(value) in self._data
+
     def insert(self, value: Any) -> bool:
         key = _to_hashable_key(value)
         before = len(self._data)

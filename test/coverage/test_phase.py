@@ -956,19 +956,7 @@ def test_mixed_type_keyword(ctx):
                 "query": {"key": ["0", "0"]},
             },
             {
-                "query": {"key": ["AAA"]},
-            },
-            {
                 "query": {"key": [["null", "null"]]},
-            },
-            {
-                "query": {"key": ["null"]},
-            },
-            {
-                "query": {"key": ["true"]},
-            },
-            {
-                "query": {"key": ["0.5"]},
             },
             {
                 "query": {"key": ["0"]},
@@ -2337,9 +2325,6 @@ def test_query_without_constraints_negative(ctx):
                 "http://127.0.0.1/foo?q=0&q=0",
                 "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null&q=null",
-                "http://127.0.0.1/foo?q=null",
-                "http://127.0.0.1/foo?q=true",
-                "http://127.0.0.1/foo?q=0.5",
                 "http://127.0.0.1/foo?q=0",
                 "http://127.0.0.1/foo?q=AAA",
                 "http://127.0.0.1/foo?q=null",
@@ -2351,14 +2336,10 @@ def test_query_without_constraints_negative(ctx):
             {"type": "array", "items": {"type": "string", "pattern": "^[0-9]{3,5}$"}},
             True,
             [
-                "http://127.0.0.1/foo",
                 "http://127.0.0.1/foo?q=0&q=0",
                 "http://127.0.0.1/foo",
                 "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null&q=null",
-                "http://127.0.0.1/foo?q=null",
-                "http://127.0.0.1/foo?q=true",
-                "http://127.0.0.1/foo?q=0.5",
                 "http://127.0.0.1/foo?q=0",
                 "http://127.0.0.1/foo?q=AAA",
                 "http://127.0.0.1/foo?q=null",
@@ -10081,3 +10062,113 @@ def test_required_string_with_max_length_beyond_generation_buffer(ctx, max_lengt
         ],
     )
     assert any("key" in case.query for case in _iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE))
+
+
+def test_object_query_parameter_yields_no_duplicate_requests(ctx):
+    # Non-dict values collapse to `name=` on the wire, so every type violation repeats the positive request.
+    schema = load_schema(
+        ctx,
+        parameters=[{"in": "query", "name": "filter", "required": False, "schema": {"type": "object"}}],
+        method="get",
+    )
+    queries = [case.query for case in _iter_cases(schema["/foo"]["GET"], *GenerationMode)]
+    assert queries == [{"filter": ""}]
+
+
+def test_two_object_query_parameters_yield_no_duplicate_requests(ctx):
+    schema = load_schema(
+        ctx,
+        parameters=[
+            {"in": "query", "name": "filter", "required": False, "schema": {"type": "object"}},
+            {"in": "query", "name": "sort_by", "required": False, "schema": {"type": "object"}},
+        ],
+        method="get",
+    )
+    queries = [case.query for case in _iter_cases(schema["/foo"]["GET"], *GenerationMode)]
+    assert queries == [
+        {"sort_by": "", "filter": ""},
+        {"filter": ""},
+        {"x-schemathesis-unknown-property": "42", "filter": ""},
+        {"sort_by": ""},
+        {"x-schemathesis-unknown-property": "42", "sort_by": ""},
+    ]
+
+
+def test_array_query_parameter_yields_no_duplicate_requests(ctx):
+    # A one-item list and the bare value put the same `ids=` on the wire.
+    schema = load_schema(
+        ctx,
+        parameters=[
+            {
+                "in": "query",
+                "name": "ids",
+                "required": False,
+                "style": "form",
+                "explode": True,
+                "schema": {"type": "array", "items": {"type": "integer"}},
+            }
+        ],
+        method="get",
+    )
+    queries = [case.query for case in _iter_cases(schema["/foo"]["GET"], *GenerationMode)]
+    assert queries == [
+        {"ids": ["0"]},
+        {"ids": []},
+        {"ids": "0.5"},
+        {"ids": "true"},
+        {"ids": "null"},
+        {"ids": "AAA"},
+        {"ids": [["null", "null"]]},
+    ]
+
+
+def test_empty_array_query_parameter_yields_no_duplicate_requests(ctx):
+    # An empty list sends nothing, so combinations differing only by it hit the same URL.
+    schema = load_schema(
+        ctx,
+        parameters=[
+            {
+                "in": "query",
+                "name": name,
+                "required": False,
+                "style": "form",
+                "explode": True,
+                "schema": {"type": "array", "items": {"type": "string", "enum": ["x"]}},
+            }
+            for name in ("a", "b")
+        ],
+        method="get",
+    )
+    config = SanitizationConfig(enabled=False)
+    urls = [
+        prepare_request(case, headers=None, config=config).url
+        for case in _iter_cases(schema["/foo"]["GET"], *GenerationMode)
+    ]
+    assert sorted(urls) == sorted(set(urls))
+
+
+def test_body_and_parameter_cases_yield_no_duplicate_requests(ctx):
+    # The body case already carries the template's empty header, so the header's own positive repeats it.
+    schema = load_schema(
+        ctx,
+        parameters=[
+            {"in": "header", "name": "X-Key", "required": False, "schema": {"type": "string", "nullable": True}}
+        ],
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["name"],
+                        "properties": {"name": {"type": "string", "example": "app"}},
+                    }
+                }
+            },
+        },
+    )
+    cases = _iter_cases(schema["/foo"]["POST"], GenerationMode.POSITIVE)
+    assert [(dict(case.headers), case.body) for case in cases] == [
+        ({"X-Key": ""}, {"name": "app"}),
+        ({"X-Key": "null"}, {"name": "app"}),
+    ]
