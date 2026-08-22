@@ -3355,6 +3355,9 @@ def _negative_pattern(
     # one burns the whole generation budget only to come up empty.
     if matches_every_string(pattern):
         return
+    # No length fits the window, so there is no string to violate the pattern with.
+    if max_length is not None and (min_length or 0) > max_length:
+        return
     # The same regex recurs verbatim across operations; one Hypothesis search covers the whole audit.
     # `is_valid_for_location` makes the outcome location-dependent, so the location is part of the key.
     cache_key = ("negative_pattern", pattern, min_length, max_length, ctx.location, ctx.validator_cls)

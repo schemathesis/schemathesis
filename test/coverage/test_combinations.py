@@ -3229,3 +3229,8 @@ def test_positive_values_respect_sibling_not(pctx, schema):
 )
 def test_positive_values_respect_sibling_combinators(pctx, schema):
     assert_conform(cover_schema(pctx, schema), schema)
+
+
+def test_negative_pattern_with_min_length_above_max_length_skips_pattern_violation(nctx):
+    schema = {"type": "string", "minLength": 1, "maxLength": 0, "pattern": "^[a-z]+$"}
+    assert_not_conform(cover_schema(nctx, schema), schema)
