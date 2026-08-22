@@ -5,7 +5,7 @@ from collections.abc import Callable, Generator, Mapping
 from typing import Any
 from urllib.parse import quote
 
-from schemathesis.core.jsonschema import maybe_resolve_bundled
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, maybe_resolve_bundled
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, DelimitedValue, RawQueryString
 from schemathesis.specs.openapi.checks import _COLLECTION_FORMAT_DELIMITERS
 
@@ -62,10 +62,10 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
             schema_was_top_ref = False
             if isinstance(schema, dict):
                 schema_was_top_ref = isinstance(schema.get("$ref"), str)
-                bundled = schema.get("x-bundled") if isinstance(schema.get("x-bundled"), dict) else None
+                bundled = schema.get(BUNDLE_STORAGE_KEY) if isinstance(schema.get(BUNDLE_STORAGE_KEY), dict) else None
                 schema = maybe_resolve_bundled(schema)
-                if bundled is not None and "x-bundled" not in schema:
-                    schema = {**schema, "x-bundled": bundled}
+                if bundled is not None and BUNDLE_STORAGE_KEY not in schema:
+                    schema = {**schema, BUNDLE_STORAGE_KEY: bundled}
                 type_ = schema.get("type")
             else:
                 type_ = None
@@ -207,24 +207,11 @@ def _serialize_query_openapi3(
     schema_was_top_ref: bool = False,
 ) -> Generator[Callable | None, None, None]:
     if type_ == "object":
-        # OpenAPI has no spec-defined style for objects with nested-object properties.
-        # Only emit recursive bracket notation when the parameter schema was a bare top-level `$ref`
-        # (matches Spring `@ModelAttribute` and similar consumers). Inline schemas keep their
-        # declared flat-extract semantics so we don't regress documented `extracted_object` behaviour.
-        is_nested = schema_was_top_ref and _schema_has_nested_object_properties(schema)
-        if style == "deepObject":
-            if is_nested:
-                yield nested_object(name)
-            else:
-                yield deep_object(name)
-        if style is None or style == "form":
-            if explode is False:
-                yield comma_delimited_object(name)
-            if explode:
-                if is_nested:
-                    yield nested_object(name)
-                else:
-                    yield extracted_object(name)
+        yield from _query_object_conversions(name, style, explode, schema, schema_was_top_ref)
+    elif type_ is None and _has_object_branch(schema):
+        # A branch keeps the type unknown until the value exists, so the value decides.
+        for func in _query_object_conversions(name, style, explode, schema, schema_was_top_ref):
+            yield _only_for_objects(func, name)
     elif type_ == "array" and explode is False:
         if style == "pipeDelimited":
             yield delimited_encoded(name, delimiter="|")
@@ -234,6 +221,68 @@ def _serialize_query_openapi3(
             yield delimited_encoded(name, delimiter=",")
 
 
+def _only_for_objects(map_function: Callable | None, name: str) -> Callable | None:
+    if map_function is None:
+        return None
+
+    def _map(item: Generated) -> Generated:
+        return map_function(item) if isinstance(item.get(name), dict) else item
+
+    return _map
+
+
+def _resolved_with_bundle(node: dict[str, Any], bundled: Any) -> dict[str, Any]:
+    """Splice the parent's bundle map onto `node` so its `$ref` resolves."""
+    if isinstance(bundled, dict) and BUNDLE_STORAGE_KEY not in node and "$ref" in node:
+        node = {**node, BUNDLE_STORAGE_KEY: bundled}
+    return maybe_resolve_bundled(node)
+
+
+def _has_object_branch(schema: dict[str, Any] | None) -> bool:
+    """Return True when `anyOf`/`oneOf`/`allOf` offers an object shape."""
+    if not isinstance(schema, dict):
+        return False
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
+    for keyword in ("anyOf", "oneOf", "allOf"):
+        for branch in schema.get(keyword) or []:
+            if not isinstance(branch, dict):
+                continue
+            resolved = _resolved_with_bundle(branch, bundled)
+            branch_type = resolved.get("type")
+            if branch_type == "object" or (isinstance(branch_type, list) and "object" in branch_type):
+                return True
+            if "properties" in resolved:
+                return True
+    return False
+
+
+def _query_object_conversions(
+    name: str,
+    style: str | None,
+    explode: bool | None,
+    schema: dict[str, Any] | None,
+    schema_was_top_ref: bool,
+) -> Generator[Callable | None, None, None]:
+    # OpenAPI has no spec-defined style for objects with nested-object properties.
+    # Only emit recursive bracket notation when the parameter schema was a bare top-level `$ref`
+    # (matches Spring `@ModelAttribute` and similar consumers). Inline schemas keep their
+    # declared flat-extract semantics so we don't regress documented `extracted_object` behaviour.
+    is_nested = schema_was_top_ref and _schema_has_nested_object_properties(schema)
+    if style == "deepObject":
+        if is_nested:
+            yield nested_object(name)
+        else:
+            yield deep_object(name)
+    if style is None or style == "form":
+        if explode is False:
+            yield comma_delimited_object(name)
+        if explode:
+            if is_nested:
+                yield nested_object(name)
+            else:
+                yield extracted_object(name)
+
+
 def _schema_has_nested_object_properties(schema: dict[str, Any] | None) -> bool:
     """Return True when at least one property in `schema` resolves to a nested object."""
     if not isinstance(schema, dict):
@@ -241,16 +290,12 @@ def _schema_has_nested_object_properties(schema: dict[str, Any] | None) -> bool:
     properties = schema.get("properties")
     if not isinstance(properties, Mapping):
         return False
-    bundled = schema.get("x-bundled")
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
     for property_schema in properties.values():
         if not isinstance(property_schema, dict):
             continue
-        # Splice the parent's bundle map onto the property so nested `$ref`s resolve.
-        candidate = property_schema
-        if isinstance(bundled, dict) and "x-bundled" not in candidate and "$ref" in candidate:
-            candidate = {**candidate, "x-bundled": bundled}
-        resolved = maybe_resolve_bundled(candidate)
-        property_type = resolved.get("type") if isinstance(resolved, dict) else None
+        resolved = _resolved_with_bundle(property_schema, bundled)
+        property_type = resolved.get("type")
         if property_type == "object":
             return True
         if isinstance(property_type, list) and "object" in property_type:

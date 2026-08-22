@@ -30,6 +30,13 @@ from schemathesis.specs.openapi.serialization import (
 from schemathesis.transport.prepare import get_default_headers
 from test.utils import assert_requests_call
 
+# A branch keeps the parameter's type unknown until the value exists.
+_BRANCHING_SCHEMA = {
+    "oneOf": [
+        {"type": "integer"},
+        {"type": "object", "properties": {"number": {"type": "integer"}, "size": {"type": "integer"}}},
+    ]
+}
 PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1]}
 NULLABLE_PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1], "nullable": True}
 ARRAY_SCHEMA = {"type": "array", "enum": [["blue", "black", "brown"]], "example": ["blue", "black", "brown"]}
@@ -991,6 +998,18 @@ _NESTED_EXPECTED = {"request[pagination][pageNumber]": 1, "request[pagination][p
             {"anything": "ok"},
             {"anything": "ok"},
             id="no-schema-passthrough",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "required": False, "schema": _BRANCHING_SCHEMA},
+            {"page": {"number": 1, "size": 50}},
+            {"number": 1, "size": 50},
+            id="branching-object-extracted",
+        ),
+        pytest.param(
+            {"name": "page", "in": "query", "required": False, "schema": _BRANCHING_SCHEMA},
+            {"page": 2},
+            {"page": 2},
+            id="branching-scalar-passthrough",
         ),
     ],
 )
