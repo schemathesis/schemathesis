@@ -12,6 +12,7 @@
 - Coverage phase skipping body examples that name a `readOnly` field.
 - False positive `positive_data_acceptance` for values with a sibling `anyOf`/`oneOf` in the coverage phase.
 - Coverage phase sending empty array and object path parameters that blank the path segment.
+- Coverage phase repeating requests when different generated values serialize identically.
 - Coverage phase ignoring header and cookie `example`/`default` values with non-alphanumeric characters.
 - Coverage phase omitting string parameters with a very large `maxLength`.
 

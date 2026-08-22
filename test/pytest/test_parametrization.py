@@ -347,8 +347,8 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests, not the example from the schema
     result.assert_outcomes(passed=1)
-    # 6 calls = 2 examples (from schema & Media Type Object) + 4 coverage cases (2 per example)
-    result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
+    # 4 calls = 2 examples (from schema & Media Type Object) + 2 coverage cases (one per example)
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 def test_multiple_examples_different_locations(testdir):
@@ -396,8 +396,8 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used in tests as a part of a single request, i.e. combined
     result.assert_outcomes(passed=1)
-    # 6 calls = 2 examples (from body schema & Media Type Object) + 4 coverage cases
-    result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
+    # 4 calls = 2 examples (from body schema & Media Type Object) + 2 coverage cases
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 def test_multiple_examples_same_location(testdir):
