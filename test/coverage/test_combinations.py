@@ -3234,3 +3234,23 @@ def test_positive_values_respect_sibling_combinators(pctx, schema):
 def test_negative_pattern_with_min_length_above_max_length_skips_pattern_violation(nctx):
     schema = {"type": "string", "minLength": 1, "maxLength": 0, "pattern": "^[a-z]+$"}
     assert_not_conform(cover_schema(nctx, schema), schema)
+
+
+# Past 2**53 a unit step vanishes in float arithmetic, leaving the "violating" value equal to the bound.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"minimum": -5.151020255852562e16},
+        {"type": "number", "maximum": 1e17},
+        {"type": "integer", "maximum": 9996036847180748.0},
+    ],
+    ids=["untyped-minimum", "number-maximum", "integer-float-spelled-maximum"],
+)
+def test_negative_numeric_boundary_steps_past_large_float_bounds(nctx, schema):
+    assert_not_conform(cover_schema(nctx, schema), schema)
+
+
+def test_positive_integer_past_exclusive_float_bound_steps_in_integer_arithmetic(ctx_factory):
+    schema = {"type": "integer", "exclusiveMinimum": 9996036847180748.0}
+    ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
+    assert_conform(cover_schema(ctx, schema), schema)

@@ -14,7 +14,7 @@ from decimal import Decimal
 from functools import lru_cache, partial
 from hashlib import blake2b
 from itertools import combinations, count, islice
-from math import inf, nextafter
+from math import ceil, floor, inf, nextafter, ulp
 
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
@@ -1857,7 +1857,7 @@ def cover_schema_iter(
                         yield from _negative_format(ctx, schema, value)
                 elif key == "maximum":
                     # Legacy draft-4 `exclusiveMaximum: true` makes `maximum` itself the excluded boundary.
-                    next = value if schema.get("exclusiveMaximum") is True else value + 1
+                    next = value if schema.get("exclusiveMaximum") is True else _just_past(schema, value, going_up=True)
                     if seen.insert(next):
                         yield NegativeValue(
                             next,
@@ -1867,7 +1867,9 @@ def cover_schema_iter(
                         )
                 elif key == "minimum":
                     # Legacy draft-4 `exclusiveMinimum: true` makes `minimum` itself the excluded boundary.
-                    next = value if schema.get("exclusiveMinimum") is True else value - 1
+                    next = (
+                        value if schema.get("exclusiveMinimum") is True else _just_past(schema, value, going_up=False)
+                    )
                     if seen.insert(next):
                         yield NegativeValue(
                             next,
@@ -2763,10 +2765,22 @@ def _adjust_numeric_bound(
     value: int | float, *, is_integer: bool, going_up: bool, is_float32: bool = False
 ) -> int | float:
     if is_integer:
-        return value + (1 if going_up else -1)
+        # Stepped in integer arithmetic: a unit step vanishes on a float past 2**53.
+        return floor(value) + 1 if going_up else ceil(value) - 1
     if is_float32:
         return next_float32(value, going_up=going_up)
     return nextafter(float(value), inf if going_up else -inf)
+
+
+def _just_past(schema: JsonSchemaObject, bound: int | float, *, going_up: bool) -> int | float:
+    """The value one step outside an inclusive bound: a unit where a unit exists, the float spacing past 2**53."""
+    direction = 1 if going_up else -1
+    declared = schema.get("type")
+    if "integer" in (declared if isinstance(declared, list) else [declared]):
+        return (floor(bound) if going_up else ceil(bound)) + direction
+    if isinstance(bound, int):
+        return bound + direction
+    return bound + direction * max(1.0, ulp(bound))
 
 
 def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:

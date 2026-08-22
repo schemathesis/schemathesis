@@ -17,6 +17,7 @@
 - Coverage phase omitting string parameters with a very large `maxLength`.
 - Coverage phase generating no positive cases for objects with an ungeneratable property.
 - Coverage phase crashing on a `pattern` whose `minLength` exceeds `maxLength`.
+- False positive `negative_data_rejection` for numeric bounds past 2^53 in the coverage phase.
 - Object values for query parameters declared with `anyOf`/`oneOf` serialized as their property names.
 
 ## [4.25.0](https://github.com/schemathesis/schemathesis/compare/v4.24.3...v4.25.0) - 2026-08-21
