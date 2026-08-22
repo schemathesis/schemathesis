@@ -3254,3 +3254,25 @@ def test_positive_integer_past_exclusive_float_bound_steps_in_integer_arithmetic
     schema = {"type": "integer", "exclusiveMinimum": 9996036847180748.0}
     ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
     assert_conform(cover_schema(ctx, schema), schema)
+
+
+# Bundled names restart per operation, so the same `$ref` names different targets in different operations.
+def test_positive_values_follow_each_schema_own_reference_target():
+    custom_formats = get_default_format_strategies()
+    for target in ({"type": "integer"}, {"type": "null"}):
+        schema = {
+            "type": "object",
+            "properties": {"a": {"type": "array", "items": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}, "minItems": 1}},
+            BUNDLE_STORAGE_KEY: {"schema1": target},
+        }
+        ctx = CoverageContext(
+            root_schema=schema,
+            location=ParameterLocation.BODY,
+            media_type=("application", "json"),
+            generation_modes=[GenerationMode.POSITIVE],
+            is_required=True,
+            custom_formats=custom_formats,
+            validator_cls=jsonschema_rs.Draft4Validator,
+            update_pattern=update_quantifier,
+        )
+        assert_conform(cover_schema(ctx, schema), schema)
