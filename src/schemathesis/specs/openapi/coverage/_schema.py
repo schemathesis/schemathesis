@@ -401,6 +401,7 @@ class CoverageContext:
         "validator_cls",
         "update_pattern",
         "_resolver",
+        "_root_token_cell",
         "allow_extra_parameters",
         "expanding",
         "generating",
@@ -420,6 +421,7 @@ class CoverageContext:
         update_pattern: Callable[[str, int | None, int | None], str] | None = None,
         _resolver: Resolver | None = None,
         _path_str_cache_cell: list[str | None] | None = None,
+        _root_token_cell: list[object] | None = None,
         allow_extra_parameters: bool = True,
         expanding: dict[str, int] | None = None,
         generating: dict[str, int] | None = None,
@@ -440,6 +442,8 @@ class CoverageContext:
         self.validator_cls = validator_cls
         self.update_pattern = update_pattern
         self._resolver = _resolver
+        # Shared like the path cell: every context over this document answers with the same token.
+        self._root_token_cell: list[object] = _root_token_cell if _root_token_cell is not None else [None]
         self.allow_extra_parameters = allow_extra_parameters
         # How deep the walk is inside each reference, shared with every context derived from this one.
         self.expanding = expanding if expanding is not None else {}
@@ -464,6 +468,15 @@ class CoverageContext:
         """Resolve a $ref to its schema definition."""
         _, resolved = resolve_reference(self.resolver, ref)
         return resolved
+
+    def schema_key(self, schema: JsonSchema) -> tuple[object, ...]:
+        """A cache key for what generation reads: the schema, and the document behind any reference in it."""
+        return (schema_cache_key(schema), self._root_token() if _reads_references(schema) else None)
+
+    def _root_token(self) -> object:
+        if self._root_token_cell[0] is None:
+            self._root_token_cell[0] = _to_hashable_key(self.root_schema)
+        return self._root_token_cell[0]
 
     @contextmanager
     def expand(self, reference: str, *, counters: dict[str, int] | None = None) -> Generator[None, None, None]:
@@ -524,6 +537,7 @@ class CoverageContext:
             update_pattern=self.update_pattern,
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
+            _root_token_cell=self._root_token_cell,
             allow_extra_parameters=self.allow_extra_parameters,
             expanding=self.expanding,
             generating=self.generating,
@@ -542,6 +556,7 @@ class CoverageContext:
             update_pattern=self.update_pattern,
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
+            _root_token_cell=self._root_token_cell,
             allow_extra_parameters=self.allow_extra_parameters,
             expanding=self.expanding,
             generating=self.generating,
@@ -696,7 +711,7 @@ class CoverageContext:
         # unsatisfiable schemas (e.g. JS-style `/.../`-wrapped regex) cost seconds per Hypothesis call.
         try:
             cache_key = (
-                schema_cache_key(schema),
+                self.schema_key(schema),
                 id(self.custom_formats),
                 id(self.update_pattern),
                 self.validator_cls,
@@ -1039,6 +1054,14 @@ def _digest(serialized: str) -> str | bytes:
     if len(serialized) <= _MAX_INLINE_KEY:
         return serialized
     return blake2b(serialized.encode(), digest_size=16).digest()
+
+
+def _reads_references(value: object) -> bool:
+    if isinstance(value, dict):
+        return "$ref" in value or any(_reads_references(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_reads_references(item) for item in value)
+    return False
 
 
 def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | bytes | T]:
@@ -3503,7 +3526,7 @@ def _negative_format(
     # Negative-format draws can spend seconds on JS-style `/.../`-wrapped patterns; cache by
     # the structural inputs so the same shape across 100s of operations runs Hypothesis once.
     try:
-        cache_key = ("negative_format", schema_cache_key(without_format), format, validator_cls)
+        cache_key = ("negative_format", ctx.schema_key(without_format), format, validator_cls)
     except (TypeError, ValueError):
         cache_key = None
     if cache_key is not None:
@@ -3679,7 +3702,7 @@ def _negative_type(
         cache_key = (
             "negative_type",
             tuple(sorted(types)),
-            schema_cache_key(schema),
+            ctx.schema_key(schema),
             ctx.location,
             ctx.media_type,
             ctx.validator_cls,
