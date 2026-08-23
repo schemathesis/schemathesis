@@ -303,6 +303,11 @@ class BaseSchema(Mapping):
             return base_url.rstrip("/")
         return self._cached_base_url
 
+    @property
+    def declared_base_url(self) -> str | None:
+        """Absolute base URL the schema itself advertises, if any."""
+        return None
+
     def validate(self) -> None:
         raise NotImplementedError
 

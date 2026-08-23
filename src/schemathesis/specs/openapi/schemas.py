@@ -431,6 +431,13 @@ class OpenApiSchema(BaseSchema):
     def _get_base_path(self) -> str:
         return self.adapter.get_base_path(self.raw_schema)
 
+    @property
+    @override
+    def declared_base_url(self) -> str | None:
+        with suppress(InvalidSchema):
+            return self.adapter.get_base_url(self.raw_schema)
+        return None
+
     def _get_paths(self) -> Mapping[str, Any] | None:
         paths = self.raw_schema.get("paths")
         if paths is None:

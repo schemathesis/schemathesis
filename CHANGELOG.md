@@ -6,6 +6,10 @@
 
 - Support for validating `httpx2` responses in `Case.validate_response`.
 
+### :wrench: Changed
+
+- Suggest the server URL declared in the schema when the missing `base_url` error fires.
+
 ### :bug: Fixed
 
 - Coverage phase emitting branch values that ignore a sibling `anyOf`/`oneOf`/`allOf` or the keywords beside them.

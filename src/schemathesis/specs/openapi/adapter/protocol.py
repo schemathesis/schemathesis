@@ -40,6 +40,7 @@ GetResponseContentTypes = Callable[["APIOperation", "Response"], list[str]]
 GetRequestPayloadContentTypes = Callable[["APIOperation"], list[str]]
 GetDefaultMediaTypes = Callable[[Mapping[str, Any]], list[str]]
 GetBasePath = Callable[[Mapping[str, Any]], str]
+GetBaseUrl = Callable[[Mapping[str, Any]], "str | None"]
 ValidateSchema = Callable[[Mapping[str, Any]], None]
 GetParameterSerializer = Callable[[list[dict[str, Any]]], Callable | None]
 IterParameters = Callable[
@@ -125,6 +126,7 @@ class SchemaAdapter(SchemaVocabulary, Protocol):
     get_request_payload_content_types: GetRequestPayloadContentTypes
     get_default_media_types: GetDefaultMediaTypes
     get_base_path: GetBasePath
+    get_base_url: GetBaseUrl
     validate_schema: ValidateSchema
 
 

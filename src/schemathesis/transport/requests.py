@@ -180,7 +180,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         current_session_auth = None
 
         if session is None:
-            validate_vanilla_requests_kwargs(data)
+            validate_vanilla_requests_kwargs(data, case.operation.schema.declared_base_url)
             session = requests.Session()
             close_session = True
         else:
@@ -236,7 +236,7 @@ def _request_with_retries(session: requests.Session, data: dict[str, Any], retri
             attempt += 1
 
 
-def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
+def validate_vanilla_requests_kwargs(data: dict[str, Any], declared_base_url: str | None = None) -> None:
     """Check arguments for `requests.Session.request`.
 
     Some arguments can be valid for cases like ASGI integration, but at the same time they won't work for the regular
@@ -250,9 +250,16 @@ def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
             if frame.function == "call_and_validate":
                 method_name = "call_and_validate"
                 break
+        if declared_base_url is not None:
+            suggestion = f"Your schema declares a server at {declared_base_url}:\n"
+        else:
+            suggestion = ""
+        example = declared_base_url or "https://api.example.com"
         raise IncorrectUsage(
-            "The `base_url` argument is required when specifying a schema via a file, so Schemathesis knows where to send the data. \n"
-            f"Pass `base_url` either to the `schemathesis.openapi.from_*` loader or to the `Case.{method_name}`.\n"
+            "The `base_url` argument is required when specifying a schema via a file, so Schemathesis knows where to send the data.\n"
+            f"{suggestion}"
+            f'    schema.config.update(base_url="{example}")\n'
+            f"You can also pass `base_url` to `Case.{method_name}`.\n"
             f"If you use the ASGI integration, please supply your test client "
             f"as the `session` argument to `call`.\nURL: {url}"
         )
