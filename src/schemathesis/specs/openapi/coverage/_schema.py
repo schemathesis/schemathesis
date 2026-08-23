@@ -74,6 +74,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
 from schemathesis.generation.jsonschema import build
+from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.converter import apply_rewritten_pattern
@@ -1374,13 +1375,22 @@ def _merge_allowed_values(merged: dict[str, Any], key: str, value: Any) -> None:
         return
     if not isinstance(current, list) or not isinstance(incoming, list):
         return
-    shared = [item for item in current if item in incoming]
+    incoming_keys = {_allowed_value_key(other) for other in incoming}
+    shared = [item for item in current if _allowed_value_key(item) in incoming_keys]
     merged.pop("const", None)
     merged.pop("enum", None)
     if len(shared) == 1 and pinned:
         merged["const"] = shared[0]
     else:
         merged["enum"] = shared
+
+
+def _allowed_value_key(value: Any) -> object:
+    try:
+        return json_identity(value)
+    except (TypeError, ValueError):
+        # Not a JSON value (e.g. bytes out of a YAML document); nothing else compares equal to it.
+        return ("python", repr(value))
 
 
 def _is_number(value: Any) -> bool:
