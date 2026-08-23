@@ -4001,3 +4001,17 @@ def test_additional_property_key_skips_a_declared_name(ctx_factory):
         for value in scenario_values(ctx, schema, CoverageScenario.OBJECT_ADDITIONAL_PROPERTY)
     ]
     assert added == [{"x-schemathesis-additional1"}]
+
+
+# JSON tells `false` and `0` apart where Python does not, while `1` and `1.0` are the same number.
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"const": False, "anyOf": [{"const": 0}]}, []),
+        ({"enum": [0, 1, "x"], "anyOf": [{"enum": [False, True, "x"]}]}, ["x"]),
+        ({"const": 1, "anyOf": [{"const": 1.0}]}, [1]),
+    ],
+    ids=["bool-vs-number", "enum-overlap", "int-vs-float"],
+)
+def test_positive_allowed_values_intersect_as_json(pctx, schema, expected):
+    assert cover_schema(pctx, schema) == expected

@@ -451,7 +451,7 @@ def _array(
         # No position can be filled, so the empty array is the only value the bounds may allow.
         return st.nothing() if kwargs.get("min_size") else st.builds(list)
     if all_distinct:
-        return st.lists(element, unique_by=_json_identity, **kwargs)
+        return st.lists(element, unique_by=json_identity, **kwargs)
     if view.distinctness is canonical.Distinctness.SOME_REPEATED:
         return st.lists(element, **kwargs).map(_repeat_one)
     return st.lists(element, **kwargs)
@@ -609,7 +609,7 @@ def _from_layout(
     if max_items is not None:
         kwargs["max_size"] = max_items - fixed
     # `unique_by` settles the free positions; collisions across parts are left to the joined filter.
-    distinct = {"unique_by": _json_identity} if all_distinct else {}
+    distinct = {"unique_by": json_identity} if all_distinct else {}
     parts.append(st.lists(free, **distinct, **kwargs))
     return _joined(parts, unique=all_distinct, checked=layout.counted, schema=schema)
 
@@ -821,7 +821,7 @@ def _repeated(placement: _Placement, *, unique: bool) -> SearchStrategy[list[Jso
         # A contradiction canonicalization could not see: nothing meets the demand, so no array clears
         # the schema this way. Other layouts, and the schema's other branches, may still.
         return st.nothing()
-    kwargs = {"unique_by": _json_identity} if unique else {}
+    kwargs = {"unique_by": json_identity} if unique else {}
     repeated = st.lists(element, min_size=count, max_size=count + placement.slack, **kwargs)
     try:
         repeated.validate()
@@ -858,7 +858,7 @@ def _supply(
         # An element also answers to `items`; a demanded value it rejects is not drawable.
         admits = _validator(items)
         raw = [value for value in raw if admits(value)]
-    return frozenset(_json_identity(value) for value in raw)
+    return frozenset(json_identity(value) for value in raw)
 
 
 @lru_cache(maxsize=512)
@@ -866,9 +866,9 @@ def _finite_values(schema: jsonschema_rs.CanonicalSchema) -> frozenset[object] |
     """The values this schema admits, as uniqueness keys, or `None` when they are not enumerable."""
     view = schema.view()
     if isinstance(view, canonical.ConstView):
-        return frozenset({_json_identity(cast("JsonValue", view.value))})
+        return frozenset({json_identity(cast("JsonValue", view.value))})
     if isinstance(view, canonical.EnumView):
-        return frozenset(_json_identity(value) for value in view.values)
+        return frozenset(json_identity(value) for value in view.values)
     return None
 
 
@@ -909,7 +909,7 @@ def _parts_unique(parts: tuple[Sequence[JsonValue], ...]) -> bool:
     # `unique_by` settled each part on its own; only collisions across them are left to catch.
     seen: set[object] = set()
     for part in parts:
-        keys = {_json_identity(value) for value in part}
+        keys = {json_identity(value) for value in part}
         if len(keys) != len(part) or keys & seen:
             return False
         seen |= keys
@@ -920,13 +920,13 @@ def _repeat_one(value: list[JsonValue]) -> list[JsonValue]:
     """One drawn array, with an element repeated where every one of them differs."""
     # A repeat needs two positions to sit in, and the demand carries that floor with it.
     assert len(value) >= 2
-    seen = {_json_identity(item) for item in value}
+    seen = {json_identity(item) for item in value}
     if len(seen) < len(value):
         return value
     return [value[0], *value[:-1]]
 
 
-def _json_identity(value: JsonValue) -> object:
+def json_identity(value: JsonValue) -> object:
     """What `uniqueItems` counts as the same value."""
     # `True == 1` in Python, but `true` and `1` are different JSON values.
     if isinstance(value, bool):

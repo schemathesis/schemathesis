@@ -13,6 +13,7 @@
 
 ### :bug: Fixed
 
+- Coverage phase keeping `false` for `const: 0` (and vice versa) when intersecting allowed values.
 - Coverage phase emitting a `oneOf` value a second branch admits under the operation's draft.
 - Coverage phase emitting branch values that ignore a sibling `anyOf`/`oneOf`/`allOf` or the keywords beside them.
 - Coverage phase emitting objects without a name one `allOf` branch requires and another forbids.
