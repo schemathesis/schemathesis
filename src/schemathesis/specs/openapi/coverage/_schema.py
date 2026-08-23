@@ -1874,7 +1874,7 @@ def cover_schema_iter(
                 elif key == "maximum":
                     # Legacy draft-4 `exclusiveMaximum: true` makes `maximum` itself the excluded boundary.
                     next = value if schema.get("exclusiveMaximum") is True else _just_past(schema, value, going_up=True)
-                    if seen.insert(next):
+                    if next is not None and seen.insert(next):
                         yield NegativeValue(
                             next,
                             scenario=CoverageScenario.VALUE_ABOVE_MAXIMUM,
@@ -1886,7 +1886,7 @@ def cover_schema_iter(
                     next = (
                         value if schema.get("exclusiveMinimum") is True else _just_past(schema, value, going_up=False)
                     )
-                    if seen.insert(next):
+                    if next is not None and seen.insert(next):
                         yield NegativeValue(
                             next,
                             scenario=CoverageScenario.VALUE_BELOW_MINIMUM,
@@ -2800,12 +2800,22 @@ def _adjust_numeric_bound(
     return nextafter(float(value), inf if going_up else -inf)
 
 
-def _just_past(schema: JsonSchemaObject, bound: int | float, *, going_up: bool) -> int | float:
-    """The value one step outside an inclusive bound: a unit where a unit exists, the float spacing past 2**53."""
+def _just_past(schema: JsonSchemaObject, bound: int | float, *, going_up: bool) -> int | float | None:
+    """The value one step outside an inclusive bound: a unit where a unit exists, the float spacing past it.
+
+    `None` where no representable value lies past the bound.
+    """
     direction = 1 if going_up else -1
     declared = schema.get("type")
     if "integer" in (declared if isinstance(declared, list) else [declared]):
         return (floor(bound) if going_up else ceil(bound)) + direction
+    if schema.get("format") == "float":
+        # A single-precision reader narrows the value, so the step reaches at least the next single.
+        edge = next_float32(bound, going_up=going_up)
+        if edge in (inf, -inf):
+            return None
+        if abs(edge - bound) > 1:
+            return bound + direction * abs(edge - bound)
     if isinstance(bound, int):
         return bound + direction
     return bound + direction * max(1.0, ulp(bound))
