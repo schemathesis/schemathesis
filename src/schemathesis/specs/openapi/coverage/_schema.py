@@ -1599,7 +1599,7 @@ def _positive_for_leaves(
     one_of = schema.get("oneOf")
     exclusivity = None
     if isinstance(one_of, list):
-        exclusivity = _make_branch_validators([_resolve_sub_schema(ctx, branch) for branch in one_of], ctx)
+        exclusivity = [_judges(_resolve_sub_schema(ctx, branch), ctx) for branch in one_of]
     for leaf in leaves:
         with ExitStack() as stack:
             for reference in leaf.references:
@@ -1613,10 +1613,23 @@ def _positive_for_leaves(
                 if (
                     exclusivity is not None
                     and leaf.one_of is not None
-                    and is_valid_for_others(value.value, leaf.one_of, exclusivity)
+                    and _matches_another_branch(value.value, leaf.one_of, exclusivity)
                 ):
                     continue
                 yield value
+
+
+def _matches_another_branch(value: Any, index: int, branches: list[list[jsonschema_rs.Validator]]) -> bool:
+    """Whether some other branch admits the value under any draft that reads it."""
+    if contains_binary(value):
+        return False
+    for branch_index, judges in enumerate(branches):
+        if branch_index == index:
+            continue
+        # A branch nothing can check may admit anything; counting it keeps exclusivity conservative.
+        if not judges or any(judge.is_valid(value) for judge in judges):
+            return True
+    return False
 
 
 def _drawn_positive(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:

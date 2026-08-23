@@ -3947,3 +3947,13 @@ def test_positive_object_keeps_properties_named_like_keywords(ctx_factory, name)
 )
 def test_positive_branch_values_meet_their_siblings(pctx, schema, folded):
     assert cover_schema(pctx, schema) == cover_schema(pctx, folded)
+
+
+# Draft 4 reads 0.0 as a non-integer, so a `not integer` branch matches it too; exclusivity holds in every draft.
+def test_positive_one_of_exclusivity_judged_by_the_operation_draft(pctx):
+    schema = {"oneOf": [{"not": {"type": "integer"}}, {"type": "number", "example": None, "default": None}]}
+    validator = jsonschema_rs.Draft4Validator(schema)
+    values = cover_schema(pctx, schema)
+    assert values
+    for value in values:
+        assert validator.is_valid(value), value
