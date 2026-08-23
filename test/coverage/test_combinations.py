@@ -3288,3 +3288,35 @@ def test_positive_integer_with_fractional_multiple_of_stays_on_the_integer_grid(
     values = cover_schema(pctx, schema)
     assert values and all(isinstance(value, int) for value in values), values
     assert_conform(values, schema)
+
+
+# A required name outside `properties` answers to a matching `patternProperties` entry, else to `additionalProperties`.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {
+            "type": "object",
+            "properties": {"a": {"type": "null"}},
+            "required": ["a", "b"],
+            "additionalProperties": {"type": "boolean"},
+        },
+        {
+            "type": "object",
+            "properties": {"x": {"type": "null"}},
+            "required": ["ab"],
+            "patternProperties": {"^a": {"type": "boolean"}},
+            "additionalProperties": {"type": "string"},
+        },
+        {
+            "allOf": [
+                {"type": "object", "properties": {"b": {"type": "null"}}, "additionalProperties": {"type": "boolean"}},
+                {"type": "object", "properties": {"b": {"type": "null"}}, "required": ["a"]},
+            ]
+        },
+    ],
+    ids=["additional-properties", "pattern-properties", "all-of"],
+)
+def test_positive_required_name_outside_properties_takes_its_governing_schema(pctx, schema):
+    values = cover_schema(pctx, schema)
+    assert values
+    assert_conform(values, schema)

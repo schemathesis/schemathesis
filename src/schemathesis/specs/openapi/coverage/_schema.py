@@ -2559,8 +2559,16 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
         properties = schema.get("properties")
         if properties is not None:
             required = schema.get("required", [])
-            if schema.get("additionalProperties") is not False:
-                extra: dict[str, JsonSchemaObject] = {k: {} for k in required if k not in properties}
+            additional = schema.get("additionalProperties", True)
+            if additional is not False:
+                # Declaring a name under `properties` exempts it from `additionalProperties`, so a required name
+                # matching no `patternProperties` entry carries that schema as its placeholder instead.
+                patterns = _pattern_property_regexes(schema)
+                extra: dict[str, JsonSchemaObject] = {
+                    k: {} if additional is True or any(pattern.search(k) for pattern in patterns) else additional
+                    for k in required
+                    if k not in properties
+                }
             else:
                 extra = {}
             all_properties = {
