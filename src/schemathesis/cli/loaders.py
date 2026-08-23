@@ -47,7 +47,13 @@ def into_event_stream(
         # a separate FilterSet is passed there. It combines both config file filters + CLI options.
         schema.filter_set = schema.config.operations.create_filter_set(**filter_set)
         if file_exists(location) and schema.config.base_url is None:
-            raise click.UsageError(MISSING_BASE_URL_MESSAGE)
+            message = MISSING_BASE_URL_MESSAGE
+            declared = schema.declared_base_url
+            if declared is not None:
+                message += (
+                    f"\nYour schema declares a server at {declared} - pass `--url {declared}` if that is your target."
+                )
+            raise click.UsageError(message)
     except KeyboardInterrupt:
         yield Interrupted(phase=None)
         return
