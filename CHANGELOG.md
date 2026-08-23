@@ -9,6 +9,7 @@
 ### :wrench: Changed
 
 - Suggest the server URL declared in the schema when the missing `base_url` error fires.
+- Mention `warnings.fail-on` in the `--warnings` help text.
 
 ### :bug: Fixed
 

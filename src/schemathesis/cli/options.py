@@ -370,7 +370,10 @@ SUPPRESS_HEALTH_CHECK = OptionSpec(
 
 WARNINGS = OptionSpec(
     "--warnings",
-    help="Control warning display: 'off' to disable all, or comma-separated list of warning types to enable",
+    help=(
+        "Control warning display: 'off' to disable all, or comma-separated list of warning types to enable. "
+        "Set `warnings.fail-on` in the config file to exit with a non-zero code on them"
+    ),
     type=str,
     default=None,
     callback=validate_warnings,
