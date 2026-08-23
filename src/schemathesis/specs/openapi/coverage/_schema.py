@@ -3155,7 +3155,11 @@ def _iter_positive_object(
                 description="Object with only required properties",
             )
     seen = HashSet()
+    max_properties = schema.get("maxProperties")
     for name, sub_schema in properties.items():
+        # A property the template left out adds a key, which the size window may not have room for.
+        if name not in template and isinstance(max_properties, int) and len(template) + 1 > max_properties:
+            continue
         # Skip pre-seed when the property is absent: `template.get(name)` would be None
         # and dedup legitimate null emissions for nullable optionals.
         if name in template:
@@ -3171,7 +3175,6 @@ def _iter_positive_object(
     # Handle additionalProperties with schema
     additional_properties = schema.get("additionalProperties")
     if isinstance(additional_properties, dict):
-        max_properties = schema.get("maxProperties")
         if isinstance(max_properties, int) and len(template) + 1 > max_properties:
             return
         existing_keys = set(properties.keys()) | set(template.keys())
