@@ -99,6 +99,9 @@ EXAMPLE_USAGE_PROBABILITY = 0.20
 # Low so injected constants seed exploration without crowding out hypothesis-generated values.
 CONSTANTS_OVERLAY_PROBABILITY = 0.15
 
+# Keywords that settle a parameter's type on their own; a default beside them would narrow it.
+_TYPE_DECIDING_KEYWORDS = ("anyOf", "oneOf", "allOf", "not", "$ref")
+
 
 def _variant_key(variant: dict[str, Any]) -> str:
     """Create a stable string key for a variant dict."""
@@ -987,7 +990,9 @@ class OpenApiComponent(ABC):
         # Missing the `type` keyword may significantly slowdown data generation, ensure it is set
         default_type = self._get_default_type()
         if isinstance(schema, dict):
-            if default_type is not None:
+            # Beside a combinator or a reference the default would narrow what they admit (a `null` branch
+            # of a header is still a header), so only a schema that says nothing about its type gets one.
+            if default_type is not None and not any(key in schema for key in _TYPE_DECIDING_KEYWORDS):
                 schema.setdefault("type", default_type)
         elif schema is True and default_type is not None:
             # Restrict such cases too

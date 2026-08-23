@@ -8,6 +8,10 @@
 
 ### :bug: Fixed
 
+- Coverage phase emitting branch values that ignore a sibling `anyOf`/`oneOf`/`allOf` or the keywords beside them.
+- Coverage phase emitting objects without a name one `allOf` branch requires and another forbids.
+- Non-body parameters with `anyOf`/`oneOf`/`$ref` schemas losing their `null` branch to the default string type.
+- Duplicate positive cases for schemas combining `anyOf`/`oneOf` with keywords beside them.
 - Coverage phase ignoring `additionalProperties` for required names absent from `properties`.
 - Coverage phase exceeding `maxProperties` when covering a property the template omits.
 - Numeric `exclusiveMinimum`/`exclusiveMaximum` overriding a tighter `minimum`/`maximum` instead of combining.
