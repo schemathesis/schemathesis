@@ -29,7 +29,8 @@ Options:
                                  default  [x>=1.0]
   --warnings WARNINGS            Control warning display: 'off' to disable all,
                                  or comma-separated list of warning types to
-                                 enable
+                                 enable. Set `warnings.fail-on` in the config
+                                 file to exit with a non-zero code on them
 
 API validation options:
   -c, --checks                  Comma-separated list of checks to run against
