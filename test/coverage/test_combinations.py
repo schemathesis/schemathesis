@@ -3334,3 +3334,17 @@ def test_positive_object_keeps_property_sweep_within_max_properties(pctx, schema
     values = cover_schema(pctx, schema)
     assert values
     assert_conform(values, schema)
+
+
+# Both spellings of a bound apply; the resolved window is the tighter one, here empty.
+def test_positive_number_with_both_bound_spellings_keeps_the_tighter_one(ctx_factory):
+    schema = {
+        "type": "integer",
+        "minimum": 8,
+        "maximum": -7,
+        "exclusiveMinimum": -8,
+        "exclusiveMaximum": 5,
+        "multipleOf": 2,
+    }
+    ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
+    assert_conform(cover_schema(ctx, schema), schema)

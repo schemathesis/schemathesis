@@ -64,14 +64,17 @@ def resolve_inclusive_bounds(
     maximum = schema.get("maximum")
     exclusive_minimum = schema.get("exclusiveMinimum")
     exclusive_maximum = schema.get("exclusiveMaximum")
+    # Both spellings apply at once, so the resolved bound is the tighter of the two.
     if isinstance(exclusive_minimum, bool):
         if exclusive_minimum and is_numeric_bound(minimum):
             minimum = step(minimum, True)
     elif is_numeric_bound(exclusive_minimum):
-        minimum = step(exclusive_minimum, True)
+        stepped = step(exclusive_minimum, True)
+        minimum = max(minimum, stepped) if is_numeric_bound(minimum) else stepped
     if isinstance(exclusive_maximum, bool):
         if exclusive_maximum and is_numeric_bound(maximum):
             maximum = step(maximum, False)
     elif is_numeric_bound(exclusive_maximum):
-        maximum = step(exclusive_maximum, False)
+        stepped = step(exclusive_maximum, False)
+        maximum = min(maximum, stepped) if is_numeric_bound(maximum) else stepped
     return minimum, maximum
