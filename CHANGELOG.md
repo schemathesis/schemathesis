@@ -13,6 +13,12 @@
 - Numeric `exclusiveMinimum`/`exclusiveMaximum` overriding a tighter `minimum`/`maximum` instead of combining.
 - Coverage phase emitting an optional object property whose schema requires a name it forbids.
 - False positive `negative_data_rejection` for `format: float` bounds a single-precision server cannot distinguish.
+- Coverage phase emitting a non-object as a `minProperties` violation for untyped schemas.
+- Coverage phase hanging on a `maxProperties` past the generation buffer.
+- Coverage phase emitting float-spelled bounds as integer boundary values.
+- Coverage phase crashing on a large `minItems` without `items`, and building arrays past the generation buffer.
+- Coverage phase crashing on a `minProperties` past the generation buffer.
+- Coverage phase emitting `enum`/`const` members the operation's draft rejects.
 - False positive `negative_data_rejection` for bodies whose schema declares a `format` anywhere.
 - Coverage phase skipping body examples that name a `readOnly` field.
 - False positive `positive_data_acceptance` for values with a sibling `anyOf`/`oneOf` in the coverage phase.
