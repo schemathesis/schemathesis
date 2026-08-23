@@ -3320,3 +3320,17 @@ def test_positive_required_name_outside_properties_takes_its_governing_schema(pc
     values = cover_schema(pctx, schema)
     assert values
     assert_conform(values, schema)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"a": {"type": "null"}}, "maxProperties": 0},
+        {"type": "object", "properties": {"b": {"type": "null"}}, "required": ["a"], "maxProperties": 1},
+    ],
+    ids=["no-room-at-all", "required-fills-the-window"],
+)
+def test_positive_object_keeps_property_sweep_within_max_properties(pctx, schema):
+    values = cover_schema(pctx, schema)
+    assert values
+    assert_conform(values, schema)

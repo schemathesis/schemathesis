@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - Coverage phase ignoring `additionalProperties` for required names absent from `properties`.
+- Coverage phase exceeding `maxProperties` when covering a property the template omits.
 - False positive `negative_data_rejection` for bodies whose schema declares a `format` anywhere.
 - Coverage phase skipping body examples that name a `readOnly` field.
 - False positive `positive_data_acceptance` for values with a sibling `anyOf`/`oneOf` in the coverage phase.
