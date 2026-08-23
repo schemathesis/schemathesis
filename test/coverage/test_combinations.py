@@ -2617,10 +2617,6 @@ def test_anyof_with_required_constraints(pctx):
         {"id": "", "name": ""},
         {"type": "", "id": ""},
         {"id": ""},
-        {"id": "", "name": "", "type": ""},
-        {"id": "", "name": ""},
-        {"name": "", "type": ""},
-        {"name": ""},
     ]
     assert_conform(covered, schema)
 
@@ -2661,10 +2657,8 @@ def test_merge_with_parent_context_merges_required_lists(pctx):
     assert all("type" in v and "name" in v for v in covered if isinstance(v, dict))
 
 
-def test_inline_sub_with_own_properties_is_self_contained(pctx):
-    # An inline anyOf sub with its own `properties` is treated as a complete type,
-    # just like a $ref to the same schema — parent properties are NOT injected into
-    # the sub-schema generation path.
+def test_inline_sub_with_own_properties_is_folded_with_parent(pctx):
+    # A branch with its own `properties` still answers to the parent's; both sets appear together.
     schema = {
         "type": "object",
         "properties": {
@@ -2678,9 +2672,7 @@ def test_inline_sub_with_own_properties_is_self_contained(pctx):
     }
     covered = cover_schema(pctx, schema)
     assert_conform(covered, schema)
-    # Sub is self-contained: generates {"id": 0} without parent_field injected.
-    # Parent's own property path generates the other values independently.
-    assert covered == [{"id": 0}, {}, {"parent_field": ""}, {}]
+    assert covered == [{"parent_field": "", "id": 0}, {"id": 0}, {"parent_field": ""}, {}]
 
 
 def test_with_effective_required_break_when_no_extra_fields(pctx):
@@ -2804,8 +2796,6 @@ def test_ref_to_additive_schema_inherits_parent_properties(ctx_factory):
         {"name": "", "id": 0},
         {"name": ""},
         {"name": "", "id": 0},
-        {"id": 0, "name": ""},
-        {"name": ""},
     ]
 
 
@@ -2848,7 +2838,7 @@ def test_oneof_branch_honors_sibling_items(ctx_factory):
     }
     covered = cover_schema(pctx, schema)
     assert_conform(covered, schema)
-    assert covered == [{"entrypoint": ""}, {"entrypoint": []}, {"entrypoint": [""]}]
+    assert covered == [{"entrypoint": ""}, {"entrypoint": [""]}, {"entrypoint": []}]
 
 
 def test_anyof_branch_honors_sibling_additional_properties(ctx_factory):
@@ -3859,3 +3849,21 @@ def test_positive_object_keeps_properties_named_like_keywords(ctx_factory, name)
     schema = {"type": "object", "properties": {"nested": inner}}
     context = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
     assert next(cover_schema_iter(context, schema)).value == {"nested": {name: "", "other": ""}}
+
+
+# A branch is covered folded with the keywords and combinators beside it, so the node yields what its fold yields.
+@pytest.mark.parametrize(
+    ("schema", "folded"),
+    [
+        ({"oneOf": [{"type": "null"}, {"type": "boolean"}], "allOf": [{"type": "null"}]}, {"type": "null"}),
+        ({"oneOf": [{"type": "boolean"}], "anyOf": [{"type": "null"}]}, {"not": {}}),
+        (
+            {"type": "integer", "minimum": 5, "anyOf": [{"type": "string"}, {"multipleOf": 3}]},
+            {"type": "integer", "minimum": 5, "multipleOf": 3},
+        ),
+        ({"type": "string", "pattern": "^[a-z]+$", "anyOf": [{"type": "null"}]}, {"not": {}}),
+    ],
+    ids=["oneOf-beside-allOf", "oneOf-beside-anyOf", "type-beside-anyOf", "pattern-beside-anyOf"],
+)
+def test_positive_branch_values_meet_their_siblings(pctx, schema, folded):
+    assert cover_schema(pctx, schema) == cover_schema(pctx, folded)

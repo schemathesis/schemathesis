@@ -816,150 +816,153 @@ class CoverageContext:
                 if accepted is not NOT_SET:
                     return accepted
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ANNOTATION_KEYWORDS])
-        if keys == ["type"]:
-            return cached_draw(get_strategy_for_type(schema["type"]))
-        if keys == ["format", "type"]:
-            if schema["type"] != "string":
+        # Shortcuts read the describing keywords alone, which a combinator beside them can still narrow;
+        # such a schema is built whole instead.
+        if not any(key in schema for key in _FOLDED_KEYS):
+            if keys == ["type"]:
                 return cached_draw(get_strategy_for_type(schema["type"]))
-            fmt = schema["format"]
-            if fmt in self.custom_formats:
-                return cached_draw(self.custom_formats[fmt])
-        if (
-            "properties" in keys
-            and set(keys) <= {"properties", "required", "type", "minProperties"}
-            and schema.get("type", "object") == "object"
-        ):
-            obj = {}
-            properties = schema["properties"]
-            for key, sub_schema in properties.items():
-                if isinstance(sub_schema, dict) and "const" in sub_schema:
-                    obj[key] = sub_schema["const"]
-                else:
-                    try:
-                        obj[key] = self.generate_from_schema(sub_schema)
-                    except Unsatisfiable:
-                        pass
-            for key in schema.get("required", []):
-                if key not in properties:
-                    try:
-                        obj[key] = self.generate_from_schema({})
-                    except Unsatisfiable:
-                        pass
-            if any(key not in obj for key in schema.get("required", [])):
-                raise Unsatisfiable
-            # Properties that cannot be generated leave the object short of `minProperties`;
-            # names the schema does not mention carry the rest.
-            names = ("x" * size for size in count())
-            while len(obj) < schema.get("minProperties", 0):
-                obj.setdefault(next(names), None)
-            return obj
-        if "enum" in schema:
-            enum_values = [v for v in schema["enum"] if _is_valid_with_formats(v, schema, self)]
-            if not enum_values:
-                raise Unsatisfiable
-            return cached_draw(st.sampled_from(enum_values))
-        if "pattern" in schema and "string" in get_type(schema):
-            pattern = schema["pattern"]
-            try:
-                re.compile(pattern)
-            except re.error:
-                raise Unsatisfiable from None
-            if self.location == ParameterLocation.PATH and pattern_requires_literal(pattern, "/{}"):
-                raise Unsatisfiable
-            min_length = schema.get("minLength")
-            max_length = schema.get("maxLength")
-            if min_length is not None or max_length is not None:
-                pattern_min, pattern_max = pattern_length_bounds(pattern)
-                if max_length is not None and max_length < pattern_min:
-                    raise Unsatisfiable
-                if min_length is not None and pattern_max is not None and min_length > pattern_max:
-                    raise Unsatisfiable
-                # A floor above the sizes the pattern emits on its own is where drawing and
-                # discarding never lands, so the length gets worked out rather than searched for.
-                doomed = min_length is not None and min_length > pattern_min
-                if doomed and pattern_length_is_unreachable(pattern, min_length, max_length):
-                    raise Unsatisfiable
-                updated = pattern
-                if self.update_pattern is not None:
-                    updated = self.update_pattern(pattern, min_length, max_length)
-                if doomed and not _keeps_length_within(updated, min_length, max_length):
-                    # The quantifier rewrite left the window open, so one length gets spelled into
-                    # the pattern outright; shapes it cannot rewrite keep whatever it managed.
-                    pinned = pin_pattern_length(pattern, min_length, max_length)
-                    if pinned != pattern:
-                        updated = pinned
-                pattern = updated
-            if min_length is not None and min_length > MAX_GENERATED_PATTERN_LENGTH:
-                return self._long_string_matching(schema, min_length)
-            fmt = schema.get("format")
-            strategy = _pattern_strategy(pattern, min_length, max_length, fmt if fmt in VALIDATED_FORMATS else None)
-            if strategy is None:
-                raise Unsatisfiable from None
-            return cached_draw(strategy)
-        min_properties = schema.get("minProperties")
-        if (
-            isinstance(min_properties, int)
-            and min_properties > MAX_DRAWN_OBJECT_PROPERTIES
-            and "object" in get_type(schema)
-        ):
-            # Past the generation buffer there is no object worth building.
-            if min_properties > INTERNAL_BUFFER_SIZE:
-                raise Unsatisfiable
-            # Synthesized names only go where any name is admitted and takes the same value.
+            if keys == ["format", "type"]:
+                if schema["type"] != "string":
+                    return cached_draw(get_strategy_for_type(schema["type"]))
+                fmt = schema["format"]
+                if fmt in self.custom_formats:
+                    return cached_draw(self.custom_formats[fmt])
             if (
-                schema.get("additionalProperties", True) is not False
-                and "propertyNames" not in schema
-                and "patternProperties" not in schema
+                "properties" in keys
+                and set(keys) <= {"properties", "required", "type", "minProperties"}
+                and schema.get("type", "object") == "object"
             ):
-                return self._filled_object(schema, min_properties)
-        min_items = schema.get("minItems")
-        if isinstance(min_items, int) and min_items > MAX_DRAWN_ARRAY_ITEMS and "array" in get_type(schema):
-            # Past the generation buffer there is no array worth building.
-            if min_items > INTERNAL_BUFFER_SIZE:
-                raise Unsatisfiable
-            items = schema.get("items", True)
-            # Repeating one element cannot satisfy either of these.
-            if (
-                (items is True or isinstance(items, dict))
-                and not schema.get("uniqueItems")
-                and "contains" not in schema
-            ):
-                return self._tiled_array(schema, min_items)
-        if (
-            (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
-            and isinstance(schema["items"], dict)
-            and "array" in get_type(schema)
-        ):
-            items = schema["items"]
-            min_items = schema.get("minItems", 0)
-            if "enum" in items:
-                enum_values = [v for v in items["enum"] if _is_valid_with_formats(v, items, self)]
+                obj = {}
+                properties = schema["properties"]
+                for key, sub_schema in properties.items():
+                    if isinstance(sub_schema, dict) and "const" in sub_schema:
+                        obj[key] = sub_schema["const"]
+                    else:
+                        try:
+                            obj[key] = self.generate_from_schema(sub_schema)
+                        except Unsatisfiable:
+                            pass
+                for key in schema.get("required", []):
+                    if key not in properties:
+                        try:
+                            obj[key] = self.generate_from_schema({})
+                        except Unsatisfiable:
+                            pass
+                if any(key not in obj for key in schema.get("required", [])):
+                    raise Unsatisfiable
+                # Properties that cannot be generated leave the object short of `minProperties`;
+                # names the schema does not mention carry the rest.
+                names = ("x" * size for size in count())
+                while len(obj) < schema.get("minProperties", 0):
+                    obj.setdefault(next(names), None)
+                return obj
+            if "enum" in schema:
+                enum_values = [v for v in schema["enum"] if _is_valid_with_formats(v, schema, self)]
                 if not enum_values:
-                    # Nothing matches, so only an empty array can conform.
-                    if min_items:
+                    raise Unsatisfiable
+                return cached_draw(st.sampled_from(enum_values))
+            if "pattern" in schema and "string" in get_type(schema):
+                pattern = schema["pattern"]
+                try:
+                    re.compile(pattern)
+                except re.error:
+                    raise Unsatisfiable from None
+                if self.location == ParameterLocation.PATH and pattern_requires_literal(pattern, "/{}"):
+                    raise Unsatisfiable
+                min_length = schema.get("minLength")
+                max_length = schema.get("maxLength")
+                if min_length is not None or max_length is not None:
+                    pattern_min, pattern_max = pattern_length_bounds(pattern)
+                    if max_length is not None and max_length < pattern_min:
                         raise Unsatisfiable
-                    return []
-                return cached_draw(st.lists(st.sampled_from(enum_values), min_size=min_items))
-            # Recurse so `items`-level `example`/`examples`/`default` reach generation.
-            if any(k in items for k in ("example", "examples", "default")):
-                size = max(min_items, 1)
-                return [self.generate_from_schema(items) for _ in range(size)]
-            sub_keys = sorted([k for k in items if not k.startswith("x-") and k not in ["description", "example"]])
-            if sub_keys == ["type"] and items["type"] == "string":
-                return cached_draw(st.lists(st.text(), min_size=min_items))
+                    if min_length is not None and pattern_max is not None and min_length > pattern_max:
+                        raise Unsatisfiable
+                    # A floor above the sizes the pattern emits on its own is where drawing and
+                    # discarding never lands, so the length gets worked out rather than searched for.
+                    doomed = min_length is not None and min_length > pattern_min
+                    if doomed and pattern_length_is_unreachable(pattern, min_length, max_length):
+                        raise Unsatisfiable
+                    updated = pattern
+                    if self.update_pattern is not None:
+                        updated = self.update_pattern(pattern, min_length, max_length)
+                    if doomed and not _keeps_length_within(updated, min_length, max_length):
+                        # The quantifier rewrite left the window open, so one length gets spelled into
+                        # the pattern outright; shapes it cannot rewrite keep whatever it managed.
+                        pinned = pin_pattern_length(pattern, min_length, max_length)
+                        if pinned != pattern:
+                            updated = pinned
+                    pattern = updated
+                if min_length is not None and min_length > MAX_GENERATED_PATTERN_LENGTH:
+                    return self._long_string_matching(schema, min_length)
+                fmt = schema.get("format")
+                strategy = _pattern_strategy(pattern, min_length, max_length, fmt if fmt in VALIDATED_FORMATS else None)
+                if strategy is None:
+                    raise Unsatisfiable from None
+                return cached_draw(strategy)
+            min_properties = schema.get("minProperties")
             if (
-                sub_keys == ["properties", "required", "type"]
-                or sub_keys == ["properties", "type"]
-                or sub_keys == ["properties"]
+                isinstance(min_properties, int)
+                and min_properties > MAX_DRAWN_OBJECT_PROPERTIES
+                and "object" in get_type(schema)
             ):
-                strategies = {key: self.build_strategy(sub) for key, sub in items["properties"].items()}
-                if all(strategy is not None for strategy in strategies.values()):
-                    return cached_draw(
-                        st.lists(
-                            st.fixed_dictionaries(cast("dict[str, st.SearchStrategy]", strategies)),
-                            min_size=min_items,
+                # Past the generation buffer there is no object worth building.
+                if min_properties > INTERNAL_BUFFER_SIZE:
+                    raise Unsatisfiable
+                # Synthesized names only go where any name is admitted and takes the same value.
+                if (
+                    schema.get("additionalProperties", True) is not False
+                    and "propertyNames" not in schema
+                    and "patternProperties" not in schema
+                ):
+                    return self._filled_object(schema, min_properties)
+            min_items = schema.get("minItems")
+            if isinstance(min_items, int) and min_items > MAX_DRAWN_ARRAY_ITEMS and "array" in get_type(schema):
+                # Past the generation buffer there is no array worth building.
+                if min_items > INTERNAL_BUFFER_SIZE:
+                    raise Unsatisfiable
+                items = schema.get("items", True)
+                # Repeating one element cannot satisfy either of these.
+                if (
+                    (items is True or isinstance(items, dict))
+                    and not schema.get("uniqueItems")
+                    and "contains" not in schema
+                ):
+                    return self._tiled_array(schema, min_items)
+            if (
+                (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
+                and isinstance(schema["items"], dict)
+                and "array" in get_type(schema)
+            ):
+                items = schema["items"]
+                min_items = schema.get("minItems", 0)
+                if "enum" in items:
+                    enum_values = [v for v in items["enum"] if _is_valid_with_formats(v, items, self)]
+                    if not enum_values:
+                        # Nothing matches, so only an empty array can conform.
+                        if min_items:
+                            raise Unsatisfiable
+                        return []
+                    return cached_draw(st.lists(st.sampled_from(enum_values), min_size=min_items))
+                # Recurse so `items`-level `example`/`examples`/`default` reach generation.
+                if any(k in items for k in ("example", "examples", "default")):
+                    size = max(min_items, 1)
+                    return [self.generate_from_schema(items) for _ in range(size)]
+                sub_keys = sorted([k for k in items if not k.startswith("x-") and k not in ["description", "example"]])
+                if sub_keys == ["type"] and items["type"] == "string":
+                    return cached_draw(st.lists(st.text(), min_size=min_items))
+                if (
+                    sub_keys == ["properties", "required", "type"]
+                    or sub_keys == ["properties", "type"]
+                    or sub_keys == ["properties"]
+                ):
+                    strategies = {key: self.build_strategy(sub) for key, sub in items["properties"].items()}
+                    if all(strategy is not None for strategy in strategies.values()):
+                        return cached_draw(
+                            st.lists(
+                                st.fixed_dictionaries(cast("dict[str, st.SearchStrategy]", strategies)),
+                                min_size=min_items,
+                            )
                         )
-                    )
 
         if keys == ["allOf"]:
             # Resolve refs into a fresh list so the caller's schema is not mutated; the
@@ -1247,6 +1250,8 @@ _ANNOTATION_KEYWORDS = frozenset(
         "xml",
     }
 )
+# Keywords holding one subschema; two of them on a node both apply to the same values.
+_CHILD_SLOTS = frozenset({"items", "additionalProperties", "contains", "propertyNames", "additionalItems"})
 _TIGHTEST_LOWER = frozenset({"minLength", "minItems", "minProperties", "minimum", "exclusiveMinimum"})
 _TIGHTEST_UPPER = frozenset({"maxLength", "maxItems", "maxProperties", "maximum", "exclusiveMaximum"})
 
@@ -1288,14 +1293,16 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
         # declare; folding the property sets together would let those escape it.
         if isinstance(extra, dict) and extra and merged_names - set(branch.get("properties", {})):
             return None
-    _restrict_closed_properties(merged, folded_branches)
+    if not _restrict_closed_properties(merged, folded_branches):
+        # A branch forbidding extras leaves no room for a name another branch requires.
+        return {"not": {}}
     # Keyword order drives the order coverage walks constraints in; keep it independent of
     # which branch each one came from.
     return dict(sorted(merged.items()))
 
 
-def _restrict_closed_properties(merged: dict[str, Any], branches: list[JsonSchemaObject]) -> None:
-    """Drop properties that a branch forbidding extras does not name; no value could carry them."""
+def _restrict_closed_properties(merged: dict[str, Any], branches: list[JsonSchemaObject]) -> bool:
+    """Drop properties that a branch forbidding extras does not name; `False` when one of them is required."""
     allowed: set[str] | None = None
     for branch in branches:
         if branch.get("additionalProperties") is not False or branch.get("patternProperties"):
@@ -1303,13 +1310,12 @@ def _restrict_closed_properties(merged: dict[str, Any], branches: list[JsonSchem
         names = set(branch.get("properties", {}))
         allowed = names if allowed is None else allowed & names
     if allowed is None:
-        return
+        return True
     properties = merged.get("properties")
     if isinstance(properties, dict):
         merged["properties"] = {name: sub for name, sub in properties.items() if name in allowed}
     required = merged.get("required")
-    if isinstance(required, list):
-        merged["required"] = [name for name in required if name in allowed]
+    return not isinstance(required, list) or all(name in allowed for name in required)
 
 
 def _merge_keyword(merged: dict[str, Any], key: str, value: Any) -> bool:
@@ -1338,6 +1344,8 @@ def _merge_keyword(merged: dict[str, Any], key: str, value: Any) -> bool:
             else:
                 properties[name] = sub_schema
         merged[key] = properties
+    elif key in _CHILD_SLOTS and isinstance(current, dict) and isinstance(value, dict):
+        merged[key] = {"allOf": [current, value]}
     elif current != value and key not in _ANNOTATION_KEYWORDS:
         # Two constraints on the same keyword, e.g. a pair of formats. Both hold, and folding
         # would keep only one of them.
@@ -1431,24 +1439,6 @@ def _has_array_sibling(sub_schemas: list) -> bool:
     return False
 
 
-def _merge_with_parent_context(parent: JsonSchemaObject, sub: JsonSchema) -> JsonSchema:
-    if not isinstance(sub, dict):
-        return sub
-    result: dict[str, Any] = {
-        k: (deepclone(v) if k == "properties" else v) for k, v in parent.items() if k not in _COMBINATOR_KEYS
-    }
-    for key, value in sub.items():
-        if key == "required" and "required" in result:
-            parent_req: list[str] = result["required"] if isinstance(result["required"], list) else [result["required"]]
-            sub_req: list[str] = value if isinstance(value, list) else [value]
-            result["required"] = list(dict.fromkeys(parent_req + sub_req))
-        elif key == "properties" and "properties" in result:
-            result["properties"] = {**result["properties"], **value}
-        else:
-            result[key] = value
-    return result
-
-
 def _generate_oversized_string(
     ctx: CoverageContext, original_schema: JsonSchemaObject, new_schema: dict[str, Any], target_length: int
 ) -> str | None:
@@ -1526,6 +1516,108 @@ def _ensure_contains_bounds(ctx: CoverageContext, value: list, schema: JsonSchem
     return result
 
 
+_FOLDED_KEYS = ("allOf", "anyOf", "oneOf")
+
+
+@dataclass(frozen=True)
+class _Leaf:
+    """One choice of branches at a node, folded with the keywords beside its combinators."""
+
+    # `None` when the choice has no single flat spelling; `conjunction` still describes it.
+    schema: JsonSchemaObject | None
+    conjunction: JsonSchemaObject
+    one_of: int | None
+    references: tuple[str, ...]
+
+
+def _fold(schema: JsonSchema, ctx: CoverageContext) -> list[_Leaf] | None:
+    """The node as one leaf per `anyOf` x `oneOf` choice, `allOf` folded in; `None` without combinators."""
+    if not isinstance(schema, dict) or not any(key in schema for key in _FOLDED_KEYS):
+        return None
+    if any(key in schema and not isinstance(schema[key], list) for key in _FOLDED_KEYS):
+        # A combinator that is not a list parses as nothing, and a draw from it says so.
+        return [_Leaf(None, schema, None, ())]
+    described = {key: value for key, value in schema.items() if key not in _FOLDED_KEYS}
+    all_of = schema.get("allOf")
+    choices: list[tuple[int | None, list[tuple[JsonSchema, str | None]]]] = [(None, [])]
+    for key in ("anyOf", "oneOf"):
+        branches = schema.get(key)
+        if branches is None:
+            continue
+        opened = [(index, _open_branch(ctx, branch, branches)) for index, branch in enumerate(branches)]
+        choices = [
+            (index if key == "oneOf" else one_of, [*members, branch])
+            for one_of, members in choices
+            for index, branch in opened
+            if branch is not None
+        ]
+    leaves = []
+    for one_of, members in choices:
+        chosen = [*(all_of or []), *(branch for branch, _ in members)]
+        if any(member is False for member in chosen):
+            continue
+        conjunction = {**described, "allOf": [member for member in chosen if member is not True]}
+        references = [reference for _, reference in members if reference is not None]
+        inlined, inlined_references = _inline_allof_refs(conjunction, ctx)
+        merged = _merge_all_of(inlined)
+        if merged == {"not": {}}:
+            continue
+        leaves.append(_Leaf(merged, inlined, one_of, (*references, *inlined_references)))
+    return leaves
+
+
+def _open_branch(ctx: CoverageContext, branch: JsonSchema, siblings: list) -> tuple[JsonSchema, str | None] | None:
+    """The branch with its reference resolved, or `None` once that reference is walked out."""
+    reference = branch.get("$ref") if isinstance(branch, dict) else None
+    if reference is not None and ctx.is_exhausted(reference):
+        return None
+    effective = _resolve_sub_schema(ctx, branch)
+    # Off the body an empty string serializes like an empty array (`?p=`), so beside an array
+    # branch a string branch is kept non-empty.
+    if (
+        ctx.location != ParameterLocation.BODY
+        and isinstance(effective, dict)
+        and effective.get("type") == "string"
+        and "minLength" not in effective
+        and _has_array_sibling(siblings)
+    ):
+        effective = {**effective, "minLength": 1}
+    return effective, reference
+
+
+def _positive_for_leaves(
+    ctx: CoverageContext, schema: JsonSchemaObject, leaves: list[_Leaf]
+) -> Generator[GeneratedValue, None, None]:
+    one_of = schema.get("oneOf")
+    exclusivity = None
+    if isinstance(one_of, list):
+        exclusivity = _make_branch_validators([_resolve_sub_schema(ctx, branch) for branch in one_of], ctx)
+    for leaf in leaves:
+        with ExitStack() as stack:
+            for reference in leaf.references:
+                stack.enter_context(ctx.expand(reference))
+            if leaf.schema is not None:
+                values = cover_schema_iter(ctx, leaf.schema)
+            else:
+                # No single flat spelling (two `pattern`s, two `format`s): one conforming value rather than none.
+                values = _drawn_positive(ctx, leaf.conjunction)
+            for value in values:
+                if (
+                    exclusivity is not None
+                    and leaf.one_of is not None
+                    and is_valid_for_others(value.value, leaf.one_of, exclusivity)
+                ):
+                    continue
+                yield value
+
+
+def _drawn_positive(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
+    with suppress(Unsatisfiable):
+        yield PositiveValue(
+            ctx.generate_from_schema(schema), scenario=CoverageScenario.DEFAULT_POSITIVE_TEST, description="Valid value"
+        )
+
+
 def _cover_positive_for_type(
     ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -1549,157 +1641,15 @@ def _cover_positive_for_type(
         ctx = ctx.with_positive()
         enum = schema.get("enum", NOT_SET)
         const = schema.get("const", NOT_SET)
-        for key in ("anyOf", "oneOf"):
-            sub_schemas = schema.get(key)
-            if sub_schemas is not None:
-                if key == "oneOf":
-                    resolved_schemas = [
-                        ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in sub_schemas
-                    ]
-                    one_of_validators: list[jsonschema_rs.Validator] | None = _make_branch_validators(
-                        resolved_schemas, ctx
-                    )
-                else:
-                    one_of_validators = None
-                # A branch may generate values that satisfy the branch schema but violate
-                # parent-level constraints (e.g. parent `properties.discriminator: const value`,
-                # or parent `type` excluding the branch's type). Only gate body schemas:
-                # header/query/cookie/path adapters inject type:string for serialization, which
-                # would incorrectly filter null values from nullable anyOf branches.
-                parent_validator: jsonschema_rs.Validator | None = None
-                if ctx.location == ParameterLocation.BODY and any(
-                    key in ALL_KEYWORDS and key not in _COMBINATOR_KEYS for key in schema
-                ):
-                    # Nested `$ref`s point into the root's bundle; without it the validator
-                    # fails to compile and branch values pass unfiltered.
-                    full_schema: JsonSchema = schema
-                    if BUNDLE_STORAGE_KEY in ctx.root_schema:
-                        full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-                    try:
-                        parent_validator = make_validator(full_schema, ctx.validator_cls)
-                    except Exception:
-                        pass
-                # For non-body params, an empty bare string serializes to the same wire form as an
-                # empty array (`?p=`), so the string branch never disambiguates from a sibling array
-                # branch. Force non-empty strings.
-                disambiguate_string_branch = (
-                    ctx.location != ParameterLocation.BODY
-                    and isinstance(sub_schemas, list)
-                    and _has_array_sibling(sub_schemas)
-                )
-                for idx, sub_schema in enumerate(sub_schemas):
-                    # Resolving the branch here leaves no pointer for the walk to count, so a branch
-                    # leading back into the value being covered has to be counted before it is opened.
-                    reference = sub_schema.get("$ref") if isinstance(sub_schema, dict) else None
-                    if reference is not None and ctx.is_exhausted(reference):
-                        continue
-                    effective = _resolve_sub_schema(ctx, sub_schema)
-                    if (
-                        disambiguate_string_branch
-                        and isinstance(effective, dict)
-                        and effective.get("type") == "string"
-                        and "minLength" not in effective
-                    ):
-                        effective = {**effective, "minLength": 1}
-                    if isinstance(effective, dict) and "properties" in effective:
-                        # See GH-3584
-                        # Sub-schema defines its own properties — treat as a complete type, do not inject parent properties.
-                        # Exception: required fields absent from the branch but defined in the parent must be injected
-                        # (or referenced from the branch's own properties) so they are still honoured.
-                        parent_props = schema.get("properties", {}) if isinstance(schema, dict) else {}
-                        parent_required_raw = schema.get("required", []) if isinstance(schema, dict) else []
-                        parent_required: list = parent_required_raw if isinstance(parent_required_raw, list) else []
-                        branch_props = effective.get("properties", {})
-                        branch_required_raw = effective.get("required", [])
-                        branch_required: list = branch_required_raw if isinstance(branch_required_raw, list) else []
-                        to_inject = {
-                            f: parent_props[f]
-                            for f in set(branch_required) | set(parent_required)
-                            if f not in branch_props and f in parent_props
-                        }
-                        # Required keys the branch should honour: its own plus parent-required keys
-                        # that the branch can already satisfy (or that we inject above).
-                        merged_required = list(
-                            dict.fromkeys(
-                                list(branch_required)
-                                + [
-                                    f
-                                    for f in parent_required
-                                    if f not in branch_required and (f in branch_props or f in to_inject)
-                                ]
-                            )
-                        )
-                        if to_inject or merged_required != branch_required:
-                            effective = {
-                                **effective,
-                                "properties": {**branch_props, **to_inject} if to_inject else branch_props,
-                                "required": merged_required,
-                            }
-                        gen = cover_schema_iter(ctx, effective)
-                    else:
-                        # See GH-3520
-                        # Additive constraint — merge parent context so sub-schema knows field definitions
-                        gen = cover_schema_iter(ctx, _merge_with_parent_context(schema, effective))
-                    with ctx.expand(reference) if reference is not None else nullcontext():
-                        if one_of_validators is not None:
-                            # Only yield values valid for exactly this one branch
-                            for v in gen:
-                                if not is_valid_for_others(v.value, idx, one_of_validators):
-                                    if parent_validator is None or (
-                                        not contains_binary(v.value) and parent_validator.is_valid(v.value)
-                                    ):
-                                        yield v
-                        else:
-                            for v in gen:
-                                if parent_validator is None or (
-                                    not contains_binary(v.value) and parent_validator.is_valid(v.value)
-                                ):
-                                    yield v
-        all_of = schema.get("allOf")
-        # Set when the merged form is used for allOf: the canonical schema covers the full merged
-        # constraints, so the outer schema's type/properties generation must be skipped to avoid
-        # producing cases that violate allOf's required fields.
-        allof_handles_all = False
-        if all_of is not None:
-            # Covering a lone branch on its own drops every constraint sitting beside `allOf`, so that
-            # shortcut only holds when the outer schema carries none of them.
-            outer_constrains = any(key != "allOf" and key in ALL_KEYWORDS for key in schema)
-            if isinstance(all_of, list) and len(all_of) == 1 and not outer_constrains:
-                yield from cover_schema_iter(ctx, all_of[0])
-            else:
-                folded = False
-                inlined = schema
-                with suppress(jsonschema_rs.ValidationError):
-                    inlined, inlined_refs = _inline_allof_refs(schema, ctx)
-                    merged = _merge_all_of(inlined)
-                    if merged is not None:
-                        with ExitStack() as stack:
-                            for reference in inlined_refs:
-                                stack.enter_context(ctx.expand(reference))
-                            yield from cover_schema_iter(ctx, merged)
-                        folded = True
-                if not folded:
-                    # Members with no single flat spelling (two `pattern`s, two `format`s) leave the
-                    # walker nothing to cover; emit one conforming value instead of dropping the schema.
-                    with suppress(Unsatisfiable):
-                        yield PositiveValue(
-                            ctx.generate_from_schema(inlined),
-                            scenario=CoverageScenario.DEFAULT_POSITIVE_TEST,
-                            description="Valid value",
-                        )
-                allof_handles_all = True
-        if not allof_handles_all:
-            if enum is not NOT_SET:
-                for value in enum:
-                    if _is_valid_with_formats(value, schema, ctx):
-                        yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
-            elif const is not NOT_SET:
-                if _is_valid_with_formats(const, schema, ctx):
-                    yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
-            elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
-                yield from _filter_against_combinators(
-                    _positive_for_describing_keywords(ctx, schema, ty, template), schema, ctx
-                )
+        if enum is not NOT_SET:
+            for value in enum:
+                if _is_valid_with_formats(value, schema, ctx):
+                    yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
+        elif const is not NOT_SET:
+            if _is_valid_with_formats(const, schema, ctx):
+                yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
+        elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
+            yield from _positive_for_describing_keywords(ctx, schema, ty, template)
         if "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
             # These violations are positive for the outer schema, so flip the mode.
@@ -1876,10 +1826,14 @@ def cover_schema_iter(
     push_examples_to_properties(schema)
     if not isinstance(types, list):
         types = [types]  # type: ignore[unreachable]
-    if not types:
+    leaves = _fold(schema, ctx) if GenerationMode.POSITIVE in ctx.generation_modes else None
+    if leaves is not None:
+        with _ignore_unfixable():
+            yield from _filter_against_not(_positive_for_leaves(ctx.with_positive(), schema, leaves), schema, ctx)
+    elif not types:
         with _ignore_unfixable():
             yield from _filter_against_not(_cover_positive_for_type(ctx, schema, None), schema, ctx)
-    for ty in types:
+    for ty in types if leaves is None else []:
         with _ignore_unfixable():
             yield from _filter_against_not(_cover_positive_for_type(ctx, schema, ty), schema, ctx)
     if GenerationMode.NEGATIVE in ctx.generation_modes:
@@ -2397,24 +2351,6 @@ def _drop_invalid_for_location(
         elif not ctx.is_valid_for_location(value):
             continue
         yield case
-
-
-def _filter_against_combinators(
-    cases: Generator[GeneratedValue, None, None], schema: JsonSchema, ctx: CoverageContext
-) -> Generator[GeneratedValue, None, None]:
-    """Drop values that violate `anyOf`/`oneOf` on the same schema.
-
-    Values are built from the describing keywords alone, without consulting sibling `anyOf`/`oneOf`
-    constraints (e.g. a branch tightening a property's enum or a string's length). When such a
-    combinator is present, validate each generated value against the full schema and drop the ones
-    no branch accepts.
-    """
-    if not isinstance(schema, dict) or ("anyOf" not in schema and "oneOf" not in schema):
-        yield from cases
-        return
-    for case in cases:
-        if _is_valid_with_formats(case.value, schema, ctx):
-            yield case
 
 
 def _filter_against_not(
