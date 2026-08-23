@@ -1043,9 +1043,11 @@ def iter_coverage_cases(
                 for parameter in _parameter_set
                 if parameter.name in combination
             }
+            # A required parameter the template could not seed is absent from the combination; requiring it
+            # anyway would describe a container nothing satisfies.
             schema: dict[str, Any] = {
                 "properties": properties,
-                "required": list(_required),
+                "required": [name for name in _required if name in properties],
                 "additionalProperties": False,
             }
             # Each parameter keeps its bundled definitions next to itself, but their references point at

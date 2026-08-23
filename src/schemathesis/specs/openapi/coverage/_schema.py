@@ -923,14 +923,6 @@ class CoverageContext:
         if isinstance(schema, dict) and "examples" in schema:
             # Examples may contain binary data, which canonicalization rejects
             schema = {key: value for key, value in schema.items() if key != "examples"}
-        # Prevent some hard to satisfy schemas
-        if isinstance(schema, dict) and schema.get("additionalProperties") is False and "required" in schema:
-            # Set required properties to any value to simplify generation
-            schema = dict(schema)
-            properties = schema.setdefault("properties", {})
-            for key in schema["required"]:
-                properties.setdefault(key, {})
-
         # Deep clone so the pattern rewrite below leaves the original schema alone
         cloned = deepclone(schema)
         # Add bundled schemas if any; they are shared and reshaped once, not cloned per value.
@@ -1423,7 +1415,10 @@ def _generate_template_with_deflation_fallback(
         # property individually.
         original_required = schema.get("required", []) if isinstance(schema, dict) else []
         properties = template_schema.get("properties", {}) if isinstance(template_schema, dict) else {}
-        deflated = {**template_schema, "required": [k for k in original_required if k in properties]}
+        deflated = {
+            **template_schema,
+            "required": [k for k in original_required if properties.get(k) != {"not": {}}],
+        }
         return ctx.generate_from_schema(deflated)
 
 
@@ -2582,11 +2577,15 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
             # Ignore non-structural keys (annotations like `title`, OpenAPI `nullable`,
             # `readOnly`, `x-*` extensions); only JSON Schema keywords gate the choice.
             schema_keys = {k for k in schema if k in ALL_KEYWORDS}
+            # `{"not": {}}` marks a property as forbidden; requiring it makes the template unsatisfiable.
+            forbidden = {k for k, v in all_properties.items() if v == {"not": {}}}
+            # Inflating may add to `required`, never take from it: a name the schema requires but does not
+            # declare stays required, so an object nothing can satisfy is generated as such.
+            kept = [k for k in required if k not in forbidden]
             if schema_keys <= _FAST_PATH_KEYS:
-                required_for_template = [k for k in required if k in all_properties]
+                required_for_template = kept
             else:
-                # `{"not": {}}` marks a property as forbidden; requiring it makes the template unsatisfiable.
-                required_for_template = [k for k, v in all_properties.items() if v != {"not": {}}]
+                required_for_template = list(dict.fromkeys([*kept, *(k for k in all_properties if k not in forbidden)]))
             return {
                 **schema,
                 "required": required_for_template,

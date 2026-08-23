@@ -3348,3 +3348,19 @@ def test_positive_number_with_both_bound_spellings_keeps_the_tighter_one(ctx_fac
     }
     ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
     assert_conform(cover_schema(ctx, schema), schema)
+
+
+# The template may inflate `required`, never relax it: an unsatisfiable optional object must stay absent.
+def test_positive_object_omits_optional_property_whose_schema_requires_an_undeclared_name(pctx):
+    schema = {
+        "type": "object",
+        "properties": {
+            "a": {
+                "type": "object",
+                "properties": {"b": {"type": "null"}},
+                "additionalProperties": False,
+                "required": ["a"],
+            }
+        },
+    }
+    assert cover_schema(pctx, schema) == [{}]
