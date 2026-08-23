@@ -15,7 +15,7 @@ from fractions import Fraction
 from functools import lru_cache, partial
 from hashlib import blake2b
 from itertools import combinations, count, islice
-from math import ceil, floor, inf, nextafter, ulp
+from math import ceil, floor, inf, isinf, nextafter, ulp
 
 from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
@@ -710,10 +710,10 @@ class CoverageContext:
 
     def _filled_object(self, schema: JsonSchemaObject, size: int) -> dict[str, Any]:
         """An object of this size, one drawn value repeated under fresh names rather than drawn whole."""
-        # A copy, so the names do not land on the draw every later caller of the same schema gets.
-        result = dict(
-            self.generate_from_schema({key: value for key, value in schema.items() if key != "minProperties"})
-        )
+        # An object rather than whatever else the schema admits, copied so the names do not land on the
+        # draw every later caller of the same schema gets.
+        base = {key: value for key, value in schema.items() if key != "minProperties"}
+        result = dict(self.generate_from_schema({**base, "type": "object"}))
         additional = schema.get("additionalProperties", True)
         filler = self.generate_from_schema(additional if isinstance(additional, dict) else {})
         declared = schema.get("properties", {})
@@ -816,6 +816,13 @@ class CoverageContext:
                 if accepted is not NOT_SET:
                     return accepted
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ANNOTATION_KEYWORDS])
+        # Past the generation buffer there is no container worth building, whatever else the schema says.
+        min_properties = schema.get("minProperties")
+        if isinstance(min_properties, int) and min_properties > INTERNAL_BUFFER_SIZE and "object" in get_type(schema):
+            raise Unsatisfiable
+        min_items = schema.get("minItems")
+        if isinstance(min_items, int) and min_items > INTERNAL_BUFFER_SIZE and "array" in get_type(schema):
+            raise Unsatisfiable
         # Shortcuts read the describing keywords alone, which a combinator beside them can still narrow;
         # such a schema is built whole instead.
         if not any(key in schema for key in _FOLDED_KEYS):
@@ -835,7 +842,11 @@ class CoverageContext:
                 obj = {}
                 properties = schema["properties"]
                 for key, sub_schema in properties.items():
-                    if isinstance(sub_schema, dict) and "const" in sub_schema:
+                    if (
+                        isinstance(sub_schema, dict)
+                        and "const" in sub_schema
+                        and _is_valid_with_formats(sub_schema["const"], sub_schema, self)
+                    ):
                         obj[key] = sub_schema["const"]
                     else:
                         try:
@@ -899,33 +910,30 @@ class CoverageContext:
                 if strategy is None:
                     raise Unsatisfiable from None
                 return cached_draw(strategy)
-            min_properties = schema.get("minProperties")
             if (
                 isinstance(min_properties, int)
                 and min_properties > MAX_DRAWN_OBJECT_PROPERTIES
                 and "object" in get_type(schema)
             ):
-                # Past the generation buffer there is no object worth building.
-                if min_properties > INTERNAL_BUFFER_SIZE:
-                    raise Unsatisfiable
-                # Synthesized names only go where any name is admitted and takes the same value.
+                # Synthesized names only go where any name is admitted and takes the same value, and
+                # only where the ceiling leaves room for the floor.
+                max_properties = schema.get("maxProperties")
                 if (
                     schema.get("additionalProperties", True) is not False
                     and "propertyNames" not in schema
                     and "patternProperties" not in schema
+                    and (not isinstance(max_properties, int) or max_properties >= min_properties)
                 ):
                     return self._filled_object(schema, min_properties)
-            min_items = schema.get("minItems")
             if isinstance(min_items, int) and min_items > MAX_DRAWN_ARRAY_ITEMS and "array" in get_type(schema):
-                # Past the generation buffer there is no array worth building.
-                if min_items > INTERNAL_BUFFER_SIZE:
-                    raise Unsatisfiable
                 items = schema.get("items", True)
-                # Repeating one element cannot satisfy either of these.
+                max_items = schema.get("maxItems")
+                # Repeating one element cannot satisfy either of these, and no length fits a ceiling under the floor.
                 if (
                     (items is True or isinstance(items, dict))
                     and not schema.get("uniqueItems")
                     and "contains" not in schema
+                    and (not isinstance(max_items, int) or max_items >= min_items)
                 ):
                     return self._tiled_array(schema, min_items)
             if (
@@ -1629,13 +1637,14 @@ def _cover_positive_for_type(
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty, ctx)
         template = _generate_template_with_deflation_fallback(ctx, schema, template_schema)
-    elif _implies_object_type(schema):
+    elif ty is None and _implies_object_type(schema):
         template_schema = _get_template_schema(schema, "object", ctx)
         template = _generate_template_with_deflation_fallback(ctx, schema, template_schema)
-    elif _implies_array_type(schema):
+    elif ty is None and _implies_array_type(schema):
         template_schema = _get_template_schema(schema, "array", ctx)
         template = _generate_template_with_deflation_fallback(ctx, schema, template_schema)
     else:
+        # Another type's values need no container template, and one that cannot be built must not take them along.
         template = None
     if GenerationMode.POSITIVE in ctx.generation_modes:
         ctx = ctx.with_positive()
@@ -2750,32 +2759,51 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
 
 
-def _as_number(value: Decimal) -> int | float:
-    """A decimal as JSON spells it: an integer where it is whole, since past 2**53 a float may not be able to."""
-    return int(value) if value == value.to_integral_value() else float(value)
+def _rational(value: int | float) -> Fraction:
+    """A number as the decimal its JSON text spells, which is what the validator computes with."""
+    return Fraction(value) if isinstance(value, int) else Fraction(str(value))
 
 
-def closest_multiple_greater_than(y: int | float, x: int | float) -> int | float:
+def _as_number(value: Fraction) -> int | float:
+    """A rational as JSON spells it: an integer where it is whole, since past 2**53 a float may not be able to."""
+    return int(value) if value.denominator == 1 else float(value)
+
+
+def _spelled_multiple(candidate: Fraction, step: Fraction, *, going_up: bool) -> int | float | None:
+    """The candidate where a float's JSON text spells it exactly, else the nearest multiple past it one does."""
+    # Multiples of an awkward step can miss every float for a stretch; a few floats on is as far as it is worth going.
+    for _ in range(8):
+        number = _as_number(candidate)
+        if isinstance(number, int) or isinf(number):
+            return None if isinstance(number, float) else number
+        if Fraction(str(number)) == candidate:
+            return number
+        edge = _rational(nextafter(number, inf if going_up else -inf))
+        quotient, remainder = divmod(edge, step)
+        candidate = edge if remainder == 0 else step * (quotient + 1 if going_up else quotient)
+    return None
+
+
+def closest_multiple_greater_than(y: int | float, x: int | float) -> int | float | None:
     """Find the closest multiple of X that is greater than Y."""
     if isinstance(y, int) and isinstance(x, int):
         return y if y % x == 0 else y + x - y % x
-    # Decimal arithmetic via the canonical `repr` keeps the value exact where IEEE-754 drifts.
-    step = Decimal(str(x))
-    quotient, remainder = divmod(Decimal(str(y)), step)
-    return _as_number(Decimal(str(y)) if remainder == 0 else step * (quotient + 1))
+    step = _rational(x)
+    quotient, remainder = divmod(_rational(y), step)
+    return _spelled_multiple(_rational(y) if remainder == 0 else step * (quotient + 1), step, going_up=True)
 
 
-def _shift_by_multiple(value: int | float, step: int | float, *, direction: int) -> int | float:
+def _shift_by_multiple(value: int | float, step: int | float, *, direction: int) -> int | float | None:
     if isinstance(value, int) and isinstance(step, int):
         return value + direction * step
-    return _as_number(Decimal(str(value)) + direction * Decimal(str(step)))
+    return _spelled_multiple(_rational(value) + direction * _rational(step), _rational(step), going_up=direction > 0)
 
 
-def _largest_multiple_within(value: int | float, step: int | float) -> int | float:
+def _largest_multiple_within(value: int | float, step: int | float) -> int | float | None:
     if isinstance(value, int) and isinstance(step, int):
         return value - (value % step)
-    decimal_step = Decimal(str(step))
-    return _as_number(Decimal(str(value)) - (Decimal(str(value)) % decimal_step))
+    rational, rational_step = _rational(value), _rational(step)
+    return _spelled_multiple(rational - rational % rational_step, rational_step, going_up=False)
 
 
 def _exact(bound: int | float) -> int | Decimal:
@@ -2902,15 +2930,15 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             smallest = closest_multiple_greater_than(minimum, multiple_of)
         else:
             smallest = minimum
-        if _within_adjusted_bounds(smallest) and seen.insert(smallest):
+        if smallest is not None and _within_adjusted_bounds(smallest) and seen.insert(smallest):
             yield PositiveValue(smallest, scenario=CoverageScenario.MINIMUM_VALUE, description="Minimum value")
 
         # One more than minimum if possible
         if multiple_of is not None:
-            larger = _shift_by_multiple(smallest, multiple_of, direction=1)
+            larger = None if smallest is None else _shift_by_multiple(smallest, multiple_of, direction=1)
         else:
             larger = minimum + 1
-        if (maximum is None or larger <= maximum) and seen.insert(larger):
+        if larger is not None and (maximum is None or larger <= maximum) and seen.insert(larger):
             yield PositiveValue(
                 larger, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
             )
@@ -2921,15 +2949,15 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             largest = _largest_multiple_within(maximum, multiple_of)
         else:
             largest = maximum
-        if _within_adjusted_bounds(largest) and seen.insert(largest):
+        if largest is not None and _within_adjusted_bounds(largest) and seen.insert(largest):
             yield PositiveValue(largest, scenario=CoverageScenario.MAXIMUM_VALUE, description="Maximum value")
 
         # One less than maximum if possible
         if multiple_of is not None:
-            smaller = _shift_by_multiple(largest, multiple_of, direction=-1)
+            smaller = None if largest is None else _shift_by_multiple(largest, multiple_of, direction=-1)
         else:
             smaller = maximum - 1
-        if (minimum is None or smaller >= minimum) and seen.insert(smaller):
+        if smaller is not None and (minimum is None or smaller >= minimum) and seen.insert(smaller):
             yield PositiveValue(
                 smaller, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
             )

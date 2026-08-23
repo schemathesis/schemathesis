@@ -3252,6 +3252,66 @@ def test_positive_integer_boundaries_are_integers(pctx, schema):
     assert values and all(isinstance(value, int) for value in values), values
 
 
+# A floor past the buffer rules its own type out, combinator or not; the other types stay (long strings are padded).
+@pytest.mark.parametrize(
+    ("schema", "expected_types"),
+    [
+        ({"minItems": 32769, "anyOf": [{"type": "string"}, {"type": "array"}]}, {str}),
+        ({"minProperties": 32769, "anyOf": [{"type": "integer"}, {"type": "object"}]}, {int}),
+        ({"minLength": 40000, "anyOf": [{"type": "integer"}, {"type": "string"}]}, {int, str}),
+        ({"type": "array", "minItems": 32769, "anyOf": [{}]}, set()),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "o": {
+                        "type": "object",
+                        "anyOf": [{}],
+                        "properties": {"p": {"type": "array", "minItems": 32769}},
+                        "required": ["p"],
+                    }
+                },
+                "required": ["o"],
+            },
+            set(),
+        ),
+    ],
+    ids=["items", "properties", "length", "typed-array", "built-whole"],
+)
+def test_positive_floor_past_the_buffer_beside_a_combinator(pctx, schema, expected_types):
+    values = cover_schema(pctx, schema)
+    assert {type(value) for value in values} == expected_types, values
+    assert_conform(values, schema)
+
+
+# A floor no ceiling admits rules the container out; filling to the floor anyway would breach the ceiling.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"maxItems": 0, "minItems": 65},
+        {"type": "array", "maxItems": 3, "minItems": 65},
+        {"maxProperties": 0, "minProperties": 65},
+        {"type": "object", "maxProperties": 3, "minProperties": 65},
+        {"minProperties": 65, "maximum": 0},
+    ],
+    ids=["untyped-items", "typed-items", "untyped-properties", "typed-properties", "untyped-properties-only"],
+)
+def test_positive_large_floor_respects_the_ceiling(pctx, schema):
+    assert_conform(cover_schema(pctx, schema), schema)
+
+
+# The filler starts from an object even where the schema admits other types too.
+def test_positive_large_floor_under_a_type_list_still_fills_an_object(pctx):
+    schema = {
+        "type": "object",
+        "properties": {"p": {"type": ["null", "object"], "minProperties": 65}},
+        "required": ["p"],
+    }
+    values = cover_schema(pctx, schema)
+    assert any(isinstance(value["p"], dict) and len(value["p"]) >= 65 for value in values), values
+    assert_conform(values, schema)
+
+
 # One drawn element repeated fills a large floor whether or not `items` is declared; past the buffer nothing is built.
 @pytest.mark.parametrize(
     ("schema", "lengths"),
@@ -3310,6 +3370,26 @@ def test_positive_flipped_from_not_is_judged_by_the_operation_draft(pctx):
     validator = jsonschema_rs.Draft4Validator(schema)
     for value in cover_schema(pctx, schema):
         validator.validate(value)
+
+
+# Multiples past the decimal context's precision are still exact, and only a multiple a float spells is emitted.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "number", "maximum": 1e30, "multipleOf": 3.0},
+        {"type": "number", "minimum": 1e30, "multipleOf": 3.0},
+        {"type": "number", "exclusiveMinimum": 1e30, "multipleOf": 0.5},
+        {"type": "number", "exclusiveMaximum": -1e30, "multipleOf": 0.3},
+    ],
+    ids=["maximum", "minimum", "exclusive-minimum-half-step", "exclusive-maximum-decimal-step"],
+)
+def test_positive_number_multiples_past_decimal_precision(ctx_factory, schema):
+    ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = cover_schema(ctx, schema)
+    assert values
+    for value in values:
+        assert validator.is_valid(value), value
 
 
 # The validator reads a float bound as the decimal its JSON text spells, so integer steps must be taken in decimal.

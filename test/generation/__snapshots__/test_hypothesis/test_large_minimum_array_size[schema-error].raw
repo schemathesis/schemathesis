@@ -23,9 +23,9 @@ Schemathesis dev
 
 ==================================== ERRORS ====================================
 __________________________________ POST /data __________________________________
-Failed Health Check
+Schema Error
 
-Minimum possible example is too large for request body (application/json)
+Cannot generate test data for request body (application/json)
 Schema:
 
 {
@@ -37,11 +37,11 @@ Schema:
 }
 
 This usually means:
-  - Arrays with large minimum size (e.g., minItems: 100)
-  - Many required properties with their own large minimums
-  - Nested structures that multiply size requirements
+  - Type mismatch (e.g., enum with strings but type: integer)
+  - Contradictory constraints (e.g., minimum > maximum)
+  - Regex that's too complex to generate values for
 
-Tip: Reduce minimum size requirements or number of required properties or bypass this health check using `--suppress-health-check=large_base_example`.
+Tip: Review all parameters and request body schemas for conflicting constraints.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -59,7 +59,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Errors:
-  🚫 Failed Health Check: 1
+  🚫 Schema Error: 1
 
 Test cases:
   No test cases were generated

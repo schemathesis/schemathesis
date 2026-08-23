@@ -17,7 +17,7 @@ from hypothesis.strategies._internal.deferred import DeferredStrategy
 from jsonschema_rs import canonical
 
 from schemathesis.config import OutputConfig
-from schemathesis.core import MAX_STRING_LENGTH
+from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_STRING_LENGTH
 from schemathesis.core.errors import (
     InvalidSchema,
     UnsupportedRegexPattern,
@@ -75,6 +75,11 @@ def _countable(bound: int | None) -> int | None:
     """A size bound Hypothesis can be handed, or `None` when it runs past what a size can count."""
     # Sizes are averaged as floats, so a bound past this range fails the conversion before any check.
     return bound if bound is None or bound <= sys.maxsize else None
+
+
+def _floor(bound: int | None) -> int | None:
+    """A size floor a draw can reach, or `None` past the buffer one draw fits in."""
+    return bound if bound is None or bound <= INTERNAL_BUFFER_SIZE else None
 
 
 # What a builder raises when it cannot draw for a node, and a caller may route around it.
@@ -420,7 +425,7 @@ class _Layout:
 def _array(
     schema: jsonschema_rs.CanonicalSchema, view: jsonschema_rs.canonical.ArrayView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
-    if view.min_items is not None and _countable(view.min_items) is None:
+    if view.min_items is not None and _floor(view.min_items) is None:
         # No array can be that long.
         return st.nothing()
     if view.prefix_items or view.contains:
@@ -1086,6 +1091,9 @@ def _collect(
     entries: SearchStrategy[tuple[str, JsonValue]], low: int, high: int
 ) -> SearchStrategy[dict[str, JsonValue]]:
     def resolved() -> SearchStrategy[dict[str, JsonValue]]:
+        if _floor(low) is None:
+            # No object can be that wide.
+            return st.nothing()
         if entries.is_empty:
             # No key can be spelled; the floor decides whether that is fatal or only means no extras.
             return st.nothing() if low else st.just({})

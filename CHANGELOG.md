@@ -12,6 +12,13 @@
 - Coverage phase emitting objects without a name one `allOf` branch requires and another forbids.
 - Non-body parameters with `anyOf`/`oneOf`/`$ref` schemas losing their `null` branch to the default string type.
 - Duplicate positive cases for schemas combining `anyOf`/`oneOf` with keywords beside them.
+- Coverage phase emitting a property's `const` that the rest of its schema rejects.
+- Coverage phase crashing on `multipleOf` beside a numeric bound past 28 significant digits.
+- Coverage phase emitting `multipleOf` steps no float spells, which land back on the excluded bound.
+- Coverage phase crashing on a `minItems`/`minProperties` past the generation buffer beside a combinator.
+- Coverage phase filling a large `minItems`/`minProperties` floor past a smaller ceiling.
+- Coverage phase dropping every value of a type when another type's container template cannot be built.
+- Report a `minItems`/`minProperties` past the generation buffer as a schema error instead of a health check.
 - Coverage phase ignoring `additionalProperties` for required names absent from `properties`.
 - Coverage phase exceeding `maxProperties` when covering a property the template omits.
 - Numeric `exclusiveMinimum`/`exclusiveMaximum` overriding a tighter `minimum`/`maximum` instead of combining.
