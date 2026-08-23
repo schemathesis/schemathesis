@@ -20,6 +20,10 @@
 - Coverage phase crashing on a `minProperties` past the generation buffer.
 - Coverage phase emitting `enum`/`const` members the operation's draft rejects.
 - Coverage phase stepping integer boundaries of float-spelled bounds in binary, not the decimal the validator reads.
+- Coverage phase emitting `example`/`default` values the operation's draft rejects.
+- Coverage phase dropping properties named `if`, `then`, `else`, or `not` from nested templates.
+- Coverage phase spending a minute on a `minProperties` in the hundreds and then emitting nothing.
+- Coverage phase emitting an excluded integer bound when `minimum`/`maximum` repeats a large float `exclusiveMinimum`/`exclusiveMaximum`.
 - Coverage phase judging `anyOf`/`oneOf` branch values against the parent in the wrong draft.
 - Coverage phase emitting a float as a type violation for `integer` when `number` is allowed too.
 - Coverage phase crashing on a `pattern` whose `minLength` exceeds the generation buffer.

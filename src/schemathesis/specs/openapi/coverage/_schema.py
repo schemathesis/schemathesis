@@ -29,7 +29,12 @@ from schemathesis.core.jsonschema import (
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
-from schemathesis.core.jsonschema.numeric import bounds_are_unsatisfiable, next_float32, resolve_inclusive_bounds
+from schemathesis.core.jsonschema.numeric import (
+    bounds_are_unsatisfiable,
+    is_numeric_bound,
+    next_float32,
+    resolve_inclusive_bounds,
+)
 
 try:
     from json.encoder import _make_iterencode  # type: ignore[attr-defined]
@@ -151,21 +156,43 @@ def _replace_zero_with_nonzero(x: float) -> float:
     return x or 0.0
 
 
-def _is_strictly_valid(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> bool:
-    # Fails closed: when no validator can be built (e.g. cross-draft keyword combos rejected
-    # by both the auto-detected draft and the spec's `validator_cls`), treat the value as
-    # unchecked so callers drop it rather than ship it as a valid positive coverage body.
+def _judges(schema: JsonSchema, ctx: CoverageContext) -> list[jsonschema_rs.Validator]:
+    """The operation's draft, plus the latest draft for the assertions it adds (`const`, formats); each that loads."""
     full_schema: JsonSchema = schema
-    if BUNDLE_STORAGE_KEY in ctx.root_schema:
+    if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in ctx.root_schema and BUNDLE_STORAGE_KEY not in schema:
         full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-    try:
-        return make_validator_for(full_schema).is_valid(value)
-    except Exception:
-        pass
-    try:
-        return make_validator(full_schema, ctx.validator_cls).is_valid(value)
-    except Exception:
-        return False
+    latest = jsonschema_rs.validator_cls_for(full_schema)
+    judges: list[jsonschema_rs.Validator] = []
+    for validator_cls in dict.fromkeys((ctx.validator_cls, latest)):
+        try:
+            judges.append(make_validator(_spelled_for(full_schema, validator_cls, ctx), validator_cls))
+        except Exception:
+            continue
+    return judges
+
+
+def _spelled_for(schema: JsonSchema, validator_cls: type, ctx: CoverageContext) -> JsonSchema:
+    """The schema as values are drawn for this draft: Draft 4 reads `const` only once it is spelled as `enum`."""
+    if validator_cls is not jsonschema_rs.Draft4Validator or not isinstance(schema, dict):
+        return schema
+    bundle = schema.get(BUNDLE_STORAGE_KEY)
+    if bundle is None:
+        return _prepared(schema, draft4=True)
+    rest = {key: value for key, value in schema.items() if key != BUNDLE_STORAGE_KEY}
+    return {**_prepared(rest, draft4=True), BUNDLE_STORAGE_KEY: _ready_bundle(bundle, None, True)}
+
+
+def _admitted(value: Any, schema: JsonSchema, ctx: CoverageContext, *, unjudged: bool) -> bool:
+    """Whether every judge that loads admits the value; `unjudged` answers when none does."""
+    judges = _judges(schema, ctx)
+    if not judges:
+        return unjudged
+    return all(judge.is_valid(value) for judge in judges)
+
+
+def _is_strictly_valid(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> bool:
+    # Fails closed, so a value nothing can check is dropped rather than shipped as a valid positive.
+    return _admitted(value, schema, ctx, unjudged=False)
 
 
 def _without_forbidden_keys(value: Any, schema: dict[str, Any]) -> Any:
@@ -202,6 +229,8 @@ NEGATIVE_MODE_MAX_ITEMS = 15
 # Longest array still drawn element by element; a pattern-matched element spends budget per
 # character, so past this the draw stops being affordable.
 MAX_DRAWN_ARRAY_ITEMS = 64
+# Largest object still drawn whole; free values past this overrun the buffer before the floor is met.
+MAX_DRAWN_OBJECT_PROPERTIES = 64
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
@@ -255,9 +284,10 @@ UNKNOWN_PROPERTY_VALUE = 42
 ADDITIONAL_PROPERTY_KEY_BASE = "x-schemathesis-additional"
 
 
-def _generate_additional_property_key(existing_keys: set[str]) -> str:
-    key = ADDITIONAL_PROPERTY_KEY_BASE
-    counter = 0
+def _generate_additional_property_key(existing_keys: set[str], start: int = 0) -> str:
+    """The first free numbered key at or past `start`; a caller taking keys in order passes how many it has taken."""
+    counter = start
+    key = ADDITIONAL_PROPERTY_KEY_BASE if counter == 0 else f"{ADDITIONAL_PROPERTY_KEY_BASE}{counter}"
     while key in existing_keys:
         counter += 1
         key = f"{ADDITIONAL_PROPERTY_KEY_BASE}{counter}"
@@ -623,11 +653,11 @@ class CoverageContext:
         if wider is None:
             return None
         strategy = self._build(wider, draft)
-        validator = _judge(schema)
-        if strategy is None or validator is None:
+        judge = _judge(schema, self)
+        if strategy is None or judge is None:
             return None
         # The wider form admits values the schema rules out, so the validator has the last word.
-        return strategy.filter(validator.is_valid)
+        return strategy.filter(judge)
 
     def _build(self, schema: JsonSchema, draft: int) -> st.SearchStrategy | None:
         # This phase reshapes what it is given and covers whatever parses, so a definition the draft
@@ -663,8 +693,8 @@ class CoverageContext:
             candidate = self._generate_from_schema_inner(described)
         except (InvalidArgument, Unsatisfiable):
             return NOT_SET
-        validator = _judge(schema)
-        if validator is None or not validator.is_valid(candidate):
+        judge = _judge(schema, self)
+        if judge is None or not judge(candidate):
             return NOT_SET
         return candidate
 
@@ -677,6 +707,25 @@ class CoverageContext:
         if isinstance(item, (dict, list)):
             return [deepclone(item) for _ in range(length)]
         return [item] * length
+
+    def _filled_object(self, schema: JsonSchemaObject, size: int) -> dict[str, Any]:
+        """An object of this size, one drawn value repeated under fresh names rather than drawn whole."""
+        # A copy, so the names do not land on the draw every later caller of the same schema gets.
+        result = dict(
+            self.generate_from_schema({key: value for key, value in schema.items() if key != "minProperties"})
+        )
+        additional = schema.get("additionalProperties", True)
+        filler = self.generate_from_schema(additional if isinstance(additional, dict) else {})
+        declared = schema.get("properties", {})
+        for index in count():
+            if len(result) >= size:
+                break
+            name = f"x{index}"
+            if name in result or name in declared:
+                continue
+            # A shared value would let one caller's edit show up under every other name.
+            result[name] = deepclone(filler) if isinstance(filler, (dict, list)) else filler
+        return result
 
     def _long_string_matching(self, schema: JsonSchemaObject, length: int) -> str:
         """A string this long the `pattern` accepts, for lengths matching it cannot draw."""
@@ -848,9 +897,21 @@ class CoverageContext:
                 raise Unsatisfiable from None
             return cached_draw(strategy)
         min_properties = schema.get("minProperties")
-        if isinstance(min_properties, int) and min_properties > INTERNAL_BUFFER_SIZE and "object" in get_type(schema):
+        if (
+            isinstance(min_properties, int)
+            and min_properties > MAX_DRAWN_OBJECT_PROPERTIES
+            and "object" in get_type(schema)
+        ):
             # Past the generation buffer there is no object worth building.
-            raise Unsatisfiable
+            if min_properties > INTERNAL_BUFFER_SIZE:
+                raise Unsatisfiable
+            # Synthesized names only go where any name is admitted and takes the same value.
+            if (
+                schema.get("additionalProperties", True) is not False
+                and "propertyNames" not in schema
+                and "patternProperties" not in schema
+            ):
+                return self._filled_object(schema, min_properties)
         min_items = schema.get("minItems")
         if isinstance(min_items, int) and min_items > MAX_DRAWN_ARRAY_ITEMS and "array" in get_type(schema):
             # Past the generation buffer there is no array worth building.
@@ -995,12 +1056,12 @@ def _ready_bundle(
     if cached is not MISSING:
         return cached[0]
     if update_pattern is None:
-        result = _prepared(bundle, draft4=draft4)
+        result = _prepared_by_name(bundle, draft4=draft4, drop=frozenset())
     else:
         # Rewriting in place, so on a copy the caller's document does not share.
         result = deepclone(bundle)
         _apply_pattern_optimizations(result, update_pattern)
-        result = _prepared(result, draft4=draft4)
+        result = _prepared_by_name(result, draft4=draft4, drop=frozenset())
     # The trailing elements pin the keyed objects, so their `id`s cannot be recycled into a stale hit.
     _READY_BUNDLE_CACHE[key] = (result, bundle, update_pattern)
     return result
@@ -1098,14 +1159,18 @@ _COMBINATOR_KEYS = frozenset({"anyOf", "oneOf", "allOf", "not", "if", "then", "e
 _CONDITIONAL_KEYS = frozenset({"not", "if", "then", "else"})
 # Keywords holding data rather than sub-schemas; their contents are values, not spellings to rewrite.
 _DATA_KEYWORDS = frozenset({"const", "enum", "default", "example", "examples"})
+# Keywords whose value maps names to schemas.
+_NAMED_SCHEMAS = frozenset(
+    {"properties", "patternProperties", "definitions", "$defs", "dependentSchemas", BUNDLE_STORAGE_KEY}
+)
 
 
-def _judge(schema: JsonSchema) -> jsonschema_rs.Validator | None:
-    """Draft-detecting, so a `const` inside a Draft 4 document still rules values out."""
-    try:
-        return make_validator_for(schema)
-    except jsonschema_rs.ValidationError:
+def _judge(schema: JsonSchema, ctx: CoverageContext) -> Callable[[Any], bool] | None:
+    """Whether the schema admits a value, or `None` where nothing can check it."""
+    judges = _judges(schema, ctx)
+    if not judges:
         return None
+    return lambda value: all(judge.is_valid(value) for judge in judges)
 
 
 def _prepared(value: Any, *, draft4: bool = False, drop: frozenset[str] = frozenset()) -> Any:
@@ -1131,10 +1196,21 @@ def _prepared(value: Any, *, draft4: bool = False, drop: frozenset[str] = frozen
             # Draft 4 has no boolean schemas either.
             sub = [{} if branch is True else {"not": {}} if branch is False else branch for branch in sub]
             changed = True
-        prepared_sub = sub if key in _DATA_KEYWORDS else _prepared(sub, draft4=draft4, drop=drop)
+        if key in _DATA_KEYWORDS:
+            prepared_sub = sub
+        elif key in _NAMED_SCHEMAS and isinstance(sub, dict):
+            prepared_sub = _prepared_by_name(sub, draft4=draft4, drop=drop)
+        else:
+            prepared_sub = _prepared(sub, draft4=draft4, drop=drop)
         changed = changed or prepared_sub is not sub
         result[key] = prepared_sub
     return result if changed else value
+
+
+def _prepared_by_name(schemas: dict[str, Any], *, draft4: bool, drop: frozenset[str]) -> dict[str, Any]:
+    """`_prepared` over a map whose keys are names, not keywords, so a property called `not` stays."""
+    result = {name: _prepared(sub, draft4=draft4, drop=drop) for name, sub in schemas.items()}
+    return schemas if all(new is old for new, old in zip(result.values(), schemas.values(), strict=True)) else result
 
 
 def _without_conditionals(schema: JsonSchemaObject) -> JsonSchemaObject | None:
@@ -1694,7 +1770,7 @@ def _ignore_unfixable(
             raise
 
 
-def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageContext) -> str | None:
+def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageContext, start: int = 0) -> str | None:
     """Return an additional-property key: propertyNames-valid, matching no patternProperties, or None."""
     patterns = _pattern_property_regexes(schema)
 
@@ -1714,7 +1790,7 @@ def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageCont
         except Exception:
             return None
         return key if is_additional(key) else None
-    fallback = _generate_additional_property_key(existing_keys)
+    fallback = _generate_additional_property_key(existing_keys, start)
     if is_additional(fallback):
         return fallback
     return next((candidate for candidate in _UNEXPECTED_PROPERTY_KEYS[1:] if is_additional(candidate)), None)
@@ -2135,8 +2211,9 @@ def cover_schema_iter(
                     existing_keys = set(obj_value.keys())
                     needed = value + 1 - len(existing_keys)
                     if needed > 0:
-                        for _ in range(needed):
-                            new_key = _pick_property_name(schema, existing_keys, ctx)
+                        for taken in range(needed):
+                            # Earlier picks took every lower number, so scanning from here finds the same key faster.
+                            new_key = _pick_property_name(schema, existing_keys, ctx, start=taken)
                             if new_key is None:
                                 break
                             existing_keys.add(new_key)
@@ -2335,21 +2412,8 @@ def _filter_against_combinators(
     if not isinstance(schema, dict) or ("anyOf" not in schema and "oneOf" not in schema):
         yield from cases
         return
-    # Sub-schemas keep `$ref` pointing into the root's `x-bundled` map; the validator
-    # cannot resolve those without the bundle attached.
-    full_schema: JsonSchema = schema
-    if BUNDLE_STORAGE_KEY in ctx.root_schema:
-        full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-    try:
-        validator = make_validator_for(full_schema)
-    except Exception:
-        yield from cases
-        return
     for case in cases:
-        try:
-            if validator.is_valid(case.value):
-                yield case
-        except Exception:
+        if _is_valid_with_formats(case.value, schema, ctx):
             yield case
 
 
@@ -2370,22 +2434,10 @@ def _filter_against_not(
 
 
 def _is_valid_with_formats(value: object, schema: JsonSchema, ctx: CoverageContext) -> bool:
-    """Return True if value satisfies schema including format constraints at all nesting levels."""
+    """Whether the schema admits the value, passing a value nothing can check."""
     if not isinstance(schema, dict):
         return True
-    full_schema: JsonSchema = schema
-    if BUNDLE_STORAGE_KEY in ctx.root_schema:
-        full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-    # Auto-detection picks the latest draft (wider format coverage); fall back to the spec's
-    # draft so Draft-4-only constructs still validate instead of silently passing.
-    try:
-        return make_validator_for(full_schema).is_valid(value)
-    except Exception:
-        pass
-    try:
-        return make_validator(full_schema, ctx.validator_cls).is_valid(value)
-    except Exception:
-        return True
+    return _admitted(value, schema, ctx, unjudged=True)
 
 
 def _make_branch_validators(schemas: list[JsonSchema], ctx: CoverageContext) -> list[jsonschema_rs.Validator]:
@@ -2839,6 +2891,15 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     schema = {**schema, "type": pinned}
     is_integer = pinned == "integer"
     is_float32 = not is_integer and schema.get("format") == "float"
+    if is_integer:
+        # Draft 4 reads `1.0` as a number, so an integer's boundary is the nearest integer inside the bound; rounded
+        # first, in decimal, so it compares with a stepped exclusive bound the way the validator reads both.
+        rounded = {
+            key: int(rounding(_exact(schema[key])))
+            for key, rounding in (("minimum", ceil), ("maximum", floor))
+            if is_numeric_bound(schema.get(key))
+        }
+        schema = {**schema, **rounded}
     minimum, maximum = resolve_inclusive_bounds(
         schema,
         step=lambda value, going_up: _adjust_numeric_bound(
@@ -2848,10 +2909,6 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if bounds_are_unsatisfiable(minimum, maximum):
         # Nothing representable past the bound, so emit no value.
         return
-    if is_integer:
-        # Draft 4 reads `1.0` as a number, so an integer's boundary is the nearest integer inside the bound.
-        minimum = None if minimum is None else ceil(_exact(minimum))
-        maximum = None if maximum is None else floor(_exact(maximum))
     multiple_of = schema.get("multipleOf")
     if is_integer and multiple_of is not None and not isinstance(multiple_of, int):
         # Integer multiples of `p/q` are exactly the multiples of `p`.
