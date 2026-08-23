@@ -30,6 +30,7 @@ from schemathesis.specs.openapi.coverage._schema import (
 )
 from schemathesis.specs.openapi.formats import get_default_format_strategies
 from schemathesis.specs.openapi.patterns import update_quantifier
+from test.utils import to_float32
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="Possessive repeats and atomic groups are only available in Python 3.11+"
@@ -3364,3 +3365,19 @@ def test_positive_object_omits_optional_property_whose_schema_requires_an_undecl
         },
     }
     assert cover_schema(pctx, schema) == [{}]
+
+
+# A float32-parsing server narrows the value; the boundary negative must still fall outside after narrowing.
+@pytest.mark.parametrize(
+    ("keyword", "bound"),
+    [("maximum", 1e10), ("minimum", -1e10), ("maximum", 10000000000)],
+    ids=["maximum", "minimum", "integer-spelled-maximum"],
+)
+def test_negative_float_boundary_survives_float32_narrowing(nctx, keyword, bound):
+    schema = {"type": "number", "format": "float", keyword: bound}
+    scenario = CoverageScenario.VALUE_ABOVE_MAXIMUM if keyword == "maximum" else CoverageScenario.VALUE_BELOW_MINIMUM
+    values = [generated.value for generated in cover_schema_iter(nctx, schema) if generated.scenario == scenario]
+    assert values
+    for value in values:
+        narrowed = to_float32(float(value))
+        assert narrowed > to_float32(bound) if keyword == "maximum" else narrowed < to_float32(bound), value
