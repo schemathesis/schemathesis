@@ -3381,3 +3381,73 @@ def test_negative_float_boundary_survives_float32_narrowing(nctx, keyword, bound
     for value in values:
         narrowed = to_float32(float(value))
         assert narrowed > to_float32(bound) if keyword == "maximum" else narrowed < to_float32(bound), value
+
+
+# `minProperties` only constrains objects; a negative built without pinning the type may be a valid non-object.
+@pytest.mark.parametrize("schema", [{"minProperties": 2}, {"minProperties": 2, "properties": {"a": {"type": "null"}}}])
+def test_negative_min_properties_without_type_stays_an_object(nctx, schema):
+    values = [
+        generated.value
+        for generated in cover_schema_iter(nctx, schema)
+        if generated.scenario == CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES
+    ]
+    assert values
+    assert_not_conform(values, schema)
+
+
+# Past the generation buffer there is no object worth building, let alone one key per unit of `maxProperties`.
+def test_negative_max_properties_past_the_buffer_is_skipped(nctx):
+    schema = {"type": "object", "maxProperties": 40_000}
+    scenarios = {generated.scenario for generated in cover_schema_iter(nctx, schema)}
+    assert CoverageScenario.OBJECT_ABOVE_MAX_PROPERTIES not in scenarios
+
+
+# Draft 4 reads `1.0` as a number, not an integer, so an integer's boundary value must be spelled as one.
+@pytest.mark.parametrize(
+    "schema",
+    [{"type": "integer", "minimum": -5.151020255852562e16}, {"type": "integer", "maximum": 7.0}],
+    ids=["float-spelled-minimum", "float-spelled-maximum"],
+)
+def test_positive_integer_boundaries_are_integers(pctx, schema):
+    values = cover_schema(pctx, schema)
+    assert values and all(isinstance(value, int) for value in values), values
+
+
+# One drawn element repeated fills a large floor whether or not `items` is declared; past the buffer nothing is built.
+@pytest.mark.parametrize(
+    ("schema", "lengths"),
+    [
+        ({"type": "array", "minItems": 9000}, {9000, 9001}),
+        ({"minItems": 9000}, {9000, 9001}),
+        ({"minItems": 33915}, set()),
+        ({"type": "array", "items": {"type": "null"}, "minItems": 100000}, set()),
+    ],
+    ids=["undeclared-items", "untyped", "untyped-past-the-buffer", "declared-items-past-the-buffer"],
+)
+def test_positive_array_floor_is_tiled_within_the_buffer(pctx, schema, lengths):
+    arrays = [value for value in cover_schema(pctx, schema) if isinstance(value, list)]
+    assert {len(value) for value in arrays} == lengths
+    assert_conform(arrays, schema)
+
+
+# A value the operation's draft rejects must not slip through because a newer draft cannot read the schema at all.
+def test_positive_enum_values_are_judged_by_the_operation_draft(pctx):
+    schema = {"enum": [[]], "minItems": 1, "minimum": 0, "exclusiveMinimum": True}
+    assert cover_schema(pctx, schema) == []
+
+
+# Past the generation buffer there is no object worth building, in either direction.
+@pytest.mark.parametrize("mode", list(GenerationMode))
+def test_min_properties_past_the_buffer_is_skipped(ctx_factory, mode):
+    ctx = ctx_factory(generation_modes=[mode])
+    schema = {"type": "object", "minProperties": 40_000}
+    scenarios = {generated.scenario for generated in cover_schema_iter(ctx, schema)}
+    assert not scenarios & {CoverageScenario.VALID_OBJECT, CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES}
+
+
+# A positive flipped out of `not` still answers to the outer keywords, spelled in the operation's draft.
+def test_positive_flipped_from_not_is_judged_by_the_operation_draft(pctx):
+    schema = {"type": "string", "maxLength": 2, "minimum": 0, "exclusiveMinimum": True, "not": {"enum": ["ab"]}}
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema(pctx, schema):
+        validator.validate(value)

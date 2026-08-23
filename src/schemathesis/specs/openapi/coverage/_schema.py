@@ -672,7 +672,7 @@ class CoverageContext:
         """An array of this length, repeated from a one-element draw rather than drawn whole."""
         # A one-element array rather than a bare element: drawing the element on its own skips how
         # the schema's `pattern` gets reconciled with the configured alphabet.
-        item = self.generate_from_schema({**schema, "minItems": 1, "maxItems": 1})[0]
+        item = self.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1})[0]
         # A shared element would let one caller's edit show up at every other index.
         if isinstance(item, (dict, list)):
             return [deepclone(item) for _ in range(length)]
@@ -811,7 +811,7 @@ class CoverageContext:
         ) and schema["type"] == "integer":
             return cached_draw(st.integers(min_value=schema.get("minimum"), max_value=schema.get("maximum")))
         if "enum" in schema:
-            enum_values = [v for v in schema["enum"] if is_valid(v, schema)]
+            enum_values = [v for v in schema["enum"] if _is_valid_with_formats(v, schema, self)]
             if not enum_values:
                 raise Unsatisfiable
             return cached_draw(st.sampled_from(enum_values))
@@ -853,17 +853,23 @@ class CoverageContext:
             if strategy is None:
                 raise Unsatisfiable from None
             return cached_draw(strategy)
+        min_properties = schema.get("minProperties")
+        if isinstance(min_properties, int) and min_properties > INTERNAL_BUFFER_SIZE and "object" in get_type(schema):
+            # Past the generation buffer there is no object worth building.
+            raise Unsatisfiable
         min_items = schema.get("minItems")
-        if (
-            isinstance(min_items, int)
-            and min_items > MAX_DRAWN_ARRAY_ITEMS
-            and isinstance(schema.get("items"), dict)
-            and "array" in get_type(schema)
+        if isinstance(min_items, int) and min_items > MAX_DRAWN_ARRAY_ITEMS and "array" in get_type(schema):
+            # Past the generation buffer there is no array worth building.
+            if min_items > INTERNAL_BUFFER_SIZE:
+                raise Unsatisfiable
+            items = schema.get("items", True)
             # Repeating one element cannot satisfy either of these.
-            and not schema.get("uniqueItems")
-            and "contains" not in schema
-        ):
-            return self._tiled_array(schema, min_items)
+            if (
+                (items is True or isinstance(items, dict))
+                and not schema.get("uniqueItems")
+                and "contains" not in schema
+            ):
+                return self._tiled_array(schema, min_items)
         if (
             (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
             and isinstance(schema["items"], dict)
@@ -872,7 +878,7 @@ class CoverageContext:
             items = schema["items"]
             min_items = schema.get("minItems", 0)
             if "enum" in items:
-                enum_values = [v for v in items["enum"] if is_valid(v, items)]
+                enum_values = [v for v in items["enum"] if _is_valid_with_formats(v, items, self)]
                 if not enum_values:
                     # Nothing matches, so only an empty array can conform.
                     if min_items:
@@ -1615,10 +1621,10 @@ def _cover_positive_for_type(
         if not allof_handles_all:
             if enum is not NOT_SET:
                 for value in enum:
-                    if is_valid(value, schema):
+                    if _is_valid_with_formats(value, schema, ctx):
                         yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
             elif const is not NOT_SET:
-                if is_valid(const, schema):
+                if _is_valid_with_formats(const, schema, ctx):
                     yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
             elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
                 yield from _filter_against_combinators(
@@ -1630,19 +1636,9 @@ def _cover_positive_for_type(
             # The inner-violation alone doesn't guarantee the value satisfies the outer's
             # other constraints (type, properties, etc.); validate before yielding.
             nctx = ctx.with_negative()
-            outer_validator: jsonschema_rs.Validator | None = None
-            full_schema = schema
-            if BUNDLE_STORAGE_KEY in ctx.root_schema:
-                full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-            try:
-                outer_validator = make_validator_for(full_schema)
-            except Exception:
-                pass
             for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen)):
-                if (
-                    outer_validator is not None
-                    and flipped.generation_mode == GenerationMode.POSITIVE
-                    and not outer_validator.is_valid(flipped.value)
+                if flipped.generation_mode == GenerationMode.POSITIVE and not _is_valid_with_formats(
+                    flipped.value, schema, ctx
                 ):
                     continue
                 yield flipped
@@ -2133,7 +2129,7 @@ def cover_schema_iter(
                                     description=f"Object with invalid additional property: {invalid.description}",
                                     location=nctx.current_path,
                                 )
-                elif key == "maxProperties" and isinstance(value, int) and value >= 0:
+                elif key == "maxProperties" and isinstance(value, int) and 0 <= value < INTERNAL_BUFFER_SIZE:
                     additional_properties = schema.get("additionalProperties", True)
                     # Skip if additionalProperties is false - can't add more properties cleanly
                     if additional_properties is False:
@@ -2169,7 +2165,12 @@ def cover_schema_iter(
                             # Only use empty object if no required properties
                             obj_value = {}
                         else:
-                            new_schema = {**schema, "minProperties": value - 1, "maxProperties": value - 1}
+                            new_schema = {
+                                **schema,
+                                "type": "object",
+                                "minProperties": value - 1,
+                                "maxProperties": value - 1,
+                            }
                             obj_value = ctx.generate_from_schema(new_schema)
                         if seen.insert(obj_value):
                             yield NegativeValue(
@@ -2841,6 +2842,10 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if bounds_are_unsatisfiable(minimum, maximum):
         # Nothing representable past the bound, so emit no value.
         return
+    if is_integer:
+        # Draft 4 reads `1.0` as a number, so an integer's boundary is the nearest integer inside the bound.
+        minimum = None if minimum is None else ceil(minimum)
+        maximum = None if maximum is None else floor(maximum)
     multiple_of = schema.get("multipleOf")
     if is_integer and multiple_of is not None and not isinstance(multiple_of, int):
         # Integer multiples of `p/q` are exactly the multiples of `p`.
@@ -3027,7 +3032,7 @@ def _positive_array(
         # Ensure there is enough items to pass `minItems` if it is specified
         length = min_items or 1
         item_schema = schema["items"]
-        enum_values = [v for v in item_schema["enum"] if is_valid(v, item_schema)]
+        enum_values = [v for v in item_schema["enum"] if _is_valid_with_formats(v, item_schema, ctx)]
         if schema.get("uniqueItems") and length > 1:
             for i, variant in enumerate(enum_values):
                 others = [enum_values[j] for j in range(len(enum_values)) if j != i]
