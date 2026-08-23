@@ -13,53 +13,61 @@
 
 ### :bug: Fixed
 
-- Coverage phase keeping `false` for `const: 0` (and vice versa) when intersecting allowed values.
-- Coverage phase emitting a `oneOf` value a second branch admits under the operation's draft.
-- Coverage phase emitting branch values that ignore a sibling `anyOf`/`oneOf`/`allOf` or the keywords beside them.
-- Coverage phase emitting objects without a name one `allOf` branch requires and another forbids.
-- Non-body parameters with `anyOf`/`oneOf`/`$ref` schemas losing their `null` branch to the default string type.
+#### Coverage phase
+
+- Keeping `false` for `const: 0` (and vice versa) when intersecting allowed values.
+- Emitting branch values that ignore a sibling `anyOf`/`oneOf`/`allOf` or the keywords beside them.
+- Emitting objects without a name one `allOf` branch requires and another forbids.
 - Duplicate positive cases for schemas combining `anyOf`/`oneOf` with keywords beside them.
-- Coverage phase emitting a property's `const` that the rest of its schema rejects.
-- Coverage phase crashing on `multipleOf` beside a numeric bound past 28 significant digits.
-- Coverage phase emitting `multipleOf` steps no float spells, which land back on the excluded bound.
-- Coverage phase crashing on a `minItems`/`minProperties` past the generation buffer beside a combinator.
-- Coverage phase filling a large `minItems`/`minProperties` floor past a smaller ceiling.
-- Coverage phase dropping every value of a type when another type's container template cannot be built.
-- Report a `minItems`/`minProperties` past the generation buffer as a schema error instead of a health check.
-- Coverage phase ignoring `additionalProperties` for required names absent from `properties`.
-- Coverage phase exceeding `maxProperties` when covering a property the template omits.
+- Emitting a property's `const` that the rest of its schema rejects.
+- Emitting a `oneOf` value a second branch admits under the operation's draft.
+- Emitting `enum`/`const` members the operation's draft rejects.
+- Emitting `example`/`default` values the operation's draft rejects.
+- Judging `anyOf`/`oneOf` branch values against the parent in the wrong draft.
+- Crashing on `multipleOf` beside a numeric bound past 28 significant digits.
+- Emitting `multipleOf` steps no float can carry, landing back on the excluded bound.
 - Numeric `exclusiveMinimum`/`exclusiveMaximum` overriding a tighter `minimum`/`maximum` instead of combining.
-- Coverage phase emitting an optional object property whose schema requires a name it forbids.
-- False positive `negative_data_rejection` for `format: float` bounds a single-precision server cannot distinguish.
-- Coverage phase emitting a non-object as a `minProperties` violation for untyped schemas.
-- Coverage phase hanging on a `maxProperties` past the generation buffer.
-- Coverage phase emitting float-spelled bounds as integer boundary values.
-- Coverage phase crashing on a large `minItems` without `items`, and building arrays past the generation buffer.
-- Coverage phase crashing on a `minProperties` past the generation buffer.
-- Coverage phase emitting `enum`/`const` members the operation's draft rejects.
-- Coverage phase stepping integer boundaries of float-spelled bounds in binary, not the decimal the validator reads.
-- Coverage phase emitting `example`/`default` values the operation's draft rejects.
-- Coverage phase dropping properties named `if`, `then`, `else`, or `not` from nested templates.
-- Coverage phase spending a minute on a `minProperties` in the hundreds and then emitting nothing.
-- Coverage phase emitting an excluded integer bound when `minimum`/`maximum` repeats a large float `exclusiveMinimum`/`exclusiveMaximum`.
-- Coverage phase judging `anyOf`/`oneOf` branch values against the parent in the wrong draft.
-- Coverage phase emitting a float as a type violation for `integer` when `number` is allowed too.
-- Coverage phase crashing on a `pattern` whose `minLength` exceeds the generation buffer.
-- Coverage phase emitting a non-multiple for `multipleOf` past 2^53, where the next multiple has no float spelling.
-- Coverage phase emitting `inf` as a violation of a bound at the largest float.
-- Coverage phase emitting values for strings, alone or as properties, whose `minLength` exceeds `maxLength`.
-- False positive `negative_data_rejection` for bodies whose schema declares a `format` anywhere.
-- Coverage phase skipping body examples that name a `readOnly` field.
-- False positive `positive_data_acceptance` for values with a sibling `anyOf`/`oneOf` in the coverage phase.
-- Coverage phase sending empty array and object path parameters that blank the path segment.
-- Coverage phase repeating requests when different generated values serialize identically.
-- Coverage phase ignoring header and cookie `example`/`default` values with non-alphanumeric characters.
-- Coverage phase omitting string parameters with a very large `maxLength`.
-- Coverage phase generating no positive cases for objects with an ungeneratable property.
-- Coverage phase crashing on a `pattern` whose `minLength` exceeds `maxLength`.
-- False positive `negative_data_rejection` for numeric bounds past 2^53 in the coverage phase.
-- Coverage phase reusing generated values across operations whose `$ref` targets differ.
-- Coverage phase generating non-integer values for integers with a fractional `multipleOf`.
+- Integer boundary values emitted as floats when the bound is written like `7.0`.
+- Integer steps past float bounds taken in binary, not the decimal the validator reads.
+- Emitting an excluded integer bound when `minimum`/`maximum` repeats a large float `exclusiveMinimum`/`exclusiveMaximum`.
+- Emitting a float as a type violation for `integer` when `number` is allowed too.
+- Emitting a non-multiple for `multipleOf` past 2^53.
+- Emitting `inf` as a violation of a bound at the largest float.
+- Generating non-integer values for integers with a fractional `multipleOf`.
+- Dropping every value of a type when another type's container template cannot be built.
+- Ignoring `additionalProperties` for required names absent from `properties`.
+- Exceeding `maxProperties` when covering a property the template omits.
+- Emitting an optional object property whose schema requires a name it forbids.
+- Emitting a non-object as a `minProperties` violation for untyped schemas.
+- Dropping properties named `if`, `then`, `else`, or `not` from nested templates.
+- Generating no positive cases for objects with an ungeneratable property.
+- Crashing on a `pattern` whose `minLength` exceeds the generation buffer.
+- Emitting values for strings, alone or as properties, whose `minLength` exceeds `maxLength`.
+- Omitting string parameters with a very large `maxLength`.
+- Crashing on a `pattern` whose `minLength` exceeds `maxLength`.
+- Crashing on a `minItems`/`minProperties` past the generation buffer beside a combinator.
+- Filling a large `minItems`/`minProperties` floor past a smaller ceiling.
+- Hanging on a `maxProperties` past the generation buffer.
+- Crashing on a large `minItems` without `items`, and building arrays past the generation buffer.
+- Crashing on a `minProperties` past the generation buffer.
+- Spending a minute on a `minProperties` in the hundreds and then emitting nothing.
+- Sending empty array and object path parameters that blank the path segment.
+- Repeating requests when different generated values serialize identically.
+- Ignoring header and cookie `example`/`default` values with non-alphanumeric characters.
+- Skipping body examples that name a `readOnly` field.
+- Reusing generated values across operations whose `$ref` targets differ.
+
+#### False positives
+
+- `positive_data_acceptance` for values with a sibling `anyOf`/`oneOf` in the coverage phase.
+- `negative_data_rejection` for `format: float` bounds a single-precision server cannot distinguish.
+- `negative_data_rejection` for numeric bounds past 2^53 in the coverage phase.
+- `negative_data_rejection` for bodies whose schema declares a `format` anywhere.
+
+#### Others
+
+- Report a `minItems`/`minProperties` past the generation buffer as a schema error instead of a health check.
+- Non-body parameters with `anyOf`/`oneOf`/`$ref` schemas losing their `null` branch to the default string type.
 - Object values for query parameters declared with `anyOf`/`oneOf` serialized as their property names.
 
 ## [4.25.0](https://github.com/schemathesis/schemathesis/compare/v4.24.3...v4.25.0) - 2026-08-21
