@@ -5,7 +5,6 @@ import pytest
 import yaml
 
 import schemathesis
-from schemathesis.checks import CheckContext
 from schemathesis.config import SchemathesisConfig
 from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.config._checks import ChecksConfig
@@ -41,6 +40,7 @@ from schemathesis.specs.openapi.checks import (
     use_after_free,
 )
 from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
+from test.utils import check_context
 
 
 @pytest.mark.parametrize(
@@ -503,14 +503,7 @@ def test_negative_data_rejection_passes_for_rejection_status_codes(
         ),
         query={"key": 1},
     )
-    ctx = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        response_checks=None,
-    )
+    ctx = check_context()
     if should_raise:
         with pytest.raises(AcceptedNegativeData):
             negative_data_rejection(ctx, response, case)
@@ -531,14 +524,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     )
     assert (
         negative_data_rejection(
-            CheckContext(
-                override=None,
-                auth=None,
-                headers=None,
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(),
             response,
             case,
         )
@@ -627,14 +613,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
     )
 
     result = response_schema_conformance(
-        CheckContext(
-            override=None,
-            auth=None,
-            headers=None,
-            config=ChecksConfig(),
-            transport_kwargs=None,
-            response_checks=None,
-        ),
+        check_context(),
         response,
         case,
     )
@@ -680,14 +659,7 @@ def test_positive_data_acceptance(
             generation_modes=[GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE],
         ),
     )
-    ctx = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig.from_dict({"positive_data_acceptance": {"expected-statuses": expected_statuses}}),
-        transport_kwargs=None,
-        response_checks=None,
-    )
+    ctx = check_context(ChecksConfig.from_dict({"positive_data_acceptance": {"expected-statuses": expected_statuses}}))
 
     if should_raise:
         with pytest.raises(Failure) as exc_info:
@@ -899,19 +871,12 @@ def test_missing_required_header_default_statuses(ctx, response_factory, status_
             ),
         ),
     )
-    check_ctx = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        response_checks=None,
-    )
+    context = check_context()
     if should_raise:
         with pytest.raises(Failure):
-            missing_required_header(check_ctx, response, case)
+            missing_required_header(context, response, case)
     else:
-        assert missing_required_header(check_ctx, response, case) is None
+        assert missing_required_header(context, response, case) is None
 
 
 @pytest.mark.parametrize("path, method", [("/success", "get"), ("/basic", "post")])
@@ -983,14 +948,7 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
     # 2. This is valid for an integer parameter
     # 3. The API correctly returns 200
     result = negative_data_rejection(
-        CheckContext(
-            override=None,
-            auth=None,
-            headers=None,
-            config=ChecksConfig(),
-            transport_kwargs=None,
-            response_checks=None,
-        ),
+        check_context(),
         response,
         case,
     )
@@ -1041,14 +999,7 @@ def test_negative_data_rejection_multi_element_array_with_valid_element(ctx, res
     response = response_factory.requests(status_code=200)
 
     result = negative_data_rejection(
-        CheckContext(
-            override=None,
-            auth=None,
-            headers=None,
-            config=ChecksConfig(),
-            transport_kwargs=None,
-            response_checks=None,
-        ),
+        check_context(),
         response,
         case,
     )
@@ -1105,14 +1056,7 @@ def test_negative_data_rejection_multi_element_array_string_numeric_element(ctx,
     response = response_factory.requests(status_code=200)
 
     result = negative_data_rejection(
-        CheckContext(
-            override=None,
-            auth=None,
-            headers=None,
-            config=ChecksConfig(),
-            transport_kwargs=None,
-            response_checks=None,
-        ),
+        check_context(),
         response,
         case,
     )
@@ -1151,14 +1095,7 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
 
     assert (
         negative_data_rejection(
-            CheckContext(
-                override=None,
-                auth=None,
-                headers=None,
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(),
             response,
             case,
         )
@@ -1195,14 +1132,7 @@ def test_negative_data_rejection_path_string_numeric_serialization(ctx, response
 
     assert (
         negative_data_rejection(
-            CheckContext(
-                override=None,
-                auth=None,
-                headers=None,
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(),
             response,
             case,
         )
@@ -1243,14 +1173,7 @@ def test_negative_data_rejection_path_string_numeric_serialization_with_other_ne
 
     with pytest.raises(Failure):
         negative_data_rejection(
-            CheckContext(
-                override=None,
-                auth=None,
-                headers=None,
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(),
             response,
             case,
         )
@@ -1281,14 +1204,7 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
 
     with pytest.raises(MalformedJson) as exc_info:
         response_schema_conformance(
-            CheckContext(
-                override=None,
-                auth=None,
-                headers=None,
-                config=ChecksConfig(),
-                transport_kwargs=None,
-                response_checks=None,
-            ),
+            check_context(),
             response,
             case,
         )
@@ -1340,9 +1256,7 @@ def test_response_schema_conformance_names_matched_response(ctx, response_factor
     assert expected_note in exc_info.value.message
 
 
-_CHECK_CTX = CheckContext(
-    override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
-)
+_CHECK_CTX = check_context()
 
 _DATE_TIME_PATHS = {
     "/test": {
@@ -1573,32 +1487,21 @@ def _build_user_profile_chain(ctx, response_factory, *, delete_status: int):
     recorder.record_case(parent_id=delete_case.id, case=get_case, transition=None, is_transition_applied=False)
     recorder.record_response(case_id=get_case.id, response=get_response)
 
-    check_context = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        recorder=recorder,
-        response_checks=None,
-    )
-    return check_context, get_case, get_response
+    return check_context(recorder=recorder), get_case, get_response
 
 
 @pytest.mark.parametrize("delete_status", [500, 404], ids=["server-crash", "not-found"])
 def test_use_after_free_skips_when_delete_failed(ctx, response_factory, delete_status):
     # When DELETE returns 5xx (server crash) or 404 (nothing to free), the resource was never
     # actually deleted, so a subsequent 2xx read is not a use-after-free.
-    check_context, get_case, get_response = _build_user_profile_chain(
-        ctx, response_factory, delete_status=delete_status
-    )
-    assert use_after_free(check_context, get_response, get_case) is None
+    context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=delete_status)
+    assert use_after_free(context, get_response, get_case) is None
 
 
 def test_use_after_free_fires_when_delete_succeeded(ctx, response_factory):
-    check_context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=204)
+    context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=204)
     with pytest.raises(UseAfterFree):
-        use_after_free(check_context, get_response, get_case)
+        use_after_free(context, get_response, get_case)
 
 
 _NESTED_RESOURCE_SCHEMA = {
@@ -1648,16 +1551,7 @@ def test_use_after_free_skips_recreation_via_put(ctx, response_factory, put_stat
     recorder.record_case(parent_id=delete_case.id, case=put_case, transition=None, is_transition_applied=False)
     recorder.record_response(case_id=put_case.id, response=put_response)
 
-    check_context = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        recorder=recorder,
-        response_checks=None,
-    )
-    assert use_after_free(check_context, put_response, put_case) is None
+    assert use_after_free(check_context(recorder=recorder), put_response, put_case) is None
 
 
 @pytest.mark.parametrize(
@@ -1696,20 +1590,13 @@ def test_unsupported_method_404_on_templated_path(
             ),
         ),
     )
-    check_ctx = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        response_checks=None,
-    )
+    context = check_context()
     response = response_factory.requests(status_code=status_code)
     if should_raise:
         with pytest.raises(Failure):
-            unsupported_method(check_ctx, response, case)
+            unsupported_method(context, response, case)
     else:
-        assert unsupported_method(check_ctx, response, case) is None
+        assert unsupported_method(context, response, case) is None
 
 
 def _token_endpoint_paths():
@@ -1717,17 +1604,6 @@ def _token_endpoint_paths():
         "/token": {"post": {"responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}}}},
         "/items": {"post": {"responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}}}},
     }
-
-
-def _check_context(config=None):
-    return CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=config or ChecksConfig(),
-        transport_kwargs=None,
-        response_checks=None,
-    )
 
 
 @pytest.mark.parametrize(
@@ -1765,9 +1641,9 @@ def test_positive_data_acceptance_token_endpoint(ctx, response_factory, token_ur
 
     if should_raise:
         with pytest.raises(Failure):
-            positive_data_acceptance(_check_context(), response, case)
+            positive_data_acceptance(check_context(), response, case)
     else:
-        assert positive_data_acceptance(_check_context(), response, case) is None
+        assert positive_data_acceptance(check_context(), response, case) is None
 
 
 def test_positive_data_acceptance_configured_dynamic_auth_path(ctx, response_factory):
@@ -1778,11 +1654,11 @@ def test_positive_data_acceptance_configured_dynamic_auth_path(ctx, response_fac
     response = response_factory.requests(status_code=400)
 
     granting = schema["/token"]["POST"].Case(_meta=build_metadata())
-    assert positive_data_acceptance(_check_context(), response, granting) is None
+    assert positive_data_acceptance(check_context(), response, granting) is None
 
     other = schema["/items"]["POST"].Case(_meta=build_metadata())
     with pytest.raises(Failure):
-        positive_data_acceptance(_check_context(), response, other)
+        positive_data_acceptance(check_context(), response, other)
 
 
 def test_positive_data_acceptance_token_url_carries_base_path(ctx, response_factory):
@@ -1796,7 +1672,7 @@ def test_positive_data_acceptance_token_url_carries_base_path(ctx, response_fact
         },
     )
     case = schema["/token"]["POST"].Case(_meta=build_metadata())
-    assert positive_data_acceptance(_check_context(), response_factory.requests(status_code=400), case) is None
+    assert positive_data_acceptance(check_context(), response_factory.requests(status_code=400), case) is None
 
 
 def test_positive_data_acceptance_empty_token_path_does_not_match_root(ctx, response_factory):
@@ -1804,7 +1680,7 @@ def test_positive_data_acceptance_empty_token_path_does_not_match_root(ctx, resp
     schema.config.auth.dynamic.schemes["oauth2"] = DynamicTokenAuthConfig(extract_from="body")
     case = schema["/"]["POST"].Case(_meta=build_metadata())
     with pytest.raises(Failure):
-        positive_data_acceptance(_check_context(), response_factory.requests(status_code=400), case)
+        positive_data_acceptance(check_context(), response_factory.requests(status_code=400), case)
 
 
 ALLOW_SCHEMA_PATHS = {
@@ -1853,19 +1729,12 @@ def test_allow_header_conformance(ctx, response_factory, headers, method, expect
     schema = ctx.openapi.load_schema(ALLOW_SCHEMA_PATHS)
     case = schema["/items"]["GET"].Case()
     response = Response.from_requests(response_factory.requests(headers=headers, method=method), verify=True)
-    check_ctx = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        response_checks=None,
-    )
+    context = check_context()
     if expected is None:
-        assert allow_header_conformance(check_ctx, response, case) is None
+        assert allow_header_conformance(context, response, case) is None
     else:
         with pytest.raises(AllowHeaderMismatch, match=re.escape(expected)):
-            allow_header_conformance(check_ctx, response, case)
+            allow_header_conformance(context, response, case)
 
 
 def test_allow_header_conformance_repeated_header(ctx, response_factory):
@@ -1873,12 +1742,4 @@ def test_allow_header_conformance_repeated_header(ctx, response_factory):
     raw.raw.headers.add("Allow", "GET")
     raw.raw.headers.add("Allow", "POST")
     case = ctx.openapi.load_schema(ALLOW_SCHEMA_PATHS)["/items"]["GET"].Case()
-    check_ctx = CheckContext(
-        override=None,
-        auth=None,
-        headers=None,
-        config=ChecksConfig(),
-        transport_kwargs=None,
-        response_checks=None,
-    )
-    assert allow_header_conformance(check_ctx, Response.from_requests(raw, verify=True), case) is None
+    assert allow_header_conformance(check_context(), Response.from_requests(raw, verify=True), case) is None

@@ -16,6 +16,8 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.checks import CheckContext
+from schemathesis.config import ChecksConfig
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.engine import Status, events, from_schema
@@ -303,3 +305,15 @@ class EventStream:
     @property
     def finished(self) -> EngineFinished | None:
         return self.find(EngineFinished)
+
+
+def check_context(config=None, *, recorder=None):
+    return CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=config or ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+        response_checks=None,
+    )

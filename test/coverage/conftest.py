@@ -20,6 +20,7 @@ def ctx_factory():
         allow_extra_parameters: bool = True,
         validator_cls: type[jsonschema_rs.Validator] = jsonschema_rs.Draft4Validator,
         root_schema: dict | None = None,
+        update_pattern=update_quantifier,
     ) -> CoverageContext:
         return CoverageContext(
             root_schema=root_schema or {},
@@ -29,7 +30,7 @@ def ctx_factory():
             is_required=is_required,
             custom_formats=get_default_format_strategies(),
             validator_cls=validator_cls,
-            update_pattern=update_quantifier,
+            update_pattern=update_pattern,
             allow_extra_parameters=allow_extra_parameters,
         )
 
