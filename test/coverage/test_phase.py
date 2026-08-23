@@ -13,6 +13,12 @@ from requests import Request
 import schemathesis
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import NOT_SET
+from schemathesis.core.error_feedback.store import (
+    ErrorFeedbackStore,
+    Observation,
+    ObservationKind,
+    SizeBoundPayload,
+)
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
@@ -6435,3 +6441,108 @@ def test_annotation_keyword_does_not_erase_positive_cases(ctx, keyword, value):
         },
     )
     assert [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"token": ""}]
+
+
+def test_querystring_parameter_is_not_duplicated(ctx):
+    # A `querystring` parameter serializes its whole content as the raw query, so repeating it means nothing.
+    operation = load_schema(
+        ctx,
+        [
+            {
+                "name": "raw",
+                "in": "querystring",
+                "required": True,
+                "content": {
+                    "application/x-www-form-urlencoded": {
+                        "schema": {"type": "object", "properties": {"a": {"type": "string"}}}
+                    }
+                },
+            },
+        ],
+        version="3.2.0",
+    )["/foo"]["post"]
+    assert [
+        case.meta.phase.data.parameter
+        for case in collect_cases(operation, GenerationMode.NEGATIVE, generate_duplicate_query_parameters=True)
+        if case.meta.phase.data.scenario == CoverageScenario.DUPLICATE_PARAMETER
+    ] == []
+
+
+@pytest.mark.parametrize(
+    ("minimum", "keeps_example"),
+    [(5, False), (1, True)],
+    ids=["contradicted", "compatible"],
+)
+def test_parameter_example_is_dropped_when_an_inferred_bound_contradicts_it(ctx, minimum, keeps_example):
+    operation = load_schema(
+        ctx,
+        [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}, "example": "ab"}],
+    )["/foo"]["post"]
+    store = ErrorFeedbackStore()
+    store.record(
+        Observation(
+            operation_label=operation.label,
+            location=ParameterLocation.QUERY,
+            parameter_path=("q",),
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message=f"size must be at least {minimum}",
+            payload=SizeBoundPayload(min=minimum, max=None),
+        )
+    )
+    values = [case.query["q"] for case in iter_cases(operation, GenerationMode.POSITIVE, error_feedback=store)]
+    assert values and all(len(value) >= minimum for value in values), values
+    assert ("ab" in values) is keeps_example
+
+
+@pytest.mark.parametrize(
+    ("minimum", "keeps_example"),
+    [(5, False), (1, True)],
+    ids=["contradicted", "compatible"],
+)
+def test_body_example_is_dropped_when_an_inferred_bound_contradicts_it(ctx, minimum, keeps_example):
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "example": {"name": "ab"},
+        },
+    )
+    store = ErrorFeedbackStore()
+    store.record(
+        Observation(
+            operation_label=operation.label,
+            location=ParameterLocation.BODY,
+            parameter_path=("name",),
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message=f"size must be at least {minimum}",
+            payload=SizeBoundPayload(min=minimum, max=None),
+        )
+    )
+    bodies = [
+        case.body
+        for case in iter_cases(operation, GenerationMode.POSITIVE, error_feedback=store)
+        if case.body is not NOT_SET
+    ]
+    assert bodies and all(len(body["name"]) >= minimum for body in bodies), bodies
+    assert ({"name": "ab"} in bodies) is keeps_example
+
+
+def test_each_custom_media_type_alternative_yields_its_own_body(ctx):
+    schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+    schemathesis.openapi.media_type("image/jpeg", st.just(b"\xff\xd8jpeg"))
+    operation = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/pdf": {"schema": {"type": "string", "format": "binary"}},
+                "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
+            },
+        },
+    )["/foo"]["post"]
+    assert [(case.media_type, case.body) for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
+        ("application/pdf", b"%PDF-1.4"),
+        ("image/jpeg", b"\xff\xd8jpeg"),
+    ]

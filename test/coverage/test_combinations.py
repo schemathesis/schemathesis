@@ -3957,3 +3957,47 @@ def test_positive_one_of_exclusivity_judged_by_the_operation_draft(pctx):
     assert values
     for value in values:
         assert validator.is_valid(value), value
+
+
+REF_WITH_SIBLINGS = {
+    "$ref": "#/x-bundled/base",
+    "properties": {"extra": {"type": "integer"}},
+    "required": ["extra"],
+}
+REF_TARGET_BUNDLE = {"base": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({**REF_WITH_SIBLINGS, "x-bundled": REF_TARGET_BUNDLE}, [{"name": "", "extra": 0}]),
+        (
+            {"oneOf": [REF_WITH_SIBLINGS, {"type": "string"}], "x-bundled": REF_TARGET_BUNDLE},
+            [{"name": "", "extra": 0}, ""],
+        ),
+    ],
+    ids=["bare", "inside-branch"],
+)
+def test_ref_sibling_properties_and_required_merge_into_the_target(ctx_factory, schema, expected):
+    ctx = ctx_factory(root_schema=schema, location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    assert cover_schema(ctx, schema) == expected
+
+
+def test_no_unexpected_property_when_every_candidate_name_matches_pattern_properties(nctx):
+    # `patternProperties` validates the added key instead of `additionalProperties`, so it stays valid.
+    schema = {"type": "object", "patternProperties": {"property": {"type": "string"}}, "additionalProperties": False}
+    assert scenario_values(nctx, schema, CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES) == []
+
+
+def test_additional_property_key_skips_a_declared_name(ctx_factory):
+    schema = {
+        "type": "object",
+        "properties": {"x-schemathesis-additional": {"type": "string"}},
+        "additionalProperties": {"type": "integer"},
+    }
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    added = [
+        set(value) - {"x-schemathesis-additional"}
+        for value in scenario_values(ctx, schema, CoverageScenario.OBJECT_ADDITIONAL_PROPERTY)
+    ]
+    assert added == [{"x-schemathesis-additional1"}]
