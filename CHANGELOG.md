@@ -19,6 +19,13 @@
 - Coverage phase crashing on a large `minItems` without `items`, and building arrays past the generation buffer.
 - Coverage phase crashing on a `minProperties` past the generation buffer.
 - Coverage phase emitting `enum`/`const` members the operation's draft rejects.
+- Coverage phase stepping integer boundaries of float-spelled bounds in binary, not the decimal the validator reads.
+- Coverage phase judging `anyOf`/`oneOf` branch values against the parent in the wrong draft.
+- Coverage phase emitting a float as a type violation for `integer` when `number` is allowed too.
+- Coverage phase crashing on a `pattern` whose `minLength` exceeds the generation buffer.
+- Coverage phase emitting a non-multiple for `multipleOf` past 2^53, where the next multiple has no float spelling.
+- Coverage phase emitting `inf` as a violation of a bound at the largest float.
+- Coverage phase emitting values for strings, alone or as properties, whose `minLength` exceeds `maxLength`.
 - False positive `negative_data_rejection` for bodies whose schema declares a `format` anywhere.
 - Coverage phase skipping body examples that name a `readOnly` field.
 - False positive `positive_data_acceptance` for values with a sibling `anyOf`/`oneOf` in the coverage phase.

@@ -775,8 +775,6 @@ class CoverageContext:
             fmt = schema["format"]
             if fmt in self.custom_formats:
                 return cached_draw(self.custom_formats[fmt])
-        if (keys == ["maxLength", "minLength", "type"] or keys == ["maxLength", "type"]) and schema["type"] == "string":
-            return cached_draw(st.text(min_size=schema.get("minLength", 0), max_size=schema["maxLength"]))
         if (
             "properties" in keys
             and set(keys) <= {"properties", "required", "type", "minProperties"}
@@ -806,10 +804,6 @@ class CoverageContext:
             while len(obj) < schema.get("minProperties", 0):
                 obj.setdefault(next(names), None)
             return obj
-        if (
-            keys == ["maximum", "minimum", "type"] or keys == ["maximum", "type"] or keys == ["minimum", "type"]
-        ) and schema["type"] == "integer":
-            return cached_draw(st.integers(min_value=schema.get("minimum"), max_value=schema.get("maximum")))
         if "enum" in schema:
             enum_values = [v for v in schema["enum"] if _is_valid_with_formats(v, schema, self)]
             if not enum_values:
@@ -1506,7 +1500,7 @@ def _cover_positive_for_type(
                     if BUNDLE_STORAGE_KEY in ctx.root_schema:
                         full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
                     try:
-                        parent_validator = make_validator_for(full_schema)
+                        parent_validator = make_validator(full_schema, ctx.validator_cls)
                     except Exception:
                         pass
                 # For non-body params, an empty bare string serializes to the same wire form as an
@@ -2634,6 +2628,8 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if min_length == 0:
         min_length = None
     max_length = schema.get("maxLength")
+    if max_length is not None and (min_length or 0) > max_length:
+        return
     # Spec hints are checked against `declared`: the header/cookie narrowing below only simplifies
     # generated values, and values the transport cannot send are rejected separately.
     declared = schema
@@ -2766,28 +2762,37 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
 
 
+def _as_number(value: Decimal) -> int | float:
+    """A decimal as JSON spells it: an integer where it is whole, since past 2**53 a float may not be able to."""
+    return int(value) if value == value.to_integral_value() else float(value)
+
+
 def closest_multiple_greater_than(y: int | float, x: int | float) -> int | float:
     """Find the closest multiple of X that is greater than Y."""
-    quotient, remainder = divmod(y, x)
-    if remainder == 0:
-        return y
-    return x * (quotient + 1)
+    if isinstance(y, int) and isinstance(x, int):
+        return y if y % x == 0 else y + x - y % x
+    # Decimal arithmetic via the canonical `repr` keeps the value exact where IEEE-754 drifts.
+    step = Decimal(str(x))
+    quotient, remainder = divmod(Decimal(str(y)), step)
+    return _as_number(Decimal(str(y)) if remainder == 0 else step * (quotient + 1))
 
 
 def _shift_by_multiple(value: int | float, step: int | float, *, direction: int) -> int | float:
-    # IEEE-754 subtraction (e.g. `99999.99 - 0.01`) drifts by `~1e-12`, making the result
-    # fail `multipleOf`. Decimal arithmetic via the canonical `repr` keeps the value exact
-    # for fractions whose decimal form is short.
     if isinstance(value, int) and isinstance(step, int):
         return value + direction * step
-    return float(Decimal(str(value)) + direction * Decimal(str(step)))
+    return _as_number(Decimal(str(value)) + direction * Decimal(str(step)))
 
 
 def _largest_multiple_within(value: int | float, step: int | float) -> int | float:
     if isinstance(value, int) and isinstance(step, int):
         return value - (value % step)
     decimal_step = Decimal(str(step))
-    return float(Decimal(str(value)) - (Decimal(str(value)) % decimal_step))
+    return _as_number(Decimal(str(value)) - (Decimal(str(value)) % decimal_step))
+
+
+def _exact(bound: int | float) -> int | Decimal:
+    """A float bound as the decimal its JSON text spells, which is what the validator compares against."""
+    return bound if isinstance(bound, int) else Decimal(str(bound))
 
 
 def _adjust_numeric_bound(
@@ -2795,7 +2800,7 @@ def _adjust_numeric_bound(
 ) -> int | float:
     if is_integer:
         # Stepped in integer arithmetic: a unit step vanishes on a float past 2**53.
-        return floor(value) + 1 if going_up else ceil(value) - 1
+        return floor(_exact(value)) + 1 if going_up else ceil(_exact(value)) - 1
     if is_float32:
         return next_float32(value, going_up=going_up)
     return nextafter(float(value), inf if going_up else -inf)
@@ -2809,7 +2814,7 @@ def _just_past(schema: JsonSchemaObject, bound: int | float, *, going_up: bool) 
     direction = 1 if going_up else -1
     declared = schema.get("type")
     if "integer" in (declared if isinstance(declared, list) else [declared]):
-        return (floor(bound) if going_up else ceil(bound)) + direction
+        return (floor(_exact(bound)) if going_up else ceil(_exact(bound))) + direction
     if schema.get("format") == "float":
         # A single-precision reader narrows the value, so the step reaches at least the next single.
         edge = next_float32(bound, going_up=going_up)
@@ -2819,7 +2824,8 @@ def _just_past(schema: JsonSchemaObject, bound: int | float, *, going_up: bool) 
             return bound + direction * abs(edge - bound)
     if isinstance(bound, int):
         return bound + direction
-    return bound + direction * max(1.0, ulp(bound))
+    stepped = bound + direction * max(1.0, ulp(bound))
+    return None if stepped in (inf, -inf) else stepped
 
 
 def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
@@ -2844,8 +2850,8 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         return
     if is_integer:
         # Draft 4 reads `1.0` as a number, so an integer's boundary is the nearest integer inside the bound.
-        minimum = None if minimum is None else ceil(minimum)
-        maximum = None if maximum is None else floor(maximum)
+        minimum = None if minimum is None else ceil(_exact(minimum))
+        maximum = None if maximum is None else floor(_exact(maximum))
     multiple_of = schema.get("multipleOf")
     if is_integer and multiple_of is not None and not isinstance(multiple_of, int):
         # Integer multiples of `p/q` are exactly the multiples of `p`.
@@ -3418,8 +3424,8 @@ def _negative_pattern(
     # one burns the whole generation budget only to come up empty.
     if matches_every_string(pattern):
         return
-    # No length fits the window, so there is no string to violate the pattern with.
-    if max_length is not None and (min_length or 0) > max_length:
+    # No length fits the window, or none short of the generation buffer, so there is no string to violate it with.
+    if (max_length is not None and (min_length or 0) > max_length) or (min_length or 0) >= INTERNAL_BUFFER_SIZE:
         return
     # The same regex recurs verbatim across operations; one Hypothesis search covers the whole audit.
     # `is_valid_for_location` makes the outcome location-dependent, so the location is part of the key.
@@ -3766,7 +3772,8 @@ def _negative_type(
 
     if "number" in types:
         strategies.pop("integer", None)
-    if "integer" in types:
+    elif "integer" in types:
+        # A non-integer float breaks `integer`; with `number` also allowed it would be a valid value.
         strategies["number"] = FLOAT_STRATEGY
         restrict("number", _is_non_integer_float)
     # For path/query parameters, numeric strings like "9" serialize identically to integer 9 in the URL,
