@@ -3451,3 +3451,77 @@ def test_positive_flipped_from_not_is_judged_by_the_operation_draft(pctx):
     validator = jsonschema_rs.Draft4Validator(schema)
     for value in cover_schema(pctx, schema):
         validator.validate(value)
+
+
+# The validator reads a float bound as the decimal its JSON text spells, so integer steps must be taken in decimal.
+@pytest.mark.parametrize(
+    ("schema", "mode"),
+    [
+        ({"type": "integer", "maximum": -5.151020255852562e16}, GenerationMode.POSITIVE),
+        ({"type": "integer", "minimum": 5.151020255852562e16}, GenerationMode.POSITIVE),
+        ({"type": "integer", "exclusiveMaximum": -5.151020255852562e16}, GenerationMode.POSITIVE),
+        ({"type": "integer", "minimum": -5.151020255852562e16}, GenerationMode.NEGATIVE),
+    ],
+    ids=["maximum", "minimum", "exclusive-maximum", "negative-minimum"],
+)
+def test_integer_steps_past_float_bounds_follow_the_decimal_text(ctx_factory, schema, mode):
+    ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[mode])
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = cover_schema(ctx, schema)
+    assert values
+    for value in values:
+        assert validator.is_valid(value) == (mode == GenerationMode.POSITIVE), value
+
+
+# A property's bound is read the same way whether the template or the boundary sweep builds the value.
+def test_positive_object_template_steps_float_bounds_in_decimal(pctx):
+    schema = {"type": "object", "properties": {"a": {"type": "integer", "maximum": -5.151020255852562e16}}}
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema(pctx, schema):
+        validator.validate(value)
+
+
+# A branch value still answers to the parent's keywords in the operation's draft, where `0.0` is no integer.
+def test_positive_branch_values_respect_parent_type_in_the_operation_draft(ctx_factory):
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    schema = {"type": "integer", "anyOf": [{"anyOf": [{"type": "number", "example": None, "default": None}]}]}
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema(ctx, schema):
+        validator.validate(value)
+
+
+# A non-integer float only violates `integer` when `number` is not also allowed.
+def test_negative_type_for_number_and_integer_union_emits_no_number(nctx):
+    schema = {"type": ["number", "integer"], "minimum": 0.0, "maximum": 1.0}
+    values = [
+        generated.value
+        for generated in cover_schema_iter(nctx, schema)
+        if generated.scenario == CoverageScenario.INCORRECT_TYPE
+    ]
+    assert values
+    assert not any(isinstance(value, (int, float)) and not isinstance(value, bool) for value in values), values
+
+
+def test_negative_pattern_with_min_length_past_the_buffer_is_skipped(nctx):
+    schema = {"type": "string", "minLength": 57341, "pattern": "^a"}
+    assert_not_conform(cover_schema(nctx, schema), schema)
+
+
+# Past 2**53 the next multiple may have no float spelling; as an integer it is exact.
+def test_positive_number_multiples_past_float_precision_are_exact(pctx):
+    schema = {"type": "number", "multipleOf": 3, "minimum": 9996036847180748.0}
+    assert_conform(cover_schema(pctx, schema), schema)
+
+
+def test_negative_boundary_past_the_largest_float_is_skipped(nctx):
+    schema = {"maximum": 1.7976931348623157e308}
+    assert inf not in cover_schema(nctx, schema)
+
+
+def test_positive_string_with_min_length_above_max_length_emits_nothing(pctx):
+    assert cover_schema(pctx, {"type": "string", "minLength": 1, "maxLength": 0}) == []
+
+
+def test_positive_object_drops_optional_string_with_an_empty_length_window(pctx):
+    schema = {"type": "object", "properties": {"a": {"type": "string", "minLength": 1, "maxLength": 0}}}
+    assert cover_schema(pctx, schema) == [{}]
