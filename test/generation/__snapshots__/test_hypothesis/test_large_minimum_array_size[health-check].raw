@@ -1,0 +1,69 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+__________________________________ POST /data __________________________________
+Failed Health Check
+
+Minimum possible example is too large for request body (application/json)
+Schema:
+
+{
+    "type": "array",
+    "items": {
+        "type": "integer"
+    },
+    "minItems": 20000
+}
+
+This usually means:
+  - Arrays with large minimum size (e.g., minItems: 100)
+  - Many required properties with their own large minimums
+  - Nested structures that multiply size requirements
+
+Tip: Reduce minimum size requirements or number of required properties or bypass this health check using `--suppress-health-check=large_base_example`.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Errored: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  🚫 Fuzzing
+  ⏭  Stateful (disabled)
+
+Errors:
+  🚫 Failed Health Check: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

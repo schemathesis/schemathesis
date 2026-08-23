@@ -1053,7 +1053,10 @@ def test_jsonify_python_specific_types_leaves_input_alone():
     assert value == {"foo": True, "bar": [None]}
 
 
-def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
+# Inside the generation buffer the floor is drawable but its minimal example is too large; past the buffer no
+# example exists at all, which is a schema error rather than a health check.
+@pytest.mark.parametrize("min_items", [20000, 100000], ids=["health-check", "schema-error"])
+def test_large_minimum_array_size(ctx, cli, snapshot_cli, min_items):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
@@ -1063,7 +1066,7 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
                         "required": True,
                         "content": {
                             "application/json": {
-                                "schema": {"type": "array", "items": {"type": "integer"}, "minItems": 100000}
+                                "schema": {"type": "array", "items": {"type": "integer"}, "minItems": min_items}
                             }
                         },
                     },
@@ -1072,7 +1075,6 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
             },
         }
     )
-    # Then it should be able to generate requests
     assert (
         cli.run(
             str(schema_path), "--max-examples=1", f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive"
