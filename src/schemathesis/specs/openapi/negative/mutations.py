@@ -840,7 +840,8 @@ def _ensure_boolean_not_coercible(ctx: MutationContext, schema: Schema, old_type
     if new_type in ("integer", "number"):
         schema["not"] = {"enum": [0, 1]}
     elif new_type == "string":
-        schema["not"] = {"pattern": r"(?i)^(?:true|false|0|1)$"}
+        # Spelled without `(?i)`: the `regex` format reads the ECMA-262 dialect, which has no inline flags.
+        schema["not"] = {"pattern": r"^(?:[Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]|0|1)$"}
 
 
 def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:

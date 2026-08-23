@@ -18,3 +18,9 @@ def test_failure_cache_is_keyed_by_schema():
     with pytest.raises(jsonschema_rs.ValidationError):
         make_validator({"type": "string", "pattern": "("}, jsonschema_rs.Draft7Validator)
     assert make_validator({"type": "string", "pattern": "^a$"}, jsonschema_rs.Draft7Validator).is_valid("a")
+
+
+@pytest.mark.parametrize("keyword", ["unevaluatedProperties", "unevaluatedItems"])
+def test_unevaluated_beside_self_reference_builds(keyword):
+    validator = make_validator({"$ref": "#", keyword: False}, jsonschema_rs.Draft202012Validator)
+    assert validator.is_valid([] if keyword == "unevaluatedItems" else {})
