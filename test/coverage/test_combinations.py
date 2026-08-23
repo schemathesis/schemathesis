@@ -3293,6 +3293,27 @@ def test_min_properties_past_the_buffer_is_skipped(ctx_factory, mode):
     assert not scenarios & {CoverageScenario.VALID_OBJECT, CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES}
 
 
+# One drawn value under synthesized names fills a large floor; declared names keep their own schemas.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "minProperties": 1000},
+        {"type": "object", "minProperties": 1000, "additionalProperties": {"type": "integer"}},
+        {
+            "type": "object",
+            "minProperties": 1000,
+            "properties": {"x": {"type": "integer"}, "y": {"type": "string"}},
+            "required": ["y"],
+        },
+    ],
+    ids=["free", "typed-additional", "declared-names"],
+)
+def test_positive_object_floor_is_filled_within_the_buffer(pctx, schema):
+    objects = [value for value in cover_schema(pctx, schema) if isinstance(value, dict)]
+    assert objects and all(len(value) >= 1000 for value in objects), [len(value) for value in objects]
+    assert_conform(objects, schema)
+
+
 # A positive flipped out of `not` still answers to the outer keywords, spelled in the operation's draft.
 def test_positive_flipped_from_not_is_judged_by_the_operation_draft(pctx):
     schema = {"type": "string", "maxLength": 2, "minimum": 0, "exclusiveMinimum": True, "not": {"enum": ["ab"]}}
@@ -3309,8 +3330,16 @@ def test_positive_flipped_from_not_is_judged_by_the_operation_draft(pctx):
         ({"type": "integer", "minimum": 5.151020255852562e16}, GenerationMode.POSITIVE),
         ({"type": "integer", "exclusiveMaximum": -5.151020255852562e16}, GenerationMode.POSITIVE),
         ({"type": "integer", "minimum": -5.151020255852562e16}, GenerationMode.NEGATIVE),
+        (
+            {"type": "integer", "minimum": -5.151020255852562e16, "exclusiveMinimum": -5.151020255852562e16},
+            GenerationMode.POSITIVE,
+        ),
+        (
+            {"type": "integer", "maximum": 5.151020255852562e16, "exclusiveMaximum": 5.151020255852562e16},
+            GenerationMode.POSITIVE,
+        ),
     ],
-    ids=["maximum", "minimum", "exclusive-maximum", "negative-minimum"],
+    ids=["maximum", "minimum", "exclusive-maximum", "negative-minimum", "both-minimums", "both-maximums"],
 )
 def test_integer_steps_past_float_bounds_follow_the_decimal_text(ctx_factory, schema, mode):
     ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[mode])
@@ -3802,3 +3831,31 @@ def test_unique_items_array_is_not_filled_by_repetition(pctx):
 
     for value in cover_schema_iter(pctx, schema):
         assert len(set(value.value)) == len(value.value), value.value[:3]
+
+
+# Draft 4 reads `1.0` as a number; a spec-provided value still answers to the operation's draft.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "integer", "example": 1.0},
+        {"type": "integer", "default": 2.0},
+        {"type": "integer", "enum": [1.0, 2]},
+        {"type": "object", "properties": {"a": {"type": "integer", "example": 1.0}}},
+        {"type": "array", "items": {"type": "integer"}, "example": [1.0]},
+    ],
+    ids=["example", "default", "enum", "nested-example", "array-example"],
+)
+def test_positive_spec_values_are_judged_by_the_operation_draft(pctx, schema):
+    validator = jsonschema_rs.Draft4Validator(schema)
+    values = cover_schema(pctx, schema)
+    assert values
+    for value in values:
+        validator.validate(value)
+
+
+@pytest.mark.parametrize("name", ["plain", "then", "else", "not", "if", "const"])
+def test_positive_object_keeps_properties_named_like_keywords(ctx_factory, name):
+    inner = {"type": "object", "properties": {name: {"type": "string"}, "other": {"type": "string"}}}
+    schema = {"type": "object", "properties": {"nested": inner}}
+    context = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    assert next(cover_schema_iter(context, schema)).value == {"nested": {name: "", "other": ""}}
