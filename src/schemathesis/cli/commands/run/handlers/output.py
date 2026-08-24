@@ -652,7 +652,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         assert self.unit_tests_manager is None
         self.unit_tests_manager = UnitTestProgressManager(
             console=self.console,
-            title=phase.value,
+            title=phase.display,
             total=self.statistic.operations.selected,
         )
         self.unit_tests_manager.start()
@@ -1123,19 +1123,19 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             status, skip_reason = self.phases[phase]
 
             if status == Status.SKIP:
-                click.echo(_style(f"  ⏭  {phase.value}", fg="yellow"), nl=False)
+                click.echo(_style(f"  ⏭  {phase.display}", fg="yellow"), nl=False)
                 if skip_reason:
-                    click.echo(_style(f" ({skip_reason.value})", fg="yellow"))
+                    click.echo(_style(f" ({skip_reason.display})", fg="yellow"))
                 else:
                     click.echo()
             elif status == Status.SUCCESS:
-                click.echo(_style(f"  ✅ {phase.value}", fg="green"))
+                click.echo(_style(f"  ✅ {phase.display}", fg="green"))
             elif status == Status.FAILURE:
-                click.echo(_style(f"  ❌ {phase.value}", fg="red"))
+                click.echo(_style(f"  ❌ {phase.display}", fg="red"))
             elif status == Status.ERROR:
-                click.echo(_style(f"  🚫 {phase.value}", fg="red"))
+                click.echo(_style(f"  🚫 {phase.display}", fg="red"))
             elif status == Status.INTERRUPTED:
-                click.echo(_style(f"  ⚡ {phase.value}", fg="yellow"))
+                click.echo(_style(f"  ⚡ {phase.display}", fg="yellow"))
         click.echo()
 
     def display_test_cases(self, ctx: BaseExecutionContext) -> None:

@@ -63,7 +63,7 @@ def run_test(
             is_final=False,
         )
 
-    phase_name = phase.value.lower()
+    phase_name = phase.value
     assert phase_name in ("examples", "coverage", "fuzzing", "stateful")
 
     operation_config = ctx.config.operations.get_for_operation(operation)

@@ -305,7 +305,7 @@ class OpenApiSchema(BaseSchema):
         from schemathesis.engine.run.unit._pool import DefaultScheduler, split_results
         from schemathesis.specs.openapi._ordering import compute_operation_layers
 
-        phase_config = self.config.phases.get_by_name(name=phase.name.name)
+        phase_config = self.config.phases.get_by_name(name=phase.name.value)
         assert isinstance(phase_config, FuzzingPhaseConfig | CoveragePhaseConfig | ExamplesPhaseConfig)
         if phase_config.operation_ordering == OperationOrdering.NONE:
             return DefaultScheduler(operations=operations)

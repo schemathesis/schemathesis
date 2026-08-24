@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.25.1...HEAD) - TBD
 
+### :wrench: Changed
+
+- NDJSON report spells phase names and skip reasons as machine tokens (`stateful`, `not_applicable`).
+
 ### :bug: Fixed
 
 - NDJSON report omitting each failure's title, severity and operation.

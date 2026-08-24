@@ -619,7 +619,7 @@ def test_cache_metrics_serialize_in_ndjson(ctx, cli, tmp_path):
         if name != "PhaseFinished":
             continue
         phase = payload.get("phase") or {}
-        if phase.get("name") != "API probing":
+        if phase.get("name") != "probing":
             continue
         cache_report = payload.get("payload", {}).get("cache")
         break

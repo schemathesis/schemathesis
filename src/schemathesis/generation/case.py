@@ -486,7 +486,7 @@ class Case(Generic[OperationT]):
 
         phase = PhaseName.from_str(self.meta.phase.name.value) if self.meta is not None else None
         config = self.operation.schema.config.checks_config_for(
-            operation=self.operation, phase=phase.name if phase is not None else None
+            operation=self.operation, phase=phase.value if phase is not None else None
         )
         response_checks = run_checks_for(self.operation.schema).for_responses()
         ctx = CheckContext(

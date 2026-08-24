@@ -283,7 +283,8 @@ class WarningCollector:
                 warnings.should_display(SchemathesisWarning.MISSING_TEST_DATA)
                 or warnings.should_display(SchemathesisWarning.VALIDATION_MISMATCH)
             )
-            and GenerationMode.POSITIVE in self.config.generation_for(operation=operation, phase=event.phase.name).modes
+            and GenerationMode.POSITIVE
+            in self.config.generation_for(operation=operation, phase=event.phase.value).modes
             and all_positive_are_rejected(event.recorder)
         ):
             if statistic.should_warn_about_missing_test_data():

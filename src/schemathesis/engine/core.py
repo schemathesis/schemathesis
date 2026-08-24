@@ -96,7 +96,7 @@ class Engine:
                 skip_reason=PhaseSkipReason.NOT_SUPPORTED,
             )
 
-        phase = phase_name.value.lower()
+        phase = phase_name.value
         if (
             phase in ("examples", "coverage", "fuzzing", "stateful")
             and not self.schema.config.phases.get_by_name(name=phase).enabled

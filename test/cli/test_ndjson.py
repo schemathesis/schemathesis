@@ -303,7 +303,7 @@ def test_enum_serialization(cli, ctx, ndjson_path):
         data = get_event_data(event)
         phase = data["phase"]
         assert isinstance(phase["name"], str)
-        assert phase["name"] in ("API probing", "Schema analysis", "Examples", "Coverage", "Fuzzing", "Stateful")
+        assert phase["name"] in ("probing", "schema_analysis", "examples", "coverage", "fuzzing", "stateful")
 
     # Status enum should be serialized as string value
     phase_finished = [e for e in events if get_event_type(e) == "PhaseFinished"]
@@ -476,7 +476,7 @@ def test_stateful_with_extraction_failure(cli, ctx, ndjson_path):
 
     # Stateful phase should run
     phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
-    assert any(get_event_data(e)["phase"]["name"] == "Stateful" for e in phase_started)
+    assert any(get_event_data(e)["phase"]["name"] == "stateful" for e in phase_started)
 
 
 def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
