@@ -9,6 +9,7 @@
 - Missing Allure entry in the `Reports` section of the CLI summary.
 - Coverage phase emitting a `pattern`-matching string as a `multipleOf` violation for union types.
 - Coverage phase emitting a value two `oneOf` branches admit when one keeps keywords beside `$ref`.
+- Coverage phase ignoring keywords beside `$ref` when generating values.
 
 ## [4.25.1](https://github.com/schemathesis/schemathesis/compare/v4.25.0...v4.25.1) - 2026-08-24
 

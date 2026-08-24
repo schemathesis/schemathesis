@@ -750,7 +750,12 @@ class CoverageContext:
                 raise Unsatisfiable
             with self.expand(reference, counters=self.generating):
                 # Deep clone to avoid circular references in Python objects
-                return self._generate_from_resolved(deepclone(self.resolve_ref(reference)))
+                resolved = deepclone(self.resolve_ref(reference))
+                rest = {key: value for key, value in schema.items() if key != "$ref"}
+                if isinstance(resolved, dict) and any(key not in _ANNOTATION_KEYWORDS for key in rest):
+                    # Keywords beside the reference constrain the value too.
+                    return self._generate_from_resolved({"allOf": [resolved, rest]})
+                return self._generate_from_resolved(resolved)
         return self._generate_from_resolved(schema)
 
     def _generate_from_resolved(self, schema: JsonSchema) -> Any:
@@ -979,10 +984,16 @@ class CoverageContext:
             references = [item["$ref"] for item in schema["allOf"] if isinstance(item, dict) and "$ref" in item]
             if any(self.is_exhausted(reference, counters=self.generating) for reference in references):
                 raise Unsatisfiable
-            resolved_all_of = [
-                self.resolve_ref(item["$ref"]) if isinstance(item, dict) and "$ref" in item else item
-                for item in schema["allOf"]
-            ]
+            resolved_all_of = []
+            for item in schema["allOf"]:
+                if isinstance(item, dict) and "$ref" in item:
+                    resolved_all_of.append(self.resolve_ref(item["$ref"]))
+                    # Keywords beside the reference constrain the branch too; keep them as their own conjunct.
+                    rest = {key: value for key, value in item.items() if key != "$ref"}
+                    if rest:
+                        resolved_all_of.append(rest)
+                else:
+                    resolved_all_of.append(item)
             merged = _merge_all_of({**schema, "allOf": resolved_all_of})
             if merged is not None:
                 # Resolving above leaves no pointer to count, so the branches stay counted while the
@@ -1725,6 +1736,12 @@ def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] 
                     resolved, nested = _inline_allof_refs(resolved, ctx, seen | {ref})
                     inlined_refs |= nested
                 new_all_of.append(resolved)
+                rest = {key: value for key, value in sub_schema.items() if key != "$ref"}
+                if rest:
+                    # Keywords beside the reference constrain the branch too; keep them as their own conjunct.
+                    inlined, nested = _inline_allof_refs(rest, ctx, seen)
+                    inlined_refs |= nested
+                    new_all_of.append(inlined)
                 changed = True
             else:
                 new_all_of.append(sub_schema)

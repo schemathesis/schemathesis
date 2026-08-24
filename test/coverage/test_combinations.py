@@ -3743,6 +3743,32 @@ def test_all_of_with_a_boolean_branch_emits_a_conforming_value(pctx):
     assert values and all(isinstance(value, str) for value in values), values
 
 
+# Keywords beside a property's `$ref` constrain its value in the object template too.
+@pytest.mark.parametrize(
+    "property_schema",
+    [
+        {"$ref": f"#/{BUNDLE_STORAGE_KEY}/A", "anyOf": [{"type": "null"}]},
+        {"allOf": [{"$ref": f"#/{BUNDLE_STORAGE_KEY}/A", "anyOf": [{"type": "null"}]}]},
+    ],
+    ids=["ref-sibling", "ref-sibling-in-all-of"],
+)
+def test_positive_object_template_keeps_property_ref_sibling_keywords(ctx_factory, property_schema):
+    schema = {
+        "type": "object",
+        "properties": {"a": property_schema},
+        BUNDLE_STORAGE_KEY: {"A": {"type": "boolean"}},
+    }
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert validator.is_valid(value), value
+
+
 # Under Draft 2020-12 keywords beside a branch `$ref` constrain it; dropping them emits values off the set.
 def test_positive_all_of_ref_branch_keeps_sibling_keywords(ctx_factory):
     schema = {
