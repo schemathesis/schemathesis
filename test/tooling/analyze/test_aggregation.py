@@ -124,7 +124,7 @@ def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path, write_n
                     "id": "a",
                     "timestamp": 1.0,
                     "value": {"type": "KeyError", "message": "'anyOf'"},
-                    "phase": "Fuzzing",
+                    "phase": "fuzzing",
                     "label": "POST /records",
                 }
             },
@@ -133,7 +133,7 @@ def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path, write_n
                     "id": "b",
                     "timestamp": 2.0,
                     "value": {"type": "KeyError", "message": "'anyOf'"},
-                    "phase": "Fuzzing",
+                    "phase": "fuzzing",
                     "label": "POST /records",
                 }
             },
@@ -142,7 +142,7 @@ def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path, write_n
                     "id": "c",
                     "timestamp": 3.0,
                     "value": {"type": "ReadTimeout", "message": "read timed out"},
-                    "phase": "Stateful",
+                    "phase": "stateful",
                     "label": "POST /records",
                 }
             },
@@ -150,8 +150,8 @@ def test_analyze_dedupes_engine_errors_by_type_phase_operation(tmp_path, write_n
     )
     run = analyze(path)
     assert [(e.type, e.phase, e.operation_label, e.count) for e in run.engine_errors] == [
-        ("KeyError", "Fuzzing", "POST /records", 2),
-        ("ReadTimeout", "Stateful", "POST /records", 1),
+        ("KeyError", "fuzzing", "POST /records", 2),
+        ("ReadTimeout", "stateful", "POST /records", 1),
     ]
 
 
@@ -168,11 +168,11 @@ def test_analyze_truncated_phase(tmp_path, write_ndjson):
         [
             {"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}},
             {"EngineStarted": {"timestamp": 0.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 1.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 1.0}},
         ],
     )
     run = analyze(path)
-    assert [(phase.name, phase.truncated) for phase in run.phases] == [("Fuzzing", True)]
+    assert [(phase.name, phase.truncated) for phase in run.phases] == [("fuzzing", True)]
 
 
 def test_analyze_duration_falls_back_to_last_event_when_truncated(tmp_path, write_ndjson):
@@ -182,8 +182,8 @@ def test_analyze_duration_falls_back_to_last_event_when_truncated(tmp_path, writ
         [
             {"Initialize": {"command": "x", "schemathesis_version": "test", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.5}},
-            {"PhaseFinished": {"phase": {"name": "Fuzzing"}, "timestamp": 142.5}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.5}},
+            {"PhaseFinished": {"phase": {"name": "fuzzing"}, "timestamp": 142.5}},
         ],
     )
     assert analyze(path).duration_seconds == 42.5
@@ -231,13 +231,13 @@ def test_analyze_phase_timings_accumulate(tmp_path, write_ndjson):
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
-            {"PhaseFinished": {"phase": {"name": "Fuzzing"}, "timestamp": 101.0}},
+            {"PhaseFinished": {"phase": {"name": "fuzzing"}, "timestamp": 101.0}},
         ],
     )
     run = analyze(path)
-    fuzzing = next(phase for phase in run.phases if phase.name == "Fuzzing")
+    fuzzing = next(phase for phase in run.phases if phase.name == "fuzzing")
     assert fuzzing.generation_seconds == pytest.approx(0.12)
     assert fuzzing.response_seconds == pytest.approx(0.50)
 
@@ -264,7 +264,7 @@ def test_analyze_per_operation_timings_accumulate(tmp_path, write_ndjson):
         path,
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
         ],
     )
@@ -292,13 +292,13 @@ def test_analyze_phase_timings_skip_missing_fields(tmp_path, write_ndjson):
         path,
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
-            {"PhaseFinished": {"phase": {"name": "Fuzzing"}, "timestamp": 101.0}},
+            {"PhaseFinished": {"phase": {"name": "fuzzing"}, "timestamp": 101.0}},
         ],
     )
     run = analyze(path)
-    fuzzing = next(phase for phase in run.phases if phase.name == "Fuzzing")
+    fuzzing = next(phase for phase in run.phases if phase.name == "fuzzing")
     assert fuzzing.generation_seconds == 0.0
     assert fuzzing.response_seconds == 0.0
     assert fuzzing.buckets.positive_accepted == 1

@@ -14,6 +14,7 @@ from .metrics import (
     RunMetrics,
     TransitionRecord,
     TransitionStats,
+    format_phase_name,
 )
 
 
@@ -358,7 +359,7 @@ def render_markdown(run: RunMetrics) -> str:
             unaccounted_str = _format_duration(unaccounted) if unaccounted >= 0 else "?"
             unaccounted_pct_str = f"{unaccounted_pct:.1f}%" if unaccounted >= 0 else "?"
             write(
-                f"| {phase.name} | {wall_str} | {calls} | {_format_seconds(generation)} | "
+                f"| {format_phase_name(phase.name)} | {wall_str} | {calls} | {_format_seconds(generation)} | "
                 f"{_format_per_case_ms(generation / calls) if calls else '-'} | "
                 f"{_format_seconds(response)} | "
                 f"{_format_per_case_ms(response / calls) if calls else '-'} | "
@@ -377,7 +378,7 @@ def render_markdown(run: RunMetrics) -> str:
         write("| Count | Type | Phase | Operation | Message |\n")
         write("|------:|------|-------|-----------|---------|\n")
         for error in run.engine_errors:
-            phase_label = error.phase or "-"
+            phase_label = format_phase_name(error.phase) if error.phase else "-"
             op_label = f"`{error.operation_label}`" if error.operation_label else "-"
             message = error.message.replace("|", "\\|").replace("\n", " ")
             if len(message) > 80:
