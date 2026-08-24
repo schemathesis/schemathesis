@@ -13,6 +13,7 @@ from typing import IO, TYPE_CHECKING, Any
 import requests
 
 from schemathesis.core import NOT_SET
+from schemathesis.core.failures import Failure
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import Unresolvable
@@ -118,6 +119,8 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
             "headers": headers,
             "body": serialize(obj.body, sanitization=sanitization),
         }
+    if isinstance(obj, Failure):
+        return obj.asdict()
     if isinstance(obj, Exception):
         return {"type": type(obj).__name__, "message": str(obj)}
     if isinstance(obj, Request):

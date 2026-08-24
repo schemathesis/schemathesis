@@ -102,13 +102,7 @@ def serialize_recorder(
                 "failure_info": (
                     {
                         "code_sample": check.failure_info.code_sample,
-                        "failure": {
-                            "operation": check.failure_info.failure.operation,
-                            "title": check.failure_info.failure.title,
-                            "message": check.failure_info.failure.message,
-                            "case_id": check.failure_info.failure.case_id,
-                            "severity": check.failure_info.failure.severity.name,
-                        },
+                        "failure": check.failure_info.failure.asdict(),
                     }
                     if check.failure_info is not None
                     else None
@@ -213,7 +207,7 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
                     title=failure_data["title"],
                     message=failure_data["message"],
                     case_id=failure_data["case_id"],
-                    severity=Severity[failure_data["severity"]],
+                    severity=Severity(failure_data["severity"]),
                 )
                 failure_info: CheckFailureInfo | None = CheckFailureInfo(
                     code_sample=info["code_sample"],

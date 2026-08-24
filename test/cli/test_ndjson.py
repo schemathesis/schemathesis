@@ -154,6 +154,39 @@ def test_interaction_with_failure(ctx, cli, hypothesis_max_examples, ndjson_path
     assert len(scenario_finished) >= 1
 
 
+def collect_failures(events):
+    return [
+        entry["failure_info"]["failure"]
+        for event in events
+        if get_event_type(event) == "ScenarioFinished"
+        for entries in get_event_data(event)["recorder"].get("checks", {}).values()
+        for entry in entries
+        if entry.get("failure_info")
+    ]
+
+
+def test_failure_details(ctx, cli, ndjson_path):
+    api = ctx.openapi.apps.failure()
+    cli.run_and_assert(
+        api.schema_url,
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=1",
+        "--seed=1",
+        exit_code=ExitCode.TESTS_FAILED,
+    )
+    failures = collect_failures(load_ndjson(ndjson_path))
+    assert failures
+    assert [{key: value for key, value in failure.items() if key != "case_id"} for failure in failures] == [
+        {
+            "type": "ServerError",
+            "operation": "GET /api/failure",
+            "title": "Server error",
+            "message": "",
+            "severity": "critical",
+        }
+    ] * len(failures)
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
 def test_run_subprocess(ctx, testdir, ndjson_path, hypothesis_max_examples):
     api = ctx.openapi.apps.success()
