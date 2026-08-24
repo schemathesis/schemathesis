@@ -37,7 +37,7 @@ class VcrHandler(EventHandler):
         self.output = output
         self.config = config
         self.preserve_bytes = preserve_bytes
-        self.command = get_command_representation()
+        self.command = get_command_representation(config.sanitization if config.sanitization.enabled else None)
         self.queue = queue or Queue()
         self.worker = threading.Thread(
             name="SchemathesisVcrWriter",
