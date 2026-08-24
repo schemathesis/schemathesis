@@ -4015,3 +4015,18 @@ def test_additional_property_key_skips_a_declared_name(ctx_factory):
 )
 def test_positive_allowed_values_intersect_as_json(pctx, schema, expected):
     assert cover_schema(pctx, schema) == expected
+
+
+# A `multipleOf` violation is a number; a `pattern` beside an open type must not turn it into a string.
+def test_negative_multiple_of_stays_numeric_beside_pattern(ctx_factory):
+    nctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    schema = {"type": ["number", "string"], "multipleOf": 1.0, "pattern": ""}
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = scenario_values(nctx, schema, CoverageScenario.NOT_MULTIPLE_OF)
+    assert values
+    for value in values:
+        assert not validator.is_valid(value), value

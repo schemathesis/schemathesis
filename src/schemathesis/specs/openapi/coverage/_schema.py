@@ -3512,9 +3512,14 @@ def _with_negated_key(schema: JsonSchemaObject, key: str, value: Any) -> JsonSch
 def _negative_multiple_of(
     ctx: CoverageContext, schema: dict, multiple_of: int | float
 ) -> Generator[GeneratedValue, None, None]:
+    # Only a number can violate `multipleOf`; a union type keeps just its numeric part, so a
+    # sibling keyword like `pattern` cannot steer the draw into another type.
+    types = get_type(schema)
+    pinned = "number" if "number" in types else "integer" if "integer" in types else None
+    if pinned is None:
+        return
     yield NegativeValue(
-        # Only a number can violate `multipleOf`, so say so where the schema left the type open.
-        ctx.generate_from_schema(_with_negated_key({"type": "number", **schema}, "multipleOf", multiple_of)),
+        ctx.generate_from_schema(_with_negated_key({**schema, "type": pinned}, "multipleOf", multiple_of)),
         scenario=CoverageScenario.NOT_MULTIPLE_OF,
         description=f"Non-multiple of {multiple_of}",
         location=ctx.current_path,
