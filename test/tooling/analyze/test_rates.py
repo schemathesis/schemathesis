@@ -41,7 +41,7 @@ def test_failures_per_minute_uses_unique_count(tmp_path, write_ndjson):
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 160.0}},
         ],
@@ -69,7 +69,7 @@ def test_twoxx_per_minute(tmp_path, write_ndjson):
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             payload,
             {"EngineFinished": {"timestamp": 160.0}},
         ],
@@ -97,7 +97,7 @@ def test_new_operation_per_minute_timeline(tmp_path, write_ndjson):
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /a", 100.5, 200),  # minute 0
             _scenario_at("GET /b", 165.0, 200),  # minute 1
             _scenario_at("GET /c", 230.0, 200),  # minute 2
@@ -118,7 +118,7 @@ def test_timeline_does_not_count_4xx_only_operations(tmp_path, write_ndjson):
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /a", 100.5, 200),
             _scenario_at("GET /b", 165.0, 422),  # 4xx-only — excluded
             {"EngineFinished": {"timestamp": 180.0}},
@@ -172,7 +172,7 @@ def test_reachability_lists_distinct_operations_with_2xx(tmp_path, write_ndjson)
         [
             {"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}},
             {"EngineStarted": {"timestamp": 100.0}},
-            {"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}},
+            {"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}},
             _scenario_at("GET /b", 100.5, 200),
             _scenario_at("GET /a", 101.0, 200),
             _scenario_at("GET /c", 102.0, 422),  # never gets a 2xx — excluded

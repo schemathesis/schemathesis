@@ -30,12 +30,12 @@ def _sample_run() -> RunMetrics:
         status_histogram={200: 8, 422: 5, 400: 4, 503: 1, 401: 2, 404: 1, 302: 2},
         phases=[
             PhaseMetrics(
-                name="Coverage",
+                name="coverage",
                 duration_seconds=3.0,
                 buckets=Bucket(positive_accepted=6, positive_drift=4, negative_rejected=2),
             ),
             PhaseMetrics(
-                name="Fuzzing",
+                name="fuzzing",
                 duration_seconds=1.5,
                 buckets=Bucket(
                     positive_accepted=2,
@@ -206,7 +206,7 @@ def test_render_markdown_unaccounted_question_mark_when_negative():
     run = _sample_run()
     run.phases = [
         PhaseMetrics(
-            name="Fuzzing",
+            name="fuzzing",
             duration_seconds=10.0,
             buckets=Bucket(positive_accepted=1),
             generation_seconds=8.0,

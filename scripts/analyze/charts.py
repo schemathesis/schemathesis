@@ -6,7 +6,7 @@ from pathlib import Path
 import seaborn
 from matplotlib import figure, pyplot
 
-from .metrics import RunMetrics
+from .metrics import RunMetrics, format_phase_name
 
 
 def _save(fig: figure.Figure, base: Path) -> None:
@@ -41,7 +41,7 @@ def _bucket_chart(run: RunMetrics, charts_dir: Path) -> None:
 def _phases_chart(run: RunMetrics, charts_dir: Path) -> None:
     if not run.phases:
         return
-    names = [phase.name for phase in run.phases]
+    names = [format_phase_name(phase.name) for phase in run.phases]
     durations = [phase.duration_seconds for phase in run.phases]
     fig, ax = pyplot.subplots(figsize=(8, 4))
     seaborn.barplot(x=names, y=durations, ax=ax, color="#8b5cf6")

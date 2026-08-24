@@ -584,6 +584,11 @@ def _matches_operation_route(case_value: dict, operation_label: str) -> bool:
     return case_method == expected_method.upper()
 
 
+def format_phase_name(name: str) -> str:
+    """Human-readable phase name; the stream carries machine tokens."""
+    return name.replace("_", " ").capitalize()
+
+
 def _phase_name(payload: dict) -> str | None:
     phase = payload.get("phase")
     if isinstance(phase, dict):

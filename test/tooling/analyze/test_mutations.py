@@ -36,7 +36,7 @@ def _scenario_payload(label, cases, interactions, *, timestamp=100.5):
 def _write_mutation_run(path, payloads):
     lines = [
         json.dumps({"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}}),
-        json.dumps({"PhaseStarted": {"phase": {"name": "Fuzzing"}, "timestamp": 100.0}}),
+        json.dumps({"PhaseStarted": {"phase": {"name": "fuzzing"}, "timestamp": 100.0}}),
     ]
     lines.extend(json.dumps(p) for p in payloads)
     path.write_text("\n".join(lines) + "\n")
