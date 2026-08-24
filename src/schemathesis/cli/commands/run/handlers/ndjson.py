@@ -42,7 +42,13 @@ class NdjsonHandler(EventHandler):
         self.worker.start()
 
     def start(self, ctx: BaseExecutionContext) -> None:
-        self.queue.put(_Initialize(seed=ctx.config.seed, command=get_command_representation()))
+        sanitization = self.config.output.sanitization
+        self.queue.put(
+            _Initialize(
+                seed=ctx.config.seed,
+                command=get_command_representation(sanitization if sanitization.enabled else None),
+            )
+        )
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         self.queue.put(_Process(payload=event))

@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from schemathesis.config import ProjectConfig
+from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.reporting import HarWriter, JunitXmlWriter, NdjsonWriter, VcrWriter
+from schemathesis.reporting._command import sanitize_args
 
 
 def test_ndjson_writer_context_manager():
@@ -50,3 +51,32 @@ def test_junitxml_writer_context_manager():
 def test_writer_context_manager_no_error_without_open(writer_cls, kwargs):
     with writer_cls(output=StringIO(), **kwargs):
         pass
+
+
+@pytest.mark.parametrize(
+    "args, expected",
+    [
+        (["-H", "X-API-Key: s3cret"], ["-H", "X-API-Key: [Filtered]"]),
+        (["--header=Authorization: Bearer s3cret"], ["--header=Authorization: [Filtered]"]),
+        (["-H", "X-Trace-Id: keep-me"], ["-H", "X-Trace-Id: keep-me"]),
+        (["-a", "admin:hunter2"], ["-a", "[Filtered]"]),
+        (["--auth=admin:hunter2"], ["--auth=[Filtered]"]),
+        (["--proxy", "http://user:pw@proxy:3128"], ["--proxy", "http://[Filtered]@proxy:3128"]),
+        (["-u", "https://api.example.com/?token=s3cret"], ["-u", "https://api.example.com/?token=%5BFiltered%5D"]),
+        (["https://user:pw@api.example.com/openapi.json"], ["https://[Filtered]@api.example.com/openapi.json"]),
+        (["--max-examples=5"], ["--max-examples=5"]),
+    ],
+    ids=[
+        "header-short",
+        "header-joined",
+        "header-benign",
+        "auth-short",
+        "auth-joined",
+        "proxy",
+        "url-option",
+        "url-positional",
+        "unrelated",
+    ],
+)
+def test_sanitize_args(args, expected):
+    assert sanitize_args(args, config=SanitizationConfig()) == expected

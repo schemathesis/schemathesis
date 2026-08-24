@@ -506,6 +506,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]:
     from schemathesis.config._report import ReportFormat
+    from schemathesis.reporting._command import get_command_representation
     from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
@@ -513,7 +514,8 @@ def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitX
     writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter] = []
     reports = schema.config.reports
     seed = schema.config.seed
-    command = " ".join(sys.argv)
+    sanitization = schema.config.output.sanitization
+    command = get_command_representation(sanitization if sanitization.enabled else None)
     if reports.vcr.enabled:
         path = reports.get_path(ReportFormat.VCR)
         vcr_writer = VcrWriter(output=path, config=schema.config.output, preserve_bytes=reports.preserve_bytes)

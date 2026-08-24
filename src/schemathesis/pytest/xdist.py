@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import dataclasses
 import hashlib
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,6 +12,7 @@ import pytest
 from schemathesis.config import OutputConfig, ReportConfig, ReportFormat, ReportsConfig, SanitizationConfig
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
+from schemathesis.reporting._command import get_command_representation
 
 if TYPE_CHECKING:
     from xdist.workermanage import WorkerController
@@ -252,11 +252,12 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
         if report.enabled:
             paths[fmt.value] = str(report.path) if report.path is not None else None
 
+    sanitization = schema.config.output.sanitization
     return {
         "seed": schema.config.seed,
-        "command": " ".join(sys.argv),
+        "command": get_command_representation(sanitization if sanitization.enabled else None),
         "preserve_bytes": reports.preserve_bytes,
-        "sanitization": dataclasses.asdict(schema.config.output.sanitization),
+        "sanitization": dataclasses.asdict(sanitization),
         "directory": str(reports.directory),
         "paths": paths,
         "api_title": schema.raw_schema.get("info", {}).get("title"),

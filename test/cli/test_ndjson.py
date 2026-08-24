@@ -389,6 +389,29 @@ def test_sanitization_disabled(cli, ctx, ndjson_path):
     assert len(phase_started) >= 1
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
+def test_credentials_sanitized_in_command(ctx, testdir, ndjson_path):
+    api = ctx.openapi.apps.success()
+    testdir.run(
+        str(Path(sys.executable).with_name("schemathesis")),
+        "run",
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=1",
+        "-H",
+        "X-API-Key: s3cret",
+        "-H",
+        "X-Trace-Id: keep-me",
+        "--auth",
+        "admin:hunter2",
+        api.schema_url,
+    )
+    assert get_event_data(load_ndjson(ndjson_path)[0])["command"] == (
+        f"st run --report-ndjson-path={ndjson_path} --max-examples=1 "
+        "-H X-API-Key: [Filtered] -H X-Trace-Id: keep-me "
+        f"--auth [Filtered] {api.schema_url}"
+    )
+
+
 def test_stateful_with_extraction_failure(cli, ctx, ndjson_path):
     # Link expression references non-existent field to trigger Err serialization
     app, _ = ctx.openapi.make_flask_app(
