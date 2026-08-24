@@ -1224,17 +1224,21 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
     def display_reports(self) -> None:
         reports = self.config.reports
-        if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.ndjson.enabled:
-            click.echo(_style("Reports:", bold=True))
+        enabled = [
+            (format, report)
             for format, report in (
                 (ReportFormat.JUNIT, reports.junit),
                 (ReportFormat.VCR, reports.vcr),
                 (ReportFormat.HAR, reports.har),
                 (ReportFormat.NDJSON, reports.ndjson),
-            ):
-                if report.enabled:
-                    path = reports.get_path(format)
-                    click.echo(_style(f"  - {format.value.upper()}: {path}"))
+                (ReportFormat.ALLURE, reports.allure),
+            )
+            if report.enabled
+        ]
+        if enabled:
+            click.echo(_style("Reports:", bold=True))
+            for format, _ in enabled:
+                click.echo(_style(f"  - {format.value.upper()}: {reports.get_path(format)}"))
             click.echo()
 
     def display_seed(self) -> None:
