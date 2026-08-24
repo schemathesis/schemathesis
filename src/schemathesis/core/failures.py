@@ -6,7 +6,7 @@ import textwrap
 import traceback
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from enum import Enum, auto
+from enum import Enum
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
@@ -35,19 +35,21 @@ def reason_phrase(status_code: int) -> str:
     return _RFC9110_PHRASES.get(status_code) or http.client.responses.get(status_code, "Unknown")
 
 
-class Severity(Enum):
+class Severity(str, Enum):
     # For server errors, security issues like ignored auth
-    CRITICAL = auto()
+    CRITICAL = "critical"
     # For schema violations
-    HIGH = auto()
+    HIGH = "high"
     # For content type issues, header problems
-    MEDIUM = auto()
+    MEDIUM = "medium"
     # For performance issues, minor inconsistencies
-    LOW = auto()
+    LOW = "low"
 
-    def __lt__(self, other: Severity) -> bool:
-        # Lower values are more severe
-        return self.value < other.value
+    def __lt__(self, other: Severity) -> bool:  # type: ignore[override]
+        return _SEVERITY_ORDER[self] < _SEVERITY_ORDER[other]
+
+
+_SEVERITY_ORDER = {Severity.CRITICAL: 0, Severity.HIGH: 1, Severity.MEDIUM: 2, Severity.LOW: 3}
 
 
 @dataclass
@@ -75,6 +77,17 @@ class Failure(AssertionError):
         if not self.message:
             return self.title
         return f"{self.title}\n\n{self.message}"
+
+    def asdict(self) -> dict[str, Any]:
+        """Wire representation shared by the NDJSON report and cross-worker transport."""
+        return {
+            "type": self.__class__.__name__,
+            "operation": self.operation,
+            "title": self.title,
+            "message": self.message,
+            "case_id": self.case_id,
+            "severity": self.severity.value,
+        }
 
     def __lt__(self, other: Failure) -> bool:
         return (
