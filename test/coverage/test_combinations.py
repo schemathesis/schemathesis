@@ -3743,6 +3743,35 @@ def test_all_of_with_a_boolean_branch_emits_a_conforming_value(pctx):
     assert values and all(isinstance(value, str) for value in values), values
 
 
+# Under Draft 2020-12 keywords beside a branch `$ref` constrain it; dropping them emits values off the set.
+def test_positive_all_of_ref_branch_keeps_sibling_keywords(ctx_factory):
+    schema = {
+        "allOf": [{"$ref": f"#/{BUNDLE_STORAGE_KEY}/A", "anyOf": [{"type": "null"}]}],
+        BUNDLE_STORAGE_KEY: {"A": {"type": "boolean"}},
+    }
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert validator.is_valid(value), value
+
+
+# Draft 4 ignores keywords beside `$ref`, so that branch admits `null` too and `oneOf` rejects it.
+def test_positive_one_of_ref_branch_sibling_keywords_judged_by_the_operation_draft(ctx_factory):
+    schema = {
+        "oneOf": [{"type": "null"}, {"$ref": f"#/{BUNDLE_STORAGE_KEY}/A", "anyOf": [{"type": "boolean"}]}],
+        BUNDLE_STORAGE_KEY: {"A": {"type": "null"}},
+    }
+    ctx = ctx_factory(root_schema=schema, location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert validator.is_valid(value), value
+
+
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [

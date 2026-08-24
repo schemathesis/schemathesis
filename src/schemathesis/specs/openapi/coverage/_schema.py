@@ -1448,6 +1448,16 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
         return sub
 
 
+def _branch_as_judged(ctx: CoverageContext, branch: JsonSchema) -> JsonSchema:
+    """The form of a branch its judges load: as written when a draft may ignore keywords beside `$ref`."""
+    if isinstance(branch, dict) and "$ref" in branch:
+        # The discriminator pin models server behavior and counts under every draft; any other keyword
+        # beside `$ref` counts only under drafts that read it, so each judge gets the branch as written.
+        if any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch):
+            return branch
+    return _resolve_sub_schema(ctx, branch)
+
+
 def _has_array_sibling(sub_schemas: list) -> bool:
     for sub in sub_schemas:
         if isinstance(sub, dict):
@@ -1609,7 +1619,7 @@ def _positive_for_leaves(
     one_of = schema.get("oneOf")
     exclusivity = None
     if isinstance(one_of, list):
-        exclusivity = [_judges(_resolve_sub_schema(ctx, branch), ctx) for branch in one_of]
+        exclusivity = [_judges(_branch_as_judged(ctx, branch), ctx) for branch in one_of]
     for leaf in leaves:
         with ExitStack() as stack:
             for reference in leaf.references:
