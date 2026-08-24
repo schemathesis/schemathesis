@@ -146,3 +146,16 @@ def test_after_run_failure_in_allure(ctx, cli, ensure_reachability_module, tmp_p
     run_check_results = [r for r in results if r.get("name") == "Run checks"]
     assert run_check_results, [r.get("name") for r in results]
     assert run_check_results[0]["status"] == "failed"
+
+
+def test_allure_path_displayed(ctx, cli, tmp_path, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert (
+        cli.run(
+            api.schema_url,
+            f"--report-allure-path={tmp_path / 'allure-results'}",
+            f"--report-junit-path={tmp_path / 'junit.xml'}",
+            "--max-examples=1",
+        )
+        == snapshot_cli
+    )
