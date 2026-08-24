@@ -13,48 +13,45 @@ if TYPE_CHECKING:
 class PhaseName(str, enum.Enum):
     """Available execution phases."""
 
-    PROBING = "API probing"
-    SCHEMA_ANALYSIS = "Schema analysis"
-    EXAMPLES = "Examples"
-    COVERAGE = "Coverage"
-    FUZZING = "Fuzzing"
-    STATEFUL_TESTING = "Stateful"
+    PROBING = "probing"
+    SCHEMA_ANALYSIS = "schema_analysis"
+    EXAMPLES = "examples"
+    COVERAGE = "coverage"
+    FUZZING = "fuzzing"
+    STATEFUL_TESTING = "stateful"
 
     @classmethod
     def defaults(cls) -> list[PhaseName]:
         return [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
 
     @property
-    def name(self) -> str:
-        return {
-            PhaseName.PROBING: "probing",
-            PhaseName.SCHEMA_ANALYSIS: "schema analysis",
-            PhaseName.EXAMPLES: "examples",
-            PhaseName.COVERAGE: "coverage",
-            PhaseName.FUZZING: "fuzzing",
-            PhaseName.STATEFUL_TESTING: "stateful",
-        }[self]
+    def display(self) -> str:
+        """Title-cased label for terminal output."""
+        if self is PhaseName.PROBING:
+            return "API probing"
+        return self.value.replace("_", " ").capitalize()
 
     @classmethod
     def from_str(cls, value: str) -> PhaseName:
-        return {
-            "probing": cls.PROBING,
-            "schema analysis": cls.SCHEMA_ANALYSIS,
-            "examples": cls.EXAMPLES,
-            "coverage": cls.COVERAGE,
-            "fuzzing": cls.FUZZING,
-            "stateful": cls.STATEFUL_TESTING,
-        }[value.lower()]
+        return cls(value.lower())
 
 
 class PhaseSkipReason(str, enum.Enum):
     """Reasons why a phase might not be executed."""
 
-    DISABLED = "disabled"  # Explicitly disabled via config
-    NOT_SUPPORTED = "not supported"  # Feature not supported by schema
-    NOT_APPLICABLE = "not applicable"  # No relevant data (e.g., no transitions for stateful)
-    FAILURE_LIMIT_REACHED = "failure limit reached"
-    NOTHING_TO_TEST = "nothing to test"
+    # Explicitly disabled via config
+    DISABLED = "disabled"
+    # Feature not supported by schema
+    NOT_SUPPORTED = "not_supported"
+    # No relevant data (e.g., no transitions for stateful)
+    NOT_APPLICABLE = "not_applicable"
+    FAILURE_LIMIT_REACHED = "failure_limit_reached"
+    NOTHING_TO_TEST = "nothing_to_test"
+
+    @property
+    def display(self) -> str:
+        """Label for terminal output."""
+        return self.value.replace("_", " ")
 
 
 @dataclass(slots=True)

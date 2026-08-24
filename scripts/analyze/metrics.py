@@ -469,7 +469,7 @@ def classify_call(call: dict) -> CallClassification:
 
 SCENARIO_FINISHED_EVENTS = {"ScenarioFinished", "FuzzScenarioFinished"}
 # Phases that never issue test calls — excluded from per-phase metrics.
-SKIP_PHASES = {"API probing", "Schema analysis"}
+SKIP_PHASES = {"probing", "schema_analysis"}
 # Prefix match so future "Stateful X" / "Fuzz X" variants stay grouped.
 STATEFUL_LABEL_PREFIX = "Stateful"
 FUZZ_LABEL_PREFIX = "Fuzz"
@@ -1020,7 +1020,7 @@ def analyze(path: Path) -> RunMetrics:
                     current_phase = name
             elif event_name == "PhaseFinished":
                 name = _phase_name(payload)
-                if name == "API probing":
+                if name == "probing":
                     cache_payload = (payload.get("payload") or {}).get("cache")
                     if isinstance(cache_payload, dict):
                         run.cache = CacheMetrics(

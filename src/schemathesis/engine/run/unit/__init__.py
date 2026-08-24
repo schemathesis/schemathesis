@@ -303,7 +303,7 @@ def worker_task(
                                 test_func=run_one_case,
                                 config=HypothesisTestConfig(
                                     modes=[mode],
-                                    settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.name),
+                                    settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.value),
                                     seed=ctx.config.seed,
                                     project=ctx.config,
                                     as_strategy_kwargs=as_strategy_kwargs,
@@ -353,7 +353,7 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
 def build_feedback_sources(ctx: EngineContext, *, operation: APIOperation, phase: PhaseName) -> FeedbackSources:
     extra_data_source = None
     # Extra data sources augment generation only when enabled for this phase.
-    phase_config = ctx.config.phases_for(operation=operation).get_by_name(name=phase.name)
+    phase_config = ctx.config.phases_for(operation=operation).get_by_name(name=phase.value)
     if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)):
         if phase_config.extra_data_sources.is_enabled and ctx.extra_data_source is not None:
             extra_data_source = ctx.extra_data_source

@@ -62,12 +62,12 @@ def run_driver(
 
     operation_config = ctx.config.operations.get_for_operation(operation)
     continue_on_failure = operation_config.continue_on_failure or ctx.config.continue_on_failure or False
-    generation = ctx.config.generation_for(operation=operation, phase=phase.value.lower())
+    generation = ctx.config.generation_for(operation=operation, phase=phase.value)
     override = overrides.for_operation(ctx.config, operation=operation)
     auth = ctx.config.auth_for(operation=operation)
     headers = ctx.config.headers_for(operation=operation)
     transport_kwargs = ctx.get_transport_kwargs(operation=operation)
-    checks_config = ctx.config.checks_config_for(operation=operation, phase=phase.value.lower())
+    checks_config = ctx.config.checks_config_for(operation=operation, phase=phase.value)
     check_ctx = CheckContext(
         override=override,
         auth=auth,

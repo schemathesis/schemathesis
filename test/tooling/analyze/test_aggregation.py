@@ -81,8 +81,8 @@ def test_analyze_run_duration_positive(analyzer_ndjson):
 def test_analyze_phases_recorded(analyzer_ndjson):
     run = analyze(analyzer_ndjson)
     names = {phase.name for phase in run.phases}
-    assert names >= {"Coverage", "Fuzzing"}
-    assert names.isdisjoint({"API probing", "Schema analysis"})
+    assert names >= {"coverage", "fuzzing"}
+    assert names.isdisjoint({"probing", "schema_analysis"})
     for phase in run.phases:
         assert phase.duration_seconds >= 0.0
         assert phase.truncated is False
