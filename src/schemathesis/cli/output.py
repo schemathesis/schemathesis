@@ -12,11 +12,10 @@ import click
 
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
+from schemathesis.cli.summary import ErrorGroup, FailureGroup, OperationsSummary, TestCasesSummary
 from schemathesis.core.errors import LoaderErrorKind
 from schemathesis.core.failures import (
-    RUN_CHECKS_LABEL,
     MessageBlock,
-    Severity,
     format_failures,
     is_reproducible_failure,
 )
@@ -304,84 +303,62 @@ def display_failures(statistic: Statistic, config: OutputConfig, *, record_crash
         )
 
 
-def display_api_operations(
-    *,
-    selected: int,
-    total: int,
-    tested: int,
-    errored: int = 0,
-    skipped: int = 0,
-    skip_reasons: list[str] | None = None,
-) -> None:
+def display_api_operations(operations: OperationsSummary) -> None:
     click.echo(_style("API Operations:", bold=True))
-    click.echo(_style(f"  Selected: {click.style(str(selected), bold=True)}/{click.style(str(total), bold=True)}"))
-    click.echo(_style(f"  Tested: {click.style(str(tested), bold=True)}"))
-    if errored:
-        click.echo(_style(f"  Errored: {click.style(str(errored), bold=True)}"))
-    if skipped:
-        click.echo(_style(f"  Skipped: {click.style(str(skipped), bold=True)}"))
-        for reason in sorted(set(skip_reasons or [])):
+    click.echo(
+        _style(
+            f"  Selected: {click.style(str(operations.selected), bold=True)}"
+            f"/{click.style(str(operations.total), bold=True)}"
+        )
+    )
+    click.echo(_style(f"  Tested: {click.style(str(operations.tested), bold=True)}"))
+    if operations.errored:
+        click.echo(_style(f"  Errored: {click.style(str(operations.errored), bold=True)}"))
+    if operations.skipped:
+        click.echo(_style(f"  Skipped: {click.style(str(operations.skipped), bold=True)}"))
+        for reason in sorted(set(operations.skip_reasons)):
             click.echo(_style(f"    - {reason.rstrip('.')}"))
     click.echo()
 
 
-def display_failures_summary(statistic: Statistic) -> None:
-    failure_counts: dict[str, tuple[Severity, int]] = {}
-    for grouped in statistic.failures.values():
-        for group in grouped.values():
-            for failure in group.failures:
-                data = failure_counts.get(failure.title, (failure.severity, 0))
-                failure_counts[failure.title] = (failure.severity, data[1] + 1)
+def display_failures_summary(failures: list[FailureGroup]) -> None:
     click.echo(_style("Failures:", bold=True))
-    sorted_failures = sorted(failure_counts.items(), key=lambda x: (x[1][0], x[0]))
-    for title, (_, count) in sorted_failures:
-        click.echo(_style(f"  ❌ {title}: "), nl=False)
-        click.echo(_style(str(count), bold=True))
+    for group in failures:
+        click.echo(_style(f"  ❌ {group.title}: "), nl=False)
+        click.echo(_style(str(group.count), bold=True))
     click.echo()
 
 
-def display_test_cases(statistic: Statistic) -> None:
-    if statistic.total_cases == 0:
+def display_test_cases(test_cases: TestCasesSummary) -> None:
+    if test_cases.generated == 0:
         click.echo(_style("Test cases:", bold=True))
         click.echo("  No test cases were generated\n")
         return
 
-    # `after_run` checks are not tied to cases, so they are counted in the "Failures" block, not here.
-    unique_failures = sum(
-        len(group.failures)
-        for label, grouped in statistic.failures.items()
-        if label != RUN_CHECKS_LABEL
-        for group in grouped.values()
-    )
     click.echo(_style("Test cases:", bold=True))
-    parts = [f"  {click.style(str(statistic.total_cases), bold=True)} generated"]
+    parts = [f"  {click.style(str(test_cases.generated), bold=True)} generated"]
 
-    if statistic.cases_without_checks == statistic.total_cases:
-        parts.append(f"{click.style(str(statistic.cases_without_checks), bold=True)} skipped")
+    if test_cases.without_checks == test_cases.generated:
+        parts.append(f"{click.style(str(test_cases.without_checks), bold=True)} skipped")
     else:
-        if unique_failures > 0:
+        if test_cases.unique_failures > 0:
             parts.append(
-                f"{click.style(str(statistic.cases_with_failures), bold=True)} found "
-                f"{click.style(str(unique_failures), bold=True)} unique failures"
+                f"{click.style(str(test_cases.with_failures), bold=True)} found "
+                f"{click.style(str(test_cases.unique_failures), bold=True)} unique failures"
             )
         else:
-            parts.append(f"{click.style(str(statistic.total_cases), bold=True)} passed")
-        if statistic.cases_without_checks > 0:
-            parts.append(f"{click.style(str(statistic.cases_without_checks), bold=True)} skipped")
+            parts.append(f"{click.style(str(test_cases.generated), bold=True)} passed")
+        if test_cases.without_checks > 0:
+            parts.append(f"{click.style(str(test_cases.without_checks), bold=True)} skipped")
 
     click.echo(_style(", ".join(parts) + "\n"))
 
 
-def display_errors_summary(errors: set[events.NonFatalError]) -> None:
-    """Display a summary of non-fatal errors grouped by title."""
-    error_counts: dict[str, int] = {}
-    for error in errors:
-        title = error.info.title
-        error_counts[title] = error_counts.get(title, 0) + 1
+def display_errors_summary(errors: list[ErrorGroup]) -> None:
     click.echo(_style("Errors:", bold=True))
-    for title in sorted(error_counts):
-        click.echo(_style(f"  🚫 {title}: "), nl=False)
-        click.echo(_style(str(error_counts[title]), bold=True))
+    for group in errors:
+        click.echo(_style(f"  🚫 {group.title}: "), nl=False)
+        click.echo(_style(str(group.count), bold=True))
     click.echo()
 
 

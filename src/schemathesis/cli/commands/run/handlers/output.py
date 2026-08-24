@@ -32,13 +32,14 @@ from schemathesis.cli.output import (
     make_progress_bar,
     print_lines,
 )
+from schemathesis.cli.summary import SummaryData
 from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.output import decode_response_text, prepare_response_payload
 from schemathesis.core.result import Ok
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.engine import Status, StopReason, events
+from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.probes import ProbeOutcome
 
@@ -1069,50 +1070,6 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
         click.echo()
 
-    def display_api_operations(self, ctx: BaseExecutionContext, stop_reason: StopReason) -> None:
-        assert self.statistic is not None
-        errored = len(
-            {
-                err.label
-                for err in self.errors
-                # Some API operations may have some tests before they have an error
-                if err.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]
-                and err.label not in ctx.statistic.tested_operations
-                and err.related_to_operation
-            }
-        )
-        # API operations that are skipped due to fail-fast are counted here as well
-        skipped = self.statistic.operations.selected - len(ctx.statistic.tested_operations) - errored
-        # An operation tested in one phase may have been skipped in another; its reason does not explain
-        # the operations counted above, which were never tested at all.
-        explained = {
-            label: reasons
-            for label, reasons in self.skip_reasons.items()
-            if label not in ctx.statistic.tested_operations
-        }
-        reasons = {reason for values in explained.values() for reason in values}
-        # Cases ran, but no selected check applied to them. Operations tested elsewhere are not in the count above.
-        without_checks = ctx.statistic.operations_without_checks - ctx.statistic.tested_operations
-        if without_checks:
-            reasons.add("No checks ran")
-        if skipped > len(explained.keys() | without_checks):
-            if stop_reason.skip_explanation is not None:
-                reasons.add(stop_reason.skip_explanation)
-            elif any(
-                self.phases[phase][0] == Status.ERROR
-                for phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
-            ):
-                reasons.add("Phase errored")
-        skip_reasons = sorted(reasons)
-        display_api_operations(
-            selected=self.statistic.operations.selected,
-            total=self.statistic.operations.total,
-            tested=len(ctx.statistic.tested_operations),
-            errored=errored,
-            skipped=skipped,
-            skip_reasons=skip_reasons,
-        )
-
     def display_phases(self) -> None:
         click.echo(_style("Test Phases:", bold=True))
 
@@ -1137,15 +1094,6 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             elif status == Status.INTERRUPTED:
                 click.echo(_style(f"  ⚡ {phase.display}", fg="yellow"))
         click.echo()
-
-    def display_test_cases(self, ctx: BaseExecutionContext) -> None:
-        display_test_cases(ctx.statistic)
-
-    def display_failures_summary(self, ctx: BaseExecutionContext) -> None:
-        display_failures_summary(ctx.statistic)
-
-    def display_errors_summary(self) -> None:
-        display_errors_summary(self.errors)
 
     def display_warnings_summary(self) -> None:
         click.echo(_style("Warnings:", bold=True))
@@ -1275,16 +1223,25 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         display_section_name("SUMMARY")
         click.echo()
 
-        if self.statistic:
-            self.display_api_operations(ctx, event.stop_reason)
+        summary = SummaryData.from_run(
+            api_statistic=self.statistic,
+            statistic=ctx.statistic,
+            errors=self.errors,
+            phases=self.phases,
+            skip_reasons=self.skip_reasons,
+            stop_reason=event.stop_reason,
+        )
+
+        if summary.operations is not None:
+            display_api_operations(summary.operations)
 
         self.display_phases()
 
-        if ctx.statistic.failures:
-            self.display_failures_summary(ctx)
+        if summary.failures:
+            display_failures_summary(summary.failures)
 
-        if self.errors:
-            self.display_errors_summary()
+        if summary.errors:
+            display_errors_summary(summary.errors)
 
         if not self.warnings.is_empty:
             self.display_warnings_summary()
@@ -1305,7 +1262,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             print_lines(ctx.summary_lines)
             click.echo()
 
-        self.display_test_cases(ctx)
+        display_test_cases(summary.test_cases)
         self.display_reports()
         self.display_seed()
         self.display_final_line(ctx, event)

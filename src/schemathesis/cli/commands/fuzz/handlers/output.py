@@ -24,6 +24,7 @@ from schemathesis.cli.output import (
     make_console,
     print_lines,
 )
+from schemathesis.cli.summary import OperationsSummary, reduce_errors, reduce_failures, reduce_test_cases
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason
@@ -272,16 +273,16 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
         click.echo()
 
         if ctx.statistic.failures:
-            display_failures_summary(ctx.statistic)
+            display_failures_summary(reduce_failures(ctx.statistic))
 
         if ctx.errors:
-            display_errors_summary(ctx.errors)
+            display_errors_summary(reduce_errors(ctx.errors))
 
         if ctx.summary_lines:
             print_lines(ctx.summary_lines)
             click.echo()
 
-        display_test_cases(ctx.statistic)
+        display_test_cases(reduce_test_cases(ctx.statistic))
         display_seed(ctx.config)
         unique_failures = sum(
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
@@ -304,8 +305,12 @@ def _display_api_operations(ctx: FuzzExecutionContext) -> None:
         }
     )
     display_api_operations(
-        selected=ctx.api_statistic.operations.selected,
-        total=ctx.api_statistic.operations.total,
-        tested=len(ctx.statistic.tested_operations),
-        errored=errored,
+        OperationsSummary(
+            total=ctx.api_statistic.operations.total,
+            selected=ctx.api_statistic.operations.selected,
+            tested=len(ctx.statistic.tested_operations),
+            errored=errored,
+            skipped=0,
+            skip_reasons=[],
+        )
     )
