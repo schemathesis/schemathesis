@@ -1670,6 +1670,34 @@ def _drawn_positive(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator
         )
 
 
+def _fold_pattern_properties_into_declared(schema: JsonSchemaObject) -> JsonSchemaObject:
+    """Declared properties conjoined with the `patternProperties` entries matching their name."""
+    properties = schema.get("properties")
+    pattern_properties = schema.get("patternProperties")
+    if not isinstance(properties, dict) or not isinstance(pattern_properties, dict):
+        return schema
+    compiled = []
+    for pattern, sub_schema in pattern_properties.items():
+        try:
+            compiled.append((re.compile(pattern), sub_schema))
+        except re.error:
+            continue
+    folded = {}
+    for name, sub_schema in properties.items():
+        matching = [pattern_sub for regex, pattern_sub in compiled if regex.search(name) and pattern_sub is not True]
+        if not matching or sub_schema is False:
+            folded[name] = sub_schema
+        elif any(pattern_sub is False for pattern_sub in matching):
+            folded[name] = {"not": {}}
+        else:
+            conjuncts = [branch for branch in (sub_schema, *matching) if branch is not True]
+            merged = _merge_all_of({"allOf": conjuncts})
+            folded[name] = merged if merged is not None else {"allOf": conjuncts}
+    if folded == properties:
+        return schema
+    return {**schema, "properties": folded}
+
+
 def _cover_positive_for_type(
     ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -1677,6 +1705,9 @@ def _cover_positive_for_type(
     # Avoid expensive template generation in that case.
     if GenerationMode.POSITIVE not in ctx.generation_modes:
         return
+
+    if ty == "object" or ty is None:
+        schema = _fold_pattern_properties_into_declared(schema)
 
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty, ctx)

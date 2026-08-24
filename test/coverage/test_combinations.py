@@ -4085,3 +4085,24 @@ def test_negative_multiple_of_stays_numeric_beside_pattern(ctx_factory):
     assert values
     for value in values:
         assert not validator.is_valid(value), value
+
+
+# A `patternProperties` entry matching a declared name constrains that property's values too.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"a": {"type": "null"}}, "patternProperties": {"a": False}},
+        {"type": "object", "properties": {"a": {"type": "string"}}, "patternProperties": {"^a$": {"minLength": 5}}},
+    ],
+    ids=["forbidding", "constraining"],
+)
+def test_positive_declared_property_meets_matching_pattern_properties(ctx_factory, schema):
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert validator.is_valid(value), value
