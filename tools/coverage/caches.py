@@ -14,9 +14,7 @@ from schemathesis.specs.openapi.coverage import _schema
 def clear_internal_caches() -> None:
     _schema._draw_outcome.cache_clear()
     _schema._pattern_strategy.cache_clear()
-    _schema._FORMAT_VALIDATORS.clear()
-    _schema._REMOVE_EXAMPLES_CACHE.clear()
-    _schema._READY_BUNDLE_CACHE.clear()
+    _schema.DEFAULT_GENERATION_SESSION.close()
     patterns.normalize_regex.cache_clear()
     patterns.is_valid_jsonschema_rs_regex.cache_clear()
     patterns._parse_regex.cache_clear()
@@ -34,7 +32,6 @@ def clear_internal_caches() -> None:
     jsonschema._validator_failure_cache.clear()
     jsonschema._seeded_validator_cache.clear()
     jsonschema._bundle_registry_cache.clear()
-    hypothesis.schema_generation_cache.clear()
     hypothesis.custom_formats_cache.clear()
     hypothesis.canonical_strategy_cache.clear()
     hypothesis.canonical_form_cache.clear()

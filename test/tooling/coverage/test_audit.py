@@ -359,16 +359,16 @@ def test_clear_internal_caches_drains_known_caches(ctx):
     raw = ctx.openapi.build_schema(_PATHS)
     audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
     populated_caches = [
-        len(coverage_internals._FORMAT_VALIDATORS),
-        len(coverage_internals._REMOVE_EXAMPLES_CACHE._data),
-        len(hypothesis_internals.schema_generation_cache._data),
+        len(coverage_internals.DEFAULT_GENERATION_SESSION.format_validators),
+        len(coverage_internals.DEFAULT_GENERATION_SESSION.removed_examples._data),
+        len(coverage_internals.DEFAULT_GENERATION_SESSION.values._data),
         len(hypothesis_internals.canonical_strategy_cache._data),
     ]
     assert any(populated_caches), populated_caches
     clear_internal_caches()
-    assert coverage_internals._FORMAT_VALIDATORS == {}
-    assert coverage_internals._REMOVE_EXAMPLES_CACHE._data == {}
-    assert hypothesis_internals.schema_generation_cache._data == {}
+    assert coverage_internals.DEFAULT_GENERATION_SESSION.format_validators == {}
+    assert coverage_internals.DEFAULT_GENERATION_SESSION.removed_examples._data == {}
+    assert coverage_internals.DEFAULT_GENERATION_SESSION.values._data == {}
     assert hypothesis_internals.custom_formats_cache._data == {}
     assert hypothesis_internals.canonical_strategy_cache._data == {}
     assert hypothesis_internals._first_param_cache._data == {}

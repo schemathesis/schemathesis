@@ -60,7 +60,7 @@ from schemathesis.core import (
     MAX_STRING_LENGTH,
     NOT_SET,
 )
-from schemathesis.core.cache import MISSING, BoundedCache
+from schemathesis.core.cache import MISSING
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
@@ -69,12 +69,13 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
-from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples, schema_generation_cache
+from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples
 from schemathesis.generation.jsonschema import build
 from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.converter import apply_rewritten_pattern
+from schemathesis.specs.openapi.coverage._session import DEFAULT_GENERATION_SESSION, GenerationSession
 from schemathesis.specs.openapi.coverage._wire import (
     HEADER_ALLOWED_CHARS,
     WireSemantics,
@@ -116,27 +117,29 @@ VALIDATED_FORMATS = frozenset(
     }
 )
 
-_FORMAT_VALIDATORS: dict[tuple[str, type], jsonschema_rs.Validator] = {}
 
-
-def _get_format_validator(format: str, validator_cls: type[jsonschema_rs.Validator]) -> jsonschema_rs.Validator:
+def _get_format_validator(
+    session: GenerationSession, format: str, validator_cls: type[jsonschema_rs.Validator]
+) -> jsonschema_rs.Validator:
     """Get or create a cached validator for checking a specific format."""
     key = (format, validator_cls)
-    if key not in _FORMAT_VALIDATORS:
-        _FORMAT_VALIDATORS[key] = make_validator({"type": "string", "format": format}, validator_cls)
-    return _FORMAT_VALIDATORS[key]
+    if key not in session.format_validators:
+        session.format_validators[key] = make_validator({"type": "string", "format": format}, validator_cls)
+    return session.format_validators[key]
 
 
-def conforms_to_format(value: object, format: str, validator_cls: type[jsonschema_rs.Validator]) -> bool:
+def conforms_to_format(
+    session: GenerationSession, value: object, format: str, validator_cls: type[jsonschema_rs.Validator]
+) -> bool:
     """Check if a value conforms to a JSON Schema format."""
-    return _get_format_validator(format, validator_cls).is_valid(value)
+    return _get_format_validator(session, format, validator_cls).is_valid(value)
 
 
-def _remove_examples(schema: dict[str, Any]) -> dict[str, Any]:
+def _remove_examples(session: GenerationSession, schema: dict[str, Any]) -> dict[str, Any]:
     """Recursively remove 'examples' field from a schema for jsonschema-rs compatibility."""
     # Sub-schemas reached via `$ref` are the same dict instance across calls, so id-keyed
     # caching saves rewalking shared definitions (e.g. k8s ObjectMeta referenced everywhere).
-    cached = _REMOVE_EXAMPLES_CACHE.get(id(schema))
+    cached = session.removed_examples.get(id(schema))
     if cached is not MISSING:
         return cached[0]
     result: dict[str, Any] = {}
@@ -144,17 +147,14 @@ def _remove_examples(schema: dict[str, Any]) -> dict[str, Any]:
         if key == "examples":
             continue
         if isinstance(value, dict):
-            result[key] = _remove_examples(value)
+            result[key] = _remove_examples(session, value)
         elif isinstance(value, list):
-            result[key] = [_remove_examples(item) if isinstance(item, dict) else item for item in value]
+            result[key] = [_remove_examples(session, item) if isinstance(item, dict) else item for item in value]
         else:
             result[key] = value
     # The second element pins `schema`, so its `id` cannot be recycled into a stale hit.
-    _REMOVE_EXAMPLES_CACHE[id(schema)] = (result, schema)
+    session.removed_examples[id(schema)] = (result, schema)
     return result
-
-
-_REMOVE_EXAMPLES_CACHE: BoundedCache = BoundedCache(maxsize=4096)
 
 
 def _replace_zero_with_nonzero(x: float) -> float:
@@ -184,7 +184,7 @@ def _spelled_for(schema: JsonSchema, validator_cls: type, ctx: CoverageContext) 
     if bundle is None:
         return _prepared(schema, draft4=True)
     rest = {key: value for key, value in schema.items() if key != BUNDLE_STORAGE_KEY}
-    return {**_prepared(rest, draft4=True), BUNDLE_STORAGE_KEY: _ready_bundle(bundle, None, True)}
+    return {**_prepared(rest, draft4=True), BUNDLE_STORAGE_KEY: _ready_bundle(ctx.session, bundle, None, True)}
 
 
 def _admitted(value: Any, schema: JsonSchema, ctx: CoverageContext, *, unjudged: bool) -> bool:
@@ -438,6 +438,7 @@ class CoverageContext:
         "update_pattern",
         "_resolver",
         "_root_token_cell",
+        "session",
         "wire",
         "allow_extra_parameters",
         "expanding",
@@ -462,6 +463,7 @@ class CoverageContext:
         allow_extra_parameters: bool = True,
         expanding: dict[str, int] | None = None,
         generating: dict[str, int] | None = None,
+        session: GenerationSession | None = None,
     ) -> None:
         self.root_schema = root_schema
         self.location = location
@@ -483,6 +485,7 @@ class CoverageContext:
         self._root_token_cell: list[object] = _root_token_cell if _root_token_cell is not None else [None]
         self.allow_extra_parameters = allow_extra_parameters
         self.wire = WireSemantics(location=location, media_type=media_type, is_required=is_required)
+        self.session = session if session is not None else DEFAULT_GENERATION_SESSION
         # How deep the walk is inside each reference, shared with every context derived from this one.
         self.expanding = expanding if expanding is not None else {}
         # The same, for building one value; a value nests on its own budget, not the walk's.
@@ -579,6 +582,7 @@ class CoverageContext:
             allow_extra_parameters=self.allow_extra_parameters,
             expanding=self.expanding,
             generating=self.generating,
+            session=self.session,
         )
 
     def with_negative(self) -> CoverageContext:
@@ -598,6 +602,7 @@ class CoverageContext:
             allow_extra_parameters=self.allow_extra_parameters,
             expanding=self.expanding,
             generating=self.generating,
+            session=self.session,
         )
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
@@ -614,7 +619,7 @@ class CoverageContext:
             rest = {key: value for key, value in schema.items() if key != BUNDLE_STORAGE_KEY}
             prepared = {
                 **_prepared(rest, draft4=draft4),
-                BUNDLE_STORAGE_KEY: _ready_bundle(bundle, self.update_pattern, draft4),
+                BUNDLE_STORAGE_KEY: _ready_bundle(self.session, bundle, self.update_pattern, draft4),
             }
         strategy = self._build(prepared, draft)
         if strategy is not None or not isinstance(prepared, dict):
@@ -737,14 +742,14 @@ class CoverageContext:
         try:
             cache_key = (
                 self.schema_key(schema),
-                id(self.custom_formats),
-                id(self.update_pattern),
+                self.session.token_for(self.custom_formats),
+                self.session.token_for(self.update_pattern),
                 self.validator_cls,
             )
         except (TypeError, ValueError):
             cache_key = None
         if cache_key is not None:
-            cached = schema_generation_cache.get(cache_key)
+            cached = self.session.values.get(cache_key)
             if cached is UNSATISFIABLE_RESULT:
                 raise Unsatisfiable
             if cached is not MISSING:
@@ -753,12 +758,12 @@ class CoverageContext:
             value = self._generate_from_schema_inner(schema)
         except Unsatisfiable:
             if cache_key is not None:
-                schema_generation_cache[cache_key] = UNSATISFIABLE_RESULT
+                self.session.values[cache_key] = UNSATISFIABLE_RESULT
             raise
         if isinstance(value, list) and isinstance(schema, dict) and "contains" in schema:
             value = _ensure_contains_bounds(self, value, schema)
         if cache_key is not None:
-            schema_generation_cache[cache_key] = deepclone(value) if isinstance(value, (dict, list)) else value
+            self.session.values[cache_key] = deepclone(value) if isinstance(value, (dict, list)) else value
         return value
 
     def _generate_from_schema_inner(self, schema: JsonSchemaObject) -> Any:
@@ -990,7 +995,7 @@ class CoverageContext:
             and (fmt := schema.get("format")) in VALIDATED_FORMATS
             and fmt in self.custom_formats
         ):
-            validator = _get_format_validator(fmt, self.validator_cls)
+            validator = _get_format_validator(self.session, fmt, self.validator_cls)
             strategy = strategy.filter(lambda v: not isinstance(v, str) or validator.is_valid(v))
         return self.generate_from(strategy)
 
@@ -1030,15 +1035,15 @@ def _apply_pattern_optimizations(
             _apply_pattern_optimizations(item, update_pattern)
 
 
-_READY_BUNDLE_CACHE: BoundedCache = BoundedCache(maxsize=64)
-
-
 def _ready_bundle(
-    bundle: dict[str, Any], update_pattern: Callable[[str, int | None, int | None], str] | None, draft4: bool
+    session: GenerationSession,
+    bundle: dict[str, Any],
+    update_pattern: Callable[[str, int | None, int | None], str] | None,
+    draft4: bool,
 ) -> dict[str, Any]:
     """The bundled definitions with pattern rewrites and draft spellings already applied."""
     key = (id(bundle), id(update_pattern), draft4)
-    cached = _READY_BUNDLE_CACHE.get(key)
+    cached = session.ready_bundles.get(key)
     if cached is not MISSING:
         return cached[0]
     if update_pattern is None:
@@ -1049,7 +1054,7 @@ def _ready_bundle(
         _apply_pattern_optimizations(result, update_pattern)
         result = _prepared_by_name(result, draft4=draft4, drop=frozenset())
     # The trailing elements pin the keyed objects, so their `id`s cannot be recycled into a stale hit.
-    _READY_BUNDLE_CACHE[key] = (result, bundle, update_pattern)
+    session.ready_bundles[key] = (result, bundle, update_pattern)
     return result
 
 
@@ -3560,7 +3565,7 @@ def _negative_pattern(
     # The same regex recurs verbatim across operations; one Hypothesis search covers the whole audit.
     # `representable` makes the outcome location-dependent, so the location is part of the key.
     cache_key = ("negative_pattern", pattern, min_length, max_length, ctx.location, ctx.validator_cls)
-    value = schema_generation_cache.get(cache_key)
+    value = ctx.session.values.get(cache_key)
     if value is UNSATISFIABLE_RESULT:
         raise Unsatisfiable
     if value is MISSING:
@@ -3580,9 +3585,9 @@ def _negative_pattern(
         try:
             value = ctx.generate_from(strategy)
         except Unsatisfiable:
-            schema_generation_cache[cache_key] = UNSATISFIABLE_RESULT
+            ctx.session.values[cache_key] = UNSATISFIABLE_RESULT
             raise
-        schema_generation_cache[cache_key] = value
+        ctx.session.values[cache_key] = value
     yield NegativeValue(
         value,
         scenario=CoverageScenario.INVALID_PATTERN,
@@ -3667,12 +3672,14 @@ def _negative_required(
         )
 
 
-def _violates_format(value: object, format: str, validator_cls: type[jsonschema_rs.Validator]) -> bool:
-    return not conforms_to_format(value, format, validator_cls)
+def _violates_format(
+    value: object, session: GenerationSession, format: str, validator_cls: type[jsonschema_rs.Validator]
+) -> bool:
+    return not conforms_to_format(session, value, format, validator_cls)
 
 
-def _violates_hostname(value: object, validator_cls: type[jsonschema_rs.Validator]) -> bool:
-    return value == "" or not conforms_to_format(value, "hostname", validator_cls)
+def _violates_hostname(value: object, session: GenerationSession, validator_cls: type[jsonschema_rs.Validator]) -> bool:
+    return value == "" or not conforms_to_format(session, value, "hostname", validator_cls)
 
 
 def _negative_format(
@@ -3703,7 +3710,7 @@ def _negative_format(
     except (TypeError, ValueError):
         cache_key = None
     if cache_key is not None:
-        cached = schema_generation_cache.get(cache_key)
+        cached = ctx.session.values.get(cache_key)
         if cached is UNSATISFIABLE_RESULT:
             raise Unsatisfiable
         if cached is not MISSING:
@@ -3715,9 +3722,9 @@ def _negative_format(
             )
             return
     if format == "hostname":
-        filter_fn = partial(_violates_hostname, validator_cls=validator_cls)
+        filter_fn = partial(_violates_hostname, session=ctx.session, validator_cls=validator_cls)
     else:
-        filter_fn = partial(_violates_format, format=format, validator_cls=validator_cls)
+        filter_fn = partial(_violates_format, session=ctx.session, format=format, validator_cls=validator_cls)
     try:
         strategy = ctx.build_strategy(without_format)
         if strategy is None:
@@ -3725,10 +3732,10 @@ def _negative_format(
         value: str = examples.generate_one(strategy.filter(filter_fn))
     except Unsatisfiable:
         if cache_key is not None:
-            schema_generation_cache[cache_key] = UNSATISFIABLE_RESULT
+            ctx.session.values[cache_key] = UNSATISFIABLE_RESULT
         raise
     if cache_key is not None:
-        schema_generation_cache[cache_key] = value
+        ctx.session.values[cache_key] = value
     yield NegativeValue(
         value,
         scenario=CoverageScenario.INVALID_FORMAT,
@@ -3853,7 +3860,7 @@ def _negative_type(
     except (TypeError, ValueError):
         cache_key = None
     if cache_key is not None:
-        cached = schema_generation_cache.get(cache_key)
+        cached = ctx.session.values.get(cache_key)
         if cached is not MISSING:
             for value in cached:
                 if seen.insert(value) and ctx.wire.representable(value):
@@ -3927,7 +3934,7 @@ def _negative_type(
         schema = dict(schema)
         schema[BUNDLE_STORAGE_KEY] = ctx.root_schema[BUNDLE_STORAGE_KEY]
 
-    schema = _remove_examples(schema)
+    schema = _remove_examples(ctx.session, schema)
 
     try:
         is_valid = make_validator(schema, ctx.validator_cls).is_valid
@@ -3965,7 +3972,7 @@ def _negative_type(
             except Unsatisfiable:
                 break
     if cache_key is not None:
-        schema_generation_cache[cache_key] = generated_values
+        ctx.session.values[cache_key] = generated_values
     for value in generated_values:
         if seen.insert(value) and ctx.wire.representable(value):
             yield NegativeValue(
