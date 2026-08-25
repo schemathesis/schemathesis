@@ -4106,3 +4106,20 @@ def test_positive_declared_property_meets_matching_pattern_properties(ctx_factor
     validator = jsonschema_rs.Draft202012Validator(schema)
     for value in cover_schema(ctx, schema):
         assert validator.is_valid(value), value
+
+
+# Merged property halves conflict and one half requires a name, so the property itself admits no object.
+def test_positive_all_of_merged_property_keeps_nested_required(ctx_factory):
+    schema = {
+        "allOf": [
+            {
+                "type": "object",
+                "properties": {"c": {"type": "object", "properties": {"a": {"type": "null"}}, "required": ["a"]}},
+            },
+            {"type": "object", "properties": {"c": {"type": "object", "properties": {"a": {"type": "boolean"}}}}},
+        ]
+    }
+    ctx = ctx_factory(root_schema=schema, location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert validator.is_valid(value), value

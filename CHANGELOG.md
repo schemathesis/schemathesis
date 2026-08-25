@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.25.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.
+
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 
 ### :wrench: Changed

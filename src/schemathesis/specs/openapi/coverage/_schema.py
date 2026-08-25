@@ -1302,6 +1302,13 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     if merged.get("not") == {}:
         # A branch rejects every value, so the keywords folded in around it cannot make one fit.
         return {"not": {}}
+    required = merged.get("required")
+    if isinstance(required, list) and isinstance(merged.get("properties"), dict):
+        # Requiring a name whose merged schema admits nothing leaves no object to satisfy the fold.
+        for name in required:
+            sub = merged["properties"].get(name)
+            if sub is False or sub == {"not": {}}:
+                return {"not": {}}
     if "$ref" in merged and any(key != "$ref" and key not in _ANNOTATION_KEYWORDS for key in merged):
         # A reference that stays unresolved overrides everything folded in beside it, so those
         # constraints would silently vanish from the value.
