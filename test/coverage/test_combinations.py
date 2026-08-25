@@ -4108,6 +4108,28 @@ def test_positive_declared_property_meets_matching_pattern_properties(ctx_factor
         assert validator.is_valid(value), value
 
 
+# A branch's `$ref` siblings narrow what it admits; ignoring them lets a value matching exactly
+# one branch ship as a `oneOf` violation.
+def test_negative_one_of_judges_branches_with_ref_sibling_keywords(ctx_factory):
+    schema = {
+        "oneOf": [
+            {"type": "null"},
+            {"$ref": f"#/{BUNDLE_STORAGE_KEY}/A", "anyOf": [{"type": "null"}]},
+            {"type": "array", "items": {"type": "null"}},
+        ],
+        BUNDLE_STORAGE_KEY: {"A": {}},
+    }
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert not validator.is_valid(value), value
+
+
 # Merged property halves conflict and one half requires a name, so the property itself admits no object.
 def test_positive_all_of_merged_property_keeps_nested_required(ctx_factory):
     schema = {
