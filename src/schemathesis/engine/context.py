@@ -20,6 +20,7 @@ from schemathesis.engine.observations import Observations
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
+from schemathesis.generation.coverage import GenerationSession
 from schemathesis.python._constants.orchestrator import build_constants_pool
 from schemathesis.python._constants.pool import ConstantsPool
 from schemathesis.schemas import APIOperation
@@ -68,6 +69,8 @@ class EngineContext:
         "_checks_lock",
         "_constants_extraction",
         "_constants_extraction_lock",
+        "coverage_session",
+        "coverage_unexpected_methods_seen",
         "reauth",
     )
 
@@ -106,6 +109,9 @@ class EngineContext:
         self._constants_extraction = LazyInit.UNSET
         self._constants_extraction_lock = threading.Lock()
         self.reauth = ReauthState(retry_on_statuses=schema.reauth_retry_statuses)
+        # Coverage generation state lives and dies with the run.
+        self.coverage_session = GenerationSession()
+        self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 

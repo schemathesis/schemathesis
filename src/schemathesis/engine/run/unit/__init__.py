@@ -59,6 +59,8 @@ def _build_coverage_generator(
         auth_storage=as_strategy_kwargs.get("auth_storage"),
         as_strategy_kwargs=as_strategy_kwargs,
         feedback=feedback,
+        session=ctx.coverage_session,
+        unexpected_methods_seen=ctx.coverage_unexpected_methods_seen,
     )
 
 
@@ -90,7 +92,6 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         mode = HypothesisTestMode.EXAMPLES
     elif phase.name == PhaseName.COVERAGE:
         mode = HypothesisTestMode.COVERAGE
-        engine.schema.reset_coverage_state()
     else:
         mode = HypothesisTestMode.FUZZING
 

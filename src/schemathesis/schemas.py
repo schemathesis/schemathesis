@@ -29,6 +29,7 @@ from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
+from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
 from schemathesis.generation.meta import CaseMetadata
@@ -499,9 +500,6 @@ class BaseSchema(Mapping):
         """Return spec-specific data the coverage phase asks of a schema."""
         return CoverageCapabilities(format_strategies={}, update_pattern=None, validator_cls=None)
 
-    def reset_coverage_state(self) -> None:
-        """Reset spec-specific runtime state held across coverage runs; default is a no-op."""
-
     def record_runtime_observations(
         self,
         *,
@@ -522,6 +520,8 @@ class BaseSchema(Mapping):
         generation_config: GenerationConfig,
         extra_data_source: ResourcePool | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
+        unexpected_methods_seen: set[tuple[str, str]] | None = None,
+        session: GenerationSession | None = None,
     ) -> Iterator[Case]:
         raise NotImplementedError
 

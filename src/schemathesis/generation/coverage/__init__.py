@@ -15,13 +15,24 @@ MAX_PINNED_REGISTRIES = 64
 class GenerationSession:
     """Owns the caches one coverage run draws from; closing it releases them all."""
 
-    __slots__ = ("_lock", "_pinned", "format_validators", "ready_bundles", "removed_examples", "values")
+    __slots__ = (
+        "_lock",
+        "_pinned",
+        "draw_outcomes",
+        "format_validators",
+        "pattern_strategies",
+        "ready_bundles",
+        "removed_examples",
+        "values",
+    )
 
     def __init__(self) -> None:
         self.values: BoundedCache = BoundedCache(maxsize=2048)
         self.format_validators: dict[tuple[str, type[jsonschema_rs.Validator]], jsonschema_rs.Validator] = {}
         self.removed_examples: BoundedCache = BoundedCache(maxsize=4096)
         self.ready_bundles: BoundedCache = BoundedCache(maxsize=64)
+        self.draw_outcomes: BoundedCache = BoundedCache(maxsize=128)
+        self.pattern_strategies: BoundedCache = BoundedCache(maxsize=128)
         # Pinning a registry keeps its `id` from being recycled into a colliding token.
         self._pinned: OrderedDict[int, object] = OrderedDict()
         self._lock = threading.Lock()
@@ -45,6 +56,8 @@ class GenerationSession:
         self.format_validators.clear()
         self.removed_examples.clear()
         self.ready_bundles.clear()
+        self.draw_outcomes.clear()
+        self.pattern_strategies.clear()
         with self._lock:
             self._pinned.clear()
 
