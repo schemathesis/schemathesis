@@ -11,7 +11,7 @@ from contextlib import ExitStack, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
-from functools import lru_cache, partial
+from functools import partial
 from hashlib import blake2b
 from itertools import combinations, count, islice
 from math import ceil, floor, inf, isinf, nextafter, ulp
@@ -69,13 +69,13 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
+from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION, GenerationSession
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples
 from schemathesis.generation.jsonschema import build
 from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.converter import apply_rewritten_pattern
-from schemathesis.specs.openapi.coverage._session import DEFAULT_GENERATION_SESSION, GenerationSession
 from schemathesis.specs.openapi.coverage._wire import (
     HEADER_ALLOWED_CHARS,
     WireSemantics,
@@ -362,18 +362,17 @@ PositiveValue = GeneratedValue.with_positive
 NegativeValue = GeneratedValue.with_negative
 
 
-@lru_cache(maxsize=128)
-def _draw_outcome(strategy: st.SearchStrategy) -> tuple[Any, Unsatisfiable | None]:
+def cached_draw(session: GenerationSession, strategy: st.SearchStrategy) -> Any:
     # Draws are seeded, so a strategy that yields nothing yields nothing every time - and finding
     # that out costs the whole generation budget, which is far too much to pay twice.
-    try:
-        return examples.generate_one(strategy), None
-    except Unsatisfiable as exc:
-        return None, exc
-
-
-def cached_draw(strategy: st.SearchStrategy) -> Any:
-    value, failure = _draw_outcome(strategy)
+    outcome = session.draw_outcomes.get(strategy)
+    if outcome is MISSING:
+        try:
+            outcome = (examples.generate_one(strategy), None)
+        except Unsatisfiable as exc:
+            outcome = (None, exc)
+        session.draw_outcomes[strategy] = outcome
+    value, failure = outcome
     if failure is not None:
         raise failure.with_traceback(None)
     return value
@@ -387,15 +386,19 @@ def _keeps_length_within(pattern: str, min_length: int | None, max_length: int |
     return max_length is None or (pattern_max is not None and pattern_max <= max_length)
 
 
-@lru_cache(maxsize=128)
 def _pattern_strategy(
-    pattern: str, min_length: int | None, max_length: int | None, fmt: str | None
+    session: GenerationSession, pattern: str, min_length: int | None, max_length: int | None, fmt: str | None
 ) -> st.SearchStrategy | None:
     """Strings the pattern matches within the length bounds, or `None` when Python `re` cannot read it."""
     # Memoized because `cached_draw` keys on the strategy itself: a pattern rebuilt per draw arrives as
     # a fresh object every time, so the same regex gets drawn from again instead of answering from cache.
+    key = (pattern, min_length, max_length, fmt)
+    cached = session.pattern_strategies.get(key)
+    if cached is not MISSING:
+        return cached
     compiled = compile_ecma_pattern(pattern)
     if compiled is None:
+        session.pattern_strategies[key] = None
         return None
     strategy = st.from_regex(compiled, fullmatch=True)
     if min_length is not None and max_length is not None:
@@ -406,6 +409,7 @@ def _pattern_strategy(
         strategy = strategy.filter(lambda s: len(s) <= max_length)
     if fmt is not None:
         strategy = strategy.filter(make_validator_for({"type": "string", "format": fmt}).is_valid)
+    session.pattern_strategies[key] = strategy
     return strategy
 
 
@@ -606,7 +610,7 @@ class CoverageContext:
         )
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
-        return cached_draw(strategy)
+        return cached_draw(self.session, strategy)
 
     def build_strategy(self, schema: JsonSchema) -> st.SearchStrategy | None:
         draft = CANONICALIZE_DRAFT_BY_VALIDATOR[self.validator_cls]
@@ -807,13 +811,13 @@ class CoverageContext:
         # such a schema is built whole instead.
         if not any(key in schema for key in _FOLDED_KEYS):
             if keys == ["type"]:
-                return cached_draw(get_strategy_for_type(schema["type"]))
+                return cached_draw(self.session, get_strategy_for_type(schema["type"]))
             if keys == ["format", "type"]:
                 if schema["type"] != "string":
-                    return cached_draw(get_strategy_for_type(schema["type"]))
+                    return cached_draw(self.session, get_strategy_for_type(schema["type"]))
                 fmt = schema["format"]
                 if fmt in self.custom_formats:
-                    return cached_draw(self.custom_formats[fmt])
+                    return cached_draw(self.session, self.custom_formats[fmt])
             if (
                 "properties" in keys
                 and set(keys) <= {"properties", "required", "type", "minProperties"}
@@ -851,7 +855,7 @@ class CoverageContext:
                 enum_values = [v for v in schema["enum"] if _is_valid_with_formats(v, schema, self)]
                 if not enum_values:
                     raise Unsatisfiable
-                return cached_draw(st.sampled_from(enum_values))
+                return cached_draw(self.session, st.sampled_from(enum_values))
             if "pattern" in schema and "string" in get_type(schema):
                 pattern = schema["pattern"]
                 try:
@@ -886,10 +890,12 @@ class CoverageContext:
                 if min_length is not None and min_length > MAX_GENERATED_PATTERN_LENGTH:
                     return self._long_string_matching(schema, min_length)
                 fmt = schema.get("format")
-                strategy = _pattern_strategy(pattern, min_length, max_length, fmt if fmt in VALIDATED_FORMATS else None)
+                strategy = _pattern_strategy(
+                    self.session, pattern, min_length, max_length, fmt if fmt in VALIDATED_FORMATS else None
+                )
                 if strategy is None:
                     raise Unsatisfiable from None
-                return cached_draw(strategy)
+                return cached_draw(self.session, strategy)
             if (
                 isinstance(min_properties, int)
                 and min_properties > MAX_DRAWN_OBJECT_PROPERTIES
@@ -930,14 +936,14 @@ class CoverageContext:
                         if min_items:
                             raise Unsatisfiable
                         return []
-                    return cached_draw(st.lists(st.sampled_from(enum_values), min_size=min_items))
+                    return cached_draw(self.session, st.lists(st.sampled_from(enum_values), min_size=min_items))
                 # Recurse so `items`-level `example`/`examples`/`default` reach generation.
                 if any(k in items for k in ("example", "examples", "default")):
                     size = max(min_items, 1)
                     return [self.generate_from_schema(items) for _ in range(size)]
                 sub_keys = sorted([k for k in items if not k.startswith("x-") and k not in ["description", "example"]])
                 if sub_keys == ["type"] and items["type"] == "string":
-                    return cached_draw(st.lists(st.text(), min_size=min_items))
+                    return cached_draw(self.session, st.lists(st.text(), min_size=min_items))
                 if (
                     sub_keys == ["properties", "required", "type"]
                     or sub_keys == ["properties", "type"]
@@ -949,10 +955,11 @@ class CoverageContext:
                         strategies = {key: self.build_strategy(sub) for key, sub in items["properties"].items()}
                         if all(strategy is not None for strategy in strategies.values()):
                             return cached_draw(
+                                self.session,
                                 st.lists(
                                     st.fixed_dictionaries(cast("dict[str, st.SearchStrategy]", strategies)),
                                     min_size=min_items,
-                                )
+                                ),
                             )
 
         if keys == ["allOf"]:

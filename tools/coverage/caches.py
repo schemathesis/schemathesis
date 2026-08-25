@@ -12,8 +12,6 @@ from schemathesis.specs.openapi.coverage import _schema
 
 
 def clear_internal_caches() -> None:
-    _schema._draw_outcome.cache_clear()
-    _schema._pattern_strategy.cache_clear()
     _schema.DEFAULT_GENERATION_SESSION.close()
     patterns.normalize_regex.cache_clear()
     patterns.is_valid_jsonschema_rs_regex.cache_clear()

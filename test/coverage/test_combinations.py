@@ -18,6 +18,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator_for
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone, transform
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.coverage import MAX_PINNED_REGISTRIES, GenerationSession
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.coverage import _schema
@@ -33,7 +34,6 @@ from schemathesis.specs.openapi.coverage._schema import (
     _positive_string,
     cover_schema_iter,
 )
-from schemathesis.specs.openapi.coverage._session import MAX_PINNED_REGISTRIES, GenerationSession
 from schemathesis.specs.openapi.patterns import update_quantifier
 from test.coverage.helpers import scenario_values
 from test.utils import to_float32

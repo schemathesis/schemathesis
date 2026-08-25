@@ -61,6 +61,6 @@ def reset_hooks():
     canonical_strategy_cache.clear()
     validator_cache.clear()
     _validator_failure_cache.clear()
-    from schemathesis.specs.openapi.coverage._session import DEFAULT_GENERATION_SESSION
+    from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION
 
     DEFAULT_GENERATION_SESSION.close()

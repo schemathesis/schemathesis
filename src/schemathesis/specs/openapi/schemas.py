@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
+    from schemathesis.generation.coverage import GenerationSession
     from schemathesis.generation.stateful import APIStateMachine
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.specs.openapi.adapter import OpenApiResponses
@@ -99,8 +100,7 @@ class OpenApiSchema(BaseSchema):
         self._operation_lookup = OperationLookup(self, HTTP_METHODS)
         self._operations = OperationLoader(self)
         self._response_validator = ResponseValidator(self)
-        # Path-level dedup of undeclared-method coverage probes; cleared per coverage phase via
-        # `reset_coverage_state`.
+        # Path-level dedup of undeclared-method coverage probes for callers that pass no run-scoped set.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
         # Per-operation security overlays populated by runtime auth inference. Empty when the server
         # never enforces auth on a declared-public operation; otherwise generations consult this
@@ -178,10 +178,6 @@ class OpenApiSchema(BaseSchema):
         )
 
     @override
-    def reset_coverage_state(self) -> None:
-        self.coverage_unexpected_methods_seen.clear()
-
-    @override
     def record_runtime_observations(
         self,
         *,
@@ -212,6 +208,8 @@ class OpenApiSchema(BaseSchema):
         generation_config: GenerationConfig,
         extra_data_source: ResourcePool | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
+        unexpected_methods_seen: set[tuple[str, str]] | None = None,
+        session: GenerationSession | None = None,
     ) -> Iterator[Case]:
         from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 
@@ -223,8 +221,11 @@ class OpenApiSchema(BaseSchema):
             unexpected_methods=phases_config.coverage.unexpected_methods,
             generation_config=generation_config,
             extra_data_source=extra_data_source,
-            unexpected_methods_seen=self.coverage_unexpected_methods_seen,
+            unexpected_methods_seen=unexpected_methods_seen
+            if unexpected_methods_seen is not None
+            else self.coverage_unexpected_methods_seen,
             error_feedback=error_feedback,
+            session=session,
         )
 
     @override

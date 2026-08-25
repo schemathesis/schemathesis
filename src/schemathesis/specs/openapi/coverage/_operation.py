@@ -20,6 +20,7 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
+from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.generation.hypothesis.builder import _case_to_kwargs
@@ -402,6 +403,7 @@ def iter_coverage_cases(
     extra_data_source: ResourcePool | None = None,
     unexpected_methods_seen: set[tuple[str, str]] | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
+    session: GenerationSession | None = None,
 ) -> Generator[Case, None, None]:
     generators: dict[tuple[ParameterLocation, str], Generator[GeneratedValue, None, None]] = {}
     serializers = operation.get_parameter_serializers()
@@ -534,6 +536,7 @@ def iter_coverage_cases(
                 schema = {**schema, "examples": [pool_value]}
         gen = cover_schema_iter(
             CoverageContext(
+                session=session,
                 root_schema=schema,
                 location=location,
                 media_type=None,
@@ -564,6 +567,7 @@ def iter_coverage_cases(
                 schema.setdefault("minLength", 1)
                 gen = cover_schema_iter(
                     CoverageContext(
+                        session=session,
                         root_schema=schema,
                         location=location,
                         media_type=None,
@@ -719,6 +723,7 @@ def iter_coverage_cases(
                 ) from exc
             gen = cover_schema_iter(
                 CoverageContext(
+                    session=session,
                     root_schema=schema,
                     location=ParameterLocation.BODY,
                     media_type=media_type,
@@ -751,6 +756,7 @@ def iter_coverage_cases(
                     # separately and prefer it for the template.
                     pos_gen = cover_schema_iter(
                         CoverageContext(
+                            session=session,
                             root_schema=schema,
                             location=ParameterLocation.BODY,
                             media_type=media_type,
@@ -1066,6 +1072,7 @@ def iter_coverage_cases(
             iterator = iter(
                 cover_schema_iter(
                     CoverageContext(
+                        session=session,
                         root_schema=subschema,
                         location=_location,
                         media_type=None,

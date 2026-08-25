@@ -24,6 +24,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid_headers
+from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -108,6 +109,8 @@ class CoverageGenerator:
         auth_storage: AuthStorage | None,
         as_strategy_kwargs: dict[str, Any],
         feedback: FeedbackSources,
+        session: GenerationSession | None = None,
+        unexpected_methods_seen: set[tuple[str, str]] | None = None,
     ) -> None:
         self._operation = operation
         self._generation_modes = generation_modes
@@ -115,6 +118,8 @@ class CoverageGenerator:
         self._auth_storage = auth_storage
         self._as_strategy_kwargs = as_strategy_kwargs
         self._feedback = feedback
+        self._session = session
+        self._unexpected_methods_seen = unexpected_methods_seen
         self._controller = Controller()
         _capture_missing_path_parameters(operation, self._controller)
 
@@ -153,6 +158,8 @@ class CoverageGenerator:
                 generation_config=self._generation_config,
                 extra_data_source=extra_data_source,
                 error_feedback=error_feedback,
+                unexpected_methods_seen=self._unexpected_methods_seen,
+                session=self._session,
             ):
                 if (
                     case.media_type

@@ -144,8 +144,6 @@ class CoverageBackend(Protocol):
 
     def get_coverage_capabilities(self) -> CoverageCapabilities: ...  # pragma: no cover
 
-    def reset_coverage_state(self) -> None: ...  # pragma: no cover
-
     def iter_coverage_cases(
         self,
         operation: APIOperation,

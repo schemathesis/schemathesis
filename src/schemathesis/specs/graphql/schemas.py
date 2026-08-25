@@ -29,6 +29,7 @@ from schemathesis.core.timing import Instant
 from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
+from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -222,6 +223,8 @@ class GraphQLSchema(BaseSchema):
         generation_config: GenerationConfig,
         extra_data_source: ResourcePool | None = None,
         error_feedback: ErrorFeedbackStore | None = None,
+        unexpected_methods_seen: set[tuple[str, str]] | None = None,
+        session: GenerationSession | None = None,
     ) -> Iterator[Case]:
         # GraphQL has no coverage phase yet; the schema-level case enumerator is empty.
         return iter(())
