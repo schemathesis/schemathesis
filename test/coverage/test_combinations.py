@@ -4108,6 +4108,42 @@ def test_positive_declared_property_meets_matching_pattern_properties(ctx_factor
         assert validator.is_valid(value), value
 
 
+# Under Draft 2020-12 the first positions belong to `prefixItems`; `items` values must not land there.
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"items": {}, "prefixItems": [False]},
+        {"type": "array", "items": {"type": "integer"}, "prefixItems": [{"type": "string"}]},
+    ],
+    ids=["forbidden-first", "typed-first"],
+)
+def test_positive_array_items_covering_respects_prefix_items(ctx_factory, schema):
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert validator.is_valid(value), value
+
+
+def test_negative_prefix_items_covered_for_raw_keyword(ctx_factory):
+    schema = {"type": "array", "prefixItems": [{"type": "integer"}], "minItems": 1}
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = cover_schema(ctx, schema)
+    assert any(isinstance(value, list) and value for value in values), values
+    for value in values:
+        assert not validator.is_valid(value), value
+
+
 # A branch's `$ref` siblings narrow what it admits; ignoring them lets a value matching exactly
 # one branch ship as a `oneOf` violation.
 def test_negative_one_of_judges_branches_with_ref_sibling_keywords(ctx_factory):
