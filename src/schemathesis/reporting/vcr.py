@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import json
 from io import StringIO
 from pathlib import Path
@@ -9,6 +8,7 @@ from typing import IO, TYPE_CHECKING
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url
+from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transport import Headers, Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status
@@ -178,7 +178,7 @@ class VcrWriter:
             else:
                 uri = interaction.request.uri
 
-            recorded_at = datetime.datetime.fromtimestamp(interaction.timestamp, datetime.timezone.utc).isoformat()
+            recorded_at = format_timestamp(interaction.timestamp)
 
             stream.write(f"\n  recorded_at: '{recorded_at}'")
             write_checks(checks)

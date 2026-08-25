@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.25.2...HEAD) - TBD
 
+### :rocket: Added
+
+- `--report json` writes the run's verdict as one JSON document.
+
 ### :bug: Fixed
 
 - Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.

@@ -104,13 +104,14 @@ Network requests options:
 Output options:
   --report FORMAT                 Generate test reports in formats specified as
                                   a comma-separated list [possible values:
-                                  junit, vcr, har, ndjson, allure]
+                                  junit, vcr, har, ndjson, json, allure]
   --report-dir DIRECTORY          Directory to store all report files  [default:
                                   schemathesis-report]
   --report-junit-path FILENAME    Custom path for JUnit XML report
   --report-vcr-path FILENAME      Custom path for VCR cassette
   --report-har-path FILENAME      Custom path for HAR file
   --report-ndjson-path FILENAME   Custom path for NDJSON events file
+  --report-json-path FILENAME     Custom path for the JSON run report
   --report-allure-path DIRECTORY  Directory for Allure result files
   --report-preserve-bytes         Retain exact byte sequence of payloads in
                                   cassettes, encoded as base64

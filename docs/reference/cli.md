@@ -394,7 +394,7 @@ These options control the reporting and output format of test results:
 !!! note ""
 
     **Type**: `Comma-separated list`  
-    **Possible values**: `junit`, `vcr`, `har`, `ndjson`  
+    **Possible values**: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`  
 
     Generate test reports in specified formats as a comma-separated list.
 
@@ -424,7 +424,7 @@ These options control the reporting and output format of test results:
     Custom path for JUnit XML report.
 
     ```console
-    $ st run openapi.yaml --report junit --report-junit-path ./custom-junit.xml
+    $ st run openapi.yaml --report-junit-path ./custom-junit.xml
     ```
 
 #### `--report-vcr-path FILENAME`
@@ -436,7 +436,7 @@ These options control the reporting and output format of test results:
     Custom path for VCR cassette.
 
     ```console
-    $ st run openapi.yaml --report vcr --report-vcr-path ./custom-vcr.yaml
+    $ st run openapi.yaml --report-vcr-path ./custom-vcr.yaml
     ```
 
 #### `--report-har-path FILENAME`
@@ -448,7 +448,7 @@ These options control the reporting and output format of test results:
     Custom path for HAR file.
 
     ```console
-    $ st run openapi.yaml --report har --report-har-path ./custom-har.json
+    $ st run openapi.yaml --report-har-path ./custom-har.json
     ```
 
 #### `--report-ndjson-path FILENAME`
@@ -460,7 +460,19 @@ These options control the reporting and output format of test results:
     Custom path for NDJSON events file. This format exports all engine events as newline-delimited JSON, useful for analysis and tooling integration. Not applicable to the pytest plugin.
 
     ```console
-    $ st run openapi.yaml --report ndjson --report-ndjson-path ./events.ndjson
+    $ st run openapi.yaml --report-ndjson-path ./events.ndjson
+    ```
+
+#### `--report-json-path FILENAME`
+
+!!! note ""
+
+    **Type**: `String`  
+
+    Custom path for the JSON run report. This format exports the run's verdict as a single JSON document — operation counts, phase statuses, grouped failures and errors, and warnings — so CI can read what a run was worth without scraping the terminal. Not applicable to the pytest plugin.
+
+    ```console
+    $ st run openapi.yaml --report-json-path ./report.json
     ```
 
 #### `--report-preserve-bytes`

@@ -24,7 +24,11 @@ from schemathesis.cli.output import (
     make_console,
     print_lines,
 )
-from schemathesis.cli.summary import OperationsSummary, reduce_errors, reduce_failures, reduce_test_cases
+from schemathesis.cli.summary import (
+    reduce_errors,
+    reduce_failures,
+    reduce_test_cases,
+)
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, StopReason
@@ -296,21 +300,6 @@ class FuzzOutputHandler(BaseOutputHandler["FuzzExecutionContext"]):
 
 
 def _display_api_operations(ctx: FuzzExecutionContext) -> None:
-    assert ctx.api_statistic is not None
-    errored = len(
-        {
-            err.label
-            for err in ctx.errors
-            if err.related_to_operation and err.label not in ctx.statistic.tested_operations
-        }
-    )
-    display_api_operations(
-        OperationsSummary(
-            total=ctx.api_statistic.operations.total,
-            selected=ctx.api_statistic.operations.selected,
-            tested=len(ctx.statistic.tested_operations),
-            errored=errored,
-            skipped=0,
-            skip_reasons=[],
-        )
-    )
+    operations = ctx.summary().operations
+    assert operations is not None
+    display_api_operations(operations)

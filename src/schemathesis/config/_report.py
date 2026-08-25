@@ -19,6 +19,7 @@ class ReportFormat(str, Enum):
     VCR = "vcr"
     HAR = "har"
     NDJSON = "ndjson"
+    JSON = "json"
     ALLURE = "allure"
 
     @property
@@ -29,6 +30,7 @@ class ReportFormat(str, Enum):
             self.VCR: "yaml",
             self.HAR: "json",
             self.NDJSON: "ndjson",
+            self.JSON: "json",
             # directory output — no file extension
             self.ALLURE: "",
         }[self]
@@ -60,6 +62,7 @@ class ReportsConfig(DiffBase):
     vcr: ReportConfig
     har: ReportConfig
     ndjson: ReportConfig
+    json: ReportConfig
     allure: ReportConfig
     _timestamp: str
 
@@ -72,6 +75,7 @@ class ReportsConfig(DiffBase):
         vcr: ReportConfig | None = None,
         har: ReportConfig | None = None,
         ndjson: ReportConfig | None = None,
+        json: ReportConfig | None = None,
         allure: ReportConfig | None = None,
     ) -> None:
         self.directory = Path(resolve(directory) or DEFAULT_REPORT_DIRECTORY)
@@ -80,6 +84,7 @@ class ReportsConfig(DiffBase):
         self.vcr = vcr or ReportConfig()
         self.har = har or ReportConfig()
         self.ndjson = ndjson or ReportConfig()
+        self.json = json or ReportConfig()
         self.allure = allure or ReportConfig()
         self._timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
@@ -92,6 +97,7 @@ class ReportsConfig(DiffBase):
             vcr=ReportConfig.from_dict(data.get("vcr", {})),
             har=ReportConfig.from_dict(data.get("har", {})),
             ndjson=ReportConfig.from_dict(data.get("ndjson", {})),
+            json=ReportConfig.from_dict(data.get("json", {})),
             allure=ReportConfig.from_dict(data.get("allure", {})),
         )
 
@@ -103,6 +109,7 @@ class ReportsConfig(DiffBase):
         vcr_path: str | None = None,
         har_path: str | None = None,
         ndjson_path: str | None = None,
+        json_path: str | None = None,
         allure_path: str | None = None,
         directory: Path = DEFAULT_REPORT_DIRECTORY,
         preserve_bytes: bool | None = None,
@@ -120,6 +127,9 @@ class ReportsConfig(DiffBase):
         if ndjson_path is not None or ReportFormat.NDJSON in formats:
             self.ndjson.enabled = True
             self.ndjson.path = Path(ndjson_path) if ndjson_path is not None else ndjson_path
+        if json_path is not None or ReportFormat.JSON in formats:
+            self.json.enabled = True
+            self.json.path = Path(json_path) if json_path is not None else json_path
         if allure_path is not None or ReportFormat.ALLURE in formats:
             self.allure.enabled = True
             self.allure.path = Path(allure_path) if allure_path is not None else allure_path

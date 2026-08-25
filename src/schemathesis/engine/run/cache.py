@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum, auto
 from typing import TYPE_CHECKING, cast
 
@@ -27,6 +27,7 @@ from schemathesis.core.cache import (
 from schemathesis.core.error_feedback import ObservationKind
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.timing import format_timestamp
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.recorder import ScenarioRecorder
 
@@ -160,7 +161,7 @@ def _flush(ctx: EngineContext, writer: CacheWriter) -> None:
             schemathesis_version=SCHEMATHESIS_VERSION,
             schema_location=ctx.schema.location or "",
             base_url=ctx.config.base_url or "",
-            created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            created_at=format_timestamp(time.time()),
         )
         entries: list[Entry] = []
     else:
