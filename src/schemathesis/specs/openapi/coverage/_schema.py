@@ -2341,10 +2341,9 @@ def cover_schema_iter(
                                 yield value
                 elif key == "oneOf":
                     nctx = ctx.with_negative()
-                    resolved_schemas = [
-                        ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value
-                    ]
-                    validators = _make_branch_validators(resolved_schemas, ctx)
+                    # Branches as written: the validator resolves `$ref` itself, so keywords beside it
+                    # count exactly as the operation's draft reads them.
+                    validators = _make_branch_validators(value, ctx)
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):

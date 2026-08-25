@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.
+- Coverage phase emitting valid values as `oneOf` violations for branches with `$ref` siblings.
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 
