@@ -18,6 +18,7 @@ except ImportError:
 import schemathesis
 from schemathesis.core.errors import InternalError
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
+from schemathesis.generation.hypothesis import examples
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import (
     _PARTIAL_SCRIPT_CLASSES,
@@ -616,18 +617,19 @@ def test_pin_pattern_length_leaves_possessive_repeats_alone():
         (r"[\p{L}&&[a]", None),
         (r"[\p{L}&&[:alpha]", None),
         (r"[\p{L}[a]", None),
-        # A named group spells differently in Python.
-        (r"^(?<major>\d+)\.(?<minor>\d+)$", r"^(?P<major>\d+)\.(?P<minor>\d+)$"),
-        (r"(?<word>\w+)-(?<rest>.*)", r"(?P<word>\w+)-(?P<rest>.*)"),
+        # Neither spelling of a group name is read by every engine, so the name goes.
+        (r"^(?<major>\d+)\.(?<minor>\d+)$", r"^(\d+)\.(\d+)$"),
+        (r"(?<word>\w+)-(?<rest>.*)", r"(\w+)-(.*)"),
+        (r"^(?P<major>\d+)\.(?P<minor>\d+)$", r"^(\d+)\.(\d+)$"),
         # Lookbehind opens the same way but names no group.
         (r"(?<=a)b", None),
         (r"(?<!a)b", None),
         # An escaped paren, and a class, leave the sequence as literal characters.
         (r"\(?<a>", None),
         (r"[(?<a>]", None),
-        # A name Python cannot carry, and a name reused across alternatives, which it rejects.
-        (r"(?<1st>a)", None),
-        (r"(?<x>a)|(?<x>b)", None),
+        # A name Python cannot carry, and a name reused across alternatives, both readable once dropped.
+        (r"(?<1st>a)", r"(a)"),
+        (r"(?<x>a)|(?<x>b)", r"(a)|(b)"),
         # No translation needed (already valid Python regex)
         (r"[a-z]+", None),
         (r"^\d+$", None),
@@ -1427,6 +1429,26 @@ def test_pattern_the_validator_cannot_compile_is_dropped(ctx):
 
     assert "pattern" not in parameter.optimized_schema
     assert parameter.optimized_schema["maxLength"] == 5
+
+
+@pytest.mark.parametrize("pattern", [r"^(?P<major>\d+)$", r"^(?<major>\d+)$"], ids=["python", "ecma"])
+def test_named_group_pattern_is_kept(ctx, pattern):
+    # A group name only one engine reads would leave the pattern refused where the schema is validated.
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "pattern": pattern}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schemathesis.openapi.from_dict(schema)["/items"]["GET"]
+    assert next(iter(operation.query)).optimized_schema["pattern"] == r"^(\d+)$"
+    assert examples.generate_one(operation.as_strategy()).query["q"].isdigit()
 
 
 def test_quantifier_rewrite_the_validator_cannot_compile_is_not_taken():

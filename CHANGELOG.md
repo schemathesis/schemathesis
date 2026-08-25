@@ -12,6 +12,7 @@
 - Coverage phase emitting valid values as `oneOf` violations for branches with `$ref` siblings.
 - Coverage phase ignoring `prefixItems` when building array cases for OpenAPI 3.1 operations.
 - Coverage phase dropping a required name `properties` does not declare from generated array items.
+- Generation failing for an OpenAPI 3.0 `pattern` that names a capture group.
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 
