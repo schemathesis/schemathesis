@@ -1849,6 +1849,350 @@ def _negation_ignored_by_dialect(ctx: CoverageContext, keyword: str) -> bool:
     return keyword in ("const", "propertyNames", "prefixItems") and ctx.validator_cls is jsonschema_rs.Draft4Validator
 
 
+def _negative_format_for_declared_types(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    declared = schema.get("type", [])
+    types = declared if isinstance(declared, list) else [declared]
+    if "string" in types or not types:
+        # Binary formats accept any bytes - no meaningful format violations
+        if value not in ("binary", "byte"):
+            yield from _negative_format(ctx, schema, value)
+
+
+def _negative_maximum(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    # Legacy draft-4 `exclusiveMaximum: true` makes `maximum` itself the excluded boundary.
+    next = value if schema.get("exclusiveMaximum") is True else _just_past(schema, value, going_up=True)
+    if next is not None and seen.insert(next):
+        yield NegativeValue(
+            next,
+            scenario=CoverageScenario.VALUE_ABOVE_MAXIMUM,
+            description="Value greater than maximum",
+            location=ctx.current_path,
+        )
+
+
+def _negative_minimum(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    # Legacy draft-4 `exclusiveMinimum: true` makes `minimum` itself the excluded boundary.
+    next = value if schema.get("exclusiveMinimum") is True else _just_past(schema, value, going_up=False)
+    if next is not None and seen.insert(next):
+        yield NegativeValue(
+            next,
+            scenario=CoverageScenario.VALUE_BELOW_MINIMUM,
+            description="Value smaller than minimum",
+            location=ctx.current_path,
+        )
+
+
+def _negative_exclusive_maximum(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if isinstance(value, bool):
+        return
+    yield NegativeValue(
+        value,
+        scenario=CoverageScenario.VALUE_ABOVE_MAXIMUM,
+        description="Value greater than maximum",
+        location=ctx.current_path,
+    )
+
+
+def _negative_exclusive_minimum(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not seen.insert(value):
+        return
+    if isinstance(value, bool):
+        return
+    yield NegativeValue(
+        value,
+        scenario=CoverageScenario.VALUE_BELOW_MINIMUM,
+        description="Value smaller than minimum",
+        location=ctx.current_path,
+    )
+
+
+def _negative_min_length(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not 0 < value < INTERNAL_BUFFER_SIZE:
+        return
+    # minLength only constrains strings; skip when schema explicitly excludes string type
+    if "string" not in get_type(schema):
+        return
+    if value == 1:
+        # In this case, the only possible negative string is an empty one
+        # The `pattern` value may require an non-empty one and the generation will fail
+        # However, it is fine to violate `pattern` here as it is negative string generation anyway
+        value = ""
+        if ctx.is_valid_for_location(value) and seen.insert(value):
+            yield NegativeValue(
+                value,
+                scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
+                description="String smaller than minLength",
+                location=ctx.current_path,
+            )
+    else:
+        with suppress(InvalidArgument):
+            min_length = max_length = value - 1
+            new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+            new_schema.pop("enum", None)
+            new_schema.pop("const", None)
+            new_schema["type"] = "string"
+            if "pattern" in new_schema and ctx.update_pattern is not None:
+                new_schema["pattern"] = ctx.update_pattern(schema["pattern"], min_length, max_length)
+            try:
+                value = ctx.generate_from_schema(new_schema)
+            except Unsatisfiable:
+                # Format or pattern may forbid the truncated length (e.g. no valid email of length 5).
+                fallback = {k: v for k, v in new_schema.items() if k != "format"}
+                if "pattern" in fallback:
+                    del fallback["minLength"]
+                    del fallback["maxLength"]
+                    value = ctx.generate_from_schema(fallback)[:max_length]
+                elif fallback != new_schema:
+                    value = ctx.generate_from_schema(fallback)
+                else:
+                    raise
+            if ctx.is_valid_for_location(value) and seen.insert(value):
+                yield NegativeValue(
+                    value,
+                    scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
+                    description="String smaller than minLength",
+                    location=ctx.current_path,
+                )
+
+
+def _negative_max_length(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not (isinstance(value, int) and value < MAX_STRING_LENGTH and "string" in get_type(schema)):
+        return
+    try:
+        target_length = value + 1
+        new_value: str | None
+        if target_length >= INTERNAL_BUFFER_SIZE:
+            # Cheap synthesis: any character violates the bound; bypass Hypothesis
+            # to avoid blowing past its internal buffer for very large limits.
+            new_value = "a" * target_length
+        else:
+            min_length = max_length = target_length
+            new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+            new_schema.pop("enum", None)
+            new_schema.pop("const", None)
+            new_schema["type"] = "string"
+            new_value = _generate_oversized_string(ctx, schema, new_schema, target_length)
+        if new_value is not None and seen.insert(new_value):
+            yield NegativeValue(
+                new_value,
+                scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,
+                description="String larger than maxLength",
+                location=ctx.current_path,
+            )
+    except (InvalidArgument, Unsatisfiable):
+        pass
+
+
+def _negative_max_items(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not (isinstance(value, int) and value < INTERNAL_BUFFER_SIZE):
+        return
+    if value > NEGATIVE_MODE_MAX_ITEMS:
+        # It could be extremely slow to generate large arrays
+        # Generate values up to the limit and reuse them to construct the final array
+        new_schema = {
+            **schema,
+            "minItems": NEGATIVE_MODE_MAX_ITEMS,
+            "maxItems": NEGATIVE_MODE_MAX_ITEMS,
+            "type": "array",
+        }
+        array_value: list = []
+        if "items" in schema and isinstance(schema["items"], dict):
+            # The schema may have another large array nested, therefore generate covering cases
+            # and use them to build an array for the current schema
+            negative = [case.value for case in islice(cover_schema_iter(ctx, schema["items"]), NEGATIVE_MODE_MAX_ITEMS)]
+            positive = [
+                case.value
+                for case in islice(cover_schema_iter(ctx.with_positive(), schema["items"]), NEGATIVE_MODE_MAX_ITEMS)
+            ]
+            # Interleave positive & negative values. Empty if either list is empty —
+            # fall back to direct generation below so the yielded array is non-empty.
+            array_value = [value for pair in zip(positive, negative, strict=False) for value in pair][
+                :NEGATIVE_MODE_MAX_ITEMS
+            ]
+        if not array_value:
+            try:
+                array_value = ctx.generate_from_schema(new_schema)
+            except (InvalidArgument, Unsatisfiable):
+                return
+
+        # Extend the array to be of length value + 1 by repeating its own elements
+        diff = value + 1 - len(array_value)
+        if diff > 0 and array_value:
+            array_value += array_value * (diff // len(array_value)) + array_value[: diff % len(array_value)]
+        if seen.insert(array_value):
+            yield NegativeValue(
+                array_value,
+                scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
+                description="Array with more items than allowed by maxItems",
+                location=ctx.current_path,
+            )
+    else:
+        # Force the array to have one more item than allowed
+        new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
+        oversized: list | None = None
+        try:
+            oversized = ctx.generate_from_schema(new_schema)
+        except (InvalidArgument, Unsatisfiable):
+            # `uniqueItems: true` over a finite items domain (e.g. enum) makes a
+            # length-(max+1) unique array unsatisfiable; drop uniqueness so the
+            # maxItems violation still ships, even if it also violates uniqueItems.
+            if new_schema.get("uniqueItems"):
+                relaxed = {k: v for k, v in new_schema.items() if k != "uniqueItems"}
+                with suppress(InvalidArgument, Unsatisfiable):
+                    oversized = ctx.generate_from_schema(relaxed)
+        if oversized is not None and ctx.is_valid_for_location(oversized) and seen.insert(oversized):
+            yield NegativeValue(
+                oversized,
+                scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
+                description="Array with more items than allowed by maxItems",
+                location=ctx.current_path,
+            )
+
+
+def _negative_min_items(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not (isinstance(value, int) and value > 0):
+        return
+    if value == 1:
+        # The 0-item case is structurally trivial. Skip the Hypothesis round-trip
+        # so unresolvable / unsatisfiable `items` schemas don't drop the negative.
+        if ctx.is_valid_for_location([]) and seen.insert([]):
+            yield NegativeValue(
+                [],
+                scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
+                description="Array with fewer items than allowed by minItems",
+                location=ctx.current_path,
+            )
+    else:
+        try:
+            # Drop spec hints: they describe valid shapes, so `generate_from_schema`
+            # would short-circuit to the example (vacuously accepted when a sibling
+            # `$ref` blocks validator construction) and skip the bound we install.
+            new_schema = {k: v for k, v in schema.items() if k not in ("example", "examples", "default")}
+            new_schema.update({"minItems": value - 1, "maxItems": value - 1, "type": "array"})
+            array_value = ctx.generate_from_schema(new_schema)
+            if ctx.is_valid_for_location(array_value) and seen.insert(array_value):
+                yield NegativeValue(
+                    array_value,
+                    scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
+                    description="Array with fewer items than allowed by minItems",
+                    location=ctx.current_path,
+                )
+        except (InvalidArgument, Unsatisfiable):
+            pass
+
+
+def _negative_min_properties(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not (isinstance(value, int) and value > 0):
+        return
+    try:
+        required = schema.get("required", [])
+        if value == 1 and not required:
+            # Only use empty object if no required properties
+            obj_value = {}
+        else:
+            new_schema = {
+                **schema,
+                "type": "object",
+                "minProperties": value - 1,
+                "maxProperties": value - 1,
+            }
+            obj_value = ctx.generate_from_schema(new_schema)
+        if seen.insert(obj_value):
+            yield NegativeValue(
+                obj_value,
+                scenario=CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES,
+                description="Object with fewer properties than allowed by minProperties",
+                location=ctx.current_path,
+            )
+    except (InvalidArgument, Unsatisfiable):
+        pass
+
+
+def _negative_all_of(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    nctx = ctx.with_negative()
+    if len(value) == 1:
+        with nctx.at(0):
+            yield from cover_schema_iter(nctx, value[0], seen)
+    else:
+        with _ignore_unfixable():
+            folded = _merge_all_of(schema)
+            # A branch that cannot be folded would loop if recursed on as a whole;
+            # iterate sub-schemas instead.
+            if folded is None:
+                for idx, sub in enumerate(value):
+                    with nctx.at(idx):
+                        yield from cover_schema_iter(nctx, sub, seen)
+            else:
+                yield from cover_schema_iter(nctx, folded, seen)
+
+
+def _negative_any_of(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    nctx = ctx.with_negative()
+    resolved_schemas = [ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value]
+    validators = _make_branch_validators(resolved_schemas, ctx)
+    # Body fields in multipart/form-urlencoded are serialized as strings via str().
+    # Query/path/header parameters are also stringified, but servers parse them
+    # back to their declared type before validation, so str() doesn't make them
+    # valid for explicitly string-typed branches in that case.
+    stringify_body_fields = ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type)
+    for idx, sub_schema in enumerate(value):
+        with nctx.at(idx):
+            for generated in cover_schema_iter(nctx, sub_schema, seen):
+                # Negative value for this schema could be a positive value for another one
+                if is_valid_for_others(generated.value, idx, validators, resolved_schemas, stringify_body_fields):
+                    continue
+                yield generated
+
+
+def _negative_one_of(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    nctx = ctx.with_negative()
+    # Branches as written: the validator resolves `$ref` itself, so keywords beside it
+    # count exactly as the operation's draft reads them.
+    validators = _make_branch_validators(value, ctx)
+    for idx, sub_schema in enumerate(value):
+        with nctx.at(idx):
+            for generated in cover_schema_iter(nctx, sub_schema, seen):
+                if is_invalid_for_oneOf(generated.value, idx, validators):
+                    yield generated
+
+
+def _negative_not(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not isinstance(value, dict | bool):
+        return
+    # For 'not' schemas: generate positive cases of inner schema (valid values)
+    # These valid values are negative for the outer schema, so flip the mode
+    pctx = ctx.with_positive()
+    yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen))
+
+
 def cover_schema_iter(
     ctx: CoverageContext, schema: JsonSchema, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -1937,33 +2281,15 @@ def cover_schema_iter(
         template = None
         if not ctx.can_be_negated(schema):
             return
-        # `enum`/`const` without a sibling `type` (e.g. `canonicalish` strips `type` from
-        # `{type: string, enum: [...]}` because the enum values already pin the type) would
-        # otherwise miss type-violation negatives. Infer the type from the values once so the
-        # `enum`/`const` branches below can dispatch `_negative_type` alongside `_negative_enum`.
-        inferred_types: list[str] | None = None
-        if "type" not in schema:
-            if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
-                inferred_types = sorted({to_json_type_name(v) for v in schema["enum"]})
-            elif "const" in schema:
-                inferred_types = [to_json_type_name(schema["const"])]
         # Snapshot: walking a keyword can push examples down into a schema shared with this one,
         # and a key landing here mid-walk is not one this pass was meant to cover anyway.
         for key, value in list(schema.items()):
             with _ignore_unfixable(), ctx.at(key):
                 if _negation_ignored_by_dialect(ctx, key):
                     continue
-                if key == "enum":
-                    yield from _negative_enum(ctx, value, seen, schema)
-                    if inferred_types:
-                        yield from _negative_type(ctx, inferred_types, seen, schema)
-                elif key == "const":
-                    for value_ in _negative_enum(ctx, [value], seen, schema):
-                        yield value_
-                    if inferred_types:
-                        yield from _negative_type(ctx, inferred_types, seen, schema)
-                elif key == "type":
-                    yield from _negative_type(ctx, value, seen, schema)
+                handler = _NEGATIVE_HANDLERS.get(key)
+                if handler is not None:
+                    yield from handler(ctx, schema, value, seen)
                 elif key == "properties":
                     template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
                     yield from _negative_properties(ctx, template, value)
@@ -1974,242 +2300,11 @@ def cover_schema_iter(
                     template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
                     if isinstance(template, dict):
                         yield from _negative_property_names(ctx, template, value)
-                elif key == "items" and isinstance(value, dict):
-                    parent_min_items = schema.get("minItems")
-                    min_items = parent_min_items if isinstance(parent_min_items, int) else 0
-                    yield from _negative_items(ctx, value, min_items=min_items)
-                elif key == "items" and isinstance(value, list):
-                    yield from _negative_prefix_items(ctx, value)
-                elif key == "prefixItems" and isinstance(value, list):
-                    yield from _negative_prefix_items(ctx, value)
-                elif key == "pattern":
-                    min_length = schema.get("minLength")
-                    max_length = schema.get("maxLength")
-                    yield from _negative_pattern(ctx, value, min_length=min_length, max_length=max_length)
-                elif key == "format" and ("string" in types or not types):
-                    # Binary formats accept any bytes - no meaningful format violations
-                    if value not in ("binary", "byte"):
-                        yield from _negative_format(ctx, schema, value)
-                elif key == "maximum":
-                    # Legacy draft-4 `exclusiveMaximum: true` makes `maximum` itself the excluded boundary.
-                    next = value if schema.get("exclusiveMaximum") is True else _just_past(schema, value, going_up=True)
-                    if next is not None and seen.insert(next):
-                        yield NegativeValue(
-                            next,
-                            scenario=CoverageScenario.VALUE_ABOVE_MAXIMUM,
-                            description="Value greater than maximum",
-                            location=ctx.current_path,
-                        )
-                elif key == "minimum":
-                    # Legacy draft-4 `exclusiveMinimum: true` makes `minimum` itself the excluded boundary.
-                    next = (
-                        value if schema.get("exclusiveMinimum") is True else _just_past(schema, value, going_up=False)
-                    )
-                    if next is not None and seen.insert(next):
-                        yield NegativeValue(
-                            next,
-                            scenario=CoverageScenario.VALUE_BELOW_MINIMUM,
-                            description="Value smaller than minimum",
-                            location=ctx.current_path,
-                        )
-                elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and seen.insert(value):
-                    if isinstance(value, bool):
-                        continue
-                    verb = "greater" if key == "exclusiveMaximum" else "smaller"
-                    limit = "maximum" if key == "exclusiveMaximum" else "minimum"
-                    scenario = (
-                        CoverageScenario.VALUE_ABOVE_MAXIMUM
-                        if key == "exclusiveMaximum"
-                        else CoverageScenario.VALUE_BELOW_MINIMUM
-                    )
-                    yield NegativeValue(
-                        value, scenario=scenario, description=f"Value {verb} than {limit}", location=ctx.current_path
-                    )
-                elif key == "multipleOf":
-                    for value_ in _negative_multiple_of(ctx, schema, value):
-                        if seen.insert(value_.value):
-                            yield value_
-                elif key == "minLength" and 0 < value < INTERNAL_BUFFER_SIZE:
-                    # minLength only constrains strings; skip when schema explicitly excludes string type
-                    if "string" in get_type(schema):
-                        if value == 1:
-                            # In this case, the only possible negative string is an empty one
-                            # The `pattern` value may require an non-empty one and the generation will fail
-                            # However, it is fine to violate `pattern` here as it is negative string generation anyway
-                            value = ""
-                            if ctx.is_valid_for_location(value) and seen.insert(value):
-                                yield NegativeValue(
-                                    value,
-                                    scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
-                                    description="String smaller than minLength",
-                                    location=ctx.current_path,
-                                )
-                        else:
-                            with suppress(InvalidArgument):
-                                min_length = max_length = value - 1
-                                new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
-                                new_schema.pop("enum", None)
-                                new_schema.pop("const", None)
-                                new_schema["type"] = "string"
-                                if "pattern" in new_schema and ctx.update_pattern is not None:
-                                    new_schema["pattern"] = ctx.update_pattern(
-                                        schema["pattern"], min_length, max_length
-                                    )
-                                try:
-                                    value = ctx.generate_from_schema(new_schema)
-                                except Unsatisfiable:
-                                    # Format or pattern may forbid the truncated length (e.g. no valid email of length 5).
-                                    fallback = {k: v for k, v in new_schema.items() if k != "format"}
-                                    if "pattern" in fallback:
-                                        del fallback["minLength"]
-                                        del fallback["maxLength"]
-                                        value = ctx.generate_from_schema(fallback)[:max_length]
-                                    elif fallback != new_schema:
-                                        value = ctx.generate_from_schema(fallback)
-                                    else:
-                                        raise
-                                if ctx.is_valid_for_location(value) and seen.insert(value):
-                                    yield NegativeValue(
-                                        value,
-                                        scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
-                                        description="String smaller than minLength",
-                                        location=ctx.current_path,
-                                    )
-                elif (
-                    key == "maxLength"
-                    and isinstance(value, int)
-                    and value < MAX_STRING_LENGTH
-                    and "string" in get_type(schema)
-                ):
-                    try:
-                        target_length = value + 1
-                        new_value: str | None
-                        if target_length >= INTERNAL_BUFFER_SIZE:
-                            # Cheap synthesis: any character violates the bound; bypass Hypothesis
-                            # to avoid blowing past its internal buffer for very large limits.
-                            new_value = "a" * target_length
-                        else:
-                            min_length = max_length = target_length
-                            new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
-                            new_schema.pop("enum", None)
-                            new_schema.pop("const", None)
-                            new_schema["type"] = "string"
-                            new_value = _generate_oversized_string(ctx, schema, new_schema, target_length)
-                        if new_value is not None and seen.insert(new_value):
-                            yield NegativeValue(
-                                new_value,
-                                scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,
-                                description="String larger than maxLength",
-                                location=ctx.current_path,
-                            )
-                    except (InvalidArgument, Unsatisfiable):
-                        pass
-                elif key == "uniqueItems" and value:
-                    yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
                     template = template or _generate_template_with_deflation_fallback(
                         ctx, schema, _get_template_schema(schema, "object", ctx)
                     )
                     yield from _negative_required(ctx, template, value)
-                elif key == "maxItems" and isinstance(value, int) and value < INTERNAL_BUFFER_SIZE:
-                    if value > NEGATIVE_MODE_MAX_ITEMS:
-                        # It could be extremely slow to generate large arrays
-                        # Generate values up to the limit and reuse them to construct the final array
-                        new_schema = {
-                            **schema,
-                            "minItems": NEGATIVE_MODE_MAX_ITEMS,
-                            "maxItems": NEGATIVE_MODE_MAX_ITEMS,
-                            "type": "array",
-                        }
-                        array_value: list = []
-                        if "items" in schema and isinstance(schema["items"], dict):
-                            # The schema may have another large array nested, therefore generate covering cases
-                            # and use them to build an array for the current schema
-                            negative = [
-                                case.value
-                                for case in islice(cover_schema_iter(ctx, schema["items"]), NEGATIVE_MODE_MAX_ITEMS)
-                            ]
-                            positive = [
-                                case.value
-                                for case in islice(
-                                    cover_schema_iter(ctx.with_positive(), schema["items"]), NEGATIVE_MODE_MAX_ITEMS
-                                )
-                            ]
-                            # Interleave positive & negative values. Empty if either list is empty —
-                            # fall back to direct generation below so the yielded array is non-empty.
-                            array_value = [value for pair in zip(positive, negative, strict=False) for value in pair][
-                                :NEGATIVE_MODE_MAX_ITEMS
-                            ]
-                        if not array_value:
-                            try:
-                                array_value = ctx.generate_from_schema(new_schema)
-                            except (InvalidArgument, Unsatisfiable):
-                                continue
-
-                        # Extend the array to be of length value + 1 by repeating its own elements
-                        diff = value + 1 - len(array_value)
-                        if diff > 0 and array_value:
-                            array_value += (
-                                array_value * (diff // len(array_value)) + array_value[: diff % len(array_value)]
-                            )
-                        if seen.insert(array_value):
-                            yield NegativeValue(
-                                array_value,
-                                scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
-                                description="Array with more items than allowed by maxItems",
-                                location=ctx.current_path,
-                            )
-                    else:
-                        # Force the array to have one more item than allowed
-                        new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
-                        oversized: list | None = None
-                        try:
-                            oversized = ctx.generate_from_schema(new_schema)
-                        except (InvalidArgument, Unsatisfiable):
-                            # `uniqueItems: true` over a finite items domain (e.g. enum) makes a
-                            # length-(max+1) unique array unsatisfiable; drop uniqueness so the
-                            # maxItems violation still ships, even if it also violates uniqueItems.
-                            if new_schema.get("uniqueItems"):
-                                relaxed = {k: v for k, v in new_schema.items() if k != "uniqueItems"}
-                                with suppress(InvalidArgument, Unsatisfiable):
-                                    oversized = ctx.generate_from_schema(relaxed)
-                        if oversized is not None and ctx.is_valid_for_location(oversized) and seen.insert(oversized):
-                            yield NegativeValue(
-                                oversized,
-                                scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
-                                description="Array with more items than allowed by maxItems",
-                                location=ctx.current_path,
-                            )
-                elif key == "minItems" and isinstance(value, int) and value > 0:
-                    if value == 1:
-                        # The 0-item case is structurally trivial. Skip the Hypothesis round-trip
-                        # so unresolvable / unsatisfiable `items` schemas don't drop the negative.
-                        if ctx.is_valid_for_location([]) and seen.insert([]):
-                            yield NegativeValue(
-                                [],
-                                scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
-                                description="Array with fewer items than allowed by minItems",
-                                location=ctx.current_path,
-                            )
-                    else:
-                        try:
-                            # Drop spec hints: they describe valid shapes, so `generate_from_schema`
-                            # would short-circuit to the example (vacuously accepted when a sibling
-                            # `$ref` blocks validator construction) and skip the bound we install.
-                            new_schema = {
-                                k: v for k, v in schema.items() if k not in ("example", "examples", "default")
-                            }
-                            new_schema.update({"minItems": value - 1, "maxItems": value - 1, "type": "array"})
-                            array_value = ctx.generate_from_schema(new_schema)
-                            if ctx.is_valid_for_location(array_value) and seen.insert(array_value):
-                                yield NegativeValue(
-                                    array_value,
-                                    scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
-                                    description="Array with fewer items than allowed by minItems",
-                                    location=ctx.current_path,
-                                )
-                        except (InvalidArgument, Unsatisfiable):
-                            pass
                 elif key == "additionalProperties" and schema.get("type") in ["object", None]:
                     if value is False and "pattern" not in schema:
                         # additionalProperties: false - add unexpected property
@@ -2282,80 +2377,6 @@ def cover_schema_iter(
                             description="Object with more properties than allowed by maxProperties",
                             location=ctx.current_path,
                         )
-                elif key == "minProperties" and isinstance(value, int) and value > 0:
-                    try:
-                        required = schema.get("required", [])
-                        if value == 1 and not required:
-                            # Only use empty object if no required properties
-                            obj_value = {}
-                        else:
-                            new_schema = {
-                                **schema,
-                                "type": "object",
-                                "minProperties": value - 1,
-                                "maxProperties": value - 1,
-                            }
-                            obj_value = ctx.generate_from_schema(new_schema)
-                        if seen.insert(obj_value):
-                            yield NegativeValue(
-                                obj_value,
-                                scenario=CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES,
-                                description="Object with fewer properties than allowed by minProperties",
-                                location=ctx.current_path,
-                            )
-                    except (InvalidArgument, Unsatisfiable):
-                        pass
-                elif key == "allOf":
-                    nctx = ctx.with_negative()
-                    if len(value) == 1:
-                        with nctx.at(0):
-                            yield from cover_schema_iter(nctx, value[0], seen)
-                    else:
-                        with _ignore_unfixable():
-                            folded = _merge_all_of(schema)
-                            # A branch that cannot be folded would loop if recursed on as a whole;
-                            # iterate sub-schemas instead.
-                            if folded is None:
-                                for idx, sub in enumerate(value):
-                                    with nctx.at(idx):
-                                        yield from cover_schema_iter(nctx, sub, seen)
-                            else:
-                                yield from cover_schema_iter(nctx, folded, seen)
-                elif key == "anyOf":
-                    nctx = ctx.with_negative()
-                    resolved_schemas = [
-                        ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value
-                    ]
-                    validators = _make_branch_validators(resolved_schemas, ctx)
-                    # Body fields in multipart/form-urlencoded are serialized as strings via str().
-                    # Query/path/header parameters are also stringified, but servers parse them
-                    # back to their declared type before validation, so str() doesn't make them
-                    # valid for explicitly string-typed branches in that case.
-                    stringify_body_fields = ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type)
-                    for idx, sub_schema in enumerate(value):
-                        with nctx.at(idx):
-                            for value in cover_schema_iter(nctx, sub_schema, seen):
-                                # Negative value for this schema could be a positive value for another one
-                                if is_valid_for_others(
-                                    value.value, idx, validators, resolved_schemas, stringify_body_fields
-                                ):
-                                    continue
-                                yield value
-                elif key == "oneOf":
-                    nctx = ctx.with_negative()
-                    # Branches as written: the validator resolves `$ref` itself, so keywords beside it
-                    # count exactly as the operation's draft reads them.
-                    validators = _make_branch_validators(value, ctx)
-                    for idx, sub_schema in enumerate(value):
-                        with nctx.at(idx):
-                            for value in cover_schema_iter(nctx, sub_schema, seen):
-                                if is_invalid_for_oneOf(value.value, idx, validators):
-                                    yield value
-                elif key == "not" and isinstance(value, dict | bool):
-                    # For 'not' schemas: generate positive cases of inner schema (valid values)
-                    # These valid values are negative for the outer schema, so flip the mode
-                    pctx = ctx.with_positive()
-                    yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen))
 
 
 def is_valid_for_others(
@@ -3360,8 +3381,27 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
         yield next(combinations(optional, size))
 
 
+# `enum`/`const` without a sibling `type` (e.g. `canonicalish` strips `type` from `{type: string, enum: [...]}`
+# because the enum values already pin the type) would otherwise miss type-violation negatives.
+def _inferred_value_types(schema: dict) -> list[str] | None:
+    if "type" in schema:
+        return None
+    enum = schema.get("enum")
+    if isinstance(enum, list) and enum:
+        return sorted({to_json_type_name(v) for v in enum})
+    if "const" in schema:
+        return [to_json_type_name(schema["const"])]
+    return None
+
+
+def _negative_const(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    yield from _negative_enum(ctx, schema, [value], seen)
+
+
 def _negative_enum(
-    ctx: CoverageContext, value: list, seen: HashSet, schema: JsonSchemaObject | None = None
+    ctx: CoverageContext, schema: dict, value: list, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
     def is_not_in_value(x: Any) -> bool:
         if x in value or not ctx.is_valid_for_location(x):
@@ -3395,6 +3435,9 @@ def _negative_enum(
                     description="Enum value with type mismatching the declared 'type'",
                     location=ctx.current_path,
                 )
+    inferred = _inferred_value_types(schema)
+    if inferred:
+        yield from _negative_type(ctx, schema, inferred, seen)
 
 
 def _negative_properties(
@@ -3496,6 +3539,24 @@ def _negative_pattern_properties(
 
 
 def _negative_items(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if isinstance(value, dict):
+        parent_min_items = schema.get("minItems")
+        min_items = parent_min_items if isinstance(parent_min_items, int) else 0
+        yield from _negative_array_items(ctx, value, min_items=min_items)
+    elif isinstance(value, list):
+        yield from _negative_prefix_items(ctx, value)
+
+
+def _negative_tuple_items(
+    ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if isinstance(value, list):
+        yield from _negative_prefix_items(ctx, value)
+
+
+def _negative_array_items(
     ctx: CoverageContext, schema: JsonSchema, *, min_items: int = 0
 ) -> Generator[GeneratedValue, None, None]:
     """Arrays not matching the schema."""
@@ -3559,8 +3620,10 @@ def _not_matching_pattern(value: str, pattern: re.Pattern) -> bool:
 
 
 def _negative_pattern(
-    ctx: CoverageContext, pattern: str, min_length: int | None = None, max_length: int | None = None
+    ctx: CoverageContext, schema: dict, pattern: str, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
+    min_length = schema.get("minLength")
+    max_length = schema.get("maxLength")
     try:
         compiled = re.compile(pattern)
     except re.error:
@@ -3611,7 +3674,7 @@ def _with_negated_key(schema: JsonSchemaObject, key: str, value: Any) -> JsonSch
 
 
 def _negative_multiple_of(
-    ctx: CoverageContext, schema: dict, multiple_of: int | float
+    ctx: CoverageContext, schema: dict, multiple_of: int | float, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
     # Only a number can violate `multipleOf`; a union type keeps just its numeric part, so a
     # sibling keyword like `pattern` cannot steer the draw into another type.
@@ -3619,15 +3682,21 @@ def _negative_multiple_of(
     pinned = "number" if "number" in types else "integer" if "integer" in types else None
     if pinned is None:
         return
-    yield NegativeValue(
-        ctx.generate_from_schema(_with_negated_key({**schema, "type": pinned}, "multipleOf", multiple_of)),
-        scenario=CoverageScenario.NOT_MULTIPLE_OF,
-        description=f"Non-multiple of {multiple_of}",
-        location=ctx.current_path,
-    )
+    candidate = ctx.generate_from_schema(_with_negated_key({**schema, "type": pinned}, "multipleOf", multiple_of))
+    if seen.insert(candidate):
+        yield NegativeValue(
+            candidate,
+            scenario=CoverageScenario.NOT_MULTIPLE_OF,
+            description=f"Non-multiple of {multiple_of}",
+            location=ctx.current_path,
+        )
 
 
-def _negative_unique_items(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
+def _negative_unique_items(
+    ctx: CoverageContext, schema: JsonSchemaObject, unique_items: Any, seen: HashSet
+) -> Generator[GeneratedValue, None, None]:
+    if not unique_items:
+        return
     unique = jsonify(ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1}))
     yield NegativeValue(
         unique + unique,
@@ -3851,7 +3920,7 @@ def _stringified_type_violations(
 
 
 def _negative_type(
-    ctx: CoverageContext, ty: str | list[str], seen: HashSet, schema: dict[str, Any]
+    ctx: CoverageContext, schema: dict[str, Any], ty: str | list[str], seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
     if isinstance(ty, str):
         types = [ty]
@@ -4058,3 +4127,33 @@ def push_examples_to_properties(schema: JsonSchemaObject) -> None:
                             properties[prop]["examples"] = []
                         if value not in properties[prop]["examples"]:
                             properties[prop]["examples"].append(value)
+
+
+# Negative handlers for keywords that need no shared object template; the template-bound
+# object family stays dispatched inline in `cover_schema_iter`.
+_NEGATIVE_HANDLERS: dict[
+    str, Callable[[CoverageContext, dict, Any, HashSet], Generator[GeneratedValue, None, None]]
+] = {
+    "enum": _negative_enum,
+    "const": _negative_const,
+    "type": _negative_type,
+    "items": _negative_items,
+    "prefixItems": _negative_tuple_items,
+    "pattern": _negative_pattern,
+    "format": _negative_format_for_declared_types,
+    "maximum": _negative_maximum,
+    "minimum": _negative_minimum,
+    "exclusiveMaximum": _negative_exclusive_maximum,
+    "exclusiveMinimum": _negative_exclusive_minimum,
+    "multipleOf": _negative_multiple_of,
+    "minLength": _negative_min_length,
+    "maxLength": _negative_max_length,
+    "uniqueItems": _negative_unique_items,
+    "maxItems": _negative_max_items,
+    "minItems": _negative_min_items,
+    "minProperties": _negative_min_properties,
+    "allOf": _negative_all_of,
+    "anyOf": _negative_any_of,
+    "oneOf": _negative_one_of,
+    "not": _negative_not,
+}
