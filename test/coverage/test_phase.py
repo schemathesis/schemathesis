@@ -27,9 +27,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import CoverageScenario, TestPhase
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
-from schemathesis.specs.openapi.coverage._schema import (
-    quote_path_parameter,
-)
+from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
 from schemathesis.transport.prepare import prepare_request
 from test.coverage.helpers import (
     assert_bodies,

@@ -7,7 +7,6 @@ Produces positive and negative coverage values for individual schema constructs
 from __future__ import annotations
 
 import re
-import string
 from contextlib import ExitStack, contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from decimal import Decimal
@@ -49,7 +48,6 @@ except ImportError:
 from collections.abc import Callable, Generator, Iterator
 from json.encoder import JSONEncoder, encode_basestring_ascii
 from typing import Any, TypeVar, cast
-from urllib.parse import quote
 
 import jsonschema_rs
 from hypothesis import strategies as st
@@ -66,7 +64,6 @@ from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type, to_json_type_name
-from schemathesis.core.media_types import is_form_parts, is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
@@ -78,6 +75,13 @@ from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.specs.openapi.converter import apply_rewritten_pattern
+from schemathesis.specs.openapi.coverage._wire import (
+    HEADER_ALLOWED_CHARS,
+    WireSemantics,
+    ensure_valid_headers_schema,
+    ensure_valid_path_parameter_schema,
+    jsonify,
+)
 from schemathesis.specs.openapi.patterns import (
     matches_every_string,
     pattern_length_bounds,
@@ -434,6 +438,7 @@ class CoverageContext:
         "update_pattern",
         "_resolver",
         "_root_token_cell",
+        "wire",
         "allow_extra_parameters",
         "expanding",
         "generating",
@@ -477,6 +482,7 @@ class CoverageContext:
         # Shared like the path cell: every context over this document answers with the same token.
         self._root_token_cell: list[object] = _root_token_cell if _root_token_cell is not None else [None]
         self.allow_extra_parameters = allow_extra_parameters
+        self.wire = WireSemantics(location=location, media_type=media_type, is_required=is_required)
         # How deep the walk is inside each reference, shared with every context derived from this one.
         self.expanding = expanding if expanding is not None else {}
         # The same, for building one value; a value nests on its own budget, not the walk's.
@@ -593,43 +599,6 @@ class CoverageContext:
             expanding=self.expanding,
             generating=self.generating,
         )
-
-    def is_valid_for_location(self, value: Any) -> bool:
-        if self.location in ("header", "cookie") and isinstance(value, str):
-            return not value or (is_latin_1_encodable(value) and not has_invalid_characters("A", value))
-        elif self.location == "path":
-            return not is_invalid_path_parameter(value)
-        return True
-
-    def leads_to_negative_test_case(self, value: Any) -> bool:
-        if self.location == "query":
-            # Some values will not be serialized into the query string
-            if isinstance(value, list) and not self.is_required:
-                # Optional parameters should be present
-                return any(item not in [{}, []] for item in value)
-        return True
-
-    def will_be_serialized_to_string(self) -> bool:
-        if self.location in ("query", "path", "header", "cookie"):
-            return True
-        if self.location == "body" and self.media_type is not None:
-            if is_form_parts(self.media_type):
-                return True
-            if is_xml_parts(self.media_type):
-                return True
-        return False
-
-    def can_be_negated(self, schema: JsonSchemaObject) -> bool:
-        # Path, query, header, and cookie parameters will be stringified anyway
-        # If there are no constraints, then anything will match the original schema after serialization
-        if self.will_be_serialized_to_string():
-            cleaned = {
-                k: v
-                for k, v in schema.items()
-                if not k.startswith("x-") and k not in ["description", "example", "examples"]
-            }
-            return cleaned not in [{}, {"type": "string"}]
-        return True
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
         return cached_draw(strategy)
@@ -1925,7 +1894,7 @@ def _negative_min_length(
         # The `pattern` value may require an non-empty one and the generation will fail
         # However, it is fine to violate `pattern` here as it is negative string generation anyway
         value = ""
-        if ctx.is_valid_for_location(value) and seen.insert(value):
+        if ctx.wire.representable(value) and seen.insert(value):
             yield NegativeValue(
                 value,
                 scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
@@ -1954,7 +1923,7 @@ def _negative_min_length(
                     value = ctx.generate_from_schema(fallback)
                 else:
                     raise
-            if ctx.is_valid_for_location(value) and seen.insert(value):
+            if ctx.wire.representable(value) and seen.insert(value):
                 yield NegativeValue(
                     value,
                     scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
@@ -2052,7 +2021,7 @@ def _negative_max_items(
                 relaxed = {k: v for k, v in new_schema.items() if k != "uniqueItems"}
                 with suppress(InvalidArgument, Unsatisfiable):
                     oversized = ctx.generate_from_schema(relaxed)
-        if oversized is not None and ctx.is_valid_for_location(oversized) and seen.insert(oversized):
+        if oversized is not None and ctx.wire.representable(oversized) and seen.insert(oversized):
             yield NegativeValue(
                 oversized,
                 scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
@@ -2069,7 +2038,7 @@ def _negative_min_items(
     if value == 1:
         # The 0-item case is structurally trivial. Skip the Hypothesis round-trip
         # so unresolvable / unsatisfiable `items` schemas don't drop the negative.
-        if ctx.is_valid_for_location([]) and seen.insert([]):
+        if ctx.wire.representable([]) and seen.insert([]):
             yield NegativeValue(
                 [],
                 scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
@@ -2084,7 +2053,7 @@ def _negative_min_items(
             new_schema = {k: v for k, v in schema.items() if k not in ("example", "examples", "default")}
             new_schema.update({"minItems": value - 1, "maxItems": value - 1, "type": "array"})
             array_value = ctx.generate_from_schema(new_schema)
-            if ctx.is_valid_for_location(array_value) and seen.insert(array_value):
+            if ctx.wire.representable(array_value) and seen.insert(array_value):
                 yield NegativeValue(
                     array_value,
                     scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
@@ -2154,7 +2123,7 @@ def _negative_any_of(
     # Query/path/header parameters are also stringified, but servers parse them
     # back to their declared type before validation, so str() doesn't make them
     # valid for explicitly string-typed branches in that case.
-    stringify_body_fields = ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type)
+    stringify_body_fields = ctx.wire.form_body()
     for idx, sub_schema in enumerate(value):
         with nctx.at(idx):
             for generated in cover_schema_iter(nctx, sub_schema, seen):
@@ -2275,7 +2244,7 @@ def cover_schema_iter(
             yield from _filter_against_not(_cover_positive_for_type(ctx, schema, ty), schema, ctx)
     if GenerationMode.NEGATIVE in ctx.generation_modes:
         template = None
-        if not ctx.can_be_negated(schema):
+        if not ctx.wire.can_be_negated(schema):
             return
         # Snapshot: walking a keyword can push examples down into a schema shared with this one,
         # and a key landing here mid-walk is not one this pass was meant to cover anyway.
@@ -2459,11 +2428,11 @@ def _drop_invalid_for_location(
     for case in cases:
         value = case.value
         if isinstance(value, dict):
-            # `is_valid_for_location` judges a dict by its `repr`, which is not what a path
+            # `representable` judges a dict by its `repr`, which is not what a path
             # parameter sends; only an empty object is unrepresentable there.
             if ctx.location == ParameterLocation.PATH and not value:
                 continue
-        elif not ctx.is_valid_for_location(value):
+        elif not ctx.wire.representable(value):
             continue
         yield case
 
@@ -2561,24 +2530,10 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
                 _schema["examples"] = valid_examples
             else:
                 del _schema["examples"]
-        if _schema.get("type") == "string" and _xml_string_needs_non_empty(ctx, _schema):
+        if _schema.get("type") == "string" and ctx.wire.xml_string_needs_non_empty(_schema):
             _schema["minLength"] = 1
         return _schema
     return schema
-
-
-def _xml_string_needs_non_empty(ctx: CoverageContext, schema: JsonSchemaObject) -> bool:
-    # Empty XML elements (<tag></tag>) round-trip as None on common parsers (etree, xmltodict,
-    # default Jackson), so positive cases never exercise server-side string keywords and "kept-valid"
-    # context in negative cases reaches the server malformed. Force >= 1 character.
-    if ctx.location != ParameterLocation.BODY or ctx.media_type is None or not is_xml_parts(ctx.media_type):
-        return False
-    if schema.get("minLength") not in (None, 0):
-        return False
-    max_length = schema.get("maxLength")
-    if max_length is not None and max_length < 1:
-        return False
-    return "enum" not in schema and "const" not in schema
 
 
 _FAST_PATH_KEYS = frozenset({"properties", "required", "type"})
@@ -2693,35 +2648,6 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
     return {**schema, "type": ty}
 
 
-def _get_not_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
-    """Safely get the 'not' schema as a dict, handling boolean schemas."""
-    not_schema = schema.get("not", {})
-    if isinstance(not_schema, dict):
-        return not_schema.copy()
-    return {}
-
-
-def _ensure_valid_path_parameter_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
-    # Path parameters should have at least 1 character length and don't contain any characters with special treatment
-    # on the transport level.
-    # The implementation below sneaks into `not` to avoid clashing with existing `pattern` keyword
-    not_ = _get_not_schema(schema)
-    not_["pattern"] = r"[/{}]"
-    min_length = max(schema.get("minLength", 0), 1)
-    return {**schema, "minLength": min_length, "not": not_}
-
-
-# Characters `_ensure_valid_headers_schema` keeps; a pattern requiring anything else is unsatisfiable for headers.
-HEADER_ALLOWED_CHARS = string.ascii_letters + string.digits
-
-
-def _ensure_valid_headers_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
-    # Reject any character that is not A-Z, a-z, or 0-9 for simplicity
-    not_ = _get_not_schema(schema)
-    not_["pattern"] = r"[^A-Za-z0-9]"
-    return {**schema, "not": not_}
-
-
 def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
     # Pin type to "string"; for unions like ["string","null"] the dispatcher yields null separately,
@@ -2737,15 +2663,15 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     # generated values, and values the transport cannot send are rejected separately.
     declared = schema
     if ctx.location == "path" and not ("format" in schema and schema["format"] in ctx.custom_formats):
-        schema = _ensure_valid_path_parameter_schema(schema)
+        schema = ensure_valid_path_parameter_schema(schema)
         declared = schema
     elif ctx.location in ("header", "cookie") and not ("format" in schema and schema["format"] in ctx.custom_formats):
         pattern = schema.get("pattern")
         if isinstance(pattern, str) and pattern_requires_char_outside(pattern, HEADER_ALLOWED_CHARS):
             return
         # Don't apply it for known formats - they will insure the correct format during generation
-        schema = _ensure_valid_headers_schema(schema)
-    elif _xml_string_needs_non_empty(ctx, schema):
+        schema = ensure_valid_headers_schema(schema)
+    elif ctx.wire.xml_string_needs_non_empty(schema):
         schema = {**schema, "minLength": 1}
         declared = schema
         min_length = 1
@@ -2765,7 +2691,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         if (
             example is not NOT_SET
             and _is_valid_with_formats(example, declared, ctx)
-            and ctx.is_valid_for_location(example)
+            and ctx.wire.representable(example)
             and seen_values.insert(example)
         ):
             has_valid_example = True
@@ -2774,7 +2700,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             for example in examples:
                 if (
                     _is_valid_with_formats(example, declared, ctx)
-                    and ctx.is_valid_for_location(example)
+                    and ctx.wire.representable(example)
                     and seen_values.insert(example)
                 ):
                     has_valid_example = True
@@ -2784,7 +2710,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             and not (example is not NOT_SET and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
             and _is_valid_with_formats(default, declared, ctx)
-            and ctx.is_valid_for_location(default)
+            and ctx.wire.representable(default)
             and seen_values.insert(default)
         ):
             has_valid_example = True
@@ -3296,7 +3222,7 @@ def _iter_positive_object(
             accepted = _accept_object_hint(default, schema, ctx)
             if accepted is not NOT_SET:
                 yield PositiveValue(accepted, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    elif template_complete and (template or not (ctx.is_required and is_form_parts(ctx.media_type))):
+    elif template_complete and (template or not ctx.wire.required_form_body()):
         outer_seen.insert(template)
         yield PositiveValue(template, scenario=CoverageScenario.VALID_OBJECT, description="Valid object")
 
@@ -3328,7 +3254,7 @@ def _iter_positive_object(
         # which violates requestBody.required
         if (
             (min_props is None or len(only_required) >= min_props)
-            and (only_required or not (ctx.is_required and is_form_parts(ctx.media_type)))
+            and (only_required or not ctx.wire.required_form_body())
             and outer_seen.insert(only_required)
         ):
             yield PositiveValue(
@@ -3400,7 +3326,7 @@ def _negative_enum(
     ctx: CoverageContext, schema: dict, value: list, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
     def is_not_in_value(x: Any) -> bool:
-        if x in value or not ctx.is_valid_for_location(x):
+        if x in value or not ctx.wire.representable(x):
             return False
         return seen.insert(x)
 
@@ -3423,7 +3349,7 @@ def _negative_enum(
                 # Integer values satisfy `type: number` in JSON Schema.
                 if entry_type == "integer" and "number" in declared_types:
                     continue
-                if not ctx.is_valid_for_location(entry) or not seen.insert(entry):
+                if not ctx.wire.representable(entry) or not seen.insert(entry):
                     continue
                 yield NegativeValue(
                     entry,
@@ -3440,8 +3366,8 @@ def _negative_properties(
     ctx: CoverageContext, template: dict, properties: dict
 ) -> Generator[GeneratedValue, None, None]:
     nctx = ctx.with_negative()
-    is_form = ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type)
-    is_xml = ctx.location == ParameterLocation.BODY and ctx.media_type is not None and is_xml_parts(ctx.media_type)
+    is_form = ctx.wire.form_body()
+    is_xml = ctx.wire.xml_body()
     bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
     for key, sub_schema in properties.items():
         validator: jsonschema_rs.Validator | None = None
@@ -3505,7 +3431,7 @@ def _negative_property_names(
         if not isinstance(bad_key, str) or bad_key in template:
             continue
         candidate = {**template, bad_key: ""}
-        if not ctx.leads_to_negative_test_case(candidate):
+        if not ctx.wire.leads_to_negative_test_case(candidate):
             continue
         yield NegativeValue(
             candidate,
@@ -3573,7 +3499,7 @@ def _negative_array_items(
             items = [value.value, *(filler for _ in range(min_items - 1))]
         else:
             items = [value.value]
-        if ctx.leads_to_negative_test_case(items):
+        if ctx.wire.leads_to_negative_test_case(items):
             yield NegativeValue(
                 items,
                 scenario=value.scenario,
@@ -3602,7 +3528,7 @@ def _negative_prefix_items(
         for neg_value in cover_schema_iter(nctx, item_schema):
             items = valid_items.copy()
             items[idx] = neg_value.value
-            if ctx.leads_to_negative_test_case(items):
+            if ctx.wire.leads_to_negative_test_case(items):
                 yield NegativeValue(
                     items,
                     scenario=neg_value.scenario,
@@ -3632,7 +3558,7 @@ def _negative_pattern(
     if (max_length is not None and (min_length or 0) > max_length) or (min_length or 0) >= INTERNAL_BUFFER_SIZE:
         return
     # The same regex recurs verbatim across operations; one Hypothesis search covers the whole audit.
-    # `is_valid_for_location` makes the outcome location-dependent, so the location is part of the key.
+    # `representable` makes the outcome location-dependent, so the location is part of the key.
     cache_key = ("negative_pattern", pattern, min_length, max_length, ctx.location, ctx.validator_cls)
     value = schema_generation_cache.get(cache_key)
     if value is UNSATISFIABLE_RESULT:
@@ -3647,7 +3573,7 @@ def _negative_pattern(
         strategy = (
             st.text(min_size=min_length or 0, max_size=max_length)
             .filter(partial(_not_matching_pattern, pattern=compiled))
-            .filter(ctx.is_valid_for_location)
+            .filter(ctx.wire.representable)
         )
         if validator is not None:
             strategy = strategy.filter(lambda v, _v=validator: not _v.is_valid(v))
@@ -3840,33 +3766,6 @@ def is_valid_header_value(value: object) -> bool:
     return True
 
 
-def jsonify(value: Any) -> Any:
-    # Builds a new value: the input may be a spec-declared example that every other case reuses.
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if value is None:
-        return "null"
-    if isinstance(value, dict):
-        return {key: jsonify(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [jsonify(item) for item in value]
-    return value
-
-
-def quote_path_parameter(value: Any) -> str:
-    if isinstance(value, str):
-        if value == ".":
-            return "%2E"
-        elif value == "..":
-            return "%2E%2E"
-        else:
-            # Percent-encode for path segments (space -> "%20"); "+" is literal in a path, not a space.
-            return quote(value, safe="")
-    if isinstance(value, list):
-        return ",".join(map(str, value))
-    return str(value)
-
-
 # Far above any text a wrong-type value turns into, so a limit this large rules nothing out.
 MAX_STRINGIFIED_TYPE_VIOLATION_LENGTH = 2**20
 
@@ -3905,10 +3804,7 @@ def _stringified_type_violations(
                 continue
             if isinstance(candidate, (dict, list)):
                 candidate = deepclone(candidate)
-            if ctx.location == ParameterLocation.PATH:
-                candidate = quote_path_parameter(jsonify(candidate))
-            elif ctx.location == ParameterLocation.QUERY:
-                candidate = jsonify(candidate)
+            candidate = ctx.wire.rendered(candidate)
             if breaks_the_schema(candidate):
                 values.append(candidate)
                 break
@@ -3936,11 +3832,11 @@ def _negative_type(
     # Form/multipart body-level type mutations don't yield reliable wire violations:
     # form-urlencoded serializes to empty body; multipart renders as boundaries around
     # str(value), which permissive servers accept as zero-part multipart.
-    if "object" in types and ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type):
+    if "object" in types and ctx.wire.form_body():
         return
     # Form-parts stringify every value; non-strings sent for a string-typed property
     # read as valid strings server-side, collapsing into the enum/format/range negation.
-    if "string" in types and ctx.location == ParameterLocation.BODY and is_form_parts(ctx.media_type):
+    if "string" in types and ctx.wire.form_body():
         return
     # Same parameter shape recurs across many operations; one Hypothesis draw covers the whole audit.
     # `ctx.path` is intentionally absent: the cached values are path-agnostic — the JSON pointer
@@ -3960,7 +3856,7 @@ def _negative_type(
         cached = schema_generation_cache.get(cache_key)
         if cached is not MISSING:
             for value in cached:
-                if seen.insert(value) and ctx.is_valid_for_location(value):
+                if seen.insert(value) and ctx.wire.representable(value):
                     yield NegativeValue(
                         value,
                         scenario=CoverageScenario.INCORRECT_TYPE,
@@ -3993,30 +3889,25 @@ def _negative_type(
         restrict("number", _is_non_integer_float)
     # For path/query parameters, numeric strings like "9" serialize identically to integer 9 in the URL,
     # making them indistinguishable and causing false positive failures
-    if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and ("integer" in types or "number" in types):
+    if ctx.wire.url_part() and ("integer" in types or "number" in types):
         if "string" in strategies:
             restrict("string", _is_not_numeric_string)
     # For path/query parameters, 0/1/true/false serialize to wire values lenient parsers
     # accept as booleans, making them indistinguishable from a valid boolean.
-    if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and "boolean" in types:
+    if ctx.wire.url_part() and "boolean" in types:
         for ty in ("integer", "number", "string"):
             if ty in strategies:
                 restrict(ty, _is_not_boolean_coercible)
-    if ctx.location in (ParameterLocation.QUERY, ParameterLocation.PATH):
+    if ctx.wire.url_part():
         strategies.pop("object", None)
     # Form-urlencoded property-level mutations with null/array/object serialize to empty
-    if ctx.location == ParameterLocation.BODY and ctx.media_type == ("application", "x-www-form-urlencoded"):
+    if ctx.wire.urlencoded_body():
         strategies.pop("null", None)
         strategies.pop("array", None)
         strategies.pop("object", None)
     # XML body: null and empty string both serialize to an empty element (<RootTag></RootTag>),
     # indistinguishable from an empty object {} at the wire level
-    if (
-        "object" in types
-        and ctx.location == ParameterLocation.BODY
-        and ctx.media_type is not None
-        and is_xml_parts(ctx.media_type)
-    ):
+    if "object" in types and ctx.wire.xml_body():
         strategies.pop("null", None)
         strategies.pop("string", None)
     if filter_func is not None:
@@ -4052,21 +3943,15 @@ def _negative_type(
             return True
 
     def _does_not_match_the_original_schema(value: Any) -> bool:
-        # For XML, None serializes to "" (empty element content), not to "None"
-        if ctx.media_type is not None and is_xml_parts(ctx.media_type) and value is None:
-            return not is_valid("")
-        return not is_valid(str(value))
+        return not is_valid(ctx.wire.observed(value))
 
-    if ctx.location == ParameterLocation.PATH:
+    if ctx.wire.url_part():
         for ty, strategy in strategies.items():
-            strategies[ty] = strategy.map(jsonify).map(quote_path_parameter)
-    elif ctx.location == ParameterLocation.QUERY:
-        for ty, strategy in strategies.items():
-            strategies[ty] = strategy.map(jsonify)
+            strategies[ty] = strategy.map(ctx.wire.rendered)
 
     # Materialize before yielding so the cache fills even when the consumer stops mid-iteration.
     generated_values: list[Any] = []
-    if apply_validation and ctx.will_be_serialized_to_string():
+    if apply_validation and ctx.wire.serializes_to_string():
         if _accepts_every_stringified_value(schema, types):
             # Nothing here could break the schema once it reaches the wire as text.
             return
@@ -4082,7 +3967,7 @@ def _negative_type(
     if cache_key is not None:
         schema_generation_cache[cache_key] = generated_values
     for value in generated_values:
-        if seen.insert(value) and ctx.is_valid_for_location(value):
+        if seen.insert(value) and ctx.wire.representable(value):
             yield NegativeValue(
                 value, scenario=CoverageScenario.INCORRECT_TYPE, description="Incorrect type", location=ctx.current_path
             )
