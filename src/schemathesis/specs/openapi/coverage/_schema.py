@@ -979,30 +979,21 @@ class CoverageContext:
                         )
 
         if keys == ["allOf"]:
-            # Resolve refs into a fresh list so the caller's schema is not mutated; the
-            # validator cache relies on schemas remaining structurally stable after first use.
             references = [item["$ref"] for item in schema["allOf"] if isinstance(item, dict) and "$ref" in item]
             if any(self.is_exhausted(reference, counters=self.generating) for reference in references):
                 raise Unsatisfiable
-            resolved_all_of = []
-            for item in schema["allOf"]:
-                if isinstance(item, dict) and "$ref" in item:
-                    resolved_all_of.append(self.resolve_ref(item["$ref"]))
-                    # Keywords beside the reference constrain the branch too; keep them as their own conjunct.
-                    rest = {key: value for key, value in item.items() if key != "$ref"}
-                    if rest:
-                        resolved_all_of.append(rest)
-                else:
-                    resolved_all_of.append(item)
-            merged = _merge_all_of({**schema, "allOf": resolved_all_of})
+            # Resolve refs into a fresh tree so the caller's schema is not mutated; the
+            # validator cache relies on schemas remaining structurally stable after first use.
+            inlined, inlined_references = _inline_allof_refs(schema, self, counters=self.generating)
+            merged = _merge_all_of(inlined)
             if merged is not None:
-                # Resolving above leaves no pointer to count, so the branches stay counted while the
+                # Inlining leaves no pointer to count, so the branches stay counted while the
                 # value they lead to is built - a branch pointing back here would never bottom out.
                 with ExitStack() as stack:
-                    for reference in references:
+                    for reference in inlined_references:
                         stack.enter_context(self.expand(reference, counters=self.generating))
                     return self.generate_from_schema(merged)
-            schema = {**schema, "allOf": resolved_all_of}
+            schema = inlined
 
         if isinstance(schema, dict) and "examples" in schema:
             # Examples may contain binary data, which canonicalization rejects
@@ -1755,7 +1746,9 @@ def _cover_positive_for_type(
                 yield flipped
 
 
-def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] = frozenset()) -> tuple[dict, set[str]]:
+def _inline_allof_refs(
+    schema: dict, ctx: CoverageContext, seen: frozenset[str] = frozenset(), *, counters: dict[str, int] | None = None
+) -> tuple[dict, set[str]]:
     # Resolve refs before merging so required fields from $ref-only siblings survive. Never writes to the input
     # (it shares sub-schemas with the root document); the caller counts the returned inlined refs as expansions.
     all_of = schema.get("allOf")
@@ -1767,24 +1760,24 @@ def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] 
     for sub_schema in all_of:
         if isinstance(sub_schema, dict) and "$ref" in sub_schema:
             ref = sub_schema["$ref"]
-            if ref not in seen and not ctx.is_exhausted(ref):
+            if ref not in seen and not ctx.is_exhausted(ref, counters=counters):
                 resolved = deepclone(ctx.resolve_ref(ref))
                 inlined_refs.add(ref)
                 if isinstance(resolved, dict):
-                    resolved, nested = _inline_allof_refs(resolved, ctx, seen | {ref})
+                    resolved, nested = _inline_allof_refs(resolved, ctx, seen | {ref}, counters=counters)
                     inlined_refs |= nested
                 new_all_of.append(resolved)
                 rest = {key: value for key, value in sub_schema.items() if key != "$ref"}
                 if rest:
                     # Keywords beside the reference constrain the branch too; keep them as their own conjunct.
-                    inlined, nested = _inline_allof_refs(rest, ctx, seen)
+                    inlined, nested = _inline_allof_refs(rest, ctx, seen, counters=counters)
                     inlined_refs |= nested
                     new_all_of.append(inlined)
                 changed = True
             else:
                 new_all_of.append(sub_schema)
         elif isinstance(sub_schema, dict):
-            inlined, nested = _inline_allof_refs(sub_schema, ctx, seen)
+            inlined, nested = _inline_allof_refs(sub_schema, ctx, seen, counters=counters)
             changed = changed or inlined is not sub_schema
             inlined_refs |= nested
             new_all_of.append(inlined)
