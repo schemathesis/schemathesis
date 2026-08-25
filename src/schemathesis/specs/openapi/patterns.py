@@ -504,8 +504,10 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
     return "".join(out)
 
 
-def _python_named_groups(pattern: str) -> str:
-    """`(?<name>...)` as Python spells it, leaving lookbehind and literal text alone."""
+def _strip_group_names(pattern: str) -> str:
+    """Named groups as plain ones, leaving lookbehind and literal text alone."""
+    # Neither spelling of a name is read by every engine the pattern reaches, and a name carries no
+    # constraint, so dropping it keeps the pattern where one spelling or the other would be refused.
     out: list[str] = []
     in_class = False
     i = 0
@@ -521,11 +523,19 @@ def _python_named_groups(pattern: str) -> str:
                 in_class = False
         elif ch == "[":
             in_class = True
-        # `(?<=` and `(?<!` open a lookbehind, which Python reads as it is.
-        elif pattern.startswith("(?<", i) and pattern[i + 3 : i + 4] not in ("=", "!"):
-            out.append("(?P<")
-            i += 3
-            continue
+        elif ch == "(":
+            name_start = -1
+            if pattern.startswith("(?P<", i):
+                name_start = i + 4
+            # `(?<=` and `(?<!` open a lookbehind, which names no group.
+            elif pattern.startswith("(?<", i) and pattern[i + 3 : i + 4] not in ("=", "!"):
+                name_start = i + 3
+            if name_start != -1:
+                end = pattern.find(">", name_start)
+                if end != -1:
+                    out.append("(")
+                    i = end + 1
+                    continue
         out.append(ch)
         i += 1
     return "".join(out)
@@ -539,15 +549,15 @@ def normalize_regex(pattern: object) -> str | None:
     - PCRE Unicode property escapes (\p{L}, \pL, etc.) -> Python equivalents
     - POSIX character classes ([:alnum:], [:digit:], etc.) -> Python equivalents
     - Python anchors (\A, \Z) -> Rust-compatible equivalents (^, $)
-    - Named groups ((?<name>...)) -> Python equivalents
+    - Named groups ((?<name>...), (?P<name>...)) -> plain groups
 
     Returns the translated pattern if successful, None if translation failed
     or the result is not a valid Python regex.
     """
     if not isinstance(pattern, str):
         return None
-    named_groups = _python_named_groups(pattern)
-    has_named_group = named_groups != pattern
+    stripped = _strip_group_names(pattern)
+    has_named_group = stripped != pattern
     # Check for both braced (\p{L}) and shorthand (\pL) forms
     has_braced = r"\p{" in pattern or r"\P{" in pattern
     has_shorthand = any(
@@ -567,7 +577,7 @@ def normalize_regex(pattern: object) -> str | None:
     ):
         return None  # No translation needed
 
-    translated = _inline_unicode_in_classes(named_groups)
+    translated = _inline_unicode_in_classes(stripped)
     if translated is None:
         return None
     for pcre_escape, python_equiv in _UNICODE_PROPERTY_MAP:
