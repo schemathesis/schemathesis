@@ -6527,6 +6527,58 @@ def test_body_example_is_dropped_when_an_inferred_bound_contradicts_it(ctx, mini
     assert ({"name": "ab"} in bodies) is keeps_example
 
 
+def test_multipart_template_body_built_from_custom_property_encodings(ctx):
+    # A property with a registered `encoding.contentType` draws from that strategy; other required
+    # properties get plain fillers so the multipart template stays complete.
+    schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG"))
+    operation = load_schema(
+        ctx,
+        parameters=[{"name": "q", "in": "query", "schema": {"type": "string", "enum": ["a", "b"]}}],
+        request_body={
+            "required": True,
+            "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "file": {"type": "string", "format": "binary"},
+                            "note": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["file", "name"],
+                    },
+                    "encoding": {"file": {"contentType": "image/png"}},
+                }
+            },
+        },
+    )["/foo"]["post"]
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
+    assert {"file": b"\x89PNG", "name": ""} in bodies, bodies[:5]
+
+
+def test_multipart_property_with_unregistered_content_type_falls_back_to_schema_generation(ctx):
+    # An `encoding.contentType` with no registered strategy contributes nothing custom;
+    # the property is generated from its schema like any other.
+    operation = load_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"file": {"type": "string", "enum": ["from-schema"]}},
+                        "required": ["file"],
+                    },
+                    "encoding": {"file": {"contentType": "application/x-unregistered"}},
+                }
+            },
+        },
+    )["/foo"]["post"]
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE)]
+    assert {"file": "from-schema"} in bodies, bodies[:5]
+
+
 def test_each_custom_media_type_alternative_yields_its_own_body(ctx):
     schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
     schemathesis.openapi.media_type("image/jpeg", st.just(b"\xff\xd8jpeg"))
@@ -6543,4 +6595,109 @@ def test_each_custom_media_type_alternative_yields_its_own_body(ctx):
     assert [(case.media_type, case.body) for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
         ("application/pdf", b"%PDF-1.4"),
         ("image/jpeg", b"\xff\xd8jpeg"),
+    ]
+
+
+def test_combination_cases_deduplicate_on_wire_form(ctx):
+    # 'x-token' and 'X-Token' collapse into one header on the wire; combination cases that
+    # repeat an already-emitted request are suppressed.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "x-token",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["secret"]},
+                        },
+                        {
+                            "name": "X-Token",
+                            "in": "header",
+                            "required": False,
+                            "schema": {"type": "string", "enum": ["secret"]},
+                        },
+                        {
+                            "name": "X-Other",
+                            "in": "header",
+                            "required": False,
+                            "schema": {"type": "string", "enum": ["other"]},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/items"]["GET"]
+    stream = [
+        (
+            case.meta.phase.data.scenario.value,
+            case.meta.generation.mode.value,
+            case.meta.phase.data.parameter,
+            dict(case.headers or {}),
+        )
+        for case in iter_cases(operation, GenerationMode.POSITIVE, GenerationMode.NEGATIVE)
+    ]
+    assert stream == [
+        ("default_positive_test", "positive", None, {"X-Token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("invalid_enum_value", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Token", {"X-Token": "0", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Token", {"X-Token": "0.5", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Token", {"X-Token": "true", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Token", {"X-Token": "null", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Token", {"X-Token": "null,null", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Token", {"X-Token": "{}", "X-Other": "other"}),
+        ("invalid_enum_value", "negative", "X-Token", {"X-Token": "AAA", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "0"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "0.5"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "true"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "null"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "null,null"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "{}"}),
+        ("invalid_enum_value", "negative", "X-Other", {"X-Token": "secret", "X-Other": "AAA"}),
+        ("missing_parameter", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("object_only_required", "positive", None, {"x-token": "secret"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "0"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "0.5"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "true"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "null"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "null,null"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "{}"}),
+        ("invalid_enum_value", "negative", "x-token", {"x-token": "AAA"}),
+        (
+            "object_unexpected_properties",
+            "negative",
+            None,
+            {"x-token": "secret", "x-schemathesis-unknown-property": "42"},
+        ),
+        ("object_required_and_optional", "positive", None, {"x-token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "0"}),
+        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "0.5"}),
+        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "true"}),
+        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "null"}),
+        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "null,null"}),
+        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "{}"}),
+        ("invalid_enum_value", "negative", "x-token", {"X-Other": "other", "x-token": "AAA"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Other": "0", "x-token": "secret"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Other": "0.5", "x-token": "secret"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Other": "true", "x-token": "secret"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Other": "null", "x-token": "secret"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Other": "null,null", "x-token": "secret"}),
+        ("incorrect_type", "negative", "X-Other", {"X-Other": "{}", "x-token": "secret"}),
+        ("invalid_enum_value", "negative", "X-Other", {"X-Other": "AAA", "x-token": "secret"}),
+        (
+            "object_unexpected_properties",
+            "negative",
+            None,
+            {"X-Other": "other", "x-token": "secret", "x-schemathesis-unknown-property": "42"},
+        ),
+        ("object_required_and_optional", "positive", None, {"X-Token": "secret"}),
     ]

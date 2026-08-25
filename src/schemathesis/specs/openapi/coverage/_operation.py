@@ -8,13 +8,14 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
+from enum import Enum, auto
 from itertools import combinations
 from typing import TYPE_CHECKING, Any, TypeGuard, cast
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator
-from schemathesis.core.media_types import FORM_MEDIA_TYPES, MEDIA_TYPE_STRATEGIES, find_media_type_strategy
+from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone
@@ -27,7 +28,6 @@ from schemathesis.generation.hypothesis.builder import _case_to_kwargs
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
-    CoveragePhaseData,
     CoverageScenario,
     GenerationInfo,
     PhaseInfo,
@@ -38,6 +38,9 @@ from schemathesis.specs.openapi.error_feedback import apply_adjustments
 from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
+    import jsonschema_rs
+    from hypothesis.strategies import SearchStrategy
+
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.parameters import ContainerName
@@ -48,12 +51,37 @@ if TYPE_CHECKING:
 
 
 class Template:
-    __slots__ = ("_components", "_template", "_serializers")
+    __slots__ = (
+        "_components",
+        "_serializers",
+        "_template",
+        "body_is_fallback_negative",
+        "has_generated_required_body",
+        "has_required_body",
+        "seed_time",
+        "unsatisfiable_required_parameter",
+    )
 
     def __init__(self, serializers: dict[str, Callable]) -> None:
         self._components: dict[ParameterLocation, ComponentInfo] = {}
         self._template: dict[str, Any] = {}
         self._serializers = serializers
+        # A required body that never produced a value, or a required parameter without a positive
+        # value, leaves no valid positive request; a fallback-negative body forbids stacking a
+        # second negative on top.
+        self.has_required_body = False
+        self.has_generated_required_body = False
+        self.body_is_fallback_negative = False
+        self.unsatisfiable_required_parameter = False
+        self.seed_time = 0.0
+
+    def can_emit(self, mode: GenerationMode) -> bool:
+        if mode == GenerationMode.POSITIVE:
+            return not (
+                (self.has_required_body and not self.has_generated_required_body)
+                or self.unsatisfiable_required_parameter
+            )
+        return not self.body_is_fallback_negative
 
     def __contains__(self, key: str) -> bool:
         return key in self._template
@@ -132,6 +160,137 @@ class TemplateValue:
     kwargs: dict[str, Any]
     raw: dict[str, Any]
     components: dict[ParameterLocation, ComponentInfo]
+
+
+class Dedup(Enum):
+    # Keyed by the request either mode already sent.
+    REQUEST = auto()
+    # Keyed only by requests the negative stream sent; positives never block it.
+    NEGATIVE_SET = auto()
+    # Same disciplines, but keyed by the built case's wire form, where header spellings
+    # differing only in casing collapse into one header.
+    WIRE_REQUEST = auto()
+    WIRE_NEGATIVE_SET = auto()
+
+
+@dataclass(slots=True)
+class CaseEmitter:
+    """Builds and deduplicates the cases one operation's coverage run emits."""
+
+    operation: APIOperation
+    correlated: dict[tuple[ParameterLocation, str], Any]
+    correlated_draws: tuple[PoolDraw, ...]
+    correlated_misses: tuple[tuple[str, str], ...]
+    seen_positive: HashSet
+    seen_negative: HashSet
+
+    def is_new_request(self, kwargs: dict[str, Any], mode: GenerationMode) -> bool:
+        # Repeating a request already sent tests nothing, whichever mode sent it first.
+        key = _dedup_key(kwargs)
+        if mode == GenerationMode.POSITIVE:
+            return self.seen_positive.insert(key)
+        return key not in self.seen_positive and self.seen_negative.insert(key)
+
+    def _meta(
+        self,
+        *,
+        generation: GenerationInfo,
+        components: dict[ParameterLocation, ComponentInfo],
+        phase: PhaseInfo,
+        raw: dict[str, Any],
+    ) -> CaseMetadata:
+        # Typed parameter containers survive so revalidation judges the schema level, not the wire form.
+        raw_containers: dict[ParameterLocation, Any] = {
+            location: value
+            for name, value in raw.items()
+            if (location := CONTAINER_TO_LOCATION.get(cast("ContainerName", name))) is not None
+            and location in components
+            and location != ParameterLocation.BODY
+        }
+        # Draws/misses narrowed to the slots this request actually carries, so the pool is not misattributed.
+        return CaseMetadata(
+            generation=generation,
+            components=components,
+            phase=phase,
+            pool_draws=_filter_draws_for_case(raw, self.correlated, self.correlated_draws),
+            pool_misses=_filter_misses_for_case(raw, self.correlated_misses),
+            raw_containers=raw_containers,
+        )
+
+    def build(
+        self,
+        data: TemplateValue,
+        *,
+        mode: GenerationMode,
+        elapsed: float,
+        scenario: CoverageScenario,
+        description: str,
+        location: str | None = None,
+        parameter: str | None = None,
+        parameter_location: ParameterLocation | None = None,
+        method: HttpMethod | None = None,
+        kwargs: dict[str, Any] | None = None,
+        raw: dict[str, Any] | None = None,
+    ) -> Case:
+        kwargs = data.kwargs if kwargs is None else kwargs
+        raw = data.raw if raw is None else raw
+        extra: dict[str, Any] = {"method": method} if method is not None else {}
+        return self.operation.Case(
+            **kwargs,
+            **extra,
+            _meta=self._meta(
+                generation=GenerationInfo(time=elapsed, mode=mode),
+                components=data.components,
+                phase=PhaseInfo.coverage(
+                    scenario=scenario,
+                    description=description,
+                    location=location,
+                    parameter=parameter,
+                    parameter_location=parameter_location,
+                ),
+                raw=raw,
+            ),
+        )
+
+    def emit(
+        self,
+        data: TemplateValue,
+        *,
+        mode: GenerationMode,
+        elapsed: float,
+        scenario: CoverageScenario,
+        description: str,
+        location: str | None = None,
+        parameter: str | None = None,
+        parameter_location: ParameterLocation | None = None,
+        method: HttpMethod | None = None,
+        kwargs: dict[str, Any] | None = None,
+        raw: dict[str, Any] | None = None,
+        dedup: Dedup = Dedup.REQUEST,
+    ) -> Case | None:
+        checked_kwargs = data.kwargs if kwargs is None else kwargs
+        if dedup is Dedup.REQUEST and not self.is_new_request(checked_kwargs, mode):
+            return None
+        if dedup is Dedup.NEGATIVE_SET and not self.seen_negative.insert(_dedup_key(checked_kwargs)):
+            return None
+        case = self.build(
+            data,
+            mode=mode,
+            elapsed=elapsed,
+            scenario=scenario,
+            description=description,
+            location=location,
+            parameter=parameter,
+            parameter_location=parameter_location,
+            method=method,
+            kwargs=kwargs,
+            raw=raw,
+        )
+        if dedup is Dedup.WIRE_REQUEST and not self.is_new_request(_case_to_kwargs(case), mode):
+            return None
+        if dedup is Dedup.WIRE_NEGATIVE_SET and not self.seen_negative.insert(_dedup_key(_case_to_kwargs(case))):
+            return None
+        return case
 
 
 def _replay(
@@ -393,84 +552,39 @@ def _case_slot_value(kwargs: dict[str, Any], location: ParameterLocation, parame
     return container[parameter_name]
 
 
-def iter_coverage_cases(
-    *,
-    operation: APIOperation,
-    generation_modes: list[GenerationMode],
-    generate_duplicate_query_parameters: bool,
-    unexpected_methods: set[str],
-    generation_config: GenerationConfig,
-    extra_data_source: ResourcePool | None = None,
-    unexpected_methods_seen: set[tuple[str, str]] | None = None,
-    error_feedback: ErrorFeedbackStore | None = None,
-    session: GenerationSession | None = None,
-) -> Generator[Case, None, None]:
-    generators: dict[tuple[ParameterLocation, str], Generator[GeneratedValue, None, None]] = {}
-    serializers = operation.get_parameter_serializers()
-    template = Template(serializers)
+@dataclass(slots=True)
+class CoverageRun:
+    """Everything the coverage stages share for one operation."""
 
-    instant = Instant()
-    responses = list(operation.responses.iter_examples())
-    custom_formats = operation.schema.get_custom_format_strategies(generation_config, GenerationMode.POSITIVE)
-
-    seen_negative = HashSet()
-    seen_positive = HashSet()
-
-    def _is_new_request(kwargs: dict[str, Any], mode: GenerationMode) -> bool:
-        # Repeating a request already sent tests nothing, whichever mode sent it first.
-        key = _dedup_key(kwargs)
-        if mode == GenerationMode.POSITIVE:
-            return seen_positive.insert(key)
-        return key not in seen_positive and seen_negative.insert(key)
-
-    capabilities = operation.schema.get_coverage_capabilities()
-    validator_cls = capabilities.validator_cls
-    update_pattern = capabilities.update_pattern
-    assert validator_cls is not None, "Coverage phase requires a JSON schema validator class"
-
+    operation: APIOperation
+    template: Template
+    emitter: CaseEmitter
+    generators: dict[tuple[ParameterLocation, str], Generator[GeneratedValue, None, None]]
+    generation_modes: list[GenerationMode]
+    generation_config: GenerationConfig
+    custom_formats: dict[str, SearchStrategy]
+    validator_cls: type[jsonschema_rs.Validator]
+    update_pattern: Callable[[str, int | None, int | None], str] | None
+    session: GenerationSession | None
+    error_feedback: ErrorFeedbackStore | None
+    responses: list[tuple[str, object]]
     correlated: dict[tuple[ParameterLocation, str], Any]
-    correlated_draws: tuple[PoolDraw, ...]
-    correlated_misses: tuple[tuple[str, str], ...]
-    if extra_data_source is not None:
-        pool_pick = extra_data_source.pick_correlated_values(operation=operation)
-        correlated = pool_pick.values
-        correlated_draws = pool_pick.draws
-        correlated_misses = pool_pick.misses
-    else:
-        correlated = {}
-        correlated_draws = ()
-        correlated_misses = ()
 
-    def _build_meta(
-        *,
-        generation: GenerationInfo,
-        components: dict[ParameterLocation, ComponentInfo],
-        phase: PhaseInfo,
-        raw: dict[str, Any],
-    ) -> CaseMetadata:
-        # Preserve typed parameter containers so revalidation can validate against
-        # the schema's abstraction level, not the stringified wire form on the case.
-        # Body is excluded — it doesn't go through parameter stringification.
-        raw_containers: dict[ParameterLocation, Any] = {
-            location: value
-            for name, value in raw.items()
-            if (location := CONTAINER_TO_LOCATION.get(cast("ContainerName", name))) is not None
-            and location in components
-            and location != ParameterLocation.BODY
-        }
-        # Filter operation-level draws/misses to only those whose slot actually appears in
-        # the yielded request. Coverage variants that omit an optional resource-bound slot,
-        # or synthesised probes that drop one parameter while keeping a pooled path param,
-        # would otherwise over- or under-attribute the pool.
-        return CaseMetadata(
-            generation=generation,
-            components=components,
-            phase=phase,
-            pool_draws=_filter_draws_for_case(raw, correlated, correlated_draws),
-            pool_misses=_filter_misses_for_case(raw, correlated_misses),
-            raw_containers=raw_containers,
-        )
 
+def _seed_parameters(run: CoverageRun) -> None:
+    operation = run.operation
+    template = run.template
+    generators = run.generators
+    generation_modes = run.generation_modes
+    generation_config = run.generation_config
+    custom_formats = run.custom_formats
+    validator_cls = run.validator_cls
+    update_pattern = run.update_pattern
+    session = run.session
+    error_feedback = run.error_feedback
+    responses = run.responses
+    correlated = run.correlated
+    instant = Instant()
     inferred_properties_per_location: dict[ParameterLocation, dict[str, Any] | None] = {}
 
     def _inferred_properties(target_location: ParameterLocation) -> dict[str, Any] | None:
@@ -497,9 +611,6 @@ def iter_coverage_cases(
         inferred_properties_per_location[target_location] = result
         return result
 
-    # Set when a required parameter has no representable positive value; the operation then has no valid
-    # positive request, so positive cases are skipped.
-    has_unsatisfiable_required_parameter = False
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
@@ -593,16 +704,16 @@ def iter_coverage_cases(
                 )
                 # A negative fallback means the required path parameter has no representable positive value.
                 if value.generation_mode == GenerationMode.NEGATIVE:
-                    has_unsatisfiable_required_parameter = True
+                    template.unsatisfiable_required_parameter = True
                 template.add_parameter(location, name, value)
                 continue
             if parameter.is_required:
-                has_unsatisfiable_required_parameter = True
+                template.unsatisfiable_required_parameter = True
             continue
         # Positive values precede negative ones, so a negative seed means the required parameter has no
         # positive value; the positive case built from this template would be invalid.
         if parameter.is_required and value.generation_mode == GenerationMode.NEGATIVE:
-            has_unsatisfiable_required_parameter = True
+            template.unsatisfiable_required_parameter = True
         template.add_parameter(location, name, value)
         if value.generation_mode == GenerationMode.NEGATIVE:
             # The seeded value only ever ships under some other method, so a parameter left with
@@ -610,245 +721,221 @@ def iter_coverage_cases(
             following = next(gen, None)
             gen = _replay(value) if following is None else _replay(following, gen)
         generators[(location, name)] = gen
-    template_time = instant.elapsed
-    has_required_body = operation.body and any(b.is_required for b in operation.body)
-    has_generated_required_body = False
-    # Set when the body template substrate had to fall back to a negative value because positive
-    # coverage yielded nothing (e.g. readOnly + allOf composition makes every template option
-    # unsatisfiable, or every `oneOf` branch overlaps). When set, parameter-mutation cases must
-    # skip NEGATIVE param values — those would mix two negatives in one case (the existing body
-    # plus the param mutation). POSITIVE param values still flow through: the case is overall
-    # negative because of the body, but the parameter's positive value still reaches the wire,
-    # which is what coverage tracking needs.
-    template_body_is_fallback_negative = False
-    if operation.body:
-        for body in operation.body:
-            instant = Instant()
+    template.seed_time = instant.elapsed
+    template.has_required_body = bool(operation.body and any(b.is_required for b in operation.body))
 
-            multipart_body = _generate_multipart_body_from_custom_strategies(body)
-            if multipart_body is not None:
-                if body.is_required:
-                    has_generated_required_body = True
-                if "body" not in template:
-                    template.set_body(
-                        GeneratedValue.with_positive(
-                            value=multipart_body,
-                            scenario=CoverageScenario.EXAMPLE_VALUE,
-                            description="Multipart body with custom encoding",
-                        ),
-                        body.media_type,
-                    )
-                continue
 
-            custom_gen = _generate_coverage_values_from_custom_strategy(body.media_type)
-            first_custom_value = next(custom_gen, None)
+def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
+    operation = run.operation
+    template = run.template
+    emitter = run.emitter
+    generation_modes = run.generation_modes
+    generation_config = run.generation_config
+    custom_formats = run.custom_formats
+    validator_cls = run.validator_cls
+    update_pattern = run.update_pattern
+    session = run.session
+    error_feedback = run.error_feedback
+    correlated = run.correlated
+    for body in operation.body:
+        instant = Instant()
 
-            if first_custom_value is not None:
-                if body.is_required:
-                    has_generated_required_body = True
-                elapsed = instant.elapsed
-                if "body" not in template:
-                    template_time += elapsed
-                    template.set_body(first_custom_value, body.media_type)
-                data = template.with_body(value=first_custom_value, media_type=body.media_type)
-                yield operation.Case(
-                    **data.kwargs,
-                    _meta=_build_meta(
-                        generation=GenerationInfo(time=elapsed, mode=first_custom_value.generation_mode),
-                        components=data.components,
-                        phase=PhaseInfo.coverage(
-                            scenario=first_custom_value.scenario,
-                            description=first_custom_value.description,
-                            location=first_custom_value.location,
-                            parameter=body.media_type,
-                            parameter_location=ParameterLocation.BODY,
-                        ),
-                        raw=data.raw,
-                    ),
-                )
-                continue
-
-            schema = body.unoptimized_schema
-            schema_is_clone = False
-            if error_feedback is not None:
-                adjusted = apply_adjustments(
-                    operation=operation,
-                    location=ParameterLocation.BODY,
-                    schema=schema,
-                    store=error_feedback,
-                )
-                if adjusted is not schema:
-                    schema = adjusted
-                    schema_is_clone = True
-            examples = body.examples
-            if examples and schema_is_clone:
-                # Drop examples invalidated by inferred constraints so coverage falls back to schema generation.
-                try:
-                    body_validator = make_validator(schema, validator_cls)
-                except Exception:
-                    body_validator = None
-                if body_validator is not None:
-                    examples = [example for example in examples if body_validator.is_valid(example)]
-            if examples:
-                if not schema_is_clone:
-                    schema = dict(schema)
-                # User-registered media types should only handle text / binary data
-                if body.media_type in MEDIA_TYPE_STRATEGIES:
-                    schema["examples"] = [example for example in examples if isinstance(example, str | bytes)]
-                else:
-                    schema["examples"] = examples
-            body_overlays = _body_pool_overlays(correlated=correlated, body_schema=schema, validator_cls=validator_cls)
-            if body_overlays:
-                schema = dict(schema)
-                schema_properties = dict(schema["properties"])
-                for prop_name, value in body_overlays.items():
-                    prop_schema = schema_properties[prop_name]
-                    assert isinstance(prop_schema, dict), "_body_pool_overlays only emits dict-schema keys"
-                    if isinstance(value, _NestedOverlay):
-                        # Splice per leaf so the coverage generator still fills sibling fields.
-                        sub_props = dict(prop_schema.get("properties") or {})
-                        for sub_name, sub_value in value.fields.items():
-                            sub_schema = sub_props[sub_name]
-                            assert isinstance(sub_schema, dict), "_nested_body_pool_overlay only emits dict-schema keys"
-                            sub_props[sub_name] = {**sub_schema, "examples": [sub_value]}
-                        schema_properties[prop_name] = {**prop_schema, "properties": sub_props}
-                    else:
-                        schema_properties[prop_name] = {**prop_schema, "examples": [value]}
-                schema["properties"] = schema_properties
-            try:
-                media_type = media_types.parse(body.media_type)
-            except MalformedMediaType as exc:
-                raise InvalidSchema.from_malformed_media_type(
-                    exc, body.media_type, path=operation.path, method=operation.method
-                ) from exc
-            gen = cover_schema_iter(
-                CoverageContext(
-                    session=session,
-                    root_schema=schema,
-                    location=ParameterLocation.BODY,
-                    media_type=media_type,
-                    generation_modes=generation_modes,
-                    is_required=body.is_required,
-                    custom_formats=custom_formats,
-                    validator_cls=validator_cls,
-                    update_pattern=update_pattern,
-                    allow_extra_parameters=generation_config.allow_extra_parameters,
-                ),
-                schema,
-            )
-            value = next(gen, NOT_SET)
-            if isinstance(value, NotSet) or (
-                body.media_type in MEDIA_TYPE_STRATEGIES and not isinstance(value.value, str | bytes)
-            ):
-                continue
+        multipart_body = _generate_multipart_body_from_custom_strategies(body)
+        if multipart_body is not None:
             if body.is_required:
-                has_generated_required_body = True
+                template.has_generated_required_body = True
+            if "body" not in template:
+                template.set_body(
+                    GeneratedValue.with_positive(
+                        value=multipart_body,
+                        scenario=CoverageScenario.EXAMPLE_VALUE,
+                        description="Multipart body with custom encoding",
+                    ),
+                    body.media_type,
+                )
+            continue
+
+        custom_gen = _generate_coverage_values_from_custom_strategy(body.media_type)
+        first_custom_value = next(custom_gen, None)
+
+        if first_custom_value is not None:
+            if body.is_required:
+                template.has_generated_required_body = True
             elapsed = instant.elapsed
             if "body" not in template:
-                template_time += elapsed
-                if value.generation_mode == GenerationMode.POSITIVE:
+                template.seed_time += elapsed
+                template.set_body(first_custom_value, body.media_type)
+            data = template.with_body(value=first_custom_value, media_type=body.media_type)
+            yield emitter.build(
+                data,
+                mode=first_custom_value.generation_mode,
+                elapsed=elapsed,
+                scenario=first_custom_value.scenario,
+                description=first_custom_value.description,
+                location=first_custom_value.location,
+                parameter=body.media_type,
+                parameter_location=ParameterLocation.BODY,
+            )
+            continue
+
+        schema = body.unoptimized_schema
+        schema_is_clone = False
+        if error_feedback is not None:
+            adjusted = apply_adjustments(
+                operation=operation,
+                location=ParameterLocation.BODY,
+                schema=schema,
+                store=error_feedback,
+            )
+            if adjusted is not schema:
+                schema = adjusted
+                schema_is_clone = True
+        examples = body.examples
+        if examples and schema_is_clone:
+            # Drop examples invalidated by inferred constraints so coverage falls back to schema generation.
+            try:
+                body_validator = make_validator(schema, validator_cls)
+            except Exception:
+                body_validator = None
+            if body_validator is not None:
+                examples = [example for example in examples if body_validator.is_valid(example)]
+        if examples:
+            if not schema_is_clone:
+                schema = dict(schema)
+            schema["examples"] = examples
+        body_overlays = _body_pool_overlays(correlated=correlated, body_schema=schema, validator_cls=validator_cls)
+        if body_overlays:
+            schema = dict(schema)
+            schema_properties = dict(schema["properties"])
+            for prop_name, value in body_overlays.items():
+                prop_schema = schema_properties[prop_name]
+                assert isinstance(prop_schema, dict), "_body_pool_overlays only emits dict-schema keys"
+                if isinstance(value, _NestedOverlay):
+                    # Splice per leaf so the coverage generator still fills sibling fields.
+                    sub_props = dict(prop_schema.get("properties") or {})
+                    for sub_name, sub_value in value.fields.items():
+                        sub_schema = sub_props[sub_name]
+                        assert isinstance(sub_schema, dict), "_nested_body_pool_overlay only emits dict-schema keys"
+                        sub_props[sub_name] = {**sub_schema, "examples": [sub_value]}
+                    schema_properties[prop_name] = {**prop_schema, "properties": sub_props}
+                else:
+                    schema_properties[prop_name] = {**prop_schema, "examples": [value]}
+            schema["properties"] = schema_properties
+        try:
+            media_type = media_types.parse(body.media_type)
+        except MalformedMediaType as exc:
+            raise InvalidSchema.from_malformed_media_type(
+                exc, body.media_type, path=operation.path, method=operation.method
+            ) from exc
+        gen = cover_schema_iter(
+            CoverageContext(
+                session=session,
+                root_schema=schema,
+                location=ParameterLocation.BODY,
+                media_type=media_type,
+                generation_modes=generation_modes,
+                is_required=body.is_required,
+                custom_formats=custom_formats,
+                validator_cls=validator_cls,
+                update_pattern=update_pattern,
+                allow_extra_parameters=generation_config.allow_extra_parameters,
+            ),
+            schema,
+        )
+        value = next(gen, NOT_SET)
+        if isinstance(value, NotSet):
+            continue
+        if body.is_required:
+            template.has_generated_required_body = True
+        elapsed = instant.elapsed
+        if "body" not in template:
+            template.seed_time += elapsed
+            if value.generation_mode == GenerationMode.POSITIVE:
+                template.set_body(value, body.media_type)
+            else:
+                # The template must be a valid positive baseline so that
+                # parameter-mutation cases (e.g. missing required header) only
+                # invalidate the one thing being tested.  If the first body value is
+                # a negative mutation (NEGATIVE-only mode), generate a positive value
+                # separately and prefer it for the template.
+                pos_gen = cover_schema_iter(
+                    CoverageContext(
+                        session=session,
+                        root_schema=schema,
+                        location=ParameterLocation.BODY,
+                        media_type=media_type,
+                        generation_modes=[GenerationMode.POSITIVE],
+                        is_required=body.is_required,
+                        custom_formats=custom_formats,
+                        validator_cls=validator_cls,
+                        update_pattern=update_pattern,
+                        allow_extra_parameters=generation_config.allow_extra_parameters,
+                    ),
+                    schema,
+                )
+                first_positive = next(pos_gen, NOT_SET)
+                if isinstance(first_positive, NotSet):
+                    template.body_is_fallback_negative = True
                     template.set_body(value, body.media_type)
                 else:
-                    # The template must be a valid positive baseline so that
-                    # parameter-mutation cases (e.g. missing required header) only
-                    # invalidate the one thing being tested.  If the first body value is
-                    # a negative mutation (NEGATIVE-only mode), generate a positive value
-                    # separately and prefer it for the template.
-                    pos_gen = cover_schema_iter(
-                        CoverageContext(
-                            session=session,
-                            root_schema=schema,
-                            location=ParameterLocation.BODY,
-                            media_type=media_type,
-                            generation_modes=[GenerationMode.POSITIVE],
-                            is_required=body.is_required,
-                            custom_formats=custom_formats,
-                            validator_cls=validator_cls,
-                            update_pattern=update_pattern,
-                            allow_extra_parameters=generation_config.allow_extra_parameters,
-                        ),
-                        schema,
-                    )
-                    first_positive = next(pos_gen, NOT_SET)
-                    if isinstance(first_positive, NotSet):
-                        template_body_is_fallback_negative = True
-                        template.set_body(value, body.media_type)
-                    else:
-                        template.set_body(first_positive, body.media_type)
-            data = template.with_body(value=value, media_type=body.media_type)
-            if not _is_new_request(data.kwargs, value.generation_mode):
-                continue
-            yield operation.Case(
-                **data.kwargs,
-                _meta=_build_meta(
-                    generation=GenerationInfo(
-                        time=elapsed,
-                        mode=value.generation_mode,
-                    ),
-                    components=data.components,
-                    phase=PhaseInfo.coverage(
-                        scenario=value.scenario,
-                        description=value.description,
-                        location=value.location,
-                        parameter=body.media_type,
-                        parameter_location=ParameterLocation.BODY,
-                    ),
-                    raw=data.raw,
-                ),
-            )
-            iterator = iter(gen)
-            while True:
-                instant = Instant()
-                try:
-                    next_value = next(iterator)
-                    if body.media_type in MEDIA_TYPE_STRATEGIES and not isinstance(next_value.value, str | bytes):
-                        continue
-
-                    data = template.with_body(value=next_value, media_type=body.media_type)
-                    if not _is_new_request(data.kwargs, next_value.generation_mode):
-                        continue
-                    yield operation.Case(
-                        **data.kwargs,
-                        _meta=_build_meta(
-                            generation=GenerationInfo(
-                                time=instant.elapsed,
-                                mode=next_value.generation_mode,
-                            ),
-                            components=data.components,
-                            phase=PhaseInfo.coverage(
-                                scenario=next_value.scenario,
-                                description=next_value.description,
-                                location=next_value.location,
-                                parameter=body.media_type,
-                                parameter_location=ParameterLocation.BODY,
-                            ),
-                            raw=data.raw,
-                        ),
-                    )
-                except StopIteration:
-                    break
-    elif (
-        GenerationMode.POSITIVE in generation_modes
-        and (not has_required_body or has_generated_required_body)
-        and not has_unsatisfiable_required_parameter
-    ):
-        data = template.unmodified()
-        seen_positive.insert(_dedup_key(data.kwargs))
-        yield operation.Case(
-            **data.kwargs,
-            _meta=_build_meta(
-                generation=GenerationInfo(
-                    time=template_time,
-                    mode=GenerationMode.POSITIVE,
-                ),
-                components=data.components,
-                phase=PhaseInfo.coverage(
-                    scenario=CoverageScenario.DEFAULT_POSITIVE_TEST, description="Default positive test case"
-                ),
-                raw=data.raw,
-            ),
+                    template.set_body(first_positive, body.media_type)
+        data = template.with_body(value=value, media_type=body.media_type)
+        case = emitter.emit(
+            data,
+            mode=value.generation_mode,
+            elapsed=elapsed,
+            scenario=value.scenario,
+            description=value.description,
+            location=value.location,
+            parameter=body.media_type,
+            parameter_location=ParameterLocation.BODY,
         )
+        if case is None:
+            continue
+        yield case
+        iterator = iter(gen)
+        while True:
+            instant = Instant()
+            try:
+                next_value = next(iterator)
+                data = template.with_body(value=next_value, media_type=body.media_type)
+                case = emitter.emit(
+                    data,
+                    mode=next_value.generation_mode,
+                    elapsed=instant.elapsed,
+                    scenario=next_value.scenario,
+                    description=next_value.description,
+                    location=next_value.location,
+                    parameter=body.media_type,
+                    parameter_location=ParameterLocation.BODY,
+                )
+                if case is not None:
+                    yield case
+            except StopIteration:
+                break
 
+
+def _default_positive(run: CoverageRun) -> Generator[Case, None, None]:
+    template = run.template
+    emitter = run.emitter
+    if GenerationMode.POSITIVE not in run.generation_modes or not template.can_emit(GenerationMode.POSITIVE):
+        return
+    data = template.unmodified()
+    case = emitter.emit(
+        data,
+        mode=GenerationMode.POSITIVE,
+        elapsed=template.seed_time,
+        scenario=CoverageScenario.DEFAULT_POSITIVE_TEST,
+        description="Default positive test case",
+    )
+    if case is not None:
+        yield case
+
+
+def _parameter_mutations(run: CoverageRun) -> Generator[Case, None, None]:
+    template = run.template
+    emitter = run.emitter
+    generators = run.generators
     for (location, name), gen in generators.items():
         iterator = iter(gen)
         # CT-mutation cases test Content-Type validation, not body validation; carrying the
@@ -869,132 +956,146 @@ def iter_coverage_cases(
                 raw = {k: v for k, v in raw.items() if k not in ("body", "media_type")}
 
             if value.generation_mode == GenerationMode.NEGATIVE:
-                if template_body_is_fallback_negative:
+                if not template.can_emit(GenerationMode.NEGATIVE):
                     # Skip: would emit a case with NEGATIVE body + NEGATIVE param.
                     continue
-                if not _is_new_request(kwargs, GenerationMode.NEGATIVE):
-                    continue
             elif value.generation_mode == GenerationMode.POSITIVE:
-                if has_required_body and not has_generated_required_body and not is_content_type_mutation:
+                if (
+                    template.has_required_body
+                    and not template.has_generated_required_body
+                    and not is_content_type_mutation
+                ):
                     continue
-                if has_unsatisfiable_required_parameter:
+                if template.unsatisfiable_required_parameter:
                     # A required parameter has no positive value, so no positive case is valid.
                     continue
-                if not _is_new_request(kwargs, GenerationMode.POSITIVE):
-                    continue
 
-            yield operation.Case(
-                **kwargs,
-                _meta=_build_meta(
-                    generation=GenerationInfo(time=instant.elapsed, mode=value.generation_mode),
-                    components=data.components,
-                    phase=PhaseInfo.coverage(
-                        scenario=value.scenario,
-                        description=value.description,
-                        location=value.location,
-                        parameter=name,
-                        parameter_location=location,
-                    ),
-                    raw=raw,
-                ),
+            case = emitter.emit(
+                data,
+                mode=value.generation_mode,
+                elapsed=instant.elapsed,
+                scenario=value.scenario,
+                description=value.description,
+                location=value.location,
+                parameter=name,
+                parameter_location=location,
+                kwargs=kwargs,
+                raw=raw,
             )
-    if template_body_is_fallback_negative:
-        # The remaining blocks emit NEGATIVE param-mutation cases (missing/duplicate/etc.)
-        # built off the template body. Combined with a fallback-negative body they would
-        # mix two negatives in one case.
-        return
-    if GenerationMode.NEGATIVE in generation_modes:
-        # Path-level: each `(path, method)` pair runs once across declared operations.
-        methods = sorted(unexpected_methods - set(operation.schema[operation.path]))
-        for method in methods:
-            if unexpected_methods_seen is not None:
-                key = (operation.path, method)
-                if key in unexpected_methods_seen:
-                    continue
-                unexpected_methods_seen.add(key)
+            if case is not None:
+                yield case
+
+
+def _unexpected_methods(
+    run: CoverageRun, unexpected_methods: set[str], unexpected_methods_seen: set[tuple[str, str]] | None
+) -> Generator[Case, None, None]:
+    operation = run.operation
+    template = run.template
+    emitter = run.emitter
+    # Path-level: each `(path, method)` pair runs once across declared operations.
+    methods = sorted(unexpected_methods - set(operation.schema[operation.path]))
+    for method in methods:
+        if unexpected_methods_seen is not None:
+            key = (operation.path, method)
+            if key in unexpected_methods_seen:
+                continue
+            unexpected_methods_seen.add(key)
+        instant = Instant()
+        data = template.unmodified()
+        yield emitter.build(
+            data,
+            mode=GenerationMode.NEGATIVE,
+            elapsed=instant.elapsed,
+            scenario=CoverageScenario.UNSPECIFIED_HTTP_METHOD,
+            description=f"Unspecified HTTP method: {method.upper()}",
+            method=cast("HttpMethod", method.upper()),
+        )
+
+
+def _duplicate_query(run: CoverageRun, generate_duplicate_query_parameters: bool) -> Generator[Case, None, None]:
+    operation = run.operation
+    template = run.template
+    emitter = run.emitter
+    # Generate duplicate query parameters
+    # NOTE: if the query schema has no constraints, then we may have no negative test cases at all
+    # as they all will match the original schema and therefore will be considered as positive ones
+    if generate_duplicate_query_parameters and operation.query and "query" in template:
+        container = template["query"]
+        for parameter in operation.query:
+            if parameter.definition.get("in") == "querystring":
+                # Duplicate parameter semantics don't apply to querystring parameters;
+                # they use content-based serialization, not individual key-value pairs.
+                continue
             instant = Instant()
-            data = template.unmodified()
-            yield operation.Case(
-                **data.kwargs,
-                method=cast("HttpMethod", method.upper()),
-                _meta=_build_meta(
-                    generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                    components=data.components,
-                    phase=PhaseInfo.coverage(
-                        scenario=CoverageScenario.UNSPECIFIED_HTTP_METHOD,
-                        description=f"Unspecified HTTP method: {method.upper()}",
-                    ),
-                    raw=data.raw,
-                ),
-            )
-        # Generate duplicate query parameters
-        # NOTE: if the query schema has no constraints, then we may have no negative test cases at all
-        # as they all will match the original schema and therefore will be considered as positive ones
-        if generate_duplicate_query_parameters and operation.query and "query" in template:
-            container = template["query"]
-            for parameter in operation.query:
-                if parameter.definition.get("in") == "querystring":
-                    # Duplicate parameter semantics don't apply to querystring parameters;
-                    # they use content-based serialization, not individual key-value pairs.
-                    continue
-                instant = Instant()
-                # Could be absent if value schema can't be negated
-                # I.e. contains just `default` value without any other keywords
-                value = container.get(parameter.name, NOT_SET)
-                if value is not NOT_SET:
-                    data = template.with_location(
-                        location=ParameterLocation.QUERY,
-                        value={**container, parameter.name: [value, value]},
-                        generation_mode=GenerationMode.NEGATIVE,
-                    )
-                    yield operation.Case(
-                        **data.kwargs,
-                        _meta=_build_meta(
-                            generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                            components=data.components,
-                            phase=PhaseInfo.coverage(
-                                scenario=CoverageScenario.DUPLICATE_PARAMETER,
-                                description=f"Duplicate `{parameter.name}` query parameter",
-                                parameter=parameter.name,
-                                parameter_location=ParameterLocation.QUERY,
-                            ),
-                            raw=data.raw,
-                        ),
-                    )
-        # Generate missing required parameters
-        for parameter in operation.iter_parameters():
-            if parameter.is_required and parameter.location != ParameterLocation.PATH:
-                instant = Instant()
-                name = parameter.name
-                location = parameter.location
-                container = template.get(location.container_name, {})
+            # Could be absent if value schema can't be negated
+            # I.e. contains just `default` value without any other keywords
+            value = container.get(parameter.name, NOT_SET)
+            if value is not NOT_SET:
                 data = template.with_location(
-                    location=location,
-                    value={k: v for k, v in container.items() if k != name},
+                    location=ParameterLocation.QUERY,
+                    value={**container, parameter.name: [value, value]},
                     generation_mode=GenerationMode.NEGATIVE,
                 )
-                kwargs = data.kwargs
-                raw = data.raw
-                # For missing Content-Type header test, don't send body
-                if location == ParameterLocation.HEADER and name.lower() == "content-type":
-                    kwargs = {k: v for k, v in kwargs.items() if k not in ("body", "media_type")}
-                    raw = {k: v for k, v in raw.items() if k not in ("body", "media_type")}
+                yield emitter.build(
+                    data,
+                    mode=GenerationMode.NEGATIVE,
+                    elapsed=instant.elapsed,
+                    scenario=CoverageScenario.DUPLICATE_PARAMETER,
+                    description=f"Duplicate `{parameter.name}` query parameter",
+                    parameter=parameter.name,
+                    parameter_location=ParameterLocation.QUERY,
+                )
 
-                if seen_negative.insert(_dedup_key(kwargs)):
-                    yield operation.Case(
-                        **kwargs,
-                        _meta=_build_meta(
-                            generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                            components=data.components,
-                            phase=PhaseInfo.coverage(
-                                scenario=CoverageScenario.MISSING_PARAMETER,
-                                description=f"Missing `{name}` at {location.value}",
-                                parameter=name,
-                                parameter_location=location,
-                            ),
-                            raw=raw,
-                        ),
-                    )
+
+def _missing_required(run: CoverageRun) -> Generator[Case, None, None]:
+    operation = run.operation
+    template = run.template
+    emitter = run.emitter
+    # Generate missing required parameters
+    for parameter in operation.iter_parameters():
+        if parameter.is_required and parameter.location != ParameterLocation.PATH:
+            instant = Instant()
+            name = parameter.name
+            location = parameter.location
+            container = template.get(location.container_name, {})
+            data = template.with_location(
+                location=location,
+                value={k: v for k, v in container.items() if k != name},
+                generation_mode=GenerationMode.NEGATIVE,
+            )
+            kwargs = data.kwargs
+            raw = data.raw
+            # For missing Content-Type header test, don't send body
+            if location == ParameterLocation.HEADER and name.lower() == "content-type":
+                kwargs = {k: v for k, v in kwargs.items() if k not in ("body", "media_type")}
+                raw = {k: v for k, v in raw.items() if k not in ("body", "media_type")}
+
+            case = emitter.emit(
+                data,
+                mode=GenerationMode.NEGATIVE,
+                elapsed=instant.elapsed,
+                scenario=CoverageScenario.MISSING_PARAMETER,
+                description=f"Missing `{name}` at {location.value}",
+                parameter=name,
+                parameter_location=location,
+                kwargs=kwargs,
+                raw=raw,
+                dedup=Dedup.NEGATIVE_SET,
+            )
+            if case is not None:
+                yield case
+
+
+def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
+    operation = run.operation
+    template = run.template
+    emitter = run.emitter
+    generation_modes = run.generation_modes
+    generation_config = run.generation_config
+    custom_formats = run.custom_formats
+    validator_cls = run.validator_cls
+    update_pattern = run.update_pattern
+    session = run.session
     # Generate combinations for each location
     for location, parameter_set in [
         (ParameterLocation.QUERY, operation.query),
@@ -1021,24 +1122,18 @@ def iter_coverage_cases(
             _parameter: str | None,
             _generation_mode: GenerationMode,
             _instant: Instant,
-        ) -> Case:
+            _dedup: Dedup = Dedup.WIRE_REQUEST,
+        ) -> Case | None:
             data = template.with_location(location=_location, value=container_values, generation_mode=_generation_mode)
-            return operation.Case(
-                **data.kwargs,
-                _meta=_build_meta(
-                    generation=GenerationInfo(
-                        time=_instant.elapsed,
-                        mode=_generation_mode,
-                    ),
-                    components=data.components,
-                    phase=PhaseInfo.coverage(
-                        scenario=scenario,
-                        description=description,
-                        parameter=_parameter,
-                        parameter_location=_location,
-                    ),
-                    raw=data.raw,
-                ),
+            return emitter.emit(
+                data,
+                mode=_generation_mode,
+                elapsed=_instant.elapsed,
+                scenario=scenario,
+                description=description,
+                parameter=_parameter,
+                parameter_location=_location,
+                dedup=_dedup,
             )
 
         def _combination_schema(
@@ -1067,7 +1162,7 @@ def iter_coverage_cases(
             return schema
 
         def _yield_negative(
-            subschema: dict[str, Any], _location: ParameterLocation, is_required: bool
+            subschema: dict[str, Any], _location: ParameterLocation, is_required: bool, _dedup: Dedup
         ) -> Generator[Case, None, None]:
             iterator = iter(
                 cover_schema_iter(
@@ -1090,23 +1185,28 @@ def iter_coverage_cases(
                 instant = Instant()
                 try:
                     more = next(iterator)
-                    yield make_case(
-                        more.value,
-                        more.scenario,
-                        more.description,
-                        _location,
-                        more.parameter,
-                        GenerationMode.NEGATIVE,
-                        instant,
-                    )
                 except StopIteration:
                     break
+                case = make_case(
+                    more.value,
+                    more.scenario,
+                    more.description,
+                    _location,
+                    more.parameter,
+                    GenerationMode.NEGATIVE,
+                    instant,
+                    _dedup,
+                )
+                # Deduplicate before filtering so even a filtered case blocks a later wire duplicate.
+                if case is None or more.scenario == CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY:
+                    continue
+                yield case
 
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
             if GenerationMode.POSITIVE in generation_modes and not (
-                has_required_body and not has_generated_required_body
+                template.has_required_body and not template.has_generated_required_body
             ):
                 case = make_case(
                     only_required,
@@ -1117,28 +1217,17 @@ def iter_coverage_cases(
                     GenerationMode.POSITIVE,
                     Instant(),
                 )
-                if _is_new_request(_case_to_kwargs(case), GenerationMode.POSITIVE):
+                if case is not None:
                     yield case
             if GenerationMode.NEGATIVE in generation_modes:
                 subschema = _combination_schema(only_required, required, parameter_set)
-                for case in _yield_negative(subschema, location, is_required=bool(required)):
-                    kwargs = _dedup_key(_case_to_kwargs(case))
-                    if not seen_negative.insert(kwargs):
-                        continue
-                    assert case.meta is not None
-                    assert isinstance(case.meta.phase.data, CoveragePhaseData)
-                    # Already generated in one of the blocks above
-                    if (
-                        location != "path"
-                        and case.meta.phase.data.scenario != CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY
-                    ):
-                        yield case
+                yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_NEGATIVE_SET)
 
         # 2. Generate combinations with required properties and one optional property
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
             if combo != base_container and GenerationMode.POSITIVE in generation_modes:
-                if not (has_required_body and not has_generated_required_body):
+                if not (template.has_required_body and not template.has_generated_required_body):
                     case = make_case(
                         combo,
                         CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
@@ -1148,27 +1237,17 @@ def iter_coverage_cases(
                         GenerationMode.POSITIVE,
                         Instant(),
                     )
-                    if _is_new_request(_case_to_kwargs(case), GenerationMode.POSITIVE):
+                    if case is not None:
                         yield case
                 if GenerationMode.NEGATIVE in generation_modes:
                     subschema = _combination_schema(combo, required, parameter_set)
-                    for case in _yield_negative(subschema, location, is_required=bool(required)):
-                        if not _is_new_request(_case_to_kwargs(case), GenerationMode.NEGATIVE):
-                            continue
-                        assert case.meta is not None
-                        assert isinstance(case.meta.phase.data, CoveragePhaseData)
-                        # Already generated in one of the blocks above
-                        if (
-                            location != "path"
-                            and case.meta.phase.data.scenario != CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY
-                        ):
-                            yield case
+                    yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_REQUEST)
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
         if (
             len(optional) > 1
             and GenerationMode.POSITIVE in generation_modes
-            and not (has_required_body and not has_generated_required_body)
+            and not (template.has_required_body and not template.has_generated_required_body)
         ):
             for size in range(2, len(optional)):
                 for combination in combinations(optional, size):
@@ -1183,6 +1262,84 @@ def iter_coverage_cases(
                             GenerationMode.POSITIVE,
                             Instant(),
                         )
-                        if _is_new_request(_case_to_kwargs(case), GenerationMode.POSITIVE):
+                        if case is not None:
                             yield case
                         break
+
+
+def iter_coverage_cases(
+    *,
+    operation: APIOperation,
+    generation_modes: list[GenerationMode],
+    generate_duplicate_query_parameters: bool,
+    unexpected_methods: set[str],
+    generation_config: GenerationConfig,
+    extra_data_source: ResourcePool | None = None,
+    unexpected_methods_seen: set[tuple[str, str]] | None = None,
+    error_feedback: ErrorFeedbackStore | None = None,
+    session: GenerationSession | None = None,
+) -> Generator[Case, None, None]:
+    generators: dict[tuple[ParameterLocation, str], Generator[GeneratedValue, None, None]] = {}
+    serializers = operation.get_parameter_serializers()
+    template = Template(serializers)
+
+    responses = list(operation.responses.iter_examples())
+    custom_formats = operation.schema.get_custom_format_strategies(generation_config, GenerationMode.POSITIVE)
+
+    capabilities = operation.schema.get_coverage_capabilities()
+    validator_cls = capabilities.validator_cls
+    update_pattern = capabilities.update_pattern
+    assert validator_cls is not None, "Coverage phase requires a JSON schema validator class"
+
+    correlated: dict[tuple[ParameterLocation, str], Any]
+    correlated_draws: tuple[PoolDraw, ...]
+    correlated_misses: tuple[tuple[str, str], ...]
+    if extra_data_source is not None:
+        pool_pick = extra_data_source.pick_correlated_values(operation=operation)
+        correlated = pool_pick.values
+        correlated_draws = pool_pick.draws
+        correlated_misses = pool_pick.misses
+    else:
+        correlated = {}
+        correlated_draws = ()
+        correlated_misses = ()
+
+    emitter = CaseEmitter(
+        operation=operation,
+        correlated=correlated,
+        correlated_draws=correlated_draws,
+        correlated_misses=correlated_misses,
+        seen_positive=HashSet(),
+        seen_negative=HashSet(),
+    )
+    run = CoverageRun(
+        operation=operation,
+        template=template,
+        emitter=emitter,
+        generators=generators,
+        generation_modes=generation_modes,
+        generation_config=generation_config,
+        custom_formats=custom_formats,
+        validator_cls=validator_cls,
+        update_pattern=update_pattern,
+        session=session,
+        error_feedback=error_feedback,
+        responses=responses,
+        correlated=correlated,
+    )
+    _seed_parameters(run)
+    if operation.body:
+        yield from _body_cases(run)
+    else:
+        yield from _default_positive(run)
+    yield from _parameter_mutations(run)
+    if not template.can_emit(GenerationMode.NEGATIVE):
+        # The remaining blocks emit NEGATIVE param-mutation cases (missing/duplicate/etc.)
+        # built off the template body. Combined with a fallback-negative body they would
+        # mix two negatives in one case.
+        return
+    if GenerationMode.NEGATIVE in generation_modes:
+        yield from _unexpected_methods(run, unexpected_methods, unexpected_methods_seen)
+        yield from _duplicate_query(run, generate_duplicate_query_parameters)
+        yield from _missing_required(run)
+    yield from _container_combinations(run)
