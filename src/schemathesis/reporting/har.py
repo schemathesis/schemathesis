@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 from collections.abc import Iterator
 from http.cookies import SimpleCookie
 from io import StringIO
@@ -13,6 +12,7 @@ import harfile
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Headers
 from schemathesis.engine.recorder import RecordedScenario
@@ -107,7 +107,7 @@ class HarWriter:
                 sanitize_value(req_headers, config=config.sanitization)
             else:
                 req_headers = interaction.request.headers
-            started_datetime = datetime.datetime.fromtimestamp(interaction.timestamp, datetime.timezone.utc).isoformat()
+            started_datetime = format_timestamp(interaction.timestamp)
             har.add_entry(
                 startedDateTime=started_datetime,
                 time=time,

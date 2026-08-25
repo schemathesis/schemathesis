@@ -10,8 +10,6 @@ from typing import TYPE_CHECKING
 import click
 
 from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
-from schemathesis.cli.commands.run.warnings import WarningCollector, WarningData
-from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.output import (
     BLOCK_PADDING,
@@ -32,15 +30,13 @@ from schemathesis.cli.output import (
     make_progress_bar,
     print_lines,
 )
-from schemathesis.cli.summary import SummaryData
 from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.output import decode_response_text, prepare_response_payload
 from schemathesis.core.result import Ok
-from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
-from schemathesis.engine.run import PhaseName, PhaseSkipReason
+from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.probes import ProbeOutcome
 
 if TYPE_CHECKING:
@@ -49,6 +45,7 @@ if TYPE_CHECKING:
     from rich.progress import Progress, TaskID
     from rich.text import Text
 
+    from schemathesis.cli.commands.run.context import ExecutionContext
     from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
@@ -520,7 +517,7 @@ class StatefulProgressManager:
 
 
 @dataclass
-class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
+class OutputHandler(BaseOutputHandler["ExecutionContext"]):
     config: ProjectConfig
 
     loading_manager: LoadingProgressManager | None = None
@@ -528,41 +525,23 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
     unit_tests_manager: UnitTestProgressManager | None = None
     stateful_tests_manager: StatefulProgressManager | None = None
 
-    statistic: ApiStatistic | None = None
-    # Keyed by operation label - a reason only applies to the operation it came from.
-    skip_reasons: dict[str, set[str]] = field(default_factory=dict)
-    warning_collector: WarningCollector | None = None
-    errors: set[events.NonFatalError] = field(default_factory=set)
-    phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
-        default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
-    )
     console: Console = field(default_factory=make_console)
 
-    @property
-    def warnings(self) -> WarningData:
-        assert self.warning_collector is not None
-        return self.warning_collector.data
-
-    def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
+    def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.PhaseStarted):
-            self._on_phase_started(event)
+            self._on_phase_started(ctx, event)
         elif isinstance(event, events.PhaseFinished):
             self._on_phase_finished(event)
         elif isinstance(event, events.ScenarioStarted):
             self._on_scenario_started(event)
         elif isinstance(event, events.ScenarioFinished):
             self._on_scenario_finished(ctx, event)
-        elif isinstance(event, events.SchemaAnalysisWarnings):
-            assert self.warning_collector is not None
-            self.warning_collector.on_schema_warnings(ctx, event)
         if isinstance(event, events.EngineFinished):
             self._on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
             self._on_interrupted(event)
         elif isinstance(event, events.FatalError):
             self._on_fatal_error(ctx, event)
-        elif isinstance(event, events.NonFatalError):
-            self.errors.add(event)
         elif isinstance(event, events.RateLimitRetry):
             self._on_rate_limit_retry(event)
         elif isinstance(event, LoadingStarted):
@@ -570,11 +549,10 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         elif isinstance(event, LoadingFinished):
             self._on_loading_finished(ctx, event)
 
-    def start(self, ctx: BaseExecutionContext) -> None:
-        self.warning_collector = WarningCollector(config=self.config)
+    def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
 
-    def shutdown(self, ctx: BaseExecutionContext) -> None:
+    def shutdown(self, ctx: ExecutionContext) -> None:
         if self.unit_tests_manager is not None:
             self.unit_tests_manager.stop()
         if self.stateful_tests_manager is not None:
@@ -584,14 +562,12 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         if self.probing_manager is not None:
             self.probing_manager.stop()
 
-    def _on_loading_finished(self, ctx: BaseExecutionContext, event: LoadingFinished) -> None:
+    def _on_loading_finished(self, ctx: ExecutionContext, event: LoadingFinished) -> None:
         from rich.padding import Padding
         from rich.style import Style
         from rich.table import Table
 
         self.config = event.config
-        assert self.warning_collector is not None
-        self.warning_collector.config = event.config
 
         assert self.loading_manager is not None
         self.loading_manager.stop()
@@ -603,8 +579,6 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         self.console.print(message)
         self.console.print()
         self.loading_manager = None
-        self.warning_collector.on_unmatched_filters(ctx, event.statistic)
-        self.statistic = event.statistic
 
         table = Table(
             show_header=False,
@@ -635,12 +609,12 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         if ctx.initialization_lines:
             print_lines(ctx.initialization_lines)
 
-    def _on_phase_started(self, event: events.PhaseStarted) -> None:
+    def _on_phase_started(self, ctx: ExecutionContext, event: events.PhaseStarted) -> None:
         phase = event.phase
         if phase.name == PhaseName.PROBING and phase.is_enabled:
             self._start_probing()
         elif phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING] and phase.is_enabled:
-            self._start_unit_tests(phase.name)
+            self._start_unit_tests(ctx, phase.name)
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             self._start_stateful_tests(event)
 
@@ -648,13 +622,13 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         self.probing_manager = ProbingProgressManager(console=self.console)
         self.probing_manager.start()
 
-    def _start_unit_tests(self, phase: PhaseName) -> None:
-        assert self.statistic is not None
+    def _start_unit_tests(self, ctx: ExecutionContext, phase: PhaseName) -> None:
+        assert ctx.api_statistic is not None
         assert self.unit_tests_manager is None
         self.unit_tests_manager = UnitTestProgressManager(
             console=self.console,
             title=phase.display,
-            total=self.statistic.operations.selected,
+            total=ctx.api_statistic.operations.selected,
         )
         self.unit_tests_manager.start()
 
@@ -676,7 +650,6 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         from rich.text import Text
 
         phase = event.phase
-        self.phases[phase.name] = (event.status, phase.skip_reason)
 
         if phase.name == PhaseName.PROBING:
             assert self.probing_manager is not None
@@ -770,17 +743,13 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             assert self.unit_tests_manager is not None
             self.unit_tests_manager.start_operation(event.label)
 
-    def _on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
-        assert self.warning_collector is not None
-        self.warning_collector.on_scenario_finished(ctx, event)
+    def _on_scenario_finished(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
             assert self.unit_tests_manager is not None
             if event.label:
                 self.unit_tests_manager.finish_operation(event.label)
             self.unit_tests_manager.update_progress()
             self.unit_tests_manager.update_stats(event.status)
-            if event.status == Status.SKIP and event.skip_reason is not None and event.label:
-                self.skip_reasons.setdefault(event.label, set()).add(event.skip_reason)
         elif (
             event.phase == PhaseName.STATEFUL_TESTING
             and not event.is_final
@@ -834,7 +803,7 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             self.console.print()
             self.probing_manager = None
 
-    def _on_fatal_error(self, ctx: BaseExecutionContext, event: events.FatalError) -> None:
+    def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
         self.shutdown(ctx)
         display_fatal_error(
             self.console,
@@ -936,91 +905,91 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
         self._print_warning_tips(tips)
 
-    def display_warnings(self) -> None:
+    def display_warnings(self, ctx: ExecutionContext) -> None:
         display_section_name("WARNINGS")
         click.echo()
-        if self.warnings.missing_auth:
+        if ctx.warnings.missing_auth:
             self._display_warning_block(
                 title="Authentication failed",
-                operations=self.warnings.missing_auth,
+                operations=ctx.warnings.missing_auth,
                 suffix_text=" returned authentication errors",
                 tips=["💡 Ensure valid authentication credentials are set via --auth or -H"],
             )
 
-        if self.warnings.missing_test_data:
+        if ctx.warnings.missing_test_data:
             self._display_warning_block(
                 title="Missing test data",
-                operations=self.warnings.missing_test_data,
+                operations=ctx.warnings.missing_test_data,
                 suffix_text=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
                 tips=[
                     "💡 Provide realistic parameter values in your config file so tests can access existing resources",
                 ],
             )
 
-        if self.warnings.validation_mismatch:
+        if ctx.warnings.validation_mismatch:
             self._display_warning_block(
                 title="Schema validation mismatch",
-                operations=self.warnings.validation_mismatch,
+                operations=ctx.warnings.validation_mismatch,
                 suffix_text=" mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation",
                 tips=["💡 Check your schema constraints - API validation may be stricter than documented"],
             )
 
-        if self.warnings.missing_deserializer:
+        if ctx.warnings.missing_deserializer:
             self._display_grouped_detail_block(
                 title="Schema validation skipped",
-                warnings=self.warnings.missing_deserializer,
+                warnings=ctx.warnings.missing_deserializer,
                 entity_name="operation",
                 suffix_text=" cannot validate responses due to missing deserializers",
                 tips=["💡 Register a deserializer with @schemathesis.deserializer() to enable validation"],
             )
 
-        if self.warnings.unused_openapi_auth:
+        if ctx.warnings.unused_openapi_auth:
             self._display_warning_block(
                 title="Unused OpenAPI auth",
-                operations=self.warnings.unused_openapi_auth,
+                operations=ctx.warnings.unused_openapi_auth,
                 suffix_text=" not defined in the schema",
                 tips=[],
                 entity_name="configured auth scheme",
             )
 
-        if self.warnings.unmatched_filter:
+        if ctx.warnings.unmatched_filter:
             self._display_warning_block(
                 title="Unmatched filters",
-                operations=self.warnings.unmatched_filter,
+                operations=ctx.warnings.unmatched_filter,
                 suffix_text=" matched no API operations",
                 tips=["💡 Check the filter for a typo, or update it if the operation was renamed"],
                 entity_name="filter",
             )
 
-        if self.warnings.method_not_allowed:
+        if ctx.warnings.method_not_allowed:
             self._display_warning_block(
                 title="Method Not Allowed",
-                operations=self.warnings.method_not_allowed,
+                operations=ctx.warnings.method_not_allowed,
                 suffix_text=" consistently returned `405 Method Not Allowed` — skipped from later phases",
                 tips=[
                     "💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported"
                 ],
             )
 
-        if self.warnings.unsupported_regex:
+        if ctx.warnings.unsupported_regex:
             self._display_detailed_warning_block(
                 title="Unsupported regex patterns",
-                warnings=self.warnings.unsupported_regex,
+                warnings=ctx.warnings.unsupported_regex,
                 entity_name="operation",
                 suffix_text=" contain regex patterns no value can be generated for",
                 tips=["💡 Supply examples for these operations, or narrow the pattern"],
             )
 
-        if self.warnings.constants_extraction:
+        if ctx.warnings.constants_extraction:
             self._display_warning_block(
                 title="Constant reuse skipped",
-                operations=self.warnings.constants_extraction,
+                operations=ctx.warnings.constants_extraction,
                 suffix_text=" could not be scanned for constant reuse",
                 tips=["💡 Check that each @schemathesis.python.constants source returns your app or modules"],
                 entity_name="registered source",
             )
 
-    def display_stateful_failures(self, ctx: BaseExecutionContext) -> None:
+    def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")
 
         click.echo("\nFailed to extract data from response:")
@@ -1070,14 +1039,14 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
 
         click.echo()
 
-    def display_phases(self) -> None:
+    def display_phases(self, ctx: ExecutionContext) -> None:
         click.echo(_style("Test Phases:", bold=True))
 
         for phase in PhaseName:
             if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS):
                 # Internal phases are not part of the test phase summary
                 continue
-            status, skip_reason = self.phases[phase]
+            status, skip_reason = ctx.phases[phase]
 
             if status == Status.SKIP:
                 click.echo(_style(f"  ⏭  {phase.display}", fg="yellow"), nl=False)
@@ -1095,57 +1064,57 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 click.echo(_style(f"  ⚡ {phase.display}", fg="yellow"))
         click.echo()
 
-    def display_warnings_summary(self) -> None:
+    def display_warnings_summary(self, ctx: ExecutionContext) -> None:
         click.echo(_style("Warnings:", bold=True))
         missing_deserializer = {
-            label for operations in self.warnings.missing_deserializer.values() for label in operations
+            label for operations in ctx.warnings.missing_deserializer.values() for label in operations
         }
         entries = (
             (
-                sum(len(operations) for operations in self.warnings.missing_auth.values()),
+                sum(len(operations) for operations in ctx.warnings.missing_auth.values()),
                 "Missing authentication",
                 "operation",
                 "returned only 401/403 responses",
             ),
             (
-                len(self.warnings.missing_test_data),
+                len(ctx.warnings.missing_test_data),
                 "Missing valid test data",
                 "operation",
                 "repeatedly returned 404 responses",
             ),
             (
-                len(self.warnings.validation_mismatch),
+                len(ctx.warnings.validation_mismatch),
                 "Schema validation mismatch",
                 "operation",
                 "mostly rejected generated data",
             ),
             (len(missing_deserializer), "Schema validation skipped", "operation", "cannot validate responses"),
             (
-                len(self.warnings.unused_openapi_auth),
+                len(ctx.warnings.unused_openapi_auth),
                 "Unused OpenAPI auth",
                 "configured auth scheme",
                 "not used in the schema",
             ),
             (
-                len(self.warnings.unsupported_regex),
+                len(ctx.warnings.unsupported_regex),
                 "Unsupported regex",
                 "operation",
                 "had ungeneratable regex patterns",
             ),
             (
-                len(self.warnings.unmatched_filter),
+                len(ctx.warnings.unmatched_filter),
                 "Unmatched filters",
                 "filter",
                 "matched no API operations",
             ),
             (
-                len(self.warnings.method_not_allowed),
+                len(ctx.warnings.method_not_allowed),
                 "Method Not Allowed",
                 "operation",
                 "skipped after consistent 405 responses",
             ),
             (
-                len(self.warnings.constants_extraction),
+                len(ctx.warnings.constants_extraction),
                 "Constant reuse skipped",
                 "registered source",
                 "could not be scanned",
@@ -1158,14 +1127,14 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             click.echo(_style(f"  ⚠️ {title}: {bold(str(count))} {entity_name}{plural} {suffix_text}", fg="yellow"))
         click.echo()
 
-    def display_final_line(self, ctx: BaseExecutionContext, event: events.EngineFinished) -> None:
+    def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         unique_failures = sum(
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
         )
         display_final_line(
             failures=unique_failures,
-            errors=len(self.errors),
-            warnings=self.warnings.kind_count,
+            errors=len(ctx.errors),
+            warnings=ctx.warnings.kind_count,
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
         )
@@ -1192,15 +1161,15 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
     def display_seed(self) -> None:
         display_seed(self.config)
 
-    def _on_engine_finished(self, ctx: BaseExecutionContext, event: events.EngineFinished) -> None:
+    def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         assert self.loading_manager is None
         assert self.probing_manager is None
         assert self.unit_tests_manager is None
         assert self.stateful_tests_manager is None
-        if self.errors:
+        if ctx.errors:
             display_section_name("ERRORS")
             errors = sorted(
-                self.errors, key=lambda r: (r.phase.value if r.phase is not None else "", r.label, r.info.title)
+                ctx.errors, key=lambda r: (r.phase.value if r.phase is not None else "", r.label, r.info.title)
             )
             for label, group_errors in groupby(errors, key=lambda r: r.label):
                 display_section_name(label, "_", fg="red")
@@ -1216,26 +1185,19 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 )
             )
         display_failures(ctx.statistic, ctx.config.output, record_crashes=ctx.config.cache.enabled)
-        if not self.warnings.is_empty:
-            self.display_warnings()
+        if not ctx.warnings.is_empty:
+            self.display_warnings(ctx)
         if ctx.statistic.extraction_failures:
             self.display_stateful_failures(ctx)
         display_section_name("SUMMARY")
         click.echo()
 
-        summary = SummaryData.from_run(
-            api_statistic=self.statistic,
-            statistic=ctx.statistic,
-            errors=self.errors,
-            phases=self.phases,
-            skip_reasons=self.skip_reasons,
-            stop_reason=event.stop_reason,
-        )
+        summary = ctx.summary()
 
         if summary.operations is not None:
             display_api_operations(summary.operations)
 
-        self.display_phases()
+        self.display_phases(ctx)
 
         if summary.failures:
             display_failures_summary(summary.failures)
@@ -1243,8 +1205,8 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         if summary.errors:
             display_errors_summary(summary.errors)
 
-        if not self.warnings.is_empty:
-            self.display_warnings_summary()
+        if not ctx.warnings.is_empty:
+            self.display_warnings_summary(ctx)
 
         if event.payload is not None:
             if event.payload.reauth_count > 0:

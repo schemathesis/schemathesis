@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.events import LoadingFinished
+from schemathesis.cli.summary import SummaryData
 from schemathesis.engine.statistic import Statistic
 
 if TYPE_CHECKING:
@@ -29,6 +30,10 @@ class BaseExecutionContext:
 
     def add_summary_line(self, line: str | Generator[str, None, None]) -> None:
         self.summary_lines.append(line)
+
+    def summary(self) -> SummaryData:
+        """Reduce the run so far into the numbers reports and the terminal share."""
+        raise NotImplementedError
 
     def on_event(self, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):

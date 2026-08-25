@@ -32,7 +32,7 @@ st fuzz https://example.schemathesis.io/openapi.json \
   --report junit
 ```
 
-All report formats are supported: `junit`, `vcr`, `har`, `ndjson`, `allure`.
+All report formats are supported: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`.
 
 ## When to use `st fuzz` vs `st run`
 

@@ -3,8 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from dataclasses import asdict, dataclass, field, replace
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -14,6 +14,7 @@ from schemathesis.core.failures import Failure, is_reproducible_failure
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION
 from schemathesis.core.storage import atomic_write_text
+from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import HttpMethod
 from schemathesis.engine import Status
@@ -229,7 +230,7 @@ class CrashWriter:
             schemathesis_version=schemathesis.__version__,
             schema_location=schema_location,
             base_url=base_url,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=format_timestamp(time.time()),
         )
         atomic_write_text(self._directory / MANIFEST_FILENAME, json.dumps(asdict(manifest), indent=2))
 

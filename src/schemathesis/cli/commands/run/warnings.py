@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from schemathesis.cli.commands.run.filters import describe_filter
 from schemathesis.cli.context import BaseExecutionContext
+from schemathesis.cli.summary import WarningData
 from schemathesis.config import ProjectConfig, SchemathesisWarning
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
@@ -14,74 +15,6 @@ from schemathesis.engine.recorder import Interaction, RecordedScenario
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
-
-
-@dataclass(slots=True)
-class WarningData:
-    missing_auth: dict[int, set[str]]
-    missing_test_data: set[str]
-    validation_mismatch: set[str]
-    missing_deserializer: dict[str, dict[str, set[str]]]
-    unused_openapi_auth: set[str]
-    unsupported_regex: dict[str, set[str]]
-    method_not_allowed: set[str]
-    constants_extraction: set[str]
-    unmatched_filter: set[str]
-
-    def __init__(
-        self,
-        missing_auth: dict[int, set[str]] | None = None,
-        missing_test_data: set[str] | None = None,
-        validation_mismatch: set[str] | None = None,
-        missing_deserializer: dict[str, dict[str, set[str]]] | None = None,
-        unused_openapi_auth: set[str] | None = None,
-        unsupported_regex: dict[str, set[str]] | None = None,
-        method_not_allowed: set[str] | None = None,
-        constants_extraction: set[str] | None = None,
-        unmatched_filter: set[str] | None = None,
-    ) -> None:
-        self.missing_auth = missing_auth or {}
-        self.missing_test_data = missing_test_data or set()
-        self.validation_mismatch = validation_mismatch or set()
-        self.missing_deserializer = missing_deserializer or {}
-        self.unused_openapi_auth = unused_openapi_auth or set()
-        self.unsupported_regex = unsupported_regex or {}
-        self.method_not_allowed = method_not_allowed or set()
-        self.constants_extraction = constants_extraction or set()
-        self.unmatched_filter = unmatched_filter or set()
-
-    @property
-    def is_empty(self) -> bool:
-        return not bool(
-            self.missing_auth
-            or self.missing_test_data
-            or self.validation_mismatch
-            or self.missing_deserializer
-            or self.unused_openapi_auth
-            or self.unsupported_regex
-            or self.method_not_allowed
-            or self.constants_extraction
-            or self.unmatched_filter
-        )
-
-    @property
-    def kind_count(self) -> int:
-        """Count distinct warning kinds currently recorded."""
-        return sum(
-            1
-            for warnings in (
-                self.missing_auth,
-                self.missing_test_data,
-                self.validation_mismatch,
-                self.missing_deserializer,
-                self.unused_openapi_auth,
-                self.unsupported_regex,
-                self.method_not_allowed,
-                self.constants_extraction,
-                self.unmatched_filter,
-            )
-            if warnings
-        )
 
 
 @dataclass(slots=True)

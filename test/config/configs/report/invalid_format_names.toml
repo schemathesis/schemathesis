@@ -4,7 +4,7 @@ directory = "reports"
 [reports.junitxml]  # should be "junit"
 enabled = true
 
-[reports.json]  # unsupported format
+[reports.csv]  # unsupported format
 enabled = true
 
 [reports.vcr]

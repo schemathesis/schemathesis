@@ -17,6 +17,7 @@ from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL
 from schemathesis.cli.ext.fs import open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
+from schemathesis.cli.json_report import JsonReportHandler
 from schemathesis.config import ReportFormat
 from schemathesis.core.errors import format_exception
 
@@ -75,6 +76,10 @@ def initialize_report_handlers(
         path = config.reports.get_path(ReportFormat.NDJSON)
         open_file(path)
         handlers.append(NdjsonHandler(output=path, config=config))
+    if config.reports.json.enabled:
+        path = config.reports.get_path(ReportFormat.JSON)
+        open_file(path)
+        handlers.append(JsonReportHandler(path))
     if config.reports.allure.enabled:
         try:
             from schemathesis.cli.commands.run.handlers.allure import AllureHandler

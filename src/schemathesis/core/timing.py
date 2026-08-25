@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from time import perf_counter
 
 
@@ -18,3 +19,8 @@ class Instant:
     @property
     def elapsed_ms(self) -> int:
         return int(self.elapsed * 1000)
+
+
+def format_timestamp(value: float) -> str:
+    """UTC timestamp for report payloads, from a `time.time()` value."""
+    return datetime.fromtimestamp(value, timezone.utc).isoformat()

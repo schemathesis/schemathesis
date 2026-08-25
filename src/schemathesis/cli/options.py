@@ -451,6 +451,13 @@ REPORT_NDJSON_PATH = OptionSpec(
     is_eager=True,
 )
 
+REPORT_JSON_PATH = OptionSpec(
+    "--report-json-path",
+    help="Custom path for the JSON run report",
+    type=click.File("w", encoding="utf-8"),
+    is_eager=True,
+)
+
 REPORT_ALLURE_PATH = OptionSpec(
     "--report-allure-path",
     help="Directory for Allure result files",
