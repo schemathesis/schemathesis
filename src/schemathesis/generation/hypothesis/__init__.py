@@ -7,7 +7,6 @@ from schemathesis.core.cache import MISSING, BoundedCache
 
 # Sentinel cached when generation raised `Unsatisfiable`.
 UNSATISFIABLE_RESULT: Final = object()
-schema_generation_cache: Final[BoundedCache] = BoundedCache(maxsize=2048)
 custom_formats_cache: Final[BoundedCache] = BoundedCache(maxsize=32)
 canonical_strategy_cache: Final[BoundedCache] = BoundedCache(maxsize=128)
 canonical_form_cache: Final[BoundedCache] = BoundedCache(maxsize=128)

@@ -13,6 +13,7 @@ from hypothesis import given, settings
 from hypothesis.errors import Unsatisfiable
 
 from schemathesis.core import MAX_GENERATED_PATTERN_LENGTH
+from schemathesis.core.cache import MISSING
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator_for
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone, transform
@@ -32,6 +33,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     _positive_string,
     cover_schema_iter,
 )
+from schemathesis.specs.openapi.coverage._session import MAX_PINNED_REGISTRIES, GenerationSession
 from schemathesis.specs.openapi.patterns import update_quantifier
 from test.coverage.helpers import scenario_values
 from test.utils import to_float32
@@ -4181,6 +4183,18 @@ def test_positive_all_of_merged_property_keeps_nested_required(ctx_factory):
     validator = jsonschema_rs.Draft4Validator(schema)
     for value in cover_schema(ctx, schema):
         assert validator.is_valid(value), value
+
+
+# Registry churn past the pin bound frees old ids; values keyed with their tokens must not survive.
+def test_generation_session_bounds_pins_and_drops_dependent_values():
+    session = GenerationSession()
+    registries = [object() for _ in range(MAX_PINNED_REGISTRIES + 1)]
+    first_token = session.token_for(registries[0])
+    session.values[("k", first_token)] = "cached"
+    for registry in registries[1:]:
+        session.token_for(registry)
+    assert len(session._pinned) == MAX_PINNED_REGISTRIES
+    assert session.values.get(("k", first_token)) is MISSING
 
 
 # An array item must keep the names its schema requires, declared under `properties` or not.
