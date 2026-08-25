@@ -1844,9 +1844,9 @@ def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageCont
 
 
 def _negation_ignored_by_dialect(ctx: CoverageContext, keyword: str) -> bool:
-    # Draft 4 (Swagger 2.0 / Open API 3.0) predates `const` and `propertyNames`; the dialect's
-    # validator ignores them, so mutating them cannot produce negative test cases.
-    return keyword in ("const", "propertyNames") and ctx.validator_cls is jsonschema_rs.Draft4Validator
+    # Draft 4 (Swagger 2.0 / Open API 3.0) predates `const`, `propertyNames` and `prefixItems`; the
+    # dialect's validator ignores them, so mutating them cannot produce negative test cases.
+    return keyword in ("const", "propertyNames", "prefixItems") and ctx.validator_cls is jsonschema_rs.Draft4Validator
 
 
 def cover_schema_iter(
@@ -1979,6 +1979,8 @@ def cover_schema_iter(
                     min_items = parent_min_items if isinstance(parent_min_items, int) else 0
                     yield from _negative_items(ctx, value, min_items=min_items)
                 elif key == "items" and isinstance(value, list):
+                    yield from _negative_prefix_items(ctx, value)
+                elif key == "prefixItems" and isinstance(value, list):
                     yield from _negative_prefix_items(ctx, value)
                 elif key == "pattern":
                     min_length = schema.get("minLength")
@@ -3050,12 +3052,38 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             )
 
 
+def _tuple_prefix_values(ctx: CoverageContext, schema: JsonSchemaObject) -> list | None:
+    """Values filling the `prefixItems` positions; `None` when synthesized arrays cannot be built soundly."""
+    prefix_items = schema.get("prefixItems")
+    if not isinstance(prefix_items, list) or not prefix_items:
+        return []
+    # A generated prefix value may collide with the appended `items` value; leave such arrays to the
+    # template, which the full schema validates.
+    if schema.get("uniqueItems"):
+        return None
+    try:
+        return [ctx.generate_from_schema(entry) for entry in prefix_items]
+    except (InvalidArgument, Unsatisfiable):
+        return None
+
+
+def _fits_array_length(schema: JsonSchemaObject, length: int) -> bool:
+    minimum = schema.get("minItems")
+    maximum = schema.get("maxItems")
+    if isinstance(minimum, int) and length < minimum:
+        return False
+    return not (isinstance(maximum, int) and length > maximum)
+
+
 def _positive_array(
     ctx: CoverageContext, schema: JsonSchemaObject, template: list
 ) -> Generator[GeneratedValue, None, None]:
     example = schema.get("example", NOT_SET)
     examples = schema.get("examples")
     default = schema.get("default", NOT_SET)
+    # The first `prefixItems` positions answer to their own schemas, so an `items` value can only
+    # sit behind values that fill them.
+    prefix_values = _tuple_prefix_values(ctx, schema)
 
     seen = HashSet()
     seen_constraints: set[tuple] = set()
@@ -3079,9 +3107,16 @@ def _positive_array(
         # An empty template skips every items-level keyword on the wire; surface a non-empty
         # baseline first so the recorder sees items satisfied. Skip when `maxItems` forbids any.
         items = schema.get("items")
-        if not template and isinstance(items, dict) and items and schema.get("maxItems") != 0:
+        if (
+            not template
+            and isinstance(items, dict)
+            and items
+            and schema.get("maxItems") != 0
+            and prefix_values is not None
+            and (not prefix_values or _fits_array_length(schema, len(prefix_values) + 1))
+        ):
             for item in cover_schema_iter(ctx, items):
-                candidate = [item.value]
+                candidate = [*prefix_values, item.value]
                 if seen.insert(candidate):
                     yield PositiveValue(candidate, scenario=CoverageScenario.VALID_ARRAY, description="Valid array")
                     break
@@ -3140,8 +3175,9 @@ def _positive_array(
         and "enum" in schema["items"]
         and isinstance(schema["items"]["enum"], list)
         and max_items != 0
-        # These synthesized arrays ignore `contains`; the repaired template covers those schemas.
+        # These synthesized arrays ignore `contains` and `prefixItems`; the repaired template covers those schemas.
         and "contains" not in schema
+        and not schema.get("prefixItems")
     ):
         # Ensure there is enough items to pass `minItems` if it is specified
         length = min_items or 1
@@ -3169,15 +3205,16 @@ def _positive_array(
     elif (
         "items" in schema
         and isinstance(schema["items"], dict)
-        and (min_items is None or min_items <= 1)
-        and (max_items is None or max_items >= 1)
+        and prefix_values is not None
+        and (min_items is None or min_items <= len(prefix_values) + 1)
+        and (max_items is None or max_items >= len(prefix_values) + 1)
         and "contains" not in schema
     ):
         # Single-item arrays exercise each items-schema branch individually.
         # `maxItems`-sized boundary arrays (above) repeat one shape and miss multi-branch coverage.
         sub_schema = schema["items"]
         for item in cover_schema_iter(ctx, sub_schema):
-            candidate = [item.value]
+            candidate = [*prefix_values, item.value]
             if seen.insert(candidate):
                 yield PositiveValue(
                     candidate,
