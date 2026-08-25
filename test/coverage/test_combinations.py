@@ -4181,3 +4181,16 @@ def test_positive_all_of_merged_property_keeps_nested_required(ctx_factory):
     validator = jsonschema_rs.Draft4Validator(schema)
     for value in cover_schema(ctx, schema):
         assert validator.is_valid(value), value
+
+
+# An array item must keep the names its schema requires, declared under `properties` or not.
+def test_positive_array_items_covering_keeps_item_required(ctx_factory):
+    schema = {
+        "type": "array",
+        "items": {"type": "object", "properties": {"a": {"type": "null"}}, "required": ["b"]},
+        "minItems": 1,
+    }
+    ctx = ctx_factory(root_schema=schema, location=ParameterLocation.BODY, generation_modes=[GenerationMode.POSITIVE])
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema(ctx, schema):
+        assert validator.is_valid(value), value
