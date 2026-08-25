@@ -422,6 +422,48 @@ def test_coverage_pool_overlay_respects_destination_format(cli, snapshot_cli, ct
     assert cli.run_openapi_app(app, "--phases=coverage", "-c positive_data_acceptance") == snapshot_cli
 
 
+def test_coverage_pool_overlays_reach_top_level_and_nested_body_slots(ctx):
+    # A pooled value the property schema rejects must not displace generated ones.
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "count": {"type": "integer"},
+                "shipping": {
+                    "type": "object",
+                    "properties": {"location_id": {"type": "string"}, "priority": {"type": "integer"}},
+                },
+            },
+            "required": ["name", "shipping"],
+        },
+    )
+
+    class _FakeDataSource:
+        def pick_correlated_values(self, *, operation):
+            return PoolPick(
+                values={
+                    (ParameterLocation.BODY, "name"): "pooled-name",
+                    (ParameterLocation.BODY, "count"): "not-an-integer",
+                    (ParameterLocation.BODY, "shipping/location_id"): "loc-7",
+                    (ParameterLocation.BODY, "shipping/priority"): "not-an-integer",
+                }
+            )
+
+    cases = iter_cases(operation, GenerationMode.POSITIVE, extra_data_source=_FakeDataSource())
+    bodies = [case.body for case in cases if isinstance(case.body, dict)]
+    assert any(body.get("name") == "pooled-name" for body in bodies), bodies
+    assert any(
+        isinstance(body.get("shipping"), dict) and body["shipping"].get("location_id") == "loc-7" for body in bodies
+    ), bodies
+    assert all(body.get("count") != "not-an-integer" for body in bodies), bodies
+    assert all(
+        not isinstance(body.get("shipping"), dict) or body["shipping"].get("priority") != "not-an-integer"
+        for body in bodies
+    ), bodies
+
+
 def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
     # Pool object value for "address" contains "country", absent from the property schema.
     operation = body_operation(
