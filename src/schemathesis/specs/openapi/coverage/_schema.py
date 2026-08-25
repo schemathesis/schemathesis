@@ -969,14 +969,17 @@ class CoverageContext:
                     or sub_keys == ["properties", "type"]
                     or sub_keys == ["properties"]
                 ):
-                    strategies = {key: self.build_strategy(sub) for key, sub in items["properties"].items()}
-                    if all(strategy is not None for strategy in strategies.values()):
-                        return cached_draw(
-                            st.lists(
-                                st.fixed_dictionaries(cast("dict[str, st.SearchStrategy]", strategies)),
-                                min_size=min_items,
+                    required = items.get("required", [])
+                    # A required name outside `properties` never appears in these drawn objects.
+                    if not isinstance(required, list) or all(name in items["properties"] for name in required):
+                        strategies = {key: self.build_strategy(sub) for key, sub in items["properties"].items()}
+                        if all(strategy is not None for strategy in strategies.values()):
+                            return cached_draw(
+                                st.lists(
+                                    st.fixed_dictionaries(cast("dict[str, st.SearchStrategy]", strategies)),
+                                    min_size=min_items,
+                                )
                             )
-                        )
 
         if keys == ["allOf"]:
             references = [item["$ref"] for item in schema["allOf"] if isinstance(item, dict) and "$ref" in item]

@@ -11,6 +11,7 @@
 - Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.
 - Coverage phase emitting valid values as `oneOf` violations for branches with `$ref` siblings.
 - Coverage phase ignoring `prefixItems` when building array cases for OpenAPI 3.1 operations.
+- Coverage phase dropping a required name `properties` does not declare from generated array items.
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 
