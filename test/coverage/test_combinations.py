@@ -4208,3 +4208,21 @@ def test_positive_array_items_covering_keeps_item_required(ctx_factory):
     validator = jsonschema_rs.Draft4Validator(schema)
     for value in cover_schema(ctx, schema):
         assert validator.is_valid(value), value
+
+
+def test_negative_one_of_ref_with_siblings_under_draft4(ctx_factory):
+    # Draft 4 ignores keywords beside `$ref`, so the second branch admits any boolean and a
+    # boolean is not a valid negative for the whole schema.
+    schema = {
+        "oneOf": [{"type": "null"}, {"$ref": "#/x-bundled/A", "anyOf": [{"type": "null"}]}],
+        "x-bundled": {"A": {"type": "boolean"}},
+    }
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft4Validator,
+        root_schema=schema,
+    )
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for value in cover_schema_iter(ctx, schema):
+        assert not validator.is_valid(value.value), f"False negative-mode value: {value.value!r}"
