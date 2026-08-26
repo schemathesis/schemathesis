@@ -2478,7 +2478,9 @@ def _make_branch_validators(schemas: list[JsonSchema], ctx: CoverageContext) -> 
     for schema in schemas:
         if bundle is not None and isinstance(schema, dict):
             schema = {**schema, BUNDLE_STORAGE_KEY: bundle}
-        result.append(make_validator_for(schema))
+        # The operation's draft, not one inferred per branch: Draft 4 ignores keywords beside
+        # `$ref`, so a branch judged under a newer draft would reject values the wire accepts.
+        result.append(make_validator(schema, ctx.validator_cls))
     return result
 
 
