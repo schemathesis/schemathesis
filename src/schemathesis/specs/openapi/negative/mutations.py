@@ -330,9 +330,7 @@ def _disjoint_descriptor_pool(
         for step_a, step_b in zip(a, b, strict=False):
             if step_a == step_b:
                 continue
-            if step_a.keyword in ("oneOf", "anyOf") and step_a.keyword == step_b.keyword:
-                return True
-            return False
+            return step_a.keyword in ("oneOf", "anyOf") and step_a.keyword == step_b.keyword
         return False
 
     def keep(candidate: MutationTargetDescriptor) -> bool:

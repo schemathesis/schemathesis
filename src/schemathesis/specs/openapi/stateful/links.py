@@ -150,18 +150,17 @@ class OpenApiLink:
                     parsed = expressions.parser.parse(expression)
                     # Find NonBodyRequest nodes that reference source parameters
                     for node in parsed:
-                        if isinstance(node, expressions.nodes.NonBodyRequest):
+                        if isinstance(node, expressions.nodes.NonBodyRequest) and not any(
+                            p.name == node.parameter and p.location == node.location
+                            for p in self.source.iter_parameters()
+                        ):
                             # Check if parameter exists in source operation
-                            if not any(
-                                p.name == node.parameter and p.location == node.location
-                                for p in self.source.iter_parameters()
-                            ):
-                                errors.append(
-                                    TransitionValidationError(
-                                        f"Expression `{expression}` references non-existent {node.location} parameter "
-                                        f"`{node.parameter}` in `{self.source.label}`"
-                                    )
+                            errors.append(
+                                TransitionValidationError(
+                                    f"Expression `{expression}` references non-existent {node.location} parameter "
+                                    f"`{node.parameter}` in `{self.source.label}`"
                                 )
+                            )
                 except Exception as exc:
                     errors.append(TransitionValidationError(str(exc)))
 

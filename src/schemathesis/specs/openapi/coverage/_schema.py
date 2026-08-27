@@ -833,16 +833,12 @@ class CoverageContext:
                     ):
                         obj[key] = sub_schema["const"]
                     else:
-                        try:
+                        with suppress(Unsatisfiable):
                             obj[key] = self.generate_from_schema(sub_schema)
-                        except Unsatisfiable:
-                            pass
                 for key in schema.get("required", []):
                     if key not in properties:
-                        try:
+                        with suppress(Unsatisfiable):
                             obj[key] = self.generate_from_schema({})
-                        except Unsatisfiable:
-                            pass
                 if any(key not in obj for key in schema.get("required", [])):
                     raise Unsatisfiable
                 # Properties that cannot be generated leave the object short of `minProperties`;
@@ -1443,11 +1439,14 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
 
 def _branch_as_judged(ctx: CoverageContext, branch: JsonSchema) -> JsonSchema:
     """The form of a branch its judges load: as written when a draft may ignore keywords beside `$ref`."""
-    if isinstance(branch, dict) and "$ref" in branch:
+    if (
+        isinstance(branch, dict)
+        and "$ref" in branch
+        and any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch)
+    ):
         # The discriminator pin models server behavior and counts under every draft; any other keyword
         # beside `$ref` counts only under drafts that read it, so each judge gets the branch as written.
-        if any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch):
-            return branch
+        return branch
     return _resolve_sub_schema(ctx, branch)
 
 
@@ -1831,10 +1830,9 @@ def _negative_format_for_declared_types(
 ) -> Generator[GeneratedValue, None, None]:
     declared = schema.get("type", [])
     types = declared if isinstance(declared, list) else [declared]
-    if "string" in types or not types:
+    if ("string" in types or not types) and value not in ("binary", "byte"):
         # Binary formats accept any bytes - no meaningful format violations
-        if value not in ("binary", "byte"):
-            yield from _negative_format(ctx, schema, value)
+        yield from _negative_format(ctx, schema, value)
 
 
 def _negative_maximum(
@@ -2205,10 +2203,8 @@ def cover_schema_iter(
                 if any(k != "$ref" and k in ALL_KEYWORDS for k in schema):
                     bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
                     check_schema = schema if bundle is None else {**schema, BUNDLE_STORAGE_KEY: bundle}
-                    try:
+                    with suppress(Exception):
                         unmerged_validator = ctx.validator_cls(check_schema, pattern_options=FANCY_REGEX_OPTIONS)
-                    except Exception:
-                        pass
                 with ctx.expand(reference):
                     for generated in cover_schema_iter(ctx, merged, seen):
                         if (
@@ -2576,9 +2572,7 @@ def _implies_object_type(schema: JsonSchemaObject) -> bool:
     if any(key in schema for key in _OBJECT_ONLY_KEYWORDS):
         return True
     additional = schema.get("additionalProperties")
-    if isinstance(additional, dict):
-        return True
-    return False
+    return isinstance(additional, dict)
 
 
 def _implies_array_type(schema: JsonSchemaObject) -> bool:
@@ -2729,12 +2723,11 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         ):
             has_valid_example = True
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-        if not has_valid_example:
-            if not min_length and not max_length or "pattern" in schema:
-                value = ctx.generate_from_schema(schema)
-                seen_values.insert(value)
-                seen_constraints.add((min_length, max_length))
-                yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
+        if not has_valid_example and (not min_length and not max_length or "pattern" in schema):
+            value = ctx.generate_from_schema(schema)
+            seen_values.insert(value)
+            seen_constraints.add((min_length, max_length))
+            yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
     elif not min_length and not max_length or "pattern" in schema:
         value = ctx.generate_from_schema(schema)
         seen_values.insert(value)
@@ -2972,10 +2965,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
     if minimum is not None:
         # Exactly the minimum
-        if multiple_of is not None:
-            smallest = closest_multiple_greater_than(minimum, multiple_of)
-        else:
-            smallest = minimum
+        smallest = closest_multiple_greater_than(minimum, multiple_of) if multiple_of is not None else minimum
         if smallest is not None and _within_adjusted_bounds(smallest) and seen.insert(smallest):
             yield PositiveValue(smallest, scenario=CoverageScenario.MINIMUM_VALUE, description="Minimum value")
 
@@ -2991,10 +2981,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
     if maximum is not None:
         # Exactly the maximum
-        if multiple_of is not None:
-            largest = _largest_multiple_within(maximum, multiple_of)
-        else:
-            largest = maximum
+        largest = _largest_multiple_within(maximum, multiple_of) if multiple_of is not None else maximum
         if largest is not None and _within_adjusted_bounds(largest) and seen.insert(largest):
             yield PositiveValue(largest, scenario=CoverageScenario.MAXIMUM_VALUE, description="Maximum value")
 
@@ -3394,15 +3381,13 @@ def _negative_properties(
                 return s if b is None else {**s, BUNDLE_STORAGE_KEY: b}
 
             keep_alive: tuple[Any, ...] = (sub_schema,) if bundle is None else (sub_schema, bundle)
-            try:
+            with suppress(Exception):
                 validator = make_validator_with_seed(
                     schema_builder=_builder,
                     validator_cls=ctx.validator_cls,
                     seed=(id(sub_schema), id(bundle)),
                     keep_alive=keep_alive,
                 )
-            except Exception:
-                pass
         with nctx.at(key):
             for value in cover_schema_iter(nctx, sub_schema):
                 if validator is not None:
@@ -3501,18 +3486,13 @@ def _negative_array_items(
     # Cap padding at NEGATIVE_MODE_MAX_ITEMS so an adversarial `minItems` doesn't blow up memory;
     # above the cap, fall back to single-item arrays (same as pre-padding behavior for that range).
     if 1 < min_items <= NEGATIVE_MODE_MAX_ITEMS:
-        try:
+        # Suppress generation errors here and fall back to a single-item negative array
+        # rather than emitting nothing when the items schema can't produce a valid filler.
+        with suppress(InvalidArgument, Unsatisfiable):
             filler = ctx.with_positive().generate_from_schema(schema)
-        except (InvalidArgument, Unsatisfiable):
-            # Items schema can't produce a valid filler — fall back to single-item negative
-            # rather than emitting nothing.
-            pass
     for value in cover_schema_iter(nctx, schema):
-        if filler is not NOT_SET:
-            # Pad to satisfy `minItems` so the items[i] check fires instead of failing at length.
-            items = [value.value, *(filler for _ in range(min_items - 1))]
-        else:
-            items = [value.value]
+        # Pad to satisfy `minItems` so the items[i] check fires instead of failing at length.
+        items = [value.value, *(filler for _ in range(min_items - 1))] if filler is not NOT_SET else [value.value]
         if ctx.wire.leads_to_negative_test_case(items):
             yield NegativeValue(
                 items,
@@ -3777,9 +3757,7 @@ def is_valid_header_value(value: object) -> bool:
     value = str(value)
     if not is_latin_1_encodable(value):
         return False
-    if has_invalid_characters("A", value):
-        return False
-    return True
+    return not has_invalid_characters("A", value)
 
 
 # Far above any text a wrong-type value turns into, so a limit this large rules nothing out.
@@ -3830,10 +3808,7 @@ def _stringified_type_violations(
 def _negative_type(
     ctx: CoverageContext, schema: dict[str, Any], ty: str | list[str], seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
-    if isinstance(ty, str):
-        types = [ty]
-    else:
-        types = ty
+    types = [ty] if isinstance(ty, str) else ty
     # Root-level binary/byte format with non-JSON content types - type mutations don't produce meaningful wire violations
     # Path is ['type'] at root level, vs ['properties', 'fieldname', 'type'] for nested properties
     if (
@@ -3905,9 +3880,8 @@ def _negative_type(
         restrict("number", _is_non_integer_float)
     # For path/query parameters, numeric strings like "9" serialize identically to integer 9 in the URL,
     # making them indistinguishable and causing false positive failures
-    if ctx.wire.url_part() and ("integer" in types or "number" in types):
-        if "string" in strategies:
-            restrict("string", _is_not_numeric_string)
+    if ctx.wire.url_part() and ("integer" in types or "number" in types) and "string" in strategies:
+        restrict("string", _is_not_numeric_string)
     # For path/query parameters, 0/1/true/false serialize to wire values lenient parsers
     # accept as booleans, making them indistinguishable from a valid boolean.
     if ctx.wire.url_part() and "boolean" in types:

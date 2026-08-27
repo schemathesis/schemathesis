@@ -45,9 +45,11 @@ def test_validate_header(value):
 
 
 def test_reraise_format_error():
-    with pytest.raises(click.BadParameter, match="Expected KEY:VALUE format, received bla."):
-        with validation.reraise_format_error("bla"):
-            raise ValueError
+    with (
+        pytest.raises(click.BadParameter, match="Expected KEY:VALUE format, received bla."),
+        validation.reraise_format_error("bla"),
+    ):
+        raise ValueError
 
 
 @pytest.mark.parametrize(

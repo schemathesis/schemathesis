@@ -131,7 +131,9 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             cookies=cookies,
         )
 
-        headers = {key: response.headers.getlist(key) for key in response.headers.keys()}
+        headers = {}
+        for name, value in response.headers:
+            headers.setdefault(name.lower(), []).append(value)
 
         return Response(
             status_code=response.status_code,

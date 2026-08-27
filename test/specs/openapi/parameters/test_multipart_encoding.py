@@ -497,14 +497,17 @@ def test_multipart_comma_separated_without_custom_strategy(ctx):
             if files:
                 for file_tuple in files:
                     name = file_tuple[0]
-                    if name == "image":
-                        if len(file_tuple) > 1 and isinstance(file_tuple[1], tuple):
-                            if len(file_tuple[1]) == 3:
-                                _, _, content_type = file_tuple[1]
-                                assert content_type in ["image/png", "image/jpeg"], (
-                                    f"Expected single content type, got: {content_type}"
-                                )
-                                content_types_seen.add(content_type)
+                    if (
+                        name == "image"
+                        and len(file_tuple) > 1
+                        and isinstance(file_tuple[1], tuple)
+                        and len(file_tuple[1]) == 3
+                    ):
+                        _, _, content_type = file_tuple[1]
+                        assert content_type in ["image/png", "image/jpeg"], (
+                            f"Expected single content type, got: {content_type}"
+                        )
+                        content_types_seen.add(content_type)
 
     test()
     assert len(content_types_seen) == 2, f"Expected both content types, got: {content_types_seen}"

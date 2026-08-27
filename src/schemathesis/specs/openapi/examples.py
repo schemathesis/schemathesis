@@ -66,11 +66,10 @@ def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     mergeable_keys = {"path_parameters", "headers", "cookies", "query", "body"}
 
     for key, value in right.items():
-        if key in mergeable_keys and key in left:
-            if isinstance(left[key], dict) and isinstance(value, dict):
-                # kwargs takes precedence
-                left[key] = {**left[key], **value}
-                continue
+        if key in mergeable_keys and key in left and isinstance(left[key], dict) and isinstance(value, dict):
+            # kwargs takes precedence
+            left[key] = {**left[key], **value}
+            continue
         left[key] = value
 
     return left
@@ -239,15 +238,12 @@ def extract_top_level(
             definitions = [parameter.definition]
         param_validator: jsonschema_rs.Validator | None = _make_example_validator(parameter.validation_schema)
         for definition in definitions:
-            if definition is parameter.definition:
-                validator = param_validator
-            else:
-                # Expanded subschema (schema itself or an anyOf/oneOf branch).
-                # Validate against the subschema's own constraints so that:
-                # - A schema-level `example` that violates the schema's own pattern is rejected.
-                # - A oneOf/anyOf branch example is validated against the branch (not the full
-                #   combined schema, which would reject strings valid for multiple branches).
-                validator = _make_example_validator(definition)
+            # Expanded subschema (schema itself or an anyOf/oneOf branch).
+            # Validate against the subschema's own constraints so that:
+            # - A schema-level `example` that violates the schema's own pattern is rejected.
+            # - A oneOf/anyOf branch example is validated against the branch (not the full
+            #   combined schema, which would reject strings valid for multiple branches).
+            validator = param_validator if definition is parameter.definition else _make_example_validator(definition)
             # Open API 2 also supports `example`
             for example_keyword in {"example", parameter.adapter.example_keyword}:
                 if isinstance(definition, dict) and example_keyword in definition:

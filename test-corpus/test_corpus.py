@@ -1,3 +1,4 @@
+import contextlib
 import pathlib
 import sys
 from io import StringIO
@@ -177,10 +178,8 @@ def _run_registered_checks(ctx, response, case):
     for check in CHECKS.get_all():
         if check in (combined_check, combined_check_coverage):
             continue
-        try:
+        with contextlib.suppress(Failure, FailureGroup):
             check(ctx, response, case)
-        except (Failure, FailureGroup):
-            pass
 
 
 def _check_body_conformance_violation(case):
@@ -266,9 +265,7 @@ def test_stateful(corpus, filename):
     schema = _load_schema(corpus, filename)
 
     # Test state machine creation and execution
-    try:
-        schema.as_state_machine()()
-    except (
+    with contextlib.suppress(
         RefResolutionError,
         IncorrectUsage,
         LoaderError,
@@ -278,7 +275,7 @@ def test_stateful(corpus, filename):
         MalformedMediaType,
         OperationNotFound,
     ):
-        pass
+        schema.as_state_machine()()
 
     # Test dependency graph analysis and link iteration
     graph = dependencies.analyze(schema)
@@ -335,9 +332,8 @@ def _is_known_body_conformance_failure(schema_id: str, label: str, check) -> boo
 
 
 def assert_event(schema_id: str, event: events.EngineEvent) -> None:
-    if isinstance(event, events.NonFatalError):
-        if not should_ignore_error(schema_id, event):
-            raise AssertionError(f"{event.label}: {event.info.format()}")
+    if isinstance(event, events.NonFatalError) and not should_ignore_error(schema_id, event):
+        raise AssertionError(f"{event.label}: {event.info.format()}")
     if isinstance(event, events.ScenarioFinished):
         all_failures = [
             check for checks in event.recorder.checks.values() for check in checks if check.status == Status.FAILURE
@@ -416,9 +412,7 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "cannot be resolved" in formatted:
         return True
-    if (schema_id, event.label) in KNOWN_ISSUES:
-        return True
-    return False
+    return (schema_id, event.label) in KNOWN_ISSUES
 
 
 GRAPHQL_FILENAMES = [member.name for member in GRAPHQL_CORPUS.getmembers()]

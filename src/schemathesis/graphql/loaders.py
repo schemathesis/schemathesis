@@ -183,10 +183,7 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
     """
     import graphql
 
-    if isinstance(file, str):
-        data = file
-    else:
-        data = file.read()
+    data = file if isinstance(file, str) else file.read()
     try:
         document = graphql.build_schema(data)
         result = graphql.execute(document, get_introspection_query_ast())

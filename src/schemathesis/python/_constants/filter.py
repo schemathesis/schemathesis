@@ -30,30 +30,22 @@ def _keep_string(value: str) -> bool:
         return False
     if _DOTTED_IDENT.match(value):
         return False
-    if value.startswith("/") or value.startswith("."):
-        return False
-    return True
+    return not (value.startswith("/") or value.startswith("."))
 
 
 def _keep_integer(value: int) -> bool:
     if value in _TRIVIAL_INTEGERS:
         return False
-    if value in _HTTP_STATUSES:
-        return False
-    return True
+    return value not in _HTTP_STATUSES
 
 
 def _keep_float(value: float) -> bool:
     if not math.isfinite(value):
         return False
-    if value in _TRIVIAL_FLOATS:
-        return False
-    return True
+    return value not in _TRIVIAL_FLOATS
 
 
 def _keep_bytes(value: bytes) -> bool:
     if b"\n" in value:
         return False
-    if len(value) > 32:
-        return False
-    return True
+    return len(value) <= 32

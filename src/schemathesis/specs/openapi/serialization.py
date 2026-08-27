@@ -530,10 +530,7 @@ def label_array(item: Generated, name: str, explode: bool | None) -> None:
 
         id=[3, 4, 5] => ".3,4,5"
     """
-    if explode:
-        delimiter = "."
-    else:
-        delimiter = ","
+    delimiter = "." if explode else ","
     new = delimiter.join(map(str, force_iterable(item[name] or ())))
     if new:
         item[name] = f".{new}"

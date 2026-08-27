@@ -91,13 +91,14 @@ def test_store_cassette(ctx, cli, cassette_path, hypothesis_max_examples, args, 
             assert first_interaction["generation"]["mode"] == mode
         assert first_interaction["phase"]["name"] in ("explicit", "coverage", "generate")
     for interaction in interactions:
-        if interaction["phase"]["name"] == "coverage":
-            if interaction["generation"]["mode"] == "negative" and not interaction["phase"]["data"][
-                "description"
-            ].startswith("Unspecified"):
-                assert interaction["phase"]["data"]["location"] is not None
-                assert interaction["phase"]["data"]["parameter"] is not None
-                assert interaction["phase"]["data"]["parameter_location"] is not None
+        if (
+            interaction["phase"]["name"] == "coverage"
+            and interaction["generation"]["mode"] == "negative"
+            and not interaction["phase"]["data"]["description"].startswith("Unspecified")
+        ):
+            assert interaction["phase"]["data"]["location"] is not None
+            assert interaction["phase"]["data"]["parameter"] is not None
+            assert interaction["phase"]["data"]["parameter_location"] is not None
 
 
 @pytest.mark.parametrize("format", ["vcr", "har", "ndjson"])
@@ -286,10 +287,7 @@ def request_args(request, tmp_path):
         key.touch()
         return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key)), ExitCode.OK
     if request.param == "proxies":
-        if platform.system() == "Windows":
-            exit_code = ExitCode.OK
-        else:
-            exit_code = ExitCode.TESTS_FAILED
+        exit_code = ExitCode.OK if platform.system() == "Windows" else ExitCode.TESTS_FAILED
         return ["--proxy=http://127.0.0.1"], "proxies", {"all": "http://127.0.0.1"}, exit_code
 
 
@@ -309,10 +307,7 @@ def test_output_sanitization(ctx, cli, hypothesis_max_examples, cassette_path, v
     )
     cassette = load_cassette(cassette_path)
 
-    if value == "true":
-        expected = "[Filtered]"
-    else:
-        expected = ANY
+    expected = "[Filtered]" if value == "true" else ANY
     interactions = cassette["http_interactions"]
     assert all(entry["request"]["headers"].get("X-Token") == [expected] for entry in interactions)
     assert all(entry["request"]["headers"].get("Authorization") == [expected] for entry in interactions)

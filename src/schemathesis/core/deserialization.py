@@ -176,10 +176,7 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
             # If the key has a tag different from `str` - use its string value.
             # With this change all integer keys or YAML 1.1 boolean-ish values like "on" / "off" will not be cast to
             # a different type
-            if key_node.tag != "tag:yaml.org,2002:str":
-                key = key_node.value
-            else:
-                key = self.construct_object(key_node, deep)
+            key = key_node.value if key_node.tag != "tag:yaml.org,2002:str" else self.construct_object(key_node, deep)
             mapping[key] = self.construct_object(value_node, deep)
         return mapping
 
@@ -297,11 +294,10 @@ def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[ServerSen
             elif field == "retry":
                 if SSE_RETRY_RE.fullmatch(value):
                     current_event[field] = int(value)
-            elif field == "id":
+            elif field == "id" and "\x00" not in value:
                 # Per WHATWG SSE spec: ignore id fields containing null characters
-                if "\x00" not in value:
-                    current_event[field] = value
-                    last_event_id = value
+                current_event[field] = value
+                last_event_id = value
 
     flushed = _flush_sse_event(current_event, current_data_lines, last_event_id=last_event_id)
     if flushed is not None:

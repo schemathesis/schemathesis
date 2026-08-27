@@ -109,10 +109,7 @@ def _parse_one_dictionary(name: str, payload: dict, *, base_dir: str | None) -> 
 
 
 def _resolve_dictionary_path(path: str, *, base_dir: str | None) -> str:
-    if os.path.isabs(path) or base_dir is None:
-        candidate = path
-    else:
-        candidate = os.path.join(base_dir, path)
+    candidate = path if os.path.isabs(path) or base_dir is None else os.path.join(base_dir, path)
     if not os.path.isfile(candidate):
         raise ConfigError(f"Dictionary file `{path}` not found")
     return os.path.abspath(candidate)
@@ -153,10 +150,7 @@ def _decode_libfuzzer_entry(text: str, *, name: str, line_no: int, path: str) ->
 def _is_valid_libfuzzer_name(value: str) -> bool:
     if not value:
         return False
-    for ch in value:
-        if not (ch.isalnum() or ch in "_-."):
-            return False
-    return True
+    return all(ch.isalnum() or ch in "_-." for ch in value)
 
 
 _SIMPLE_ESCAPES = {"\\": "\\", '"': '"', "n": "\n", "r": "\r", "t": "\t"}

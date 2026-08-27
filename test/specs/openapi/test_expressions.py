@@ -1,4 +1,5 @@
 import json
+from contextlib import suppress
 from io import BytesIO
 
 import pytest
@@ -187,10 +188,8 @@ def test_invalid_expression(output, expr):
 @given(expr=(st.text() | (st.lists(st.sampled_from([".", "}", "{", "$"]) | st.text()).map("".join))))
 @settings(deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_random_expression(expr, output):
-    try:
+    with suppress(RuntimeExpressionError):
         expressions.evaluate(expr, output)
-    except RuntimeExpressionError:
-        pass
 
 
 @pytest.mark.parametrize(

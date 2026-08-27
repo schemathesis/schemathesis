@@ -1,5 +1,6 @@
 import pathlib
 import sys
+from contextlib import suppress
 
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
@@ -45,10 +46,8 @@ def _run_all_operations(schema_dict):
             def exercise(case):
                 pass
 
-            try:
+            with suppress(Exception):
                 exercise()
-            except Exception:
-                pass
 
 
 @pytest.mark.benchmark(group="multi-operation-sagemaker")

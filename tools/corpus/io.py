@@ -62,10 +62,7 @@ def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> 
         self.flatten_mapping(node)
     mapping = {}
     for key_node, value_node in node.value:
-        if key_node.tag != "tag:yaml.org,2002:str":
-            key = key_node.value
-        else:
-            key = self.construct_object(key_node, deep)
+        key = key_node.value if key_node.tag != "tag:yaml.org,2002:str" else self.construct_object(key_node, deep)
         mapping[key] = self.construct_object(value_node, deep)
     return mapping
 
@@ -247,7 +244,7 @@ def _open_indexed_corpus(
     path = data_dir / f"{corpus_name}.tar.gz"
     with gzip.open(path, "rb") as fd:
         raw = io.BytesIO(fd.read())
-    archive = tarfile.open(fileobj=raw, mode="r:")
+    archive = tarfile.open(fileobj=raw, mode="r:")  # noqa: SIM115
     index = {member.name: member for member in archive}
     _INDEXED_ARCHIVES[corpus_name] = (archive, index)
     return archive, index

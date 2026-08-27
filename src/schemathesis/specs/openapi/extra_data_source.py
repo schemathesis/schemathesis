@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
 
@@ -635,9 +636,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         """Check if responses should be recorded for this operation."""
         if self.repository.descriptors_for_operation(operation):
             return True
-        if self.semantic_index is not None and operation in self.semantic_eligible_operations:
-            return True
-        return False
+        return self.semantic_index is not None and operation in self.semantic_eligible_operations
 
     def should_record_request(self, *, operation: str) -> bool:
         """Check if request inputs should be captured for this operation."""
@@ -779,8 +778,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
             requirement = self.requirements.get((operation.label, ParameterLocation.PATH, param_name))
             if requirement is None:
                 continue
-            try:
+            # unhashable value (e.g. list); fall through, eviction still runs
+            with suppress(TypeError):
                 self._tombstoned.add((requirement.resource_name, param_value))
-            except TypeError:  # unhashable value (e.g. list); fall through, eviction still runs
-                pass
             self.repository.remove_by_value(requirement.resource_name, param_value)

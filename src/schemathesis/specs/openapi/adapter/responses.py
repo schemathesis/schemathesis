@@ -613,10 +613,7 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
     for media_type, definition in response.get("content", {}).items():
         # Try to get a more descriptive example name from the `$ref` value
         schema_ref = definition.get("schema", {}).get("$ref")
-        if schema_ref:
-            name = schema_ref.split("/")[-1]
-        else:
-            name = f"{status_code}/{media_type}"
+        name = schema_ref.split("/")[-1] if schema_ref else f"{status_code}/{media_type}"
 
         for examples_container_keyword, example_keyword in (
             ("examples", "example"),

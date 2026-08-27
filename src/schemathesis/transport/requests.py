@@ -68,9 +68,13 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         media_type = case.media_type
 
         # Set content type header if needed
-        if media_type and media_type != "multipart/form-data" and not isinstance(case.body, NotSet):
-            if "content-type" not in final_headers:
-                final_headers["Content-Type"] = media_type
+        if (
+            media_type
+            and media_type != "multipart/form-data"
+            and not isinstance(case.body, NotSet)
+            and "content-type" not in final_headers
+        ):
+            final_headers["Content-Type"] = media_type
 
         url = prepare_url(case, base_url)
 
@@ -250,10 +254,7 @@ def validate_vanilla_requests_kwargs(data: dict[str, Any], declared_base_url: st
             if frame.function == "call_and_validate":
                 method_name = "call_and_validate"
                 break
-        if declared_base_url is not None:
-            suggestion = f"Your schema declares a server at {declared_base_url}:\n"
-        else:
-            suggestion = ""
+        suggestion = f"Your schema declares a server at {declared_base_url}:\n" if declared_base_url is not None else ""
         example = declared_base_url or "https://api.example.com"
         raise IncorrectUsage(
             "The `base_url` argument is required when specifying a schema via a file, so Schemathesis knows where to send the data.\n"

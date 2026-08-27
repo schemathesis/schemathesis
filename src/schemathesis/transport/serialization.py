@@ -296,10 +296,7 @@ def _write_array(
             _write_namespace(buffer, options)
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
-    if schema:
-        items = dict(schema.get("items", {}))
-    else:
-        items = {}
+    items = dict(schema.get("items", {})) if schema else {}
     items_resolver = resolver
     if "$ref" in items:
         items_resolver, items = resolve_reference(resolver, items["$ref"])

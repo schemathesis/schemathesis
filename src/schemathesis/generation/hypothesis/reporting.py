@@ -130,10 +130,7 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
             try:
                 generate_one(_parameter_strategy(operation, parameter, location))
             except (Unsatisfiable, InvalidArgument, InvalidSchema):
-                if location == ParameterLocation.BODY:
-                    name = parameter.media_type
-                else:
-                    name = parameter.name
+                name = parameter.media_type if location == ParameterLocation.BODY else parameter.name
                 schema = unbundle(parameter.optimized_schema, parameter.name_to_uri)
                 return UnsatisfiableParameter(location=location, name=name, schema=schema)
     return None
@@ -263,10 +260,7 @@ def find_slow_parameter(operation: APIOperation, reason: HealthCheck) -> SlowPar
             try:
                 generate_one(_parameter_strategy(operation, parameter, location), suppress_health_check=[])
             except (FailedHealthCheck, Unsatisfiable, InvalidArgument, InvalidSchema):
-                if location == ParameterLocation.BODY:
-                    name = parameter.media_type
-                else:
-                    name = parameter.name
+                name = parameter.media_type if location == ParameterLocation.BODY else parameter.name
 
                 schema = unbundle(parameter.optimized_schema, parameter.name_to_uri)
                 return SlowParameter(location=location, name=name, schema=schema, original=reason)

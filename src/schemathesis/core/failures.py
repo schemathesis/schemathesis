@@ -354,10 +354,7 @@ def format_failures(
     """Format failure information with custom styling."""
     formatter = formatter or (lambda _, x: x)
 
-    if case_id is not None:
-        output = formatter(MessageBlock.CASE_ID, f"{case_id}\n")
-    else:
-        output = ""
+    output = formatter(MessageBlock.CASE_ID, f"{case_id}\n") if case_id is not None else ""
 
     # Failures — collapse the title for runs of same-title same-class failures
     # (e.g. multiple `JsonSchemaError`s on one response) into one header.

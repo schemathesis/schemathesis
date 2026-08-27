@@ -282,8 +282,4 @@ def _is_request_body_subset(inferred_body: Any, existing_body: Any) -> bool:
         return inferred_body == existing_body
 
     # Check if all inferred fields exist in existing with same values
-    for key, value in inferred_body.items():
-        if existing_body.get(key, NOT_SET) != value:
-            return False
-
-    return True
+    return all(existing_body.get(key, NOT_SET) == value for key, value in inferred_body.items())

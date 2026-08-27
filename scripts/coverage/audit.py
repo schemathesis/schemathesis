@@ -325,10 +325,7 @@ def _fraction(covered: int, total: int) -> str:
     if total == 0:
         return f"[dim]{covered}/{total}[/]"
     ratio = covered / total
-    if ratio >= 0.9:
-        color = "yellow"
-    else:
-        color = "red"
+    color = "yellow" if ratio >= 0.9 else "red"
     return f"[{color}]{covered}/{total}[/]"
 
 

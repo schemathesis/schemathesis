@@ -199,10 +199,7 @@ class ResourceRepository:
             # Example: GET /teams/statuses -> {"frc1": {...}, "frc2": {...}}
             return [{descriptor.identifier_field: key} for key in target]
 
-        if descriptor.cardinality == Cardinality.MANY and isinstance(target, list):
-            values = target
-        else:
-            values = [target]
+        values = target if descriptor.cardinality == Cardinality.MANY and isinstance(target, list) else [target]
 
         return _wrap_extracted_values(values, descriptor)
 

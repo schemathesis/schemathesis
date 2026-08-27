@@ -19,10 +19,7 @@ from test.utils import as_param
 @pytest.mark.parametrize("type_", ["string", "integer", "array", "boolean", "number"])
 def test_headers(testdir, schema_name, type_):
     # When parameter is specified for "header"
-    if schema_name == "simple_swagger.yaml":
-        kwargs = {"type": type_}
-    else:
-        kwargs = {"schema": {"type": type_}}
+    kwargs = {"type": type_} if schema_name == "simple_swagger.yaml" else {"schema": {"type": type_}}
     testdir.make_test(
         """
 @schema.parametrize()

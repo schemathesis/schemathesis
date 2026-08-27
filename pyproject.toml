@@ -169,6 +169,7 @@ select = [
   "FURB",   # refurb
   "PGH003", # blanket-type-ignore
   "UP",     # pyupgrade
+  "SIM"     # simplify
 ]
 ignore = [
   "E501",   # Line too long

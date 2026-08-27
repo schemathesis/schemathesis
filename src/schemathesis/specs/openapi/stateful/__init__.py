@@ -319,10 +319,7 @@ def is_likely_root_transition(operation: APIOperation, node: OperationNode | Non
         return True
 
     # GET operations without path parameters are likely to return lists
-    if operation.method == "get" and not operation.path_parameters:
-        return True
-
-    return False
+    return operation.method == "get" and not operation.path_parameters
 
 
 def into_step_input(

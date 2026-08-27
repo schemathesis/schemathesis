@@ -69,10 +69,7 @@ class Matcher:
         """Matcher that checks whether the specified attribute has the provided regex."""
         if isinstance(regex, str):
             flags: re.RegexFlag | int
-            if attribute == "method":
-                flags = re.IGNORECASE
-            else:
-                flags = 0
+            flags = re.IGNORECASE if attribute == "method" else 0
             regex = re.compile(regex, flags=flags)
         func = partial(by_regex, attribute=attribute, regex=regex)
         label = f"{attribute}_regex={regex!r}"

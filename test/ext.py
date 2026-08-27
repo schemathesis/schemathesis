@@ -64,7 +64,7 @@ class ResponseStatistic(EventHandler):
             total = sum(entry.values())
             ctx.add_summary_line(f"  {label}: {total} responses")
 
-            max_status_len = max((len(str(s)) for s in entry.keys()), default=3)
+            max_status_len = max((len(str(s)) for s in entry), default=3)
             max_count_len = max((len(str(c)) for c in entry.values()), default=1)
 
             for status in sorted(entry):

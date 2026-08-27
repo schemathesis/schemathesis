@@ -1535,10 +1535,7 @@ def _padded_text(
 
 def _content_string(view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     """A decoded value first, with each encoding mapped over it."""
-    if "application/json" in view.content_media_types:
-        strategy = _anything(ctx).map(json.dumps)
-    else:
-        strategy = _text(ctx)
+    strategy = _anything(ctx).map(json.dumps) if "application/json" in view.content_media_types else _text(ctx)
     for media_type in view.content_media_types:
         if media_type != "application/json":
             # No builder for this media type; the draft-aware check mirrors what the validator

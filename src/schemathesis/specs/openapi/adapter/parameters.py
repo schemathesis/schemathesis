@@ -448,9 +448,7 @@ def _binary_length_fits(data: bytes, schema: JsonSchemaObject) -> bool:
     if isinstance(minimum, int) and length < minimum:
         return False
     maximum = schema.get("maxLength")
-    if isinstance(maximum, int) and length > maximum:
-        return False
-    return True
+    return not (isinstance(maximum, int) and length > maximum)
 
 
 def _constant_types_for(schema: JsonSchemaObject, validator_cls: type) -> tuple[ConstantType, ...]:
@@ -660,13 +658,9 @@ def build_hybrid_strategy(
         if not isinstance(base, dict):
             return base
 
-        # Single variant: no selection needed
-        if n_variants == 1:
-            idx = 0
-        else:
-            # Shuffle indices before weighted selection to avoid Hypothesis's bias
-            # toward early indices when using cumulative probability selection.
-            idx = usage_tracker.weighted_select(variant_keys, random)
+        # Weighted selection is shuffled to avoid Hypothesis's bias toward early indices
+        # when more than one variant exists; a single variant needs no selection.
+        idx = 0 if n_variants == 1 else usage_tracker.weighted_select(variant_keys, random)
         chosen = captured_variants[idx]
 
         if container_validator is not None:
@@ -722,10 +716,7 @@ def _integer_property_bounds(schema: JsonSchemaObject) -> dict[str, tuple[int | 
 
 
 def _has_explicit_slash_example(examples: Sequence[object]) -> bool:
-    for example in examples:
-        if isinstance(example, str) and "/" in unquote(example):
-            return True
-    return False
+    return any(isinstance(example, str) and "/" in unquote(example) for example in examples)
 
 
 def _get_explicit_intent_path_names(*, parameters: Sequence[OpenApiParameter]) -> frozenset[str]:
@@ -1723,9 +1714,8 @@ def iter_parameters_v2(
             resource_name = None
             for param in chain(operation_parameters, shared_parameters):
                 _, param = maybe_resolve_with_resolver(param, resolver)
-                if param.get("in") == ParameterLocation.BODY:
-                    if "$ref" in param["schema"]:
-                        resource_name = resource_name_from_ref(param["schema"]["$ref"])
+                if param.get("in") == ParameterLocation.BODY and "$ref" in param["schema"]:
+                    resource_name = resource_name_from_ref(param["schema"]["$ref"])
             for media_type in body_media_types:
                 yield OpenApiBody.from_definition(
                     definition=parameter,

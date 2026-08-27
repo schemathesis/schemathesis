@@ -111,10 +111,7 @@ def create_test(
     # Determine the source of user's settings:
     # - User's @settings decorator takes priority
     # - Otherwise use @given settings (which inherit from loaded profile or default)
-    if user_explicit_settings is not None:
-        user_settings = user_explicit_settings
-    else:
-        user_settings = given_settings
+    user_settings = user_explicit_settings if user_explicit_settings is not None else given_settings
 
     default = hypothesis.settings.default
     if user_settings.verbosity == default.verbosity:

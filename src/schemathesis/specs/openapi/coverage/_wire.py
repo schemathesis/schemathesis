@@ -82,11 +82,10 @@ class WireSemantics:
         return True
 
     def leads_to_negative_test_case(self, value: Any) -> bool:
-        if self.location == "query":
+        if self.location == "query" and isinstance(value, list) and not self.is_required:
             # Some values will not be serialized into the query string
-            if isinstance(value, list) and not self.is_required:
-                # Optional parameters should be present
-                return any(item not in [{}, []] for item in value)
+            # Optional parameters should be present
+            return any(item not in [{}, []] for item in value)
         return True
 
     def form_body(self) -> bool:

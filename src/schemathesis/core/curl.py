@@ -53,10 +53,7 @@ def generate(
     # Process headers with shell-aware escaping
     for key, value in headers.items():
         # To send an empty header with cURL we need to use `;`, otherwise empty header is ignored
-        if not value:
-            header = f"{key};"
-        else:
-            header = f"{key}: {value}"
+        header = f"{key};" if not value else f"{key}: {value}"
 
         escaped_header = _escape_and_quote(header, warnings, f"Header '{key}'")
         command += f" -H {escaped_header}"

@@ -1,6 +1,7 @@
 import json
 import re
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from unittest.mock import ANY
 
@@ -5196,10 +5197,8 @@ def test_negative_data_rejection_no_crash_with_large_dfa_pattern(ctx, response_f
     ctx_check = check_context()
 
     for case in cases:
-        try:
+        with suppress(AcceptedNegativeData):
             negative_data_rejection(ctx_check, response, case)
-        except AcceptedNegativeData:
-            pass
 
 
 NULLABLE_BINARY_MULTIPART_SCHEMA = {

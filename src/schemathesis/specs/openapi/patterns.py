@@ -718,9 +718,8 @@ def _is_position_dependent(nodes: list[_Node]) -> bool:
         elif op in REPEATS:
             if _is_position_dependent(list(value[2])):
                 return True
-        elif op == sre.BRANCH:
-            if any(_is_position_dependent(list(alternative)) for alternative in value[1]):
-                return True
+        elif op == sre.BRANCH and any(_is_position_dependent(list(alternative)) for alternative in value[1]):
+            return True
     return False
 
 
