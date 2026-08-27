@@ -157,6 +157,35 @@ def test_required_array_parameter_is_non_empty(ctx, location):
     test()
 
 
+def test_allow_empty_value_false_excludes_empty_string(ctx):
+    # `allowEmptyValue: false` forbids sending `?name=`, so an empty string is not a positive value.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "name",
+                            "required": True,
+                            "allowEmptyValue": False,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=25)
+    def test(case):
+        assert case.query["name"] != "", "Empty value generated for `allowEmptyValue: false`"
+
+    test()
+
+
 def test_inlined_definitions(deeply_nested_schema):
     # See GH-1162
     # When not resolved references are present in the schema during constructing a strategy

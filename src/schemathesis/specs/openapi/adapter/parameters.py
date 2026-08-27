@@ -1140,6 +1140,18 @@ class OpenApiParameter(OpenApiComponent):
             and schema.get("maxItems", 1) >= 1
         ):
             schema = {**schema, "minItems": 1}
+        # An explicit `allowEmptyValue: false` forbids sending the parameter with an empty value.
+        # The default is not applied — it would strip empty strings from every query parameter,
+        # and most schemas that omit the keyword do accept them.
+        if (
+            self.definition.get("allowEmptyValue") is False
+            and self.location is ParameterLocation.QUERY
+            and isinstance(schema, dict)
+            and schema.get("type") == "string"
+            and schema.get("minLength", 0) < 1
+            and schema.get("maxLength", 1) >= 1
+        ):
+            schema = {**schema, "minLength": 1}
         return schema
 
     def _get_raw_schema(self) -> JsonSchema:
