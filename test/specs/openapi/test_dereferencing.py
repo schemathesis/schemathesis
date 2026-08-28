@@ -1,7 +1,6 @@
 import gc
 import json
 import platform
-from contextlib import suppress
 from pathlib import Path
 
 import pytest
@@ -104,8 +103,10 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
     @settings(max_examples=25, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], deadline=None)
     def test(case):
         # Generated payload should be valid for the original schema (with references)
-        with suppress(RecursionError):
+        try:
             validator.validate(case.body)
+        except RecursionError:
+            pass
 
     test()
 

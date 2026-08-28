@@ -1,6 +1,5 @@
 import json
 import re
-from contextlib import suppress
 from unittest.mock import ANY
 
 import pytest
@@ -596,8 +595,10 @@ def test_call_overrides(mocker, arg, openapi_30):
     case = openapi_30["/users"]["GET"].Case(headers=original, cookies=original, query=original)
     # When user passes header / cookie / query explicitly
     overridden = {"B": "Y"}
-    with suppress(ValueError):
+    try:
         case.call(**{arg: overridden}, base_url="http://127.0.0.1")
+    except ValueError:
+        pass
     _assert_override(spy, arg, original, overridden)
 
 
@@ -618,8 +619,10 @@ def test_call_transport_overrides(mocker, with_config, kwargs, openapi_30):
         openapi_30.config.request_cert = "/tmp"
         openapi_30.config.request_timeout = 0.5
     case = openapi_30["/users"]["GET"].Case()
-    with suppress(ValueError):
+    try:
         case.call(**kwargs, base_url="http://127.0.0.1")
+    except ValueError:
+        pass
     for key, value in kwargs.items():
         assert spy.call_args[1][key] == value
 
@@ -639,8 +642,10 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     # NOTE: Werkzeug does not accept cookies, so no override
     # When user passes header / query explicitly
     overridden = {"B": "Y"}
-    with suppress(ValueError):
+    try:
         case.call(**{call_arg: overridden}, base_url="http://127.0.0.1", app=42)
+    except ValueError:
+        pass
     _assert_override(spy, client_arg, original, overridden)
 
 

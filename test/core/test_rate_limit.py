@@ -34,7 +34,10 @@ def test_maximum_requests(ctx, loader, make_url, kind):
         for _ in range(5):
             for operation in schema.get_all_operations():
                 operation = operation.ok()
-                case = operation.Case(body={}) if kind == "graphql" else operation.Case()
+                if kind == "graphql":
+                    case = operation.Case(body={})
+                else:
+                    case = operation.Case()
                 case.call()
                 counter += 1
                 if counter == 5:

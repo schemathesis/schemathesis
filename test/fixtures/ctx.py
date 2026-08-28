@@ -558,7 +558,10 @@ class Context:
     def makefile(
         self, schema: dict[str, Any], *, format: str = "json", filename: str = "schema", parent: str | None = None
     ):
-        directory = self._testdir.mkdir(parent) if parent is not None else self._testdir.tmpdir
+        if parent is not None:
+            directory = self._testdir.mkdir(parent)
+        else:
+            directory = self._testdir.tmpdir
         if format == "json":
             path = directory / f"{filename}.json"
             path.write_text(json.dumps(schema), "utf8")

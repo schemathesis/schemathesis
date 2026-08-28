@@ -4,7 +4,6 @@ import inspect
 import sys
 import unittest
 from collections.abc import Callable, Generator
-from contextlib import suppress
 from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
@@ -551,8 +550,10 @@ def _write_to_writers(
     from schemathesis.reporting.junitxml import JunitXmlWriter
 
     _AllureWriter: type[AllureWriter] | None = None
-    with suppress(ImportError):
+    try:
         from schemathesis.reporting.allure import AllureWriter as _AllureWriter
+    except ImportError:
+        pass
 
     for writer in writers:
         if isinstance(writer, JunitXmlWriter):

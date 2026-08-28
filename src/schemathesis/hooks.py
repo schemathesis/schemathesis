@@ -154,7 +154,10 @@ class HookDispatcher:
             ```
 
         """
-        hook_name = hook.__name__ if name is None else name
+        if name is None:
+            hook_name = hook.__name__
+        else:
+            hook_name = name
 
         def decorator(func: Callable) -> Callable:
             dispatcher = self.add_dispatcher(func)
@@ -323,7 +326,10 @@ def apply_to_all_dispatchers(
 
 
 def validate_filterable_hook(hook: str | Callable) -> None:
-    name = hook.__name__ if callable(hook) else hook
+    if callable(hook):
+        name = hook.__name__
+    else:
+        name = hook
     if name in ("before_process_path", "before_load_schema", "after_load_schema"):
         raise ValueError(f"Filters are not applicable to this hook: `{name}`")
 

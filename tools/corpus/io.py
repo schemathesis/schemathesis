@@ -62,7 +62,10 @@ def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> 
         self.flatten_mapping(node)
     mapping = {}
     for key_node, value_node in node.value:
-        key = key_node.value if key_node.tag != "tag:yaml.org,2002:str" else self.construct_object(key_node, deep)
+        if key_node.tag != "tag:yaml.org,2002:str":
+            key = key_node.value
+        else:
+            key = self.construct_object(key_node, deep)
         mapping[key] = self.construct_object(value_node, deep)
     return mapping
 

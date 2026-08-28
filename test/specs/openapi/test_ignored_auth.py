@@ -1,5 +1,4 @@
 import json
-from contextlib import suppress
 from typing import Annotated
 
 import pytest
@@ -97,8 +96,10 @@ def test_keep_tls_verification(ctx, mocker):
 
     @given(operation.as_strategy())
     def test(case):
-        with suppress(FailureGroup):
+        try:
             case.call_and_validate(verify=False, timeout=5)
+        except FailureGroup:
+            pass
 
     test()
 

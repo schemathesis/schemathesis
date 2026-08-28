@@ -1803,7 +1803,10 @@ def test_output_sanitization_via_config(ctx, cli, hypothesis_max_examples, enabl
     args = ()
     if override:
         # Should differ from the config file
-        args = ("--output-sanitize=false",) if enabled else ("--output-sanitize=true",)
+        if enabled:
+            args = ("--output-sanitize=false",)
+        else:
+            args = ("--output-sanitize=true",)
     result = cli.run_and_assert(
         api.schema_url,
         f"--max-examples={hypothesis_max_examples or 5}",

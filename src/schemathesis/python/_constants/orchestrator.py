@@ -30,7 +30,10 @@ def extract_registered() -> ConstantsPool:
     version = registry.version
     if _extraction_cache is not None and _extraction_cache[0] == version:
         return _extraction_cache[1]
-    pool = ConstantsPool() if not registry.get_all() else extract_all(registry=registry, adapters=default_adapters())
+    if not registry.get_all():
+        pool = ConstantsPool()
+    else:
+        pool = extract_all(registry=registry, adapters=default_adapters())
     _extraction_cache = (version, pool)
     return pool
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import threading
-from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
 
@@ -778,7 +777,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
             requirement = self.requirements.get((operation.label, ParameterLocation.PATH, param_name))
             if requirement is None:
                 continue
-            # unhashable value (e.g. list); fall through, eviction still runs
-            with suppress(TypeError):
+            try:
                 self._tombstoned.add((requirement.resource_name, param_value))
+            except TypeError:  # unhashable value (e.g. list); fall through, eviction still runs
+                pass
             self.repository.remove_by_value(requirement.resource_name, param_value)

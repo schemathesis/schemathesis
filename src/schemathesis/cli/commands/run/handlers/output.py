@@ -309,7 +309,10 @@ class UnitTestProgressManager:
         if operation := self.current_operations.pop(label, None):
             if not self.current_operations:
                 assert self.title_task_id is not None
-                description = f"  {self.title}" if self.current == self.total - 1 else self.title
+                if self.current == self.total - 1:
+                    description = f"  {self.title}"
+                else:
+                    description = self.title
                 self.title_progress.update(self.title_task_id, description=description)
             self.operations_progress.update(operation.task_id, visible=False)
 
@@ -338,7 +341,10 @@ class UnitTestProgressManager:
         icon = self._get_status_icon(default_icon)
 
         message = self._get_stats_message() or "No tests were run"
-        duration_message = f"interrupted after {duration}" if self.is_interrupted else f"in {duration}"
+        if self.is_interrupted:
+            duration_message = f"interrupted after {duration}"
+        else:
+            duration_message = f"in {duration}"
 
         return f"{icon}  {self.title} ({duration_message})\n\n    {message}"
 
@@ -502,7 +508,10 @@ class StatefulProgressManager:
         icon = icon or self._get_status_icon()
 
         message = self._get_stats_message() or "No tests were run"
-        duration_message = f"interrupted after {duration}" if self.is_interrupted else f"in {duration}"
+        if self.is_interrupted:
+            duration_message = f"interrupted after {duration}"
+        else:
+            duration_message = f"in {duration}"
 
         return f"{icon}  {self.title} ({duration_message})", message
 

@@ -65,7 +65,10 @@ def _sanitize_url_cached(
 
     # Sanitize authority
     netloc_parts = parsed.netloc.split("@")
-    netloc = f"{replacement}@{netloc_parts[-1]}" if len(netloc_parts) > 1 else parsed.netloc
+    if len(netloc_parts) > 1:
+        netloc = f"{replacement}@{netloc_parts[-1]}"
+    else:
+        netloc = parsed.netloc
 
     # Sanitize query parameters
     query = parse_qs(parsed.query, keep_blank_values=True)

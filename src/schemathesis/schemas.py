@@ -277,7 +277,10 @@ class BaseSchema(Mapping):
         """Base path for the schema."""
         # if `base_url` is specified, then it should include base path
         # Example: http://127.0.0.1:8080/api
-        path = urlsplit(self.config.base_url).path if self.config.base_url else self._get_base_path()
+        if self.config.base_url:
+            path = urlsplit(self.config.base_url).path
+        else:
+            path = self._get_base_path()
         if not path.endswith("/"):
             path += "/"
         return path
@@ -384,8 +387,14 @@ class BaseSchema(Mapping):
         return given_proxy(*args, **kwargs)
 
     def clone(self, *, test_function: Callable | NotSet = NOT_SET, filter_set: FilterSet | NotSet = NOT_SET) -> Self:
-        _test_function = self.test_function if isinstance(test_function, NotSet) else test_function
-        _filter_set = self.filter_set if isinstance(filter_set, NotSet) else filter_set
+        if isinstance(test_function, NotSet):
+            _test_function = self.test_function
+        else:
+            _test_function = test_function
+        if isinstance(filter_set, NotSet):
+            _filter_set = self.filter_set
+        else:
+            _filter_set = filter_set
 
         cloned = self.__class__(
             self.raw_schema,

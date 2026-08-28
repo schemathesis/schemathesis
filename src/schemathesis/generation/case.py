@@ -405,7 +405,10 @@ class Case(Generic[OperationT]):
 
         if self.operation.app is not None:
             kwargs.setdefault("app", self.operation.app)
-        transport_ = transport.get(kwargs["app"]) if "app" in kwargs else self.operation.schema.transport
+        if "app" in kwargs:
+            transport_ = transport.get(kwargs["app"])
+        else:
+            transport_ = self.operation.schema.transport
         try:
             response = transport_.send(
                 self,

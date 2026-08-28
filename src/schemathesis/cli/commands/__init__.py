@@ -72,7 +72,10 @@ def _show_help(ctx: click.Context, param: click.Parameter, value: bool) -> None:
 def schemathesis(ctx: click.Context, config_file: str | None) -> None:
     """Property-based API testing for OpenAPI and GraphQL."""
     try:
-        config = SchemathesisConfig.from_path(config_file) if config_file is not None else SchemathesisConfig.discover()
+        if config_file is not None:
+            config = SchemathesisConfig.from_path(config_file)
+        else:
+            config = SchemathesisConfig.discover()
     except FileNotFoundError:
         display_header(SCHEMATHESIS_VERSION)
         click.secho(

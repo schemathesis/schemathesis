@@ -109,7 +109,10 @@ def _parse_one_dictionary(name: str, payload: dict, *, base_dir: str | None) -> 
 
 
 def _resolve_dictionary_path(path: str, *, base_dir: str | None) -> str:
-    candidate = path if os.path.isabs(path) or base_dir is None else os.path.join(base_dir, path)
+    if os.path.isabs(path) or base_dir is None:
+        candidate = path
+    else:
+        candidate = os.path.join(base_dir, path)
     if not os.path.isfile(candidate):
         raise ConfigError(f"Dictionary file `{path}` not found")
     return os.path.abspath(candidate)

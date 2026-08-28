@@ -254,7 +254,10 @@ def validate_vanilla_requests_kwargs(data: dict[str, Any], declared_base_url: st
             if frame.function == "call_and_validate":
                 method_name = "call_and_validate"
                 break
-        suggestion = f"Your schema declares a server at {declared_base_url}:\n" if declared_base_url is not None else ""
+        if declared_base_url is not None:
+            suggestion = f"Your schema declares a server at {declared_base_url}:\n"
+        else:
+            suggestion = ""
         example = declared_base_url or "https://api.example.com"
         raise IncorrectUsage(
             "The `base_url` argument is required when specifying a schema via a file, so Schemathesis knows where to send the data.\n"

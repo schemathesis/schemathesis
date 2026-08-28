@@ -1,4 +1,3 @@
-from contextlib import suppress
 
 import pytest
 from hypothesis import HealthCheck, Phase, settings
@@ -287,8 +286,10 @@ def test_passing_transport_kwargs(ctx, mocker):
         def get_call_kwargs(self, case):
             return kwargs
 
-    with suppress(FailureGroup):
+    try:
         APIWorkflow.run()
+    except FailureGroup:
+        pass
 
     assert mocked.call_args.args[0]._transport_kwargs == kwargs
 

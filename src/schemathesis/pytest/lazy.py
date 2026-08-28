@@ -55,7 +55,10 @@ def get_all_tests(
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
-            _as_strategy_kwargs = as_strategy_kwargs(operation) if callable(as_strategy_kwargs) else {}
+            if callable(as_strategy_kwargs):
+                _as_strategy_kwargs = as_strategy_kwargs(operation)
+            else:
+                _as_strategy_kwargs = {}
 
             # Get modes from config for this operation
             modes = []

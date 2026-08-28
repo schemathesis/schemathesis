@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterable
-from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING, cast
@@ -137,9 +136,11 @@ def _run(ctx: EngineContext) -> CacheReport | None:
     if ctx.error_feedback is not None and report.replayed:
         ctx.error_feedback.checkpoint()
 
-    # Advisory cache -- disk errors must not fail the run.
-    with suppress(OSError):
+    try:
         write(directory, manifest, _sanitize_entries(survivors, ctx))
+    except OSError:
+        # Advisory cache -- disk errors must not fail the run.
+        pass
 
     return report
 
@@ -204,8 +205,10 @@ def _flush(ctx: EngineContext, writer: CacheWriter) -> None:
 
     entries = _enforce_per_operation_cap(entries)
 
-    with suppress(OSError):
+    try:
         write(directory, manifest, _sanitize_entries(entries, ctx))
+    except OSError:
+        pass
 
 
 def _sanitize_entries(entries: list[Entry], ctx: EngineContext) -> list[Entry]:

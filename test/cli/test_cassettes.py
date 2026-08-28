@@ -287,7 +287,10 @@ def request_args(request, tmp_path):
         key.touch()
         return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key)), ExitCode.OK
     if request.param == "proxies":
-        exit_code = ExitCode.OK if platform.system() == "Windows" else ExitCode.TESTS_FAILED
+        if platform.system() == "Windows":
+            exit_code = ExitCode.OK
+        else:
+            exit_code = ExitCode.TESTS_FAILED
         return ["--proxy=http://127.0.0.1"], "proxies", {"all": "http://127.0.0.1"}, exit_code
 
 
@@ -307,7 +310,10 @@ def test_output_sanitization(ctx, cli, hypothesis_max_examples, cassette_path, v
     )
     cassette = load_cassette(cassette_path)
 
-    expected = "[Filtered]" if value == "true" else ANY
+    if value == "true":
+        expected = "[Filtered]"
+    else:
+        expected = ANY
     interactions = cassette["http_interactions"]
     assert all(entry["request"]["headers"].get("X-Token") == [expected] for entry in interactions)
     assert all(entry["request"]["headers"].get("Authorization") == [expected] for entry in interactions)

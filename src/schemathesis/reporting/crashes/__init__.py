@@ -4,7 +4,6 @@ import hashlib
 import json
 import re
 import time
-from contextlib import suppress
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -256,8 +255,10 @@ class CrashWriter:
 
     def remove_files(self, filenames: set[str]) -> None:
         for filename in filenames:
-            with suppress(FileNotFoundError):
+            try:
                 (self._directory / filename).unlink()
+            except FileNotFoundError:
+                pass
 
 
 def load_manifest(directory: Path) -> CrashManifest | None:

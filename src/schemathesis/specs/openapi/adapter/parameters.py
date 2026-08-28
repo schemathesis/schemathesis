@@ -658,9 +658,13 @@ def build_hybrid_strategy(
         if not isinstance(base, dict):
             return base
 
-        # Weighted selection is shuffled to avoid Hypothesis's bias toward early indices
-        # when more than one variant exists; a single variant needs no selection.
-        idx = 0 if n_variants == 1 else usage_tracker.weighted_select(variant_keys, random)
+        # Single variant: no selection needed
+        if n_variants == 1:
+            idx = 0
+        else:
+            # Shuffle indices before weighted selection to avoid Hypothesis's bias
+            # toward early indices when using cumulative probability selection.
+            idx = usage_tracker.weighted_select(variant_keys, random)
         chosen = captured_variants[idx]
 
         if container_validator is not None:

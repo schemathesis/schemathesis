@@ -183,7 +183,10 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
         ```
 
     """
-    data = file if isinstance(file, str) else file.read()
+    if isinstance(file, str):
+        data = file
+    else:
+        data = file.read()
     try:
         schema = json.loads(data)
     except json.JSONDecodeError:

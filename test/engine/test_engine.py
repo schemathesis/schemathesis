@@ -466,7 +466,10 @@ def test_response_conformance_malformed_json(ctx):
 
     check = _last_scenario_checks(stream)[-1]
     assert check.failure_info.failure.title == "JSON deserialization error"
-    expected = "Key name must be string at char" if IS_PYPY else "Expecting property name enclosed in double quotes"
+    if IS_PYPY:
+        expected = "Key name must be string at char"
+    else:
+        expected = "Expecting property name enclosed in double quotes"
     assert check.failure_info.failure.validation_message == expected
     assert check.failure_info.failure.position == 1
 

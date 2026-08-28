@@ -5577,7 +5577,10 @@ def customer_get(*, operation_id="getCustomer", parameter_name="customer_id"):
 
 def link(target_operation, parameters=None, request_body=None, use_ref=False):
     """Build a link definition."""
-    link_def = {"operationRef": target_operation} if use_ref else {"operationId": target_operation}
+    if use_ref:
+        link_def = {"operationRef": target_operation}
+    else:
+        link_def = {"operationId": target_operation}
 
     if parameters:
         link_def["parameters"] = parameters

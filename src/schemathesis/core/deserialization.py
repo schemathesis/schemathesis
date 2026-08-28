@@ -176,7 +176,10 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
             # If the key has a tag different from `str` - use its string value.
             # With this change all integer keys or YAML 1.1 boolean-ish values like "on" / "off" will not be cast to
             # a different type
-            key = key_node.value if key_node.tag != "tag:yaml.org,2002:str" else self.construct_object(key_node, deep)
+            if key_node.tag != "tag:yaml.org,2002:str":
+                key = key_node.value
+            else:
+                key = self.construct_object(key_node, deep)
             mapping[key] = self.construct_object(value_node, deep)
         return mapping
 
