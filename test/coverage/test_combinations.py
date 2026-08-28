@@ -1284,6 +1284,43 @@ def test_negative_property_names(ctx_factory, schema, expected):
     assert_covers_negative(nctx, schema, expected)
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"a": {"type": "null"}}, "propertyNames": {"pattern": "^[0-9]{3}$"}},
+        {"type": "object", "properties": {"abc": {"type": "null"}}, "propertyNames": {"maxLength": 2}},
+        {
+            "type": "object",
+            "properties": {"a": {"type": "null"}, "bbb": {"type": "boolean"}},
+            "propertyNames": {"minLength": 3},
+        },
+    ],
+    ids=["pattern", "max-length", "one-name-admitted"],
+)
+def test_positive_object_respects_property_names(ctx_factory, schema):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = cover_schema(ctx, schema)
+    assert values
+    for value in values:
+        assert validator.is_valid(value), value
+
+
+# Draft 4 validators ignore `propertyNames`, so the properties beside it stay coverable.
+def test_positive_object_covers_properties_beside_ignored_property_names(ctx_factory):
+    schema = {"type": "object", "properties": {"a": {"type": "null"}}, "propertyNames": {"pattern": "^[0-9]{3}$"}}
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft4Validator,
+    )
+    assert {"a": None} in cover_schema(ctx, schema)
+
+
 def test_positive_pattern(pctx):
     schema = {"pattern": r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", "minLength": 7, "maxLength": 20, "type": "string"}
     assert_covers(pctx, schema, ["0000-0000", "00-0000", "00-00000", "0000-000000000000000", "000-000000000000000"])

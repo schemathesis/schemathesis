@@ -1826,6 +1826,15 @@ def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageCont
     return next((candidate for candidate in _UNEXPECTED_PROPERTY_KEYS[1:] if is_additional(candidate)), None)
 
 
+def _admits_property_name(ctx: CoverageContext, schema: JsonSchemaObject, name: str) -> bool:
+    """Whether `propertyNames` lets the object carry `name`."""
+    property_names = schema.get("propertyNames")
+    # Draft 4 validators ignore `propertyNames`, so it constrains nothing there.
+    if property_names is None or ctx.validator_cls is jsonschema_rs.Draft4Validator:
+        return True
+    return is_valid(name, property_names)
+
+
 def _negation_ignored_by_dialect(ctx: CoverageContext, keyword: str) -> bool:
     # Draft 4 (Swagger 2.0 / Open API 3.0) predates `const`, `propertyNames` and `prefixItems`; the
     # dialect's validator ignores them, so mutating them cannot produce negative test cases.
@@ -3287,6 +3296,8 @@ def _iter_positive_object(
     for name, sub_schema in properties.items():
         # A property the template left out adds a key, which the size window may not have room for.
         if name not in template and isinstance(max_properties, int) and len(template) + 1 > max_properties:
+            continue
+        if not _admits_property_name(ctx, schema, name):
             continue
         # Skip pre-seed when the property is absent: `template.get(name)` would be None
         # and dedup legitimate null emissions for nullable optionals.
