@@ -3480,7 +3480,11 @@ def _negative_items(
     if isinstance(value, dict):
         parent_min_items = schema.get("minItems")
         min_items = parent_min_items if isinstance(parent_min_items, int) else 0
-        yield from _negative_array_items(ctx, value, min_items=min_items)
+        prefix = _tuple_prefix_values(ctx, schema)
+        if prefix is None:
+            # The leading positions cannot be filled soundly, so an `items` value has nowhere to sit.
+            return
+        yield from _negative_array_items(ctx, value, prefix=prefix, min_items=min_items)
     elif isinstance(value, list):
         yield from _negative_prefix_items(ctx, value)
 
@@ -3493,14 +3497,15 @@ def _negative_tuple_items(
 
 
 def _negative_array_items(
-    ctx: CoverageContext, schema: JsonSchema, *, min_items: int = 0
+    ctx: CoverageContext, schema: JsonSchema, *, prefix: list, min_items: int = 0
 ) -> Generator[GeneratedValue, None, None]:
-    """Arrays not matching the schema."""
+    """Arrays not matching the schema, with `prefix` filling the positions `prefixItems` owns."""
     nctx = ctx.with_negative()
     filler: object = NOT_SET
+    padding = min_items - len(prefix) - 1
     # Cap padding at NEGATIVE_MODE_MAX_ITEMS so an adversarial `minItems` doesn't blow up memory;
-    # above the cap, fall back to single-item arrays (same as pre-padding behavior for that range).
-    if 1 < min_items <= NEGATIVE_MODE_MAX_ITEMS:
+    # above the cap, fall back to unpadded arrays (same as pre-padding behavior for that range).
+    if padding > 0 and min_items <= NEGATIVE_MODE_MAX_ITEMS:
         try:
             filler = ctx.with_positive().generate_from_schema(schema)
         except (InvalidArgument, Unsatisfiable):
@@ -3510,9 +3515,9 @@ def _negative_array_items(
     for value in cover_schema_iter(nctx, schema):
         if filler is not NOT_SET:
             # Pad to satisfy `minItems` so the items[i] check fires instead of failing at length.
-            items = [value.value, *(filler for _ in range(min_items - 1))]
+            items = [*prefix, value.value, *(filler for _ in range(padding))]
         else:
-            items = [value.value]
+            items = [*prefix, value.value]
         if ctx.wire.leads_to_negative_test_case(items):
             yield NegativeValue(
                 items,
