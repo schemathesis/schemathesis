@@ -17,6 +17,9 @@ Options:
   -u, --url URL                  API base URL (required for file-based schemas)
   -w, --workers                  Number of concurrent workers for testing. Auto-
                                  adjusts if 'auto' is specified[auto, 1-64]
+  --max-time SECONDS             Time budget for the whole run; fuzzing and
+                                 stateful testing repeat until it is spent
+                                 [x>=1]
   --phases                       A comma-separated list of test phases to run
                                  [possible values: examples, coverage, fuzzing,
                                  stateful]

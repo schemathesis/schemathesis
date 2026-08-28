@@ -166,6 +166,21 @@ $ st run [OPTIONS] SCHEMA
     $ st run openapi.yaml --max-failures 5
     ```
 
+#### `--max-time SECONDS`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Default**: `null`  
+    **Range**: `≥1`  
+
+    Time budget for the whole run. Each phase gets a share of it, then fuzzing and stateful testing
+    repeat with fresh data until the budget is spent.
+
+    ```console
+    $ st run openapi.yaml --max-time 600
+    ```
+
 #### `--continue-on-failure`
 
 !!! note ""
@@ -690,7 +705,7 @@ The `fuzz` command continuously generates multi-step API scenarios.
 $ st fuzz [OPTIONS] SCHEMA
 ```
 
-`st fuzz` accepts all options from [`st run`](#run) except `--phases`, `--no-shrink`, and `--max-examples`, plus the following fuzzing-specific options:
+`st fuzz` accepts all options from [`st run`](#run) except `--phases`, `--no-shrink`, and `--max-examples`.
 
 ### Fuzzing Options
 

@@ -31,6 +31,7 @@ from schemathesis.engine.errors import (
     is_unrecoverable_network_error,
 )
 from schemathesis.engine.run import PhaseName
+from schemathesis.engine.run.unit._case import BudgetExpired
 from schemathesis.engine._rate_limit_retry import call_and_validate_with_retry
 from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -111,6 +112,10 @@ def _classify_suite_error(
     settings: hypothesis.settings,
 ) -> tuple[Status, bool, list[events.EngineEvent]]:
     """Map a state machine failure into the suite status, whether to re-run it, and the events to emit."""
+    if isinstance(exc, BudgetExpired):
+        # The clock ended the suite. A failure found before it surfaces as its own group, so there is
+        # nothing left to report here; the engine reports the limit itself.
+        return Status.SUCCESS, False, []
     if isinstance(exc, KeyboardInterrupt):
         # Raised in the state machine when the stop event is set or it is raised by the user's code
         # that is placed in the base class of the state machine.
@@ -130,9 +135,10 @@ def _classify_suite_error(
             ctx.mark_as_seen_in_run(failure)
         return Status.FAILURE, True, []
     if isinstance(exc, Flaky):
-        # Ignore flakiness
+        # A replay that cannot reproduce the failure does not unreport it: the suite already showed it.
+        found = Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS
         if engine.has_reached_the_failure_limit:
-            return Status.SUCCESS, False, []
+            return found, False, []
         stored = state.unrecoverable_network_error
         if stored is not None:
             # Flakiness caused by a transient transport failure: surface it and stop rather than
@@ -140,7 +146,7 @@ def _classify_suite_error(
             return Status.ERROR, False, [_network_nonfatal_error(stored)]
         # Mark all failures in this suite as seen to prevent them being re-discovered
         ctx.mark_current_suite_as_seen_in_run()
-        return Status.SUCCESS, True, []
+        return found, True, []
     if isinstance(exc, Unsatisfiable) and not isinstance(exc, UnsatisfiableSchema) and ctx.completed_scenarios > 0:
         # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
         # values are possible to generate based on the previous observations, we retry the generation,
@@ -251,6 +257,9 @@ def execute_state_machine_loop(
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
             if engine.has_to_stop:
+                # Say which one stopped it: a spent budget is a planned finish, Ctrl-C is not.
+                if engine.has_reached_time_limit and not engine.is_interrupted:
+                    raise BudgetExpired
                 raise KeyboardInterrupt
 
             operation_label = input.case.operation.label
@@ -393,8 +402,6 @@ def execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
-    seed = engine.config.seed
-
     while True:
         # Promote observations from the previous run into the stable read state.
         if engine.link_calibration is not None:
@@ -417,12 +424,20 @@ def execute_state_machine_loop(
                 )
             )
             break
+        if engine.has_reached_time_limit:
+            # No scenario ran, so there is nothing this suite can vouch for.
+            event_queue.put(
+                events.SuiteFinished(
+                    id=suite_started.id,
+                    phase=PhaseName.STATEFUL_TESTING,
+                    status=Status.SKIP,
+                )
+            )
+            break
         suite_status = Status.SUCCESS
         retry = False
-        InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
-        # Predictably change the seed to avoid re-running the same sequences if tests fail
-        # yet have reproducible results
-        seed += 1
+        # A fresh seed per suite: a retry or a later cycle must not replay what an earlier suite did.
+        InstrumentedStateMachine = hypothesis.seed(engine.next_stateful_seed())(_InstrumentedStateMachine)
         try:
             with catch_warnings(), ignore_hypothesis_output():
                 filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
@@ -448,7 +463,8 @@ def execute_state_machine_loop(
             ctx.reset()
         if retry:
             continue
-        # Exit on the first successful state machine execution
+        # One clean pass, then hand the budget back: under a time limit the engine repeats the whole
+        # sequence, and holding on here would leave every later phase without a turn.
         break
 
 
@@ -484,7 +500,7 @@ def validate_response(
             code_sample="\n".join(commands),
             failure=failure,
         )
-        control.count_failure()
+        control.count_failure(failure)
         stateful_ctx.mark_as_seen_in_suite(failure)
         collected.add(failure)
 

@@ -183,6 +183,26 @@ Rules:
 !!! info "CLI Only"
     This option only applies when using the `schemathesis run` command. For pytest, use pytest's own `-x` or `--maxfail` options instead.
 
+#### `max-time`
+
+!!! note ""
+
+    **Type**: `Integer (≥1)`  
+    **Default**: `null`  
+
+    Time budget for the whole run, in seconds. Each phase gets a share of it, then fuzzing and
+    stateful testing repeat with fresh data until the budget is spent.
+
+    Applies to both `st run` and `st fuzz`. To bound only `st fuzz`, use [`fuzz.max-time`](#fuzzmax-time),
+    which takes precedence over this key.
+
+    ```toml
+    max-time = 600
+    ```
+
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command. For pytest, use pytest's own `--timeout` plugin or your CI job timeout instead.
+
 #### `warnings`
 
 !!! note ""
@@ -1412,7 +1432,8 @@ Settings for `st fuzz`.
     **Type:** `Integer`  
     **Default:** `null`  
 
-    Stop fuzzing after this many seconds. Without this setting, `st fuzz` runs until the first failure or interrupted.
+    Stop fuzzing after this many seconds. Overrides the root [`max-time`](#max-time) for `st fuzz`.
+    Without either, `st fuzz` runs until the first failure or interrupted.
 
     ```toml
     [fuzz]

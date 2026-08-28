@@ -30,6 +30,10 @@
       "type": "integer",
       "minimum": 1
     },
+    "max-time": {
+      "type": "integer",
+      "minimum": 1
+    },
     "reports": {
       "type": "object",
       "additionalProperties": false,

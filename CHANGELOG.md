@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- `--max-time` stops `st run` after the given number of seconds.
 - `--report json` writes the run's verdict as one JSON document.
 - Support for `state` in the ASGI lifespan scope.
 

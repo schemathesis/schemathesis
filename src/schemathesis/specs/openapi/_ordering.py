@@ -29,7 +29,12 @@ def compute_operation_layers(schema: OpenApiSchema, operations: list[APIOperatio
     if dependency_layers is not None:
         # Build layers using dependency graph ordering
         operations_by_label = {op.label: op for op in operations}
-        layers = [[operations_by_label[label] for label in labels] for labels in dependency_layers if labels]
+        # The graph covers the whole schema; a caller may pass a subset, so labels it left out are skipped.
+        layers = [
+            [operations_by_label[label] for label in labels if label in operations_by_label]
+            for labels in dependency_layers
+            if labels
+        ]
         # Operations the dependency graph could not analyze (e.g. unresolvable `$ref`s) are absent from
         # its layers. Place them by RESTful priority so they still run instead of going untested.
         analyzed = {label for labels in dependency_layers for label in labels}

@@ -86,6 +86,14 @@ MAX_FAILURES = OptionSpec(
     show_default=True,
 )
 
+MAX_TIME = OptionSpec(
+    "--max-time",
+    "max_time",
+    type=click.IntRange(min=1),
+    help="Time budget for the whole run; fuzzing and stateful testing repeat until it is spent",
+    metavar="SECONDS",
+)
+
 CONTINUE_ON_FAILURE = OptionSpec(
     "--continue-on-failure",
     "continue_on_failure",

@@ -716,6 +716,62 @@ def test_max_failures(ctx):
     assert stream.finished.stop_reason == StopReason.FAILURE_LIMIT
 
 
+def test_max_time(ctx):
+    # A path parameter keeps generation from exhausting early; the example count needs several times
+    # the limit to run so the stop is the clock rather than the phase finishing on its own.
+    api = ctx.openapi.apps.path_variable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=1, max_examples=2000, phases=[PhaseName.FUZZING])
+    assert stream.finished.stop_reason == StopReason.MAX_TIME
+
+
+@pytest.mark.parametrize("workers", [1, 2])
+def test_max_time_reaches_every_operation(ctx, workers):
+    # Without a per-operation share the first operation consumes the whole budget and the rest are
+    # never dispatched, which makes the tested set depend on schema order.
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=3, max_examples=2000, workers=workers, phases=[PhaseName.FUZZING])
+    tested = {event.label for event in stream.find_all(events.ScenarioFinished)}
+    assert tested == {"POST /users/", "GET /users/{user_id}", "PATCH /users/{user_id}"}
+
+
+def test_max_time_in_unit_phase_is_not_an_interrupt(ctx):
+    # Same misattribution as the stateful phase: the clock is not the user pressing Ctrl-C.
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=1, max_examples=2000, phases=[PhaseName.FUZZING])
+    assert stream.finished.stop_reason == StopReason.MAX_TIME
+    assert stream.find_all(events.Interrupted) == []
+    fuzzing = stream.find(events.PhaseFinished, phase=lambda phase: phase.name == PhaseName.FUZZING)
+    assert fuzzing.status != Status.INTERRUPTED
+
+
+def test_max_time_in_stateful_phase_is_not_an_interrupt(ctx):
+    # Reaching the limit is a planned stop; reporting it as Ctrl-C would misattribute it to the user.
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=1, max_examples=2000, phases=[PhaseName.STATEFUL_TESTING])
+    assert stream.finished.stop_reason == StopReason.MAX_TIME
+    assert stream.find_all(events.Interrupted) == []
+    stateful = stream.find(events.PhaseFinished, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
+    assert stateful.status != Status.INTERRUPTED
+
+
+def test_max_time_keeps_operation_errors_visible(ctx, restore_checks):
+    # Running out of the operation's share does not undo the errors it already produced.
+    @schemathesis.check
+    def boom(ctx, response, case):
+        raise ValueError("boom")
+
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, checks=[boom], max_time=1, max_examples=2000, phases=[PhaseName.FUZZING])
+    errored = {event.label for event in stream.find_all(events.NonFatalError)}
+    passed = {event.label for event in stream.find_all(events.ScenarioFinished) if event.status == Status.SUCCESS}
+    assert not errored & passed, errored & passed
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_skip_operations_with_recursive_references(ctx, schema_with_recursive_references):
     # When the test schema contains recursive references
@@ -1131,19 +1187,13 @@ def test_engine_finished_stop_reason_completed(ctx):
 
 
 def test_stop_event_stream_after_second_event(event_stream):
-    next(event_stream)
-    next(event_stream)
-    next(event_stream)
-    next(event_stream)
-    next(event_stream)
-    next(event_stream)
-    next(event_stream)
-    next(event_stream)
+    for _ in range(8):
+        next(event_stream)
     event_stream.stop()
-    next(event_stream)
-    next(event_stream)
-    assert isinstance(next(event_stream), events.EngineFinished)
-    assert next(event_stream, None) is None
+    remaining = list(event_stream)
+
+    assert isinstance(remaining[-1], events.EngineFinished)
+    assert [event for event in remaining if isinstance(event, events.ScenarioStarted)] == []
 
 
 def test_finish(event_stream):
@@ -1510,3 +1560,442 @@ def test_stateful_phase_missing_deserializer_warnings(ctx):
     warning_messages = {(w.operation_label, w.status_code, w.content_type) for w in warning_event.warnings}
     assert ("POST /users", "201", "application/msgpack") in warning_messages
     assert ("GET /users/{userId}", "200", "application/msgpack") in warning_messages
+
+
+def _coverage_passes(stream):
+    return sum(
+        1
+        for event in stream.events
+        if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.COVERAGE
+    )
+
+
+def test_max_time_repeats_coverage_once_feedback_is_learned(ctx):
+    # The pass itself teaches the parsers, so the operations it taught are worth generating again.
+    api = ctx.openapi.apps.planted_bug()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=5, max_examples=100_000, phases=[PhaseName.COVERAGE])
+
+    assert _coverage_passes(stream) == 2
+
+
+def test_max_time_keeps_coverage_single_pass_without_feedback(ctx):
+    # Nothing was learned, so the pass is not repeated within the cycle.
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=5, max_examples=100_000, phases=[PhaseName.COVERAGE])
+
+    assert _coverage_passes(stream) == 1
+
+
+def test_max_time_coverage_rerun_is_scoped_to_taught_operations(ctx):
+    # An operation that taught nothing would regenerate identical cases, so the repeat skips it.
+    api = ctx.openapi.apps.planted_bug_with_quiet_operation()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=5, max_examples=100_000, phases=[PhaseName.COVERAGE])
+    passes: list[list[str]] = []
+    for event in stream.events:
+        if isinstance(event, events.PhaseStarted):
+            if event.phase.name == PhaseName.COVERAGE:
+                passes.append([])
+            elif event.phase.name == PhaseName.FUZZING and passes:
+                break
+        elif isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.COVERAGE:
+            passes[-1].append(event.recorder.label)
+
+    assert set(passes[0]) == {"POST /users", "GET /health"}
+    assert set(passes[1]) == {"POST /users"}
+
+
+def test_max_time_coverage_rerun_reaches_what_feedback_unlocked(ctx):
+    # The planted 500 sits behind a required-fields gate that only the parsed 400 bodies open.
+    api = ctx.openapi.apps.planted_bug()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(
+        schema,
+        max_time=5,
+        max_examples=100_000,
+        checks=(not_a_server_error,),
+        phases=[PhaseName.COVERAGE],
+    )
+
+    assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
+
+
+def test_max_time_skips_coverage_rerun_for_feedback_that_cannot_change_generation(ctx):
+    # Learning that an operation needs auth teaches generation nothing, so no scoped repeat follows.
+    api = ctx.openapi.apps.under_declared_security()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=5, max_examples=100_000, phases=[PhaseName.COVERAGE])
+
+    assert _coverage_passes(stream) == 1
+
+
+def test_max_time_skips_coverage_rerun_when_feedback_predates_the_pass(ctx):
+    # The examples phase already taught the parsers, so no scoped repeat follows the two full passes.
+    api = ctx.openapi.apps.planted_bug_taught_by_examples()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(
+        schema,
+        max_time=5,
+        max_examples=100_000,
+        phases=[PhaseName.EXAMPLES, PhaseName.COVERAGE],
+    )
+
+    assert _coverage_passes(stream) == 1
+
+
+def test_max_time_repeats_coverage_until_feedback_stops_arriving(ctx):
+    # Satisfying the first constraint reveals a second one, which only another pass can act on.
+    api = ctx.openapi.apps.two_stage_planted_bug()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=5, max_examples=100_000, phases=[PhaseName.COVERAGE])
+
+    assert _coverage_passes(stream) >= 3
+
+
+def test_max_time_cycles_do_not_repeat_the_same_cases(ctx):
+    # Repeating a phase is only worth the time if each cycle explores somewhere the last one did not.
+    api = ctx.openapi.apps.path_variable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=10, max_examples=20, seed=1, phases=[PhaseName.FUZZING])
+    rounds: list[set[str]] = []
+    for event in stream.events:
+        if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.FUZZING:
+            rounds.append(set())
+        elif isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.FUZZING:
+            rounds[-1].update(
+                str((case.value.path_parameters, case.value.query, case.value.body))
+                for case in event.recorder.cases.values()
+            )
+
+    assert len(rounds) > 1, len(rounds)
+    assert rounds[1] - rounds[0], "cycle 2 generated nothing cycle 1 had not"
+
+
+def test_max_time_stops_cycling_when_a_cycle_runs_nothing(ctx):
+    # Repeating a cycle that executes no scenario just burns the budget emitting skips.
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=2, max_examples=5, phases=[PhaseName.EXAMPLES])
+    starts = stream.find_all(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.COVERAGE)
+
+    assert len(starts) <= 1, len(starts)
+
+
+def test_max_time_stops_reserving_for_a_phase_that_only_skips(ctx):
+    # Holding budget back for a phase that never runs halves what fuzzing gets on every cycle.
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=2, max_examples=100_000, phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING])
+    stateful = [
+        event for event in stream.find_all(events.PhaseFinished) if event.phase.name == PhaseName.STATEFUL_TESTING
+    ]
+
+    assert [event.status for event in stateful].count(Status.SKIP) <= 1, len(stateful)
+
+
+def test_max_time_keeps_results_that_landed_as_the_budget_ran_out(ctx, app_runner):
+    # Workers finish moments apart; the one that lands after the deadline is still work that happened.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/first": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/second": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/first")
+    def first():
+        time.sleep(1.1)
+        return "", 200
+
+    @app.route("/second")
+    def second():
+        time.sleep(1.5)
+        return "", 500
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(schema, max_time=1, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
+
+    assert {(event.label, event.status) for event in stream.find_all(events.ScenarioFinished)} == {
+        ("GET /first", Status.SUCCESS),
+        ("GET /second", Status.FAILURE),
+    }
+
+
+def test_max_time_stops_generating_once_the_budget_is_gone(ctx, app_runner):
+    # Enumerating an operation the run can no longer test costs the same time as testing it.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/wide": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "kind",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"enum": [f"v{index}" for index in range(12000)]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/wide")
+    def wide():
+        return "", 200
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    started = time.monotonic()
+    execute(schema, max_time=1, max_examples=1, phases=[PhaseName.COVERAGE])
+
+    assert time.monotonic() - started < 2.0
+
+
+def test_max_time_bounds_coverage_repeats_when_feedback_never_settles(ctx):
+    # An API that never stops teaching would otherwise spend the whole budget on coverage.
+    api = ctx.openapi.apps.endlessly_novel_feedback()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=1, max_examples=100_000, phases=[PhaseName.COVERAGE])
+
+    assert _coverage_passes(stream) <= 4
+
+
+def test_max_failures_counts_a_repeated_failure_once(ctx):
+    # Every cycle re-finds the same failure; only new ones may spend the limit.
+    api = ctx.openapi.apps.failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=2, max_examples=5, max_failures=3, phases=[PhaseName.FUZZING])
+
+    assert stream.finished.stop_reason == StopReason.MAX_TIME
+
+
+@pytest.mark.usefixtures("restore_checks")
+def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
+    # Ctrl-C and a spent budget both stop the run; only the budget is a planned finish.
+    @schemathesis.check
+    def interrupt_after_the_deadline(ctx, response, case):
+        time.sleep(1.1)
+        raise KeyboardInterrupt
+
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(
+        schema,
+        checks=[interrupt_after_the_deadline],
+        max_time=1,
+        max_examples=5,
+        phases=[PhaseName.FUZZING],
+    )
+
+    assert stream.finished.stop_reason == StopReason.INTERRUPTED
+
+
+INFERRABLE_LINK_PATHS = {
+    "/users": {
+        "post": {
+            "responses": {
+                "201": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
+                    },
+                }
+            }
+        }
+    },
+    "/users/{userId}": {
+        "get": {
+            "parameters": [
+                {"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}},
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        }
+    },
+}
+
+
+def test_max_time_reserves_for_stateful_when_links_are_only_inferred(ctx, app_runner):
+    # Inference runs when the phase starts, too late for the phases ahead of it to hold time back.
+    app, _ = ctx.openapi.make_flask_app(INFERRABLE_LINK_PATHS)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return flask.jsonify({"id": 1}), 201
+
+    @app.route("/users/<user_id>")
+    def get_user(user_id):
+        return flask.jsonify({"id": user_id})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_time=3,
+        max_examples=100_000,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+
+    assert [event for event in stream.find_all(events.ScenarioFinished) if event.phase == PhaseName.STATEFUL_TESTING]
+
+
+def test_links_inferred_from_location_headers(ctx, app_runner):
+    # The `Location` header of a created resource is the only hint that these two operations chain.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return "", 201, {"Location": "/users/1"}
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return flask.jsonify({"id": user_id})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_examples=5,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+    started = stream.find(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
+
+    assert started.payload.inferred_transitions > 0
+
+
+def test_max_time_reserves_for_stateful_while_links_may_still_appear(ctx, app_runner):
+    # Runtime-inferred links only show up once fuzzing has run, so the share has to be held before that.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [
+                        {"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return "", 201, {"Location": "/users/1"}
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return flask.jsonify({"id": user_id})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_time=3,
+        max_examples=100_000,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+
+    assert [event for event in stream.find_all(events.ScenarioFinished) if event.phase == PhaseName.STATEFUL_TESTING]
+
+
+def test_max_time_stops_reserving_once_stateful_proves_idle(ctx, app_runner):
+    # No link ever surfaces, so after one pass the share held for stateful is dead weight.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [
+                        {"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return "", 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return flask.jsonify({"id": user_id})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_time=3,
+        max_examples=100_000,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.FUZZING, PhaseName.STATEFUL_TESTING],
+    )
+    fuzzing = stream.find_all(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.FUZZING)
+
+    assert len(fuzzing) <= 3, len(fuzzing)
+
+
+LINKED_USERS_PATHS = {
+    "/users": {
+        "post": {
+            "responses": {
+                "201": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}
+                    },
+                    "links": {"GetUser": {"operationId": "getUser", "parameters": {"userId": "$response.body#/id"}}},
+                }
+            }
+        }
+    },
+    "/users/{userId}": {
+        "get": {
+            "operationId": "getUser",
+            "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+    },
+}
+
+
+def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner):
+    # A retry that starts with the budget already gone issues no request, so it vouches for nothing.
+    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return flask.jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        # Outlasts the budget, so the retry the failure schedules starts with nothing left to spend.
+        time.sleep(2.5)
+        return "", 500
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = execute(
+        schema,
+        max_time=2,
+        max_examples=100_000,
+        modes=[GenerationMode.POSITIVE],
+        phases=[PhaseName.STATEFUL_TESTING],
+    )
+
+    assert [event.status for event in stream.find_all(events.SuiteFinished)] == [Status.FAILURE, Status.SKIP]

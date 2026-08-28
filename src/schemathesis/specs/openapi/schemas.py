@@ -338,8 +338,11 @@ class OpenApiSchema(BaseSchema):
         if self.analysis.should_inject_links():
             injected += self.analysis.inject_links()
         # Injected links land in the schema, where operations may share a response definition, so one
-        # injection can add several transitions. Re-measure instead of adding the injection count.
-        transitions = self._measure_statistic().transitions if injected else self.statistic.transitions
+        # injection can add several transitions. Drop the memoized measurement so this call and every
+        # later reader see them, rather than the counts from before the injection.
+        if injected:
+            self.__dict__.pop("statistic", None)
+        transitions = self.statistic.transitions
         return StatefulInference(inferred=injected, total=transitions.total, selected=transitions.selected)
 
     @override

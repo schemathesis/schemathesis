@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from itertools import count
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -146,6 +147,155 @@ def planted_bug() -> OpenAPIApp:
         ]
         if missing:
             return jsonify({"messages": missing}), 400
+        return "", 500
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def planted_bug_with_quiet_operation() -> OpenAPIApp:
+    # `POST /users` teaches the parsers; `GET /health` never errors, so it learns nothing.
+    spec = build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "description": {"type": "string"},
+                                        "tags": {"type": "array", "items": {"type": "string"}},
+                                        "active": {"type": "boolean"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
+                }
+            },
+            "/health": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/users", methods=["POST"])
+    def create_user() -> Any:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
+        missing = [
+            f"{name} - must not be blank"
+            for name in REQUIRED_FIELDS
+            if not isinstance(body.get(name), str) or not body[name].strip()
+        ]
+        if missing:
+            return jsonify({"messages": missing}), 400
+        return "", 500
+
+    @app.route("/health", methods=["GET"])
+    def health() -> Any:
+        return jsonify({"ok": True})
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def planted_bug_taught_by_examples() -> OpenAPIApp:
+    # The declared example trips the 400 gate, so the parsers learn before the coverage pass generates.
+    spec = build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "description": {"type": "string"},
+                                    },
+                                },
+                                "example": {"name": "", "description": ""},
+                            }
+                        },
+                    },
+                    "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/users", methods=["POST"])
+    def create_user() -> Any:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
+        missing = [
+            f"{name} - must not be blank"
+            for name in REQUIRED_FIELDS
+            if not isinstance(body.get(name), str) or not body[name].strip()
+        ]
+        if missing:
+            return jsonify({"messages": missing}), 400
+        return "", 500
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def two_stage_planted_bug() -> OpenAPIApp:
+    # The second constraint is only revealed once the first is satisfied, so one repeat cannot reach the bug.
+    spec = build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "description": {"type": "string"},
+                                        "contact": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/users", methods=["POST"])
+    def create_user() -> Any:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
+        blank = [
+            f"{name} - must not be blank"
+            for name in ("name", "description")
+            if not isinstance(body.get(name), str) or not body[name].strip()
+        ]
+        if blank:
+            return jsonify({"messages": blank}), 400
+        contact = body.get("contact")
+        if not isinstance(contact, str) or "@" not in contact:
+            return jsonify({"messages": ["contact - must be a well-formed email address"]}), 400
         return "", 500
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
@@ -1121,4 +1271,33 @@ def token_with_examples() -> OpenAPIApp:
     )
     app = make_flask_app_from_schema(spec)
     _register_token_handler(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def endlessly_novel_feedback() -> OpenAPIApp:
+    # Every rejection names a field the parsers have never seen, so no pass is ever the last one.
+    spec = build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+    counter = count()
+
+    @app.route("/users", methods=["POST"])
+    def create_user() -> Any:
+        return jsonify({"messages": [f"field{next(counter)} - must not be blank"]}), 400
+
     return OpenAPIApp(spec=spec, server=app, kind="flask")

@@ -40,6 +40,7 @@ from schemathesis.cli.options import (
     MAX_FAILURES,
     MAX_REDIRECTS,
     MAX_RESPONSE_TIME,
+    MAX_TIME,
     NO_COLOR,
     OUTPUT_SANITIZE,
     OUTPUT_TRUNCATE,
@@ -85,6 +86,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 @group("Options")
 @grouped_option(*BASE_URL.args, **BASE_URL.kwargs)
 @grouped_option(*WORKERS.args, **WORKERS.kwargs)
+@grouped_option(*MAX_TIME.args, **MAX_TIME.kwargs)
 @grouped_option(
     "--phases",
     help="A comma-separated list of test phases to run",
@@ -172,6 +174,7 @@ def run(
     max_response_time: float | None = None,
     phases: list[str] = DEFAULT_PHASES,
     max_failures: int | None = None,
+    max_time: int | None = None,
     continue_on_failure: bool | None = None,
     include_path: tuple[str, ...],
     include_path_regex: str | None,
@@ -265,6 +268,7 @@ def run(
         seed=generation_seed,
         wait_for_schema=wait_for_schema,
         max_failures=max_failures,
+        max_time=max_time,
     )
     config.output.sanitization.update(enabled=output_sanitize)
     config.output.truncation.update(enabled=output_truncate)

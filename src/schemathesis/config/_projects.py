@@ -518,6 +518,15 @@ class ProjectConfig(DiffBase):
         parent.max_failures = value
 
     @property
+    def max_time(self) -> int | None:
+        return self._get_parent().max_time
+
+    @max_time.setter
+    def max_time(self, value: int | None) -> None:
+        parent = self._get_parent()
+        parent.max_time = value
+
+    @property
     def reports(self) -> ReportsConfig:
         return self._get_parent().reports
 

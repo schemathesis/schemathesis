@@ -1,7 +1,7 @@
 import pytest
 
 import schemathesis
-from schemathesis.engine import events
+from schemathesis.engine import StopReason, events
 from schemathesis.engine.run import PhaseName
 from test.utils import EventStream
 
@@ -199,3 +199,20 @@ def test_after_response_observes_stateful_phase(ctx, restore_checks):
     ).execute()
 
     assert PhaseName.STATEFUL_TESTING in seen_phases, seen_phases
+
+
+def test_after_run_runs_when_the_clock_ends_the_run(ctx, restore_checks):
+    # Spending the whole budget is how a timed run is meant to end, not an abort that voids the checks.
+    called = []
+
+    @schemathesis.check
+    class Tracked:
+        def after_run(self, ctx):
+            called.append(True)
+
+    api = ctx.openapi.apps.path_variable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = EventStream(schema, checks=[Tracked], phases=[PhaseName.FUZZING], max_examples=2000, max_time=1).execute()
+
+    assert stream.finished.stop_reason == StopReason.MAX_TIME
+    assert called
