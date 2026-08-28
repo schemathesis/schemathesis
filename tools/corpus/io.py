@@ -247,7 +247,7 @@ def _open_indexed_corpus(
     path = data_dir / f"{corpus_name}.tar.gz"
     with gzip.open(path, "rb") as fd:
         raw = io.BytesIO(fd.read())
-    archive = tarfile.open(fileobj=raw, mode="r:")
+    archive = tarfile.open(fileobj=raw, mode="r:")  # noqa: SIM115
     index = {member.name: member for member in archive}
     _INDEXED_ARCHIVES[corpus_name] = (archive, index)
     return archive, index

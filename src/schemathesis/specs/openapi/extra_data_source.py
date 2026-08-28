@@ -635,9 +635,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         """Check if responses should be recorded for this operation."""
         if self.repository.descriptors_for_operation(operation):
             return True
-        if self.semantic_index is not None and operation in self.semantic_eligible_operations:
-            return True
-        return False
+        return self.semantic_index is not None and operation in self.semantic_eligible_operations
 
     def should_record_request(self, *, operation: str) -> bool:
         """Check if request inputs should be captured for this operation."""

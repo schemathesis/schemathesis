@@ -168,10 +168,7 @@ def _walk(
 
 
 def _has_recognized_message(body: object, *, default_location: ParameterLocation) -> bool:
-    for _, _, message in _walk(body, path=(), location=default_location, at_root=True):
-        if _classify(message):
-            return True
-    return False
+    return any(_classify(message) for _, _, message in _walk(body, path=(), location=default_location, at_root=True))
 
 
 @PARSERS.register

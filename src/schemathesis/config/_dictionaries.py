@@ -153,10 +153,7 @@ def _decode_libfuzzer_entry(text: str, *, name: str, line_no: int, path: str) ->
 def _is_valid_libfuzzer_name(value: str) -> bool:
     if not value:
         return False
-    for ch in value:
-        if not (ch.isalnum() or ch in "_-."):
-            return False
-    return True
+    return all(ch.isalnum() or ch in "_-." for ch in value)
 
 
 _SIMPLE_ESCAPES = {"\\": "\\", '"': '"', "n": "\n", "r": "\r", "t": "\t"}

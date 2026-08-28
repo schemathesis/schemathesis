@@ -335,9 +335,8 @@ def _is_known_body_conformance_failure(schema_id: str, label: str, check) -> boo
 
 
 def assert_event(schema_id: str, event: events.EngineEvent) -> None:
-    if isinstance(event, events.NonFatalError):
-        if not should_ignore_error(schema_id, event):
-            raise AssertionError(f"{event.label}: {event.info.format()}")
+    if isinstance(event, events.NonFatalError) and not should_ignore_error(schema_id, event):
+        raise AssertionError(f"{event.label}: {event.info.format()}")
     if isinstance(event, events.ScenarioFinished):
         all_failures = [
             check for checks in event.recorder.checks.values() for check in checks if check.status == Status.FAILURE
@@ -416,9 +415,7 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "cannot be resolved" in formatted:
         return True
-    if (schema_id, event.label) in KNOWN_ISSUES:
-        return True
-    return False
+    return (schema_id, event.label) in KNOWN_ISSUES
 
 
 GRAPHQL_FILENAMES = [member.name for member in GRAPHQL_CORPUS.getmembers()]

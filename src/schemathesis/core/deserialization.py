@@ -297,11 +297,10 @@ def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[ServerSen
             elif field == "retry":
                 if SSE_RETRY_RE.fullmatch(value):
                     current_event[field] = int(value)
-            elif field == "id":
+            elif field == "id" and "\x00" not in value:
                 # Per WHATWG SSE spec: ignore id fields containing null characters
-                if "\x00" not in value:
-                    current_event[field] = value
-                    last_event_id = value
+                current_event[field] = value
+                last_event_id = value
 
     flushed = _flush_sse_event(current_event, current_data_lines, last_event_id=last_event_id)
     if flushed is not None:

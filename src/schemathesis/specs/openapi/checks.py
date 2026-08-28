@@ -567,10 +567,7 @@ def _has_unverifiable_mutations(case: Case) -> bool:
         return False
 
     phase_data = meta.phase.data
-    if isinstance(phase_data, FuzzingPhaseData) and phase_data.description is None:
-        return True
-
-    return False
+    return isinstance(phase_data, FuzzingPhaseData) and phase_data.description is None
 
 
 def _non_body_negative_values_match_schema(case: Case) -> bool:

@@ -695,10 +695,7 @@ class ParameterSet(Generic[P]):
         return None
 
     def __contains__(self, name: str) -> bool:
-        for parameter in self.items:
-            if parameter.name == name:
-                return True
-        return False
+        return any(parameter.name == name for parameter in self.items)
 
     def __iter__(self) -> Generator[P, None, None]:
         yield from iter(self.items)

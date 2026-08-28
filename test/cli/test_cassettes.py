@@ -91,13 +91,14 @@ def test_store_cassette(ctx, cli, cassette_path, hypothesis_max_examples, args, 
             assert first_interaction["generation"]["mode"] == mode
         assert first_interaction["phase"]["name"] in ("explicit", "coverage", "generate")
     for interaction in interactions:
-        if interaction["phase"]["name"] == "coverage":
-            if interaction["generation"]["mode"] == "negative" and not interaction["phase"]["data"][
-                "description"
-            ].startswith("Unspecified"):
-                assert interaction["phase"]["data"]["location"] is not None
-                assert interaction["phase"]["data"]["parameter"] is not None
-                assert interaction["phase"]["data"]["parameter_location"] is not None
+        if (
+            interaction["phase"]["name"] == "coverage"
+            and interaction["generation"]["mode"] == "negative"
+            and not interaction["phase"]["data"]["description"].startswith("Unspecified")
+        ):
+            assert interaction["phase"]["data"]["location"] is not None
+            assert interaction["phase"]["data"]["parameter"] is not None
+            assert interaction["phase"]["data"]["parameter_location"] is not None
 
 
 @pytest.mark.parametrize("format", ["vcr", "har", "ndjson"])

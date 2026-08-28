@@ -890,7 +890,7 @@ def test_record_successful_delete_uses_only_resource_linked_params(ctx):
 
     # The key should only contain the resource-linked parameter (itemId), not version
     assert len(data_source.usage_tracker._delete_attempts) == 1
-    for key in data_source.usage_tracker._delete_attempts.keys():
+    for key in data_source.usage_tracker._delete_attempts:
         assert "itemId" in key
         assert "version" not in key
         assert "v1" not in key

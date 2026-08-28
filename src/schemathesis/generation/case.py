@@ -240,7 +240,7 @@ class Case(Generic[OperationT]):
         """Initialize hash tracking in metadata for generated components only."""
         assert self._meta is not None
         # Only track components that were actually generated
-        for location in self._meta.components.keys():
+        for location in self._meta.components:
             value = self.get_container(location)
             hash_value = self._hash_container(value)
             self._meta.update_validated_hash(location, hash_value)
@@ -258,7 +258,7 @@ class Case(Generic[OperationT]):
             return
 
         # Only check components that were actually generated
-        for location in self._meta.components.keys():
+        for location in self._meta.components:
             last_hash = self._meta._last_validated_hashes[location]
             value = self.get_container(location)
             current_hash = self._hash_container(value)

@@ -7,7 +7,7 @@ Produces positive and negative coverage values for individual schema constructs
 from __future__ import annotations
 
 import re
-from contextlib import ExitStack, contextmanager, nullcontext, suppress
+from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
@@ -1449,11 +1449,14 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
 
 def _branch_as_judged(ctx: CoverageContext, branch: JsonSchema) -> JsonSchema:
     """The form of a branch its judges load: as written when a draft may ignore keywords beside `$ref`."""
-    if isinstance(branch, dict) and "$ref" in branch:
+    if (
+        isinstance(branch, dict)
+        and "$ref" in branch
+        and any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch)
+    ):
         # The discriminator pin models server behavior and counts under every draft; any other keyword
         # beside `$ref` counts only under drafts that read it, so each judge gets the branch as written.
-        if any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch):
-            return branch
+        return branch
     return _resolve_sub_schema(ctx, branch)
 
 
@@ -1652,10 +1655,12 @@ def _matches_another_branch(value: Any, index: int, branches: list[list[jsonsche
 
 
 def _drawn_positive(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
-    with suppress(Unsatisfiable):
+    try:
         yield PositiveValue(
             ctx.generate_from_schema(schema), scenario=CoverageScenario.DEFAULT_POSITIVE_TEST, description="Valid value"
         )
+    except Unsatisfiable:
+        pass
 
 
 def _fold_pattern_properties_into_declared(schema: JsonSchemaObject) -> JsonSchemaObject:
@@ -1846,10 +1851,9 @@ def _negative_format_for_declared_types(
 ) -> Generator[GeneratedValue, None, None]:
     declared = schema.get("type", [])
     types = declared if isinstance(declared, list) else [declared]
-    if "string" in types or not types:
+    if ("string" in types or not types) and value not in ("binary", "byte"):
         # Binary formats accept any bytes - no meaningful format violations
-        if value not in ("binary", "byte"):
-            yield from _negative_format(ctx, schema, value)
+        yield from _negative_format(ctx, schema, value)
 
 
 def _negative_maximum(
@@ -1929,7 +1933,7 @@ def _negative_min_length(
                 location=ctx.current_path,
             )
     else:
-        with suppress(InvalidArgument):
+        try:
             min_length = max_length = value - 1
             new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
             new_schema.pop("enum", None)
@@ -1957,6 +1961,8 @@ def _negative_min_length(
                     description="String smaller than minLength",
                     location=ctx.current_path,
                 )
+        except InvalidArgument:
+            pass
 
 
 def _negative_max_length(
@@ -2046,8 +2052,10 @@ def _negative_max_items(
             # maxItems violation still ships, even if it also violates uniqueItems.
             if new_schema.get("uniqueItems"):
                 relaxed = {k: v for k, v in new_schema.items() if k != "uniqueItems"}
-                with suppress(InvalidArgument, Unsatisfiable):
+                try:
                     oversized = ctx.generate_from_schema(relaxed)
+                except (InvalidArgument, Unsatisfiable):
+                    pass
         if oversized is not None and ctx.wire.representable(oversized) and seen.insert(oversized):
             yield NegativeValue(
                 oversized,
@@ -2591,9 +2599,7 @@ def _implies_object_type(schema: JsonSchemaObject) -> bool:
     if any(key in schema for key in _OBJECT_ONLY_KEYWORDS):
         return True
     additional = schema.get("additionalProperties")
-    if isinstance(additional, dict):
-        return True
-    return False
+    return bool(isinstance(additional, dict))
 
 
 def _implies_array_type(schema: JsonSchemaObject) -> bool:
@@ -2654,7 +2660,7 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
             }
             # When the fast path fires, required is used to decide what's truly required;
             # keep it at the schema's original required to avoid aborting on optional
-            # properties with unsatisfiable schemas.  Otherwise inflate to all_properties
+            # properties with unsatisfiable schemas. Otherwise inflate to all_properties
             # so every defined property appears in the generated template.
             # Ignore non-structural keys (annotations like `title`, OpenAPI `nullable`,
             # `readOnly`, `x-*` extensions); only JSON Schema keywords gate the choice.
@@ -2744,12 +2750,11 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         ):
             has_valid_example = True
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-        if not has_valid_example:
-            if not min_length and not max_length or "pattern" in schema:
-                value = ctx.generate_from_schema(schema)
-                seen_values.insert(value)
-                seen_constraints.add((min_length, max_length))
-                yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
+        if not has_valid_example and (not min_length and not max_length or "pattern" in schema):
+            value = ctx.generate_from_schema(schema)
+            seen_values.insert(value)
+            seen_constraints.add((min_length, max_length))
+            yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
     elif not min_length and not max_length or "pattern" in schema:
         value = ctx.generate_from_schema(schema)
         seen_values.insert(value)
@@ -3802,9 +3807,7 @@ def is_valid_header_value(value: object) -> bool:
     value = str(value)
     if not is_latin_1_encodable(value):
         return False
-    if has_invalid_characters("A", value):
-        return False
-    return True
+    return not has_invalid_characters("A", value)
 
 
 # Far above any text a wrong-type value turns into, so a limit this large rules nothing out.
@@ -3930,9 +3933,8 @@ def _negative_type(
         restrict("number", _is_non_integer_float)
     # For path/query parameters, numeric strings like "9" serialize identically to integer 9 in the URL,
     # making them indistinguishable and causing false positive failures
-    if ctx.wire.url_part() and ("integer" in types or "number" in types):
-        if "string" in strategies:
-            restrict("string", _is_not_numeric_string)
+    if ctx.wire.url_part() and ("integer" in types or "number" in types) and "string" in strategies:
+        restrict("string", _is_not_numeric_string)
     # For path/query parameters, 0/1/true/false serialize to wire values lenient parsers
     # accept as booleans, making them indistinguishable from a valid boolean.
     if ctx.wire.url_part() and "boolean" in types:

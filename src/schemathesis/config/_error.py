@@ -226,7 +226,7 @@ def _format_oneof_error(error: ValidationError) -> str:
                     elif one_of_error.kind.name == "additionalProperties":
                         # Find the invalid property
                         valid = {"api_key", "username", "password", "bearer"}
-                        invalid = [k for k in error.instance.keys() if k not in valid]
+                        invalid = [k for k in error.instance if k not in valid]
                         if invalid:
                             return (
                                 f"Error in {section} section:\n  Invalid property:\n\n"

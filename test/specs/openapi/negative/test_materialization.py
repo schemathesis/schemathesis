@@ -75,7 +75,7 @@ def test_materialize_skips_descriptors_when_replay_schema_diverges(materialize_t
     target_walks = [tuple((step.keyword, step.selector) for step in s.path) for s in targets]
     # Root and `properties.outer` survive; the deeper `properties.leaf` is dropped.
     assert ("properties", "outer") in [w[-1] for w in target_walks if w]
-    assert all(("properties", "leaf") != w[-1] for w in target_walks if w)
+    assert all(w[-1] != ("properties", "leaf") for w in target_walks if w)
 
 
 def test_materialize_ref_with_siblings_keeps_wrapper_not_target(materialize_targets):

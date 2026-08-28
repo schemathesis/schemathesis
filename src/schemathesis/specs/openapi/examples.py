@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import cycle, islice
@@ -66,11 +65,10 @@ def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     mergeable_keys = {"path_parameters", "headers", "cookies", "query", "body"}
 
     for key, value in right.items():
-        if key in mergeable_keys and key in left:
-            if isinstance(left[key], dict) and isinstance(value, dict):
-                # kwargs takes precedence
-                left[key] = {**left[key], **value}
-                continue
+        if key in mergeable_keys and key in left and isinstance(left[key], dict) and isinstance(value, dict):
+            # kwargs takes precedence
+            left[key] = {**left[key], **value}
+            continue
         left[key] = value
 
     return left
@@ -503,9 +501,11 @@ def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Ge
     if "value" in example:
         yield example["value"]
     elif "externalValue" in example:
-        with suppress(requests.RequestException):
+        try:
             # Report a warning if not available?
             yield load_external_example(example["externalValue"])
+        except requests.RequestException:
+            pass
     elif example:
         yield example
 

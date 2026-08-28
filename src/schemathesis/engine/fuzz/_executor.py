@@ -233,9 +233,8 @@ def _run_forever(
         while True:
             try:
                 event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
-                if isinstance(event, events.FuzzScenarioFinished):
-                    if event.status in (Status.FAILURE, Status.ERROR):
-                        ctx.control.count_failure()
+                if isinstance(event, events.FuzzScenarioFinished) and event.status in (Status.FAILURE, Status.ERROR):
+                    ctx.control.count_failure()
                 yield event
             except queue.Empty:
                 if not any(t.is_alive() for t in threads):

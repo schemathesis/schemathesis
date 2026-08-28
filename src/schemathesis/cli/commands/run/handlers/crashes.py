@@ -50,9 +50,12 @@ class CrashHandler(EventHandler):
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
             self._start_worker(_project_title(event.schema, event.config))
-        elif isinstance(event, (events.ScenarioFinished, events.FuzzScenarioFinished)):
-            if event.status in (Status.FAILURE, Status.ERROR, Status.SUCCESS):
-                self.queue.put(_Process(recorder=event.recorder, success=event.status == Status.SUCCESS))
+        elif isinstance(event, (events.ScenarioFinished, events.FuzzScenarioFinished)) and event.status in (
+            Status.FAILURE,
+            Status.ERROR,
+            Status.SUCCESS,
+        ):
+            self.queue.put(_Process(recorder=event.recorder, success=event.status == Status.SUCCESS))
 
     def _start_worker(self, project_title: str | None) -> None:
         assert self.worker is None

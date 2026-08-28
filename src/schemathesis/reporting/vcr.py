@@ -34,7 +34,7 @@ class VcrWriter:
     def open(self, seed: int | None = None, *, command: str) -> None:
         """Open the output file and write the VCR header."""
         if isinstance(self._output, Path):
-            self._owned_file = open(self._output, "w", encoding="utf-8")
+            self._owned_file = open(self._output, "w", encoding="utf-8")  # noqa: SIM115
             self._stream = self._owned_file
         else:
             self._stream = self._output

@@ -106,11 +106,10 @@ def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:
     for arg in args:
         if arg.startswith(CORPUS_SCHEME):
             schema_dict = _load_corpus_dict(arg)
-            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-            json.dump(schema_dict, tmp)
-            tmp.flush()
-            tmp.close()
-            updated.append(tmp.name)
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+                json.dump(schema_dict, tmp)
+                tmp.flush()
+                updated.append(tmp.name)
             updated.append(f"--url={_MOCK_BASE_URL}")
             tmp_paths.append(tmp.name)
         else:

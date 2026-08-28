@@ -34,7 +34,7 @@ def extract_token_from_header(headers: Mapping[str, str], name: str) -> str:
     for header_name, header_value in headers.items():
         if header_name.lower() == name_lower:
             return header_value
-    available = ", ".join(f"'{h}'" for h in headers.keys())
+    available = ", ".join(f"'{h}'" for h in headers)
     raise WFCTokenExtractionError(f"Header '{name}' not found in response. Available headers: {available or 'none'}")
 
 

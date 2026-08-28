@@ -104,9 +104,13 @@ def iter_operation_summaries(
             if handle is None or handle not in handles:
                 # Fallback: cleanup ops typically return Boolean, so the entity
                 # name has to come from the field name itself (`deleteBook` -> `Book`).
-                if cleanup_entity is not None and scalar_name == "ID" and argument_name in ("id", "ids"):
-                    if Handle(cleanup_entity, "id") in handles:
-                        consumed[argument_name] = Handle(cleanup_entity, "id")
+                if (
+                    cleanup_entity is not None
+                    and scalar_name == "ID"
+                    and argument_name in ("id", "ids")
+                    and Handle(cleanup_entity, "id") in handles
+                ):
+                    consumed[argument_name] = Handle(cleanup_entity, "id")
                 continue
             consumed[argument_name] = handle
 

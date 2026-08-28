@@ -355,9 +355,10 @@ def build_feedback_sources(ctx: EngineContext, *, operation: APIOperation, phase
     extra_data_source = None
     # Extra data sources augment generation only when enabled for this phase.
     phase_config = ctx.config.phases_for(operation=operation).get_by_name(name=phase.value)
-    if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)):
-        if phase_config.extra_data_sources.is_enabled and ctx.extra_data_source is not None:
-            extra_data_source = ctx.extra_data_source
+    if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)) and (
+        phase_config.extra_data_sources.is_enabled and ctx.extra_data_source is not None
+    ):
+        extra_data_source = ctx.extra_data_source
     constants_value_source = None
     # Inject constants value source only when the pool is non-empty.
     if not ctx.constants_extraction.is_empty():

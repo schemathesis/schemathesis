@@ -62,9 +62,7 @@ def _is_local_module(module_name: str, path: str) -> bool:
     for root in _THIRD_PARTY_ROOTS:
         if normalized.startswith(root + os.sep):
             return False
-    if _STDLIB_PATH and normalized.startswith(_STDLIB_PATH + os.sep):
-        return False
-    return True
+    return not (_STDLIB_PATH and normalized.startswith(_STDLIB_PATH + os.sep))
 
 
 def local_imports_of(module_name: str) -> set[str]:

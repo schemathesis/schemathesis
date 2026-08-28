@@ -68,9 +68,13 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         media_type = case.media_type
 
         # Set content type header if needed
-        if media_type and media_type != "multipart/form-data" and not isinstance(case.body, NotSet):
-            if "content-type" not in final_headers:
-                final_headers["Content-Type"] = media_type
+        if (
+            media_type
+            and media_type != "multipart/form-data"
+            and not isinstance(case.body, NotSet)
+            and "content-type" not in final_headers
+        ):
+            final_headers["Content-Type"] = media_type
 
         url = prepare_url(case, base_url)
 
