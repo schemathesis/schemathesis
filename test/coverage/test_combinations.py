@@ -1261,6 +1261,23 @@ def test_negative_pattern(nctx, schema, expected):
     assert_unique(covered)
 
 
+# Nothing satisfies `{"not": {}}`, so the values covering it are described by what they are not, not by their type.
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"not": {}}, "Value is not allowed"),
+        (
+            {"type": "object", "properties": {"a": {"not": {}}}},
+            "a: Value is not allowed",
+        ),
+    ],
+    ids=["root", "property"],
+)
+def test_negative_forbidden_schema_description(nctx, schema, expected):
+    descriptions = {value.description for value in cover_schema_iter(nctx, schema)}
+    assert expected in descriptions, descriptions
+
+
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
