@@ -4151,6 +4151,28 @@ def test_positive_array_items_covering_respects_prefix_items(ctx_factory, schema
         assert validator.is_valid(value), value
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "array", "items": {"type": "null"}, "prefixItems": [{"type": "boolean"}]},
+        {"type": "array", "items": {"type": "integer"}, "prefixItems": [{"type": "string"}], "minItems": 3},
+    ],
+    ids=["single-prefix", "padded"],
+)
+def test_negative_array_items_covering_respects_prefix_items(ctx_factory, schema):
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = cover_schema(ctx, schema)
+    assert any(isinstance(value, list) and value for value in values), values
+    for value in values:
+        assert not validator.is_valid(value), value
+
+
 def test_negative_prefix_items_covered_for_raw_keyword(ctx_factory):
     schema = {"type": "array", "prefixItems": [{"type": "integer"}], "minItems": 1}
     ctx = ctx_factory(
