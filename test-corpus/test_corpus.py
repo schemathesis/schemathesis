@@ -1,4 +1,3 @@
-import contextlib
 import pathlib
 import sys
 from io import StringIO
@@ -178,8 +177,10 @@ def _run_registered_checks(ctx, response, case):
     for check in CHECKS.get_all():
         if check in (combined_check, combined_check_coverage):
             continue
-        with contextlib.suppress(Failure, FailureGroup):
+        try:
             check(ctx, response, case)
+        except (Failure, FailureGroup):
+            pass
 
 
 def _check_body_conformance_violation(case):
@@ -265,7 +266,9 @@ def test_stateful(corpus, filename):
     schema = _load_schema(corpus, filename)
 
     # Test state machine creation and execution
-    with contextlib.suppress(
+    try:
+        schema.as_state_machine()()
+    except (
         RefResolutionError,
         IncorrectUsage,
         LoaderError,
@@ -275,7 +278,7 @@ def test_stateful(corpus, filename):
         MalformedMediaType,
         OperationNotFound,
     ):
-        schema.as_state_machine()()
+        pass
 
     # Test dependency graph analysis and link iteration
     graph = dependencies.analyze(schema)

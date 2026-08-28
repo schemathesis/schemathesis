@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import cycle, islice
@@ -502,9 +501,11 @@ def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Ge
     if "value" in example:
         yield example["value"]
     elif "externalValue" in example:
-        with suppress(requests.RequestException):
+        try:
             # Report a warning if not available?
             yield load_external_example(example["externalValue"])
+        except requests.RequestException:
+            pass
     elif example:
         yield example
 

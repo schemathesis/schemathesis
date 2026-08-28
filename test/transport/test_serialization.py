@@ -4,7 +4,6 @@ import json
 import platform
 import re
 import string
-from contextlib import suppress
 from io import StringIO
 from xml.etree import ElementTree
 
@@ -1143,10 +1142,12 @@ def test_serialize_xml_hypothesis(ctx, data, schema_object, media_type):
 
     # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
     # it can be parsed.
-    with suppress(SerializationError):
+    try:
         for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
             serialized_data = transport.serialize_case(case)["data"].decode("utf8")
             ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")
+    except SerializationError:
+        pass
 
 
 def test_xml_with_binary(ctx):

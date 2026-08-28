@@ -7,7 +7,7 @@ Produces positive and negative coverage values for individual schema constructs
 from __future__ import annotations
 
 import re
-from contextlib import ExitStack, contextmanager, nullcontext, suppress
+from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass
 from decimal import Decimal
 from fractions import Fraction
@@ -1655,10 +1655,12 @@ def _matches_another_branch(value: Any, index: int, branches: list[list[jsonsche
 
 
 def _drawn_positive(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
-    with suppress(Unsatisfiable):
+    try:
         yield PositiveValue(
             ctx.generate_from_schema(schema), scenario=CoverageScenario.DEFAULT_POSITIVE_TEST, description="Valid value"
         )
+    except Unsatisfiable:
+        pass
 
 
 def _fold_pattern_properties_into_declared(schema: JsonSchemaObject) -> JsonSchemaObject:
@@ -1931,7 +1933,7 @@ def _negative_min_length(
                 location=ctx.current_path,
             )
     else:
-        with suppress(InvalidArgument):
+        try:
             min_length = max_length = value - 1
             new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
             new_schema.pop("enum", None)
@@ -1959,6 +1961,8 @@ def _negative_min_length(
                     description="String smaller than minLength",
                     location=ctx.current_path,
                 )
+        except InvalidArgument:
+            pass
 
 
 def _negative_max_length(
@@ -2048,8 +2052,10 @@ def _negative_max_items(
             # maxItems violation still ships, even if it also violates uniqueItems.
             if new_schema.get("uniqueItems"):
                 relaxed = {k: v for k, v in new_schema.items() if k != "uniqueItems"}
-                with suppress(InvalidArgument, Unsatisfiable):
+                try:
                     oversized = ctx.generate_from_schema(relaxed)
+                except (InvalidArgument, Unsatisfiable):
+                    pass
         if oversized is not None and ctx.wire.representable(oversized) and seen.insert(oversized):
             yield NegativeValue(
                 oversized,

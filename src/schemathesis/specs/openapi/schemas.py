@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator, Iterator, Mapping
-from contextlib import suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import cached_property
@@ -435,9 +434,10 @@ class OpenApiSchema(BaseSchema):
     @property
     @override
     def declared_base_url(self) -> str | None:
-        with suppress(InvalidSchema):
+        try:
             return self.adapter.get_base_url(self.raw_schema)
-        return None
+        except InvalidSchema:
+            return None
 
     def _get_paths(self) -> Mapping[str, Any] | None:
         paths = self.raw_schema.get("paths")
@@ -520,8 +520,10 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def validate(self) -> None:
-        with suppress(TypeError):
+        try:
             self._validate()
+        except TypeError:
+            pass
 
     def _validate(self) -> None:
         self.adapter.validate_schema(self.raw_schema)

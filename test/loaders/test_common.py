@@ -1,5 +1,4 @@
 import time
-from contextlib import suppress
 
 import pytest
 from flask import Flask, jsonify
@@ -60,8 +59,10 @@ def test_base_url_override(ctx, loader, make_url, base_url):
 def test_uri_loader_custom_kwargs(mocker, target, loader):
     # All custom kwargs are passed to `requests` as is
     mocked = mocker.patch(target)
-    with suppress(Exception):
+    try:
         loader("http://127.0.0.1:8000", verify=False, headers={"X-Test": "foo"})
+    except Exception:
+        pass
     assert mocked.call_args[1]["verify"] is False
     assert mocked.call_args[1]["headers"] == {"X-Test": "foo", "User-Agent": USER_AGENT}
 
