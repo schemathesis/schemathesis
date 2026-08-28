@@ -36,6 +36,28 @@ if TYPE_CHECKING:
     from schemathesis.resources import ExtraDataSource
 
 
+class _SliceBudget:
+    """Splits the time left in the run evenly over the operations still to be dispatched."""
+
+    __slots__ = ("_remaining_operations", "_lock")
+
+    def __init__(self, total_operations: int) -> None:
+        self._remaining_operations = total_operations
+        self._lock = threading.Lock()
+
+    def take(self, deadline: float) -> float:
+        """Claim one operation's share; unused time from earlier operations flows to later ones.
+
+        Shares are sized as if operations ran one after another. With several workers the phase can
+        therefore finish before the deadline, which wastes budget but never starves an operation.
+        """
+        with self._lock:
+            remaining_operations = max(self._remaining_operations, 1)
+            self._remaining_operations -= 1
+        now = time.monotonic()
+        return now + max(deadline - now, 0.0) / remaining_operations
+
+
 @dataclass
 class EngineContext:
     """Holds context shared for a test run."""
@@ -56,6 +78,10 @@ class EngineContext:
         "start_time",
         "observations",
         "_thread_local",
+        "_slice_budget",
+        "_reserved_time",
+        "cycle_index",
+        "_stateful_suites",
         "_transport_kwargs_cache",
         "_extra_data_source",
         "_extra_data_source_lock",
@@ -95,6 +121,10 @@ class EngineContext:
         self.link_calibration = LinkCalibrationState() if schema.config.phases.stateful.link_calibration else None
         self.observations = observations
         self._thread_local = threading.local()
+        self._slice_budget: _SliceBudget | None = None
+        self._reserved_time = 0.0
+        self.cycle_index = 0
+        self._stateful_suites = 0
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
         self._extra_data_source = LazyInit.UNSET
         self._extra_data_source_lock = threading.Lock()
@@ -131,6 +161,10 @@ class EngineContext:
     @property
     def is_interrupted(self) -> bool:
         return self.control.is_interrupted
+
+    @property
+    def has_reached_time_limit(self) -> bool:
+        return self.control.has_reached_time_limit
 
     @property
     def has_reached_the_failure_limit(self) -> bool:
@@ -196,6 +230,41 @@ class EngineContext:
         session = make_session(self.config, operation=operation)
         self._thread_local.session = session
         return session
+
+    @property
+    def cycle_seed(self) -> int | None:
+        """Run seed shifted by the cycle, so a repeat covers ground the last one did not."""
+        seed = self.config.seed
+        return None if seed is None else seed + self.cycle_index
+
+    def next_stateful_seed(self) -> int | None:
+        """Seed for the next stateful suite; every suite in the run gets its own, cycles included."""
+        seed = self.config.seed
+        offset = self._stateful_suites
+        self._stateful_suites += 1
+        return None if seed is None else seed + offset
+
+    def reserve_time(self, seconds: float) -> None:
+        """Hold back part of the budget so a later phase is not starved by the ones before it."""
+        self._reserved_time = seconds
+
+    def start_unit_phase(self, total_operations: int) -> None:
+        """Reset the per-operation time share at the start of a unit phase."""
+        self._slice_budget = _SliceBudget(total_operations)
+
+    def take_operation_slice(self) -> None:
+        """Claim this worker's share of the remaining time for the operation it just picked up."""
+        deadline = self.control.deadline
+        budget = self._slice_budget
+        if deadline is None or budget is None:
+            self._thread_local.slice_deadline = None
+            return
+        self._thread_local.slice_deadline = budget.take(deadline - self._reserved_time)
+
+    @property
+    def is_operation_slice_expired(self) -> bool:
+        deadline = getattr(self._thread_local, "slice_deadline", None)
+        return deadline is not None and time.monotonic() >= deadline
 
     def get_transport_kwargs(self, operation: APIOperation | None = None) -> dict[str, Any]:
         key = operation.label if operation is not None else None

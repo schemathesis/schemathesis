@@ -325,8 +325,10 @@ def fuzz(
         codec=generation_codec,
     )
 
-    project_fuzz = config.projects.get_default().fuzz
-    fuzz_config = FuzzConfig(max_time=max_time if max_time is not None else project_fuzz.max_time)
+    project = config.projects.get_default()
+    # `[fuzz] max-time` narrows the budget for this command; the root key applies to both commands.
+    configured = project.fuzz.max_time if project.fuzz.max_time is not None else project.max_time
+    fuzz_config = FuzzConfig(max_time=max_time if max_time is not None else configured)
 
     executor.execute(
         location=location,

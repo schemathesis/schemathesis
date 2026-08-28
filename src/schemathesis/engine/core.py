@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from schemathesis import auths
@@ -13,7 +13,7 @@ from schemathesis.engine._check_context import run_after_run_checks
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.events import EventGenerator, StatefulPhasePayload
 from schemathesis.engine.observations import Observations
-from schemathesis.engine.run import Phase, PhaseName, PhaseSkipReason
+from schemathesis.engine.run import ELASTIC_PHASES, Phase, PhaseName, PhaseSkipReason
 
 if TYPE_CHECKING:
     from schemathesis.core.spec import ApiSchema
@@ -40,7 +40,12 @@ class Engine:
             ):
                 observations = Observations()
 
-        ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), observations=observations)
+        ctx = EngineContext(
+            schema=self.schema,
+            stop_event=threading.Event(),
+            observations=observations,
+            max_time=self.schema.config.max_time,
+        )
         return EventStream(plan.execute(ctx), ctx.control.stop_event)
 
     def fuzz(self, config: FuzzConfig | None = None) -> EventStream:
@@ -121,11 +126,19 @@ class Engine:
         )
 
 
+# An API whose rejections keep naming something new never stops teaching; without a cap it would
+# keep coverage regenerating until the budget is gone and leave the other phases nothing.
+MAX_COVERAGE_CATCHUP_PASSES = 3
+
+
 @dataclass(slots=True)
 class ExecutionPlan:
     """Manages test execution phases."""
 
     phases: list[Phase]
+    catchup_passes: int = 0
+    # Elastic phases still worth a turn; a phase that proved idle is dropped and stops being reserved for.
+    elastic: list[Phase] = field(default_factory=list)
 
     def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
@@ -142,25 +155,47 @@ class ExecutionPlan:
                 yield from self._finish(engine)
                 return
 
-            # Run main phases
-            for phase in self.phases:
-                try:
-                    payload = self._adapt_execution(engine, phase)
-                except HookExecutionError as exc:
-                    yield events.NonFatalError(
-                        error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
-                    )
-                    yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
-                    continue
-                yield events.PhaseStarted(phase=phase, payload=payload)
-                if phase.should_execute(engine):
-                    yield from run.execute(engine, phase)
-                else:
-                    if engine.has_reached_the_failure_limit:
-                        phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
-                    yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
+            self._settle_stateful(engine)
+
+            taught: dict[str, int] = {}
+            bounded = [phase for phase in self.phases if phase.name not in ELASTIC_PHASES]
+            self.elastic = [phase for phase in self.phases if phase.name in ELASTIC_PHASES]
+
+            for phase in bounded:
+                is_coverage = phase.name == PhaseName.COVERAGE
+                if is_coverage:
+                    # Feedback recorded before the pass is already folded into what it generates.
+                    taught.update(self._feedback_counts(engine))
+                yield from self._run_phase(engine, phase)
                 if engine.is_interrupted:
                     break  # type: ignore[unreachable]
+                if is_coverage:
+                    yield from self._coverage_catchup(engine, taught)
+
+            # Examples and coverage enumerate the schema once; repeating them re-sends the same cases.
+            # Fuzzing and stateful keep drawing new ones, so only they are worth another turn.
+            cycle = 0
+            while not engine.is_interrupted:
+                engine.cycle_index = cycle
+                executed = 0
+                idle = []
+                for phase in self.elastic:
+                    if engine.is_interrupted:
+                        break  # type: ignore[unreachable]
+                    for event in self._run_phase(engine, phase):
+                        if isinstance(event, events.ScenarioFinished):
+                            executed += 1
+                        elif isinstance(event, events.PhaseFinished) and event.status == Status.SKIP:
+                            idle.append(phase)
+                        yield event
+                    if not engine.is_interrupted:
+                        yield from self._coverage_catchup(engine, taught)
+                # A phase that skipped has nothing to run; holding budget back for it starves the rest.
+                self.elastic = [phase for phase in self.elastic if phase not in idle]
+                # A cycle that ran nothing will run nothing next time either.
+                if engine.has_to_stop or engine.control.max_time is None or not executed:
+                    break
+                cycle += 1
 
         except KeyboardInterrupt:
             engine.stop()
@@ -168,6 +203,83 @@ class ExecutionPlan:
 
         # Always finish
         yield from self._finish(engine)
+
+    def _coverage_catchup(self, engine: EngineContext, taught: dict[str, int]) -> EventGenerator:
+        """Regenerate coverage for operations that have started explaining their rejections."""
+        if engine.control.max_time is None or engine.has_to_stop:
+            return
+        coverage = next((item for item in self.phases if item.name == PhaseName.COVERAGE), None)
+        if coverage is None or not coverage.is_enabled:
+            return
+        # Satisfying one constraint can reveal the next, so keep going while the pass keeps teaching.
+        while self.catchup_passes < MAX_COVERAGE_CATCHUP_PASSES and not engine.has_to_stop:
+            counts = self._feedback_counts(engine)
+            learned = {label for label, count in counts.items() if count > taught.get(label, 0)}
+            if not learned:
+                return
+            taught.update(counts)
+            self.catchup_passes += 1
+            yield from self._run_phase(engine, coverage, only=frozenset(learned))
+
+    def _feedback_counts(self, engine: EngineContext) -> dict[str, int]:
+        store = engine.error_feedback
+        return store.observation_counts() if store is not None else {}
+
+    def _run_phase(self, engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> EventGenerator:
+        try:
+            payload = self._adapt_execution(engine, phase)
+        except HookExecutionError as exc:
+            yield events.NonFatalError(
+                error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
+            )
+            yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
+            return
+        yield events.PhaseStarted(phase=phase, payload=payload)
+        engine.reserve_time(self._time_to_reserve_after(phase, engine))
+        if phase.should_execute(engine):
+            yield from run.execute(engine, phase, only=only)
+        else:
+            if engine.has_reached_the_failure_limit:
+                phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
+            yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
+
+    def _settle_stateful(self, engine: EngineContext) -> None:
+        """Decide whether stateful testing will run, before any phase spends budget.
+
+        Links may exist only through inference, which otherwise runs when the phase starts - too late
+        for the earlier phases to reserve time for it. Static injection needs no runtime data.
+        """
+        if engine.control.max_time is None:
+            return
+        stateful = next((item for item in self.phases if item.name == PhaseName.STATEFUL_TESTING), None)
+        if (
+            stateful is not None
+            and not stateful.is_enabled
+            and stateful.skip_reason == PhaseSkipReason.NOT_APPLICABLE
+            and engine.apply_stateful_inference().total > 0
+        ):
+            stateful.enable()
+
+    def _is_reservable(self, phase: Phase, engine: EngineContext) -> bool:
+        """Whether a share is still worth holding back for this phase."""
+        # Links may only surface in responses, so keep stateful's share until a pass proves it idle.
+        return phase.is_enabled or (
+            phase.name == PhaseName.STATEFUL_TESTING
+            and phase.skip_reason == PhaseSkipReason.NOT_APPLICABLE
+            and engine.observations is not None
+        )
+
+    def _time_to_reserve_after(self, phase: Phase, engine: EngineContext) -> float:
+        """Budget this pass must leave for the phases queued behind it in the same cycle."""
+        remaining = engine.control.remaining_time
+        if remaining is None:
+            return 0.0
+        elastic = [item for item in self.elastic if self._is_reservable(item, engine)]
+        if phase in elastic:
+            queued = len(elastic) - elastic.index(phase) - 1
+        else:
+            queued = len(elastic) if phase.name not in ELASTIC_PHASES else 0
+        return remaining * queued / (queued + 1)
 
     def _finish(self, ctx: EngineContext) -> EventGenerator:
         """Finish the test run."""
@@ -181,7 +293,9 @@ class ExecutionPlan:
             reauth_broke=ctx.reauth.broke,
         )
         # Skip after_run on a partial run (interrupt/abort); the fuzz path runs them on stop.
-        failures = run_after_run_checks(ctx) if ctx.stop_reason == StopReason.COMPLETED else []
+        # Spending the whole time budget is a planned finish, so it keeps them.
+        completed = ctx.stop_reason in (StopReason.COMPLETED, StopReason.MAX_TIME)
+        failures = run_after_run_checks(ctx) if completed else []
         yield events.EngineFinished(
             running_time=ctx.running_time,
             stop_reason=ctx.stop_reason,

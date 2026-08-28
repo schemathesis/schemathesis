@@ -36,6 +36,10 @@ class PhaseName(str, enum.Enum):
         return cls(value.lower())
 
 
+# Phases worth repeating: their yield scales with the time given to them.
+ELASTIC_PHASES = (PhaseName.FUZZING, PhaseName.STATEFUL_TESTING)
+
+
 class PhaseSkipReason(str, enum.Enum):
     """Reasons why a phase might not be executed."""
 
@@ -77,7 +81,7 @@ class Phase:
         self.skip_reason = None
 
 
-def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
+def execute(ctx: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
     from . import analysis, probes, stateful, unit
@@ -90,6 +94,6 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
         elif phase.name == PhaseName.SCHEMA_ANALYSIS:
             yield from analysis.execute(ctx, phase)
         elif phase.name == PhaseName.EXAMPLES or phase.name == PhaseName.COVERAGE or phase.name == PhaseName.FUZZING:
-            yield from unit.execute(ctx, phase)
+            yield from unit.execute(ctx, phase, only=only)
         elif phase.name == PhaseName.STATEFUL_TESTING:
             yield from stateful.execute(ctx, phase)

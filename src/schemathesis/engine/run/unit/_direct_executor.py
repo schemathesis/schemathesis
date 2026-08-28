@@ -13,7 +13,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.errors import TestingState, UnexpectedError, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.run.unit._case import record_extra_data_from_recorder, run_one_case
+from schemathesis.engine.run.unit._case import BudgetExpired, record_extra_data_from_recorder, run_one_case
 from schemathesis.engine.run.unit._errors import (
     iter_controller_error_events,
     translate_iteration_exception,
@@ -23,7 +23,18 @@ from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_outpu
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
+    from schemathesis.generation.case import Case
     from schemathesis.generation.drivers import CaseGenerator
+
+
+def _collect_within_budget(generator: CaseGenerator, ctx: EngineContext) -> list[Case]:
+    """Enumerate the generator, stopping once the run has no time left to test what it produces."""
+    cases = []
+    for case in generator:
+        cases.append(case)
+        if ctx.has_to_stop or ctx.is_operation_slice_expired:
+            break
+    return cases
 
 
 def run_driver(
@@ -85,12 +96,15 @@ def run_driver(
     status = Status.SUCCESS
     any_case_ran = False
     any_case_errored = False
+    budget_expired = False
     pending_events: list[events.EngineEvent] = []
     try:
         # Silence Hypothesis stderr chatter so it doesn't leak into the engine's event stream.
         with ignore_hypothesis_output():
             # Match LIFO order from Hypothesis `Phase.explicit` so engine output matches the pytest path.
-            for case in reversed(list(generator)):
+            for case in reversed(_collect_within_budget(generator, ctx)):
+                if ctx.has_reached_time_limit:
+                    raise BudgetExpired
                 if ctx.has_to_stop:
                     # Promote the stop signal so `KeyboardInterrupt` handler reports INTERRUPTED.
                     raise KeyboardInterrupt
@@ -113,13 +127,10 @@ def run_driver(
                     # subsequent cases still run; their errors are accumulated and surfaced together.
                     any_case_errored = True
                     continue
-            if not any_case_ran:
-                status = Status.SKIP
-                skip_reason = "No examples in schema"
-            elif any_case_errored:
-                status = Status.ERROR
     except (FailureGroup, Failure):
         status = Status.FAILURE
+    except BudgetExpired:
+        budget_expired = True
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
@@ -135,6 +146,13 @@ def run_driver(
             state=state,
             non_fatal_error=non_fatal_error,
         )
+
+    if status == Status.SUCCESS:
+        if not any_case_ran:
+            status = Status.SKIP
+            skip_reason = "Time limit reached" if budget_expired else "No examples in schema"
+        elif any_case_errored:
+            status = Status.ERROR
 
     if (
         status == Status.SUCCESS

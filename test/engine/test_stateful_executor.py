@@ -12,7 +12,10 @@ from schemathesis.config import HealthCheck, SchemathesisConfig
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.run import Phase, PhaseName, stateful
-from schemathesis.engine.run.stateful._executor import _get_hypothesis_settings_kwargs_override
+from schemathesis.engine.run.stateful._executor import (
+    _classify_suite_error,
+    _get_hypothesis_settings_kwargs_override,
+)
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS
 from test.engine._late_put import attach_late_put
 
@@ -59,3 +62,16 @@ def test_narrow_suppress_health_check_keeps_stateful_suppression():
     assert set(
         hypothesis.settings(settings, **_get_hypothesis_settings_kwargs_override(settings)).suppress_health_check
     ) == set(DEFAULT_STATE_MACHINE_SETTINGS.suppress_health_check)
+
+
+def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
+    # Ctrl-C and a spent budget both stop the suite; only the budget means "keep what you have".
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    engine = EngineContext(schema=schema, stop_event=threading.Event(), max_time=0)
+    engine.stop()
+
+    status, _, emitted = _classify_suite_error(KeyboardInterrupt(), ctx=None, engine=engine, state=None, settings=None)
+
+    assert status == Status.INTERRUPTED
+    assert emitted

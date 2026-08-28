@@ -11,6 +11,15 @@ from schemathesis.core.statistic import ApiStatistic
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 
+# How telling each outcome is about a phase that ran several times: the summary keeps the highest.
+PHASE_STATUS_PRIORITY = {
+    Status.SKIP: 0,
+    Status.SUCCESS: 1,
+    Status.INTERRUPTED: 2,
+    Status.FAILURE: 3,
+    Status.ERROR: 4,
+}
+
 
 @dataclass
 class ExecutionContext(BaseExecutionContext):
@@ -41,7 +50,11 @@ class ExecutionContext(BaseExecutionContext):
         elif isinstance(event, events.SchemaAnalysisWarnings):
             collector.on_schema_warnings(self, event)
         elif isinstance(event, events.PhaseFinished):
-            self.phases[event.phase.name] = (event.status, event.phase.skip_reason)
+            # A phase repeats under a time budget; a later pass that ran out of budget or was cut short
+            # must not downgrade what an earlier one already found.
+            current, _ = self.phases[event.phase.name]
+            if PHASE_STATUS_PRIORITY[event.status] >= PHASE_STATUS_PRIORITY[current]:
+                self.phases[event.phase.name] = (event.status, event.phase.skip_reason)
         elif isinstance(event, events.ScenarioFinished):
             self.statistic.on_scenario_finished(event.recorder)
             collector.on_scenario_finished(self, event)

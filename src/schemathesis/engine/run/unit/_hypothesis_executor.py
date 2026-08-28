@@ -19,7 +19,7 @@ from schemathesis.engine.context import EngineContext
 from schemathesis.engine.errors import TestingState, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.run.unit._case import record_extra_data_from_recorder
+from schemathesis.engine.run.unit._case import BudgetExpired, record_extra_data_from_recorder
 from schemathesis.engine.run.unit._errors import classify_test_exception, iter_mark_error_events
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -110,6 +110,16 @@ def run_test(
         skip_reason = {"Hypothesis has been told to run no examples for this test.": "No examples in schema"}.get(
             str(exc), str(exc)
         )
+    except BudgetExpired:
+        # The operation ran out of its share, not the whole run — keep whatever it already produced,
+        # errors included: running out of time does not undo them.
+        if errors:
+            status = Status.ERROR
+        elif not recorder.interactions:
+            status = Status.SKIP
+            skip_reason = "Time limit reached"
+        else:
+            status = Status.SUCCESS
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)

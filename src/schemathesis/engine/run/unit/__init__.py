@@ -76,13 +76,17 @@ def _build_examples_generator(
     )
 
 
-def _create_scheduler(engine: EngineContext, phase: Phase) -> Scheduler:
+def _create_scheduler(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> Scheduler:
     """Create the appropriate scheduler via the schema's specification-aware override."""
     operations: list[Result[APIOperation, InvalidSchema]] = list(engine.schema.get_all_operations())
+    if only is not None:
+        operations = [item for item in operations if isinstance(item, Ok) and item.ok().label in only]
+    # Entries the schema could not produce never claim a share, so counting them shrinks every other one.
+    engine.start_unit_phase(total_operations=sum(1 for item in operations if isinstance(item, Ok)))
     return engine.schema.get_unit_scheduler(operations, phase)
 
 
-def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
+def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> events.EventGenerator:
     """Run a set of unit tests.
 
     Implemented as a producer-consumer pattern via a task queue.
@@ -97,7 +101,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
     # Create scheduler based on ordering configuration
     try:
-        scheduler = _create_scheduler(engine, phase)
+        scheduler = _create_scheduler(engine, phase, only=only)
     except HookExecutionError as exc:
         yield events.NonFatalError(
             error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
@@ -142,12 +146,14 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                             if event.status != Status.SKIP and (status is None or status < event.status):
                                 status = event.status
                             if event.status in (Status.ERROR, Status.FAILURE):
-                                engine.control.count_failure()
+                                engine.control.count_failure((phase.name, event.label))
                             engine.record_observations(event.recorder)
                         if isinstance(event, events.Interrupted) or engine.is_interrupted:
                             status = Status.INTERRUPTED
                             engine.stop()
-                        if engine.has_to_stop:
+                        # A reached failure limit stops at N by design. A spent budget has no cap to
+                        # keep, so let the workers wind down and hand over what they already produced.
+                        if engine.has_reached_the_failure_limit:
                             break
                     except queue.Empty:
                         # A worker may put its final events and exit between this thread's
@@ -235,6 +241,7 @@ def worker_task(
 
                 if isinstance(result, Ok):
                     operation = result.ok()
+                    ctx.take_operation_slice()
                     phases = ctx.config.phases_for(operation=operation)
                     # Skip tests if this phase is disabled
                     if (
@@ -311,7 +318,7 @@ def worker_task(
                                 config=HypothesisTestConfig(
                                     modes=[mode],
                                     settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.value),
-                                    seed=ctx.config.seed,
+                                    seed=ctx.cycle_seed,
                                     project=ctx.config,
                                     as_strategy_kwargs=as_strategy_kwargs,
                                     feedback=feedback,

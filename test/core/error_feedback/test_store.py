@@ -16,6 +16,7 @@ from schemathesis.core.error_feedback import (
     TypeMismatchPayload,
     observation_fingerprint,
 )
+from schemathesis.core.error_feedback.store import MAX_ENTRIES_PER_BUCKET
 from schemathesis.core.parameters import ParameterLocation
 
 
@@ -95,3 +96,12 @@ def test_size_bound_min_and_max_merge_into_one_canonical():
     observations = store.observations(operation_label="POST /v1/foo", location=ParameterLocation.BODY)
     assert len(observations) == 1
     assert observations[0].payload == SizeBoundPayload(min=3, max=30)
+
+
+def test_observation_counts_keep_growing_past_the_bucket_cap():
+    # The cap bounds what is remembered, not how much an operation has taught.
+    store = ErrorFeedbackStore()
+    for index in range(MAX_ENTRIES_PER_BUCKET * 2):
+        store.record(_make(kind=ObservationKind.MUST_NOT_BE_BLANK, payload=None, path=(f"f{index}",)))
+
+    assert store.observation_counts() == {"POST /v1/foo": MAX_ENTRIES_PER_BUCKET * 2}

@@ -187,6 +187,8 @@ class _Entry:
 @dataclass(slots=True)
 class _Bucket:
     entries: dict[_EntryKey, _Entry] = field(default_factory=dict)
+    # Distinct signals ever inserted here; unlike `entries` it survives eviction at the cap.
+    inserted: int = 0
 
 
 class ErrorFeedbackStore:
@@ -213,6 +215,14 @@ class ErrorFeedbackStore:
         with self._lock:
             self._generation += 1
 
+    def observation_counts(self) -> dict[str, int]:
+        """How much each operation has taught the parsers, by distinct observation."""
+        counts: dict[str, int] = {}
+        with self._lock:
+            for (label, _), bucket in self._buckets.items():
+                counts[label] = counts.get(label, 0) + bucket.inserted
+        return counts
+
     def distinct_observations(self) -> int:
         """Total distinct observations recorded across every bucket."""
         with self._lock:
@@ -235,6 +245,7 @@ class ErrorFeedbackStore:
                     count=1,
                     last_message=observation.raw_message,
                 )
+                bucket.inserted += 1
             else:
                 entry.count += 1
                 entry.last_message = observation.raw_message

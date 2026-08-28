@@ -212,6 +212,7 @@ class EventStream:
         auth=None,
         workers=1,
         max_failures=None,
+        max_time=None,
         request_timeout=None,
         tls_verify=None,
         with_security_parameters=True,
@@ -239,6 +240,7 @@ class EventStream:
             schema.config.auth.update(basic=auth)
         schema.config.seed = seed
         schema.config.max_failures = max_failures
+        schema.config.max_time = max_time
         if max_steps is not None:
             schema.config.phases.stateful.max_steps = max_steps
         if parameters is not None:

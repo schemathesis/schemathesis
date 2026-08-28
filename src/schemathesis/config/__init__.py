@@ -101,6 +101,7 @@ class SchemathesisConfig(DiffBase):
     _config_path: str | None
     wait_for_schema: float | int | None
     max_failures: int | None
+    max_time: int | None
     reports: ReportsConfig
     cache: CacheConfig
     output: OutputConfig
@@ -115,6 +116,7 @@ class SchemathesisConfig(DiffBase):
         seed: int | None = None,
         wait_for_schema: float | int | None = None,
         max_failures: int | None = None,
+        max_time: int | None = None,
         reports: ReportsConfig | None = None,
         cache: CacheConfig | None = None,
         output: OutputConfig | None = None,
@@ -127,6 +129,7 @@ class SchemathesisConfig(DiffBase):
         self._config_path = None
         self.wait_for_schema = wait_for_schema
         self.max_failures = max_failures
+        self.max_time = max_time
         self.reports = reports or ReportsConfig()
         self.cache = cache or CacheConfig()
         self.output = output or OutputConfig()
@@ -188,6 +191,7 @@ class SchemathesisConfig(DiffBase):
         seed: int | None = None,
         wait_for_schema: float | int | None = None,
         max_failures: int | None,
+        max_time: int | None = None,
     ) -> None:
         """Set top-level configuration options."""
         if color is not None:
@@ -200,6 +204,8 @@ class SchemathesisConfig(DiffBase):
             self.wait_for_schema = wait_for_schema
         if max_failures is not None:
             self.max_failures = max_failures
+        if max_time is not None:
+            self.max_time = max_time
 
     @classmethod
     def from_path(cls, path: PathLike | str) -> SchemathesisConfig:
@@ -236,6 +242,7 @@ class SchemathesisConfig(DiffBase):
             seed=data.get("seed"),
             wait_for_schema=data.get("wait-for-schema"),
             max_failures=data.get("max-failures"),
+            max_time=data.get("max-time"),
             reports=ReportsConfig.from_dict(data.get("reports", {})),
             cache=CacheConfig.from_dict(data.get("cache", {})),
             output=OutputConfig.from_dict(data.get("output", {})),

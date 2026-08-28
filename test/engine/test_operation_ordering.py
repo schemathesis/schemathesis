@@ -721,3 +721,53 @@ def test_operation_with_unresolvable_ref_is_still_dispatched(ctx):
         dispatched.append(result.ok().label)
 
     assert sorted(dispatched) == sorted(operation.label for operation in _operations(loaded))
+
+
+def test_create_scheduler_filters_to_requested_operations(ctx):
+    # Dependency layers are built from the whole graph, so a filtered run must not trip over the rest.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/products/{productName}": {
+                "get": {
+                    "operationId": "getProduct",
+                    "parameters": [
+                        {"name": "productName", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["name"],
+                                        "properties": {"name": {"type": "string"}},
+                                    }
+                                }
+                            },
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                },
+                "post": {
+                    "operationId": "createProduct",
+                    "parameters": [
+                        {"name": "productName", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {"201": {"description": "Created"}},
+                },
+            }
+        }
+    )
+    engine = EngineContext(schema=loaded, stop_event=threading.Event())
+    phase = Phase(name=PhaseName.COVERAGE, is_enabled=True)
+
+    scheduler = _create_scheduler(engine, phase, only=frozenset({"GET /products/{productName}"}))
+
+    dispatched: list[str] = []
+    while True:
+        result = scheduler.next_operation()
+        if result is None:
+            break
+        dispatched.append(result.ok().label)
+    assert dispatched == ["GET /products/{productName}"]

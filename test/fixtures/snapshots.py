@@ -53,6 +53,7 @@ class CliSnapshotConfig:
     replace_reproduce_with: bool = False
     replace_test_cases: bool = True
     replace_phase_statistic: bool = False
+    replace_cycle_metrics: bool = False
     replace_stateful_statistic: bool = True
     remove_last_line: bool = False
     replace: bool = True
@@ -146,6 +147,11 @@ class CliSnapshotConfig:
             data = re.sub(r"Tested: \d+", "Tested: N", data)
         if self.replace_phase_statistic:
             data = re.sub("🚫 [0-9]+ errors", "🚫 1 error", data)
+        if self.replace_cycle_metrics:
+            data = re.sub(r"\d+ cases", "N cases", data)
+            data = re.sub(r"Scenarios:\s+\d+", "Scenarios:    N", data)
+            # Whether a scenario passed before the failing one depends on the draw order.
+            data = re.sub(r"(?m)^(\s*)(?:✅ \d+ passed {2})?❌ \d+ failed[ \t]*$", r"\1❌ N failed", data)
         if "Stateful" in data:
             if self.replace_stateful_statistic:
                 data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)

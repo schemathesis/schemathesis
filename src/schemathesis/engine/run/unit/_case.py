@@ -42,6 +42,10 @@ def _targets_declared_method(case: Case) -> bool:
     return case.method.lower() == case.operation.method.lower()
 
 
+class BudgetExpired(KeyboardInterrupt):
+    """Raised when the run's time budget is out, either for this operation's share or overall."""
+
+
 def run_one_case(
     *,
     case: Case,
@@ -57,6 +61,10 @@ def run_one_case(
 ) -> None:
     """Run one case end-to-end: call, record, validate, classify."""
     try:
+        # A slice may be shorter than a single case takes. Let the first one through anyway, so an
+        # operation is never selected and then left with nothing to show for it.
+        if ctx.has_reached_time_limit or (ctx.is_operation_slice_expired and recorder.interactions):
+            raise BudgetExpired
         if ctx.has_to_stop:
             raise KeyboardInterrupt
         # Honor a supervisor SKIP verdict that flipped mid-scenario; without this,
