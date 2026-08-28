@@ -2190,7 +2190,10 @@ def _negative_not(
     # For 'not' schemas: generate positive cases of inner schema (valid values)
     # These valid values are negative for the outer schema, so flip the mode
     pctx = ctx.with_positive()
-    yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen))
+    # Nothing satisfies the schema around a `not` that admits everything, so what a value is
+    # says nothing about why it is rejected.
+    description = "Value is not allowed" if value == {} or value is True else None
+    yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen), description=description)
 
 
 def cover_schema_iter(
@@ -4018,6 +4021,7 @@ def _negative_type(
 
 def _flip_generation_mode_for_not(
     values: Generator[GeneratedValue, None, None],
+    description: str | None = None,
 ) -> Generator[GeneratedValue, None, None]:
     """Flip generation mode for values from 'not' schemas.
 
@@ -4033,7 +4037,7 @@ def _flip_generation_mode_for_not(
             value=value.value,
             generation_mode=flipped_mode,
             scenario=value.scenario,
-            description=value.description,
+            description=description or value.description,
             location=value.location,
             parameter=value.parameter,
         )

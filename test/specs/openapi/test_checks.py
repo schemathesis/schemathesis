@@ -1283,6 +1283,37 @@ def test_response_schema_conformance_invalid_format_fails_by_default(ctx, respon
         response_schema_conformance(_CHECK_CTX, response, case)
 
 
+# A `writeOnly` property is rewritten to a schema nothing satisfies; the message must still read as English.
+def test_response_schema_conformance_forbidden_property_message(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"secret": {"type": "string", "writeOnly": True}},
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    case = schema["/test"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(content=b'{"secret": "s"}'), True)
+
+    with pytest.raises(JsonSchemaError) as exc_info:
+        response_schema_conformance(_CHECK_CTX, response, case)
+    assert exc_info.value.message.startswith('Property "secret" is not allowed')
+
+
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
     config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
     schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(_DATE_TIME_PATHS), config=config)

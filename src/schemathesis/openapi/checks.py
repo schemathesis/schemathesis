@@ -139,6 +139,16 @@ class JsonSchemaError(Failure):
 
         assert isinstance(schema, (dict, bool))
 
+        # Read-only and write-only properties are rewritten to a schema nothing satisfies, and the raw
+        # validator message spells that rewrite rather than naming what it rejects.
+        if schema == {"not": {}} and exc.schema_path and exc.schema_path[-1] == "not":
+            name = exc.instance_path[-1] if exc.instance_path else None
+            validation_message = (
+                f'Property "{name}" is not allowed' if isinstance(name, str) else "Value is not allowed"
+            )
+        else:
+            validation_message = exc.message
+
         # Reorder schema to prioritize the failing keyword in the output
         if isinstance(schema, dict) and exc.schema_path:
             failing_keyword = exc.schema_path[-1]
@@ -165,13 +175,13 @@ class JsonSchemaError(Failure):
                 schema_title += f"/{segment}"
         else:
             schema_title = "Schema"
-        prefix = f"{exc.message}\n\n{context}" if context else exc.message
+        prefix = f"{validation_message}\n\n{context}" if context else validation_message
         full_message = f"{prefix}\n\n{schema_title}:\n\n{schema_str}\n\nValue:\n\n{value}"
         return cls(
             operation=operation,
             title=title,
             message=full_message,
-            validation_message=exc.message,
+            validation_message=validation_message,
             schema_path=exc.schema_path,
             schema=schema if isinstance(schema, dict) else {},
             instance_path=exc.instance_path,
