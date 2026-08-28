@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.
+- Coverage phase treating `allOf` branches naming `integer` and `number` as unsatisfiable.
 - Coverage phase emitting valid values as `anyOf`/`oneOf` violations for branches with `$ref` siblings.
 - Coverage phase ignoring `prefixItems` when building array cases for OpenAPI 3.1 operations.
 - Coverage phase dropping a required name `properties` does not declare from generated array items.

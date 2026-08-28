@@ -3745,6 +3745,26 @@ def test_all_of_with_a_boolean_branch_emits_a_conforming_value(pctx):
     assert values and all(isinstance(value, str) for value in values), values
 
 
+# `integer` and `number` overlap, so a branch pair naming them still admits every integer.
+@pytest.mark.parametrize(
+    "branches",
+    [
+        [{"type": "integer"}, {"type": "number"}],
+        [{"type": "number"}, {"type": "integer"}],
+        [{"type": "integer"}, {"type": ["number", "string"]}],
+    ],
+    ids=["integer-number", "number-integer", "integer-number-union"],
+)
+def test_all_of_narrows_number_to_integer(pctx, nctx, branches):
+    schema = {"allOf": branches}
+    positive = cover_schema(pctx, schema)
+    assert positive
+    assert_conform(positive, schema)
+    negative = cover_schema(nctx, schema)
+    assert negative
+    assert_not_conform(negative, schema)
+
+
 # Keywords beside a property's `$ref` constrain its value in the object template too.
 @pytest.mark.parametrize(
     "property_schema",
