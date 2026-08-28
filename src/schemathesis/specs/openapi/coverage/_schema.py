@@ -1394,6 +1394,12 @@ def _intersect_types(current: Any, value: Any) -> Any:
     current_types = current if isinstance(current, list) else [current]
     value_types = value if isinstance(value, list) else [value]
     shared = [name for name in current_types if name in value_types]
+    # Every integer is a number, so naming both still admits the integers.
+    if "integer" not in shared and (
+        ("integer" in current_types and "number" in value_types)
+        or ("number" in current_types and "integer" in value_types)
+    ):
+        shared.append("integer")
     return shared[0] if len(shared) == 1 else shared
 
 
