@@ -1,4 +1,3 @@
-
 import pytest
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis.errors import InvalidDefinition

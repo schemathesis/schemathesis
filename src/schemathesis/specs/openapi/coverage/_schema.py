@@ -1449,11 +1449,14 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
 
 def _branch_as_judged(ctx: CoverageContext, branch: JsonSchema) -> JsonSchema:
     """The form of a branch its judges load: as written when a draft may ignore keywords beside `$ref`."""
-    if isinstance(branch, dict) and "$ref" in branch:
+    if (
+        isinstance(branch, dict)
+        and "$ref" in branch
+        and any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch)
+    ):
         # The discriminator pin models server behavior and counts under every draft; any other keyword
         # beside `$ref` counts only under drafts that read it, so each judge gets the branch as written.
-        if any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch):
-            return branch
+        return branch
     return _resolve_sub_schema(ctx, branch)
 
 
@@ -2590,9 +2593,7 @@ def _implies_object_type(schema: JsonSchemaObject) -> bool:
     if any(key in schema for key in _OBJECT_ONLY_KEYWORDS):
         return True
     additional = schema.get("additionalProperties")
-    if isinstance(additional, dict):
-        return True
-    return False
+    return bool(isinstance(additional, dict))
 
 
 def _implies_array_type(schema: JsonSchemaObject) -> bool:
