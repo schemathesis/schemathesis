@@ -1284,6 +1284,43 @@ def test_negative_property_names(ctx_factory, schema, expected):
     assert_covers_negative(nctx, schema, expected)
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"a": {"type": "null"}}, "propertyNames": {"pattern": "^[0-9]{3}$"}},
+        {"type": "object", "properties": {"abc": {"type": "null"}}, "propertyNames": {"maxLength": 2}},
+        {
+            "type": "object",
+            "properties": {"a": {"type": "null"}, "bbb": {"type": "boolean"}},
+            "propertyNames": {"minLength": 3},
+        },
+    ],
+    ids=["pattern", "max-length", "one-name-admitted"],
+)
+def test_positive_object_respects_property_names(ctx_factory, schema):
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = cover_schema(ctx, schema)
+    assert values
+    for value in values:
+        assert validator.is_valid(value), value
+
+
+# Draft 4 validators ignore `propertyNames`, so the properties beside it stay coverable.
+def test_positive_object_covers_properties_beside_ignored_property_names(ctx_factory):
+    schema = {"type": "object", "properties": {"a": {"type": "null"}}, "propertyNames": {"pattern": "^[0-9]{3}$"}}
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE],
+        validator_cls=jsonschema_rs.Draft4Validator,
+    )
+    assert {"a": None} in cover_schema(ctx, schema)
+
+
 def test_positive_pattern(pctx):
     schema = {"pattern": r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", "minLength": 7, "maxLength": 20, "type": "string"}
     assert_covers(pctx, schema, ["0000-0000", "00-0000", "00-00000", "0000-000000000000000", "000-000000000000000"])
@@ -3745,6 +3782,26 @@ def test_all_of_with_a_boolean_branch_emits_a_conforming_value(pctx):
     assert values and all(isinstance(value, str) for value in values), values
 
 
+# `integer` and `number` overlap, so a branch pair naming them still admits every integer.
+@pytest.mark.parametrize(
+    "branches",
+    [
+        [{"type": "integer"}, {"type": "number"}],
+        [{"type": "number"}, {"type": "integer"}],
+        [{"type": "integer"}, {"type": ["number", "string"]}],
+    ],
+    ids=["integer-number", "number-integer", "integer-number-union"],
+)
+def test_all_of_narrows_number_to_integer(pctx, nctx, branches):
+    schema = {"allOf": branches}
+    positive = cover_schema(pctx, schema)
+    assert positive
+    assert_conform(positive, schema)
+    negative = cover_schema(nctx, schema)
+    assert negative
+    assert_not_conform(negative, schema)
+
+
 # Keywords beside a property's `$ref` constrain its value in the object template too.
 @pytest.mark.parametrize(
     "property_schema",
@@ -4129,6 +4186,28 @@ def test_positive_array_items_covering_respects_prefix_items(ctx_factory, schema
     validator = jsonschema_rs.Draft202012Validator(schema)
     for value in cover_schema(ctx, schema):
         assert validator.is_valid(value), value
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "array", "items": {"type": "null"}, "prefixItems": [{"type": "boolean"}]},
+        {"type": "array", "items": {"type": "integer"}, "prefixItems": [{"type": "string"}], "minItems": 3},
+    ],
+    ids=["single-prefix", "padded"],
+)
+def test_negative_array_items_covering_respects_prefix_items(ctx_factory, schema):
+    ctx = ctx_factory(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        validator_cls=jsonschema_rs.Draft202012Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator(schema)
+    values = cover_schema(ctx, schema)
+    assert any(isinstance(value, list) and value for value in values), values
+    for value in values:
+        assert not validator.is_valid(value), value
 
 
 def test_negative_prefix_items_covered_for_raw_keyword(ctx_factory):

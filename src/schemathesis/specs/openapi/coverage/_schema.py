@@ -833,12 +833,16 @@ class CoverageContext:
                     ):
                         obj[key] = sub_schema["const"]
                     else:
-                        with suppress(Unsatisfiable):
+                        try:
                             obj[key] = self.generate_from_schema(sub_schema)
+                        except Unsatisfiable:
+                            pass
                 for key in schema.get("required", []):
                     if key not in properties:
-                        with suppress(Unsatisfiable):
+                        try:
                             obj[key] = self.generate_from_schema({})
+                        except Unsatisfiable:
+                            pass
                 if any(key not in obj for key in schema.get("required", [])):
                     raise Unsatisfiable
                 # Properties that cannot be generated leave the object short of `minProperties`;
@@ -1390,6 +1394,12 @@ def _intersect_types(current: Any, value: Any) -> Any:
     current_types = current if isinstance(current, list) else [current]
     value_types = value if isinstance(value, list) else [value]
     shared = [name for name in current_types if name in value_types]
+    # Every integer is a number, so naming both still admits the integers.
+    if "integer" not in shared and (
+        ("integer" in current_types and "number" in value_types)
+        or ("number" in current_types and "integer" in value_types)
+    ):
+        shared.append("integer")
     return shared[0] if len(shared) == 1 else shared
 
 
@@ -1439,14 +1449,11 @@ def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
 
 def _branch_as_judged(ctx: CoverageContext, branch: JsonSchema) -> JsonSchema:
     """The form of a branch its judges load: as written when a draft may ignore keywords beside `$ref`."""
-    if (
-        isinstance(branch, dict)
-        and "$ref" in branch
-        and any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch)
-    ):
+    if isinstance(branch, dict) and "$ref" in branch:
         # The discriminator pin models server behavior and counts under every draft; any other keyword
         # beside `$ref` counts only under drafts that read it, so each judge gets the branch as written.
-        return branch
+        if any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch):
+            return branch
     return _resolve_sub_schema(ctx, branch)
 
 
@@ -1817,6 +1824,15 @@ def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageCont
     if is_additional(fallback):
         return fallback
     return next((candidate for candidate in _UNEXPECTED_PROPERTY_KEYS[1:] if is_additional(candidate)), None)
+
+
+def _admits_property_name(ctx: CoverageContext, schema: JsonSchemaObject, name: str) -> bool:
+    """Whether `propertyNames` lets the object carry `name`."""
+    property_names = schema.get("propertyNames")
+    # Draft 4 validators ignore `propertyNames`, so it constrains nothing there.
+    if property_names is None or ctx.validator_cls is jsonschema_rs.Draft4Validator:
+        return True
+    return is_valid(name, property_names)
 
 
 def _negation_ignored_by_dialect(ctx: CoverageContext, keyword: str) -> bool:
@@ -2203,8 +2219,10 @@ def cover_schema_iter(
                 if any(k != "$ref" and k in ALL_KEYWORDS for k in schema):
                     bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
                     check_schema = schema if bundle is None else {**schema, BUNDLE_STORAGE_KEY: bundle}
-                    with suppress(Exception):
+                    try:
                         unmerged_validator = ctx.validator_cls(check_schema, pattern_options=FANCY_REGEX_OPTIONS)
+                    except Exception:
+                        pass
                 with ctx.expand(reference):
                     for generated in cover_schema_iter(ctx, merged, seen):
                         if (
@@ -2572,7 +2590,9 @@ def _implies_object_type(schema: JsonSchemaObject) -> bool:
     if any(key in schema for key in _OBJECT_ONLY_KEYWORDS):
         return True
     additional = schema.get("additionalProperties")
-    return isinstance(additional, dict)
+    if isinstance(additional, dict):
+        return True
+    return False
 
 
 def _implies_array_type(schema: JsonSchemaObject) -> bool:
@@ -2633,7 +2653,7 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
             }
             # When the fast path fires, required is used to decide what's truly required;
             # keep it at the schema's original required to avoid aborting on optional
-            # properties with unsatisfiable schemas.  Otherwise inflate to all_properties
+            # properties with unsatisfiable schemas. Otherwise inflate to all_properties
             # so every defined property appears in the generated template.
             # Ignore non-structural keys (annotations like `title`, OpenAPI `nullable`,
             # `readOnly`, `x-*` extensions); only JSON Schema keywords gate the choice.
@@ -2965,7 +2985,10 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
     if minimum is not None:
         # Exactly the minimum
-        smallest = closest_multiple_greater_than(minimum, multiple_of) if multiple_of is not None else minimum
+        if multiple_of is not None:
+            smallest = closest_multiple_greater_than(minimum, multiple_of)
+        else:
+            smallest = minimum
         if smallest is not None and _within_adjusted_bounds(smallest) and seen.insert(smallest):
             yield PositiveValue(smallest, scenario=CoverageScenario.MINIMUM_VALUE, description="Minimum value")
 
@@ -2981,7 +3004,10 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
     if maximum is not None:
         # Exactly the maximum
-        largest = _largest_multiple_within(maximum, multiple_of) if multiple_of is not None else maximum
+        if multiple_of is not None:
+            largest = _largest_multiple_within(maximum, multiple_of)
+        else:
+            largest = maximum
         if largest is not None and _within_adjusted_bounds(largest) and seen.insert(largest):
             yield PositiveValue(largest, scenario=CoverageScenario.MAXIMUM_VALUE, description="Maximum value")
 
@@ -3269,6 +3295,8 @@ def _iter_positive_object(
         # A property the template left out adds a key, which the size window may not have room for.
         if name not in template and isinstance(max_properties, int) and len(template) + 1 > max_properties:
             continue
+        if not _admits_property_name(ctx, schema, name):
+            continue
         # Skip pre-seed when the property is absent: `template.get(name)` would be None
         # and dedup legitimate null emissions for nullable optionals.
         if name in template:
@@ -3381,13 +3409,15 @@ def _negative_properties(
                 return s if b is None else {**s, BUNDLE_STORAGE_KEY: b}
 
             keep_alive: tuple[Any, ...] = (sub_schema,) if bundle is None else (sub_schema, bundle)
-            with suppress(Exception):
+            try:
                 validator = make_validator_with_seed(
                     schema_builder=_builder,
                     validator_cls=ctx.validator_cls,
                     seed=(id(sub_schema), id(bundle)),
                     keep_alive=keep_alive,
                 )
+            except Exception:
+                pass
         with nctx.at(key):
             for value in cover_schema_iter(nctx, sub_schema):
                 if validator is not None:
@@ -3465,7 +3495,11 @@ def _negative_items(
     if isinstance(value, dict):
         parent_min_items = schema.get("minItems")
         min_items = parent_min_items if isinstance(parent_min_items, int) else 0
-        yield from _negative_array_items(ctx, value, min_items=min_items)
+        prefix = _tuple_prefix_values(ctx, schema)
+        if prefix is None:
+            # The leading positions cannot be filled soundly, so an `items` value has nowhere to sit.
+            return
+        yield from _negative_array_items(ctx, value, prefix=prefix, min_items=min_items)
     elif isinstance(value, list):
         yield from _negative_prefix_items(ctx, value)
 
@@ -3478,21 +3512,27 @@ def _negative_tuple_items(
 
 
 def _negative_array_items(
-    ctx: CoverageContext, schema: JsonSchema, *, min_items: int = 0
+    ctx: CoverageContext, schema: JsonSchema, *, prefix: list, min_items: int = 0
 ) -> Generator[GeneratedValue, None, None]:
-    """Arrays not matching the schema."""
+    """Arrays not matching the schema, with `prefix` filling the positions `prefixItems` owns."""
     nctx = ctx.with_negative()
     filler: object = NOT_SET
+    padding = min_items - len(prefix) - 1
     # Cap padding at NEGATIVE_MODE_MAX_ITEMS so an adversarial `minItems` doesn't blow up memory;
-    # above the cap, fall back to single-item arrays (same as pre-padding behavior for that range).
-    if 1 < min_items <= NEGATIVE_MODE_MAX_ITEMS:
-        # Suppress generation errors here and fall back to a single-item negative array
-        # rather than emitting nothing when the items schema can't produce a valid filler.
-        with suppress(InvalidArgument, Unsatisfiable):
+    # above the cap, fall back to unpadded arrays (same as pre-padding behavior for that range).
+    if padding > 0 and min_items <= NEGATIVE_MODE_MAX_ITEMS:
+        try:
             filler = ctx.with_positive().generate_from_schema(schema)
+        except (InvalidArgument, Unsatisfiable):
+            # Items schema can't produce a valid filler — fall back to single-item negative
+            # rather than emitting nothing.
+            pass
     for value in cover_schema_iter(nctx, schema):
-        # Pad to satisfy `minItems` so the items[i] check fires instead of failing at length.
-        items = [value.value, *(filler for _ in range(min_items - 1))] if filler is not NOT_SET else [value.value]
+        if filler is not NOT_SET:
+            # Pad to satisfy `minItems` so the items[i] check fires instead of failing at length.
+            items = [*prefix, value.value, *(filler for _ in range(padding))]
+        else:
+            items = [*prefix, value.value]
         if ctx.wire.leads_to_negative_test_case(items):
             yield NegativeValue(
                 items,
@@ -3808,7 +3848,10 @@ def _stringified_type_violations(
 def _negative_type(
     ctx: CoverageContext, schema: dict[str, Any], ty: str | list[str], seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
-    types = [ty] if isinstance(ty, str) else ty
+    if isinstance(ty, str):
+        types = [ty]
+    else:
+        types = ty
     # Root-level binary/byte format with non-JSON content types - type mutations don't produce meaningful wire violations
     # Path is ['type'] at root level, vs ['properties', 'fieldname', 'type'] for nested properties
     if (
