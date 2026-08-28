@@ -3459,6 +3459,30 @@ def test_integer_steps_past_float_bounds_follow_the_decimal_text(ctx_factory, sc
         assert validator.is_valid(value) == (mode == GenerationMode.POSITIVE), value
 
 
+# A multiple sits inside a pinned float bound only when both are read as the decimal text spells them.
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"type": "number", "minimum": -5.151020255852562e16, "maximum": -5.151020255852562e16, "multipleOf": 2},
+            [-51510202558525620],
+        ),
+        (
+            {"type": "number", "minimum": 5.151020255852562e16, "maximum": 5.151020255852562e16, "multipleOf": 2},
+            [51510202558525620],
+        ),
+        (
+            {"type": "number", "minimum": -5.151020255852562e16, "maximum": -5.151020255852562e16, "multipleOf": 100},
+            [],
+        ),
+    ],
+    ids=["negative", "positive", "no-multiple-fits"],
+)
+def test_positive_number_multiple_within_pinned_float_bounds(ctx_factory, schema, expected):
+    ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
+    assert cover_schema(ctx, schema) == expected
+
+
 # A property's bound is read the same way whether the template or the boundary sweep builds the value.
 def test_positive_object_template_steps_float_bounds_in_decimal(pctx):
     schema = {"type": "object", "properties": {"a": {"type": "integer", "maximum": -5.151020255852562e16}}}

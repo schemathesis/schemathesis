@@ -2945,7 +2945,10 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     seen = HashSet()
 
     def _within_adjusted_bounds(value: int | float) -> bool:
-        return (minimum is None or value >= minimum) and (maximum is None or value <= maximum)
+        # Read in decimal, the way the validator reads both the value and the bound: past 2**53 a
+        # multiple that fits the bound's text can still compare outside the float that spells it.
+        exact = _exact(value)
+        return (minimum is None or exact >= _exact(minimum)) and (maximum is None or exact <= _exact(maximum))
 
     if example is not NOT_SET or examples or default is not NOT_SET:
         has_valid_example = False
@@ -2999,7 +3002,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             larger = None if smallest is None else _shift_by_multiple(smallest, multiple_of, direction=1)
         else:
             larger = minimum + 1
-        if larger is not None and (maximum is None or larger <= maximum) and seen.insert(larger):
+        if larger is not None and _within_adjusted_bounds(larger) and seen.insert(larger):
             yield PositiveValue(
                 larger, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
             )
@@ -3018,7 +3021,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             smaller = None if largest is None else _shift_by_multiple(largest, multiple_of, direction=-1)
         else:
             smaller = maximum - 1
-        if smaller is not None and (minimum is None or smaller >= minimum) and seen.insert(smaller):
+        if smaller is not None and _within_adjusted_bounds(smaller) and seen.insert(smaller):
             yield PositiveValue(
                 smaller, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
             )

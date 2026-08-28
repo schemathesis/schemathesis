@@ -17,6 +17,7 @@
 - Empty strings generated for query parameters declaring `allowEmptyValue: false`. [#4574](https://github.com/schemathesis/schemathesis/issues/4574)
 - Coverage phase emitting valid values as `items` violations for arrays declaring `prefixItems`.
 - Coverage phase emitting properties whose names `propertyNames` rejects.
+- Coverage phase emitting a `multipleOf` value outside the float bound `minimum` and `maximum` pin.
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 
