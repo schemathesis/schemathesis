@@ -23,7 +23,7 @@ def assert_links_work(response_factory, location, results, schema):
 
 def build_links(inferencer, location: str) -> list[dict]:
     """Build all possible OpenAPI link definitions from Location header."""
-    normalized_location = inferencer._normalize_location(location)
+    normalized_location = inferencer.normalize_location(location)
     if normalized_location is None:
         return []
     matches = inferencer._find_matches_from_normalized_location(normalized_location)

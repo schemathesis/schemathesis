@@ -24,6 +24,7 @@ from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     EnsureResourceAvailability,
     IgnoredAuth,
+    InvalidLocation,
     JsonSchemaError,
     MalformedMediaType,
     MissingContentType,
@@ -922,6 +923,55 @@ def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) 
         undocumented_methods=[method.upper() for method in undocumented],
         message=f"`Allow` header does not match the schema — {'; '.join(parts)}\n\nList exactly the methods this resource supports in `Allow`",
     )
+
+
+# Statuses that mean the URL from `Location` does not lead to a usable resource.
+UNREACHABLE_LOCATION_STATUSES = frozenset({404, 405, 500, 501})
+
+
+@schemathesis.check
+class invalid_location:
+    """Verify that the URL from the `Location` header points at a reachable resource."""
+
+    def __init__(self) -> None:
+        # One probe per source operation, so fuzzing an endpoint does not double its request count.
+        self._probed: set[str] = set()
+
+    def after_response(self, ctx: CheckContext, response: Response, case: Case) -> bool | None:
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+        schema = case.operation.schema
+        if not isinstance(schema, OpenApiSchema):
+            return True
+        values = response.headers.get("location")
+        if not values or case.operation.label in self._probed:
+            return None
+        path = schema.analysis.inferencer.normalize_location(values[0])
+        if path is None:
+            # Points outside the tested API
+            return None
+        target = schema.find_operation_by_path("GET", path)
+        if target is None and schema.has_matching_path(path):
+            # Documented resource without `GET`; probing it with any other verb could modify it
+            return None
+        self._probed.add(case.operation.label)
+        operation = target if target is not None else case.operation
+        probe = Case(operation=operation, method="GET", path=path)
+        kwargs = dict(ctx._transport_kwargs or {})
+        if operation.app is not None:
+            kwargs.setdefault("app", operation.app)
+        ctx._record_case(parent_id=case.id, case=probe)
+        probe_response = schema.transport.send(probe, **kwargs)
+        ctx._record_response(case_id=probe.id, response=probe_response)
+        if probe_response.status_code in UNREACHABLE_LOCATION_STATUSES:
+            reason = http.client.responses.get(probe_response.status_code, "Unknown")
+            raise InvalidLocation(
+                operation=case.operation.label,
+                location=values[0],
+                status_code=probe_response.status_code,
+                message=f"`Location: {values[0]}` points at a resource that answered `{probe_response.status_code} {reason}`\n\nReturn a `Location` that resolves to an existing resource",
+            )
+        return None
 
 
 def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:

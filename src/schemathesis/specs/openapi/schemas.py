@@ -607,6 +607,18 @@ class OpenApiSchema(BaseSchema):
             return self.find_operation_by_id(operation_ref.value)
         return self.find_operation_by_reference(operation_ref.value)
 
+    def has_matching_path(self, path: str) -> bool:
+        """Whether an actual request path matches a documented path template, under any method."""
+        from werkzeug.exceptions import MethodNotAllowed, NotFound
+
+        try:
+            self.analysis.inferencer._adapter.match(path)
+        except MethodNotAllowed:
+            return True
+        except NotFound:
+            return False
+        return True
+
     @override
     def get_case_strategy(
         self,

@@ -114,6 +114,7 @@
 
 - Report filter expressions that match no API operations, with the closest match as a suggestion.
 - `allow_header_conformance` check comparing the `Allow` header against the methods declared in the schema.
+- `invalid_location` check following the `Location` header to verify it resolves to a reachable resource.
 
 ### :bug: Fixed
 

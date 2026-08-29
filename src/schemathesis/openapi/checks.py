@@ -508,3 +508,39 @@ class AllowHeaderMismatch(Failure):
     @property
     def _unique_key(self) -> str:
         return f"{','.join(self.missing_methods)}|{','.join(self.undocumented_methods)}"
+
+
+class InvalidLocation(Failure):
+    """`Location` header points at a resource that cannot be reached."""
+
+    __slots__ = (
+        "operation",
+        "location",
+        "status_code",
+        "message",
+        "title",
+        "case_id",
+        "severity",
+    )
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        location: str,
+        status_code: int,
+        message: str,
+        title: str = "Invalid Location",
+        case_id: str | None = None,
+    ) -> None:
+        self.operation = operation
+        self.location = location
+        self.status_code = status_code
+        self.message = message
+        self.title = title
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
+
+    @property
+    def _unique_key(self) -> str:
+        return str(self.status_code)
