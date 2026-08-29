@@ -3098,8 +3098,12 @@ def _positive_array(
             and prefix_values is not None
             and (not prefix_values or _fits_array_length(schema, len(prefix_values) + 1))
         ):
+            has_contains = "contains" in schema
             for item in cover_schema_iter(ctx, items):
                 candidate = [*prefix_values, item.value]
+                # A single item can push the match count past `maxContains`.
+                if has_contains and not is_valid(candidate, schema):
+                    continue
                 if seen.insert(candidate):
                     yield PositiveValue(candidate, scenario=CoverageScenario.VALID_ARRAY, description="Valid array")
                     break
