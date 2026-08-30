@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,7 +38,6 @@ jobs:
       - name: Run benchmarks
         uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
-          token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "simulation"
           run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio --test-group=${{ matrix.shard }} --test-group-count=4
 
@@ -57,6 +60,5 @@ jobs:
       - name: Run memory benchmarks
         uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
-          token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "memory"
           run: uvx --from=pytest --with=".[bench]" pytest benches/memory/engine_run.py --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
