@@ -67,10 +67,12 @@ import schemathesis
 
 schema = schemathesis.openapi.from_url("https://your-api.com/openapi.json")
 
+
 @schema.parametrize()
 def test_api(case):
     # Tests with random data, edge cases, and invalid inputs
     case.call_and_validate()
+
 
 # Stateful testing: Tests workflows like: create user -> get user -> delete user
 APIWorkflow = schema.as_state_machine()

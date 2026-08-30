@@ -27,27 +27,17 @@ group = cli.add_group("Counter options")
 ### Step 2: Add options to the group
 
 ```python
-group.add_option(
-    "--counter-initial", 
-    type=int, 
-    default=0,
-    help="Initial counter value",
-    envvar="COUNTER_INITIAL"
-)
+group.add_option("--counter-initial", type=int, default=0, help="Initial counter value", envvar="COUNTER_INITIAL")
 
 group.add_option(
     "--counter-output",
     type=click.Path(file_okay=True, dir_okay=False, writable=True),
     help="File to write counter results",
-    envvar="COUNTER_OUTPUT"
+    envvar="COUNTER_OUTPUT",
 )
 
 group.add_option(
-    "--counter-verbose",
-    is_flag=True,
-    default=False,
-    help="Show detailed counter information",
-    envvar="COUNTER_VERBOSE"
+    "--counter-verbose", is_flag=True, default=False, help="Show detailed counter information", envvar="COUNTER_VERBOSE"
 )
 ```
 
@@ -99,9 +89,7 @@ class CounterHandler(cli.EventHandler):
 
         if self.output_file:
             self._write_output_file()
-            context.add_summary_line(
-                f"  Results written to: {self.output_file}"
-            )
+            context.add_summary_line(f"  Results written to: {self.output_file}")
 
     def _write_output_file(self):
         with open(self.output_file, "w") as f:

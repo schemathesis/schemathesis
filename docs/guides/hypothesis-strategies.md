@@ -41,6 +41,7 @@ Use `@schema.given()` to inject custom data into your Schemathesis tests. This w
 ```python
 from hypothesis import strategies as st
 
+
 # Generate authentication tokens
 @schema.given(auth_token=st.sampled_from(["token1", "token2", "token3"]))
 @schema.parametrize()
@@ -48,11 +49,13 @@ def test_api_with_auth(case, auth_token):
     case.headers["Authorization"] = f"Bearer {auth_token}"
     case.call_and_validate()
 
+
 # Use existing data for path parameters
 existing_user_ids = [1, 42, 123, 456]
 
+
 @schema.given(user_id=st.sampled_from(existing_user_ids))
-@schema.parametrize() 
+@schema.parametrize()
 def test_user_endpoints(case, user_id):
     if "user_id" in case.path_parameters:
         case.path_parameters["user_id"] = user_id
@@ -70,11 +73,13 @@ Each test will run multiple Hypothesis examples, so your custom data will be sam
     ```python
     from hypothesis import Phase, settings
 
+
     # 1. One for schema examples (without @schema.given()):
     @schema.parametrize()
     @settings(phases=[Phase.explicit])
     def test_user_endpoints_with_examples(case):
         case.call_and_validate()
+
 
     # 2. One for property-based testing with your custom strategies:
     @schema.given(user_id=st.sampled_from(existing_user_ids))
@@ -121,6 +126,7 @@ Since Hypothesis generates multiple examples, a new user is created and cleaned 
 admin_operations = schema["/admin"].as_strategy()
 regular_operations = schema["/posts"].as_strategy()
 
+
 @schema.given(data=st.data())
 @schema.parametrize()
 def test_user_workflow(case, data):
@@ -136,7 +142,7 @@ def test_user_workflow(case, data):
             admin_case.headers["User-ID"] = str(user_data["id"])
             admin_case.call_and_validate()
         else:
-            # Test regular user endpoints  
+            # Test regular user endpoints
             user_case = data.draw(regular_operations)
             user_case.headers["User-ID"] = str(user_data["id"])
             user_case.call_and_validate()
@@ -159,6 +165,7 @@ create_user_strategy = schema["/users"]["POST"].as_strategy()
 update_user_strategy = schema["/users/{id}"]["PUT"].as_strategy()
 delete_user_strategy = schema["/users/{id}"]["DELETE"].as_strategy()
 
+
 @given(data=st.data())
 def test_user_lifecycle(data):
     # Step 1: Always create user
@@ -172,13 +179,13 @@ def test_user_lifecycle(data):
         update_case = data.draw(update_user_strategy)
         update_case.path_parameters = {"id": user_id}
         update_case.call_and_validate()
-    
+
     if data.draw(st.booleans()):  # 50% chance
         # Create a post for this user
         post_case = data.draw(schema["/posts"]["POST"].as_strategy())
         post_case.body["author_id"] = user_id
         post_case.call_and_validate()
-    
+
     # Step 3: Always cleanup
     delete_case = data.draw(delete_user_strategy)
     delete_case.path_parameters = {"id": user_id}
@@ -196,6 +203,7 @@ from hypothesis import given
 # Create strategies for specific operations
 create_pet_strategy = schema["/pet"]["POST"].as_strategy()
 get_pet_strategy = schema["/pet/{id}"]["GET"].as_strategy()
+
 
 class TestAPI(TestCase):
     @given(case=create_pet_strategy)

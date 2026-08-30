@@ -41,10 +41,7 @@ paths:
 
 This schema tells Schemathesis to generate lists of dictionaries like:
 ```python
-[
-    {"first_name": "John", "last_name": "Doe"},
-    {"first_name": "Jane", "last_name": "Smith"}
-]
+[{"first_name": "John", "last_name": "Doe"}, {"first_name": "Jane", "last_name": "Smith"}]
 ```
 
 Register a serializer that converts these dictionaries to CSV bytes:
@@ -55,6 +52,7 @@ import csv
 import schemathesis
 from io import StringIO
 
+
 @schemathesis.serializer("text/csv")
 def csv_serializer(ctx, value):
     """Convert list of dictionaries to CSV bytes"""
@@ -62,10 +60,9 @@ def csv_serializer(ctx, value):
     if isinstance(value, bytes):
         return value
 
-    # Handle unexpected types in negative testing  
-    if not isinstance(value, list) or \
-      not all(isinstance(item, dict) for item in value):
-        return str(value).encode('utf-8')
+    # Handle unexpected types in negative testing
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        return str(value).encode("utf-8")
 
     if not value:
         return b""  # Empty CSV
@@ -77,7 +74,7 @@ def csv_serializer(ctx, value):
     writer.writeheader()
     writer.writerows(value)
 
-    return output.getvalue().encode('utf-8')  # Must return bytes or None
+    return output.getvalue().encode("utf-8")  # Must return bytes or None
 ```
 
 ```bash
@@ -106,10 +103,7 @@ schemathesis.serializer.alias("application/x-yaml-custom", "application/yaml")
 schemathesis.serializer.alias("application/vnd.company.internal", "application/json")
 
 # Register multiple aliases at once
-schemathesis.serializer.alias(
-    ["text/x-json", "application/jsonrequest"],
-    "application/json"
-)
+schemathesis.serializer.alias(["text/x-json", "application/jsonrequest"], "application/json")
 ```
 
 **Note:** Media types with `+json` or `+xml` suffixes (like `application/vnd.api+json`) are automatically handled. The following JSON variants are also recognized without aliases: `text/json`, `application/x-json`, `application/jwt`, `application/jose+jwe`.
@@ -117,9 +111,7 @@ schemathesis.serializer.alias(
 ### Multiple aliases for the same format
 
 ```python
-@schemathesis.serializer(
-    "text/csv", "text/comma-separated-values", "application/csv"
-)
+@schemathesis.serializer("text/csv", "text/comma-separated-values", "application/csv")
 def csv_serializer(ctx, value):
     # Same implementation handles all aliases
     if isinstance(value, bytes):
@@ -138,11 +130,11 @@ def context_aware_csv(ctx, value):
 
     # Different CSV format based on endpoint
     if "/bulk-import" in ctx.case.path:
-        delimiter = '\t'  # Use tabs for bulk import
+        delimiter = "\t"  # Use tabs for bulk import
     else:
-        delimiter = ','   # Use commas for regular upload
-    
-    return serialize_csv_with_delimiter(value, delimiter).encode('utf-8')
+        delimiter = ","  # Use commas for regular upload
+
+    return serialize_csv_with_delimiter(value, delimiter).encode("utf-8")
 ```
 
 !!! info "Automatic Transport Registration"

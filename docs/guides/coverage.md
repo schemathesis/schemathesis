@@ -105,14 +105,15 @@ When you mount your own `hooks.py` at `/app/hooks.py`, it replaces the built-in 
 
 ```python
 import tracecov
+
 tracecov.schemathesis.install()
 
 # your hooks below
 import schemathesis
 
+
 @schemathesis.hook
-def before_generate_query(context, strategy):
-    ...
+def before_generate_query(context, strategy): ...
 ```
 
 Or set `SCHEMATHESIS_COVERAGE=false` to skip tracecov without touching your hooks file.

@@ -108,12 +108,14 @@ You can customize the output location using `--report-junit-path` or change the 
 === "After (fixed)"
     ```python
     from enum import Enum
-    
+
+
     class RoomType(str, Enum):
         standard = "standard"
-        deluxe = "deluxe" 
+        deluxe = "deluxe"
         suite = "suite"
-    
+
+
     class BookingRequest(BaseModel):
         room_type: RoomType  # Only valid values
     ```

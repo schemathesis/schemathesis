@@ -4083,8 +4083,7 @@ import schemathesis
 
 # Apply auth only for operations that path starts with `/users/` but not the `POST` method
 @schemathesis.auth().apply_to(path_regex="^/users/").skip_for(method="POST")
-class MyAuth:
-    ...
+class MyAuth: ...
 ```
 
 -   Add a convenience mapping-like interface to `OperationDefinition`
@@ -4106,16 +4105,14 @@ schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
 # Schema-level auth
 # Before: @schema.auth.register()
 @schema.auth()
-class MyAuth:
-    ...
+class MyAuth: ...
 
 
 # Test-level auth
 # Before: @schema.auth.apply(MyAuth)
 @schema.auth(MyAuth)
 @schema.parametrize()
-def test_api(case):
-    ...
+def test_api(case): ...
 ```
 
 ### :bug: Fixed
@@ -5164,13 +5161,9 @@ for event in runner.execute():
 
 ``` python
 # BEFORE
-schema = schemathesis.from_uri(
-    "http://example.com/openapi.json", "http://127.0.0.1:8000/", "GET"
-)
+schema = schemathesis.from_uri("http://example.com/openapi.json", "http://127.0.0.1:8000/", "GET")
 # NOW
-schema = schemathesis.from_uri(
-    "http://example.com/openapi.json", base_url="http://127.0.0.1:8000/", method="GET"
-)
+schema = schemathesis.from_uri("http://example.com/openapi.json", base_url="http://127.0.0.1:8000/", method="GET")
 ```
 
 ### :wrench: Changed
