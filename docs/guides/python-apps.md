@@ -19,12 +19,15 @@ import schemathesis
 
 app = FastAPI()
 
+
 @app.get("/users")
 async def get_users():
     return [{"id": 1, "name": "Alice"}]
 
+
 # Load schema directly from the app
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
 
 @schema.parametrize()
 def test_api(case):
@@ -39,15 +42,19 @@ import schemathesis
 
 app = Flask(__name__)
 
+
 @app.route("/users")
 def get_users():
     return jsonify([{"id": 1, "name": "Alice"}])
+
 
 @app.route("/openapi.json")
 def openapi_spec():
     return {...}  # Your OpenAPI schema
 
+
 schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
 
 @schema.parametrize()
 def test_api(case):
@@ -75,6 +82,7 @@ App inspection reaches the request handlers' modules, plus - for Flask - the mod
 import schemathesis
 import myapp.resolvers
 
+
 @schemathesis.python.constants
 def _constants():
     return myapp.resolvers
@@ -93,11 +101,14 @@ import schemathesis
 
 app = FastAPI()
 
+
 @app.get("/users")
 async def get_users():
     return [{"id": 1, "name": "Alice"}]
 
+
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
 
 @schema.parametrize()
 def test_api_with_session(case):
@@ -121,6 +132,7 @@ import pytest
 from fastapi import FastAPI
 import schemathesis
 
+
 @pytest.fixture
 def configured_app(database_session):
     app = FastAPI()
@@ -132,11 +144,14 @@ def configured_app(database_session):
 
     return app
 
+
 @pytest.fixture
 def api_schema(configured_app):
     return schemathesis.openapi.from_asgi("/openapi.json", configured_app)
 
+
 schema = schemathesis.pytest.from_fixture("api_schema")
+
 
 @schema.parametrize()
 def test_operations(case):
@@ -153,15 +168,13 @@ import schemathesis
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
+
 @schema.auth()
 class AppAuth:
     def get(self, case, context):
         # Login to get a fresh token
         client = TestClient(context.app)
-        response = client.post("/auth/token", json={
-            "username": "test_user", 
-            "password": "test_password"
-        })
+        response = client.post("/auth/token", json={"username": "test_user", "password": "test_password"})
         return response.json()["access_token"]
 
     def set(self, case, data, context):

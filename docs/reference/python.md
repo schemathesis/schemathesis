@@ -282,19 +282,14 @@ st.lists(st.integers().map(nodes.Int), min_size=1, max_size=5).map(nodes.List)
 ```python
 import graphql
 
+
 # JSON object scalar (simplified)
 def create_object_field(key, value):
-    return graphql.ObjectFieldNode(
-        name=graphql.NameNode(value=key),
-        value=value
-    )
+    return graphql.ObjectFieldNode(name=graphql.NameNode(value=key), value=value)
+
 
 # Simple object with string fields
-st.dictionaries(
-    keys=st.text(min_size=1, max_size=10),
-    values=st.text().map(nodes.String),
-    min_size=1, max_size=3
-).map(lambda d: nodes.Object([
-    create_object_field(k, v) for k, v in d.items()
-]))
+st.dictionaries(keys=st.text(min_size=1, max_size=10), values=st.text().map(nodes.String), min_size=1, max_size=3).map(
+    lambda d: nodes.Object([create_object_field(k, v) for k, v in d.items()])
+)
 ```

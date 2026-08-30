@@ -204,13 +204,11 @@ Static options can't handle tokens that expire, so create a custom authenticatio
 import requests
 import schemathesis
 
+
 @schemathesis.auth()
 class TokenAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
-        response = requests.post(
-            "http://localhost:8000/auth/token",
-            json={"username": "demo", "password": "test"}
-        )
+        response = requests.post("http://localhost:8000/auth/token", json={"username": "demo", "password": "test"})
         return response.json()["access_token"]
 
     def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
@@ -233,27 +231,23 @@ class RefreshableAuth:
             return self.refresh_access_token()
         else:
             return self.login()
-    
+
     def login(self) -> str:
-        response = requests.post(
-            "http://localhost:8000/auth/login",
-            json={"username": "demo", "password": "test"}
-        )
+        response = requests.post("http://localhost:8000/auth/login", json={"username": "demo", "password": "test"})
         data = response.json()
         self.refresh_token = data["refresh_token"]
         return data["access_token"]
 
     def refresh_access_token(self) -> str:
         response = requests.post(
-            "http://localhost:8000/auth/refresh",
-            headers={"Authorization": f"Bearer {self.refresh_token}"}
+            "http://localhost:8000/auth/refresh", headers={"Authorization": f"Bearer {self.refresh_token}"}
         )
         data = response.json()
         if "refresh_token" in data:
             self.refresh_token = data["refresh_token"]
         return data["access_token"]
 
-    # Define `set` as before ... 
+    # Define `set` as before ...
 ```
 
 - `refresh_interval=600` - Get new tokens every 10 minutes
@@ -272,15 +266,12 @@ class ScopedAuth:
         scopes = get_required_scopes(ctx)
         response = requests.post(
             "http://localhost:8000/auth/token",
-            json={
-                "username": "demo", 
-                "password": "test",
-                "scopes": scopes.split(",") if scopes else []
-            }
+            json={"username": "demo", "password": "test", "scopes": scopes.split(",") if scopes else []},
         )
         return response.json()["access_token"]
 
-    # Define `set` as before ... 
+    # Define `set` as before ...
+
 
 def get_required_scopes(ctx: schemathesis.AuthContext) -> str:
     """Extract required OAuth scopes from operation security requirements"""
@@ -310,24 +301,21 @@ Apply authentication only to specific endpoints:
 @schemathesis.auth().apply_to(path="/users/").skip_for(method="POST")
 class UserAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
-        response = requests.post(
-            "http://localhost:8000/auth/user-token",
-            json={"username": "demo", "password": "test"}
-        )
+        response = requests.post("http://localhost:8000/auth/user-token", json={"username": "demo", "password": "test"})
         return response.json()["access_token"]
-    
-    # Define `set` as before ... 
+
+    # Define `set` as before ...
+
 
 @schemathesis.auth().apply_to(path="/admin/")
 class AdminAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         response = requests.post(
-            "http://localhost:8000/auth/admin-token",
-            json={"username": "admin", "password": "admin-pass"}
+            "http://localhost:8000/auth/admin-token", json={"username": "admin", "password": "admin-pass"}
         )
         return response.json()["access_token"]
-    
-    # Define `set` as before ... 
+
+    # Define `set` as before ...
 ```
 
 **Common filter patterns:**
@@ -351,11 +339,8 @@ class AdminAuth:
 To apply auth only to operations that require a specific OpenAPI security scheme:
 
 ```python
-@schemathesis.auth().apply_to(
-    schemathesis.openapi.require_security_scheme("session")
-)
-class SessionAuth:
-    ...
+@schemathesis.auth().apply_to(schemathesis.openapi.require_security_scheme("session"))
+class SessionAuth: ...
 ```
 
 ## Applying Different Auth to Different Operations
@@ -401,9 +386,7 @@ import schemathesis
 from requests_ntlm import HttpNtlmAuth
 
 # Use existing requests auth implementation
-schemathesis.auth.set_from_requests(
-    HttpNtlmAuth("domain\\username", "password")
-)
+schemathesis.auth.set_from_requests(HttpNtlmAuth("domain\\username", "password"))
 ```
 
 ## Setup
@@ -426,6 +409,7 @@ import schemathesis
 from requests.auth import HTTPDigestAuth
 
 schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
+
 
 @schema.parametrize()
 def test_api(case: schemathesis.Case) -> None:
@@ -455,6 +439,7 @@ class APITokenAuth:
         case.headers = case.headers or {}
         case.headers["Authorization"] = f"Bearer {data}"
 
+
 @schema.parametrize()
 def test_api(case: schemathesis.Case) -> None:
     # Auth applied automatically
@@ -465,7 +450,7 @@ Or register for specific tests only:
 
 ```python
 @schema.auth(MyAuth)
-@schema.parametrize() 
+@schema.parametrize()
 def test_protected_endpoints(case: schemathesis.Case) -> None:
     case.call_and_validate()
 ```
@@ -476,6 +461,7 @@ For persistent sessions or custom client configuration:
 
 ```python
 import requests
+
 
 @schema.parametrize()
 def test_with_session(case: schemathesis.Case) -> None:

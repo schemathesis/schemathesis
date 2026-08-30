@@ -13,6 +13,7 @@ schema = schemathesis.openapi.from_url(
     "http://127.0.0.1:8080/openapi.json",
 )
 
+
 @schema.parametrize()
 def test_api(case):
     case.call_and_validate()
@@ -65,7 +66,9 @@ When you need pytest fixtures for schema setup, use `schemathesis.pytest.from_fi
 def api_schema(database):
     return schemathesis.openapi.from_asgi("/openapi.json", app)
 
+
 schema = schemathesis.pytest.from_fixture("api_schema")
+
 
 @schema.parametrize()
 def test_api(case):
@@ -148,19 +151,18 @@ import schemathesis
 
 schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
 
+
 @pytest.mark.asyncio
 @schema.parametrize()
 async def test_api_async(case, client):
-    response = await client.request(
-        case.method, case.formatted_path, headers=case.headers
-    )
+    response = await client.request(case.method, case.formatted_path, headers=case.headers)
     schema[case.path][case.method].validate_response(response)
+
 
 # Or with trio
 @pytest.mark.trio
 @schema.parametrize()
-async def test_api_trio(case, client):
-    ...
+async def test_api_trio(case, client): ...
 ```
 
 !!! important "Async Network Calls"

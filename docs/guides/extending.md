@@ -17,6 +17,7 @@ Your API requires existing user IDs, but Schemathesis generates random values th
 # hooks.py
 import schemathesis
 
+
 @schemathesis.hook
 def map_query(ctx, query):
     if query and "user_id" in query:
@@ -100,12 +101,14 @@ SUBCATEGORIES = {
     "clothing": ["shirts", "pants", "shoes"],
 }
 
+
 @st.composite
 def with_subcategory(draw, body):
     category = (body or {}).get("category")
     options = SUBCATEGORIES.get(category, ["other"])
     subcategory = draw(st.sampled_from(options))
     return {**(body or {}), "subcategory": subcategory}
+
 
 @schemathesis.hook
 def flatmap_body(ctx, body):
@@ -128,9 +131,8 @@ def check_user_permissions(ctx, response, case):
         response_data = response.json()
         if response_data.get("id") != user_id:
             actual = response_data.get("id")
-            raise AssertionError(
-                f"Accessed wrong data: expected {user_id}, got {actual}"
-            )
+            raise AssertionError(f"Accessed wrong data: expected {user_id}, got {actual}")
+
 
 @schemathesis.check
 def check_audit_trail(ctx, response, case):
@@ -256,6 +258,7 @@ schemathesis.openapi.format("date", st.dates(max_value=today).map(str))
 # hooks.py (for CLI) or conftest.py (for pytest)
 import schemathesis
 
+
 @schemathesis.hook
 def map_headers(ctx, headers):
     if headers is None:
@@ -285,6 +288,7 @@ Put hooks in `conftest.py` to make them available to all tests:
 # test_api.py
 schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
 
+
 @schema.parametrize()
 def test_api(case):
     case.call_and_validate()
@@ -299,6 +303,7 @@ def map_headers(ctx, headers):
     headers = headers or {}
     headers["X-User-Context"] = "test-user"
     return headers
+
 
 # Only apply to a specific operation
 @schemathesis.hook.apply_to(name="GET /orders/{order_id}")
@@ -331,6 +336,7 @@ def before_init_operation(ctx, operation):
     for alternative in operation.body:
         schema = alternative.definition.get("schema", {})
         remove_optional_properties(schema)
+
 
 def remove_optional_properties(schema):
     if not isinstance(schema, dict):
@@ -382,12 +388,14 @@ def filter_body(ctx, body):
 ```python
 from hypothesis import strategies as st
 
+
 @schemathesis.hook
 def flatmap_body(ctx, body):
     node = body.definitions[0].selection_set.selections[0]
     if node.name.value == "someField":
         return st.just(body).map(lambda b: modify_body(b, "someDependentField"))
     return st.just(body)
+
 
 def modify_body(body, new_field_name):
     new_field = ...  # Create a new field node

@@ -70,6 +70,7 @@ schema = schemathesis.openapi.from_url(
 # To show the token in the cURL snippet
 schema.config.output.sanitization.update(enabled=False)
 
+
 @schema.parametrize()
 def test_api(case):
     case.call_and_validate(headers={"Authorization": "Bearer secret-token"})
@@ -152,10 +153,12 @@ Run the provided `curl` command to reproduce this failure.
     ```python
     from enum import Enum
 
+
     class RoomType(str, Enum):
         standard = "standard"
-        deluxe = "deluxe" 
+        deluxe = "deluxe"
         suite = "suite"
+
 
     class BookingRequest(BaseModel):
         room_type: RoomType  # Only valid values
@@ -176,6 +179,7 @@ import schemathesis
 
 schema = ...  # snip
 
+
 @schema.include(operation_id="create_booking_bookings_post").parametrize()
 def test_api(case):
     case.call_and_validate(headers={"Authorization": "Bearer secret-token"})
@@ -195,6 +199,7 @@ import schemathesis
 from hypothesis import settings
 
 schema = ...  # snip
+
 
 @schema.parametrize()
 @settings(max_examples=500)
@@ -238,6 +243,7 @@ schema = schemathesis.openapi.from_url(
     "http://127.0.0.1:8080/openapi.json",
 )
 
+
 @schema.parametrize()
 def test_api(case):
     case.call_and_validate()
@@ -248,13 +254,8 @@ Schemathesis automatically loads `schemathesis.toml` from the current directory 
 ```python
 import schemathesis
 
-config = schemathesis.Config.from_path(
-    "path-to-my/config.toml"
-)
-schema = schemathesis.openapi.from_url(
-    "http://127.0.0.1:8080/openapi.json",
-    config=config
-)
+config = schemathesis.Config.from_path("path-to-my/config.toml")
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json", config=config)
 ```
 
 ## What's next?

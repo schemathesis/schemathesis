@@ -7,6 +7,7 @@ Schemathesis validates API responses against JSON Schema definitions. JSON and Y
 ```python
 import schemathesis
 
+
 @schemathesis.deserializer("application/vnd.custom")
 def decode_custom(ctx: schemathesis.DeserializationContext, response):
     try:
@@ -32,6 +33,7 @@ Example using context:
 
 ```python
 import msgpack
+
 
 @schemathesis.deserializer("application/vnd.api+msgpack")
 def deserialize_msgpack(ctx: schemathesis.DeserializationContext, response):

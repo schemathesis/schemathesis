@@ -60,6 +60,7 @@ import schemathesis
 
 schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
 
+
 class APIWorkflow(schema.as_state_machine()):
     def setup(self):
         """Run once at the start of each test scenario."""
@@ -72,6 +73,7 @@ class APIWorkflow(schema.as_state_machine()):
 
     def after_call(self, response, case):
         """Process every response."""
+
 
 TestAPI = APIWorkflow.TestCase
 ```
@@ -164,11 +166,13 @@ Or use pytest fixtures:
 ```python
 import pytest
 
+
 @pytest.fixture(scope="session")
 def database():
     # create database
-    yield 
+    yield
     # drop database
+
 
 @pytest.mark.usefixtures("database")
 class TestAPI(APIWorkflow.TestCase):
@@ -186,14 +190,17 @@ When your application requires fixtures to initialize (database connections, app
 import pytest
 import schemathesis
 
+
 @pytest.fixture
 def api_schema(database, app_config):
     # Schema loading requires initialized app
     return schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
 
-@pytest.fixture  
+
+@pytest.fixture
 def state_machine(api_schema):
     return api_schema.as_state_machine()
+
 
 def test_statefully(state_machine):
     state_machine.run()
@@ -252,10 +259,7 @@ Create realistic test data at the start of each scenario:
 class APIWorkflow(schema.as_state_machine()):
     def setup(self):
         # Create a test user for this scenario
-        case = schema["/users"]["POST"].Case(body={
-            "username": "test_user",
-            "email": "test@example.com"
-        })
+        case = schema["/users"]["POST"].Case(body={"username": "test_user", "email": "test@example.com"})
         response = case.call()
         self.user_id = response.json()["id"]
 
@@ -272,13 +276,13 @@ Handle login and token management for protected endpoints:
 ```python
 import requests
 
+
 class APIWorkflow(schema.as_state_machine()):
     def setup(self):
         # Login and get auth token
-        response = requests.post("http://localhost:8000/auth/login", json={
-            "username": "test_user",
-            "password": "test_password"
-        })
+        response = requests.post(
+            "http://localhost:8000/auth/login", json={"username": "test_user", "password": "test_password"}
+        )
         token = response.json()["access_token"]
         self.auth_headers = {"Authorization": f"Bearer {token}"}
 

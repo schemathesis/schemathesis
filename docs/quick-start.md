@@ -56,9 +56,10 @@ Reproduce with:
 === "pytest integration"
     ```python
     import schemathesis
-    
+
     schema = schemathesis.openapi.from_url("https://your-api.com/openapi.json")
-    
+
+
     @schema.parametrize()
     def test_api(case):
         # Automatically calls your API and validates the response

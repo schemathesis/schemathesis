@@ -66,6 +66,7 @@ Schemathesis allows you to register your own metrics to guide targeted testing. 
 # metrics.py
 import schemathesis
 
+
 @schemathesis.metric
 def response_size(ctx: schemathesis.MetricContext) -> float:
     """Favor responses with larger payloads."""

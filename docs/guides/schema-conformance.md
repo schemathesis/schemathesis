@@ -16,9 +16,7 @@ def test_get_user():
 
 ```python
 def test_with_conditional_logic():
-    response = requests.post(
-        "http://api.example.com/users", json={"name": "Alice"}
-    )
+    response = requests.post("http://api.example.com/users", json={"name": "Alice"})
 
     assert schema["/users"]["POST"].is_valid_response(response)
 ```
@@ -29,14 +27,14 @@ def test_with_conditional_logic():
 import pytest
 import schemathesis
 
+
 @pytest.fixture(scope="session")
 def api_schema():
     return schemathesis.openapi.from_url("http://api.example.com/openapi.json")
 
+
 def test_user_workflow(api_schema):
-    create_response = requests.post(
-        "http://api.example.com/users", json={"name": "Test"}
-    )
+    create_response = requests.post("http://api.example.com/users", json={"name": "Test"})
     user_id = create_response.json()["id"]
 
     api_schema["/users"]["POST"].validate_response(create_response)

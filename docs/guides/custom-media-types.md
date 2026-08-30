@@ -63,12 +63,14 @@ schemathesis.openapi.media_type("image/*", image_strategy)
 import zipfile
 import io
 
+
 def create_test_zip():
     """Create a minimal valid ZIP file"""
     buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, 'w') as zf:
+    with zipfile.ZipFile(buffer, "w") as zf:
         zf.writestr("test.txt", "test content")
     return buffer.getvalue()
+
 
 zip_strategy = st.just(create_test_zip())
 schemathesis.openapi.media_type("application/zip", zip_strategy)
@@ -80,10 +82,12 @@ Register strategies using wildcard patterns to match multiple media types:
 
 ```python
 # Register a single strategy for all image types
-image_strategy = st.sampled_from([
-    b"\x89PNG\r\n\x1a\n...",  # PNG
-    b"\xff\xd8\xff\xe0...",   # JPEG
-])
+image_strategy = st.sampled_from(
+    [
+        b"\x89PNG\r\n\x1a\n...",  # PNG
+        b"\xff\xd8\xff\xe0...",  # JPEG
+    ]
+)
 schemathesis.openapi.media_type("image/*", image_strategy)
 ```
 
@@ -118,11 +122,7 @@ Wildcards work bidirectionally - you can register `image/*` and use `image/png` 
 
 ```python
 # Register PDF strategy with common aliases
-schemathesis.openapi.media_type(
-    "application/pdf",
-    pdf_strategy,
-    aliases=["application/x-pdf", "application/acrobat"]
-)
+schemathesis.openapi.media_type("application/pdf", pdf_strategy, aliases=["application/x-pdf", "application/acrobat"])
 
 # Handles application/pdf, application/x-pdf, and application/acrobat
 ```
@@ -132,17 +132,15 @@ schemathesis.openapi.media_type(
 ```python
 from hypothesis import strategies as st
 
+
 @st.composite
 def dynamic_xml(draw):
     """Generate XML with random but valid structure"""
-    tag_name = draw(st.text(
-        alphabet=st.characters(
-            whitelist_categories=["L"]), min_size=3, max_size=10
-        )
-    )
+    tag_name = draw(st.text(alphabet=st.characters(whitelist_categories=["L"]), min_size=3, max_size=10))
     content = draw(st.text(min_size=1, max_size=50))
 
     return f"<?xml version='1.0'?><{tag_name}>{content}</{tag_name}>".encode()
+
 
 schemathesis.openapi.media_type("application/xml", dynamic_xml())
 ```

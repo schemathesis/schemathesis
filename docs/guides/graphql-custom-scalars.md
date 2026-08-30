@@ -37,12 +37,11 @@ from schemathesis.graphql import nodes
 
 # Configure custom scalars
 schemathesis.graphql.scalar("Email", st.emails().map(nodes.String))
-schemathesis.graphql.scalar(
-    "PositiveInt", st.integers(min_value=1).map(nodes.Int)
-)
+schemathesis.graphql.scalar("PositiveInt", st.integers(min_value=1).map(nodes.Int))
 
 # Load schema and run tests
 schema = schemathesis.graphql.from_url("http://localhost:8000/graphql")
+
 
 @schema.parametrize()
 def test_graphql_api(case):
@@ -58,17 +57,13 @@ def test_graphql_api(case):
 ```python
 schemathesis.graphql.scalar("Email", st.emails().map(nodes.String))
 schemathesis.graphql.scalar("URL", st.urls().map(nodes.String))
-schemathesis.graphql.scalar(
-    "Phone", st.from_regex(r"\+1-\d{3}-\d{3}-\d{4}").map(nodes.String)
-)
+schemathesis.graphql.scalar("Phone", st.from_regex(r"\+1-\d{3}-\d{3}-\d{4}").map(nodes.String))
 ```
 
 **Numeric scalars:**
 ```python
 schemathesis.graphql.scalar("Percentage", st.integers(0, 100).map(nodes.Int))
-schemathesis.graphql.scalar(
-    "Price", st.decimals(min_value=0, max_value=1000, places=2).map(nodes.Float)
-)
+schemathesis.graphql.scalar("Price", st.decimals(min_value=0, max_value=1000, places=2).map(nodes.Float))
 ```
 
 **Constrained scalars:**
@@ -77,11 +72,7 @@ schemathesis.graphql.scalar(
 from datetime import date
 
 schemathesis.graphql.scalar(
-    "RecentDate", 
-    st.dates(
-        min_value=date(2020, 1, 1), 
-        max_value=date(2030, 12, 31)
-    ).map(str).map(nodes.String)
+    "RecentDate", st.dates(min_value=date(2020, 1, 1), max_value=date(2030, 12, 31)).map(str).map(nodes.String)
 )
 ```
 
@@ -103,6 +94,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.graphql import nodes
 
+
 def dict_to_object_fields(data: dict) -> list:
     """Convert a dictionary to a list of ObjectFieldNode instances."""
     fields = []
@@ -112,6 +104,7 @@ def dict_to_object_fields(data: dict) -> list:
         field_node = graphql.ObjectFieldNode(name=name_node, value=value_node)
         fields.append(field_node)
     return fields
+
 
 def python_value_to_ast_node(value):
     """Convert a Python value to the appropriate GraphQL AST ValueNode."""
@@ -133,6 +126,7 @@ def python_value_to_ast_node(value):
         return graphql.ObjectValueNode(fields=tuple(fields))
     raise ValueError("Unsupported value")
 
+
 # Register JSON scalar
 alphabet = st.characters(min_codepoint=ord("A"), max_codepoint=ord("Z"))
 schemathesis.graphql.scalar(
@@ -145,12 +139,10 @@ schemathesis.graphql.scalar(
             | st.floats(allow_nan=False, allow_infinity=False)
             | st.booleans()
             | st.none(),
-            lambda strategy: st.lists(strategy, max_size=3)
-            | st.dictionaries(
-                  keys=st.text(min_size=1, max_size=10, alphabet=alphabet), 
-                  values=strategy, 
-                  max_size=3
-              ),
+            lambda strategy: (
+                st.lists(strategy, max_size=3)
+                | st.dictionaries(keys=st.text(min_size=1, max_size=10, alphabet=alphabet), values=strategy, max_size=3)
+            ),
         ),
         min_size=1,
         max_size=5,
