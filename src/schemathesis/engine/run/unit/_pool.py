@@ -50,6 +50,10 @@ def split_results(
     return successes, errors
 
 
+# Put on the events queue by each worker as it exits, so the consumer need not poll to notice.
+WORKER_FINISHED = object()
+
+
 class WorkerPool:
     """Manages a pool of worker threads."""
 
@@ -79,6 +83,7 @@ class WorkerPool:
         finally:
             # A worker stopping mid-operation must not block the layer barrier forever
             self.scheduler.release()
+            self.events_queue.put(WORKER_FINISHED)
 
     def start(self) -> None:
         """Start all worker threads."""

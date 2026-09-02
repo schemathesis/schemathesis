@@ -32,7 +32,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.unit._direct_executor import run_driver
-from schemathesis.engine.run.unit._pool import WorkerPool
+from schemathesis.engine.run.unit._pool import WORKER_FINISHED, WorkerPool
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import overrides
 from schemathesis.generation.drivers import CoverageGenerator, ExamplesGenerator
@@ -122,10 +122,16 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
             phase=phase.name,
             suite_id=suite_started.id,
         ) as pool:
+            finished = 0
             try:
                 while True:
                     try:
                         event = pool.events_queue.get(timeout=WORKER_TIMEOUT)
+                        if event is WORKER_FINISHED:
+                            finished += 1
+                            if finished == len(pool.workers):
+                                break
+                            continue
                         is_executed = True
                         if engine.is_interrupted:
                             raise KeyboardInterrupt
