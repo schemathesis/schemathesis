@@ -6,6 +6,10 @@
 
 - `--report json` writes the run's verdict as one JSON document.
 
+### :racing_car: Performance
+
+- ~100 ms less overhead in each examples, coverage, and fuzzing phase.
+
 ### :bug: Fixed
 
 - Write-only property violations in responses reported as `{} is not allowed`.
