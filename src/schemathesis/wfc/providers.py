@@ -137,6 +137,7 @@ class LoginEndpointAuthProvider:
     def _fetch_asgi(self, app: Any, context: AuthContext) -> _LoginResponse:
         timeout = context.operation.schema.config.request_timeout_for(operation=context.operation)
         body, headers = self._body_and_headers()
+        assert self.config.endpoint is not None
         try:
             with asgi.get_client(app) as client:
                 response = client.request(

@@ -46,8 +46,8 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
 
     """
     require_relative_url(path)
-    client = asgi.get_client(app)
-    response = load_from_url(client.get, url=path, **kwargs)
+    with asgi.get_client(app) as client:
+        response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(decode_lossy(response.content, response.encoding), content_type)
     loaded = from_dict(schema=schema, config=config)

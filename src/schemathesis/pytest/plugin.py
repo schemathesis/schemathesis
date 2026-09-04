@@ -50,6 +50,7 @@ from schemathesis.generation.stateful.state_machine import StatefulCallbackMark,
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_constants_warnings, emit_openapi_auth_warnings
+from schemathesis.python import asgi
 from schemathesis.python._constants.orchestrator import make_constants_value_source
 from schemathesis.schemas import APIOperation
 
@@ -681,6 +682,15 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
+    # Applications reached over ASGI keep their lifespan running between requests; end it with the test that
+    # started it, while its fixtures are still alive.
+    try:
+        asgi.shutdown_lifespans()
+    finally:
+        _teardown_reporting(item)
+
+
+def _teardown_reporting(item: pytest.Item) -> None:
     item_cls = getattr(item, "cls", None)
     if item_cls is not None and StatefulSchemaMark.is_set(item_cls):
         StatefulCallbackMark.set(item_cls, None)

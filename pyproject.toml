@@ -32,6 +32,7 @@ classifiers = [
   "Topic :: Software Development :: Testing",
 ]
 dependencies = [
+  "anyio>=4.5,<5",
   "click>=8.0,<9",
   "harfile>=0.5.0,<1.0",
   "hypothesis>=6.130.12,<7",
@@ -42,7 +43,6 @@ dependencies = [
   "PyYAML>=5.1,<7.0",
   "requests>=2.22,<3",
   "rich>=13.9.4",
-  "starlette-testclient>=0.4.1,<1",
   "tomli>=2.2.1; python_version < '3.11'",
   "typing-extensions>=4.12.2",
   "werkzeug>=0.16.0,<4",

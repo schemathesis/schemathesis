@@ -98,13 +98,13 @@ class Auth:
 """
     if python_app_type == "asgi":
         return """
-from starlette_testclient import TestClient
+from schemathesis.python.asgi import ASGIClient
 
 @schema.auth()
 class Auth:
 
     def get(self, case, context):
-        client = TestClient(context.app)
+        client = ASGIClient(context.app)
         response = client.post("/auth/token/", json={"username": "test", "password": "pass"})
         return response.json()["access_token"]
 

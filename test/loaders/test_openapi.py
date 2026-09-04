@@ -28,6 +28,33 @@ def test_openapi_asgi_loader(run_test):
     run_test(strategy)
 
 
+def test_openapi_asgi_loader_starts_lifespan():
+    # A schema route may only be able to answer once the application has started.
+    spec = {
+        "openapi": "3.0.2",
+        "info": {"title": "t", "version": "1"},
+        "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    }
+
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    scope["state"]["spec"] = spec
+                    await send({"type": "lifespan.startup.complete"})
+                else:
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+        body = json.dumps(scope["state"]["spec"]).encode()
+        await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": body})
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    operations = [result.ok() for result in schema.get_all_operations()]
+    assert [f"{operation.method.upper()} {operation.path}" for operation in operations] == ["GET /users"]
+
+
 def test_openapi_wsgi_loader(ctx, run_test):
     # When a WSGI app is loaded via `from_wsgi`
     api = ctx.openapi.apps.success()

@@ -96,8 +96,8 @@ Use custom test clients for shared configuration, authentication, or application
 
 ```python
 from fastapi import FastAPI
-from starlette.testclient import TestClient
 import schemathesis
+from schemathesis.python.asgi import ASGIClient
 
 app = FastAPI()
 
@@ -112,8 +112,8 @@ schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 @schema.parametrize()
 def test_api_with_session(case):
-    with TestClient(app) as client:
-        # Client handles startup/shutdown events automatically
+    with ASGIClient(app) as client:
+        # Entering the client starts the application lifespan
         case.call_and_validate(session=client)
 ```
 
@@ -163,8 +163,8 @@ def test_operations(case):
 For scenarios where you need to dynamically obtain authentication tokens (login flows, OAuth), integrate with your app's auth system:
 
 ```python
-from starlette.testclient import TestClient
 import schemathesis
+from schemathesis.python.asgi import ASGIClient
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
@@ -173,7 +173,7 @@ schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 class AppAuth:
     def get(self, case, context):
         # Login to get a fresh token
-        client = TestClient(context.app)
+        client = ASGIClient(context.app)
         response = client.post("/auth/token", json={"username": "test_user", "password": "test_password"})
         return response.json()["access_token"]
 

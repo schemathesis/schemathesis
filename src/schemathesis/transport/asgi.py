@@ -21,6 +21,9 @@ class ASGITransport(RequestsTransport):
             kwargs["base_url"] = normalize_base_url(case.operation.base_url)
         application = kwargs.pop("app", case.operation.app)
 
+        if session is not None:
+            return super().send(case, session=session, **kwargs)
+
         with asgi.get_client(application) as client:
             return super().send(case, session=client, **kwargs)
 
