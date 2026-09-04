@@ -46,8 +46,8 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     """
     require_relative_url(path)
     kwargs.setdefault("json", {"query": get_introspection_query()})
-    client = asgi.get_client(app)
-    response = load_from_url(client.post, url=path, **kwargs)
+    with asgi.get_client(app) as client:
+        response = load_from_url(client.post, url=path, **kwargs)
     schema = extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
     loaded = from_dict(schema=schema, config=config)
     loaded.app = app

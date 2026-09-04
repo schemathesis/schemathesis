@@ -5,13 +5,30 @@
 ### :rocket: Added
 
 - `--report json` writes the run's verdict as one JSON document.
+- Support for `state` in the ASGI lifespan scope.
+
+### :wrench: Changed
+
+- Drop `starlette-testclient` and `starlette` dependencies.
+- ASGI application state persists between generated test cases.
+- ASGI lifespan shutdown runs per pytest test, or at process exit outside pytest.
 
 ### :racing_car: Performance
 
 - ~100 ms less overhead in each examples, coverage, and fuzzing phase.
+- Single event loop shared by ASGI applications, with one lifespan cycle per test.
 
 ### :bug: Fixed
 
+- ASGI application support failing with `anyio` 4.15.
+- `HEAD` operations against ASGI applications failing with an internal `AttributeError`.
+- ASGI applications that do not implement the lifespan protocol failing with a `TypeError`.
+- ASGI applications serving requests after reporting a failed startup.
+- ASGI lifespan failures after startup or after shutdown completes going unreported.
+- IPv6 and userinfo base URLs rejected for ASGI applications.
+- `session` passed to `case.call()` ignored for ASGI applications.
+- Request timeouts ignored for ASGI applications, leaving a hung handler unbounded.
+- ASGI lifespan not started while fetching the schema.
 - Write-only property violations in responses reported as `{} is not allowed`.
 - Read-only property violations in requests reported as a valid value of its type.
 - Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.
