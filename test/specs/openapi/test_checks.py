@@ -10,7 +10,7 @@ from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
 from schemathesis.core.mutations import OperatorKind
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import EncodedPath, ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
@@ -1103,6 +1103,52 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
     )
 
 
+def test_negative_data_rejection_multiple_mutations_name_parameters(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "kind", "in": "query", "required": True, "schema": {"type": "string", "minLength": 2}},
+                        {"name": "tag", "in": "query", "required": False, "schema": {"type": "string", "minLength": 2}},
+                    ],
+                    "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    operation = schema["/api/items"]["GET"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="Violates `minLength` at /properties/kind\nViolates `minLength` at /properties/tag",
+            parameter_location=ParameterLocation.QUERY,
+            mutations=tuple(
+                Mutation(
+                    path=(),
+                    schema_pointer=f"/properties/{name}",
+                    channel=MutationChannel.SCHEMA,
+                    operator=OperatorKind.NEGATE_CONSTRAINTS,
+                    keywords=("minLength",),
+                    parameter=name,
+                    original_value=None,
+                    new_value=None,
+                )
+                for name in ("kind", "tag")
+            ),
+        ),
+        query={"kind": "", "tag": ""},
+    )
+
+    with pytest.raises(AcceptedNegativeData) as exc:
+        negative_data_rejection(check_context(), response_factory.requests(status_code=200), case)
+
+    assert "Invalid component: parameters `kind`, `tag` in query" in str(exc.value)
+
+
 @pytest.mark.parametrize(
     ("value", "reported"),
     [
@@ -1189,6 +1235,37 @@ def test_negative_data_rejection_path_string_numeric_serialization(ctx, response
         )
         is None
     )
+
+
+def test_negative_data_rejection_encoded_path_value(ctx, response_factory):
+    # Already-encoded path values carry a `str` subclass that the JSON Schema validator rejects.
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/run/{id}": {
+                "post": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "string", "minLength": 1}}
+                    ],
+                    "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    operation = schema["/api/run/{id}"]["POST"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="Invalid type integer (expected string)",
+            parameter="id",
+            parameter_location=ParameterLocation.PATH,
+        ),
+        path_parameters={"id": EncodedPath("abc")},
+    )
+
+    assert negative_data_rejection(check_context(), response_factory.requests(status_code=200), case) is None
 
 
 def test_negative_data_rejection_path_string_numeric_serialization_with_other_negation(ctx, response_factory):

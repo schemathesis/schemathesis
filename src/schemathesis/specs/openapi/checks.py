@@ -501,7 +501,8 @@ def _string_type_mutation_becomes_valid_after_serialization(case: Case, location
         expected_types = get_type(parameter.definition.get("schema", {}))
 
         if isinstance(value, (str, int, float)):
-            wire_value = value if isinstance(value, str) else str(value)
+            # `str` subclasses like already-encoded path values are rejected by the validator.
+            wire_value = str(value)
             # Path parameters are URL-encoded; decode before parsing.
             if location == ParameterLocation.PATH:
                 wire_value = unquote(wire_value)
@@ -669,8 +670,16 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
                 # Build structured message: parameter `name` in location - description
                 # For body, don't show parameter name (it's the media type, not useful)
                 location = phase.data.parameter_location
-                if phase.data.parameter and location != ParameterLocation.BODY:
-                    parts.append(f"parameter `{phase.data.parameter}`")
+                if location != ParameterLocation.BODY:
+                    # A case mutating several parameters carries no single name, but each mutation knows its own.
+                    names = (
+                        [phase.data.parameter]
+                        if phase.data.parameter
+                        else list(dict.fromkeys(m.parameter for m in phase.data.mutations if m.parameter))
+                    )
+                    if names:
+                        label = "parameter" if len(names) == 1 else "parameters"
+                        parts.append(f"{label} " + ", ".join(f"`{name}`" for name in names))
                 if location:
                     parts.append(f"in {location.name.lower()}")
                 # Lowercase first letter of description for consistency
