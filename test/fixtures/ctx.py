@@ -260,6 +260,9 @@ class OpenAPIApps:
     def wfc_login_plain(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_login_plain())
 
+    def wfc_role_gated(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_role_gated())
+
     def planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug())
 

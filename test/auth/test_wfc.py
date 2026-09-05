@@ -9,6 +9,8 @@ from flask import Flask
 
 import schemathesis
 from schemathesis.auths import AuthContext
+from schemathesis.core.cache import Manifest, write
+from schemathesis.core.cache.models import FORMAT_VERSION
 from schemathesis.wfc.converter import wfc_to_auth_provider
 from schemathesis.wfc.errors import WFCLoginError
 from schemathesis.wfc.loader import load_from_dict
@@ -868,3 +870,150 @@ def test_auth_entry_wins_over_the_template():
 
     assert entry.login_endpoint_auth.endpoint == "/own"
     assert entry.login_endpoint_auth.verb == "POST"
+
+
+ROLE_AUTH = {
+    "auth": [
+        {"name": "viewer", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey viewer"}]},
+        {"name": "editor", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey editor"}]},
+        {"name": "admin", "fixedHeaders": [{"name": "Authorization", "value": "ApiKey admin"}]},
+    ]
+}
+
+
+def _identities(api, method, prefix):
+    return {
+        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
+        for r in api.requests
+        if r.method == method and r.path.startswith(prefix)
+    }
+
+
+def test_escalation_walks_the_chain_until_admitted(cli, ctx, tmp_path):
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing")
+
+    assert _identities(api, "GET", "/api/open") == {"viewer"}
+    assert "admin" not in _identities(api, "DELETE", "/api/editor-only")
+    assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "editor", "admin"}
+
+
+def test_rejected_payloads_do_not_block_escalation(cli, ctx, tmp_path):
+    # `/api/validated` answers 400 before checking the role, so 403s arrive interleaved with 400s.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=15", f"--auth-wfc={auth}", "--phases=fuzzing")
+    assert "admin" in _identities(api, "POST", "/api/validated")
+
+
+def test_pinned_user_never_escalates(cli, ctx, tmp_path):
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing", "--auth-wfc-user=viewer")
+    assert _identities(api, "DELETE", "/api/admin-only") == {"viewer"}
+
+
+def test_assignment_is_restored_from_cache(cli, ctx, tmp_path):
+    # A second run starts where the first settled instead of walking the chain again.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+    cache_dir = tmp_path / "cache"
+    config = {"cache": {"directory": str(cache_dir)}, "auth": {"wfc": {"path": auth}}}
+
+    cli.run(api.schema_url, "--max-examples=8", "--phases=fuzzing", config=config)
+    first = len(api.requests)
+    cli.run(api.schema_url, "--max-examples=8", "--phases=fuzzing", config=config)
+
+    second = [r for r in api.requests[first:] if r.method == "DELETE" and "admin-only" in r.path]
+    assert second, "second run never reached the gated operation"
+    assert {(r.headers.get("Authorization") or "").removeprefix("ApiKey ") for r in second} == {"admin"}
+
+
+def test_failure_names_the_identity(cli, ctx, tmp_path):
+    # With several identities in play, a report that does not say which one ran is ambiguous.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    result = cli.run(
+        api.schema_url, "--max-examples=8", "--phases=fuzzing", f"--auth-wfc={auth}", "-c", "not_a_server_error"
+    )
+
+    assert "Server error" in result.stdout
+    # The name alone is not actionable; the flag that reproduces it is.
+    assert "Identity: admin (reproduce with --auth-wfc-user admin)" in result.stdout
+
+
+def test_ndjson_records_the_identity(cli, ctx, tmp_path):
+    # Sanitization filters the header, so without the name the report cannot tell identities apart.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+    report = tmp_path / "events.ndjson"
+
+    cli.run(
+        api.schema_url,
+        "--max-examples=8",
+        "--phases=fuzzing",
+        f"--auth-wfc={auth}",
+        "-c",
+        "not_a_server_error",
+        "--report",
+        "ndjson",
+        "--report-ndjson-path",
+        str(report),
+    )
+
+    identities = {
+        node.get("value", {}).get("auth_identity")
+        for line in report.read_text().splitlines()
+        if line
+        for node in json.loads(line).get("ScenarioFinished", {}).get("recorder", {}).get("cases", {}).values()
+    }
+    assert "admin" in identities
+
+
+def test_exhausted_chain_stays_on_the_last_identity(cli, ctx, tmp_path):
+    # No identity can reach this operation; escalation must stop at the end rather than wrap.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=8", "--phases=fuzzing", f"--auth-wfc={auth}", "-c", "not_a_server_error")
+
+    seen = [
+        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
+        for r in api.requests
+        if r.method == "DELETE" and r.path.startswith("/api/nobody")
+    ]
+    assert seen, "operation was never dispatched"
+    assert seen[-1] == "admin"
+
+
+def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
+    # The auth file may have been edited since the cache was written.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    manifest = Manifest(
+        format_version=FORMAT_VERSION,
+        schemathesis_version="0.0.0",
+        schema_location=api.schema_url,
+        base_url=api.base_url,
+        created_at="2026-01-01T00:00:00Z",
+        auth_identities={"GET /api/open": "ghost"},
+    )
+    write(cache_dir, manifest, [])
+
+    cli.run(
+        api.schema_url,
+        "--max-examples=8",
+        "--phases=fuzzing",
+        "-c",
+        "not_a_server_error",
+        config={"cache": {"directory": str(cache_dir)}, "auth": {"wfc": {"path": auth}}},
+    )
+
+    assert _identities(api, "GET", "/api/open") == {"viewer"}

@@ -285,6 +285,7 @@ def display_failures_for_single_test(
                 response=group.response,
                 failures=group.failures,
                 curl=reproduce,
+                auth_identity=group.auth_identity,
                 formatter=failure_formatter,
                 config=config,
             )

@@ -93,6 +93,8 @@ class Manifest:
     created_at: str
     # Monotonic counter; bumped each time `cache.run()` rewrites the file.
     next_run_id: int = 1
+    # Operation label -> WFC auth entry name that got past authorization last run.
+    auth_identities: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,6 +104,7 @@ class Manifest:
             "base_url": self.base_url,
             "created_at": self.created_at,
             "next_run_id": self.next_run_id,
+            "auth_identities": self.auth_identities,
         }
 
     @classmethod
@@ -117,4 +120,5 @@ class Manifest:
             base_url=data["base_url"],
             created_at=data["created_at"],
             next_run_id=data["next_run_id"],
+            auth_identities=data.get("auth_identities", {}),
         )
