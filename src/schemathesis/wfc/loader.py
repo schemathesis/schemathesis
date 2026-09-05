@@ -175,8 +175,6 @@ def _validate_login_endpoint(login: LoginEndpoint, context: str) -> None:
     has_token = login.token is not None
     if has_token and login.expect_cookies is True:
         raise WFCValidationError(f"{context}: Cannot specify both 'token' and 'expectCookies=true'. Choose one.")
-    if not has_token and login.expect_cookies is not True:
-        raise WFCValidationError(f"{context}: Must specify either 'token' or 'expectCookies=true'.")
     if has_token:
         assert login.token is not None
         _validate_token_handling(login.token, f"{context}.token")

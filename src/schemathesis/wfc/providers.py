@@ -159,7 +159,8 @@ class LoginEndpointAuthProvider:
                 f"Login endpoint returned status {response.status_code}. Expected 200 or 201. "
                 f"Response: {response.text[:200]}"
             )
-        if self.config.expect_cookies:
+        # No token to extract means the login can only hand back a session.
+        if self.config.expect_cookies or self.config.token is None:
             if not response.cookies:
                 raise WFCLoginError("No cookies returned from login endpoint")
             return response.cookies

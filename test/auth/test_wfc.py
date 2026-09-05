@@ -110,6 +110,15 @@ def test_wfc_number_token_coerced(cli, ctx, tmp_path):
     assert all(_header(c, "X-Token") == "42" for c in _protected_calls(api))
 
 
+def test_wfc_login_without_token_falls_back_to_cookies(cli, ctx, tmp_path):
+    # WFC requires neither `token` nor `expectCookies`; a header-based login returning a session is valid.
+    api = ctx.openapi.apps.wfc_login()
+    auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login()}]})
+
+    assert _run_wfc(cli, api, auth).exit_code == 0
+    assert all(f"session={WFC_SESSION}" in (_header(c, "Cookie") or "") for c in _protected_calls(api))
+
+
 def test_wfc_cookie_auth_reaches_requests(cli, ctx, tmp_path):
     api = ctx.openapi.apps.wfc_login()
     auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(expectCookies=True)}]})
@@ -409,6 +418,7 @@ def test_wfc_login_connection_error(cli, ctx, tmp_path):
 
 
 def test_wfc_multiple_users_without_selection(cli, ctx, tmp_path):
+    # Most Web Fuzzing Dataset files list several users without naming a default.
     api = ctx.openapi.apps.wfc_login()
     auth = _write(
         tmp_path,
@@ -420,9 +430,8 @@ def test_wfc_multiple_users_without_selection(cli, ctx, tmp_path):
         },
     )
 
-    result = _run_wfc(cli, api, auth, max_examples=1)
-    assert result.exit_code != 0
-    assert "specify which user" in result.stdout.lower()
+    assert _run_wfc(cli, api, auth).exit_code == 0
+    assert all(_header(c, "X") == "1" for c in _protected_calls(api))
 
 
 def test_wfc_unknown_user(cli, ctx, tmp_path):
@@ -508,7 +517,6 @@ def test_wfc_path_is_directory(cli, ctx, tmp_path):
             [{"name": "u", "loginEndpointAuth": {"verb": "POST", "expectCookies": True}}],
             "either 'endpoint' or 'externalendpointurl'",
         ),
-        ([{"name": "u", "loginEndpointAuth": {"verb": "POST", "endpoint": "/l"}}], "either 'token' or 'expectcookies"),
         (
             [{"name": "u", "loginEndpointAuth": _login(token=_token(), expectCookies=True)}],
             "both 'token' and 'expectcookies",
@@ -551,7 +559,6 @@ def test_wfc_path_is_directory(cli, ctx, tmp_path):
         "both-methods",
         "endpoint-and-external",
         "neither-endpoint-external",
-        "no-token-no-cookies",
         "token-and-cookies",
         "selector-not-pointer",
         "template-no-placeholder",

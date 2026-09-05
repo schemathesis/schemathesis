@@ -301,7 +301,7 @@
         },
         "user": {
           "type": "string",
-          "description": "Name of the auth entry to use when the file defines multiple users."
+          "description": "Name of the auth entry to use. Defaults to the first one."
         },
         "refresh_interval": {
           "type": "integer",
