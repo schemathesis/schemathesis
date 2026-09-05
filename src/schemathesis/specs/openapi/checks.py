@@ -13,7 +13,7 @@ import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS, get_type, make_validator
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
@@ -48,7 +48,7 @@ from schemathesis.transport.serialization import contains_binary
 if TYPE_CHECKING:
     from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.schemas import APIOperation
-    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -411,7 +411,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
             # for the full original schema (including enum, minimum, pattern, etc.),
             # some frameworks may accept the request by picking that element.
             try:
-                validator = param.adapter.jsonschema_validator_cls(schema, pattern_options=FANCY_REGEX_OPTIONS)
+                validator = make_validator(schema, param.adapter.jsonschema_validator_cls)
             except Exception:
                 return True
             for element in param_value:
@@ -426,6 +426,18 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
                         return True
 
     return False
+
+
+def _wire_value_matches_parameter(parameter: OpenApiParameter, expected_types: list[str], wire_value: str) -> bool:
+    """Check whether the text actually sent for `parameter` satisfies its original schema."""
+    if _coerce_string_to_numeric(wire_value, expected_types) is not None:
+        return True
+    try:
+        validator = make_validator(parameter.validation_schema, parameter.adapter.jsonschema_validator_cls)
+    except Exception:
+        # Schema rejected by jsonschema_rs - validity is unknown, so don't report a failure.
+        return True
+    return validator.is_valid(wire_value)
 
 
 def _string_type_mutation_becomes_valid_after_serialization(case: Case, location: ParameterLocation) -> bool:
@@ -488,15 +500,17 @@ def _string_type_mutation_becomes_valid_after_serialization(case: Case, location
             continue
         expected_types = get_type(parameter.definition.get("schema", {}))
 
-        if isinstance(value, str):
+        if isinstance(value, (str, int, float)):
+            wire_value = value if isinstance(value, str) else str(value)
             # Path parameters are URL-encoded; decode before parsing.
-            parsed_value = unquote(value) if location == ParameterLocation.PATH else value
-            if _coerce_string_to_numeric(parsed_value, expected_types) is not None:
+            if location == ParameterLocation.PATH:
+                wire_value = unquote(wire_value)
+            if _wire_value_matches_parameter(parameter, expected_types, wire_value):
                 return True
         elif location == ParameterLocation.QUERY and isinstance(value, dict):
             # urlencode(doseq=True) iterates over dict keys, producing one query value per key.
-            # e.g. {"5": "x"} becomes ?page_size=5, which is integer-parseable.
-            if any(_coerce_string_to_numeric(str(key), expected_types) is not None for key in value):
+            # e.g. {"5": "x"} becomes ?page_size=5, which the server sees as a valid integer.
+            if any(_wire_value_matches_parameter(parameter, expected_types, str(key)) for key in value):
                 return True
 
     return False
@@ -740,7 +754,7 @@ def _additional_properties_hint(case: Case) -> str | None:
         # `format: binary` fields hold raw bytes the JSON Schema validator cannot accept.
         if contains_binary(stripped):
             return None
-        if not validator_cls(alternative.optimized_schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(stripped):
+        if not make_validator(alternative.optimized_schema, validator_cls).is_valid(stripped):
             return None
 
         count = len(extra)
@@ -961,9 +975,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
 
             value_without_additional_properties = {k: v for k, v in value.items() if k in container}
             try:
-                is_valid = validator_cls(schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(
-                    value_without_additional_properties
-                )
+                is_valid = make_validator(schema, validator_cls).is_valid(value_without_additional_properties)
             except Exception:
                 # Schema has an invalid pattern (e.g., valid Python regex but invalid ECMA 262)
                 # — can't determine validity, so skip this location
