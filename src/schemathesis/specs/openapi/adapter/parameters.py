@@ -16,7 +16,6 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import (
-    FANCY_REGEX_OPTIONS,
     VALIDATED_FORMATS_BY_DRAFT,
     BundleError,
     Bundler,
@@ -1907,9 +1906,7 @@ class OpenApiParameterSet(ParameterSet):
 
     def get_strict_validator(self) -> jsonschema_rs.Validator:
         if isinstance(self._strict_validator, NotSet):
-            self._strict_validator = self.adapter.jsonschema_validator_cls(
-                self.schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
-            )
+            self._strict_validator = make_validator(self.schema, self.adapter.jsonschema_validator_cls)
         return self._strict_validator
 
     @property

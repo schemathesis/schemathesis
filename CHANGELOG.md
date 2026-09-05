@@ -42,6 +42,7 @@
 - Coverage phase emitting properties whose names `propertyNames` rejects.
 - Coverage phase emitting a `multipleOf` value outside the float bound `minimum` and `maximum` pin.
 - Coverage phase emitting a single-item array that exceeds `maxContains`.
+- False positive `negative_data_rejection` for non-numeric query and path parameters whose serialized value is valid. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 

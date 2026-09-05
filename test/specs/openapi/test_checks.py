@@ -1103,6 +1103,57 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
     )
 
 
+@pytest.mark.parametrize(
+    ("value", "reported"),
+    [
+        ({"7": "x"}, False),
+        (7, False),
+        (True, False),
+        ({"a b": "x"}, True),
+    ],
+    ids=["object-collapse-valid", "scalar-valid", "boolean-valid", "object-collapse-invalid"],
+)
+def test_negative_data_rejection_query_string_parameter_wire_form(ctx, response_factory, value, reported):
+    # A wrong-typed query value can still reach the server as text that satisfies the declared schema.
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "kind",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "minLength": 1, "maxLength": 100, "pattern": "^\\S+$"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    operation = schema["/api/items"]["GET"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="Invalid type object (expected string)",
+            parameter="kind",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={"kind": value},
+    )
+    response = response_factory.requests(status_code=200)
+
+    if reported:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+    else:
+        assert negative_data_rejection(check_context(), response, case) is None
+
+
 def test_negative_data_rejection_path_string_numeric_serialization(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {
