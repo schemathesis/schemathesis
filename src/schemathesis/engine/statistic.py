@@ -26,6 +26,7 @@ class GroupedFailures:
     code_sample: str | None
     failures: list[Failure]
     response: Response | None
+    auth_identity: str | None = None
 
 
 @dataclass(slots=True)
@@ -124,6 +125,7 @@ class Statistic:
                     code_sample=last_failure_info.code_sample,
                     failures=current_case_failures,
                     response=recorder.interactions[case_id].response,
+                    auth_identity=case.value._auth_identity,
                 )
 
             if has_failures:

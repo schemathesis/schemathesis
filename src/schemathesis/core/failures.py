@@ -348,6 +348,7 @@ def format_failures(
     response: Response | None,
     failures: Sequence[Failure],
     curl: str | None,
+    auth_identity: str | None = None,
     formatter: BlockFormatter | None = None,
     config: OutputConfig,
 ) -> str:
@@ -385,6 +386,10 @@ def format_failures(
             else:
                 payload = prepare_response_payload(text, config=config)
                 output += textwrap.indent(f"\n`{payload}`", prefix="    ")
+    if auth_identity is not None:
+        output += formatter(
+            MessageBlock.STATUS, f"\nIdentity: {auth_identity} (reproduce with --auth-wfc-user {auth_identity})"
+        )
     # `response`/`curl` are None for failures not tied to a case (e.g. after_run): nothing to show.
     if curl is not None:
         _curl = "\n".join(f"    {line}" for line in curl.splitlines())

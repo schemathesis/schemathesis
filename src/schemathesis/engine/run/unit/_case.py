@@ -24,6 +24,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import metrics
 from schemathesis.generation.case import Case
+from schemathesis.wfc.escalation import record_auth_outcome
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import Response
@@ -177,6 +178,7 @@ def _do_call_and_validate(
             transport_kwargs=transport_kwargs,
         )
     if _targets_declared_method(case):
+        record_auth_outcome(case, response.status_code)
         is_documented_status = case.operation.responses.find_by_status_code(response.status_code) is not None
         ctx.supervisor.record_response(
             operation_label=case.operation.label,

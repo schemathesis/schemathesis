@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Try each user in a WFC auth document, moving on from the ones an operation rejects.
 - `--max-time` stops `st run` after the given number of seconds.
 - `--auth-wfc` and `--auth-wfc-user` for Web Fuzzing Commons auth files.
 - `--report json` writes the run's verdict as one JSON document.
