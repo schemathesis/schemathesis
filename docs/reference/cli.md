@@ -293,6 +293,32 @@ The following options control how Schemathesis makes network requests to the API
     $ st run openapi.yaml --auth username:password
     ```
 
+#### `--auth-wfc PATH`
+
+!!! note ""
+
+    **Type**: `String`  
+
+    Authenticate all API requests using a [Web Fuzzing Commons](https://github.com/WebFuzzing/Commons) auth file.
+    Equivalent to setting [`auth.wfc.path`](configuration.md#authwfc) in the config file.
+
+    ```console
+    $ st run openapi.yaml --auth-wfc ./market-auth.yaml
+    ```
+
+#### `--auth-wfc-user NAME`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: first entry  
+
+    Name of the entry to use when the auth file defines several users.
+
+    ```console
+    $ st run openapi.yaml --auth-wfc ./market-auth.yaml --auth-wfc-user admin
+    ```
+
 #### `--proxy URL`
 
 !!! note ""

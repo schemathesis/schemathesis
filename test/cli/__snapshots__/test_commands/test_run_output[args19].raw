@@ -81,6 +81,10 @@ Network requests options:
   -H, --header NAME:VALUE         Add a custom HTTP header to all API requests
   -a, --auth USER:PASS            Authenticate all API requests with basic
                                   authentication
+  --auth-wfc PATH                 Authenticate all API requests using a Web
+                                  Fuzzing Commons auth file
+  --auth-wfc-user NAME            Name of the entry to use from the Web Fuzzing
+                                  Commons auth file. Defaults to the first one
   --proxy URL                     Set the proxy for all network requests
   --tls-verify TEXT               Path to CA bundle for TLS verification, or
                                   'false' to disable

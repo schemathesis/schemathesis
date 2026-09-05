@@ -147,6 +147,12 @@ Point Schemathesis at a [Web Fuzzing Commons](https://github.com/WebFuzzing/Comm
 path = "auth.json"
 ```
 
+Or from the CLI:
+
+```console
+$ st run openapi.yaml --auth-wfc auth.json
+```
+
 The document lists one or more users. Static credentials use `fixedHeaders`:
 
 ```json
@@ -189,11 +195,11 @@ A login flow uses `loginEndpointAuth` — Schemathesis calls the endpoint, extra
 
 Set `"expectCookies": true` instead of `token` when the endpoint returns a session cookie. The login result is cached for the test run.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `path` | required | Path to the WFC auth document (JSON or YAML) |
-| `user` | first entry | `name` of the auth entry to use |
-| `refresh_interval` | `300` | Seconds before re-running the login flow |
+| Field | CLI | Default | Description |
+|-------|-----|---------|-------------|
+| `path` | `--auth-wfc` | required | Path to the WFC auth document (JSON or YAML) |
+| `user` | `--auth-wfc-user` | first entry | `name` of the auth entry to use |
+| `refresh_interval` | — | `300` | Seconds before re-running the login flow |
 
 ## Dynamic Token Authentication
 

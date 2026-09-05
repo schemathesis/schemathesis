@@ -157,6 +157,24 @@ AUTH = OptionSpec(
     callback=validate_auth,
 )
 
+AUTH_WFC = OptionSpec(
+    "--auth-wfc",
+    "auth_wfc",
+    help="Authenticate all API requests using a Web Fuzzing Commons auth file",
+    metavar="PATH",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+)
+
+AUTH_WFC_USER = OptionSpec(
+    "--auth-wfc-user",
+    "auth_wfc_user",
+    help="Name of the entry to use from the Web Fuzzing Commons auth file. Defaults to the first one",
+    metavar="NAME",
+    type=str,
+    default=None,
+)
+
 PROXY = OptionSpec(
     "--proxy",
     "request_proxy",

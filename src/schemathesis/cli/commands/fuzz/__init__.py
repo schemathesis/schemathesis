@@ -15,6 +15,8 @@ from schemathesis.cli.core import ensure_color, resolve_color
 from schemathesis.cli.ext.groups import group, grouped_option
 from schemathesis.cli.options import (
     AUTH,
+    AUTH_WFC,
+    AUTH_WFC_USER,
     BASE_URL,
     CHECKS_OPTION,
     CONTINUE_ON_FAILURE,
@@ -116,6 +118,8 @@ load_all_checks()
 @group("Network requests options")
 @grouped_option(*HEADER.args, **HEADER.kwargs)
 @grouped_option(*AUTH.args, **AUTH.kwargs)
+@grouped_option(*AUTH_WFC.args, **AUTH_WFC.kwargs)
+@grouped_option(*AUTH_WFC_USER.args, **AUTH_WFC_USER.kwargs)
 @grouped_option(*PROXY.args, **PROXY.kwargs)
 @grouped_option(*TLS_VERIFY.args, **TLS_VERIFY.kwargs)
 @grouped_option(*RATE_LIMIT.args, **RATE_LIMIT.kwargs)
@@ -156,6 +160,8 @@ def fuzz(
     *,
     location: str,
     auth: tuple[str, str] | None,
+    auth_wfc: str | None = None,
+    auth_wfc_user: str | None = None,
     headers: dict[str, str],
     included_check_names: list[str] | None,
     excluded_check_names: list[str] | None,
@@ -269,6 +275,8 @@ def fuzz(
         base_url=base_url,
         headers=headers or None,
         basic_auth=auth,
+        wfc_auth=auth_wfc,
+        wfc_user=auth_wfc_user,
         workers=workers,
         continue_on_failure=continue_on_failure,
         rate_limit=rate_limit,
