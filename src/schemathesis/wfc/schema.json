@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/auth.yaml",
-  "$comment": "Curated subset of the Web Fuzzing Commons auth schema. Black-box-relevant fields only; authTemplate, createUsers, and requireMockHandling are tolerated but ignored. Unknown fields are allowed.",
+  "$comment": "Curated subset of the Web Fuzzing Commons auth schema. Black-box-relevant fields only; createUsers and requireMockHandling are tolerated but ignored. `authTemplate` is merged into each `auth` entry before validation. Unknown fields are allowed.",
   "title": "Web Fuzzing Commons Authentication",
   "type": "object",
   "properties": {

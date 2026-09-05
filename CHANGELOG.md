@@ -21,6 +21,7 @@
 
 ### :bug: Fixed
 
+- Merge `authTemplate` into each entry when loading WFC auth files.
 - ASGI application support failing with `anyio` 4.15.
 - `HEAD` operations against ASGI applications failing with an internal `AttributeError`.
 - ASGI applications that do not implement the lifespan protocol failing with a `TypeError`.

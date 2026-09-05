@@ -769,3 +769,53 @@ def test_api(case):
 """
     )
     testdir.runpytest("-s").assert_outcomes(passed=1)
+
+
+# Shape used by most authenticated APIs in the Web Fuzzing Dataset.
+WFD_TEMPLATE_DOC = {
+    "auth": [
+        {"name": "admin", "loginEndpointAuth": {"payloadRaw": '{"user": "admin", "password": "bar"}'}},
+        {"name": "user", "loginEndpointAuth": {"payloadRaw": '{"user": "user", "password": "bar"}'}},
+    ],
+    "authTemplate": {
+        "loginEndpointAuth": {
+            "endpoint": "/api/auth/signin",
+            "verb": "POST",
+            "contentType": "application/json",
+            "token": {
+                "extractFrom": "body",
+                "extractSelector": "/accessToken",
+                "sendName": "Authorization",
+                "sendIn": "header",
+                "sendTemplate": "Bearer {token}",
+            },
+        }
+    },
+}
+
+
+def test_auth_template_fills_fields_entries_omit():
+    entries = load_from_dict(WFD_TEMPLATE_DOC)
+
+    assert [entry.name for entry in entries] == ["admin", "user"]
+    for entry in entries:
+        login = entry.login_endpoint_auth
+        assert login is not None
+        assert login.endpoint == "/api/auth/signin"
+        assert login.verb == "POST"
+        assert login.content_type == "application/json"
+        assert login.token is not None
+        assert login.token.send_template == "Bearer {token}"
+    assert entries[0].login_endpoint_auth.payload_raw == '{"user": "admin", "password": "bar"}'
+
+
+def test_auth_entry_wins_over_the_template():
+    doc = {
+        "auth": [{"name": "admin", "loginEndpointAuth": {"endpoint": "/own", "payloadRaw": "{}"}}],
+        "authTemplate": {"loginEndpointAuth": {"endpoint": "/shared", "verb": "POST", "expectCookies": True}},
+    }
+
+    [entry] = load_from_dict(doc)
+
+    assert entry.login_endpoint_auth.endpoint == "/own"
+    assert entry.login_endpoint_auth.verb == "POST"
