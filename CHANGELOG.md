@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - `--max-time` stops `st run` after the given number of seconds.
+- `--auth-wfc` and `--auth-wfc-user` for Web Fuzzing Commons auth files.
 - `--report json` writes the run's verdict as one JSON document.
 - Support for `state` in the ASGI lifespan scope.
 

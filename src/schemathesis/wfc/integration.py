@@ -15,9 +15,9 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 
-def register_wfc_auth(schema: BaseSchema, config: WFCAuthConfig) -> None:
+def register_wfc_auth(schema: BaseSchema, config: WFCAuthConfig, user: str | None = None) -> None:
     """Load the configured WFC file and register its auth provider on the schema."""
-    auth_info = select_user(load_from_file(config.path), config.user)
+    auth_info = select_user(load_from_file(config.path), user or config.user)
     provider = wfc_to_auth_provider(auth_info)
     if isinstance(provider, LoginEndpointAuthProvider):
         schema.auth.providers.append(CachingAuthProvider(provider, refresh_interval=config.refresh_interval))
