@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- `base_url_mismatch` warning when every response is 404 and `--url` omits the schema's base path.
 - Try each user in a WFC auth document, moving on from the ones an operation rejects.
 - `--max-time` stops `st run` after the given number of seconds.
 - `--auth-wfc` and `--auth-wfc-user` for Web Fuzzing Commons auth files.

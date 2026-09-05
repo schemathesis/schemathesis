@@ -1124,6 +1124,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 tips=["💡 Ensure valid authentication credentials are set via --auth or -H"],
             )
 
+        if ctx.warnings.base_url_mismatch:
+            self._display_warning_block(
+                title="Base URL may be missing a path",
+                operations=ctx.warnings.base_url_mismatch,
+                suffix_text=" returned only 404 Not Found",
+                tips=[f"💡 The schema declares a base path; try --url {ctx.warnings.base_url_suggestion}"],
+            )
+
         if ctx.warnings.missing_test_data:
             self._display_warning_block(
                 title="Missing test data",
@@ -1283,6 +1291,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 "Missing authentication",
                 "operation",
                 "returned only 401/403 responses",
+            ),
+            (
+                len(ctx.warnings.base_url_mismatch),
+                "Base URL may be missing a path",
+                "operation",
+                "returned only 404 responses",
             ),
             (
                 len(ctx.warnings.missing_test_data),

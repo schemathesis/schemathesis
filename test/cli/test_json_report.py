@@ -56,6 +56,7 @@ def test_report_shape(ctx, cli, json_path):
         "errors": [],
         "warnings": {
             "missing_auth": [],
+            "base_url_mismatch": [],
             "missing_test_data": [],
             "validation_mismatch": [],
             "missing_deserializer": [],

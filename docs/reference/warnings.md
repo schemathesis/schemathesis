@@ -10,6 +10,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | Warning | Signals | Quick fix |
 | --- | --- | --- |
 | `missing_auth` | Most interactions returned 401/403 | Provide valid credentials via `--auth`, custom headers, or config |
+| `base_url_mismatch` | Everything returned 404 and `--url` omits the path the schema declares | Add the path, e.g. `--url http://localhost:8080/api` |
 | `missing_test_data` | Generated parameters hit non-existent resources (404) | Seed known IDs / payloads in your config file |
 | `validation_mismatch` | Schema constraints differ from real validation (lots of 4xx) | Tighten schema or extend generators to match runtime rules |
 | `missing_deserializer` | Structured responses lack a registered deserializer | Register one via `@schemathesis.deserializer` or align `content` types with actual formats |
@@ -34,6 +35,21 @@ Missing authentication: 1 operation returned authentication errors
 **Trigger**: At least 90% of requests returned HTTP 401 or 403.
 
 In this situation, most likely the credentials are missing or invalid/insufficient. Re-check if you provided proper auth.
+
+### `base_url_mismatch`
+
+```
+Base URL may be missing a path: 12 operations returned only 404 Not Found
+
+  - GET /users
+  - POST /users
+
+💡 The schema declares a base path; try --url http://localhost:8080/api
+```
+
+`--url` is the complete base URL - Schemathesis does not merge `basePath` or `servers` from the
+schema, because the API under test may be deployed anywhere. When every request 404s and the
+schema declares a path the given URL lacks, that difference is the likely cause.
 
 ### `missing_test_data`
 

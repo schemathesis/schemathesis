@@ -246,6 +246,7 @@ Rules:
     Available warnings:
 
     - `missing_auth`: API returns only 401/403 responses, suggesting missing or invalid authentication
+    - `base_url_mismatch`: every response is 404 and `--url` omits the path declared in the schema
     - `missing_test_data`: API returns mostly 404 responses, suggesting test data doesn't match existing resources
     - `validation_mismatch`: API rejects most generated data with 4xx errors, suggesting schema/validation mismatch
     - `missing_deserializer`: Response has structured schema but no registered deserializer for validation

@@ -6,6 +6,7 @@ import enum
 class SchemathesisWarning(str, enum.Enum):
     MISSING_AUTH = "missing_auth"
     MISSING_TEST_DATA = "missing_test_data"
+    BASE_URL_MISMATCH = "base_url_mismatch"
     VALIDATION_MISMATCH = "validation_mismatch"
     MISSING_DESERIALIZER = "missing_deserializer"
     UNUSED_OPENAPI_AUTH = "unused_openapi_auth"
@@ -19,6 +20,7 @@ class SchemathesisWarning(str, enum.Enum):
         return {
             "missing_auth": cls.MISSING_AUTH,
             "missing_test_data": cls.MISSING_TEST_DATA,
+            "base_url_mismatch": cls.BASE_URL_MISMATCH,
             "validation_mismatch": cls.VALIDATION_MISMATCH,
             "missing_deserializer": cls.MISSING_DESERIALIZER,
             "unused_openapi_auth": cls.UNUSED_OPENAPI_AUTH,

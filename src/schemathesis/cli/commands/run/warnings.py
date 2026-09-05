@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 from schemathesis.cli.commands.run.filters import describe_filter
 from schemathesis.cli.context import BaseExecutionContext
@@ -15,6 +17,9 @@ from schemathesis.engine.recorder import Interaction, RecordedScenario
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 
 @dataclass(slots=True)
@@ -110,6 +115,22 @@ def auth_error_codes(statistic: StatusCodeStatistic, recorder: RecordedScenario)
         ):
             return ()
     return tuple(code for code in (401, 403) if statistic.ratio_for(code) >= AUTH_ERRORS_THRESHOLD)
+
+
+def missing_base_path(operation: APIOperation) -> str | None:
+    """The path the schema declares that the configured base URL leaves out, if any.
+
+    `--url` is the complete base URL by design, so nothing is merged from the schema. When every
+    request 404s, the difference between the two is the likely cause.
+    """
+    schema = operation.schema
+    configured = schema.config.base_url
+    if configured is None:
+        return None
+    declared = schema._get_base_path().rstrip("/")
+    if not declared:
+        return None
+    return declared if not urlsplit(configured).path.rstrip("/").endswith(declared) else None
 
 
 def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
@@ -208,6 +229,25 @@ class WarningCollector:
                 # Check if this warning should cause test failure
                 if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
                     ctx.exit_code = 1
+
+        # A wrong base URL 404s everything, and those 404s trip other checks - so this must not be
+        # gated on the scenario passing, unlike the generic 404 warning below.
+        if (
+            warnings.should_display(SchemathesisWarning.BASE_URL_MISMATCH)
+            and GenerationMode.POSITIVE
+            in self.config.generation_for(operation=operation, phase=event.phase.value).modes
+            and all_positive_are_rejected(event.recorder)
+            and statistic.should_warn_about_missing_test_data()
+        ):
+            missing = missing_base_path(operation) if operation is not None else None
+            if missing is not None:
+                assert operation is not None
+                self.data.base_url_suggestion = f"{(operation.schema.config.base_url or '').rstrip('/')}{missing}"
+                self._handle_warning(
+                    ctx,
+                    SchemathesisWarning.BASE_URL_MISMATCH,
+                    lambda: self.data.base_url_mismatch.add(event.recorder.label),
+                )
 
         # Warn if all positive test cases got 4xx in return and no failure was found
         if (

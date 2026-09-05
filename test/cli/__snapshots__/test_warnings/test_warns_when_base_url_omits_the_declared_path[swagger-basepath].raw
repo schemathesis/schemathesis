@@ -1,0 +1,74 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1
+     Specification:    Open API 2.0
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+__________________________________ GET /users __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 404
+    Documented: 200
+
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== WARNINGS ===================================
+
+Base URL may be missing a path: 1 operation returned only 404 Not Found
+
+  - GET /users
+
+💡 The schema declares a base path; try --url http://127.0.0.1/api
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Undocumented HTTP status code: 1
+
+Warnings:
+  ⚠️ Base URL may be missing a path: 1 operation returned only 404 responses
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================== 1 failure, 1 warning in 1.00s =========================

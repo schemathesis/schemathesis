@@ -338,3 +338,45 @@ def test_constants_extraction_warning_displayed(cli, ctx):
 
     assert "WARNINGS" in result.stdout
     assert "broken_source" in result.stdout
+
+
+def _base_path_app(ctx, app_runner, schema):
+    app = ctx.openapi.make_flask_app_from_schema(schema)
+
+    @app.route("/api/users")
+    def users():
+        return Response('{"ok": true}', status=200, content_type="application/json")
+
+    return app_runner.openapi_url(app)
+
+
+USERS = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    "schema_kwargs",
+    [{"version": "2.0"}, {"servers": [{"url": "/api"}]}],
+    ids=["swagger-basepath", "openapi-servers"],
+)
+def test_warns_when_base_url_omits_the_declared_path(ctx, cli, app_runner, snapshot_cli, schema_kwargs):
+    schema_url = _base_path_app(ctx, app_runner, ctx.openapi.build_schema(USERS, **schema_kwargs))
+    base = schema_url.rsplit("/", 1)[0]
+
+    assert cli.run(schema_url, f"--url={base}", "--max-examples=2", "--phases=fuzzing") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_silent_when_the_url_already_has_the_path(ctx, cli, app_runner, snapshot_cli):
+    schema_url = _base_path_app(ctx, app_runner, ctx.openapi.build_schema(USERS, version="2.0"))
+    base = schema_url.rsplit("/", 1)[0]
+
+    assert cli.run(schema_url, f"--url={base}/api", "--max-examples=2", "--phases=fuzzing") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_silent_when_the_schema_declares_no_base_path(ctx, cli, app_runner, snapshot_cli):
+    schema_url = _base_path_app(ctx, app_runner, ctx.openapi.build_schema(USERS))
+    base = schema_url.rsplit("/", 1)[0]
+
+    assert cli.run(schema_url, f"--url={base}", "--max-examples=2", "--phases=fuzzing") == snapshot_cli

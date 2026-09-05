@@ -23,6 +23,8 @@ UNIT_PHASES = (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
 class WarningData:
     missing_auth: dict[int, set[str]]
     missing_test_data: set[str]
+    base_url_mismatch: set[str]
+    base_url_suggestion: str | None
     validation_mismatch: set[str]
     missing_deserializer: dict[str, dict[str, set[str]]]
     unused_openapi_auth: set[str]
@@ -35,6 +37,8 @@ class WarningData:
         self,
         missing_auth: dict[int, set[str]] | None = None,
         missing_test_data: set[str] | None = None,
+        base_url_mismatch: set[str] | None = None,
+        base_url_suggestion: str | None = None,
         validation_mismatch: set[str] | None = None,
         missing_deserializer: dict[str, dict[str, set[str]]] | None = None,
         unused_openapi_auth: set[str] | None = None,
@@ -45,6 +49,8 @@ class WarningData:
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
+        self.base_url_mismatch = base_url_mismatch or set()
+        self.base_url_suggestion = base_url_suggestion
         self.validation_mismatch = validation_mismatch or set()
         self.missing_deserializer = missing_deserializer or {}
         self.unused_openapi_auth = unused_openapi_auth or set()
@@ -59,6 +65,7 @@ class WarningData:
             SchemathesisWarning.MISSING_AUTH.value: sorted(
                 {label for labels in self.missing_auth.values() for label in labels}
             ),
+            SchemathesisWarning.BASE_URL_MISMATCH.value: sorted(self.base_url_mismatch),
             SchemathesisWarning.MISSING_TEST_DATA.value: sorted(self.missing_test_data),
             SchemathesisWarning.VALIDATION_MISMATCH.value: sorted(self.validation_mismatch),
             SchemathesisWarning.MISSING_DESERIALIZER.value: sorted(
@@ -75,6 +82,7 @@ class WarningData:
     def is_empty(self) -> bool:
         return not bool(
             self.missing_auth
+            or self.base_url_mismatch
             or self.missing_test_data
             or self.validation_mismatch
             or self.missing_deserializer
@@ -92,6 +100,7 @@ class WarningData:
             1
             for warnings in (
                 self.missing_auth,
+                self.base_url_mismatch,
                 self.missing_test_data,
                 self.validation_mismatch,
                 self.missing_deserializer,
