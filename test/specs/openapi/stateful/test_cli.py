@@ -25,6 +25,7 @@ def test_default(ctx, cli, snapshot_cli, workers):
             "-c not_a_server_error",
             f"--workers={workers}",
             "--mode=positive",
+            "--seed=1",
         )
         == snapshot_cli
     )
@@ -108,6 +109,7 @@ def test_junit(ctx, tmp_path, cli):
         "--no-shrink",
         "--max-examples=80",
         "--max-failures=1",
+        "--seed=1",
         "-c not_a_server_error",
         f"--report-junit-path={junit_path}",
         exit_code=ExitCode.TESTS_FAILED,

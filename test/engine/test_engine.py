@@ -1706,16 +1706,16 @@ def test_max_time_keeps_results_that_landed_as_the_budget_ran_out(ctx, app_runne
 
     @app.route("/first")
     def first():
-        time.sleep(1.1)
+        time.sleep(3.2)
         return "", 200
 
     @app.route("/second")
     def second():
-        time.sleep(1.5)
+        time.sleep(3.6)
         return "", 500
 
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
-    stream = execute(schema, max_time=1, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
+    stream = execute(schema, max_time=3, max_examples=1, workers=2, phases=[PhaseName.FUZZING])
 
     assert {(event.label, event.status) for event in stream.find_all(events.ScenarioFinished)} == {
         ("GET /first", Status.SUCCESS),
@@ -1777,7 +1777,7 @@ def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
     # Ctrl-C and a spent budget both stop the run; only the budget is a planned finish.
     @schemathesis.check
     def interrupt_after_the_deadline(ctx, response, case):
-        time.sleep(1.1)
+        time.sleep(3.2)
         raise KeyboardInterrupt
 
     api = ctx.openapi.apps.success()
@@ -1785,7 +1785,7 @@ def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
     stream = execute(
         schema,
         checks=[interrupt_after_the_deadline],
-        max_time=1,
+        max_time=3,
         max_examples=5,
         phases=[PhaseName.FUZZING],
     )

@@ -2180,7 +2180,12 @@ def test_canonical_generation(schema, reaches):
 
     # A format generator cannot be steered by a pattern or a length, so those draws are discarded.
     @given(built)
-    @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+    # A starved CI runner makes metaschema draws slow enough to trip `too_slow`; validity is what this checks.
+    @settings(
+        max_examples=25,
+        deadline=None,
+        suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow],
+    )
     def test(value):
         assert is_valid(value), value
 

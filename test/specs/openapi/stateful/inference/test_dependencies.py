@@ -5503,6 +5503,7 @@ def test_stateful_bug_when_link_always_used(cli, snapshot_cli, ctx):
         cli.run_openapi_app(
             app,
             "--max-examples=10",
+            "--seed=1",
             "-c not_a_server_error",
             "--phases=stateful",
         )

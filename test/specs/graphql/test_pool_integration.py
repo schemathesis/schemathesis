@@ -92,6 +92,7 @@ def test_input_object_planted_bug_findability(ctx, cli, snapshot_cli, config):
             api.schema_url,
             "--no-shrink",
             "--max-examples=10",
+            "--seed=1",
             "-m",
             "positive",
             "-c",

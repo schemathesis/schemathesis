@@ -193,8 +193,9 @@ def test_hooks_combination(ctx):
 
     strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
+    # Both filters together admit ~0.15% of the unconstrained strings; a random draw sequence sometimes finds none.
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None, derandomize=True)
     def test(case):
         assert case.query["id"].isdigit()
         assert int(case.query["id"]) % 2 == 0
