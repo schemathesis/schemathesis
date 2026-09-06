@@ -30,6 +30,8 @@ WORKDIR /tmp/Python-${PYTHON_VERSION}
 
 # PGO (--enable-optimizations) disabled: hangs on Alpine/musl in test_datetime
 # Still optimized with: -O2, LTO, stripped binaries
+# `--disable-gil`: `--workers` are threads, so the GIL caps them. Measured 2.85x at 8 workers;
+# with the GIL on, adding workers only makes runs slower.
 RUN CFLAGS="-O2 -fno-omit-frame-pointer" \
     CXXFLAGS="-O2 -fno-omit-frame-pointer" \
     LDFLAGS="-Wl,--strip-all" \
