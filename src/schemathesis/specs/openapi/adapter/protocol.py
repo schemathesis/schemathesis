@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.jsonschema.bundler import Bundle, BundleCache, Bundler
     from schemathesis.core.jsonschema.types import JsonSchema
+    from schemathesis.core.parameters import SkippedParameter
     from schemathesis.core.transport import Response
     from schemathesis.schemas import APIOperation
 
@@ -51,6 +52,7 @@ IterParameters = Callable[
         "ParameterAdapter",
         "Bundler",
         "BundleCache",
+        list["SkippedParameter"],
     ],
     Iterable["OperationParameter"],
 ]

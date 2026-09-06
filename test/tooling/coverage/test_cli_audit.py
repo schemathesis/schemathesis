@@ -56,7 +56,8 @@ def test_is_complete_treats_error_only_schema_as_complete(ctx):
             "/broken": {
                 "post": {
                     "requestBody": {
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}}
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
                     },
                     "responses": {"200": {"description": "OK"}},
                 }

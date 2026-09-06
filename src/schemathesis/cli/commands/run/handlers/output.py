@@ -1196,6 +1196,15 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 tips=["💡 Supply examples for these operations, or narrow the pattern"],
             )
 
+        if ctx.warnings.unresolvable_reference:
+            self._display_detailed_warning_block(
+                title="Unresolvable references",
+                warnings=ctx.warnings.unresolvable_reference,
+                entity_name="operation",
+                suffix_text=" skipped optional parameters",
+                tips=["💡 Define the missing components in the schema so these parameters get tested"],
+            )
+
         if ctx.warnings.constants_extraction:
             self._display_warning_block(
                 title="Constant reuse skipped",
@@ -1340,6 +1349,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 "Constant reuse skipped",
                 "registered source",
                 "could not be scanned",
+            ),
+            (
+                len(ctx.warnings.unresolvable_reference),
+                "Unresolvable references",
+                "operation",
+                "had optional parameters skipped",
             ),
         )
         for count, title, entity_name, suffix_text in entries:

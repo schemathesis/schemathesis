@@ -32,6 +32,7 @@ class WarningData:
     method_not_allowed: set[str]
     constants_extraction: set[str]
     unmatched_filter: set[str]
+    unresolvable_reference: dict[str, set[str]]
 
     def __init__(
         self,
@@ -46,6 +47,7 @@ class WarningData:
         method_not_allowed: set[str] | None = None,
         constants_extraction: set[str] | None = None,
         unmatched_filter: set[str] | None = None,
+        unresolvable_reference: dict[str, set[str]] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
@@ -58,6 +60,7 @@ class WarningData:
         self.method_not_allowed = method_not_allowed or set()
         self.constants_extraction = constants_extraction or set()
         self.unmatched_filter = unmatched_filter or set()
+        self.unresolvable_reference = unresolvable_reference or {}
 
     def as_labels(self) -> dict[str, list[str]]:
         """Every warning kind mapped to the affected labels; empty kinds stay present."""
@@ -76,6 +79,7 @@ class WarningData:
             SchemathesisWarning.METHOD_NOT_ALLOWED.value: sorted(self.method_not_allowed),
             SchemathesisWarning.CONSTANTS_EXTRACTION.value: sorted(self.constants_extraction),
             SchemathesisWarning.UNMATCHED_FILTER.value: sorted(self.unmatched_filter),
+            SchemathesisWarning.UNRESOLVABLE_REFERENCE.value: sorted(self.unresolvable_reference),
         }
 
     @property
@@ -91,6 +95,7 @@ class WarningData:
             or self.method_not_allowed
             or self.constants_extraction
             or self.unmatched_filter
+            or self.unresolvable_reference
         )
 
     @property
@@ -109,6 +114,7 @@ class WarningData:
                 self.method_not_allowed,
                 self.constants_extraction,
                 self.unmatched_filter,
+                self.unresolvable_reference,
             )
             if warnings
         )

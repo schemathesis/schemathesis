@@ -255,6 +255,7 @@ Rules:
     - `method_not_allowed`: Operation consistently returned `405 Method Not Allowed`; subsequent phases skip it
     - `constants_extraction`: A source registered with `@schemathesis.python.constants` produced nothing usable
     - `unmatched_filter`: A filter expression matched no API operation
+    - `unresolvable_reference`: An optional parameter names a schema component that does not exist
 
 !!! info "CLI Only"
     This option only applies when using the `schemathesis run` command. The pytest plugin uses pytest's own warning system.

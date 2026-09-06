@@ -60,7 +60,7 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext, AuthProvider, AuthStorage
     from schemathesis.config import GenerationConfig
-    from schemathesis.core.adapter import OperationParameter
+    from schemathesis.core.adapter import ParsedParameters
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
@@ -537,7 +537,7 @@ class OpenApiSchema(BaseSchema):
         definition: OperationObject,
         shared_parameters: Sequence[dict[str, Any]],
         resolver: Resolver | None = None,
-    ) -> list[OperationParameter]:
+    ) -> ParsedParameters:
         return self._operations._iter_parameters(definition, shared_parameters, resolver=resolver)
 
     def _parse_responses(
@@ -552,7 +552,7 @@ class OpenApiSchema(BaseSchema):
         self,
         path: str,
         method: HttpMethodSchema,
-        parameters: list[OperationParameter],
+        parameters: ParsedParameters,
         definition: OperationObject,
         scope: str,
         resolver: Resolver | None = None,

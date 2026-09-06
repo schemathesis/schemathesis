@@ -21,7 +21,7 @@ from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.jsonschema.types import JsonSchemaObject
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER, SkippedParameter
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.spec import CoverageCapabilities
@@ -754,6 +754,8 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     query: ParameterSet[P] = field(default_factory=ParameterSet)
     body: PayloadAlternatives[P] = field(default_factory=PayloadAlternatives)
     filter_case_tracker: FilterCaseTracker | None = field(default=None, repr=False, compare=False)
+    # Optional parameters left out because their schemas could not be parsed.
+    skipped_parameters: list[SkippedParameter] = field(default_factory=list, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not self.label:

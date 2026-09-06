@@ -128,7 +128,7 @@ $ st run [OPTIONS] SCHEMA
 
     **Type**: `String or comma-separated list`  
     **Default**: All warnings enabled  
-    **Possible values**: `off`, `missing_auth`, `base_url_mismatch`, `missing_test_data`, `validation_mismatch`, `missing_deserializer`, `unused_openapi_auth`, `unsupported_regex`, `method_not_allowed`, `constants_extraction`, `unmatched_filter`  
+    **Possible values**: `off`, `missing_auth`, `base_url_mismatch`, `missing_test_data`, `validation_mismatch`, `missing_deserializer`, `unused_openapi_auth`, `unsupported_regex`, `method_not_allowed`, `constants_extraction`, `unmatched_filter`, `unresolvable_reference`  
 
     Control which warnings are displayed during test execution. Warnings help identify test configuration issues but don't stop execution. See the [Warnings reference](warnings.md) for what each one signals.
 

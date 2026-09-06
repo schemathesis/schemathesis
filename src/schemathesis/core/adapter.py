@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import ParameterLocation, SkippedParameter
 
 if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchemaObject
@@ -42,3 +43,11 @@ class OperationParameter(Protocol):
     def is_required(self) -> bool:
         """True if required."""
         ...  # pragma: no cover
+
+
+@dataclass(slots=True)
+class ParsedParameters:
+    """Parameters of a single API operation, together with those left out as unparsable."""
+
+    items: list[OperationParameter]
+    skipped: list[SkippedParameter]

@@ -1889,6 +1889,34 @@ def test_unresolvable_reference(ctx, cli, open_api_3_schema_with_recoverable_err
     assert cli.run(str(schema_path), f"--url={api.base_url}/api") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_optional_parameter_with_unresolvable_reference(ctx, cli, snapshot_cli):
+    # The operation stays testable; the dropped parameter is reported instead
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/things": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "filter",
+                            "required": False,
+                            "schema": {"$ref": "#/components/schemas/Missing"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/things")
+    def things():
+        return jsonify([])
+
+    assert cli.run_openapi_app(app, "--max-examples=1") == snapshot_cli
+
+
 @pytest.mark.parametrize("value", ["true", "false"])
 def test_output_sanitization(ctx, cli, hypothesis_max_examples, value):
     api = ctx.openapi.apps.failure()

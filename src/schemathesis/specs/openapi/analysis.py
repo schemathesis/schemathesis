@@ -22,6 +22,7 @@ from schemathesis.specs.openapi.stateful.dependencies.layers import compute_depe
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 from schemathesis.specs.openapi.warnings import (
     detect_missing_deserializers,
+    detect_unresolvable_references,
     detect_unsupported_regex,
     detect_unused_openapi_auth,
 )
@@ -222,6 +223,8 @@ class OpenAPIAnalysis:
                     warnings_map[operation.label].append(warning)
                 for regex_warning in detect_unsupported_regex(operation):
                     warnings_map[operation.label].append(regex_warning)
+                for reference_warning in detect_unresolvable_references(operation):
+                    warnings_map[operation.label].append(reference_warning)
         return warnings_map
 
     def _collect_schema_warnings(self) -> Sequence[SchemaWarning]:

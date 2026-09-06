@@ -14,6 +14,7 @@ class SchemathesisWarning(str, enum.Enum):
     METHOD_NOT_ALLOWED = "method_not_allowed"
     CONSTANTS_EXTRACTION = "constants_extraction"
     UNMATCHED_FILTER = "unmatched_filter"
+    UNRESOLVABLE_REFERENCE = "unresolvable_reference"
 
     @classmethod
     def from_str(cls, value: str) -> SchemathesisWarning:
@@ -28,4 +29,5 @@ class SchemathesisWarning(str, enum.Enum):
             "method_not_allowed": cls.METHOD_NOT_ALLOWED,
             "constants_extraction": cls.CONSTANTS_EXTRACTION,
             "unmatched_filter": cls.UNMATCHED_FILTER,
+            "unresolvable_reference": cls.UNRESOLVABLE_REFERENCE,
         }[value.lower()]

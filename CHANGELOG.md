@@ -6,6 +6,7 @@
 
 - Apollo Federation subgraph support: `_entities` and `_service` stay out unless filters select them.
 - `base_url_mismatch` warning when every response is 404 and `--url` omits the schema's base path.
+- `unresolvable_reference` warning listing optional parameters skipped over a missing schema component.
 - Try each user in a WFC auth document, moving on from the ones an operation rejects.
 - `--max-time` stops `st run` after the given number of seconds.
 - `--auth-wfc` and `--auth-wfc-user` for Web Fuzzing Commons auth files.
@@ -26,6 +27,7 @@
 
 ### :bug: Fixed
 
+- Skip optional parameters whose `$ref` does not resolve instead of rejecting the whole operation.
 - Send example values in query and path as `true` / `false` / `null`, omitting optional nulls.
 - Use a single boundary in the reproduce cURL for multipart request bodies.
 - Report GraphQL scalars with no registered strategy accurately in every generation mode.

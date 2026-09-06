@@ -65,6 +65,7 @@ def test_report_shape(ctx, cli, json_path):
             "method_not_allowed": [],
             "constants_extraction": [],
             "unmatched_filter": [],
+            "unresolvable_reference": [],
         },
         "auth": {"reauth_count": 0, "reauth_broke": False},
     }

@@ -2,7 +2,13 @@ import pytest
 
 import schemathesis
 from schemathesis.config import SchemathesisWarning
-from schemathesis.specs.openapi.warnings import MissingDeserializerWarning, detect_missing_deserializers
+from schemathesis.core.parameters import SkippedParameter
+from schemathesis.specs.openapi.warnings import (
+    MissingDeserializerWarning,
+    UnresolvableReferenceWarning,
+    detect_missing_deserializers,
+    detect_unresolvable_references,
+)
 
 
 def test_missing_deserializer_warning_properties():
@@ -247,4 +253,31 @@ def test_detect_missing_deserializers_judges_each_media_type_separately(ctx, con
     assert detect_missing_deserializers(schema["/users"]["GET"]) == [
         MissingDeserializerWarning(operation_label="GET /users", status_code="200", content_type=content_type)
         for content_type in expected
+    ]
+
+
+def test_detect_unresolvable_references_for_dropped_optional_parameter(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "filter",
+                            "required": False,
+                            "schema": {"$ref": "#/components/schemas/Missing"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Success"}},
+                }
+            }
+        }
+    )
+
+    assert detect_unresolvable_references(schema["/users"]["GET"]) == [
+        UnresolvableReferenceWarning(
+            operation_label="GET /users",
+            skipped=SkippedParameter(location="query", name="filter", reference="#/components/schemas/Missing"),
+        )
     ]

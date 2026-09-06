@@ -195,6 +195,13 @@ class WarningCollector:
                     warning.kind,
                     self._record_unsupported_regex_warning(warning.operation_label, warning.message),
                 )
+            elif warning.kind is SchemathesisWarning.UNRESOLVABLE_REFERENCE:
+                assert warning.operation_label is not None
+                self._handle_warning(
+                    ctx,
+                    warning.kind,
+                    self._record_unresolvable_reference_warning(warning.operation_label, warning.message),
+                )
             elif warning.kind is SchemathesisWarning.CONSTANTS_EXTRACTION:
                 self._handle_warning(
                     ctx,
@@ -322,6 +329,14 @@ class WarningCollector:
 
         def record() -> None:
             self.data.unsupported_regex.setdefault(operation_label, set()).add(message)
+
+        return record
+
+    def _record_unresolvable_reference_warning(self, operation_label: str, message: str) -> Callable[[], None]:
+        """Create a callback that records a dropped parameter with an unresolvable reference."""
+
+        def record() -> None:
+            self.data.unresolvable_reference.setdefault(operation_label, set()).add(message)
 
         return record
 

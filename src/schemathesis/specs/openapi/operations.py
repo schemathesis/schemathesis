@@ -8,7 +8,7 @@ import jsonschema_rs
 from packaging import version
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY
-from schemathesis.core.adapter import OperationParameter
+from schemathesis.core.adapter import OperationParameter, ParsedParameters
 from schemathesis.core.errors import (
     SCHEMA_ERROR_SUGGESTION,
     HookExecutionError,
@@ -18,7 +18,7 @@ from schemathesis.core.errors import (
     SchemaLocation,
 )
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import ParameterLocation, SkippedParameter
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transforms import get_template_fields
@@ -305,9 +305,10 @@ class OperationLoader:
         definition: OperationObject,
         shared_parameters: Sequence[dict[str, Any]],
         resolver: Resolver | None = None,
-    ) -> list[OperationParameter]:
+    ) -> ParsedParameters:
         schema = self.schema
-        return list(
+        skipped: list[SkippedParameter] = []
+        items = list(
             schema.adapter.iter_parameters(
                 definition,
                 shared_parameters,
@@ -316,8 +317,10 @@ class OperationLoader:
                 schema.adapter,
                 schema._bundler,
                 schema._bundle_cache,
+                skipped,
             )
         )
+        return ParsedParameters(items=items, skipped=skipped)
 
     def _parse_responses(
         self, definition: OperationObject, scope: str, resolver: Resolver | None = None
@@ -346,7 +349,7 @@ class OperationLoader:
         self,
         path: str,
         method: HttpMethodSchema,
-        parameters: list[OperationParameter],
+        parameters: ParsedParameters,
         definition: OperationObject,
         scope: str,
         resolver: Resolver | None = None,
@@ -381,9 +384,10 @@ class OperationLoader:
                 query=OpenApiParameterSet(ParameterLocation.QUERY, adapter=schema.adapter),
                 headers=OpenApiParameterSet(ParameterLocation.HEADER, adapter=schema.adapter),
                 cookies=OpenApiParameterSet(ParameterLocation.COOKIE, adapter=schema.adapter),
+                skipped_parameters=parameters.skipped,
             )
         )
-        for parameter in _named_after_placeholder(parameters, path):
+        for parameter in _named_after_placeholder(parameters.items, path):
             operation.add_parameter(parameter)
         missing_parameter_names = get_template_fields(operation.path) - {
             parameter.name for parameter in operation.path_parameters

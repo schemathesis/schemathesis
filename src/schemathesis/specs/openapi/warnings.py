@@ -11,6 +11,7 @@ from schemathesis.config import SchemathesisWarning
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema.types import get_type
+from schemathesis.core.parameters import SkippedParameter
 from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex
 
 if TYPE_CHECKING:
@@ -193,3 +194,34 @@ def _iter_patterns(schema: Any) -> Iterator[str]:
     elif isinstance(schema, list):
         for item in schema:
             yield from _iter_patterns(item)
+
+
+@dataclass(slots=True)
+class UnresolvableReferenceWarning:
+    """Warning for an optional parameter left out because its schema names a missing component."""
+
+    operation_label: str | None
+    """Label of the operation (e.g., 'GET /users')."""
+
+    skipped: SkippedParameter
+    """The parameter that was left out."""
+
+    @property
+    def kind(self) -> SchemathesisWarning:
+        return SchemathesisWarning.UNRESOLVABLE_REFERENCE
+
+    @property
+    def message(self) -> str:
+        return f"{self.skipped.label} - unresolvable reference `{self.skipped.reference}`"
+
+    @property
+    def group(self) -> str | None:
+        return None
+
+
+def detect_unresolvable_references(operation: APIOperation) -> list[UnresolvableReferenceWarning]:
+    """Report optional parameters dropped because a `$ref` in their schema does not resolve."""
+    return [
+        UnresolvableReferenceWarning(operation_label=operation.label, skipped=skipped)
+        for skipped in operation.skipped_parameters
+    ]

@@ -17,41 +17,59 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
- 🚫  Examples (in 0.00s)
+ ❌  Examples (in 0.00s)
 
-     🚫 1 error
+     ❌ 1 failed
 
-==================================== ERRORS ====================================
+=================================== FAILURES ===================================
 __________________________________ POST /test __________________________________
-Schema Error
+1. Test Case ID: <PLACEHOLDER>
 
-Unresolvable reference in the schema
+- Undocumented HTTP status code
 
-Error details:
-    Reference: t
-    File reference could not be resolved. Check that the file exists.
+    Received: 404
+    Documented:
 
-Need more help?
-    Join our Discord server: https://discord.gg/R9ASRAmHnA
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with:
+
+    curl -X POST -H 'xd: 0' http://127.0.0.1/api/test
+
+    st replay <PLACEHOLDER>
+
+=================================== WARNINGS ===================================
+
+Unresolvable references: 1 operation skipped optional parameters
+
+  - POST /test
+    `header` parameter `xa` - unresolvable reference `t`
+
+💡 Define the missing components in the schema so these parameters get tested
+
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 1/1
-  Tested: 0
-  Errored: 1
+  Tested: 1
 
 Test Phases:
-  🚫 Examples
+  ❌ Examples
   ⏭  Coverage (disabled)
   ⏭  Fuzzing (disabled)
   ⏭  Stateful (disabled)
 
-Errors:
-  🚫 Schema Error: 1
+Failures:
+  ❌ Undocumented HTTP status code: 1
+
+Warnings:
+  ⚠️ Unresolvable references: 1 operation had optional parameters skipped
 
 Test cases:
-  No test cases were generated
+  N generated, N found N unique failures
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+======================== 1 failure, 1 warning in 1.00s =========================
