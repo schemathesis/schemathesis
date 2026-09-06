@@ -11,6 +11,10 @@ from schemathesis.core.transport import Response, expand_status_code
         ("500", [500]),
         ("50X", list(range(500, 510))),
         ("50x", list(range(500, 510))),
+        ("0-", []),
+        ("", []),
+        ("2XXX", []),
+        ("default", []),
     ],
 )
 def test_expand_status_code(value, expected):

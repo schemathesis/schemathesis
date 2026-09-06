@@ -85,6 +85,7 @@
 
 #### Schema handling
 
+- Response keys that are not status code patterns crashing response matching.
 - Unresolvable `$ref` in an optional parameter or required body rejecting the operation.
 - Unresolvable `$ref` in a response schema rejecting the operation.
 - `openapi` versions with a suffix, such as `3.1.0-custom`, rejected.

@@ -311,6 +311,9 @@ class Response:
         return self._encoded_body
 
 
+_STATUS_CODE_CHARACTERS = frozenset(string.digits + "X")
+
+
 def expand_status_code(status_code: StatusCodePattern | int) -> list[int]:
     """Expand OpenAPI status code patterns like '2XX' or 'default' into concrete codes.
 
@@ -321,7 +324,11 @@ def expand_status_code(status_code: StatusCodePattern | int) -> list[int]:
         List of concrete status codes matching the pattern
 
     """
-    chars = [list(string.digits) if digit == "X" else [digit] for digit in str(status_code).upper()]
+    pattern = str(status_code).upper()
+    # A response key is arbitrary text, and one that is not a code pattern describes no response.
+    if not 0 < len(pattern) <= 3 or any(char not in _STATUS_CODE_CHARACTERS for char in pattern):
+        return []
+    chars = [list(string.digits) if digit == "X" else [digit] for digit in pattern]
     return [int("".join(expanded)) for expanded in product(*chars)]
 
 
