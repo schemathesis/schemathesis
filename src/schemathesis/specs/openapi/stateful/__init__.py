@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Container, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
@@ -160,6 +160,16 @@ def _mixed_mode_case(draw: st.DrawFn, strategies: dict[GenerationMode, st.Search
     return draw(strategies[GenerationMode.POSITIVE])
 
 
+def _unique_rule_name(name: str, taken: Container[str]) -> str:
+    """Operations differing only in punctuation (`/users` vs `/users/`) normalize alike; keep them separate rules."""
+    if name not in taken:
+        return name
+    suffix = 2
+    while f"{name}_{suffix}" in taken:
+        suffix += 1
+    return f"{name}_{suffix}"
+
+
 def create_state_machine(
     schema: OpenApiSchema,
     *,
@@ -190,7 +200,7 @@ def create_state_machine(
         if bundle_matchers:
             _response_matchers[operation.label] = make_response_matcher(bundle_matchers)
 
-    rules = {}
+    rules: dict[str, Callable[..., StepOutput | None]] = {}
     catch_all = Bundle("catch_all")
 
     # We want stateful testing to be effective and focus on meaningful transitions.
@@ -223,8 +233,7 @@ def create_state_machine(
             if incoming:
                 for link in incoming:
                     bundle_name = f"{link.source.label} -> {link.status_code}"
-                    name = _normalize_name(link.full_name)
-                    assert name not in rules, name
+                    name = _unique_rule_name(_normalize_name(link.full_name), rules)
                     rules[name] = transition(
                         name=name,
                         target=catch_all,
@@ -242,7 +251,7 @@ def create_state_machine(
                         ),
                     )
             if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
-                name = _normalize_name(f"RANDOM -> {target.label}")
+                name = _unique_rule_name(_normalize_name(f"RANDOM -> {target.label}"), rules)
                 if len(config.modes) == 1:
                     case_strategy = target.as_strategy(
                         generation_mode=config.modes[0],

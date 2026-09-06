@@ -480,3 +480,33 @@ def test_self_referential_fk_creator_remains_root(ctx):
         name for name, value in state_machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule")
     )
     assert "RANDOM__POST_person" in rule_names, rule_names
+
+
+def test_transitions_with_colliding_normalized_names_keep_separate_rules(ctx):
+    # `/users` and `/users/` are distinct operations, but their transition labels collapse to one identifier.
+    link = {"operationId": "getUser", "parameters": {"path.id": "$response.body#/id"}}
+    list_operation = {
+        "responses": {"200": {"content": {"application/json": {"schema": _ID_OBJECT}}, "links": {"GetUser": link}}}
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {"get": list_operation},
+            "/users/": {"get": list_operation},
+            "/users/{id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": _ID_OBJECT}}}},
+                }
+            },
+        }
+    )
+
+    assert sorted(
+        name for name, value in schema.as_state_machine().__dict__.items() if hasattr(value, "hypothesis_stateful_rule")
+    ) == [
+        "GET_users___200_GetUser__GET_users_id_",
+        "GET_users___200_GetUser__GET_users_id__2",
+        "RANDOM__GET_users",
+        "RANDOM__GET_users_",
+    ]
