@@ -189,3 +189,22 @@ def test_non_string_parameter_location(ctx):
     operation = schema["/test"]["PUT"]
     # Should not raise TypeError: unhashable type: 'dict'
     assert list(operation.iter_parameters()) == []
+
+
+# The Open API spec allows any "-suffix" on the version string.
+SUFFIXED_SPEC_VERSIONS = ["3.1.0-custom", "3.1.0-rc1", "3.0.0-2024.1", "3.0.3-alpha.7"]
+
+
+@pytest.mark.parametrize("spec_version", SUFFIXED_SPEC_VERSIONS)
+def test_spec_version_with_suffix(ctx, spec_version):
+    schema = ctx.openapi.load_schema(
+        {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}, version=spec_version
+    )
+    schema.validate()
+    assert schema.specification.version == spec_version
+    assert schema["/users"]["GET"].label == "GET /users"
+
+
+@pytest.mark.parametrize("spec_version", ["3.1.0-custom", "3.1.0-rc1"])
+def test_spec_version_with_suffix_and_no_paths(ctx, spec_version):
+    assert list(ctx.openapi.load_schema(None, version=spec_version).get_all_operations()) == []

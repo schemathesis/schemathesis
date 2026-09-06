@@ -49,6 +49,7 @@ from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
 from .operations import HTTP_METHODS, SCHEMA_PARSING_ERRORS, OperationLoader
 from .stateful import create_state_machine
+from .utils import parse_spec_version
 from .validation import ResponseValidator
 
 if TYPE_CHECKING:
@@ -116,7 +117,7 @@ class OpenApiSchema(BaseSchema):
         openapi_version = self.raw_schema.get("openapi")
         if openapi_version is not None:
             self._spec_version = openapi_version
-            parsed_version = version.parse(openapi_version)
+            parsed_version = parse_spec_version(openapi_version)
             if parsed_version >= _V3_2:
                 self.adapter = adapter.v3_2
             elif parsed_version >= _V3_1:

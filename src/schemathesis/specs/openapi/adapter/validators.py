@@ -13,6 +13,7 @@ from schemathesis.specs.openapi.definitions import (
     OPENAPI_32_VALIDATOR,
     SWAGGER_20_VALIDATOR,
 )
+from schemathesis.specs.openapi.utils import parse_spec_version
 
 _V3_1 = version.parse("3.1")
 _V3_2 = version.parse("3.2")
@@ -37,7 +38,7 @@ def validate_v2(raw_schema: Mapping[str, Any]) -> None:
 
 def validate_v3(raw_schema: Mapping[str, Any]) -> None:
     openapi_version = str(raw_schema.get("openapi", ""))
-    parsed_version = version.parse(openapi_version)
+    parsed_version = parse_spec_version(openapi_version)
     with _ignore_value_error():
         if parsed_version >= _V3_2:
             OPENAPI_32_VALIDATOR.validate(raw_schema)

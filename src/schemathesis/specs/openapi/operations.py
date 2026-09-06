@@ -30,6 +30,7 @@ from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
 from schemathesis.specs.openapi.adapter.servers import resolve_operation_base_url
+from schemathesis.specs.openapi.utils import parse_spec_version
 
 if TYPE_CHECKING:
     from schemathesis.core.adapter import ResponsesContainer
@@ -114,7 +115,7 @@ class OperationLoader:
         schema = self.schema
         paths = schema._get_paths()
         if paths is None:
-            if version.parse(schema.specification.version) >= _V3_1:
+            if parse_spec_version(schema.specification.version) >= _V3_1:
                 return
             self._raise_invalid_schema(KeyError("paths"))
 
