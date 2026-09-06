@@ -104,7 +104,12 @@ def _normalize_location(location: str) -> str:
 
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
     """Load a schema from the given file."""
-    with opener(location) as fd:
+    try:
+        fd = opener(location)
+    except ValueError as exc:
+        # A reference is arbitrary text, and text with a null byte in it names no file.
+        raise OSError(str(exc)) from exc
+    with fd:
         return deserialize_yaml(fd)
 
 

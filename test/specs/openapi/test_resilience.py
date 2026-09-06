@@ -167,6 +167,24 @@ def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
     ]
 
 
+@pytest.mark.parametrize("reference", ["missing.json", "mis\x00sing.json"], ids=["missing_file", "null_byte"])
+def test_parameter_ref_that_names_no_file_v3(ctx, reference):
+    # A reference is arbitrary text, and text with a null byte in it reaches the filesystem as a path.
+    schema = ctx.openapi.load_schema(
+        {
+            "/things": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "q", "required": True, "schema": {"$ref": reference}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    result = _first_operation(schema)
+    assert isinstance(result, Err)
+    assert "Unresolvable reference" in str(result.err())
+
+
 @pytest.mark.parametrize("required", [False, True], ids=["optional", "required"])
 def test_query_parameter_with_unresolvable_ref_v3(ctx, required):
     schema = ctx.openapi.load_schema(
