@@ -40,7 +40,7 @@ class LoginEndpoint:
     """A login endpoint that returns credentials (a token or cookies)."""
 
     verb: HttpVerb
-    # Relative path on the API server; mutually exclusive with `external_endpoint_url`.
+    # Path relative to the server root; mutually exclusive with `external_endpoint_url`.
     endpoint: str | None = None
     external_endpoint_url: str | None = None
     # Raw request body; mutually exclusive with `credentials`.

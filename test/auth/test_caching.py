@@ -1,4 +1,5 @@
 import pytest
+from flask import jsonify
 
 import schemathesis
 from schemathesis.auths import (
@@ -66,6 +67,72 @@ def test_successful_fetch_resets_failure_counter(auth_operation):
             with pytest.raises(AuthenticationError):
                 provider.get(case, ctx)
     assert attempts["n"] == len(schedule)
+
+
+def _login_provider(clock):
+    return CachingAuthProvider(
+        DynamicTokenAuthProvider(
+            path="/api/login",
+            method="post",
+            payload=None,
+            extract_from="body",
+            extract_selector="/access_token",
+            _applier=HttpBearerAuthProvider(bearer=""),
+        ),
+        refresh_interval=10_000,
+        timer=lambda: clock["value"],
+    )
+
+
+def test_fetch_breaker_retries_once_the_endpoint_recovers(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    attempts = {"n": 0}
+    clock = {"value": 0.0}
+
+    @app.route("/api/login", methods=["POST"])
+    def login():
+        attempts["n"] += 1
+        if attempts["n"] <= TOKEN_FETCH_BREAKER_THRESHOLD:
+            return jsonify({"error": "starting up"}), 503
+        return jsonify({"access_token": "test-token"})
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/data"]["GET"]
+    provider = _login_provider(clock)
+    context = AuthContext(operation=operation, app=None)
+    case = operation.Case()
+    for _ in range(TOKEN_FETCH_BREAKER_THRESHOLD + 2):
+        with pytest.raises(AuthenticationError):
+            provider.get(case, context)
+    assert attempts["n"] == TOKEN_FETCH_BREAKER_THRESHOLD
+
+    # Any wait longer than the breaker's cooldown must let the next fetch through.
+    clock["value"] += 3600
+    assert provider.get(case, context) == "test-token"
+
+
+def test_fetch_breaker_probes_at_most_once_per_cooldown(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    attempts = {"n": 0}
+    clock = {"value": 0.0}
+
+    @app.route("/api/login", methods=["POST"])
+    def login():
+        attempts["n"] += 1
+        return jsonify({"error": "down"}), 503
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/data"]["GET"]
+    provider = _login_provider(clock)
+    context = AuthContext(operation=operation, app=None)
+    case = operation.Case()
+    for _ in range(TOKEN_FETCH_BREAKER_THRESHOLD):
+        with pytest.raises(AuthenticationError):
+            provider.get(case, context)
+    for _ in range(3):
+        clock["value"] += 3600
+        for _ in range(5):
+            with pytest.raises(AuthenticationError):
+                provider.get(case, context)
+    assert attempts["n"] == TOKEN_FETCH_BREAKER_THRESHOLD + 3
 
 
 def test_keyed_breaker_is_per_key(auth_operation):

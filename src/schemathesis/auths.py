@@ -35,6 +35,8 @@ DEFAULT_REFRESH_INTERVAL = 300
 REAUTH_BREAKER_THRESHOLD = 3
 # Consecutive failed token fetches before a caching provider stops hammering the login endpoint. Not configurable.
 TOKEN_FETCH_BREAKER_THRESHOLD = 3
+# Seconds a tripped token-fetch breaker waits before letting a single probe through. Not configurable.
+TOKEN_FETCH_BREAKER_COOLDOWN = 30.0
 AuthStorageMark = Mark["AuthStorage"](attr_name="auth_storage")
 Auth = TypeVar("Auth")
 
@@ -135,7 +137,7 @@ class CachingAuthProvider(Generic[Auth]):
     retry_on: list[int] = field(default_factory=lambda: list(DEFAULT_RETRY_ON))
     _refresh_lock: threading.Lock = field(default_factory=threading.Lock)
     _fetch_failures: dict[str | int | None, int] = field(default_factory=dict)
-    _fetch_disabled_keys: set[str | int | None] = field(default_factory=set)
+    _fetch_disabled_until: dict[str | int | None, float] = field(default_factory=dict)
 
     def get(self, case: Case, context: AuthContext) -> Auth | None:
         """Get cached auth value."""
@@ -149,12 +151,18 @@ class CachingAuthProvider(Generic[Auth]):
                     return cache_entry.data
                 # A dead credential fails every fetch; stop hammering the login endpoint once tripped.
                 key = self._fetch_key(case, context)
-                if key in self._fetch_disabled_keys:
-                    raise AuthenticationError(
-                        self.provider.__class__.__name__,
-                        "get",
-                        f"Token fetch failed {TOKEN_FETCH_BREAKER_THRESHOLD} times in a row; not retrying for this run",
-                    )
+                disabled_until = self._fetch_disabled_until.get(key)
+                if disabled_until is not None:
+                    remaining = disabled_until - self.timer()
+                    if remaining > 0:
+                        raise AuthenticationError(
+                            self.provider.__class__.__name__,
+                            "get",
+                            f"Token fetch failed {TOKEN_FETCH_BREAKER_THRESHOLD} times in a row; "
+                            f"retrying in {remaining:.0f}s",
+                        )
+                    # The cooldown elapsed, so a transient outage gets one probe.
+                    del self._fetch_disabled_until[key]
                 # We know that optional auth is possible only inside a higher-level wrapper
                 try:
                     data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
@@ -179,7 +187,7 @@ class CachingAuthProvider(Generic[Auth]):
         count = self._fetch_failures.get(key, 0) + 1
         self._fetch_failures[key] = count
         if count >= TOKEN_FETCH_BREAKER_THRESHOLD:
-            self._fetch_disabled_keys.add(key)
+            self._fetch_disabled_until[key] = self.timer() + TOKEN_FETCH_BREAKER_COOLDOWN
 
     def _get_cache_entry(self, case: Case, context: AuthContext) -> CacheEntry[Auth] | None:
         return self.cache_entry

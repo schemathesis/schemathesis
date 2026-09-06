@@ -31,6 +31,7 @@
 - False positive `ignored_auth` for APIs that reject unauthenticated requests with 403.
 - Merge `authTemplate` into each entry when loading WFC auth files.
 - Select the first WFC auth entry when no `user` is configured, as documented.
+- Retry token fetches after a cooldown instead of disabling auth for the whole run.
 - Accept WFC login endpoints that specify neither `token` nor `expectCookies`, using the returned cookies.
 - Accept WFC login endpoints that redirect after sign-in, using the cookies they set.
 - ASGI application support failing with `anyio` 4.15.

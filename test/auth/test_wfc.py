@@ -533,6 +533,58 @@ def test_wfc_asgi_login_redirect_yields_cookies():
     assert case.cookies == {"JSESSIONID": WFC_SESSION}
 
 
+def test_wfc_login_endpoint_is_resolved_against_the_server_root(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/protected": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        servers=[{"url": "/app"}],
+    )
+
+    @app.route("/app/login", methods=["POST"])
+    def login() -> object:
+        return jsonify({"access_token": WFC_TOKEN})
+
+    @app.route("/app/protected", methods=["GET"])
+    def protected() -> object:
+        return jsonify({"ok": True})
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/protected"]["GET"]
+    provider = _provider_for(_login(token=_token(), endpoint="/app/login"))
+    context = AuthContext(operation=operation, app=None)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
+
+
+def _bouncing_login_app(ctx) -> Flask:
+    # Form-login servers hand out a session cookie on rejected credentials too, so only the target tells them apart.
+    app, _ = ctx.openapi.make_flask_app({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> object:
+        response = redirect("/api/login?error", code=302)
+        response.set_cookie("JSESSIONID", WFC_SESSION)
+        return response
+
+    return app
+
+
+def test_wfc_http_login_redirect_back_to_login_is_rejected(ctx, app_runner):
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(_bouncing_login_app(ctx)))["/api/protected"]["GET"]
+    provider = _provider_for(_login(expectCookies=True))
+    context = AuthContext(operation=operation, app=None)
+    with pytest.raises(WFCLoginError, match="redirected back to the login endpoint"):
+        provider.get(operation.Case(), context)
+
+
+def test_wfc_wsgi_login_redirect_back_to_login_is_rejected(ctx):
+    app = _bouncing_login_app(ctx)
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/api/protected"]["GET"]
+    provider = _provider_for(_login(expectCookies=True))
+    context = AuthContext(operation=operation, app=app)
+    with pytest.raises(WFCLoginError, match="redirected back to the login endpoint"):
+        provider.get(operation.Case(), context)
+
+
 @pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])
 def test_wfc_http_login_bad_charset(ctx, app_runner, charset):
     # A login endpoint declaring an unknown or broken charset must not crash the login request.
