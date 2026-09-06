@@ -733,7 +733,19 @@ def _collect_declared_properties(
     return declared, forbids_extras
 
 
-def _additional_properties_hint(case: Case) -> str | None:
+def _blamed_body_properties(case: Case, response: Response) -> set[str]:
+    """Top-level body property names the server's own error message pinned the rejection on."""
+    from schemathesis.core.error_feedback.collector import parse_observations
+
+    names: set[str] = set()
+    for observation in parse_observations(operation=case.operation, case=case, response=response):
+        path = observation.parameter_path
+        if observation.location is ParameterLocation.BODY and path and isinstance(path[0], str):
+            names.add(path[0])
+    return names
+
+
+def _additional_properties_hint(case: Case, response: Response) -> str | None:
     """Return a hint if extra body properties are the likely cause of server rejection."""
     if not isinstance(case.body, dict):
         return None
@@ -764,6 +776,11 @@ def _additional_properties_hint(case: Case) -> str | None:
         if contains_binary(stripped):
             return None
         if not make_validator(alternative.optimized_schema, validator_cls).is_valid(stripped):
+            return None
+
+        # The server named a declared field and none of the extras, so the extras did not cause the rejection.
+        blamed = _blamed_body_properties(case, response)
+        if blamed & declared and not blamed & extra:
             return None
 
         count = len(extra)
@@ -830,7 +847,7 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
         if response.status_code in CREDENTIAL_REJECTION_STATUSES and _grants_credentials(case.operation):
             return None
         message = f"Valid data should have been accepted\nExpected: {', '.join(config.expected_statuses)}"
-        hint = _additional_properties_hint(case)
+        hint = _additional_properties_hint(case, response)
         if hint:
             message += hint
         raise RejectedPositiveData(

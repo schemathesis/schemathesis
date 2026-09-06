@@ -27,6 +27,7 @@ from schemathesis.generation.meta import (
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     JsonSchemaError,
+    RejectedPositiveData,
     UnsupportedMethodResponse,
     UseAfterFree,
 )
@@ -355,6 +356,11 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
     assert has_only_additional_properties_in_non_body_parameters(case) is True
 
 
+def _opaque_rejection(response_factory):
+    # A rejection with nothing to attribute, so the hint falls back to its schema-side reasoning.
+    return Response.from_requests(response_factory.requests(status_code=400), verify=True)
+
+
 @pytest.mark.parametrize(
     ("body", "expected_hint"),
     [
@@ -362,7 +368,7 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
         pytest.param({"a": 1, "b": {"x": "q"}, "extra": "yes"}, "`extra`", id="real-extra-fires"),
     ],
 )
-def test_additional_properties_hint_resolves_bundled_ref(ctx, body, expected_hint):
+def test_additional_properties_hint_resolves_bundled_ref(ctx, response_factory, body, expected_hint):
     # Bundled `$ref` bodies must be resolved before classifying extras.
     schema = ctx.openapi.from_full_schema(
         {
@@ -395,7 +401,7 @@ def test_additional_properties_hint_resolves_bundled_ref(ctx, body, expected_hin
     )
     operation = schema["/foo"]["POST"]
     case = operation.Case(body=body, media_type="application/json", method="POST")
-    hint = _additional_properties_hint(case)
+    hint = _additional_properties_hint(case, _opaque_rejection(response_factory))
     if expected_hint is None:
         assert hint is None, f"False positive: {hint!r}"
     else:
@@ -410,7 +416,7 @@ def test_additional_properties_hint_resolves_bundled_ref(ctx, body, expected_hin
         pytest.param({"a": "x", "b": "y", "extra": "yes"}, "`extra`", id="real-extra-fires"),
     ],
 )
-def test_additional_properties_hint_with_composed_properties(ctx, combinator, body, expected_hint):
+def test_additional_properties_hint_with_composed_properties(ctx, response_factory, combinator, body, expected_hint):
     # Properties declared inside combinator branches are not extras, and telling the user to add
     # `additionalProperties: false` there would reject valid requests.
     schema = ctx.openapi.from_full_schema(
@@ -442,7 +448,7 @@ def test_additional_properties_hint_with_composed_properties(ctx, combinator, bo
     )
     operation = schema["/foo"]["POST"]
     case = operation.Case(body=body, media_type="application/json", method="POST")
-    hint = _additional_properties_hint(case)
+    hint = _additional_properties_hint(case, _opaque_rejection(response_factory))
     if expected_hint is None:
         assert hint is None, f"False positive: {hint!r}"
     else:
@@ -450,7 +456,7 @@ def test_additional_properties_hint_with_composed_properties(ctx, combinator, bo
         assert "`a`" not in hint and "`b`" not in hint, f"Declared keys reported as extras: {hint!r}"
 
 
-def test_additional_properties_hint_skipped_when_branch_forbids_extras(ctx):
+def test_additional_properties_hint_skipped_when_branch_forbids_extras(ctx, response_factory):
     # `additionalProperties: false` inside a branch already forbids extras, so advising to add it is noise.
     schema = ctx.openapi.from_full_schema(
         {
@@ -483,7 +489,50 @@ def test_additional_properties_hint_skipped_when_branch_forbids_extras(ctx):
     )
     operation = schema["/foo"]["POST"]
     case = operation.Case(body={"a": "x", "extra": "yes"}, media_type="application/json", method="POST")
-    assert _additional_properties_hint(case) is None
+    assert _additional_properties_hint(case, _opaque_rejection(response_factory)) is None
+
+
+_EXTRA_PROPERTY_HINT = (
+    "\nHint: The request body contains 1 additional property not defined in the schema (`extra`). "
+    "The server likely rejects unexpected fields. "
+    "Add `additionalProperties: false` to your schema to prevent this."
+)
+
+
+@pytest.mark.parametrize(
+    ("error_body", "hint"),
+    [
+        pytest.param(b'{"name": ["This field may not be blank."]}', "", id="declared-field-blamed"),
+        pytest.param(b'{"extra": ["This field may not be blank."]}', _EXTRA_PROPERTY_HINT, id="extra-property-blamed"),
+        pytest.param(b'{"detail": "Bad request"}', _EXTRA_PROPERTY_HINT, id="no-field-blamed"),
+    ],
+)
+def test_additional_properties_hint_follows_response_attribution(ctx, response_factory, error_body, hint):
+    # Blaming extras for a rejection the server pinned on a declared field points the reader at the wrong fix.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/foo"]["POST"].Case(
+        body={"name": "value", "extra": "yes"}, media_type="application/json", _meta=build_metadata()
+    )
+    response = Response.from_requests(response_factory.requests(status_code=400, content=error_body), verify=True)
+    with pytest.raises(RejectedPositiveData) as exc:
+        positive_data_acceptance(check_context(), response, case)
+    assert exc.value.message == f"Valid data should have been accepted\nExpected: 2xx, 401, 403, 404, 409, 5xx{hint}"
 
 
 @pytest.mark.parametrize(
