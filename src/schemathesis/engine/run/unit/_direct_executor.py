@@ -9,7 +9,7 @@ from schemathesis.checks import CheckContext
 from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.timing import Instant
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.errors import TestingState, UnexpectedError, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
@@ -103,10 +103,12 @@ def run_driver(
         with ignore_hypothesis_output():
             # Match LIFO order from Hypothesis `Phase.explicit` so engine output matches the pytest path.
             for case in reversed(_collect_within_budget(generator, ctx)):
-                if ctx.has_reached_time_limit:
+                # One snapshot: reading the clock twice lets the deadline pass in between and turn a
+                # spent budget into a phantom interrupt.
+                stop_reason = ctx.stop_reason
+                if stop_reason is StopReason.MAX_TIME:
                     raise BudgetExpired
-                if ctx.has_to_stop:
-                    # Promote the stop signal so `KeyboardInterrupt` handler reports INTERRUPTED.
+                if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
                     raise KeyboardInterrupt
                 any_case_ran = True
                 try:

@@ -11,7 +11,7 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.failures import Failure
-from schemathesis.engine import events
+from schemathesis.engine import StopReason, events
 from schemathesis.engine._rate_limit_retry import call_with_retry
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.errors import (
@@ -62,11 +62,14 @@ def run_one_case(
 ) -> None:
     """Run one case end-to-end: call, record, validate, classify."""
     try:
+        # One snapshot: reading the clock twice lets the deadline pass in between and turn a spent
+        # budget into a phantom interrupt.
+        stop_reason = ctx.stop_reason
         # A slice may be shorter than a single case takes. Let the first one through anyway, so an
         # operation is never selected and then left with nothing to show for it.
-        if ctx.has_reached_time_limit or (ctx.is_operation_slice_expired and recorder.interactions):
+        if stop_reason is StopReason.MAX_TIME or (ctx.is_operation_slice_expired and recorder.interactions):
             raise BudgetExpired
-        if ctx.has_to_stop:
+        if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
             raise KeyboardInterrupt
         # Honor a supervisor SKIP verdict that flipped mid-scenario; without this,
         # cases already drawn or queued would still hit the server.
