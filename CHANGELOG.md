@@ -25,6 +25,7 @@
 
 ### :bug: Fixed
 
+- Send example values in query and path as `true` / `false` / `null`, omitting optional nulls.
 - Crash on repeat runs when an operation's request body declares several media types.
 - Merge `authTemplate` into each entry when loading WFC auth files.
 - Select the first WFC auth entry when no `user` is configured, as documented.

@@ -13,6 +13,7 @@ import schemathesis
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import ResourceRepository
 from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
@@ -1083,6 +1084,178 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
         assert int(case.query["q2foo"]) % 2 == 0
 
     test()
+
+
+@pytest.mark.parametrize(
+    ("version", "nullable_integer"),
+    [("3.0.2", {"type": "integer", "nullable": True}), ("3.1.0", {"type": ["integer", "null"]})],
+    ids=["nullable", "type-null"],
+)
+def test_example_query_parameters_use_wire_form(ctx, version, nullable_integer):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "flag",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "boolean"},
+                            "example": True,
+                        },
+                        {
+                            "name": "limit",
+                            "in": "query",
+                            "required": False,
+                            "schema": nullable_integer,
+                            "example": None,
+                        },
+                        {
+                            "name": "offset",
+                            "in": "query",
+                            "required": True,
+                            "schema": nullable_integer,
+                            "example": None,
+                        },
+                        {
+                            "name": "ids",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "array", "items": nullable_integer},
+                            "example": [None, 1],
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+    operation = schema["/test"]["GET"]
+
+    assert examples.generate_one(operation.get_strategies_from_examples()[0]).query == {
+        "flag": "true",
+        "offset": "null",
+        "ids": ["null", 1],
+    }
+
+
+def test_example_path_parameters_use_wire_form(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test/{flag}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "flag",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "boolean"},
+                            "example": True,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/test/{flag}"]["GET"]
+
+    assert examples.generate_one(operation.get_strategies_from_examples()[0]).path_parameters == {"flag": "true"}
+
+
+def test_example_boolean_header_and_cookie_render_like_the_fuzzing_phase(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "X-Flag",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "boolean"},
+                            "example": True,
+                        },
+                        {
+                            "name": "session",
+                            "in": "cookie",
+                            "required": True,
+                            "schema": {"type": "boolean"},
+                            "example": False,
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/test"]["GET"]
+    example = examples.generate_one(operation.get_strategies_from_examples()[0])
+
+    assert (dict(example.headers), example.cookies) == ({"X-Flag": "True"}, {"session": "False"})
+
+
+def test_example_case_with_generated_query_stays_positive(ctx):
+    # Rendering an example for the wire must not read back as a schema violation.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "flag",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "boolean"},
+                            "example": True,
+                        },
+                        {"name": "note", "in": "query", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/test"]["GET"]
+
+    assert (
+        examples.generate_one(operation.get_strategies_from_examples()[0]).meta.generation.mode
+        == GenerationMode.POSITIVE
+    )
+
+
+def test_example_body_keeps_json_types(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "flag": {"type": "boolean"},
+                                        "limit": {"type": ["integer", "null"]},
+                                    },
+                                    "required": ["flag", "limit"],
+                                },
+                                "example": {"flag": True, "limit": None},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    operation = schema["/test"]["POST"]
+
+    assert examples.generate_one(operation.get_strategies_from_examples()[0]).body == {"flag": True, "limit": None}
 
 
 def test_external_value(ctx, app_runner):

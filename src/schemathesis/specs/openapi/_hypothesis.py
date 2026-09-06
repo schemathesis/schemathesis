@@ -1034,6 +1034,18 @@ def jsonify_python_specific_types(value: Any) -> Any:
     return value
 
 
+def jsonify_query_parameters(value: dict[str, Any], optional: frozenset[str]) -> dict[str, Any]:
+    """Convert query values to their JSON equivalents, omitting optional parameters that carry no value.
+
+    Query strings have no rendering for a JSON null; leaving the parameter out is what "no value" means there.
+    """
+    return {
+        key: jsonify_python_specific_types(item)
+        for key, item in value.items()
+        if item is not None or key not in optional
+    }
+
+
 def _build_custom_formats(generation_config: GenerationConfig, mode: GenerationMode) -> dict[str, st.SearchStrategy]:
     cache_key = (id(generation_config), mode)
     cached = custom_formats_cache.get(cache_key)

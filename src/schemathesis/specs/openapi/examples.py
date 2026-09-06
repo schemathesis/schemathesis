@@ -31,7 +31,13 @@ from schemathesis.generation.jsonschema import Alphabet, build
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi._hypothesis import _build_custom_formats, openapi_cases, snapped_float32_clone
+from schemathesis.specs.openapi._hypothesis import (
+    _build_custom_formats,
+    jsonify_python_specific_types,
+    jsonify_query_parameters,
+    openapi_cases,
+    snapped_float32_clone,
+)
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 
 if TYPE_CHECKING:
@@ -160,6 +166,7 @@ def get_strategies_from_examples(
 ) -> list[SearchStrategy[Case]]:
     """Build strategies from schema examples, augmented with pool values where available."""
     maps = operation.get_parameter_serializers()
+    optional_query = frozenset(parameter.name for parameter in operation.query if not parameter.is_required)
 
     def serialize_components(case: Case) -> Case:
         """Applies special serialization rules for case components.
@@ -169,6 +176,15 @@ def get_strategies_from_examples(
         for container, map_func in maps.items():
             value = getattr(case, container)
             setattr(case, container, map_func(value))
+        # A spec example carries Python values; the URL renders them as text, so booleans and nulls
+        # need the same JSON spelling every other phase sends.
+        case.query = jsonify_query_parameters(case.query, optional_query)
+        case.path_parameters = jsonify_python_specific_types(case.path_parameters)
+        if case._meta is not None:
+            # Rendering a value for the wire does not change the data that was generated, and
+            # re-checking the rendered form against the typed schema would call the example negative.
+            case._meta.clear_dirty(ParameterLocation.QUERY)
+            case._meta.clear_dirty(ParameterLocation.PATH)
         return case
 
     # Extract all top-level examples from the `examples` & `example` fields (`x-` prefixed versions in Open API 2)
