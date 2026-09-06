@@ -873,6 +873,16 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
     return None
 
 
+# Statuses that mean the server rejected the request at the authentication layer.
+AUTH_REJECTION_STATUSES = frozenset({401, 403})
+
+
+def _requires_authentication(operation: APIOperation) -> bool:
+    from schemathesis.specs.openapi.adapter.security import get_effective_security_scheme_names
+
+    return bool(get_effective_security_scheme_names(operation, operation.schema.raw_schema))
+
+
 @schemathesis.check
 @requires_openapi_schema
 @requires_case_meta
@@ -887,6 +897,10 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
             # Generated path parameters rarely point at an existing resource, and routing 404s before
             # method dispatch. 405 is only guaranteed when the target resource exists.
             if response.status_code == 404 and "{" in case.operation.path:
+                return None
+            # Most frameworks authenticate before method dispatch, so a protected operation rejects an
+            # undeclared method with 401/403 without ever reaching routing.
+            if response.status_code in AUTH_REJECTION_STATUSES and _requires_authentication(case.operation):
                 return None
             raise UnsupportedMethodResponse(
                 operation=case.operation.label,

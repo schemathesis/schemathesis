@@ -72,6 +72,7 @@
 - Detect `ignored_auth` bypasses in APIs that accept any well-formed bearer or basic credentials.
 - Send binary form properties as file parts when testing WSGI applications.
 - Send the body of `multipart/mixed` requests to WSGI applications instead of an empty payload.
+- False positive `unsupported_method` when a secured operation answers 401 or 403 before routing.
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 

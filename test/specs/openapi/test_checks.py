@@ -24,7 +24,12 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
-from schemathesis.openapi.checks import AllowHeaderMismatch, JsonSchemaError, UseAfterFree
+from schemathesis.openapi.checks import (
+    AllowHeaderMismatch,
+    JsonSchemaError,
+    UnsupportedMethodResponse,
+    UseAfterFree,
+)
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _additional_properties_hint,
@@ -1756,6 +1761,62 @@ def test_unsupported_method_404_on_templated_path(
             unsupported_method(context, response, case)
     else:
         assert unsupported_method(context, response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("secured", "status_code", "expected_message"),
+    [
+        (True, 401, None),
+        (True, 403, None),
+        (False, 401, "Unsupported method TRACE returned 401"),
+        (False, 403, "Unsupported method TRACE returned 403"),
+        (True, 500, "Unsupported method TRACE returned 500"),
+        (True, 405, "TRACE returned 405 without required `Allow` header"),
+    ],
+    ids=[
+        "secured-401",
+        "secured-403",
+        "open-401",
+        "open-403",
+        "secured-non-auth-status",
+        "secured-405-without-allow",
+    ],
+)
+def test_unsupported_method_auth_before_routing(ctx, response_factory, secured, status_code, expected_message):
+    # Many frameworks authenticate before method dispatch, so a protected path answers 401/403 instead of 405.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    **({"security": [{"basicAuth": []}]} if secured else {}),
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=0.1, mode=GenerationMode.NEGATIVE),
+            components={},
+            phase=PhaseInfo(
+                name=TestPhase.COVERAGE,
+                data=CoveragePhaseData(
+                    scenario=CoverageScenario.UNSPECIFIED_HTTP_METHOD,
+                    description="Unspecified HTTP method: TRACE",
+                    location=None,
+                    parameter=None,
+                    parameter_location=None,
+                ),
+            ),
+        ),
+    )
+    response = response_factory.requests(status_code=status_code, method="TRACE")
+    if expected_message is None:
+        assert unsupported_method(check_context(), response, case) is None
+    else:
+        with pytest.raises(UnsupportedMethodResponse, match=re.escape(expected_message)):
+            unsupported_method(check_context(), response, case)
 
 
 def _token_endpoint_paths():
