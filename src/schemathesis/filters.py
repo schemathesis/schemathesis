@@ -169,6 +169,13 @@ class FilterSet:
     def applies_to(self, operation: APIOperation) -> bool:
         return self.match(SimpleNamespace(operation=operation))
 
+    def is_explicitly_included(self, operation: APIOperation) -> bool:
+        """Whether a filter the user wrote selects this operation."""
+        ctx = SimpleNamespace(operation=operation)
+        if self._declared is None:
+            return any(filter_.match(ctx) for filter_ in self._includes)
+        return any(entry.filter.match(ctx) for entry in self._declared if entry.include)
+
     def match(self, ctx: HasAPIOperation) -> bool:
         """Determines whether the given operation should be included based on the defined filters.
 

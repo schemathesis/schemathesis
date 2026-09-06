@@ -258,6 +258,26 @@ def test_operations_count(ctx):
     assert schema.statistic.operations.total == 4
 
 
+def test_federation_infrastructure_is_not_tested(ctx):
+    api = ctx.graphql.apps.federated_subgraph()
+    schema = schemathesis.graphql.from_url(api.schema_url)
+    assert [operation.ok().label for operation in schema.get_all_operations()] == ["Query.getBooks"]
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (1, 1)
+
+
+def test_federation_infrastructure_is_tested_when_selected(ctx):
+    api = ctx.graphql.apps.federated_subgraph()
+    schema = schemathesis.graphql.from_url(api.schema_url).include(name="Query._entities")
+    assert [operation.ok().label for operation in schema.get_all_operations()] == ["Query._entities"]
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (2, 1)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_federated_subgraph_cli(ctx, cli, snapshot_cli):
+    api = ctx.graphql.apps.federated_subgraph()
+    assert cli.run(api.schema_url, "--max-examples=5") == snapshot_cli
+
+
 CUSTOM_QUERY_NAME = "MyQuery"
 CUSTOM_MUTATION_NAME = "MyMutation"
 

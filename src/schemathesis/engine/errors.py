@@ -11,7 +11,7 @@ import re
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from schemathesis import errors
 from schemathesis.config import ConfigError
@@ -28,6 +28,7 @@ from schemathesis.core.errors import (
     split_traceback,
 )
 from schemathesis.core.output import escape_surrogates
+from schemathesis.specs.graphql.scalars import UnknownScalar
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -120,17 +121,13 @@ class EngineErrorInfo:
     @property
     def message(self) -> str:
         """Detailed error description."""
-        import hypothesis.errors
         import requests
 
         if isinstance(self._error, requests.RequestException):
             return get_request_error_message(self._error)
 
-        if self._kind == RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR and isinstance(
-            self._error, hypothesis.errors.InvalidArgument
-        ):
-            scalar_name = scalar_name_from_error(self._error)
-            return f"Scalar type '{scalar_name}' is not recognized"
+        if isinstance(self._error, UnknownScalar):
+            return f"Scalar type '{self._error.name}' is not recognized"
 
         if self._kind in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
@@ -224,13 +221,6 @@ class EngineErrorInfo:
         return escape_surrogates("\n".join(message))
 
 
-def scalar_name_from_error(exception: hypothesis.errors.InvalidArgument) -> str:
-    # This one is always available as the format is checked upfront
-    match = re.search(r"Scalar '(\w+)' is not supported", str(exception))
-    match = cast(re.Match, match)
-    return match.group(1)
-
-
 def extract_health_check_error(error: hypothesis.errors.FailedHealthCheck) -> hypothesis.HealthCheck | None:
     from schemathesis.generation.hypothesis.reporting import HEALTH_CHECK_TITLES
 
@@ -321,6 +311,9 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
     import requests
     from hypothesis import HealthCheck
 
+    if isinstance(error, UnknownScalar):
+        return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR
+
     # Configuration errors
     if isinstance(error, ConfigError):
         return RuntimeErrorKind.CONFIG_ERROR
@@ -358,10 +351,6 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
                 HealthCheck.large_base_example: RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
             }[health_check]
         return RuntimeErrorKind.UNCLASSIFIED
-    if isinstance(error, hypothesis.errors.InvalidArgument) and str(error).startswith("Scalar "):
-        # Comes from `hypothesis-graphql`
-        return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR
-
     # Hook errors
     if isinstance(error, errors.HookExecutionError):
         return RuntimeErrorKind.HOOK_EXECUTION_ERROR

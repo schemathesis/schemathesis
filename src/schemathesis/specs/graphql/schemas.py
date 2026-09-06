@@ -51,7 +51,7 @@ from schemathesis.transport.prepare import prepare_path
 
 from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
-from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
+from .scalars import CUSTOM_SCALARS, UnknownScalar, get_extra_scalar_strategies, unsupported_scalar_name
 from .substitution import SUBSTITUTION_PROBABILITY, substitute_constants, substitute_pool_values
 
 if TYPE_CHECKING:
@@ -75,6 +75,10 @@ if TYPE_CHECKING:
 
 # Reused on every per-draw call; allocating once avoids ~600ns of `LazyStrategy` construction.
 _NONE_STRATEGY: st.SearchStrategy = st.none()
+
+# Query fields every Apollo Federation subgraph must expose. They belong to the federation gateway
+# protocol rather than to the API under test, so they stay out of the tested surface unless asked for.
+FEDERATION_FIELDS = frozenset({"_entities", "_service"})
 
 
 @dataclass(repr=False)
@@ -283,15 +287,17 @@ class GraphQLSchema(BaseSchema):
         )
 
         usage = FilterUsage(self.filter_set) if not self.filter_set.is_empty() else None
-        for type_name in ("queryType", "mutationType"):
+        for type_name, root_type in (("queryType", RootType.QUERY), ("mutationType", RootType.MUTATION)):
             type_def = raw_schema.get(type_name)
             if type_def is not None:
                 query_type_name = type_def["name"]
                 for type_def in raw_schema.get("types", []):
                     if type_def["name"] == query_type_name:
                         for field in type_def["fields"]:
-                            statistic.operations.total += 1
                             dummy_operation.label = f"{query_type_name}.{field['name']}"
+                            if self._is_hidden_federation_field(root_type, field["name"], dummy_operation):
+                                continue
+                            statistic.operations.total += 1
                             if not self._should_skip(dummy_operation):
                                 statistic.operations.selected += 1
                             if usage is not None:
@@ -311,9 +317,16 @@ class GraphQLSchema(BaseSchema):
                 continue
             for field_name, field_ in operation_type.fields.items():
                 operation = self._build_operation(root_type, operation_type, field_name, field_)
-                if self._should_skip(operation):
+                if self._is_hidden_federation_field(root_type, field_name, operation) or self._should_skip(operation):
                     continue
                 yield Ok(operation)
+
+    def _is_hidden_federation_field(self, root_type: RootType, field_name: str, operation: APIOperation) -> bool:
+        return (
+            root_type == RootType.QUERY
+            and field_name in FEDERATION_FIELDS
+            and not self.filter_set.is_explicitly_included(operation)
+        )
 
     def _should_skip(
         self,
@@ -534,7 +547,7 @@ def graphql_cases(
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body")
     try:
-        ast_node = draw(strategy)
+        ast_node = _draw_ast(draw, strategy)
     except InvalidArgument:
         # Negative mode is not possible for this operation (no required arguments or scalar types to violate)
         if generation.modes == [GenerationMode.NEGATIVE]:
@@ -552,7 +565,7 @@ def graphql_cases(
             mode=GqlMode.POSITIVE,
         )
         fallback_strategy = apply_to_all_dispatchers(operation, hook_context, hooks, fallback_strategy, "body")
-        ast_node = draw(fallback_strategy)
+        ast_node = _draw_ast(draw, fallback_strategy)
 
     operation_node = next(
         (d for d in ast_node.definitions if isinstance(d, graphql.OperationDefinitionNode)),
@@ -664,6 +677,19 @@ def _generate_parameter(
     else:
         strategy = apply_to_all_dispatchers(operation, context, hooks, st.just(explicit), container)
     return draw(strategy)
+
+
+def _draw_ast(draw: Callable, strategy: SearchStrategy) -> graphql.DocumentNode:
+    """Draw a query AST, reporting a scalar with no registered strategy as such."""
+    from hypothesis.errors import InvalidArgument
+
+    try:
+        return draw(strategy)
+    except InvalidArgument as error:
+        scalar_name = unsupported_scalar_name(error)
+        if scalar_name is None:
+            raise
+        raise UnknownScalar(scalar_name) from None
 
 
 def _noop(node: graphql.Node) -> graphql.Node:

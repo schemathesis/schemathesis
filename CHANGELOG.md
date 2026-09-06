@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Apollo Federation subgraph support: `_entities` and `_service` stay out unless filters select them.
 - `base_url_mismatch` warning when every response is 404 and `--url` omits the schema's base path.
 - Try each user in a WFC auth document, moving on from the ones an operation rejects.
 - `--max-time` stops `st run` after the given number of seconds.
@@ -27,6 +28,7 @@
 
 - Send example values in query and path as `true` / `false` / `null`, omitting optional nulls.
 - Use a single boundary in the reproduce cURL for multipart request bodies.
+- Report GraphQL scalars with no registered strategy accurately in every generation mode.
 - Crash on repeat runs when an operation's request body declares several media types.
 - Omit optional query parameters generated as `null` from the request.
 - False positive `ignored_auth` for APIs that reject unauthenticated requests with 403.

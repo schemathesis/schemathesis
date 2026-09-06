@@ -1,12 +1,21 @@
 import pytest
 from _pytest.main import ExitCode
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.generation import GenerationMode
 from schemathesis.graphql import nodes
-from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
+from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS, UnknownScalar
+
+UNSUPPORTED_SCALAR_SDL = """
+scalar FooBar
+
+type Query {
+  search(term: FooBar!, limit: Int!, offset: Int!, page: Int!): Int!
+}
+"""
 
 
 @pytest.fixture(autouse=True)
@@ -96,3 +105,38 @@ type Query {
 def test_invalid_strategy(name, value, expected):
     with pytest.raises(IncorrectUsage, match=expected):
         schemathesis.graphql.scalar(name, value)
+
+
+def test_unsupported_scalar_points_at_the_registration_api(ctx):
+    schema = ctx.graphql.load_sdl(UNSUPPORTED_SCALAR_SDL)
+
+    @given(schema["Query"]["search"].as_strategy())
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck), database=None)
+    def test(case):
+        pass
+
+    with pytest.raises(UnknownScalar) as exc:
+        test()
+
+    assert str(exc.value) == (
+        "Scalar 'FooBar' is not supported. "
+        'Register a strategy for it via `schemathesis.graphql.scalar("FooBar", ...)`'
+    )
+
+
+@pytest.mark.parametrize(
+    "modes",
+    [[GenerationMode.NEGATIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],
+    ids=["negative", "all"],
+)
+def test_unsupported_scalar_is_not_reported_as_impossible_negative(ctx, modes):
+    schema = ctx.graphql.load_sdl(UNSUPPORTED_SCALAR_SDL)
+    schema.config.generation.update(modes=modes)
+
+    @given(schema["Query"]["search"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), database=None)
+    def test(case):
+        pass
+
+    with pytest.raises(UnknownScalar, match="Scalar 'FooBar' is not supported"):
+        test()

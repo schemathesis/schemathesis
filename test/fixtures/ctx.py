@@ -448,6 +448,9 @@ class GraphQLApps:
     def books(self, *, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask") -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.books(endpoint=endpoint, framework=framework))
 
+    def federated_subgraph(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.federated_subgraph())
+
     def from_schema(
         self, schema, *, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask"
     ) -> GraphQLServer:

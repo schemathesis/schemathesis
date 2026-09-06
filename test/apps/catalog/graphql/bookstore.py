@@ -428,8 +428,31 @@ def _make_non_id_pool() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation)
 
 
+def _make_federated_subgraph() -> strawberry.Schema:
+    @strawberry.federation.type(keys=["id"])
+    class FederatedBook:
+        id: strawberry.ID
+        title: str
+
+        @classmethod
+        def resolve_reference(cls, id: strawberry.ID) -> "FederatedBook":
+            return FederatedBook(id=id, title="Kafka on the Shore")
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def getBooks(self) -> list[FederatedBook]:
+            return [FederatedBook(id=strawberry.ID("1"), title="Kafka on the Shore")]
+
+    return strawberry.federation.Schema(Query)
+
+
 def books(*, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask") -> GraphQLApp:
     return _wrap(_make_default(), endpoint, framework)
+
+
+def federated_subgraph(*, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_federated_subgraph(), endpoint, "flask")
 
 
 def from_schema(

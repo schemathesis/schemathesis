@@ -1,15 +1,27 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.errors import IncorrectUsage, SchemathesisError
 
 if TYPE_CHECKING:
     import graphql
     from hypothesis import strategies as st
 
 CUSTOM_SCALARS: dict[str, st.SearchStrategy[graphql.ValueNode]] = {}
+
+
+class UnknownScalar(SchemathesisError):
+    """A scalar type Schemathesis has no strategy for."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        super().__init__(
+            f"Scalar {name!r} is not supported. "
+            f'Register a strategy for it via `schemathesis.graphql.scalar("{name}", ...)`'
+        )
 
 
 def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
@@ -61,6 +73,15 @@ def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
             f"{strategy!r} must be a Hypothesis strategy which generates AST nodes matching this scalar"
         )
     CUSTOM_SCALARS[name] = strategy
+
+
+UNSUPPORTED_SCALAR_RE = re.compile(r"Scalar '(\w+)' is not supported")
+
+
+def unsupported_scalar_name(error: Exception) -> str | None:
+    """Name of the scalar the generator has no strategy for, if that is what went wrong."""
+    match = UNSUPPORTED_SCALAR_RE.match(str(error))
+    return match.group(1) if match is not None else None
 
 
 @lru_cache

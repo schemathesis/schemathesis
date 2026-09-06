@@ -26,6 +26,40 @@ Schemathesis automatically generates valid queries:
 { getEvents(date: "2023-12-25", id: "550e8400-e29b-41d4-a716-446655440000") }
 ```
 
+## Apollo Federation
+
+Every federated subgraph exposes `_entities` and `_service`. They belong to the federation gateway protocol
+rather than to your API, so Schemathesis leaves them out and tests the subgraph's own `Query` and `Mutation`
+fields without extra configuration.
+
+To test `_entities` anyway, select it explicitly and register a strategy for the `_Any` scalar. `_Any` carries
+an entity representation - an object with `__typename` plus that entity's `@key` fields - so a generic object
+strategy makes the resolver fail on nearly every call:
+
+```bash
+uvx schemathesis run http://localhost:8000/graphql --include-name 'Query._entities'
+```
+
+```python
+import graphql
+from hypothesis import strategies as st
+
+import schemathesis
+from schemathesis.graphql import nodes
+
+
+def representation(key: str) -> graphql.ObjectValueNode:
+    return nodes.Object(
+        [
+            graphql.ObjectFieldNode(name=graphql.NameNode(value="__typename"), value=nodes.String("Product")),
+            graphql.ObjectFieldNode(name=graphql.NameNode(value="id"), value=nodes.String(key)),
+        ]
+    )
+
+
+schemathesis.graphql.scalar("_Any", st.sampled_from(["1", "2"]).map(representation))
+```
+
 ## Adding custom scalars
 
 For scalars not covered by built-in support, register custom strategies before loading your schema:
