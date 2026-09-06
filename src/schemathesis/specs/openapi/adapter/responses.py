@@ -81,7 +81,7 @@ class OpenApiResponse:
     def get_schema(self, media_type: str | None = None) -> ResolvedSchema:
         """Return the schema for the given media type (or the default one).
 
-        Schema may be None if the media type has no schema defined.
+        Schema may be None if the media type is undocumented or has no schema defined.
         """
         resolved_media_type = self.adapter.resolve_response_media_type(self.definition, media_type)
         cache_key = self._get_cache_key(resolved_media_type)
@@ -293,28 +293,6 @@ def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | 
     return response.get("schema")
 
 
-def extract_response_schema_v3(
-    response: Mapping[str, Any],
-    resolver: Resolver,
-    scope: str,
-    nullable_keyword: str,
-    *,
-    upgrade_legacy_exclusive_bounds: bool = False,
-    merge_ref_siblings: bool = False,
-) -> Bundle | None:
-    schema = extract_raw_response_schema_v3(response)
-    if schema is not None:
-        return _prepare_schema(
-            schema,
-            resolver,
-            scope,
-            nullable_keyword,
-            upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
-            merge_ref_siblings=merge_ref_siblings,
-        )
-    return None
-
-
 def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | None:
     content = response.get("content", {})
     first_schema = None
@@ -409,7 +387,8 @@ def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str 
       1. None -> first/default media type
       2. Exact match (e.g., "application/json")
       3. Wildcard match (e.g., "application/*" matches "application/xml")
-      4. Fallback to first/default media type (for unmatched or malformed Content-Types)
+      4. Malformed Content-Type -> first/default media type
+      5. Anything else -> None, as no documented schema describes the received payload
     """
     content = response.get("content")
     if not isinstance(content, dict) or not content:
@@ -441,7 +420,7 @@ def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str 
         if media_types.matches_parts(expected, received):
             return candidate
 
-    return default
+    return None
 
 
 def extract_schema_for_media_type_v3(
@@ -457,15 +436,7 @@ def extract_schema_for_media_type_v3(
     """Extract schema for specific media type from OpenAPI 3.x response."""
     content = response.get("content")
     if media_type is None or not isinstance(content, dict) or not content:
-        # Fall back to old behavior
-        return extract_response_schema_v3(
-            response,
-            resolver,
-            scope,
-            nullable_keyword,
-            upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
-            merge_ref_siblings=merge_ref_siblings,
-        )
+        return None
 
     media_type_object = content.get(media_type)
     if not isinstance(media_type_object, dict):

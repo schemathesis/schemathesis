@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
-ExtractResponseSchema = Callable[[Mapping[str, Any], "Resolver", str, str], Union["Bundle", None]]
 PrepareResponseMediaTypeSchema = Callable[["JsonSchema", "Resolver", str, str], "Bundle"]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "Resolver", str, str], "Bundle"]
 GetDefaultResponseMediaType = Callable[[Mapping[str, Any]], str | None]
@@ -97,7 +96,6 @@ class ResponseAdapter(SchemaVocabulary, Protocol):
 
     # Function to extract response schema from specification
     extract_raw_response_schema: ExtractRawResponseSchema
-    extract_response_schema: ExtractResponseSchema
     prepare_response_media_type_schema: PrepareResponseMediaTypeSchema
     # Functions for handling multiple media types in responses
     get_default_response_media_type: GetDefaultResponseMediaType

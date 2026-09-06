@@ -446,8 +446,7 @@ def test_response_validation_selects_media_type(ctx):
         # Exact match to application/vnd.api+json (third schema - requires "data" as array)
         ("application/vnd.api+json", '{"data": []}', None),
         ("application/vnd.api+json", '{"id": 42}', JsonSchemaError),
-        # Unmatched content types fall back to first schema (application/json)
-        # Note: Non-JSON content types may skip validation if no deserializer exists
+        # Unmatched content types skip response schema validation
         ("text/plain", '{"id": 1}', None),
         ("image/png", '{"id": 1}', None),
         ("text/html", '{"id": 1}', None),

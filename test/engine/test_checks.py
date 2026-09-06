@@ -734,6 +734,41 @@ def test_no_schema(openapi_30, response_factory):
     assert case.operation.is_valid_response(response)
 
 
+PROBLEM_JSON_BODY = b'{"detail":"nope","status":400,"title":"Bad Request","type":"about:blank"}'
+PROBLEM_JSON_DEFINITION = {
+    "responses": {
+        "400": {
+            "description": "Error",
+            "content": {
+                "application/json": {
+                    "schema": {"type": "object", "properties": {"error": {"type": "string"}}, "required": ["error"]}
+                }
+            },
+        }
+    }
+}
+
+
+def test_response_schema_conformance_undocumented_json_subtype(openapi_30, response_factory):
+    # An RFC 7807 body is not described by the schema documented for `application/json`.
+    response = Response.from_requests(
+        response_factory.requests(status_code=400, content=PROBLEM_JSON_BODY, content_type="application/problem+json"),
+        True,
+    )
+    case = make_case(openapi_30, PROBLEM_JSON_DEFINITION)
+    assert response_schema_conformance(CTX, response, case) is None
+
+
+def test_content_type_conformance_undocumented_json_subtype(openapi_30, response_factory):
+    response = Response.from_requests(
+        response_factory.requests(status_code=400, content=PROBLEM_JSON_BODY, content_type="application/problem+json"),
+        True,
+    )
+    case = make_case(openapi_30, PROBLEM_JSON_DEFINITION)
+    with pytest.raises(UndefinedContentType, match="Undocumented Content-Type"):
+        content_type_conformance(CTX, response, case)
+
+
 @pytest.mark.hypothesis_nested
 def test_response_schema_conformance_references_invalid(complex_schema, response_factory):
     schema = schemathesis.openapi.from_path(complex_schema)

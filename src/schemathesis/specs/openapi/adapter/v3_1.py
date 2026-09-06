@@ -17,7 +17,6 @@ from schemathesis.specs.openapi.adapter.protocol import (
     ExtractHeaderSchema,
     ExtractParameterSchema,
     ExtractRawResponseSchema,
-    ExtractResponseSchema,
     ExtractSchemaForMediaType,
     ExtractSecurityDefinitions,
     ExtractSecurityParameters,
@@ -45,9 +44,6 @@ ref_siblings = True
 
 extract_parameter_schema: ExtractParameterSchema = parameters.extract_parameter_schema_v3
 extract_raw_response_schema: ExtractRawResponseSchema = responses.extract_raw_response_schema_v3
-extract_response_schema: ExtractResponseSchema = partial(
-    responses.extract_response_schema_v3, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
-)
 prepare_response_media_type_schema: PrepareResponseMediaTypeSchema = partial(
     responses.prepare_response_media_type_schema, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
 )
