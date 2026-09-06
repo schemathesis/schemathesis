@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Mapping
 from functools import lru_cache
@@ -167,7 +168,41 @@ def prepare_request(case: Case, headers: Mapping[str, Any] | None, *, config: Sa
             elif isinstance(kwargs["params"], str):
                 kwargs["params"] = _sanitize_query_string(kwargs["params"], config=config)
 
-    return requests.Request(**kwargs).prepare()
+    request = requests.Request(**kwargs).prepare()
+    _normalize_multipart_boundary(request)
+    return request
+
+
+# Matches the `boundary` parameter of a `Content-Type` value, quoted or bare.
+_BOUNDARY_PARAMETER = re.compile(r'boundary=("[^"]*"|[^;\s]*)', re.IGNORECASE)
+
+
+def _normalize_multipart_boundary(request: PreparedRequest) -> None:
+    """Re-key a multipart payload to a boundary derived from its own content.
+
+    Keeps the declared boundary and the one inside the body in step, so the rendered command is runnable and
+    comes out identical on every rendering of the same data.
+    """
+    content_type = request.headers.get("Content-Type")
+    body = request.body
+    if not isinstance(content_type, str) or not content_type.lower().startswith("multipart/"):
+        return
+    if not isinstance(body, bytes):
+        return
+    delimiter, separator, _ = body.partition(b"\r\n")
+    if not separator or not delimiter.startswith(b"--"):
+        return
+    existing = delimiter[2:]
+    if not existing:
+        return
+    # 32 hex characters - a valid boundary token, the same shape and length the multipart encoders produce.
+    boundary = hashlib.sha256(body.replace(existing, b"")).hexdigest()[:32]
+    request.body = body.replace(existing, boundary.encode())
+    if _BOUNDARY_PARAMETER.search(content_type):
+        request.headers["Content-Type"] = _BOUNDARY_PARAMETER.sub(f"boundary={boundary}", content_type, count=1)
+    else:
+        request.headers["Content-Type"] = f"{content_type}; boundary={boundary}"
+    request.prepare_content_length(request.body)
 
 
 def _sanitize_query_string(query: str, *, config: SanitizationConfig) -> str:

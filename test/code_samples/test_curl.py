@@ -1,6 +1,9 @@
+import re
+
 import pytest
 from _pytest.main import ExitCode
 from fastapi import FastAPI
+from flask import jsonify
 from hypothesis import HealthCheck, given, settings
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -292,3 +295,72 @@ def test_multipart_with_array_of_bytes_body(curl):
     # Then as_curl_command should not raise an error
     command = case.as_curl_command()
     curl.assert_valid(command)
+
+
+MULTIPART_PATHS = {
+    "/upload": {
+        "post": {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"file": {"type": "string", "format": "binary"}},
+                            "required": ["file"],
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        }
+    },
+    "/raw": {
+        "post": {
+            "requestBody": {
+                "required": True,
+                "content": {"multipart/form-data": {"schema": {"type": "string"}}},
+            },
+            "responses": {"200": {"description": "OK"}},
+        }
+    },
+}
+HEADER_BOUNDARY = re.compile(r"Content-Type: multipart/form-data; boundary=([^']+)'")
+BODY_BOUNDARY = re.compile(r"-d \$'--([^\\]+)\\r")
+
+
+@pytest.fixture
+def multipart_schema(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(MULTIPART_PATHS)
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        return jsonify({"success": True})
+
+    @app.route("/raw", methods=["POST"])
+    def raw():
+        return jsonify({"success": True})
+
+    return schemathesis.openapi.from_url(app_runner.openapi_url(app))
+
+
+@pytest.mark.parametrize(
+    ("path", "body"),
+    [("/upload", {"file": b"00"}), ("/raw", "00")],
+    ids=["dict-body", "non-dict-body"],
+)
+def test_multipart_boundary_matches_between_header_and_body(multipart_schema, path, body):
+    case = multipart_schema[path]["POST"].Case(body=body, media_type="multipart/form-data")
+    response = case.call()
+    command = case.as_curl_command(headers=dict(response.request.headers))
+    assert HEADER_BOUNDARY.search(command)[1] == BODY_BOUNDARY.search(command)[1]
+
+
+@pytest.mark.parametrize(
+    ("path", "body"),
+    [("/upload", {"file": b"00"}), ("/raw", "00")],
+    ids=["dict-body", "non-dict-body"],
+)
+def test_multipart_curl_command_is_stable(multipart_schema, path, body):
+    case = multipart_schema[path]["POST"].Case(body=body, media_type="multipart/form-data")
+    assert case.as_curl_command() == case.as_curl_command()
