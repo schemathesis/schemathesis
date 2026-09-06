@@ -85,6 +85,7 @@
 
 #### Schema handling
 
+- Header parameters written as a boolean schema crashing data generation.
 - Malformed `servers` URL templates crashing instead of reporting a schema error.
 - `$ref` values that name no readable file crashing instead of reporting an unresolvable reference.
 - Response keys that are not status code patterns crashing response matching.

@@ -1256,9 +1256,11 @@ def _build_header_formats(generation_config: GenerationConfig, mode: GenerationM
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:
-    # All headers should have a known format key in order to avoid the header filter
+    # All headers should have a known format key in order to avoid the header filter.
+    # A header written as a boolean names no format, and claims either every value or none.
     return all(
-        sub_schema.get("format") in _PLAIN_HEADER_FORMATS for sub_schema in schema.get("properties", {}).values()
+        isinstance(sub_schema, dict) and sub_schema.get("format") in _PLAIN_HEADER_FORMATS
+        for sub_schema in schema.get("properties", {}).values()
     )
 
 

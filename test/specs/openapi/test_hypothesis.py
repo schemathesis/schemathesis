@@ -661,6 +661,29 @@ def test_header_filtration_needed(ctx, mocker):
     mocked.assert_called()
 
 
+@pytest.mark.parametrize("subschema", [True, False], ids=["true", "false"])
+def test_boolean_header_schema(ctx, subschema):
+    # Open API 3.1 lets a parameter be written as a boolean, which claims every value or none.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [{"name": "key", "in": "header", "schema": subschema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        assert is_valid_header(case.headers)
+
+    test()
+
+
 def test_missing_header_filter(ctx, mocker):
     # Regression. See GH-1142
     mocked = mocker.spy(filters, "is_valid_header")
