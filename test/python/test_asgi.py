@@ -237,6 +237,30 @@ def test_application_without_lifespan_support():
     shutdown_lifespans()
 
 
+def test_application_refusing_the_lifespan_scope_is_served():
+    async def app(scope, receive, send):
+        if scope["type"] != "http":
+            raise ValueError("Django can only handle ASGI/HTTP connections, not lifespan.")
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    with ASGIClient(app) as client:
+        assert client.get("/x").text == "ok"
+    shutdown_lifespans()
+
+
+def test_startup_crash_after_the_first_lifespan_message_is_reported():
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            await receive()
+            raise RuntimeError("db unavailable")
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"served"})
+
+    with pytest.raises(RuntimeError, match="db unavailable"), ASGIClient(app):
+        pass
+
+
 def test_startup_failure_message_stops_the_client():
     async def app(scope, receive, send):
         if scope["type"] == "lifespan":

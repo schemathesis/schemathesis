@@ -39,6 +39,7 @@
 - False positive `negative_data_rejection` for GraphQL when captured identifiers replaced the violating argument.
 - `HEAD` operations against ASGI applications failing with an internal `AttributeError`.
 - ASGI applications that do not implement the lifespan protocol failing with a `TypeError`.
+- ASGI applications that reject the lifespan scope, such as Django, failing with a `ValueError`.
 - ASGI applications serving requests after reporting a failed startup.
 - ASGI lifespan failures after startup or after shutdown completes going unreported.
 - IPv6 and userinfo base URLs rejected for ASGI applications.

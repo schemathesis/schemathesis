@@ -93,7 +93,7 @@ def _shutdown() -> None:
 
 
 class _Lifespan:
-    __slots__ = ("app", "portal", "receive_stream", "send_stream", "task", "error", "state")
+    __slots__ = ("app", "portal", "receive_stream", "send_stream", "task", "error", "state", "asked_for_message")
 
     def __init__(self, app: ASGIApp, portal: BlockingPortal) -> None:
         self.app = app
@@ -105,6 +105,8 @@ class _Lifespan:
         self.error: BaseException | None = None
         # Filled in by the application during startup; each request gets a shallow copy.
         self.state: dict[str, Any] = {}
+        # Set when the application asks for its first lifespan message.
+        self.asked_for_message = False
 
     def start(self) -> None:
         self.task = self.portal.start_task_soon(self._run)
@@ -121,10 +123,19 @@ class _Lifespan:
             except FutureTimeoutError:
                 pass
 
+    async def _app_receive(self) -> Message:
+        self.asked_for_message = True
+        return await self.receive_stream.receive()
+
     async def _run(self) -> None:
         scope: Scope = {"type": "lifespan", "asgi": {"version": "3.0"}, "state": self.state}
         try:
-            await self.app(scope, self.receive_stream.receive, self.send_stream.send)
+            await self.app(scope, self._app_receive, self.send_stream.send)
+        except Exception:
+            # Rejecting the scope before asking for any message is how applications without lifespan support
+            # signal it, and servers keep serving them. A later failure is a real one.
+            if self.asked_for_message:
+                raise
         finally:
             await self.send_stream.send(None)
 
