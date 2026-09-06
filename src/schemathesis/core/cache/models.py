@@ -23,6 +23,8 @@ class Request:
     headers: dict[str, str] = field(default_factory=dict)
     cookies: dict[str, Any] = field(default_factory=dict)
     body: Any = None
+    # Media type the body was sent with; absent in files written before it was persisted.
+    media_type: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -32,6 +34,7 @@ class Request:
             "headers": self.headers,
             "cookies": self.cookies,
             "body": self.body,
+            "media_type": self.media_type,
         }
 
     @classmethod
@@ -43,6 +46,7 @@ class Request:
             headers=data.get("headers", {}),
             cookies=data.get("cookies", {}),
             body=data.get("body"),
+            media_type=data.get("media_type"),
         )
 
 

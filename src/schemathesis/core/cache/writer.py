@@ -81,4 +81,5 @@ def request_from_case(case: Case) -> Request:
         headers={str(k): str(v) for k, v in dict(case.headers or {}).items()},
         cookies=dict(case.cookies or {}),
         body=body,
+        media_type=case.media_type,
     )

@@ -26,6 +26,7 @@ from schemathesis.core.cache import (
 )
 from schemathesis.core.error_feedback import ObservationKind
 from schemathesis.core.error_feedback.collector import parse_observations
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -276,6 +277,8 @@ def _verify_auth_required(ctx: EngineContext, entry: Entry, operation: APIOperat
     if ctx.error_feedback is None:
         return _Outcome.SKIPPED
     case = _build_case(operation, entry.request)
+    if case is None:
+        return _Outcome.SKIPPED
     unauth_response = _send_without_auth(ctx, case, operation)
     if unauth_response is None:
         return _Outcome.SKIPPED
@@ -315,21 +318,28 @@ def _verify_method_not_allowed(ctx: EngineContext, entry: Entry, operation: APIO
     return _Outcome.CONFIRMED
 
 
-def _build_case(operation: APIOperation, request: Request) -> Case:
+def _build_case(operation: APIOperation, request: Request) -> Case | None:
+    """`None` when a cached request carries a body but no media type the operation accepts unambiguously."""
     body = request.body if request.body is not None else NOT_SET
-    return operation.Case(
-        # Persisted methods originate from `case.method` (already `HttpMethod`); on load we trust the file.
-        method=cast("HttpMethod", request.method),
-        path_parameters=request.path_parameters,
-        query=request.query,
-        headers=request.headers,
-        cookies=request.cookies,
-        body=body,
-    )
+    try:
+        return operation.Case(
+            # Persisted methods originate from `case.method` (already `HttpMethod`); on load we trust the file.
+            method=cast("HttpMethod", request.method),
+            path_parameters=request.path_parameters,
+            query=request.query,
+            headers=request.headers,
+            cookies=request.cookies,
+            body=body,
+            media_type=request.media_type,
+        )
+    except IncorrectUsage:
+        return None
 
 
 def _replay(ctx: EngineContext, entry: Entry, operation: APIOperation) -> tuple[Case, Response] | None:
     case = _build_case(operation, entry.request)
+    if case is None:
+        return None
     kwargs = ctx.get_transport_kwargs(operation=operation)
     try:
         response = case.call(**kwargs)

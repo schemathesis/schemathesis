@@ -11,7 +11,7 @@ from flask import jsonify
 
 import schemathesis
 from schemathesis.config import HttpBearerAuthConfig
-from schemathesis.core.cache import Entry, Kind, Manifest, Request, load, write
+from schemathesis.core.cache import Entry, Kind, Manifest, Request, load, request_from_case, write
 from schemathesis.core.error_feedback import ObservationKind
 from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.parameters import ParameterLocation
@@ -204,6 +204,66 @@ def test_method_not_allowed_contradicted_drops_entry(ctx, tmp_path, app_runner):
 
     assert report.dropped == 1
     assert engine.supervisor.verdict("POST /x").directive is SchedulingDirective.RUN
+
+
+def _multi_media_type_schema(ctx, app_runner):
+    object_schema = {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/w": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": object_schema,
+                            "application/x-www-form-urlencoded": object_schema,
+                            "multipart/form-data": object_schema,
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/w", methods=["GET"])
+    def w():
+        return jsonify({"ok": True})
+
+    return schemathesis.openapi.from_url(app_runner.openapi_url(app))
+
+
+def test_replay_of_entry_with_several_request_media_types(ctx, tmp_path, app_runner):
+    schema = _multi_media_type_schema(ctx, app_runner)
+    _point_cache_at(schema, tmp_path)
+    operation = schema["/w"]["POST"]
+    recording = _engine_for(schema)
+    recording.cache.record(
+        Kind.METHOD_NOT_ALLOWED,
+        operation.label,
+        request_from_case(operation.Case(body={"name": ""}, media_type="application/json")),
+    )
+    recording.cache.flush()
+
+    assert _engine_for(schema).cache.run() == cache.CacheReport(replayed=1, dropped=0, skipped=0)
+
+
+def test_entry_without_media_type_is_skipped_when_several_are_declared(ctx, tmp_path, app_runner):
+    schema = _multi_media_type_schema(ctx, app_runner)
+    _point_cache_at(schema, tmp_path)
+    _seed(
+        tmp_path,
+        [
+            Entry(
+                id=1,
+                kind=Kind.METHOD_NOT_ALLOWED,
+                operation="POST /w",
+                request=Request(method="POST", body={"name": ""}),
+            )
+        ],
+    )
+
+    assert _engine_for(schema).cache.run() == cache.CacheReport(replayed=0, dropped=0, skipped=1)
 
 
 def test_auth_required_confirmed_with_valid_credentials(ctx, tmp_path):

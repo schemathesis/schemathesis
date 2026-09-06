@@ -58,6 +58,7 @@ def sanitize_request(request: Request, config: SanitizationConfig) -> Request:
         headers={k: v for k, v in request.headers.items() if not is_sensitive_key(k, keys, markers)},
         cookies={k: v for k, v in request.cookies.items() if not is_sensitive_key(k, keys, markers)},
         body=_sanitize_body(request.body, keys, markers),
+        media_type=request.media_type,
     )
 
 
