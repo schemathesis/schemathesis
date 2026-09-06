@@ -620,7 +620,14 @@ class MutationContext:
                 continue
             new_schema[key] = value
         if self.location.is_in_header:
-            for sub_schema in new_schema.get("properties", {}).values():
+            properties = new_schema.get("properties", {})
+            for name, sub_schema in properties.items():
+                if not isinstance(sub_schema, dict):
+                    # A header written as `true` claims every value; one written as `false` takes none,
+                    # and stays that way.
+                    if sub_schema is False:
+                        continue
+                    sub_schema = properties[name] = {}
                 sub_schema["type"] = "string"
                 # `_header_value` keeps generated values within RFC 9110 codepoints so `is_valid_header` doesn't
                 # reject them. Without this, mutated header sub-schemas (e.g. `{type: string, not: {pattern: …}}`)

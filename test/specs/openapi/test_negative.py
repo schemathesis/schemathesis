@@ -1474,6 +1474,40 @@ def test_plain_string_path_parameter_does_not_exhaust_generation(ctx):
     assert cases
 
 
+@pytest.mark.parametrize("subschema", [True, False], ids=["true", "false"])
+def test_boolean_header_schema(ctx, subschema):
+    # Open API 3.1 lets a header be written as a boolean, which claims every value or none. The second
+    # header is what makes the whole set negatable, so the boolean one is reached at all.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "X-Key", "in": "header", "schema": subschema},
+                        {
+                            "name": "X-Token",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": r"^[a-z]+$"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    cases = []
+
+    @given(case=schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck))
+    def test(case):
+        cases.append(case)
+
+    test()
+    assert cases
+
+
 def test_unnegatable_path_falls_back_to_positive(ctx):
     operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, ANNOTATED_HEADER])
     modes = []
