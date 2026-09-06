@@ -105,6 +105,8 @@ class LoginEndpointAuthProvider:
                 url,
                 data=body,
                 headers=headers,
+                # A session cookie rides on the redirect itself, so following it would discard the sign-in.
+                allow_redirects=False,
                 timeout=config.request_timeout_for(operation=context.operation),
                 verify=config.tls_verify_for(operation=context.operation),
                 cert=config.request_cert_for(operation=context.operation),
@@ -141,7 +143,13 @@ class LoginEndpointAuthProvider:
         try:
             with asgi.get_client(app) as client:
                 response = client.request(
-                    self.config.verb, self.config.endpoint, data=body, headers=headers, timeout=timeout
+                    self.config.verb,
+                    self.config.endpoint,
+                    data=body,
+                    headers=headers,
+                    # A session cookie rides on the redirect itself, so following it would discard the sign-in.
+                    allow_redirects=False,
+                    timeout=timeout,
                 )
         except Exception as exc:
             raise WFCLoginError(f"ASGI login request failed: {exc}") from exc
@@ -154,13 +162,17 @@ class LoginEndpointAuthProvider:
         )
 
     def _auth_data(self, response: _LoginResponse) -> dict[str, str] | str:
-        if response.status_code not in (200, 201):
+        # No token to extract means the login can only hand back a session.
+        is_cookie_login = self.config.expect_cookies or self.config.token is None
+        # Form-login servers commonly answer a successful sign-in with a redirect to a landing page.
+        accepts_redirect = is_cookie_login and 300 <= response.status_code < 400
+        if response.status_code not in (200, 201) and not accepts_redirect:
+            expected = "200, 201 or a redirect" if is_cookie_login else "200 or 201"
             raise WFCLoginError(
-                f"Login endpoint returned status {response.status_code}. Expected 200 or 201. "
+                f"Login endpoint returned status {response.status_code}. Expected {expected}. "
                 f"Response: {response.text[:200]}"
             )
-        # No token to extract means the login can only hand back a session.
-        if self.config.expect_cookies or self.config.token is None:
+        if is_cookie_login:
             if not response.cookies:
                 raise WFCLoginError("No cookies returned from login endpoint")
             return response.cookies

@@ -5,7 +5,8 @@ import os
 
 import pytest
 from fastapi import FastAPI
-from flask import Flask
+from fastapi.responses import RedirectResponse
+from flask import Flask, jsonify, redirect
 
 import schemathesis
 from schemathesis.auths import AuthContext
@@ -352,6 +353,63 @@ def test_wfc_asgi_login_applies_token():
     case = operation.Case()
     provider.set(case, provider.get(case, context), context)
     assert case.headers["Authorization"] == f"Bearer {WFC_TOKEN}"
+
+
+def _redirect_login_app(ctx) -> Flask:
+    app, _ = ctx.openapi.make_flask_app({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> object:
+        response = redirect("/api/protected", code=302)
+        response.set_cookie("JSESSIONID", WFC_SESSION)
+        return response
+
+    @app.route("/api/protected", methods=["GET"])
+    def protected() -> object:
+        return jsonify({"ok": True})
+
+    return app
+
+
+def test_wfc_http_login_redirect_yields_cookies(ctx, app_runner):
+    # Form-login servers answer a successful sign-in with a redirect carrying the session cookie.
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(_redirect_login_app(ctx)))["/api/protected"]["GET"]
+    provider = _provider_for(_login(expectCookies=True))
+    context = AuthContext(operation=operation, app=None)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.cookies == {"JSESSIONID": WFC_SESSION}
+
+
+def test_wfc_wsgi_login_redirect_yields_cookies(ctx):
+    app = _redirect_login_app(ctx)
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/api/protected"]["GET"]
+    provider = _provider_for(_login(expectCookies=True))
+    context = AuthContext(operation=operation, app=app)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.cookies == {"JSESSIONID": WFC_SESSION}
+
+
+def test_wfc_asgi_login_redirect_yields_cookies():
+    app = FastAPI()
+
+    @app.post("/api/login")
+    def login() -> RedirectResponse:
+        response = RedirectResponse("/api/protected", status_code=302)
+        response.set_cookie("JSESSIONID", WFC_SESSION)
+        return response
+
+    @app.get("/api/protected")
+    def protected() -> dict:
+        return {"ok": True}
+
+    operation = schemathesis.openapi.from_asgi("/openapi.json", app)["/api/protected"]["GET"]
+    provider = _provider_for(_login(expectCookies=True))
+    context = AuthContext(operation=operation, app=app)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.cookies == {"JSESSIONID": WFC_SESSION}
 
 
 @pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])

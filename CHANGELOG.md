@@ -27,6 +27,7 @@
 - Merge `authTemplate` into each entry when loading WFC auth files.
 - Select the first WFC auth entry when no `user` is configured, as documented.
 - Accept WFC login endpoints that specify neither `token` nor `expectCookies`, using the returned cookies.
+- Accept WFC login endpoints that redirect after sign-in, using the cookies they set.
 - ASGI application support failing with `anyio` 4.15.
 - `HEAD` operations against ASGI applications failing with an internal `AttributeError`.
 - ASGI applications that do not implement the lifespan protocol failing with a `TypeError`.
