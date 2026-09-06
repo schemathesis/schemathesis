@@ -85,6 +85,7 @@
 
 #### Schema handling
 
+- Malformed `servers` URL templates crashing instead of reporting a schema error.
 - Response keys that are not status code patterns crashing response matching.
 - Unresolvable `$ref` in an optional parameter or required body rejecting the operation.
 - Unresolvable `$ref` in a response schema rejecting the operation.

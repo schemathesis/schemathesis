@@ -41,6 +41,8 @@ def format_server_url(
         return url.format(**defaults)
     except (KeyError, IndexError) as exc:
         raise InvalidSchema(f"'{scope_label}.url' references undefined variable: {exc}") from exc
+    except ValueError as exc:
+        raise InvalidSchema(f"'{scope_label}.url' is not a valid URL template: {exc}") from exc
 
 
 def resolve_operation_base_url(

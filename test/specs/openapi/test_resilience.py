@@ -32,6 +32,9 @@ def _schema(servers):
         "not-a-list",
         {"url": "http://x"},
         [{"url": "http://x/{undefined}"}],
+        [{"url": "http://x/}"}],
+        [{"url": "http://x/{"}],
+        [{"url": "http://x/{var!}", "variables": {"var": {"default": "v"}}}],
     ],
     ids=[
         "missing_url",
@@ -45,6 +48,9 @@ def _schema(servers):
         "servers_string",
         "servers_dict",
         "url_undefined_variable",
+        "url_stray_closing_brace",
+        "url_unclosed_brace",
+        "url_bad_conversion",
     ],
 )
 def test_invalid_servers_v3(servers):
