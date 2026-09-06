@@ -1503,12 +1503,13 @@ def _admitted_strings(view: jsonschema_rs.canonical.StringView, ctx: StrategyCon
         # Every pattern here names something with no spelling in codepoints - a script this build
         # carries no ranges for. Naming the pattern is what the caller can act on.
         raise UnsupportedRegexPattern.from_pattern(view.patterns[0])
-    return st.one_of(
-        [
-            _pattern_driven(pattern, [other for other in view.patterns if other != pattern], view, ctx)
-            for pattern in drivers
-        ]
-    )
+    strategies = [
+        _pattern_driven(pattern, [other for other in view.patterns if other != pattern], view, ctx)
+        for pattern in drivers
+    ]
+    if len(drivers) > 1:
+        strategies.append(_pattern_joined(drivers, view, ctx))
+    return st.one_of(strategies)
 
 
 # Hypothesis indexes every drawn value, and for a string that index is a number with a digit per
@@ -1607,6 +1608,23 @@ def _pattern_driven(
     for other in others:
         strategy = strategy.filter(_facet_check("pattern", other))
     # Length is normally folded into the pattern upstream; this filter is the soundness net.
+    return _within_length(strategy, view)
+
+
+def _pattern_joined(
+    drivers: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
+) -> SearchStrategy[JsonValue]:
+    """One match of every pattern, joined in any order, so a value carries them all at once."""
+    # A pattern anchored to the start and one anchored to the end meet in no value either draws on
+    # its own, and waiting for the other one's filter to land spends the whole draw budget.
+    parts = []
+    for pattern in drivers:
+        compiled = _compiled_pattern(pattern)
+        assert compiled is not None
+        parts.append(_from_pattern(compiled, ctx))
+    strategy = st.tuples(*parts).flatmap(st.permutations).map("".join)
+    for pattern in view.patterns:
+        strategy = strategy.filter(_facet_check("pattern", pattern))
     return _within_length(strategy, view)
 
 

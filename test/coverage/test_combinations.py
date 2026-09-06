@@ -3749,6 +3749,7 @@ def test_float_format_representable_example_still_emitted(pctx):
     "schema",
     [
         {"allOf": [{"type": "string", "pattern": "^a"}, {"type": "string", "pattern": "b$"}]},
+        {"allOf": [{"type": "string", "pattern": "^a"}, {"pattern": "b$"}, {"pattern": "c"}]},
         {
             "type": "object",
             "properties": {"a": {"type": "string"}},
@@ -3756,7 +3757,7 @@ def test_float_format_representable_example_still_emitted(pctx):
             "allOf": [{"properties": {"a": {"pattern": "^x"}}}, {"properties": {"a": {"pattern": "y$"}}}],
         },
     ],
-    ids=["two-patterns", "outer-properties"],
+    ids=["two-patterns", "three-patterns", "outer-properties"],
 )
 def test_satisfiable_allof_without_a_flat_form_still_emits_positive_values(pctx, schema):
     # Two `pattern`s have no single spelling, which used to drop the whole schema from coverage.
@@ -3816,6 +3817,10 @@ def test_all_of_keeps_the_tightest_upper_bound(pctx):
 def test_nested_all_of_without_a_flat_form_emits_a_conforming_value(pctx, schema):
     values = cover_schema(pctx, schema)
     assert values and all(value.startswith("a") and value.endswith("b") for value in values), values
+
+
+def test_all_of_patterns_no_string_matches_at_once_emits_nothing(pctx):
+    assert cover_schema(pctx, {"allOf": [{"type": "string", "pattern": "^a"}, {"pattern": "^b"}]}) == []
 
 
 def test_all_of_with_a_boolean_branch_emits_a_conforming_value(pctx):
