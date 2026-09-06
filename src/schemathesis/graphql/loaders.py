@@ -17,7 +17,7 @@ from schemathesis.hooks import (
     dispatch_after_load_schema,
     dispatch_before_load_schema,
 )
-from schemathesis.python import asgi, wsgi
+from schemathesis.python import asgi, django, wsgi
 
 if TYPE_CHECKING:
     from graphql import DocumentNode
@@ -46,7 +46,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     """
     require_relative_url(path)
     kwargs.setdefault("json", {"query": get_introspection_query()})
-    with asgi.get_client(app) as client:
+    with asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):
         response = load_from_url(client.post, url=path, **kwargs)
     schema = extract_schema_from_response(response, lambda r: load_json_lossy(r.content, r.encoding))
     loaded = from_dict(schema=schema, config=config)
@@ -79,7 +79,8 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     kwargs.setdefault("json", {"query": get_introspection_query()})
     client = wsgi.get_client(app)
     response = client.post(path=path, **kwargs)
-    raise_for_status(response)
+    with django.explain_disallowed_host(app, host=wsgi.HOST):
+        raise_for_status(response)
     schema = extract_schema_from_response(
         response, lambda r: load_json_lossy(r.get_data(), r.mimetype_params.get("charset", "utf-8"))
     )

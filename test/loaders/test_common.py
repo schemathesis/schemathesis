@@ -1,9 +1,16 @@
 import time
 
 import pytest
+from django.conf import settings
+from django.core.asgi import get_asgi_application
+from django.core.wsgi import get_wsgi_application
+from django.http import HttpResponse
+from django.test import override_settings
+from django.urls import path
 from flask import Flask, jsonify
 
 import schemathesis
+from schemathesis.core.errors import LoaderError
 from schemathesis.core.transport import USER_AGENT
 
 
@@ -91,3 +98,79 @@ def test_wait_for_schema_retries_on_read_timeout(ctx, app_runner):
     loaded = schemathesis.openapi.from_url(url, wait_for_schema=5, timeout=0.2)
     assert loaded.raw_schema == schema
     assert call_count[0] == 2
+
+
+COMMON_MIDDLEWARE = "django.middleware.common.CommonMiddleware"
+
+
+def bad_request(request):
+    return HttpResponse(status=400)
+
+
+urlpatterns = [path("schema", bad_request)]
+
+
+@pytest.fixture
+def django_settings():
+    if not settings.configured:
+        settings.configure(ROOT_URLCONF=__name__, ALLOWED_HOSTS=["*"], SECRET_KEY="schemathesis-test")
+
+
+DISALLOWED_HOST_MESSAGE = """Failed to load schema due to client error (HTTP 400 Bad Request)
+
+Django rejected the request because its `Host` header is not in `ALLOWED_HOSTS`
+
+    Host:          {host}
+    ALLOWED_HOSTS: {allowed_hosts}
+
+Add '{host}' to ALLOWED_HOSTS in the Django settings you use for testing"""
+
+
+@pytest.mark.parametrize(
+    ("loader", "make_app", "host"),
+    [
+        (schemathesis.openapi.from_wsgi, get_wsgi_application, "localhost"),
+        (schemathesis.openapi.from_asgi, get_asgi_application, "testserver"),
+        (schemathesis.graphql.from_wsgi, get_wsgi_application, "localhost"),
+        (schemathesis.graphql.from_asgi, get_asgi_application, "testserver"),
+    ],
+    ids=["openapi-wsgi", "openapi-asgi", "graphql-wsgi", "graphql-asgi"],
+)
+def test_django_disallowed_host(django_settings, loader, make_app, host):
+    with override_settings(
+        ROOT_URLCONF=__name__, ALLOWED_HOSTS=["api.example.com"], DEBUG=False, MIDDLEWARE=[COMMON_MIDDLEWARE]
+    ):
+        app = make_app()
+        with pytest.raises(LoaderError) as exc:
+            loader("/schema", app)
+    assert str(exc.value) == DISALLOWED_HOST_MESSAGE.format(host=host, allowed_hosts="['api.example.com']")
+
+
+def test_django_disallowed_host_with_debug(django_settings):
+    with override_settings(ROOT_URLCONF=__name__, ALLOWED_HOSTS=[], DEBUG=True, MIDDLEWARE=[COMMON_MIDDLEWARE]):
+        app = get_asgi_application()
+        with pytest.raises(LoaderError) as exc:
+            schemathesis.openapi.from_asgi("/schema", app)
+    assert str(exc.value) == DISALLOWED_HOST_MESSAGE.format(
+        host="testserver",
+        allowed_hosts="[] (empty with DEBUG on, which allows only '.localhost', '127.0.0.1' and '[::1]')",
+    )
+
+
+def make_flask_bad_request_app():
+    app = Flask("test_app")
+
+    @app.route("/schema")
+    def schema():
+        return "", 400
+
+    return app
+
+
+@pytest.mark.parametrize("make_app", [get_wsgi_application, make_flask_bad_request_app], ids=["django", "flask"])
+def test_client_error_unrelated_to_allowed_hosts(django_settings, make_app):
+    with override_settings(ROOT_URLCONF=__name__, ALLOWED_HOSTS=["*"], DEBUG=False, MIDDLEWARE=[COMMON_MIDDLEWARE]):
+        app = make_app()
+        with pytest.raises(LoaderError) as exc:
+            schemathesis.openapi.from_wsgi("/schema", app)
+    assert str(exc.value) == "Failed to load schema due to client error (HTTP 400 Bad Request)"

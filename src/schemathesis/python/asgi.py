@@ -36,6 +36,9 @@ ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 # A lifespan task ends as soon as the application returns, so waiting on it is a formality.
 _TASK_RESULT_TIMEOUT = 5
 
+# `Host` header the test client sends, unless the request overrides it.
+HOST = "testserver"
+
 _LOCK = threading.Lock()
 _STACK = ExitStack()
 _PORTAL: BlockingPortal | None = None
@@ -368,7 +371,7 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
 
 
 class ASGIClient(requests.Session):
-    def __init__(self, app: ASGIApp, base_url: str = "http://testserver") -> None:
+    def __init__(self, app: ASGIApp, base_url: str = f"http://{HOST}") -> None:
         super().__init__()
         self.adapter = _ASGIAdapter(app)
         self.mount("http://", self.adapter)
