@@ -55,7 +55,6 @@ tests = [
   "Flask>=2.1.1,<4.0",
   "httpx>=0.22.0,<1.0",
   "httpx2>=2.12.0,<3.0",
-  "hypothesis-openapi>=0.3,<1",
   "pydantic>=1.10.2",
   "pytest-asyncio>=1.0,<2.0",
   "pytest-httpserver>=1.0,<2.0",
