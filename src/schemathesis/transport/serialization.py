@@ -9,7 +9,7 @@ from urllib.parse import quote, unquote
 from schemathesis.core import Body
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
-from schemathesis.core.jsonschema.types import JsonValue
+from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.parameters import DelimitedValue, EncodedPath
 from schemathesis.core.transforms import transform
 
@@ -146,21 +146,23 @@ def serialize_xml(case: Case, value: Body) -> dict[str, Any]:
     return _serialize_xml(value, schema, resource_name=resource_name)
 
 
-def _serialize_xml(value: Any, schema: dict[str, Any], resource_name: str | None) -> dict[str, Any]:
+def _serialize_xml(value: Any, schema: JsonSchema, resource_name: str | None) -> dict[str, Any]:
     """Serialize a generated Python object as an XML string.
 
     Schemas may contain additional information for fine-tuned XML serialization.
     """
     if isinstance(value, (bytes | str)):
         return {"data": value}
-    resolver = make_root_resolver(schema)
-    if "$ref" in schema:
-        resolver, schema = resolve_reference(resolver, schema["$ref"])
-    tag = _get_xml_tag(schema, resource_name)
+    # A body written as a boolean carries no XML metadata.
+    definition: dict[str, Any] = schema if isinstance(schema, dict) else {}
+    resolver = make_root_resolver(definition)
+    if "$ref" in definition:
+        resolver, definition = resolve_reference(resolver, definition["$ref"])
+    tag = _get_xml_tag(definition, resource_name)
     buffer = StringIO()
     # Collect all namespaces to ensure that all child nodes with prefixes have proper namespaces in their parent nodes
     namespace_stack: list[str] = []
-    _write_xml(buffer, value, tag, schema, namespace_stack, resolver)
+    _write_xml(buffer, value, tag, definition, namespace_stack, resolver)
     data = buffer.getvalue()
     return {"data": data.encode("utf8")}
 

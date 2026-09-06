@@ -1103,6 +1103,28 @@ def test_get_matching_serializers(media_type, expected):
     assert {media_type for media_type, _ in TRANSPORT.get_matching_media_types(media_type)} == expected
 
 
+def test_serialize_xml_with_boolean_schema(ctx):
+    # Open API 3.1 lets a body be written as `true`, which carries no XML metadata.
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/xml": {"schema": True}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(case=schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=3)
+    def test(case):
+        assert "data" in REQUESTS_TRANSPORT.serialize_case(case)
+
+    test()
+
+
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
