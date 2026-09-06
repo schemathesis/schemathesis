@@ -47,6 +47,19 @@ def prepare_multipart_v2(
     return files or None, data or None
 
 
+def _is_file_part(property_schema: object) -> bool:
+    """Whether a form property is sent as a file, carrying a filename in its `Content-Disposition`."""
+    if not isinstance(property_schema, dict):
+        return False
+    # OpenAPI 3.1 spells `format: binary` as `contentMediaType: application/octet-stream` and `format: byte` as
+    # `contentEncoding: base64`. Any other media type annotates string content and stays a plain form field.
+    return (
+        property_schema.get("format") in ("binary", "base64")
+        or property_schema.get("contentMediaType") == "application/octet-stream"
+        or property_schema.get("contentEncoding") == "base64"
+    )
+
+
 def prepare_multipart_v3(
     operation: APIOperation, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
@@ -72,8 +85,7 @@ def prepare_multipart_v3(
 
         if isinstance(property_schema, dict):
             if isinstance(value, list):
-                items_format = (property_schema.get("items") or {}).get("format")
-                if items_format in ("binary", "base64"):
+                if _is_file_part(property_schema.get("items")):
                     filename = (body_param.get_property_filename(name) if body_param else None) or name
                     if content_type:
                         files.extend((name, (filename, item, content_type)) for item in value)
@@ -83,7 +95,7 @@ def prepare_multipart_v3(
                     files.extend((name, (None, item, content_type)) for item in value)
                 else:
                     files.extend((name, item) for item in value)
-            elif property_schema.get("format") in ("binary", "base64"):
+            elif _is_file_part(property_schema):
                 filename = (body_param.get_property_filename(name) if body_param else None) or name
                 if content_type:
                     files.append((name, (filename, value, content_type)))

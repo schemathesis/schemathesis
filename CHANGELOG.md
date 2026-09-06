@@ -49,6 +49,7 @@
 - Coverage phase emitting properties whose names `propertyNames` rejects.
 - Coverage phase emitting a `multipleOf` value outside the float bound `minimum` and `maximum` pin.
 - Coverage phase emitting a single-item array that exceeds `maxContains`.
+- Send OpenAPI 3.1 `contentMediaType: application/octet-stream` form fields as file uploads.
 - False positive `negative_data_rejection` for non-numeric query and path parameters whose serialized value is valid. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
 - `negative_data_rejection` message omitting parameter names when several parameters are mutated. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
 
