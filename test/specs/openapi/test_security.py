@@ -1,7 +1,9 @@
 import pytest
 from hypothesis import HealthCheck, given, settings
 
+from schemathesis.config._auth import AuthConfig
 from schemathesis.core.jsonschema.resolver import make_root_resolver
+from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.adapter.security import extract_security_definitions_v3
 
 
@@ -159,3 +161,77 @@ def test_invalid_security_requirement_types_are_ignored(ctx):
     assert len(params) == 1
     assert params[0]["name"] == "X-API-Key"
     assert params[0]["in"] == "header"
+
+
+SECURITY_DEFINITIONS = {
+    "2.0": {
+        "securityDefinitions": {
+            "basicAuth": {"type": "basic"},
+            "apiKeyAuth": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
+        }
+    },
+    "3.0.2": {
+        "components": {
+            "securitySchemes": {
+                "basicAuth": {"type": "http", "scheme": "basic"},
+                "apiKeyAuth": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
+            }
+        }
+    },
+}
+
+
+SECURITY_CREDENTIAL_CASES = [
+    ([{"basicAuth": []}, {"apiKeyAuth": []}], {"Authorization", "X-API-Key"}),
+    ([{"basicAuth": []}, {"apiKeyAuth": []}, {}], set()),
+]
+
+
+def _schema_with_security(ctx, version, security):
+    return ctx.openapi.load_schema(
+        {"/test": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version=version,
+        security=security,
+        **SECURITY_DEFINITIONS[version],
+    )
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
+@pytest.mark.parametrize(("security", "expected"), SECURITY_CREDENTIAL_CASES, ids=["required", "optional"])
+def test_generated_credentials_in_coverage(ctx, version, security, expected):
+    schema = _schema_with_security(ctx, version, security)
+    operation = schema["/test"]["GET"]
+    cases = schema.iter_coverage_cases(
+        operation,
+        generation_modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
+        generation_config=schema.config.generation_for(operation=operation),
+    )
+    assert {name for case in cases for name in case.headers} == expected
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
+@pytest.mark.parametrize(("security", "expected"), SECURITY_CREDENTIAL_CASES, ids=["required", "optional"])
+def test_generated_credentials_in_fuzzing(ctx, version, security, expected):
+    schema = _schema_with_security(ctx, version, security)
+    seen = set()
+
+    @given(case=schema["/test"]["GET"].as_strategy())
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck))
+    def test(case):
+        seen.update(case.headers)
+
+    test()
+
+    assert seen == expected
+
+
+def test_optional_auth_keeps_configured_credentials(ctx):
+    schema = _schema_with_security(ctx, "3.0.2", [{"basicAuth": []}, {"apiKeyAuth": []}, {}])
+    schema.config.auth = AuthConfig.from_dict({"openapi": {"basicAuth": {"username": "user", "password": "secret"}}})
+
+    @given(case=schema["/test"]["GET"].as_strategy())
+    @settings(max_examples=5, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert case.headers == {"Authorization": "Basic dXNlcjpzZWNyZXQ="}
+
+    test()

@@ -194,7 +194,6 @@ def extract_security_parameters_v2(
     """Extract all required security parameters for this operation."""
     defined = extract_security_definitions_v2(schema, resolver)
     required = get_security_requirements(schema, operation)
-    optional = has_optional_auth(schema, operation)
 
     for key in required:
         if key not in defined:
@@ -212,9 +211,6 @@ def extract_security_parameters_v2(
 
         param[ORIGINAL_SECURITY_TYPE_KEY] = ty
 
-        if optional:
-            param = {**param, "required": False}
-
         yield param
 
 
@@ -226,7 +222,6 @@ def extract_security_parameters_v3(
     """Extract all required security parameters for this operation."""
     defined = extract_security_definitions_v3(schema, resolver)
     required = get_security_requirements(schema, operation)
-    optional = has_optional_auth(schema, operation)
 
     for key in required:
         if key not in defined:
@@ -243,9 +238,6 @@ def extract_security_parameters_v3(
             continue
 
         param[ORIGINAL_SECURITY_TYPE_KEY] = ty
-
-        if optional:
-            param = {**param, "required": False}
 
         yield param
 

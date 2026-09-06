@@ -28,7 +28,7 @@ from schemathesis.hooks import HookContext, dispatch_before_init_operation, disp
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
-from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
+from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, has_optional_auth
 from schemathesis.specs.openapi.adapter.servers import resolve_operation_base_url
 from schemathesis.specs.openapi.utils import parse_spec_version
 
@@ -397,7 +397,9 @@ class OperationLoader:
                 schema.adapter.build_path_parameter({"name": name, INJECTED_PATH_PARAMETER_KEY: True})
             )
         config = schema.config.generation_for(operation=operation)
-        if config.with_security_parameters:
+        # An empty `{}` requirement documents unauthenticated access as a valid alternative. A synthesized
+        # credential can only ever be rejected, so such requests are sent without one.
+        if config.with_security_parameters and not has_optional_auth(schema.raw_schema, definition):
             for param in operation.security.iter_parameters():
                 param_name = param.get("name")
                 param_location = param.get("in")
