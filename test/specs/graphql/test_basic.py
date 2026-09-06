@@ -489,26 +489,6 @@ def test_negative_mode_fallback_to_positive(ctx):
     test_()
 
 
-@pytest.mark.hypothesis_nested
-def test_negative_mode_downgrades_when_document_stays_valid(ctx):
-    # Omitting an argument that declares a default leaves a schema-valid query the server must accept.
-    schema = ctx.graphql.load_sdl("input Filter { name: String } type Query { book(filter: Filter! = {}): String }")
-    strategy = schema["Query"]["book"].as_strategy(generation_mode=GenerationMode.NEGATIVE)
-    generated = set()
-
-    @given(strategy)
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
-    def test_(case):
-        generated.add((case.body, case.meta.generation.mode))
-
-    test_()
-
-    assert generated == {
-        ("{\n  book\n}", GenerationMode.POSITIVE),
-        ("{\n  book(filter: null)\n}", GenerationMode.NEGATIVE),
-    }
-
-
 def _make_graphql_case_with_mode(schema, mode):
     operation = schema["Mutation"]["addBook"]
     meta = CaseMetadata(

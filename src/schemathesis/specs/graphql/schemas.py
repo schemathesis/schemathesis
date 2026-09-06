@@ -597,12 +597,6 @@ def graphql_cases(
         if mutate_ast is not None:
             mutate_ast(operation_node, draw(st.randoms()))
     body = graphql.print_ast(ast_node)
-    # Every violation the negative strategy emits is a static validation error, so a query the GraphQL layer
-    # still accepts carries none. Treat it as positive - the server is right to answer such a query without errors.
-    if effective_mode.is_negative and not graphql.validate(
-        operation.schema.client_schema, graphql.parse(body), max_errors=1
-    ):
-        effective_mode = GenerationMode.POSITIVE
 
     path_parameters_ = _generate_parameter(
         ParameterLocation.PATH, path_parameters, draw, operation, hook_context, hooks
