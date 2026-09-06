@@ -179,7 +179,11 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
     from hypothesis.errors import HypothesisWarning
 
     event_queue: queue.Queue[events.EngineEvent] = queue.Queue()
-    operations = [op.ok() for op in ctx.schema.get_all_operations() if isinstance(op, Ok)]
+    operations = [
+        op.ok()
+        for op in ctx.schema.get_all_operations()
+        if isinstance(op, Ok) and not op.ok().has_skipped_required_body
+    ]
     if not operations:
         return
 

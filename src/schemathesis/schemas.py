@@ -21,7 +21,7 @@ from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.jsonschema.types import JsonSchemaObject
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER, SkippedParameter
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation, SkippedParameter
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.spec import CoverageCapabilities
@@ -784,6 +784,14 @@ class APIOperation(Generic[P, R, S, SchemaT]):
     @property
     def tags(self) -> list[str] | None:
         return self.schema.get_tags(self)
+
+    @property
+    def has_skipped_required_body(self) -> bool:
+        """The operation declares a required body whose schema could not be parsed."""
+        return any(
+            parameter.location == ParameterLocation.BODY.value and parameter.required
+            for parameter in self.skipped_parameters
+        )
 
     def iter_parameters(self) -> Iterator[P]:
         return chain(self.path_parameters, self.headers, self.cookies, self.query)

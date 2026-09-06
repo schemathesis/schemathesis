@@ -20,12 +20,14 @@ LOCATION_TO_CONTAINER: dict[str, ContainerName] = {
 
 @dataclass(frozen=True, slots=True)
 class SkippedParameter:
-    """An optional parameter left out of an operation because its schema could not be parsed."""
+    """A parameter left out of an operation because its schema could not be parsed."""
 
     location: str
     # `None` for an OpenAPI 3 request body, which is unnamed.
     name: str | None
     reference: str
+    # Only a required request body can be skipped; every other required parameter is a schema error.
+    required: bool = False
 
     @property
     def label(self) -> str:

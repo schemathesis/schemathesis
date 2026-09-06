@@ -1634,7 +1634,7 @@ def _bundle_parameter(
             name = parameter.get("name", "<UNKNOWN>")
             raise InvalidSchema.from_bundle_error(exc, location, name) from exc
         except RefResolutionError as exc:
-            if definition.get("required", False):
+            if not _is_skippable(definition, exc):
                 raise
             skipped.append(_skipped_parameter(definition, exc))
             return None
@@ -1662,7 +1662,7 @@ def _bundle_parameter(
             name = parameter.get("name", "<UNKNOWN>")
             raise InvalidSchema.from_bundle_error(exc, location, name) from exc
         except RefResolutionError as exc:
-            if definition.get("required", False):
+            if not _is_skippable(definition, exc):
                 raise
             skipped.append(_skipped_parameter(definition, exc))
             return None
@@ -1675,11 +1675,35 @@ def _bundle_parameter(
     return result
 
 
+def _is_recoverable_body_reference(reference: str) -> bool:
+    """Whether a required body can be dropped over this reference.
+
+    A same-document reference that does not resolve means the document is incomplete, which the
+    absent body already covers. A reference into another document may have failed because that
+    document could not be read - an operational error to surface rather than work around.
+    """
+    return reference.startswith("#")
+
+
+def _is_skippable(definition: Mapping, error: RefResolutionError) -> bool:
+    """Whether the operation stays testable without this parameter.
+
+    A required body can be left out and tested as a known-invalid request; every other required
+    parameter has no meaningful absent state, so the operation cannot be tested without it.
+    """
+    if not definition.get("required", False):
+        return True
+    return definition.get("in") == ParameterLocation.BODY.value and _is_recoverable_body_reference(
+        unresolvable_reference(error)
+    )
+
+
 def _skipped_parameter(definition: Mapping, error: RefResolutionError) -> SkippedParameter:
     return SkippedParameter(
         location=definition.get("in", ""),
         name=definition.get("name", "<UNKNOWN>"),
         reference=unresolvable_reference(error),
+        required=definition.get("required", False),
     )
 
 
@@ -1845,13 +1869,15 @@ def iter_parameters_v3(
                 except BundleError as exc:
                     raise InvalidSchema.from_bundle_error(exc, "body") from exc
                 except RefResolutionError as exc:
-                    if required:
+                    reference = unresolvable_reference(exc)
+                    if required and not _is_recoverable_body_reference(reference):
                         raise
                     skipped.append(
                         SkippedParameter(
                             location=ParameterLocation.BODY.value,
                             name=None,
-                            reference=unresolvable_reference(exc),
+                            reference=reference,
+                            required=required,
                         )
                     )
                     continue

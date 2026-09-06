@@ -323,10 +323,14 @@ def test_audit_schema_filters_uncovered_keywords_under_errored_operations(ctx):
             },
             "/broken": {
                 "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
-                    },
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "filter",
+                            "required": True,
+                            "schema": {"$ref": "#/components/schemas/Missing"},
+                        }
+                    ],
                     "responses": {"200": {"description": "OK"}},
                 }
             },

@@ -76,6 +76,8 @@ POSITIVE_CASES = [
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
 ]
 NEGATIVE_CASES = [
+    # Missing required body
+    {"query": {"q1": "0.5", "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}},
     {"query": {"q1": "0.5"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
     {"query": {"q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": {"j-prop": 0}},
     {"query": {"q1": "0.5", "q2": "0"}, "headers": {"h1": "0.5"}, "body": {"j-prop": 0}},
@@ -116,6 +118,8 @@ NEGATIVE_CASES = [
     {"query": {"q1": "0.5", "q2": "0"}, "headers": {"h1": "0.5", "h2": "true"}, "body": 0},
 ]
 MIXED_CASES = [
+    # Missing required body
+    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}},
     {"query": {"q1": "5"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5"}, "body": {"j-prop": 0}},
@@ -828,6 +832,8 @@ def test_negative_type_violations_for_enum_property_under_allof(ctx):
         schema,
         [GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
         [
+            # Missing required body
+            {},
             {"body": [None, None]},
             {"body": "AAA"},
             {},
@@ -952,6 +958,8 @@ def test_no_redundant_type_violations_for_enum_string_property_in_multipart(ctx)
         schema,
         [GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
         [
+            # Missing required body
+            {},
             {"body": {"color": "AAA"}},
             {"body": {}},
             {"body": {"color": "blue"}},
@@ -1010,6 +1018,8 @@ def test_negative_patterns(ctx):
     assert_negative_coverage(
         schema,
         [
+            # Missing required body
+            {},
             {
                 "body": {},
             },
@@ -1720,6 +1730,8 @@ def test_generate_empty_headers_too(ctx):
                 "maxItems": 3,
             },
             [
+                # Missing required body
+                {},
                 {"body": [False, False, False, False]},
                 {"body": [{}]},
                 {"body": [[None, None]]},
@@ -1740,6 +1752,8 @@ def test_generate_empty_headers_too(ctx):
                 "minItems": 3,
             },
             [
+                # Missing required body
+                {},
                 {"body": [False, False]},
                 {"body": [{}, False, False]},
                 {"body": [[None, None], False, False]},
@@ -1763,6 +1777,8 @@ def test_generate_empty_headers_too(ctx):
                 "maxItems": 50,
             },
             [
+                # Missing required body
+                {},
                 {
                     "body": [None] * 51,
                 },
@@ -2704,6 +2720,9 @@ def test_binary_format_should_not_generate_empty_string_as_invalid(ctx, cli, sna
 
     @app.route("/files/<path:filename>", methods=["PUT"])
     def upload_file(filename):
+        # No `Content-Type` means no body at all, unlike an empty payload the schema still allows.
+        if not request.content_type:
+            return jsonify({"message": "File is required"}), 400
         data = request.get_data()
         return jsonify({"message": "File added successfully", "size": len(data)}), 201
 
@@ -4110,6 +4129,63 @@ def test_missing_required_header_case_uses_invalid_template_body(ctx):
     )
 
 
+BODY_WITH_REQUIRED_PROPERTY = {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}
+
+
+def _missing_body_cases(operation):
+    return [
+        case
+        for case in scenario_cases(iter_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.MISSING_PARAMETER)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY
+    ]
+
+
+def test_missing_required_body_case(ctx):
+    operation = body_operation(ctx, BODY_WITH_REQUIRED_PROPERTY)
+
+    assert [
+        (case.body, case.media_type, case.meta.generation.mode, case.meta.phase.data.description)
+        for case in _missing_body_cases(operation)
+    ] == [(NOT_SET, None, GenerationMode.NEGATIVE, "Missing request body")]
+
+
+def test_missing_required_body_case_sends_no_content_type(ctx):
+    operation = body_operation(ctx, BODY_WITH_REQUIRED_PROPERTY)
+    (case,) = _missing_body_cases(operation)
+
+    prepared = prepare_request(case, headers=None, config=SanitizationConfig(enabled=False))
+
+    assert prepared.body is None
+    assert "Content-Type" not in prepared.headers
+
+
+def test_no_missing_body_case_for_optional_body(ctx):
+    operation = body_operation(ctx, BODY_WITH_REQUIRED_PROPERTY, body_required=False)
+
+    assert _missing_body_cases(operation) == []
+
+
+UNRESOLVABLE_REQUIRED_BODY = {
+    "required": True,
+    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+}
+
+
+def test_only_missing_body_case_when_required_body_reference_is_unresolvable(ctx):
+    operation = load_schema(ctx, request_body=UNRESOLVABLE_REQUIRED_BODY)["/foo"]["post"]
+
+    assert [
+        (case.body, case.media_type, case.meta.generation.mode, case.meta.phase.data.description)
+        for case in iter_cases(operation, *GenerationMode)
+    ] == [(NOT_SET, None, GenerationMode.NEGATIVE, "Missing request body")]
+
+
+def test_no_positive_cases_when_required_body_reference_is_unresolvable(ctx):
+    operation = load_schema(ctx, request_body=UNRESOLVABLE_REQUIRED_BODY)["/foo"]["post"]
+
+    assert iter_cases(operation, GenerationMode.POSITIVE) == []
+
+
 def test_missing_required_header_case_respects_before_call_hook_restoring_header(ctx):
     operation = load_schema(
         ctx,
@@ -5341,7 +5417,7 @@ def test_negative_data_rejection_no_false_positive_for_multipart_body_type_mutat
     ctx_check = check_context()
 
     for case in cases:
-        if isinstance(case.body, dict):
+        if case.body is NOT_SET or isinstance(case.body, dict):
             continue
         assert negative_data_rejection(ctx_check, response, case) is None, (
             f"False positive: body {case.body!r} ({type(case.body).__name__})"

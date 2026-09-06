@@ -79,6 +79,10 @@ def _build_examples_generator(
 def _create_scheduler(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> Scheduler:
     """Create the appropriate scheduler via the schema's specification-aware override."""
     operations: list[Result[APIOperation, InvalidSchema]] = list(engine.schema.get_all_operations())
+    if phase.name != PhaseName.COVERAGE:
+        # An operation whose required body has no usable schema cannot be sent valid data, so every phase
+        # but coverage - which tests it by omitting the body - would judge it on data it never described.
+        operations = [item for item in operations if not (isinstance(item, Ok) and item.ok().has_skipped_required_body)]
     if only is not None:
         operations = [item for item in operations if isinstance(item, Ok) and item.ok().label in only]
     # Entries the schema could not produce never claim a share, so counting them shrinks every other one.

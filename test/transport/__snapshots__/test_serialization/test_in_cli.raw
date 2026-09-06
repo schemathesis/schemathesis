@@ -21,9 +21,9 @@ Schemathesis dev
 
      ⏭  1 skipped
 
- ⏭   Coverage (in 0.00s)
+ ❌  Coverage (in 0.00s)
 
-     ⏭  1 skipped
+     ❌ 1 failed
 
  🚫  Fuzzing (in 0.00s)
 
@@ -38,25 +38,47 @@ Check your schema or add custom serializers: https://schemathesis.readthedocs.io
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== FAILURES ===================================
+________________________________ POST /api/csv _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- API accepted schema-violating request
+
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 405, 406, 409, 422, 428, 5xx
+    Invalid component: Missing request body
+
+[200] OK:
+
+    `[]`
+
+Reproduce with:
+
+    curl -X POST http://127.0.0.1/api/csv
+
+    st replay <PLACEHOLDER>
+
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 1/1
-  Tested: 0
-  Errored: 1
+  Tested: 1
 
 Test Phases:
   ⏭  Examples
-  ⏭  Coverage
+  ❌ Coverage
   🚫 Fuzzing
   ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ API accepted schema-violating request: 1
 
 Errors:
   🚫 Serialization not possible: 1
 
 Test cases:
-  No test cases were generated
+  N generated, N found N unique failures
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+========================= 1 failure, 1 error in 1.00s ==========================

@@ -150,6 +150,16 @@ class Template:
         kwargs = self._serialize(raw, components)
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
+    def without_body(self) -> TemplateValue:
+        # A `Content-Type` describing a body that is not there is a different oddity than sending no body at all.
+        raw = {key: value for key, value in self._template.items() if key not in ("body", "media_type")}
+        headers = raw.get("headers")
+        if isinstance(headers, dict):
+            raw["headers"] = {name: value for name, value in headers.items() if name.lower() != "content-type"}
+        components = {**self._components, ParameterLocation.BODY: ComponentInfo(mode=GenerationMode.NEGATIVE)}
+        kwargs = self._serialize(raw, components)
+        return TemplateValue(kwargs=kwargs, raw=raw, components=components)
+
     def with_parameter(self, *, location: ParameterLocation, name: str, value: GeneratedValue) -> TemplateValue:
         container = self._template[location.container_name]
         return self.with_location(
@@ -1096,6 +1106,24 @@ def _missing_required(run: CoverageRun) -> Generator[Case, None, None]:
             )
             if case is not None:
                 yield case
+    if template.has_required_body:
+        yield from _missing_body(run)
+
+
+def _missing_body(run: CoverageRun) -> Generator[Case, None, None]:
+    """Omit a body the operation declares it cannot do without."""
+    instant = Instant()
+    case = run.emitter.emit(
+        run.template.without_body(),
+        mode=GenerationMode.NEGATIVE,
+        elapsed=instant.elapsed,
+        scenario=CoverageScenario.MISSING_PARAMETER,
+        description="Missing request body",
+        parameter_location=ParameterLocation.BODY,
+        dedup=Dedup.NEGATIVE_SET,
+    )
+    if case is not None:
+        yield case
 
 
 def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
@@ -1343,6 +1371,12 @@ def iter_coverage_cases(
         correlated=correlated,
     )
     _seed_parameters(run)
+    if operation.has_skipped_required_body:
+        # No body can be built, so every request is body-less; omitting the required body is the
+        # only mutation this operation isolates, and any other one would be judged on the body.
+        if GenerationMode.NEGATIVE in generation_modes:
+            yield from _missing_body(run)
+        return
     if operation.body:
         yield from _body_cases(run)
     else:

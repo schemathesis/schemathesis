@@ -295,6 +295,16 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
             },
             [("response `200` header `X-Total`", "#/components/headers/Missing")],
         ),
+        (
+            {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+                },
+                "responses": {"200": {"description": "Success"}},
+            },
+            [("`body`", "#/components/schemas/Missing")],
+        ),
         ({"responses": {"200": {"description": "Success", "content": {"application/json": "not-an-object"}}}}, []),
         (
             {
@@ -312,6 +322,7 @@ MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
         "optional-parameter",
         "response-schema-and-header",
         "missing-header-definition",
+        "dropped-required-body",
         "media-type-not-an-object",
         "media-type-without-schema",
     ],

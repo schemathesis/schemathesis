@@ -1631,6 +1631,8 @@ def test_negative_data_rejection_nested_body_description(ctx, cli, snapshot_cli)
 
     @app.route("/payment", methods=["POST"])
     def payment():
+        if not request.get_data():
+            return jsonify({}), 400
         return jsonify({}), 200
 
     assert (

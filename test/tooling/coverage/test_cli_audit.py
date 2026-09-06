@@ -55,10 +55,14 @@ def test_is_complete_treats_error_only_schema_as_complete(ctx):
             "/items": {"get": {"responses": {"200": {"description": "OK"}}}},
             "/broken": {
                 "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
-                    },
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "filter",
+                            "required": True,
+                            "schema": {"$ref": "#/components/schemas/Missing"},
+                        }
+                    ],
                     "responses": {"200": {"description": "OK"}},
                 }
             },

@@ -336,7 +336,7 @@ def test_api(case):
     # ExamplesPhaseData round-trip via worker→controller boundary
     assert any(i.get("phase", {}).get("name") == "examples" for i in interactions)
     # Request body preserved through serialization
-    assert all(i["request"]["body"] is not None for i in interactions)
+    assert all(i["request"]["body"] is not None for i in interactions if i.get("phase", {}).get("name") == "examples")
 
 
 def test_vcr_report_via_directory_via_xdist(testdir, ctx):

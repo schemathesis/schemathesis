@@ -18,7 +18,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `method_not_allowed` | Operation consistently returned `405 Method Not Allowed` | Verify the server accepts this method, or remove the operation from the schema |
 | `constants_extraction` | A registered `@schemathesis.python.constants` source could not be scanned | Return your app or importable modules from the source |
 | `unmatched_filter` | A filter expression matched no API operation | Fix the typo, or update the filter if the operation was renamed |
-| `unresolvable_reference` | A parameter or response schema names a component that does not exist | Define the missing component, or drop the reference from the schema |
+| `unresolvable_reference` | A parameter, request body, or response schema names a component that does not exist | Define the missing component, or drop the reference from the schema |
 
 ## Available Warnings
 
@@ -190,7 +190,9 @@ Unresolvable references: 1 operation skipped parts of the schema
 - An **optional parameter** is left out of every generated request.
 - A **response schema** or **response header schema** is not validated, and every other check still runs against that response.
 
-A required parameter with the same problem is a hard schema error instead — the operation cannot be tested at all and is reported under "Schema Errors".
+A **required request body** with the same problem keeps the operation testable in exactly one way: the coverage phase sends the request without a body, which the schema already declares invalid. No other case can be trusted for that operation — every request would be missing the body — so the other phases skip it and no valid data is ever claimed to have been sent.
+
+Any other **required** parameter with the same problem is a hard schema error instead — a path, query, header, or cookie parameter has no meaningful absent state, so the operation cannot be tested at all and is reported under "Schema Errors".
 
 ## Configuring Warnings
 

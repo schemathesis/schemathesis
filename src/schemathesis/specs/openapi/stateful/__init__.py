@@ -178,7 +178,11 @@ def create_state_machine(
     extra_data_source: ExtraDataSource | None = None,
     constants_value_source: ConstantsPool | None = None,
 ) -> type[APIStateMachine]:
-    operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
+    operations = [
+        result.ok()
+        for result in schema.get_all_operations()
+        if isinstance(result, Ok) and not result.ok().has_skipped_required_body
+    ]
     bundles = {}
     transitions = collect_transitions(operations)
     _response_matchers: dict[str, Callable[[StepOutput], str | None]] = {}

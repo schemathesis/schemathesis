@@ -113,6 +113,8 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
     mode = GenerationMode.POSITIVE if positive else GenerationMode.NEGATIVE
     cases = collect_cases(operation, mode)
     for case in cases:
+        if case.body is NOT_SET:
+            continue
         is_valid = validator.is_valid(case.body)
         body_is_target = case.meta.phase.data.parameter_location == ParameterLocation.BODY
         if positive and not is_valid:

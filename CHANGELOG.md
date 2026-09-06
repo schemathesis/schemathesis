@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Negative coverage case that omits a request body the operation declares required.
 - Apollo Federation subgraph support: `_entities` and `_service` stay out unless filters select them.
 - `base_url_mismatch` warning when every response is 404 and `--url` omits the schema's base path.
 - `unresolvable_reference` warning listing the parameters and responses skipped over a missing schema component.
@@ -29,7 +30,7 @@
 ### :bug: Fixed
 
 - False negative `unsupported_method` for 404 responses on paths whose parameters are pinned.
-- Skip optional parameters whose `$ref` does not resolve instead of rejecting the whole operation.
+- Skip optional parameters and required bodies with unresolvable `$ref` instead of rejecting the operation.
 - Skip response schemas whose `$ref` does not resolve instead of rejecting the whole operation.
 - Send example values in query and path as `true` / `false` / `null`, omitting optional nulls.
 - Use a single boundary in the reproduce cURL for multipart request bodies.

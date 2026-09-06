@@ -25,17 +25,12 @@ Schemathesis dev
 ______________________________ POST /departments _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API accepted schema-violating request
+- Undocumented HTTP status code
 
-    Invalid data should have been rejected
-    Expected: 400, 401, 403, 404, 405, 406, 409, 422, 428, 5xx
-    Invalid component: Missing `X-Required-Header` at header
+    Received: 422
+    Documented: 201
 
-- Missing header not rejected
-
-    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406
-
-[201] Created:
+[422] Unprocessable Content:
 
     <EMPTY>
 
@@ -47,12 +42,17 @@ Reproduce with:
 
 2. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- API accepted schema-violating request
 
-    Received: 422
-    Documented: 201
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 405, 406, 409, 422, 428, 5xx
+    Invalid component: Missing `X-Required-Header` at header
 
-[422] Unprocessable Content:
+- Missing header not rejected
+
+    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406
+
+[201] Created:
 
     <EMPTY>
 

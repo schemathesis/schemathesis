@@ -1959,6 +1959,32 @@ def test_unresolvable_reference_in_response_schema(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--max-examples=1") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_required_body_with_unresolvable_reference(ctx, cli, snapshot_cli):
+    # With no body schema, omitting the body is the only request the operation can be judged on.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/things": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/things", methods=["POST"])
+    def things():
+        if not request.get_data():
+            return jsonify({"error": "body required"}), 400
+        return jsonify([])
+
+    assert cli.run_openapi_app(app, "--max-examples=1") == snapshot_cli
+
+
 @pytest.mark.parametrize("value", ["true", "false"])
 def test_output_sanitization(ctx, cli, hypothesis_max_examples, value):
     api = ctx.openapi.apps.failure()

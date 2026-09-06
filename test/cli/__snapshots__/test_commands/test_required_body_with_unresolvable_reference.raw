@@ -17,9 +17,24 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
+
+     No tests were run
+
  ✅  Coverage (in 0.00s)
 
      ✅ 1 passed
+
+
+     No tests were run
+
+=================================== WARNINGS ===================================
+
+Unresolvable references: 1 operation skipped parts of the schema
+
+  - POST /things
+    `body` - unresolvable reference `#/components/schemas/Missing`
+
+💡 Resolve these references so the skipped parts get tested
 
 =================================== SUMMARY ====================================
 
@@ -28,14 +43,17 @@ API Operations:
   Tested: 1
 
 Test Phases:
-  ⏭  Examples (disabled)
+  ⏭  Examples (nothing to test)
   ✅ Coverage
-  ⏭  Fuzzing (disabled)
-  ⏭  Stateful (disabled)
+  ⏭  Fuzzing (nothing to test)
+  ⏭  Stateful (not applicable)
+
+Warnings:
+  ⚠️ Unresolvable references: 1 operation had parts of the schema skipped
 
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+============================== 1 warning in 1.00s ==============================

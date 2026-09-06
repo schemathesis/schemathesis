@@ -25,9 +25,7 @@ Schemathesis dev
 
 API Operations:
   Selected: 1/1
-  Tested: 0
-  Skipped: 1
-    - No checks ran
+  Tested: 1
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -36,7 +34,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Test cases:
-  N generated
+  N generated, N passed
 
 Seed: 42
 

@@ -154,12 +154,11 @@ def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
         version="2.0",
     )
     result = _first_operation(schema)
-    if required:
-        assert isinstance(result, Err)
-        assert isinstance(result.err(), InvalidSchema)
-    else:
-        assert isinstance(result, Ok)
-        assert list(result.ok().body) == []
+    assert isinstance(result, Ok)
+    assert list(result.ok().body) == []
+    assert result.ok().skipped_parameters == [
+        SkippedParameter(location="body", name="payload", reference="#/definitions/Missing", required=required)
+    ]
 
 
 @pytest.mark.parametrize("required", [False, True], ids=["optional", "required"])
@@ -206,12 +205,11 @@ def test_request_body_with_unresolvable_ref_v3(ctx, required):
         }
     )
     result = _first_operation(schema)
-    if required:
-        assert isinstance(result, Err)
-        assert isinstance(result.err(), InvalidSchema)
-    else:
-        assert isinstance(result, Ok)
-        assert list(result.ok().body) == []
+    assert isinstance(result, Ok)
+    assert list(result.ok().body) == []
+    assert result.ok().skipped_parameters == [
+        SkippedParameter(location="body", name=None, reference="#/components/schemas/Missing", required=required)
+    ]
 
 
 # The dangling `$ref` sits three levels down in an otherwise usable object; bundling is all-or-nothing.

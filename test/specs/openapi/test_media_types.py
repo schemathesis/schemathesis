@@ -329,7 +329,8 @@ schema.config.phases.fuzzing.enabled = False
 
 @schema.include(path_regex="upload").parametrize()
 def test(case):
-    assert case.body == b"%PDF-1.4", f"Expected PDF bytes, got: {{case.body!r}}"
+    # Coverage also omits the required body entirely, which carries no payload to check.
+    assert case.body is NOT_SET or case.body == b"%PDF-1.4", f"Expected PDF bytes, got: {{case.body!r}}"
 """,
         paths={
             "/upload": {

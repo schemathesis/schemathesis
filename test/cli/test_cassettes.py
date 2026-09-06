@@ -95,6 +95,7 @@ def test_store_cassette(ctx, cli, cassette_path, hypothesis_max_examples, args, 
             interaction["phase"]["name"] == "coverage"
             and interaction["generation"]["mode"] == "negative"
             and not interaction["phase"]["data"]["description"].startswith("Unspecified")
+            and interaction["phase"]["data"]["description"] != "Missing request body"
         ):
             assert interaction["phase"]["data"]["location"] is not None
             assert interaction["phase"]["data"]["parameter"] is not None
