@@ -5,7 +5,9 @@ import random
 
 import graphql
 import pytest
+from hypothesis import HealthCheck, given, settings
 
+from schemathesis.generation import GenerationMode
 from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
 from schemathesis.specs.graphql.substitution import iter_operation_pool_values, substitute_pool_values
@@ -623,3 +625,50 @@ def test_pool_substitutes_non_id_argument(rng):
         operation_node=op, client_schema=schema, pool=pool, random=rng, schema_index=SchemaIndex(schema)
     )
     assert 'projectPath: "acme/web"' in graphql.print_ast(op)
+
+
+_POOL_MODE_SDL = (
+    "type Author { id: ID! } type Book { id: ID! author: Author! } type Query { book(id: ID, authorId: ID): Book }"
+)
+
+
+def _pool_with_captured_book(schema):
+    pool = GraphQLResourcePool(client_schema=schema.client_schema)
+    pool.capture(
+        operation_node=_parse("query { book { id author { id } } }"),
+        response_data={"book": {"id": "captured-book", "author": {"id": "captured-author"}}},
+    )
+    return pool
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_case_keeps_violation_when_pool_has_values(ctx):
+    schema = ctx.graphql.load_sdl(_POOL_MODE_SDL)
+    strategy = schema["Query"]["book"].as_strategy(
+        generation_mode=GenerationMode.NEGATIVE, extra_data_source=_pool_with_captured_book(schema)
+    )
+
+    @given(strategy)
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    def test(case):
+        assert graphql.validate(schema.client_schema, graphql.parse(case.body)), (
+            f"Negative case is schema-valid: {case.body}"
+        )
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_positive_case_uses_pool_values(ctx):
+    schema = ctx.graphql.load_sdl(_POOL_MODE_SDL)
+    strategy = schema["Query"]["book"].as_strategy(extra_data_source=_pool_with_captured_book(schema))
+    bodies = []
+
+    @given(strategy)
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    def test(case):
+        bodies.append(case.body)
+
+    test()
+
+    assert any('id: "captured-book"' in body and 'authorId: "captured-author"' in body for body in bodies)

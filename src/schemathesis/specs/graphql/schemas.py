@@ -560,7 +560,9 @@ def graphql_cases(
     )
     constants_draws: tuple[ConstantDraw, ...] = ()
     if operation_node is not None:
-        if isinstance(extra_data_source, GraphQLResourcePool):
+        # A captured identifier would overwrite the argument the negative strategy deliberately
+        # corrupted, turning the query valid and making the server's acceptance look like a bug.
+        if isinstance(extra_data_source, GraphQLResourcePool) and effective_mode.is_positive:
             random_source = draw(st.randoms())
             if random_source.random() < SUBSTITUTION_PROBABILITY:
                 substitute_pool_values(
