@@ -40,14 +40,17 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
 
         media_type = case.media_type
 
+        serializer = None
+        if not isinstance(case.body, NotSet) and media_type is not None:
+            media_type, serializer = self._resolve_serializer(media_type)
+
         # Set content type for payload
         if media_type and not isinstance(case.body, NotSet):
             final_headers["Content-Type"] = media_type
 
         extra: dict[str, Any]
         # Handle serialization
-        if not isinstance(case.body, NotSet) and media_type is not None:
-            serializer = self._get_serializer(media_type)
+        if serializer is not None:
             context = SerializationContext(case=case)
             extra = serializer(context, prepare_body(case))
         else:

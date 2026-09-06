@@ -148,6 +148,54 @@ def test_serialize_any(ctx):
     test()
 
 
+@pytest.mark.parametrize(
+    ("declared", "expected"),
+    [
+        ("*/*", "application/json"),
+        ("application/*", "application/json"),
+        ("application/*+json", "application/json"),
+        ("text/*", "text/json"),
+        ("application/vnd.aipportal+json", "application/vnd.aipportal+json"),
+    ],
+)
+def test_media_range_sent_as_concrete_content_type(ctx, declared, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {"required": True, "content": {declared: {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    case = schema["/data"]["POST"].Case(body={"key": "value"}, media_type=declared)
+    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+        assert transport.serialize_case(case)["headers"]["Content-Type"] == expected
+
+
+def test_multipart_content_type_left_to_requests(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {"type": "object", "properties": {"key": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    case = schema["/upload"]["POST"].Case(body={"key": "value"}, media_type="multipart/form-data")
+    assert "Content-Type" not in REQUESTS_TRANSPORT.serialize_case(case)["headers"]
+
+
 def test_serialization_not_possible_manual(ctx):
     schema = ctx.openapi.load_schema(
         {
@@ -940,6 +988,8 @@ def foo(ctx, value):
                 "application/xml",
             },
         ),
+        ("application/*+json", {"application/json", "application/problem+json"}),
+        ("application/*+xml", {"application/xml"}),
         ("*/form-data", {"multipart/form-data"}),
         ("*/*", set(TRANSPORT._serializers)),
     ],

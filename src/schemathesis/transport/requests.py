@@ -67,6 +67,10 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
         media_type = case.media_type
 
+        serializer = None
+        if not isinstance(case.body, NotSet) and media_type is not None:
+            media_type, serializer = self._resolve_serializer(media_type)
+
         # Set content type header if needed
         if (
             media_type
@@ -79,8 +83,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         url = prepare_url(case, base_url)
 
         # Handle serialization
-        if not isinstance(case.body, NotSet) and media_type is not None:
-            serializer = self._get_serializer(media_type)
+        if serializer is not None:
             context = SerializationContext(case=case)
             extra = serializer(context, prepare_body(case))
         else:
