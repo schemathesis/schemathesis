@@ -1730,3 +1730,114 @@ def test_response_schema_conformance_large_pattern(ctx, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+def _location_schema(target_methods=("get",)):
+    target = {
+        method: {
+            "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+        for method in target_methods
+    }
+    return {
+        "/items": {"post": {"responses": {"201": {"description": "Created"}}}},
+        "/items/{item_id}": target,
+    }
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_invalid_location_broken_link(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_schema())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    assert cli.run_openapi_app(app, "--checks=invalid_location", "--max-examples=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_invalid_location_working_link(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_schema())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    assert cli.run_openapi_app(app, "--checks=invalid_location", "--max-examples=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_invalid_location_external_link_is_not_followed(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_schema())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "https://example.test/items/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 404
+
+    assert cli.run_openapi_app(app, "--checks=invalid_location", "--max-examples=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_invalid_location_documented_path_without_get(ctx, cli, snapshot_cli):
+    # Probing a `DELETE`-only resource would destroy it, and its absence of `GET` is not a fault.
+    app, _ = ctx.openapi.make_flask_app(_location_schema(target_methods=("delete",)))
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42"}
+
+    @app.route("/items/<item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        return jsonify({})
+
+    assert cli.run_openapi_app(app, "--checks=invalid_location", "--max-examples=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_invalid_location_undocumented_path(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(_location_schema())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/exports/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    assert cli.run_openapi_app(app, "--checks=invalid_location", "--max-examples=1") == snapshot_cli
+
+
+def test_invalid_location_probes_each_operation_once(ctx, app_runner):
+    probed = []
+    app, _ = ctx.openapi.make_flask_app(_location_schema())
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        return jsonify({}), 201, {"Location": "/items/42"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        probed.append(item_id)
+        return jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = schema["/items"]["POST"]
+    for _ in range(3):
+        operation.Case().call_and_validate(checks=[])
+
+    assert probed == ["42"]

@@ -42,8 +42,8 @@ def _register(name, methods):
 def test_classification(restore_checks, methods, as_response, as_run):
     _register("Check", methods)
     run_checks = RunChecks.from_registry(_EMPTY_CONFIG)
-    assert [name for name, *_ in run_checks.for_responses()] == (["Check"] if as_response else [])
-    assert [name for name, _ in run_checks.for_run()] == (["Check"] if as_run else [])
+    assert ("Check" in [name for name, *_ in run_checks.for_responses()]) is as_response
+    assert ("Check" in [name for name, _ in run_checks.for_run()]) is as_run
 
 
 def test_after_run_failures_are_distinct_per_check(ctx, restore_checks):

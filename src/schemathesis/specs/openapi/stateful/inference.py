@@ -176,7 +176,7 @@ class LinkInferencer:
 
         return link
 
-    def _normalize_location(self, location: str) -> str | None:
+    def normalize_location(self, location: str) -> str | None:
         """Normalize location header, handling both relative and absolute URLs."""
         location = location.strip()
         if not location:
@@ -217,7 +217,7 @@ class LinkInferencer:
         injected = 0
 
         for entry in entries:
-            location = self._normalize_location(entry.value)
+            location = self.normalize_location(entry.value)
             if location is None:
                 # Skip invalid/empty locations or absolute URLs that don't match base_url
                 continue

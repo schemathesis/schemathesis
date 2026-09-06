@@ -9,7 +9,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+     Operations:       2 selected / 2 total
 
 
  ✅  API capabilities:
@@ -17,9 +17,17 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
- ❌  Fuzzing (in 0.00s)
+ ⏭   Examples (in 0.00s)
 
-     ❌ 1 failed
+     ⏭  2 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ✅ 1 passed  ❌ 1 failed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 2 passed
 
 =================================== FAILURES ===================================
 _________________________________ POST /items __________________________________
@@ -27,30 +35,30 @@ _________________________________ POST /items __________________________________
 
 - Invalid Location
 
-    `Location: /items/123` points at a resource that answered `404 Not Found`
+    `Location: /exports/42` points at a resource that answered `404 Not Found`
 
     Return a `Location` that resolves to an existing resource
 
 [201] Created:
 
-    `{"message":"created"}`
+    `{}`
 
 Reproduce with:
 
-    curl -X POST http://127.0.0.1/items
+    <PLACEHOLDER>
 
     st replay <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
-  Tested: 1
+  Selected: 2/2
+  Tested: 2
 
 Test Phases:
-  ⏭  Examples (disabled)
-  ⏭  Coverage (disabled)
-  ❌ Fuzzing
+  ⏭  Examples
+  ❌ Coverage
+  ✅ Fuzzing
   ⏭  Stateful (not applicable)
 
 Failures:

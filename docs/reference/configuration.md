@@ -984,6 +984,7 @@ These settings can only be applied at the project level.
       - `ignored_auth`
       - `unsupported_method`
       - `allow_header_conformance`
+      - `invalid_location`
 
     ```toml
     [checks]
