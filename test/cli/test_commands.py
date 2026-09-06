@@ -1207,6 +1207,22 @@ def test_filter_by(ctx, cli, snapshot_cli, value):
     assert cli.run(api.schema_url, "--mode=positive", "--max-examples=1", value) == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_schema_serving_endpoint_is_not_tested(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/openapi.json": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/users")
+    def users():
+        return jsonify([])
+
+    assert cli.run_openapi_app(app, "--max-examples=5") == snapshot_cli
+
+
 def test_colon_in_headers(ctx, cli):
     api = ctx.openapi.apps.success()
     header = "X-FOO"

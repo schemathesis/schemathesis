@@ -1,4 +1,7 @@
+import json
+
 import pytest
+from flask import jsonify
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
@@ -234,3 +237,83 @@ def test_non_object_response_vendor_extension(ctx, extension):
     assert [(status_code, dict(response.iter_links())) for status_code, response in operation.responses.items()] == [
         ("200", {"Self": {"operationId": "get_users"}})
     ]
+
+
+SELF_DOCUMENTED_PATHS = {
+    "/openapi.json": {"get": {"responses": {"200": {"description": "OK"}}}},
+    "/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+}
+
+
+def test_schema_endpoint_is_not_tested(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(SELF_DOCUMENTED_PATHS)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    assert [result.ok().label for result in schema.get_all_operations()] == ["GET /users"]
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (1, 1)
+
+
+def test_schema_endpoint_is_tested_when_selected(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(SELF_DOCUMENTED_PATHS)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app)).include(path="/openapi.json")
+    assert [result.ok().label for result in schema.get_all_operations()] == ["GET /openapi.json"]
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (2, 1)
+
+
+def test_schema_endpoint_is_not_tested_for_a_relative_wsgi_path(ctx):
+    app, _ = ctx.openapi.make_flask_app(SELF_DOCUMENTED_PATHS)
+    schema = schemathesis.openapi.from_wsgi("openapi.json", app)
+    assert [result.ok().label for result in schema.get_all_operations()] == ["GET /users"]
+
+
+def test_filter_excluding_the_schema_endpoint_is_not_reported_as_unmatched(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(SELF_DOCUMENTED_PATHS)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app)).exclude(path="/openapi.json")
+    assert schema.statistic.unmatched_filters == []
+
+
+def test_non_get_operation_on_schema_path_is_tested(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/openapi.json": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    assert [result.ok().label for result in schema.get_all_operations()] == ["POST /openapi.json"]
+
+
+SELF_DOCUMENTED_UNDER_BASE_PATH = {
+    "openapi": "3.0.2",
+    "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+    "servers": [{"url": "/api/v1"}],
+    "paths": {
+        "/schema/": {"get": {"responses": {"200": {"description": "OK"}}}},
+        "/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+    },
+}
+
+
+@pytest.mark.parametrize(
+    "fetch_path",
+    ["/api/v1/schema/", "/api/v1/schema/?format=json", "/api/v1/schema"],
+    ids=["exact", "query-string", "no-trailing-slash"],
+)
+def test_schema_endpoint_under_base_path_is_not_tested(ctx, app_runner, fetch_path):
+    app = ctx.openapi.make_flask_app_from_schema(SELF_DOCUMENTED_UNDER_BASE_PATH)
+
+    @app.route("/api/v1/schema/")
+    def schema_document():
+        return jsonify(SELF_DOCUMENTED_UNDER_BASE_PATH)
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app, path=fetch_path))
+    assert [result.ok().label for result in schema.get_all_operations()] == ["GET /users"]
+
+
+def test_schema_loaded_from_file_keeps_every_operation(ctx, tmp_path):
+    location = tmp_path / "openapi.json"
+    spec = ctx.openapi.build_schema({str(location): {"get": {"responses": {"200": {"description": "OK"}}}}})
+    location.write_text(json.dumps(spec))
+    schema = schemathesis.openapi.from_path(location)
+    assert [result.ok().label for result in schema.get_all_operations()] == [f"GET {location}"]

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, NoReturn, cast
+from urllib.parse import urljoin, urlsplit
 
 from packaging import version
 from requests.structures import CaseInsensitiveDict
@@ -434,6 +435,18 @@ class OpenApiSchema(BaseSchema):
     @override
     def _get_base_path(self) -> str:
         return self.adapter.get_base_path(self.raw_schema)
+
+    @cached_property
+    def _schema_document_path(self) -> str | None:
+        """Path the schema document was served from, if it came over HTTP."""
+        if self.location is None:
+            return None
+        parts = urlsplit(self.location)
+        # A `file://` location points at the filesystem and can never be an endpoint of the API under test.
+        if parts.scheme not in ("", "http", "https"):
+            return None
+        # ASGI / WSGI loaders accept a path with no leading slash, while operation paths always have one.
+        return urljoin("/", parts.path).rstrip("/")
 
     @property
     @override

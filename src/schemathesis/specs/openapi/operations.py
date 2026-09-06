@@ -122,6 +122,7 @@ class OperationLoader:
         context = HookContext()
         filters_active = not schema.filter_set.is_empty()
         should_skip = self._should_skip
+        serves_schema_document = self._serves_schema_document
         iter_parameters = self._iter_parameters
         make_operation = self.make_operation
         root_resolver = schema.root_resolver
@@ -141,6 +142,8 @@ class OperationLoader:
                         continue
                     try:
                         if filters_active and should_skip(path, method, entry):
+                            continue
+                        if serves_schema_document(path, method, entry):
                             continue
                         parameters = iter_parameters(entry, shared_parameters, resolver=path_resolver)
                         operation = make_operation(
@@ -175,6 +178,8 @@ class OperationLoader:
                     if method not in HTTP_METHODS:
                         continue
                     if filters_active and should_skip(path, method, definition):
+                        continue
+                    if self._serves_schema_document(path, method, definition):
                         continue
                     yield method, path, definition
             except SCHEMA_PARSING_ERRORS:
@@ -212,6 +217,11 @@ class OperationLoader:
                         continue
                     if not definition:
                         complete_walk = False
+                        continue
+                    if self._serves_schema_document(path, method, definition):
+                        # Keep a filter that targets it from being reported as matching nothing.
+                        if usage is not None:
+                            usage.record(self._filter_context)
                         continue
                     statistic.operations.total += 1
                     is_selected = not should_skip(path, method, definition) if filters_active else True
@@ -299,6 +309,20 @@ class OperationLoader:
         operation.label = f"{method.upper()} {path}"
         operation.definition.raw = definition
         return not schema.filter_set.match(context)
+
+    def _serves_schema_document(self, path: str, method: str, definition: OperationObject) -> bool:
+        """Whether this operation served the schema document, and so stays out unless a filter selects it."""
+        schema = self.schema
+        document_path = schema._schema_document_path
+        if document_path is None or method != "get" or schema.get_full_path(path).rstrip("/") != document_path:
+            return False
+        context = self._filter_context
+        operation = context.operation
+        operation.method = "get"
+        operation.path = path
+        operation.label = f"GET {path}"
+        operation.definition.raw = definition
+        return not schema.filter_set.is_explicitly_included(operation)
 
     def _iter_parameters(
         self,

@@ -19,6 +19,7 @@
 - Drop `starlette-testclient` and `starlette` dependencies.
 - ASGI application state persists between generated test cases.
 - ASGI lifespan shutdown runs per pytest test, or at process exit outside pytest.
+- The operation serving the loaded schema stays out of testing unless filters select it.
 
 ### :racing_car: Performance
 
