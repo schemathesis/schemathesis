@@ -24,6 +24,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
+from schemathesis.generation.overrides import Override
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     JsonSchemaError,
@@ -1807,6 +1808,52 @@ def test_unsupported_method_404_on_templated_path(
     response = response_factory.requests(status_code=status_code)
     if should_raise:
         with pytest.raises(Failure):
+            unsupported_method(context, response, case)
+    else:
+        assert unsupported_method(context, response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("pinned", "should_raise"),
+    [(True, True), (False, False)],
+    ids=["pinned", "generated"],
+)
+def test_unsupported_method_404_on_pinned_templated_path(ctx, response_factory, pinned, should_raise):
+    # A pinned path parameter names a resource the user vouched for, so 404 is a finding rather than a miss.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items/{item_id}"]["GET"].Case(
+        path_parameters={"item_id": "42"},
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=0.1, mode=GenerationMode.NEGATIVE),
+            components={},
+            phase=PhaseInfo(
+                name=TestPhase.COVERAGE,
+                data=CoveragePhaseData(
+                    scenario=CoverageScenario.UNSPECIFIED_HTTP_METHOD,
+                    description="Unspecified HTTP method: TRACE",
+                    location=None,
+                    parameter=None,
+                    parameter_location=None,
+                ),
+            ),
+        ),
+    )
+    override = (
+        Override(query={}, headers={}, cookies={}, path_parameters={"item_id": "42"}, body={}) if pinned else None
+    )
+    context = check_context(override=override)
+    response = response_factory.requests(status_code=404, method="TRACE")
+    if should_raise:
+        with pytest.raises(UnsupportedMethodResponse, match=re.escape("Unsupported method TRACE returned 404")):
             unsupported_method(context, response, case)
     else:
         assert unsupported_method(context, response, case) is None

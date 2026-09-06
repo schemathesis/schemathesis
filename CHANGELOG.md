@@ -27,6 +27,7 @@
 
 ### :bug: Fixed
 
+- False negative `unsupported_method` for 404 responses on paths whose parameters are pinned.
 - Skip optional parameters whose `$ref` does not resolve instead of rejecting the whole operation.
 - Send example values in query and path as `true` / `false` / `null`, omitting optional nulls.
 - Use a single boundary in the reproduce cURL for multipart request bodies.

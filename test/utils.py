@@ -309,9 +309,9 @@ class EventStream:
         return self.find(EngineFinished)
 
 
-def check_context(config=None, *, recorder=None):
+def check_context(config=None, *, recorder=None, override=None):
     return CheckContext(
-        override=None,
+        override=override,
         auth=None,
         headers=None,
         config=config or ChecksConfig(),

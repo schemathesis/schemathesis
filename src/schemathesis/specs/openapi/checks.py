@@ -900,6 +900,18 @@ def _requires_authentication(operation: APIOperation) -> bool:
     return bool(get_effective_security_scheme_names(operation, operation.schema.raw_schema))
 
 
+def _targets_generated_resource(ctx: CheckContext, operation: APIOperation) -> bool:
+    """Whether the resource this request targets was drawn rather than supplied by the user."""
+    if "{" not in operation.path:
+        return False
+    pinned = ctx._override.path_parameters if ctx._override is not None else {}
+    return any(
+        parameter.name not in pinned
+        for parameter in operation.iter_parameters()
+        if parameter.location == ParameterLocation.PATH
+    )
+
+
 @schemathesis.check
 @requires_openapi_schema
 @requires_case_meta
@@ -913,7 +925,7 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
         if response.status_code != 405:
             # Generated path parameters rarely point at an existing resource, and routing 404s before
             # method dispatch. 405 is only guaranteed when the target resource exists.
-            if response.status_code == 404 and "{" in case.operation.path:
+            if response.status_code == 404 and _targets_generated_resource(ctx, case.operation):
                 return None
             # Most frameworks authenticate before method dispatch, so a protected operation rejects an
             # undeclared method with 401/403 without ever reaching routing.
