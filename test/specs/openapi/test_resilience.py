@@ -6,6 +6,7 @@ import schemathesis
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.parameters import SkippedParameter
 from schemathesis.core.result import Err, Ok
+from schemathesis.specs.openapi.adapter.responses import ResolvedSchema
 
 
 def _schema(servers):
@@ -306,3 +307,50 @@ def test_referenced_parameter_with_unresolvable_ref_v3(ctx, required):
         assert result.ok().skipped_parameters == [
             SkippedParameter(location="query", name="filter", reference="#/components/schemas/Missing")
         ]
+
+
+def test_response_schema_with_unresolvable_ref_is_unvalidatable(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/things": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}},
+                        "404": {
+                            "description": "Not Found",
+                            "content": {"*/*": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+                        },
+                    }
+                }
+            }
+        }
+    )
+    responses = schema["/things"]["GET"].responses
+
+    assert responses.get("200").get_schema("application/json") == ResolvedSchema(
+        schema={"type": "object"}, media_type="application/json", name_to_uri={}, unresolvable_reference=None
+    )
+    assert responses.get("404").get_schema("application/json") == ResolvedSchema(
+        schema=None, media_type="*/*", name_to_uri={}, unresolvable_reference="#/components/schemas/Missing"
+    )
+
+
+def test_response_header_with_unresolvable_ref_is_unvalidatable(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/things": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "headers": {"X-Total": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+                        }
+                    }
+                }
+            }
+        }
+    )
+    header = dict(schema["/things"]["GET"].responses.get("200").headers.items())["X-Total"]
+
+    assert header.unresolvable_reference == "#/components/schemas/Missing"
+    assert header.schema == {}

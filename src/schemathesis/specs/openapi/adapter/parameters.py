@@ -15,7 +15,7 @@ import jsonschema_rs
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
-from schemathesis.core.errors import InvalidSchema, RefResolutionError
+from schemathesis.core.errors import InvalidSchema, RefResolutionError, unresolvable_reference
 from schemathesis.core.jsonschema import (
     VALIDATED_FORMATS_BY_DRAFT,
     BundleError,
@@ -1599,12 +1599,6 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
     return media_type_object.get("schema", {})
 
 
-def _unresolvable_reference(error: RefResolutionError) -> str:
-    """The reference the resolver could not follow, as written in the schema."""
-    notes = getattr(error, "__notes__", None)
-    return str(notes[0]) if notes else str(error)
-
-
 def _bundle_parameter(
     parameter: Mapping,
     resolver: Resolver,
@@ -1685,7 +1679,7 @@ def _skipped_parameter(definition: Mapping, error: RefResolutionError) -> Skippe
     return SkippedParameter(
         location=definition.get("in", ""),
         name=definition.get("name", "<UNKNOWN>"),
-        reference=_unresolvable_reference(error),
+        reference=unresolvable_reference(error),
     )
 
 
@@ -1857,7 +1851,7 @@ def iter_parameters_v3(
                         SkippedParameter(
                             location=ParameterLocation.BODY.value,
                             name=None,
-                            reference=_unresolvable_reference(exc),
+                            reference=unresolvable_reference(exc),
                         )
                     )
                     continue

@@ -13,8 +13,8 @@ import jsonschema_rs
 import requests
 
 from schemathesis.core.deserialization import deserialize_yaml
-from schemathesis.core.errors import RefResolutionError, RemoteDocumentError
-from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.errors import RefResolutionError, RemoteDocumentError, unresolvable_reference
+from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
@@ -289,3 +289,45 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
         raise error from exc
     # Bind `resolved.contents` so subsequent local-fragment walks land in the right document.
     return resolved_uri, Resolver(resolved.resolver, resolved.contents), resolved.contents
+
+
+def find_unresolvable_reference(schema: JsonSchema, resolver: Resolver, memo: dict[str, str | None]) -> str | None:
+    """The first reference under `schema` the resolver cannot follow, as written in the schema.
+
+    `memo` carries the verdict for every reference target already walked, so a component shared by
+    many schemas in the same document is inspected once instead of once per referring schema.
+    """
+
+    def walk(node: JsonValue, current_resolver: Resolver, in_progress: set[str]) -> str | None:
+        if isinstance(node, dict):
+            reference = node.get("$ref")
+            # An empty reference points at the current scope, which always resolves.
+            if isinstance(reference, str) and reference.strip():
+                try:
+                    uri, target_resolver, target = resolve_reference_with_uri(current_resolver, reference)
+                except RefResolutionError as exc:
+                    return unresolvable_reference(exc)
+                if uri in memo:
+                    if memo[uri] is not None:
+                        return memo[uri]
+                elif uri not in in_progress:
+                    in_progress.add(uri)
+                    found = walk(target, target_resolver, in_progress)
+                    in_progress.discard(uri)
+                    memo[uri] = found
+                    if found is not None:
+                        return found
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    found = walk(value, current_resolver, in_progress)
+                    if found is not None:
+                        return found
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, (dict, list)):
+                    found = walk(item, current_resolver, in_progress)
+                    if found is not None:
+                        return found
+        return None
+
+    return walk(schema, resolver, set())

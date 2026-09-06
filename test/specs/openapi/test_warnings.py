@@ -2,7 +2,6 @@ import pytest
 
 import schemathesis
 from schemathesis.config import SchemathesisWarning
-from schemathesis.core.parameters import SkippedParameter
 from schemathesis.specs.openapi.warnings import (
     MissingDeserializerWarning,
     UnresolvableReferenceWarning,
@@ -256,28 +255,71 @@ def test_detect_missing_deserializers_judges_each_media_type_separately(ctx, con
     ]
 
 
-def test_detect_unresolvable_references_for_dropped_optional_parameter(ctx):
-    schema = ctx.openapi.load_schema(
-        {
-            "/users": {
-                "get": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "filter",
-                            "required": False,
-                            "schema": {"$ref": "#/components/schemas/Missing"},
-                        }
-                    ],
-                    "responses": {"200": {"description": "Success"}},
+MISSING_SCHEMA = {"$ref": "#/components/schemas/Missing"}
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected"),
+    [
+        (
+            {
+                "parameters": [{"in": "query", "name": "filter", "required": False, "schema": MISSING_SCHEMA}],
+                "responses": {"200": {"description": "Success"}},
+            },
+            [("`query` parameter `filter`", "#/components/schemas/Missing")],
+        ),
+        (
+            {
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                        "headers": {"X-Total": {"schema": MISSING_SCHEMA}},
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {"*/*": {"schema": {"$ref": "#/components/schemas/ExceptionResponse"}}},
+                    },
                 }
-            }
-        }
-    )
+            },
+            [
+                ("response `200` header `X-Total`", "#/components/schemas/Missing"),
+                ("response `404`", "#/components/schemas/ExceptionResponse"),
+            ],
+        ),
+        (
+            {
+                "responses": {
+                    "200": {"description": "Success", "headers": {"X-Total": {"$ref": "#/components/headers/Missing"}}}
+                }
+            },
+            [("response `200` header `X-Total`", "#/components/headers/Missing")],
+        ),
+        ({"responses": {"200": {"description": "Success", "content": {"application/json": "not-an-object"}}}}, []),
+        (
+            {
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {"application/json": {"examples": {"first": {"value": {}}}}},
+                    }
+                }
+            },
+            [],
+        ),
+    ],
+    ids=[
+        "optional-parameter",
+        "response-schema-and-header",
+        "missing-header-definition",
+        "media-type-not-an-object",
+        "media-type-without-schema",
+    ],
+)
+def test_detect_unresolvable_references(ctx, operation, expected):
+    schema = ctx.openapi.load_schema({"/users": {"get": operation}})
 
     assert detect_unresolvable_references(schema["/users"]["GET"]) == [
-        UnresolvableReferenceWarning(
-            operation_label="GET /users",
-            skipped=SkippedParameter(location="query", name="filter", reference="#/components/schemas/Missing"),
-        )
+        UnresolvableReferenceWarning(operation_label="GET /users", subject=subject, reference=reference)
+        for subject, reference in expected
     ]

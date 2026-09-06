@@ -18,7 +18,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `method_not_allowed` | Operation consistently returned `405 Method Not Allowed` | Verify the server accepts this method, or remove the operation from the schema |
 | `constants_extraction` | A registered `@schemathesis.python.constants` source could not be scanned | Return your app or importable modules from the source |
 | `unmatched_filter` | A filter expression matched no API operation | Fix the typo, or update the filter if the operation was renamed |
-| `unresolvable_reference` | An optional parameter names a schema component that does not exist | Define the missing component, or drop the parameter from the schema |
+| `unresolvable_reference` | A parameter or response schema names a component that does not exist | Define the missing component, or drop the reference from the schema |
 
 ## Available Warnings
 
@@ -176,15 +176,19 @@ Almost always a typo or an operation that was renamed in the schema while the fi
 ### `unresolvable_reference`
 
 ```
-Unresolvable references: 1 operation skipped optional parameters
+Unresolvable references: 1 operation skipped parts of the schema
 
   - GET /things
     `query` parameter `filter` - unresolvable reference `#/components/schemas/Missing`
+    response `404` - unresolvable reference `#/components/schemas/ExceptionResponse`
 
-💡 Define the missing components in the schema so these parameters get tested
+💡 Resolve these references so the skipped parts get tested
 ```
 
-**Trigger**: A `$ref` inside an optional parameter's schema points at a component the document does not define. The parameter is left out of every generated request and the rest of the operation is tested as usual.
+**Trigger**: A `$ref` points at a component the document does not define. The rest of the operation is tested as usual:
+
+- An **optional parameter** is left out of every generated request.
+- A **response schema** or **response header schema** is not validated, and every other check still runs against that response.
 
 A required parameter with the same problem is a hard schema error instead — the operation cannot be tested at all and is reported under "Schema Errors".
 

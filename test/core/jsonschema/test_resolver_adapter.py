@@ -9,6 +9,7 @@ from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.jsonschema.resolver import (
     IN_MEMORY_BASE_URI,
     build_registry,
+    find_unresolvable_reference,
     load_file,
     make_root_resolver,
     resolve_reference,
@@ -99,3 +100,60 @@ def test_resolve_reference_to_file_path_with_uri_reserved_characters(tmp_path):
     _, resolved = resolve_reference(resolver, root_schema["$ref"])
 
     assert resolved == {"type": "string"}
+
+
+def _find(schema, memo=None):
+    document = schema if isinstance(schema, dict) else {}
+    return find_unresolvable_reference(schema, make_root_resolver(document), memo if memo is not None else {})
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        ({"properties": {"x": {"$ref": "#/$defs/missing"}}}, "#/$defs/missing"),
+        ({"anyOf": [{"type": "string"}, {"$ref": "#/$defs/missing"}]}, "#/$defs/missing"),
+        ({"allOf": [{"anyOf": [{"$ref": "#/$defs/missing"}]}]}, "#/$defs/missing"),
+        ({"$defs": {"a": {"type": "string"}}, "properties": {"x": {"$ref": "   "}}}, None),
+        ({"$defs": {"node": {"properties": {"next": {"$ref": "#/$defs/node"}}}}}, None),
+        ({"anyOf": []}, None),
+        ({"enum": ["a", 1, None]}, None),
+        ({"allOf": [{"type": "string"}, {"type": "object"}]}, None),
+        (True, None),
+        (False, None),
+    ],
+    ids=[
+        "broken-target",
+        "inside-list",
+        "inside-nested-list",
+        "blank-reference",
+        "recursive-reference",
+        "empty-list",
+        "scalar-items",
+        "resolvable-items",
+        "boolean-true",
+        "boolean-false",
+    ],
+)
+def test_find_unresolvable_reference(schema, expected):
+    assert _find(schema) == expected
+
+
+def test_find_unresolvable_reference_reuses_memoized_failure():
+    # The second lookup must reuse the memo rather than walk the shared component again.
+    document = {"$defs": {"broken": {"$ref": "#/$defs/gone"}}}
+    resolver = make_root_resolver(document)
+    memo = {}
+
+    assert find_unresolvable_reference({"$ref": "#/$defs/broken"}, resolver, memo) == "#/$defs/gone"
+    assert find_unresolvable_reference({"$ref": "#/$defs/broken"}, resolver, memo) == "#/$defs/gone"
+
+
+def test_find_unresolvable_reference_reuses_memoized_success():
+    memo = {}
+    schema = {
+        "$defs": {"ok": {"type": "string"}},
+        "properties": {"x": {"$ref": "#/$defs/ok"}, "y": {"$ref": "#/$defs/ok"}},
+    }
+
+    assert _find(schema, memo) is None
+    assert len(memo) == 1

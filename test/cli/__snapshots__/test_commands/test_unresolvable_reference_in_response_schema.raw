@@ -31,10 +31,16 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /things
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
+
 Unresolvable references: 1 operation skipped parts of the schema
 
   - GET /things
-    `query` parameter `filter` - unresolvable reference `#/components/schemas/Missing`
+    response `404` - unresolvable reference `#/components/schemas/ExceptionResponse`
 
 💡 Resolve these references so the skipped parts get tested
 
@@ -51,6 +57,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Warnings:
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
   ⚠️ Unresolvable references: 1 operation had parts of the schema skipped
 
 Test cases:
@@ -58,4 +65,4 @@ Test cases:
 
 Seed: 42
 
-============================== 1 warning in 1.00s ==============================
+============================= 2 warnings in 1.00s ==============================

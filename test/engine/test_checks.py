@@ -1511,3 +1511,60 @@ def test_iter_chain_cases_includes_referenced_sibling(ctx, response_factory):
 
     chain = list(recorder.iter_chain_cases(case_id=current_get.id, related_case_ids=(sibling_delete.id,)))
     assert [c.id for c in chain] == [parent.id, sibling_delete.id, current_get.id]
+
+
+_RESPONSES_WITH_UNRESOLVABLE_404 = {
+    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}},
+    "404": {
+        "description": "Not Found",
+        "content": {"*/*": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("status_code", "content", "raises"),
+    [(404, b'{"detail": "nope"}', False), (200, b"[]", True)],
+    ids=["unresolvable-is-skipped", "sibling-still-validates"],
+)
+def test_response_schema_conformance_with_unresolvable_reference(ctx, response_factory, status_code, content, raises):
+    schema = ctx.openapi.load_schema({"/data": {"get": {"responses": _RESPONSES_WITH_UNRESOLVABLE_404}}})
+    case = _data_case(schema)
+    response = Response.from_requests(response_factory.requests(status_code=status_code, content=content), True)
+
+    if raises:
+        with pytest.raises(JsonSchemaError):
+            response_schema_conformance(CTX, response, case)
+    else:
+        assert response_schema_conformance(CTX, response, case) is None
+
+
+@pytest.mark.parametrize(("value", "is_valid"), [("42", True), ("not-an-integer", False)])
+def test_response_headers_conformance_skips_unresolvable_reference(ctx, response_factory, value, is_valid):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "headers": {
+                                "X-Total": {"schema": {"$ref": "#/components/schemas/Missing"}},
+                                "X-Limit": {"schema": {"type": "integer"}},
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    case = _data_case(schema)
+    response = Response.from_requests(
+        response_factory.requests(headers={"X-Total": "anything", "X-Limit": value}), True
+    )
+
+    if is_valid:
+        assert response_headers_conformance(CTX, response, case) is None
+    else:
+        with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
+            response_headers_conformance(CTX, response, case)

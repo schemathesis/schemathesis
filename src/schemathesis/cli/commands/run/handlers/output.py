@@ -1201,8 +1201,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 title="Unresolvable references",
                 warnings=ctx.warnings.unresolvable_reference,
                 entity_name="operation",
-                suffix_text=" skipped optional parameters",
-                tips=["💡 Define the missing components in the schema so these parameters get tested"],
+                suffix_text=" skipped parts of the schema",
+                tips=["💡 Resolve these references so the skipped parts get tested"],
             )
 
         if ctx.warnings.constants_extraction:
@@ -1354,7 +1354,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 len(ctx.warnings.unresolvable_reference),
                 "Unresolvable references",
                 "operation",
-                "had optional parameters skipped",
+                "had parts of the schema skipped",
             ),
         )
         for count, title, entity_name, suffix_text in entries:

@@ -216,6 +216,8 @@ class OpenAPIAnalysis:
     def _collect_warnings(self) -> Mapping[str, Sequence[SchemaWarning]]:
         """Collect operation-level warnings."""
         warnings_map: dict[str, list[SchemaWarning]] = defaultdict(list)
+        # Reference targets are shared between operations, so their verdicts are computed once.
+        reference_memo: dict[str, str | None] = {}
         for result in self.schema.get_all_operations():
             if isinstance(result, Ok):
                 operation = result.ok()
@@ -223,7 +225,7 @@ class OpenAPIAnalysis:
                     warnings_map[operation.label].append(warning)
                 for regex_warning in detect_unsupported_regex(operation):
                     warnings_map[operation.label].append(regex_warning)
-                for reference_warning in detect_unresolvable_references(operation):
+                for reference_warning in detect_unresolvable_references(operation, reference_memo):
                     warnings_map[operation.label].append(reference_warning)
         return warnings_map
 

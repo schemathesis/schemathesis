@@ -196,22 +196,25 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
 
     for name, header in headers.items():
         values = response.headers.get(name.lower())
-        if values is not None:
-            value = values[0]
-            coerced = _coerce_header_value(value, header.schema)
-            for exc in header.validator.iter_errors(coerced):
-                errors.append(
-                    JsonSchemaError.from_exception(
-                        title="Response header does not conform to the schema",
-                        operation=case.operation.label,
-                        exc=exc,
-                        root_schema=header.schema,
-                        config=case.operation.schema.config.output,
-                        name_to_uri=header.name_to_uri,
-                    )
+        if values is None:
+            if header.is_required:
+                missing_headers.append(name)
+            continue
+        # A header whose schema names a missing component has nothing to validate against.
+        if header.unresolvable_reference is not None:
+            continue
+        coerced = _coerce_header_value(values[0], header.schema)
+        for exc in header.validator.iter_errors(coerced):
+            errors.append(
+                JsonSchemaError.from_exception(
+                    title="Response header does not conform to the schema",
+                    operation=case.operation.label,
+                    exc=exc,
+                    root_schema=header.schema,
+                    config=case.operation.schema.config.output,
+                    name_to_uri=header.name_to_uri,
                 )
-        elif header.is_required:
-            missing_headers.append(name)
+            )
 
     if missing_headers:
         formatted_headers = [f"\n- `{header}`" for header in missing_headers]

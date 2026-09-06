@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 import jsonschema_rs
 
 from schemathesis.core import NOT_SET, NotSet, media_types
-from schemathesis.core.errors import InvalidSchema, MalformedMediaType, RefResolutionError
+from schemathesis.core.errors import MalformedMediaType, RefResolutionError, unresolvable_reference
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.resolver import Resolver
@@ -32,6 +32,9 @@ class ResolvedSchema:
     schema: JsonSchema | None
     media_type: str | None
     name_to_uri: dict[str, str]
+    # Set when the response documents a schema that names a component the document does not define.
+    # `schema` is `None` either way, but this tells "unvalidatable" apart from "nothing documented".
+    unresolvable_reference: str | None = None
 
 
 @dataclass(slots=True)
@@ -41,6 +44,7 @@ class CachedValidation:
     schema: JsonSchema | None
     validator: jsonschema_rs.Validator | None
     name_to_uri: dict[str, str]
+    unresolvable_reference: str | None = None
 
 
 @dataclass
@@ -87,19 +91,32 @@ class OpenApiResponse:
         cache_key = self._get_cache_key(resolved_media_type)
 
         if cache_key not in self._validation_cache:
-            bundled = self.adapter.extract_schema_for_media_type(
-                self.definition, resolved_media_type, self.resolver, self.scope, self.adapter.nullable_keyword
-            )
-            # Create cache entry with schema but no validator yet (lazy validator creation)
-            if bundled is not None:
+            try:
+                bundled = self.adapter.extract_schema_for_media_type(
+                    self.definition, resolved_media_type, self.resolver, self.scope, self.adapter.nullable_keyword
+                )
+            except RefResolutionError as exc:
+                # A schema we cannot assemble leaves the response unvalidatable - the rest of the
+                # operation, including its other responses, is unaffected.
                 self._validation_cache[cache_key] = CachedValidation(
-                    schema=bundled.schema, validator=None, name_to_uri=bundled.name_to_uri
+                    schema=None, validator=None, name_to_uri={}, unresolvable_reference=unresolvable_reference(exc)
                 )
             else:
-                self._validation_cache[cache_key] = CachedValidation(schema=None, validator=None, name_to_uri={})
+                # Create cache entry with schema but no validator yet (lazy validator creation)
+                if bundled is not None:
+                    self._validation_cache[cache_key] = CachedValidation(
+                        schema=bundled.schema, validator=None, name_to_uri=bundled.name_to_uri
+                    )
+                else:
+                    self._validation_cache[cache_key] = CachedValidation(schema=None, validator=None, name_to_uri={})
 
         cached = self._validation_cache[cache_key]
-        return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type, name_to_uri=cached.name_to_uri)
+        return ResolvedSchema(
+            schema=cached.schema,
+            media_type=resolved_media_type,
+            name_to_uri=cached.name_to_uri,
+            unresolvable_reference=cached.unresolvable_reference,
+        )
 
     def _build_validator(self, schema: JsonSchema, validate_formats: bool) -> jsonschema_rs.Validator:
         return self.adapter.jsonschema_validator_cls(
@@ -132,6 +149,21 @@ class OpenApiResponse:
 
         self._sse_validator = _SseValidator(schema, self.adapter.jsonschema_validator_cls)
         return self._sse_validator
+
+    def iter_documented_schemas(self) -> Iterator[JsonSchema]:
+        """Every schema this response documents, as written and one per media type."""
+        content = self.definition.get("content")
+        if not isinstance(content, dict) or not content:
+            raw = self.get_raw_schema()
+            if raw is not None:
+                yield raw
+            return
+        for media_type, media_type_object in content.items():
+            if not isinstance(media_type_object, dict):
+                continue
+            schema = _media_type_schema(media_type, media_type_object)
+            if schema is not None:
+                yield schema
 
     def get_raw_schema(self) -> JsonSchema | None:
         """Raw and unresolved response schema.
@@ -318,10 +350,8 @@ def _prepare_schema(
     upgrade_legacy_exclusive_bounds: bool = False,
     merge_ref_siblings: bool = False,
 ) -> Bundle:
-    try:
-        bundled = bundle(schema, resolver)
-    except RefResolutionError as exc:
-        raise InvalidSchema.from_reference_resolution_error(exc, None, None) from None
+    # `RefResolutionError` propagates: callers decide what an unassemblable response schema means.
+    bundled = bundle(schema, resolver)
     # Do not clone the schema, as bundling already does it
     converted = to_json_schema(
         bundled.schema,
@@ -446,11 +476,7 @@ def extract_schema_for_media_type_v3(
     if not isinstance(media_type_object, dict):
         return None
 
-    if _is_sse_media_type(media_type):
-        item_schema = media_type_object.get("itemSchema")
-        schema = item_schema if item_schema is not None else media_type_object.get("schema")
-    else:
-        schema = media_type_object.get("schema")
+    schema = _media_type_schema(media_type, media_type_object)
     if schema is None:
         return None
 
@@ -462,6 +488,14 @@ def extract_schema_for_media_type_v3(
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
         merge_ref_siblings=merge_ref_siblings,
     )
+
+
+def _media_type_schema(media_type: str, media_type_object: Mapping[str, Any]) -> JsonSchema | None:
+    """The schema a media type entry documents, taking `itemSchema` for event streams."""
+    if _is_sse_media_type(media_type):
+        item_schema = media_type_object.get("itemSchema")
+        return item_schema if item_schema is not None else media_type_object.get("schema")
+    return media_type_object.get("schema")
 
 
 def _is_sse_media_type(value: str) -> bool:
@@ -494,11 +528,21 @@ class OpenApiResponseHeader:
     scope: str
     adapter: ResponseAdapter
 
-    __slots__ = ("name", "definition", "resolver", "scope", "adapter", "_bundle", "_validator")
+    __slots__ = ("name", "definition", "resolver", "scope", "adapter", "_bundle", "_validator", "_unresolvable")
 
     def __post_init__(self) -> None:
         self._bundle: Bundle | NotSet = NOT_SET
         self._validator: jsonschema_rs.Validator | NotSet = NOT_SET
+        self._unresolvable: str | None = None
+
+    @classmethod
+    def unvalidatable(
+        cls, name: str, resolver: Resolver, scope: str, adapter: ResponseAdapter, reference: str
+    ) -> OpenApiResponseHeader:
+        """A header whose own definition names a component the document does not define."""
+        instance = cls(name=name, definition={}, resolver=resolver, scope=scope, adapter=adapter)
+        instance._unresolvable = reference
+        return instance
 
     @property
     def is_required(self) -> bool:
@@ -507,9 +551,13 @@ class OpenApiResponseHeader:
     def _get_bundle(self) -> Bundle:
         """Get the bundled schema for this header."""
         if self._bundle is NOT_SET:
-            self._bundle = self.adapter.extract_header_schema(
-                self.definition, self.resolver, self.scope, self.adapter.nullable_keyword
-            )
+            try:
+                self._bundle = self.adapter.extract_header_schema(
+                    self.definition, self.resolver, self.scope, self.adapter.nullable_keyword
+                )
+            except RefResolutionError as exc:
+                self._unresolvable = unresolvable_reference(exc)
+                self._bundle = Bundle(schema={}, name_to_uri={})
         assert not isinstance(self._bundle, NotSet)
         return self._bundle
 
@@ -517,6 +565,12 @@ class OpenApiResponseHeader:
     def schema(self) -> JsonSchema:
         """The header schema extracted from its definition."""
         return self._get_bundle().schema
+
+    @property
+    def unresolvable_reference(self) -> str | None:
+        """The reference that leaves this header unvalidatable, if its schema names a missing component."""
+        self._get_bundle()
+        return self._unresolvable
 
     @property
     def name_to_uri(self) -> dict[str, str]:
@@ -542,7 +596,15 @@ def _iter_resolved_headers(
 ) -> Iterator[tuple[str, OpenApiResponseHeader]]:
     """Iterate and resolve header definitions."""
     for name, header in definition.items():
-        header_resolver, resolved = maybe_resolve_with_resolver(header, resolver)
+        try:
+            header_resolver, resolved = maybe_resolve_with_resolver(header, resolver)
+        except RefResolutionError as exc:
+            # The header definition itself is missing, so there is nothing left to validate against.
+            yield (
+                name,
+                OpenApiResponseHeader.unvalidatable(name, resolver, scope, adapter, unresolvable_reference(exc)),
+            )
+            continue
         new_scope = header_resolver.base_uri
         yield (
             name,

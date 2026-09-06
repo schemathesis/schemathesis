@@ -476,6 +476,12 @@ class RefResolutionError(SchemathesisError):
     """A reference the resolver could not follow."""
 
 
+def unresolvable_reference(error: RefResolutionError) -> str:
+    """The reference the resolver could not follow, as written in the schema."""
+    notes = getattr(error, "__notes__", None)
+    return str(notes[0]) if notes else str(error)
+
+
 class UnresolvableReference(SchemathesisError):
     """A reference cannot be resolved."""
 

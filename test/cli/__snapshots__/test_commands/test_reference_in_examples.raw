@@ -42,12 +42,12 @@ Reproduce with:
 
 =================================== WARNINGS ===================================
 
-Unresolvable references: 1 operation skipped optional parameters
+Unresolvable references: 1 operation skipped parts of the schema
 
   - POST /test
     `header` parameter `xa` - unresolvable reference `t`
 
-💡 Define the missing components in the schema so these parameters get tested
+💡 Resolve these references so the skipped parts get tested
 
 =================================== SUMMARY ====================================
 
@@ -65,7 +65,7 @@ Failures:
   ❌ Undocumented HTTP status code: 1
 
 Warnings:
-  ⚠️ Unresolvable references: 1 operation had optional parameters skipped
+  ⚠️ Unresolvable references: 1 operation had parts of the schema skipped
 
 Test cases:
   N generated, N found N unique failures
