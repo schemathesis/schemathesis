@@ -35,6 +35,7 @@
 - Omit optional query parameters generated as `null` from the request.
 - False positive `ignored_auth` for APIs that reject unauthenticated requests with 403.
 - Merge `authTemplate` into each entry when loading WFC auth files.
+- False positive `negative_data_rejection` for example header and cookie values.
 - Select the first WFC auth entry when no `user` is configured, as documented.
 - Retry token fetches after a cooldown instead of disabling auth for the whole run.
 - Accept WFC login endpoints that specify neither `token` nor `expectCookies`, using the returned cookies.

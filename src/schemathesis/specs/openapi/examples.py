@@ -158,6 +158,15 @@ def _build_location_schema(
     return schema
 
 
+# Parameter locations `serialize_components` rewrites into their wire form.
+_RENDERED_LOCATIONS = (
+    ParameterLocation.PATH,
+    ParameterLocation.QUERY,
+    ParameterLocation.HEADER,
+    ParameterLocation.COOKIE,
+)
+
+
 def get_strategies_from_examples(
     operation: OpenApiOperation,
     extra_data_source: OpenApiExtraDataSource | None = None,
@@ -183,8 +192,8 @@ def get_strategies_from_examples(
         if case._meta is not None:
             # Rendering a value for the wire does not change the data that was generated, and
             # re-checking the rendered form against the typed schema would call the example negative.
-            case._meta.clear_dirty(ParameterLocation.QUERY)
-            case._meta.clear_dirty(ParameterLocation.PATH)
+            for location in _RENDERED_LOCATIONS:
+                case._meta.clear_dirty(location)
         return case
 
     # Extract all top-level examples from the `examples` & `example` fields (`x-` prefixed versions in Open API 2)

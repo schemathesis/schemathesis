@@ -1226,6 +1226,40 @@ def test_example_case_with_generated_query_stays_positive(ctx):
     )
 
 
+@pytest.mark.parametrize(
+    ("location", "example_name", "generated_name"),
+    [("header", "X-Flag", "X-Note"), ("cookie", "flag", "note")],
+    ids=["header", "cookie"],
+)
+def test_example_case_with_generated_header_or_cookie_stays_positive(ctx, location, example_name, generated_name):
+    # Headers and cookies are stringified for the wire; that rendering must not read back as a violation.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": example_name,
+                            "in": location,
+                            "required": True,
+                            "schema": {"type": "boolean"},
+                            "example": True,
+                        },
+                        {"name": generated_name, "in": location, "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/test"]["GET"]
+
+    assert (
+        examples.generate_one(operation.get_strategies_from_examples()[0]).meta.generation.mode
+        == GenerationMode.POSITIVE
+    )
+
+
 def test_example_body_keeps_json_types(ctx):
     schema = ctx.openapi.load_schema(
         {
