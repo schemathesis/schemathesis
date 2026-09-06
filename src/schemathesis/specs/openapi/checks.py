@@ -1205,6 +1205,11 @@ class AuthKind(str, enum.Enum):
     GENERATED = "generated"
 
 
+# Statuses that mean the API refused an unauthenticated or badly authenticated request. Frameworks whose
+# first authentication scheme offers no challenge answer 403 instead of 401, and gateways do the same.
+AUTH_ENFORCED_STATUSES = frozenset({401, 403})
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -1229,7 +1234,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             ctx._record_case(parent_id=case.id, case=no_auth_case)
             no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
             ctx._record_response(case_id=no_auth_case.id, response=no_auth_response)
-            if no_auth_response.status_code != 401:
+            if no_auth_response.status_code not in AUTH_ENFORCED_STATUSES:
                 _raise_no_auth_error(no_auth_response, no_auth_case, AuthScenario.NO_AUTH)
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
@@ -1238,7 +1243,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                 ctx._record_case(parent_id=case.id, case=invalid_auth_case)
                 invalid_auth_response = case.operation.schema.transport.send(invalid_auth_case, **kwargs)
                 ctx._record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
-                if invalid_auth_response.status_code != 401:
+                if invalid_auth_response.status_code not in AUTH_ENFORCED_STATUSES:
                     _raise_no_auth_error(invalid_auth_response, invalid_auth_case, AuthScenario.INVALID_AUTH)
         elif auth == AuthKind.GENERATED:
             # If this auth is generated which means it is likely invalid, then
@@ -1252,18 +1257,23 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
 
 def _raise_no_auth_error(response: Response, case: Case, auth: AuthScenario) -> NoReturn:
     reason = http.client.responses.get(response.status_code, "Unknown")
+    accepted = 200 <= response.status_code < 300
 
     if auth == AuthScenario.NO_AUTH:
-        title = "API accepts requests without authentication"
+        title = (
+            "API accepts requests without authentication"
+            if accepted
+            else "Unexpected response to a request without authentication"
+        )
         detail = None
     elif auth == AuthScenario.INVALID_AUTH:
-        title = "API accepts invalid authentication"
+        title = "API accepts invalid authentication" if accepted else "Unexpected response to invalid authentication"
         detail = "invalid credentials provided"
     else:
         title = "API accepts invalid authentication"
         detail = "generated auth likely invalid"
 
-    message = f"Expected 401, got `{response.status_code} {reason}` for `{case.operation.label}`"
+    message = f"Expected 401 or 403, got `{response.status_code} {reason}` for `{case.operation.label}`"
     if detail is not None:
         message = f"{message} ({detail})"
 

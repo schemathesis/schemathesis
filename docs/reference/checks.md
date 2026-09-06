@@ -298,10 +298,12 @@ The API returned `404 Not Found` for a resource that was just created.
 
 Verifies authentication is properly enforced. When an operation declares authentication, Schemathesis tests whether the API accepts requests without credentials or with invalid credentials.
 
+Either `401` or `403` counts as enforcement.
+
 ```text
 - API accepts requests without authentication
 
-Expected 401, got `200 OK` for `GET /protected-resource`
+Expected 401 or 403, got `200 OK` for `GET /protected-resource`
 ```
 
 !!! warning "Additional requests"

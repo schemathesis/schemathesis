@@ -335,6 +335,42 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth, expected):
     assert str(exc.value.exceptions[0]).startswith(expected)
 
 
+# Frameworks whose first authentication scheme offers no challenge answer 403 instead of 401.
+def test_forbidden_response_counts_as_enforced_auth():
+    app = FastAPI()
+    api_key = APIKeyHeader(name="Authorization", auto_error=False)
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
+    def root(credentials: Annotated[str | None, Security(api_key)]):
+        if credentials != "Basic dGVzdDp0ZXN0":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        return {"message": "OK"}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    schema["/"]["GET"].Case().call_and_validate(session=ASGIClient(app), auth=("test", "test"), checks=[ignored_auth])
+
+
+def test_server_error_without_auth_is_reported():
+    app = FastAPI()
+    api_key = APIKeyHeader(name="Authorization", auto_error=False)
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
+    def root(credentials: Annotated[str | None, Security(api_key)]):
+        if credentials != "Basic dGVzdDp0ZXN0":
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return {"message": "OK"}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    with pytest.raises(FailureGroup) as exc:
+        schema["/"]["GET"].Case().call_and_validate(
+            session=ASGIClient(app), auth=("test", "test"), checks=[ignored_auth]
+        )
+    assert str(exc.value.exceptions[0]) == (
+        "Unexpected response to a request without authentication\n\n"
+        "Expected 401 or 403, got `500 Internal Server Error` for `GET /`"
+    )
+
+
 def test_explicit_auth_cli(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.basic()
     assert (

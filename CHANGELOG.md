@@ -27,6 +27,7 @@
 
 - Crash on repeat runs when an operation's request body declares several media types.
 - Omit optional query parameters generated as `null` from the request.
+- False positive `ignored_auth` for APIs that reject unauthenticated requests with 403.
 - Merge `authTemplate` into each entry when loading WFC auth files.
 - Select the first WFC auth entry when no `user` is configured, as documented.
 - Accept WFC login endpoints that specify neither `token` nor `expectCookies`, using the returned cookies.
