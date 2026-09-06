@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from schemathesis.core import Body, NotSet
+from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
@@ -30,6 +30,11 @@ if TYPE_CHECKING:
     import werkzeug
 
 
+def _is_raw_multipart(media_type: str, payload: object) -> bool:
+    """Whether a multipart payload is passed through as-is instead of being encoded into form parts."""
+    return media_types.parse(media_type)[0] == "multipart" and isinstance(payload, (str, bytes))
+
+
 class WSGITransport(BaseTransport["werkzeug.Client"]):
     @override
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
@@ -44,10 +49,6 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         if not isinstance(case.body, NotSet) and media_type is not None:
             media_type, serializer = self._resolve_serializer(media_type)
 
-        # Set content type for payload
-        if media_type and not isinstance(case.body, NotSet):
-            final_headers["Content-Type"] = media_type
-
         extra: dict[str, Any]
         # Handle serialization
         if serializer is not None:
@@ -55,6 +56,11 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             extra = serializer(context, prepare_body(case))
         else:
             extra = {}
+
+        # Set content type for payload. A raw multipart payload is sent verbatim and carries no
+        # boundary, so declaring it as multipart would make it unparsable for the application.
+        if media_type and not isinstance(case.body, NotSet) and not _is_raw_multipart(media_type, extra.get("data")):
+            final_headers["Content-Type"] = media_type
 
         query_string: dict[str, Any] | str | None = case.query
         if isinstance(query_string, dict):

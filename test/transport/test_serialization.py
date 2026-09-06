@@ -8,6 +8,7 @@ from io import StringIO
 from xml.etree import ElementTree
 
 import pytest
+from flask import jsonify, request
 from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
@@ -263,6 +264,56 @@ def test_binary_data(ctx, media_type):
             assert kwargs["headers"]["Content-Type"] == media_type
     # And it is OK to send it over the network
     assert_requests_call(case)
+
+
+def multipart_echo_schema(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {"type": "object", "properties": {"key": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        return jsonify(
+            {
+                "mimetype": request.mimetype,
+                "has_boundary": "boundary=" in (request.headers.get("Content-Type") or ""),
+                "form": dict(request.form),
+                "raw": request.get_data().decode("latin-1"),
+            }
+        )
+
+    return schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+
+def test_wsgi_multipart_form_fields_reach_the_app(ctx):
+    operation = multipart_echo_schema(ctx)["/upload"]["POST"]
+    received = operation.Case(body={"key": "value"}, media_type="multipart/form-data").call().json()
+    # The raw body carries a randomly generated boundary, so only the parsed view is comparable.
+    assert (received["mimetype"], received["has_boundary"], received["form"]) == (
+        "multipart/form-data",
+        True,
+        {"key": "value"},
+    )
+
+
+def test_wsgi_raw_multipart_body_reaches_the_app(ctx):
+    operation = multipart_echo_schema(ctx)["/upload"]["POST"]
+    case = operation.Case(body=b"\x92\x42", media_type="multipart/form-data")
+    assert case.call().json() == {"mimetype": "", "has_boundary": False, "form": {}, "raw": "\x92B"}
 
 
 def test_multipart_nested_object_serializes_as_json(ctx, case_factory):

@@ -45,6 +45,7 @@
 - Read-only property violations in requests reported as a valid value of its type.
 - Skip response schema validation when the received content type is undocumented.
 - Send a concrete `Content-Type` for request bodies declared with a media range like `application/*+json`.
+- Send raw multipart bodies to WSGI applications without an unparsable `Content-Type`.
 - Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.
 - Coverage phase treating `allOf` branches naming `integer` and `number` as unsatisfiable.
 - Coverage phase emitting valid values as `anyOf`/`oneOf` violations for branches with `$ref` siblings.
