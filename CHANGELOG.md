@@ -29,66 +29,89 @@
 
 ### :bug: Fixed
 
-- Generate test cases for schemas with `not` over `patternProperties`.
-- False negative `unsupported_method` for 404 responses on paths whose parameters are pinned.
-- Skip optional parameters and required bodies with unresolvable `$ref` instead of rejecting the operation.
-- Skip response schemas whose `$ref` does not resolve instead of rejecting the whole operation.
-- Send example values in query and path as `true` / `false` / `null`, omitting optional nulls.
-- Use a single boundary in the reproduce cURL for multipart request bodies.
-- Report GraphQL scalars with no registered strategy accurately in every generation mode.
+#### ASGI applications
+
+- Incompatibility with `anyio` 4.15.
+- `HEAD` operations failing with an internal `AttributeError`.
+- Applications that do not implement the lifespan protocol failing with a `TypeError`.
+- Applications that reject the lifespan scope, such as Django, failing with a `ValueError`.
+- Requests served after the application reports a failed startup.
+- Lifespan failures after startup or after shutdown completes going unreported.
+- Lifespan not started while fetching the schema.
+- IPv6 and userinfo base URLs rejected.
+- `session` passed to `case.call()` ignored.
+- Request timeouts ignored, leaving a hung handler unbounded.
+- Django's `ALLOWED_HOSTS` rejection reported without an explanation.
+
+#### WSGI applications
+
+- Raw multipart bodies sent with an unparsable `Content-Type`.
+- Binary form properties not sent as file parts.
+- `multipart/mixed` request bodies sent as an empty payload.
+
+#### WFC authentication
+
+- `authTemplate` not merged into each entry when loading auth files.
+- The first entry not selected when no `user` is configured, as documented.
+- Token fetch failures disabling auth for the whole run instead of retrying after a cooldown.
+- Login endpoints that specify neither `token` nor `expectCookies` rejected, ignoring the returned cookies.
+- Login endpoints that redirect after sign-in rejected, ignoring the cookies they set.
+
+#### Data generation
+
+- No test cases generated for schemas with `not` over `patternProperties`.
+- No values generated for strings that several `pattern`s must match at once.
+- Generation failing for an OpenAPI 3.0 `pattern` that names a capture group.
+- Empty strings generated for query parameters declaring `allowEmptyValue: false`. [#4574](https://github.com/schemathesis/schemathesis/issues/4574)
+- Boolean and null example values in query and path sent as Python literals, and optional nulls sent instead of omitted.
+- Delimited query and path array items sent as Python literals instead of `true` / `false` / `null`.
+- Optional query parameters generated as `null` sent instead of omitted.
+- OpenAPI 3.1 `contentMediaType: application/octet-stream` form fields not sent as file uploads.
+- Request bodies declared with a media range like `application/*+json` sent without a concrete `Content-Type`.
 - Crash on repeat runs when an operation's request body declares several media types.
-- Omit optional query parameters generated as `null` from the request.
-- False positive `ignored_auth` for APIs that reject unauthenticated requests with 403.
-- Merge `authTemplate` into each entry when loading WFC auth files.
-- False positive `negative_data_rejection` for example header and cookie values.
-- Select the first WFC auth entry when no `user` is configured, as documented.
-- Retry token fetches after a cooldown instead of disabling auth for the whole run.
-- Accept WFC login endpoints that specify neither `token` nor `expectCookies`, using the returned cookies.
-- Accept WFC login endpoints that redirect after sign-in, using the cookies they set.
-- ASGI application support failing with `anyio` 4.15.
-- False positive `negative_data_rejection` for GraphQL when captured identifiers replaced the violating argument.
-- False positive `negative_data_rejection` for GraphQL arguments that declare a default value.
-- `HEAD` operations against ASGI applications failing with an internal `AttributeError`.
-- ASGI applications that do not implement the lifespan protocol failing with a `TypeError`.
-- ASGI applications that reject the lifespan scope, such as Django, failing with a `ValueError`.
-- ASGI applications serving requests after reporting a failed startup.
-- ASGI lifespan failures after startup or after shutdown completes going unreported.
-- IPv6 and userinfo base URLs rejected for ASGI applications.
-- `session` passed to `case.call()` ignored for ASGI applications.
-- Send delimited query and path array items as `true` / `false` / `null`.
-- Request timeouts ignored for ASGI applications, leaving a hung handler unbounded.
-- ASGI lifespan not started while fetching the schema.
+- GraphQL scalars with no registered strategy misreported in some generation modes.
+
+#### Coverage phase
+
+- Emitting objects for `allOf` requiring a property no branch combination admits.
+- Treating `allOf` branches naming `integer` and `number` as unsatisfiable.
+- Emitting valid values as `anyOf`/`oneOf` violations for branches with `$ref` siblings.
+- Emitting valid values as `items` violations for arrays declaring `prefixItems`.
+- Ignoring `prefixItems` when building array cases for OpenAPI 3.1 operations.
+- Dropping a required name `properties` does not declare from generated array items.
+- Emitting properties whose names `propertyNames` rejects.
+- Emitting a `multipleOf` value outside the float bound `minimum` and `maximum` pin.
+- Emitting a single-item array that exceeds `maxContains`.
+
+#### Schema handling
+
+- Unresolvable `$ref` in an optional parameter or required body rejecting the operation.
+- Unresolvable `$ref` in a response schema rejecting the operation.
+- `openapi` versions with a suffix, such as `3.1.0-custom`, rejected.
+- Non-object vendor extension values inside `responses`, such as `x-note: null`, rejected.
+
+#### False positives
+
+- `ignored_auth` for APIs that reject unauthenticated requests with 403.
+- `negative_data_rejection` for example header and cookie values.
+- `negative_data_rejection` for GraphQL when captured identifiers replaced the violating argument.
+- `negative_data_rejection` for GraphQL arguments that declare a default value.
+- `negative_data_rejection` for non-numeric query and path parameters whose serialized value is valid. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
+- `unsupported_method` when a secured operation answers 401 or 403 before routing.
+
+#### Others
+
+- False negative `unsupported_method` for 404 responses on paths whose parameters are pinned.
+- Detect `ignored_auth` bypasses in APIs that accept any well-formed bearer or basic credentials.
+- Send requests without credentials when `security` accepts unauthenticated access via `{}`.
+- Response schemas validated against undocumented content types.
 - Write-only property violations in responses reported as `{} is not allowed`.
 - Read-only property violations in requests reported as a valid value of its type.
-- Accept `openapi` versions with a suffix, such as `3.1.0-custom`.
-- Skip response schema validation when the received content type is undocumented.
-- Send a concrete `Content-Type` for request bodies declared with a media range like `application/*+json`.
-- Send raw multipart bodies to WSGI applications without an unparsable `Content-Type`.
-- No values generated for strings that several `pattern`s must match at once.
-- Suppress the `positive_data_acceptance` extra-properties hint when the server rejects a declared field.
-- Coverage phase emitting objects for `allOf` requiring a property no branch combination admits.
-- Coverage phase treating `allOf` branches naming `integer` and `number` as unsatisfiable.
-- Coverage phase emitting valid values as `anyOf`/`oneOf` violations for branches with `$ref` siblings.
-- Coverage phase ignoring `prefixItems` when building array cases for OpenAPI 3.1 operations.
-- Coverage phase dropping a required name `properties` does not declare from generated array items.
-- Generation failing for an OpenAPI 3.0 `pattern` that names a capture group.
-- Accept non-object vendor extension values inside `responses`, such as `x-note: null`.
-- Run at least one scenario when `st fuzz` startup outlasts `--max-time`.
-- Empty strings generated for query parameters declaring `allowEmptyValue: false`. [#4574](https://github.com/schemathesis/schemathesis/issues/4574)
-- Coverage phase emitting valid values as `items` violations for arrays declaring `prefixItems`.
-- Coverage phase emitting properties whose names `propertyNames` rejects.
-- Coverage phase emitting a `multipleOf` value outside the float bound `minimum` and `maximum` pin.
-- Coverage phase emitting a single-item array that exceeds `maxContains`.
-- Send OpenAPI 3.1 `contentMediaType: application/octet-stream` form fields as file uploads.
-- False positive `negative_data_rejection` for non-numeric query and path parameters whose serialized value is valid. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
 - `negative_data_rejection` message omitting parameter names when several parameters are mutated. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
-- Explain Django's `ALLOWED_HOSTS` rejection when loading a schema from an in-process app.
+- `positive_data_acceptance` extra-properties hint shown when the server rejects a declared field.
 - Stateful phase crashing when two links produce the same transition name.
-- Detect `ignored_auth` bypasses in APIs that accept any well-formed bearer or basic credentials.
-- Send binary form properties as file parts when testing WSGI applications.
-- Send the body of `multipart/mixed` requests to WSGI applications instead of an empty payload.
-- False positive `unsupported_method` when a secured operation answers 401 or 403 before routing.
-- Send requests without credentials when `security` accepts unauthenticated access via `{}`.
+- Several boundaries used in the reproduce cURL for multipart request bodies.
+- Zero scenarios run when `st fuzz` startup outlasts `--max-time`.
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 
