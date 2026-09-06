@@ -37,6 +37,7 @@
 - Accept WFC login endpoints that redirect after sign-in, using the cookies they set.
 - ASGI application support failing with `anyio` 4.15.
 - False positive `negative_data_rejection` for GraphQL when captured identifiers replaced the violating argument.
+- False positive `negative_data_rejection` for GraphQL arguments that declare a default value.
 - `HEAD` operations against ASGI applications failing with an internal `AttributeError`.
 - ASGI applications that do not implement the lifespan protocol failing with a `TypeError`.
 - ASGI applications serving requests after reporting a failed startup.
