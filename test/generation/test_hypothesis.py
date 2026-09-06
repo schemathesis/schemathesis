@@ -2164,6 +2164,15 @@ CANONICAL_CASES = [
         {"not": {"type": "object", "propertyNames": {"pattern": "^a"}}},
         (lambda value: isinstance(value, dict) and any(not key.startswith("a") for key in value),),
     ),
+    (
+        {"not": {"type": "object", "patternProperties": {"^a": {"type": "integer"}}}},
+        (
+            lambda value: (
+                isinstance(value, dict)
+                and any(key.startswith("a") and isinstance(item, str) for key, item in value.items())
+            ),
+        ),
+    ),
 ]
 # NOT `ids=str`: pytest applies an `ids` callable per parameter, so a predicate tuple stringifies with
 # a memory address and `pytest -n auto` aborts with "Different tests were collected between gw0 and

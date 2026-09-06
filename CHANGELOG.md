@@ -29,6 +29,7 @@
 
 ### :bug: Fixed
 
+- Generate test cases for schemas with `not` over `patternProperties`.
 - False negative `unsupported_method` for 404 responses on paths whose parameters are pinned.
 - Skip optional parameters and required bodies with unresolvable `$ref` instead of rejecting the operation.
 - Skip response schemas whose `$ref` does not resolve instead of rejecting the whole operation.
