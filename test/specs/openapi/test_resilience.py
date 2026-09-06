@@ -167,7 +167,7 @@ def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
     ]
 
 
-@pytest.mark.parametrize("reference", ["missing.json", "mis\x00sing.json"], ids=["missing_file", "null_byte"])
+@pytest.mark.parametrize("reference", ["missing.json", "missing\x00.json"], ids=["missing_file", "null_byte"])
 def test_parameter_ref_that_names_no_file_v3(ctx, reference):
     # A reference is arbitrary text, and text with a null byte in it reaches the filesystem as a path.
     schema = ctx.openapi.load_schema(
