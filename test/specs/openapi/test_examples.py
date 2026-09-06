@@ -281,8 +281,8 @@ def test_examples_phase_keeps_examples_when_schema_too_malformed_to_validate(ctx
 
 
 def test_examples_phase_skips_properties_it_cannot_generate(ctx):
-    # Barring a keyed shape has no form to draw from, so that property contributes nothing.
-    undrawable = {"not": {"type": "object", "patternProperties": {"^a": {"type": "string"}}}}
+    # Barring the whole document has no form to draw from, so that property contributes nothing.
+    undrawable = {"not": {"$ref": "#"}}
     operation = ctx.openapi.load_schema(
         {
             "/r": {
