@@ -53,6 +53,7 @@ if TYPE_CHECKING:
 class Template:
     __slots__ = (
         "_components",
+        "_optional_query",
         "_serializers",
         "_template",
         "body_is_fallback_negative",
@@ -62,10 +63,11 @@ class Template:
         "unsatisfiable_required_parameter",
     )
 
-    def __init__(self, serializers: dict[str, Callable]) -> None:
+    def __init__(self, serializers: dict[str, Callable], optional_query: frozenset[str]) -> None:
         self._components: dict[ParameterLocation, ComponentInfo] = {}
         self._template: dict[str, Any] = {}
         self._serializers = serializers
+        self._optional_query = optional_query
         # A required body that never produced a value, or a required parameter without a positive
         # value, leaves no valid positive request; a fallback-negative body forbids stacking a
         # second negative on top.
@@ -107,7 +109,7 @@ class Template:
         self._template["media_type"] = media_type
         self._components[ParameterLocation.BODY] = ComponentInfo(mode=body.generation_mode)
 
-    def _serialize(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+    def _serialize(self, kwargs: dict[str, Any], components: dict[ParameterLocation, ComponentInfo]) -> dict[str, Any]:
         output = {}
         for container_name, value in kwargs.items():
             serializer = self._serializers.get(container_name)
@@ -120,6 +122,15 @@ class Template:
                     value = dict(value)
                 value = serializer(value)
             if container_name == "query" and isinstance(value, dict):
+                query_component = components.get(ParameterLocation.QUERY)
+                if query_component is None or query_component.mode == GenerationMode.POSITIVE:
+                    # Query strings have no rendering for a JSON null; leaving an optional parameter out is what
+                    # "no value" means there. Negative data keeps `null`, since sending it is the point of the case.
+                    value = {
+                        name: item
+                        for name, item in value.items()
+                        if item is not None or name not in self._optional_query
+                    }
                 value = _stringify_value(value, container_name)
             if container_name == "path_parameters" and isinstance(value, dict):
                 # dict() copy prevents quote_all from mutating self._template
@@ -129,13 +140,14 @@ class Template:
 
     def unmodified(self) -> TemplateValue:
         raw = deepclone(self._template)
-        kwargs = self._serialize(raw)
-        return TemplateValue(kwargs=kwargs, raw=raw, components=self._components.copy())
+        components = self._components.copy()
+        kwargs = self._serialize(raw, components)
+        return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
     def with_body(self, *, media_type: str, value: GeneratedValue) -> TemplateValue:
         raw = {**self._template, "media_type": media_type, "body": value.value}
-        kwargs = self._serialize(raw)
         components = {**self._components, ParameterLocation.BODY: ComponentInfo(mode=value.generation_mode)}
+        kwargs = self._serialize(raw, components)
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
     def with_parameter(self, *, location: ParameterLocation, name: str, value: GeneratedValue) -> TemplateValue:
@@ -151,7 +163,7 @@ class Template:
     ) -> TemplateValue:
         raw = {**self._template, location.container_name: value}
         components = {**self._components, location: ComponentInfo(mode=generation_mode)}
-        kwargs = self._serialize(raw)
+        kwargs = self._serialize(raw, components)
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
 
@@ -1281,7 +1293,10 @@ def iter_coverage_cases(
 ) -> Generator[Case, None, None]:
     generators: dict[tuple[ParameterLocation, str], Generator[GeneratedValue, None, None]] = {}
     serializers = operation.get_parameter_serializers()
-    template = Template(serializers)
+    template = Template(
+        serializers,
+        optional_query=frozenset(parameter.name for parameter in operation.query if not parameter.is_required),
+    )
 
     responses = list(operation.responses.iter_examples())
     custom_formats = operation.schema.get_custom_format_strategies(generation_config, GenerationMode.POSITIVE)

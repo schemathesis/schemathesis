@@ -2124,6 +2124,87 @@ def test_negative_query_parameter(ctx, schema, expected, required):
     assert urls == expected
 
 
+def test_optional_null_query_parameter_is_omitted(ctx):
+    # No mainstream framework reads `?limit=null` as a JSON null; absence is how a query string says "no value".
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {
+                "in": "query",
+                "name": "limit",
+                "required": False,
+                "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+            }
+        ],
+        method="get",
+        version="3.1.0",
+    )["/foo"]["GET"]
+    assert [case.query for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"limit": "0"}, {}]
+
+
+def test_required_null_query_parameter_is_sent(ctx):
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {
+                "in": "query",
+                "name": "limit",
+                "required": True,
+                "schema": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+            }
+        ],
+        method="get",
+        version="3.1.0",
+    )["/foo"]["GET"]
+    assert [case.query for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
+        {"limit": "0"},
+        {"limit": "null"},
+    ]
+
+
+def test_negative_null_query_parameter_is_sent(ctx):
+    operation = load_schema(
+        ctx,
+        parameters=[{"in": "query", "name": "limit", "required": False, "schema": {"type": "integer"}}],
+        method="get",
+        version="3.1.0",
+    )["/foo"]["GET"]
+    assert [case.query for case in iter_cases(operation, GenerationMode.NEGATIVE)] == [
+        {"limit": "true"},
+        {"limit": "null"},
+        {"limit": "AAA"},
+        {"limit": ["null", "null"]},
+    ]
+
+
+def test_null_inside_query_array_is_sent(ctx):
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {
+                "in": "query",
+                "name": "ids",
+                "required": False,
+                "schema": {"type": "array", "items": {"type": "null"}, "minItems": 1, "maxItems": 1},
+            }
+        ],
+        method="get",
+        version="3.1.0",
+    )["/foo"]["GET"]
+    assert [case.query for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"ids": ["null"]}]
+
+
+def test_optional_null_header_is_sent(ctx):
+    # A header carries no "absent value" convention worth guessing at; only the query string gets the omission.
+    operation = load_schema(
+        ctx,
+        parameters=[{"in": "header", "name": "X-Limit", "required": False, "schema": {"type": "null"}}],
+        method="get",
+        version="3.1.0",
+    )["/foo"]["GET"]
+    assert [case.headers for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"X-Limit": "null"}]
+
+
 def test_negative_data_rejection(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     raw_schema = build_schema(

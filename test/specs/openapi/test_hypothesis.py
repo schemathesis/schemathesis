@@ -186,6 +186,124 @@ def test_allow_empty_value_false_excludes_empty_string(ctx):
     test()
 
 
+@pytest.mark.parametrize(
+    "parameter_schema",
+    [{"type": "null"}, {"anyOf": [{"type": "integer"}, {"type": "null"}]}],
+    ids=["null", "anyOf-null"],
+)
+def test_optional_null_query_parameter_is_omitted(ctx, parameter_schema):
+    # No mainstream framework reads `?limit=null` as a JSON null; absence is how a query string says "no value".
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "limit", "required": False, "schema": parameter_schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10)
+    def test(case):
+        assert case.query.get("limit") != "null"
+
+    test()
+
+
+def test_required_null_query_parameter_is_sent(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "limit", "required": True, "schema": {"type": "null"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=5)
+    def test(case):
+        assert case.query == {"limit": "null"}
+
+    test()
+
+
+def test_optional_false_query_parameter_is_sent(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "flag", "required": False, "schema": {"enum": [False]}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10)
+    def test(case):
+        assert case.query in ({}, {"flag": "false"})
+
+    test()
+
+
+def test_null_inside_query_array_is_sent(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "ids",
+                            "required": False,
+                            "schema": {"type": "array", "items": {"type": "null"}, "minItems": 1, "maxItems": 1},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=5)
+    def test(case):
+        assert case.query in ({}, {"ids": ["null"]})
+
+    test()
+
+
+def test_null_path_parameter_is_sent(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data/{key}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "key", "required": True, "schema": {"type": "null"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    @given(schema["/data/{key}"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=5)
+    def test(case):
+        assert case.path_parameters == {"key": "null"}
+
+    test()
+
+
 def test_inlined_definitions(deeply_nested_schema):
     # See GH-1162
     # When not resolved references are present in the schema during constructing a strategy

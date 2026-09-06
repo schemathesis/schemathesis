@@ -4,6 +4,7 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from itertools import chain
 from random import Random
 from typing import TYPE_CHECKING, Any, cast
@@ -2007,6 +2008,7 @@ class OpenApiParameterSet(ParameterSet):
             GENERATOR_MODE_TO_STRATEGY_FACTORY,
             _can_skip_header_filter,
             jsonify_python_specific_types,
+            jsonify_query_parameters,
             make_negative_strategy,
         )
 
@@ -2252,8 +2254,13 @@ class OpenApiParameterSet(ParameterSet):
                         )
                     )
                 else:
+                    optional = frozenset(schema_obj.get("properties") or ()) - frozenset(
+                        schema_obj.get("required") or ()
+                    )
                     strategy = strategy.map(
-                        wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False)
+                        wrap_map_hook_for_generated_value(
+                            partial(jsonify_query_parameters, optional=optional), prune_constants=False
+                        )
                     )
             else:
                 header_filter = is_valid_header
