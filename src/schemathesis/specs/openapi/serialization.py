@@ -420,10 +420,19 @@ def delimited(item: Generated, name: str, delimiter: str) -> None:
 _WIRE_DELIMITERS = {",": ",", "|": "|", " ": "%20", "\t": "%09"}
 
 
+def _wire_item(value: object) -> str:
+    """Render one delimited item as a URL spells it: JSON scalars, not their Python repr."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    return str(value)
+
+
 @conversion
 def delimited_encoded(item: Generated, name: str, delimiter: str) -> None:
     """Join query/path items, percent-encoding each but keeping the delimiter literal and splittable."""
-    values = list(map(str, force_iterable(item[name] if item[name] is not None else ())))
+    values = [_wire_item(value) for value in force_iterable(item[name] if item[name] is not None else ())]
     logical = delimiter.join(values)
     wire = _WIRE_DELIMITERS.get(delimiter, quote(delimiter, safe=""))
     encoded = wire.join(quote(value, safe="") for value in values)

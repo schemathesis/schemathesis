@@ -43,6 +43,7 @@
 - ASGI lifespan failures after startup or after shutdown completes going unreported.
 - IPv6 and userinfo base URLs rejected for ASGI applications.
 - `session` passed to `case.call()` ignored for ASGI applications.
+- Send delimited query and path array items as `true` / `false` / `null`.
 - Request timeouts ignored for ASGI applications, leaving a hung handler unbounded.
 - ASGI lifespan not started while fetching the schema.
 - Write-only property violations in responses reported as `{} is not allowed`.

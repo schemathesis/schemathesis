@@ -9,12 +9,15 @@ from hypothesis import strategies as st
 
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
+from schemathesis.specs.openapi.examples import get_strategies_from_examples
 from schemathesis.specs.openapi.serialization import (
     _schema_has_nested_object_properties,
     comma_delimited_object,
     conversion,
     deep_object,
     delimited,
+    delimited_encoded,
     delimited_nested,
     delimited_object,
     extracted_object,
@@ -730,6 +733,119 @@ def test_array_parameter_keeps_delimiter_literal(ctx, paths, version, operation_
         assert prepared.url == expected_url
 
     test()
+
+
+_WIRE_FORM_ARRAY = [None, True, False, 1, 1.5, "x"]
+
+
+def delimited_query_paths(parameter):
+    return {"/teapot": {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}}
+
+
+def openapi3_delimited_parameter(style):
+    return {
+        "name": "color",
+        "in": "query",
+        "required": True,
+        "style": style,
+        "explode": False,
+        "schema": {"type": "array", "enum": [_WIRE_FORM_ARRAY], "example": _WIRE_FORM_ARRAY},
+    }
+
+
+def swagger2_delimited_parameter(collection_format):
+    return {
+        "name": "color",
+        "in": "query",
+        "required": True,
+        "type": "array",
+        "collectionFormat": collection_format,
+        "items": {},
+        "enum": [_WIRE_FORM_ARRAY],
+        "x-example": _WIRE_FORM_ARRAY,
+    }
+
+
+def prepared_query_string(case):
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
+    return urlsplit(requests.Request("GET", kwargs["url"], params=kwargs["params"]).prepare().url).query
+
+
+def fuzzing_query_strings(operation):
+    found = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        found.add(prepared_query_string(case))
+
+    test()
+    return found
+
+
+def examples_query_strings(operation):
+    found = set()
+    for strategy in get_strategies_from_examples(operation):
+
+        @given(case=strategy)
+        @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+        def test(case):
+            found.add(prepared_query_string(case))
+
+        test()
+    return found
+
+
+def coverage_query_strings(operation):
+    return {
+        prepared_query_string(case)
+        for case in iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=operation.schema.config.generation,
+        )
+    }
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("parameter", "version", "expected"),
+    [
+        (openapi3_delimited_parameter("pipeDelimited"), "3.0.2", "color=null%7Ctrue%7Cfalse%7C1%7C1.5%7Cx"),
+        (openapi3_delimited_parameter("spaceDelimited"), "3.0.2", "color=null%20true%20false%201%201.5%20x"),
+        (openapi3_delimited_parameter("form"), "3.0.2", "color=null,true,false,1,1.5,x"),
+        (swagger2_delimited_parameter("pipes"), "2.0", "color=null%7Ctrue%7Cfalse%7C1%7C1.5%7Cx"),
+        (swagger2_delimited_parameter("ssv"), "2.0", "color=null%20true%20false%201%201.5%20x"),
+        (swagger2_delimited_parameter("tsv"), "2.0", "color=null%09true%09false%091%091.5%09x"),
+        (swagger2_delimited_parameter("csv"), "2.0", "color=null,true,false,1,1.5,x"),
+    ],
+    ids=["pipeDelimited", "spaceDelimited", "form", "pipes", "ssv", "tsv", "csv"],
+)
+def test_delimited_query_items_use_json_wire_form(ctx, parameter, version, expected):
+    operation = ctx.openapi.load_schema(delimited_query_paths(parameter), version=version)["/teapot"]["GET"]
+
+    assert fuzzing_query_strings(operation) == {expected}
+    assert examples_query_strings(operation) == {expected}
+    assert coverage_query_strings(operation) == {expected}
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param([None], "null", id="null"),
+        pytest.param([True, False], "true|false", id="booleans"),
+        pytest.param([1, -2, 1.5], "1|-2|1.5", id="numbers"),
+        pytest.param(["true", "null"], "true|null", id="strings-already-spelled"),
+        pytest.param([{"a": True}], "{'a': True}", id="object-item-keeps-text-form"),
+        pytest.param([[None]], "[None]", id="array-item-keeps-text-form"),
+        pytest.param(None, "", id="whole-value-null"),
+    ],
+)
+def test_delimited_encoded_item_rendering(value, expected):
+    # Only JSON scalars have a Python spelling to correct; container items keep their existing text form.
+    assert delimited_encoded("color", delimiter="|")({"color": value})["color"] == expected
 
 
 def make_array_schema(location, style):
