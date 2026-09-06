@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(wfc=WFCAuthConfig(path='./market-auth.yaml')))))

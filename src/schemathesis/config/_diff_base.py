@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass, fields, is_dataclass
 from itertools import starmap
 from typing import TypeVar
@@ -7,12 +8,23 @@ from typing import TypeVar
 T = TypeVar("T", bound="DiffBase")
 
 
+def _required_parameters(cls: type) -> set[str]:
+    return {
+        name
+        for name, parameter in inspect.signature(cls).parameters.items()
+        if parameter.default is inspect.Parameter.empty and parameter.kind is not parameter.VAR_KEYWORD
+    }
+
+
 @dataclass
 class DiffBase:
     def __repr__(self) -> str:
         """Show only the fields that differ from the default."""
         assert is_dataclass(self)
-        default = self.__class__()
+        # A section with required arguments has no argument-free default, so it is built from those values
+        # and they are always shown.
+        required = _required_parameters(self.__class__)
+        default = self.__class__(**{name: getattr(self, name) for name in required})
         diffs = []
         for field in fields(self):
             name = field.name
@@ -27,7 +39,7 @@ class DiffBase:
             if name == "rate_limit" and current_value is not None:
                 assert hasattr(self, "_rate_limit")
                 current_value = self._rate_limit
-            if self._has_diff(current_value, default_value):
+            if name in required or self._has_diff(current_value, default_value):
                 diffs.append(f"{name}={self._diff_repr(current_value, default_value)}")
         return f"{self.__class__.__name__}({', '.join(diffs)})"
 

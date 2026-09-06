@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(phases=PhasesConfig(fuzzing=FuzzingPhaseConfig(error_feedback=ErrorFeedbackConfig(is_enabled=False))))))
