@@ -71,6 +71,16 @@ def test_fuzz_final_line_with_error(cli, app_runner, ctx, snapshot_cli):
     )
 
 
+def test_fuzz_budget_too_small_for_startup_still_runs_a_scenario(cli, app_runner, ctx):
+    # A budget already spent by the time fuzzing starts should still buy one scenario, not an empty run.
+    url = _make_fuzz_app(ctx, app_runner)
+
+    result = cli.main("fuzz", url, "--max-time=0")
+
+    assert "No scenarios were run" not in result.stdout, result.stdout
+    assert "Tested: 1" in result.stdout, result.stdout
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_empty_test_suite(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_app(ctx, app_runner)

@@ -55,6 +55,7 @@
 - Coverage phase dropping a required name `properties` does not declare from generated array items.
 - Generation failing for an OpenAPI 3.0 `pattern` that names a capture group.
 - Accept non-object vendor extension values inside `responses`, such as `x-note: null`.
+- Run at least one scenario when `st fuzz` startup outlasts `--max-time`.
 - Empty strings generated for query parameters declaring `allowEmptyValue: false`. [#4574](https://github.com/schemathesis/schemathesis/issues/4574)
 - Coverage phase emitting valid values as `items` violations for arrays declaring `prefixItems`.
 - Coverage phase emitting properties whose names `propertyNames` rejects.
