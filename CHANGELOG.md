@@ -59,6 +59,7 @@
 - False positive `negative_data_rejection` for non-numeric query and path parameters whose serialized value is valid. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
 - `negative_data_rejection` message omitting parameter names when several parameters are mutated. [#4600](https://github.com/schemathesis/schemathesis/issues/4600)
 - Stateful phase crashing when two links produce the same transition name.
+- Detect `ignored_auth` bypasses in APIs that accept any well-formed bearer or basic credentials.
 
 ## [4.25.2](https://github.com/schemathesis/schemathesis/compare/v4.25.1...v4.25.2) - 2026-08-24
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from base64 import b64encode
 from collections.abc import Mapping
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
@@ -10,6 +11,21 @@ from schemathesis.generation.case import Case
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
+
+INVALID_CREDENTIAL = "SCHEMATHESIS-INVALID-VALUE"
+# Wrong credentials that still match the syntax their scheme expects, so the API runs its own
+# credential validation instead of rejecting the value while parsing the `Authorization` header.
+INVALID_AUTH_HEADERS = {
+    "_basic_auth": f"Basic {b64encode(f'{INVALID_CREDENTIAL}:{INVALID_CREDENTIAL}'.encode()).decode()}",
+    "_bearer_auth": f"Bearer {INVALID_CREDENTIAL}",
+}
+
+
+def _invalid_value_for(parameter: Mapping[str, Any]) -> str:
+    """The credential to probe a security parameter with."""
+    # Swagger 2.0 keeps the parameter schema inline, Open API 3 nests it under `schema`.
+    schema = parameter.get("schema", parameter)
+    return INVALID_AUTH_HEADERS.get(schema.get("format", ""), INVALID_CREDENTIAL)
 
 
 def set_auth_for_case(case: Case, parameter: Mapping[str, Any]) -> None:
@@ -25,7 +41,7 @@ def set_auth_for_case(case: Case, parameter: Mapping[str, Any]) -> None:
             # Negative-mode cases may replace the container with a non-dict; reset to a fresh dict.
             if not isinstance(container, dict):
                 container = {}
-            container[name] = "SCHEMATHESIS-INVALID-VALUE"
+            container[name] = _invalid_value_for(parameter)
             setattr(case, attr_name, container)
 
 

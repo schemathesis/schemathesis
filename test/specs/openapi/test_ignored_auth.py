@@ -4,7 +4,7 @@ from typing import Annotated
 import pytest
 import requests
 from fastapi import FastAPI, HTTPException, Security, status
-from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from hypothesis import Phase, given, settings
 
 import schemathesis
@@ -369,6 +369,30 @@ def test_server_error_without_auth_is_reported():
         "Unexpected response to a request without authentication\n\n"
         "Expected 401 or 403, got `500 Internal Server Error` for `GET /`"
     )
+
+
+def test_accepts_any_well_formed_bearer_token():
+    app = FastAPI()
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
+    async def root(
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Security(HTTPBearer(auto_error=False))],
+    ):
+        if credentials is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        return {"token": credentials.credentials}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+    @given(case=schema["/"]["GET"].as_strategy())
+    @settings(max_examples=3, phases=[Phase.generate])
+    def test(case):
+        client = ASGIClient(app)
+        case.call_and_validate(session=client, headers={"Authorization": "Bearer secret"})
+
+    with pytest.raises(FailureGroup) as exc:
+        test()
+    assert str(exc.value.exceptions[0]).startswith("API accepts invalid authentication")
 
 
 def test_explicit_auth_cli(ctx, cli, snapshot_cli):
