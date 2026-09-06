@@ -368,6 +368,60 @@ def _multipart_content_type(serialized: dict, name: str) -> str | None:
     return None
 
 
+def _multipart_upload_echo(ctx, properties: dict, media_type: str):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {media_type: {"schema": {"type": "object", "properties": properties}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        return jsonify(
+            {
+                "content_type": request.headers.get("Content-Type", ""),
+                "files": {name: request.files[name].read().decode("latin-1") for name in request.files},
+                "filenames": {name: request.files[name].filename for name in request.files},
+                "form": dict(request.form),
+                "raw": request.get_data().decode("latin-1"),
+            }
+        )
+
+    return schemathesis.openapi.from_wsgi("/openapi.json", app)["/upload"]["POST"]
+
+
+def test_wsgi_multipart_binary_property_arrives_as_a_file(ctx):
+    operation = _multipart_upload_echo(
+        ctx,
+        {"file": {"type": "string", "format": "binary"}, "note": {"type": "string"}},
+        "multipart/form-data",
+    )
+    case = operation.Case(body={"file": b"\x01\x02data", "note": "hello"}, media_type="multipart/form-data")
+    received = case.call().json()
+    assert (received["files"], received["filenames"], received["form"]) == (
+        {"file": "\x01\x02data"},
+        {"file": "file"},
+        {"note": "hello"},
+    )
+
+
+def test_wsgi_multipart_mixed_body_arrives_intact(ctx):
+    operation = _multipart_upload_echo(ctx, {"note": {"type": "string"}}, "multipart/mixed")
+    received = operation.Case(body={"note": "hello"}, media_type="multipart/mixed").call().json()
+    boundary = received["content_type"].partition("boundary=")[2].strip('"')
+    assert received["raw"] == (
+        f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="note"\r\n\r\nhello\r\n--{boundary}--\r\n'
+    )
+
+
 def test_multipart_ref_to_object_serializes_as_json(ctx, case_factory):
     schema = ctx.openapi.load_schema(
         {

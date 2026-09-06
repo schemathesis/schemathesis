@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from contextlib import contextmanager
+from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
@@ -23,8 +24,8 @@ from schemathesis.transport.prepare import (
     prepare_headers,
     prepare_path,
 )
-from schemathesis.transport.requests import REQUESTS_TRANSPORT, _merge_query_components
-from schemathesis.transport.serialization import serialize_binary, serialize_json, serialize_xml, serialize_yaml
+from schemathesis.transport.requests import REQUESTS_TRANSPORT, _merge_query_components, prepare_multipart_parts
+from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
     import werkzeug
@@ -222,9 +223,43 @@ def yaml_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     return serialize_yaml(value)
 
 
+def _to_werkzeug_parts(files: list | None, data: dict[str, Any] | None) -> dict[str, list]:
+    """Reshape multipart parts into the field mapping Werkzeug encodes into a request body."""
+    from werkzeug.datastructures import FileStorage
+
+    parts: dict[str, list] = {}
+    for name, value in (data or {}).items():
+        parts.setdefault(name, []).extend(value if isinstance(value, list) else [value])
+    for name, part in files or []:
+        if isinstance(part, tuple):
+            filename, content, *rest = part
+            content_type = rest[0] if rest else None
+        else:
+            # A bare value carries no filename of its own and is named after its field
+            filename, content, content_type = name, part, None
+        if filename is None and content_type is None and not isinstance(content, (bytes, Binary)):
+            parts.setdefault(name, []).append(content)
+        else:
+            # Only a file-like part keeps its bytes intact and can carry a filename
+            storage = FileStorage(BytesIO(serialize_binary(content)), filename, name, content_type)
+            parts.setdefault(name, []).append(storage)
+    return parts
+
+
 @WSGI_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
 def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
-    return {"data": value}
+    if not isinstance(value, dict):
+        return {"data": value}
+    files, data = prepare_multipart_parts(ctx, value)
+    parts = _to_werkzeug_parts(files, data)
+    subtype = media_types.parse(ctx.case.media_type or "multipart/form-data")[1]
+    if subtype in ("form-data", "*"):
+        return {"data": parts}
+    from werkzeug.test import stream_encode_multipart
+
+    # Werkzeug builds a body only for `multipart/form-data`, so other subtypes are encoded here
+    stream, _, boundary = stream_encode_multipart(parts)
+    return {"data": stream.read(), "content_type": f'multipart/{subtype}; boundary="{boundary}"'}
 
 
 @WSGI_TRANSPORT.serializer("application/xml", "text/xml")

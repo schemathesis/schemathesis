@@ -396,19 +396,26 @@ def _serialize_part_value(ctx: SerializationContext, value: Any, content_type: s
     return value
 
 
+def prepare_multipart_parts(
+    ctx: SerializationContext, value: dict[str, Any]
+) -> tuple[list | None, dict[str, Any] | None]:
+    """Split a form payload into file parts and plain form fields."""
+    encoded_fields = _collect_encoded_fields(ctx)
+    for name, content_type in encoded_fields.items():
+        if name in value:
+            value[name] = _serialize_part_value(ctx, value[name], content_type)
+    multipart = _prepare_form_data(value)
+    # Surface auto-discovered per-part content types on the wire; case-level overrides still win.
+    selected = {**encoded_fields, **(ctx.case.multipart_content_types or {})}
+    return ctx.case.operation.prepare_multipart(multipart, selected)
+
+
 @REQUESTS_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
 def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     if isinstance(value, dict):
-        encoded_fields = _collect_encoded_fields(ctx)
-        for name, content_type in encoded_fields.items():
-            if name in value:
-                value[name] = _serialize_part_value(ctx, value[name], content_type)
-        multipart = _prepare_form_data(value)
-        # Surface auto-discovered per-part content types on the wire; case-level overrides still win.
-        selected = {**encoded_fields, **(ctx.case.multipart_content_types or {})}
-        files, data = ctx.case.operation.prepare_multipart(multipart, selected)
+        files, data = prepare_multipart_parts(ctx, value)
         return {"files": files, "data": data}
     # Uncommon schema. For example - `{"type": "string"}`
     boundary = choose_boundary()
