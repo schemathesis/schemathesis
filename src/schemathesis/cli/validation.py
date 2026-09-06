@@ -118,6 +118,20 @@ def validate_auth(
     return None
 
 
+def validate_wfc_external_url(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None
+) -> str | None:
+    if raw_value is None:
+        return None
+    from schemathesis.wfc.external_url import parse_override
+
+    try:
+        parse_override(raw_value)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from None
+    return raw_value
+
+
 def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str]) -> None:
     auth_is_set = auth is not None
     header_is_set = "authorization" in {header.lower() for header in headers}

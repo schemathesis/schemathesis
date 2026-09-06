@@ -76,6 +76,7 @@ def test_run_as_module(testdir):
         ("--help",),
         ("http://127.0.0.1", "--generation-codec=foobar"),
         ("http://127.0.0.1", "--report=unknown"),
+        ("http://127.0.0.1", "--auth-wfc-external-url=localhost"),
     ],
 )
 def test_run_output(cli, args, snapshot_cli):

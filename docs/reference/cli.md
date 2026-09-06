@@ -319,6 +319,21 @@ The following options control how Schemathesis makes network requests to the API
     $ st run openapi.yaml --auth-wfc ./market-auth.yaml --auth-wfc-user admin
     ```
 
+#### `--auth-wfc-external-url HOST:PORT`
+
+!!! note ""
+
+    **Type**: `String`  
+
+    Replace the host and port of every `externalEndpointURL` in the auth file, keeping the scheme, path, and query.
+    Use it when the document hardcodes an auth server address that is unreachable from where the run happens.
+    Accepts `HOST:PORT`, or a URL without a path to replace the scheme as well.
+    Has no effect when the document defines no `externalEndpointURL`.
+
+    ```console
+    $ st run openapi.yaml --auth-wfc ./market-auth.yaml --auth-wfc-external-url 10.0.0.5:8083
+    ```
+
 #### `--proxy URL`
 
 !!! note ""

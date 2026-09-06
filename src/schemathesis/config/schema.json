@@ -303,6 +303,10 @@
           "type": "string",
           "description": "Name of the auth entry to use. Defaults to the first one."
         },
+        "external_url": {
+          "type": "string",
+          "description": "Replace the host and port of every 'externalEndpointURL' in the auth file."
+        },
         "refresh_interval": {
           "type": "integer",
           "description": "Seconds to cache login credentials before re-authenticating.",

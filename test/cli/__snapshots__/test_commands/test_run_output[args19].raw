@@ -85,6 +85,10 @@ Network requests options:
                                   Fuzzing Commons auth file
   --auth-wfc-user NAME            Name of the entry to use from the Web Fuzzing
                                   Commons auth file. Defaults to the first one
+  --auth-wfc-external-url HOST:PORT
+                                  Replace the host and port of every
+                                  'externalEndpointURL' in the Web Fuzzing
+                                  Commons auth file
   --proxy URL                     Set the proxy for all network requests
   --tls-verify TEXT               Path to CA bundle for TLS verification, or
                                   'false' to disable

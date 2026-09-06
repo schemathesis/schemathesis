@@ -195,10 +195,20 @@ A login flow uses `loginEndpointAuth` — Schemathesis calls the endpoint, extra
 
 Set `"expectCookies": true` instead of `token` when the endpoint returns a session cookie. The login result is cached for the test run.
 
+When the login lives on a separate auth server, the document points at it with `externalEndpointURL`. Such addresses are
+usually hardcoded by whoever wrote the document, so redirect them without editing the file:
+
+```console
+$ st run openapi.yaml --auth-wfc auth.json --auth-wfc-external-url 10.0.0.5:8083
+```
+
+Only the host and port change; the scheme, path, and query of each URL stay as they are.
+
 | Field | CLI | Default | Description |
 |-------|-----|---------|-------------|
 | `path` | `--auth-wfc` | required | Path to the WFC auth document (JSON or YAML) |
 | `user` | `--auth-wfc-user` | first entry | `name` of the auth entry to use |
+| `external_url` | `--auth-wfc-external-url` | — | `HOST:PORT` replacing the authority of every `externalEndpointURL` |
 | `refresh_interval` | — | `300` | Seconds before re-running the login flow |
 
 ## Dynamic Token Authentication

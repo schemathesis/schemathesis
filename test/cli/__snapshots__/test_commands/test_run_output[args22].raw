@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: Invalid value for '--auth-wfc-external-url': Invalid external URL override: 'localhost'. Expected 'HOST:PORT' (for example, '127.0.0.1:8083') or a URL without a path (for example, 'http://127.0.0.1')

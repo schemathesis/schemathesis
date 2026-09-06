@@ -22,6 +22,7 @@ from schemathesis.cli.validation import (
     validate_request_cert_key,
     validate_schema_location,
     validate_warnings,
+    validate_wfc_external_url,
 )
 from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
@@ -173,6 +174,16 @@ AUTH_WFC_USER = OptionSpec(
     metavar="NAME",
     type=str,
     default=None,
+)
+
+AUTH_WFC_EXTERNAL_URL = OptionSpec(
+    "--auth-wfc-external-url",
+    "auth_wfc_external_url",
+    help="Replace the host and port of every 'externalEndpointURL' in the Web Fuzzing Commons auth file",
+    metavar="HOST:PORT",
+    type=str,
+    default=None,
+    callback=validate_wfc_external_url,
 )
 
 PROXY = OptionSpec(

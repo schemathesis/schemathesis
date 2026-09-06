@@ -218,6 +218,7 @@ class ProjectConfig(DiffBase):
         basic_auth: tuple[str, str] | None = None,
         wfc_auth: str | None = None,
         wfc_user: str | None = None,
+        wfc_external_url: str | None = None,
         workers: int | Literal["auto"] | None = None,
         continue_on_failure: bool | None = None,
         rate_limit: str | None = None,
@@ -244,8 +245,8 @@ class ProjectConfig(DiffBase):
         if basic_auth is not None:
             self.auth.update(basic=basic_auth)
 
-        if wfc_auth is not None or wfc_user is not None:
-            self.auth.update(wfc_path=wfc_auth, wfc_user=wfc_user)
+        if wfc_auth is not None or wfc_user is not None or wfc_external_url is not None:
+            self.auth.update(wfc_path=wfc_auth, wfc_user=wfc_user, wfc_external_url=wfc_external_url)
 
         if workers is not None:
             if isinstance(workers, int):

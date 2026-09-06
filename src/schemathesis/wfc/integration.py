@@ -8,6 +8,7 @@ from schemathesis.auths import AuthProvider, CachingAuthProvider
 
 from .converter import select_user, wfc_to_auth_provider
 from .escalation import EscalatingAuthProvider
+from .external_url import override_external_urls
 from .loader import load_from_file
 from .providers import LoginEndpointAuthProvider
 
@@ -25,9 +26,14 @@ def _build(auth_info: AuthenticationInfo, config: WFCAuthConfig) -> AuthProvider
     return provider
 
 
-def register_wfc_auth(schema: BaseSchema, config: WFCAuthConfig, user: str | None = None) -> None:
+def register_wfc_auth(
+    schema: BaseSchema, config: WFCAuthConfig, user: str | None = None, external_url: str | None = None
+) -> None:
     """Load the configured WFC file and register its auth provider on the schema."""
     entries = load_from_file(config.path)
+    override = external_url or config.external_url
+    if override is not None:
+        override_external_urls(entries, override)
     selected = user or config.user
     if selected is None and len(entries) > 1:
         # No user named: work through the document rather than spending the run on the first entry.
