@@ -208,3 +208,29 @@ def test_spec_version_with_suffix(ctx, spec_version):
 @pytest.mark.parametrize("spec_version", ["3.1.0-custom", "3.1.0-rc1"])
 def test_spec_version_with_suffix_and_no_paths(ctx, spec_version):
     assert list(ctx.openapi.load_schema(None, version=spec_version).get_all_operations()) == []
+
+
+@pytest.mark.parametrize("extension", [None, [], "note", 42])
+def test_non_object_response_vendor_extension(ctx, extension):
+    # A `x-` key inside `responses` may hold any JSON value, not just an object.
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "operationId": "get_users",
+                    "responses": {
+                        "x-note": extension,
+                        "200": {
+                            "description": "OK",
+                            "links": {"Self": {"operationId": "get_users"}},
+                        },
+                    },
+                }
+            }
+        }
+    )
+    assert (schema.statistic.operations.total, schema.statistic.transitions.total) == (1, 1)
+    operation = schema["/users"]["GET"]
+    assert [(status_code, dict(response.iter_links())) for status_code, response in operation.responses.items()] == [
+        ("200", {"Self": {"operationId": "get_users"}})
+    ]

@@ -259,6 +259,10 @@ def _iter_resolved_responses(
 ) -> Iterator[tuple[str, OpenApiResponse]]:
     """Iterate and resolve response definitions."""
     for key, response in definition.items():
+        # A vendor extension key inside `responses` may carry any JSON value. The response types model
+        # only well-formed entries, hence the type checker sees this guard on raw input as unreachable.
+        if not isinstance(response, dict):
+            continue  # type: ignore[unreachable]
         status_code = str(key)
         response_resolver, resolved = maybe_resolve_with_resolver(response, resolver)
         # Resolve one more level to support slightly malformed schemas with nested $ref chains

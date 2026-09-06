@@ -223,6 +223,9 @@ class OperationLoader:
                             selected_operations_by_id.add(definition["operationId"])
                         selected_operations_by_path.add((method, path))
                     for response in definition.get("responses", {}).values():
+                        # A vendor extension key inside `responses` may carry any JSON value.
+                        if not isinstance(response, dict):
+                            continue
                         if "$ref" in response:
                             _, response = resolve_reference(path_resolver, response["$ref"])
                         defined_links = response.get(links_keyword)
