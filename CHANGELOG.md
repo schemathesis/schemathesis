@@ -19,6 +19,8 @@
 - False positive `positive_data_acceptance` when `type` lists `null` but `enum` omits it.
 - False positive `negative_data_rejection` for operations whose `security` lists alternative requirements.
 - Flask-RESTX error responses such as `abort(404)` and 405 raised as internal errors under `from_wsgi`.
+- False positive `positive_data_acceptance` for `allOf` mixing `items` with a sibling branch's `prefixItems`.
+- Coverage phase generating no positive cases for `allOf` of two disjoint `contains`.
 
 ## [4.26.0](https://github.com/schemathesis/schemathesis/compare/v4.25.2...v4.26.0) - 2026-09-07
 
