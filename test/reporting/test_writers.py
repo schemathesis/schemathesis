@@ -65,6 +65,11 @@ def test_writer_context_manager_no_error_without_open(writer_cls, kwargs):
         (["-u", "https://api.example.com/?token=s3cret"], ["-u", "https://api.example.com/?token=%5BFiltered%5D"]),
         (["https://user:pw@api.example.com/openapi.json"], ["https://[Filtered]@api.example.com/openapi.json"]),
         (["--max-examples=5"], ["--max-examples=5"]),
+        (["-HX-API-Key: s3cret"], ["-HX-API-Key: [Filtered]"]),
+        (["-aadmin:hunter2"], ["-a[Filtered]"]),
+        (["-uhttps://api.example.com/?token=s3cret"], ["-uhttps://api.example.com/?token=%5BFiltered%5D"]),
+        (["-nauto"], ["-nauto"]),
+        (["-x"], ["-x"]),
     ],
     ids=[
         "header-short",
@@ -76,6 +81,11 @@ def test_writer_context_manager_no_error_without_open(writer_cls, kwargs):
         "url-option",
         "url-positional",
         "unrelated",
+        "header-attached",
+        "auth-attached",
+        "url-attached",
+        "unrelated-attached",
+        "flag-only",
     ],
 )
 def test_sanitize_args(args, expected):
