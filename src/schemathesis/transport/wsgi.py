@@ -177,6 +177,7 @@ def _capture_server_exception(application: object) -> Generator[_CapturedServerE
     captured = _CapturedServerException()
     try:
         from flask import Flask, got_request_exception
+        from werkzeug.exceptions import HTTPException
     except ImportError:
         yield captured
         return
@@ -186,6 +187,9 @@ def _capture_server_exception(application: object) -> Generator[_CapturedServerE
         return
 
     def _on_exception(sender: Flask, exception: BaseException, **_: object) -> None:
+        # Some extensions emit this signal for HTTP errors they already turned into a response
+        if isinstance(exception, HTTPException):
+            return
         captured.exception = exception
 
     got_request_exception.connect(_on_exception, application)
