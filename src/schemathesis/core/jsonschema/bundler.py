@@ -73,10 +73,13 @@ class Bundler:
         scope_stack: list[str] = []
 
         has_recursive_references = False
+        reference_count = 0
         visit = visited.add
 
         def get_def_name(uri: str) -> str:
             """Generate or retrieve the local definition name for a URI."""
+            nonlocal reference_count
+            reference_count += 1
             name = uri_to_name.get(uri)
             if name is None:
                 self.counter += 1
@@ -180,8 +183,9 @@ class Bundler:
 
         assert isinstance(bundled, dict)
 
-        # A single target that never points back at itself reads the same spelled out in place.
-        if not has_recursive_references and "$ref" in bundled and len(defs) == 1:
+        # The root reference to a single target that never points back at itself reads the same
+        # spelled out in place. A sibling pointing at that target keeps the storage it needs.
+        if not has_recursive_references and "$ref" in bundled and len(defs) == 1 and reference_count == 1:
             result = {key: value for key, value in bundled.items() if key != "$ref"}
             for value in defs.values():
                 if isinstance(value, dict):
