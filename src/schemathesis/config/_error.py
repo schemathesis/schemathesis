@@ -190,7 +190,24 @@ def _format_anyof_error(error: ValidationError) -> str:
             f"  - A positive integer (e.g., workers = 4)\n"
             f'  - The string "auto" for automatic detection (workers = "auto")'
         )
+    elif list(error.schema_path) == ["$defs", "WarningConfig", "anyOf"]:
+        enum_error = _find_enum_error(error)
+        if enum_error is not None:
+            return _format_enum_error(enum_error)
     return error.message  # pragma: no cover
+
+
+def _find_enum_error(error: ValidationError) -> ValidationError | None:
+    """Find the enum violation nested inside `anyOf` branches."""
+    if error.kind.name == "enum":
+        return error
+    if isinstance(error.kind, ValidationErrorKind.AnyOf) and error.kind.context:
+        for errors in error.kind.context:
+            for nested in errors:
+                found = _find_enum_error(nested)
+                if found is not None:
+                    return found
+    return None
 
 
 def _format_oneof_error(error: ValidationError) -> str:

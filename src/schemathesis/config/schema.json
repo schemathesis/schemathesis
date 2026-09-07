@@ -1044,26 +1044,35 @@
         }
       }
     },
+    "WarningName": {
+      "enum": [
+        "missing_auth",
+        "missing_test_data",
+        "base_url_mismatch",
+        "validation_mismatch",
+        "missing_deserializer",
+        "unused_openapi_auth",
+        "unsupported_regex",
+        "method_not_allowed",
+        "constants_extraction",
+        "unmatched_filter",
+        "unresolvable_reference"
+      ]
+    },
+    "WarningNameList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/WarningName"
+      }
+    },
     "WarningConfig": {
       "anyOf": [
         {
           "type": "boolean"
         },
         {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "enum": [
-              "missing_auth",
-              "missing_test_data",
-              "validation_mismatch",
-              "missing_deserializer",
-              "unused_openapi_auth",
-              "method_not_allowed",
-              "constants_extraction",
-              "unmatched_filter"
-            ]
-          }
+          "$ref": "#/$defs/WarningNameList"
         },
         {
           "type": "object",
@@ -1073,20 +1082,7 @@
               "type": "boolean"
             },
             "display": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": {
-                "enum": [
-                  "missing_auth",
-                  "missing_test_data",
-                  "validation_mismatch",
-                  "missing_deserializer",
-                  "unused_openapi_auth",
-                  "method_not_allowed",
-                  "constants_extraction",
-                  "unmatched_filter"
-                ]
-              }
+              "$ref": "#/$defs/WarningNameList"
             },
             "fail-on": {
               "anyOf": [
@@ -1094,20 +1090,7 @@
                   "type": "boolean"
                 },
                 {
-                  "type": "array",
-                  "uniqueItems": true,
-                  "items": {
-                    "enum": [
-                      "missing_auth",
-                      "missing_test_data",
-                      "validation_mismatch",
-                      "missing_deserializer",
-                      "unused_openapi_auth",
-                      "method_not_allowed",
-                      "constants_extraction",
-                      "unmatched_filter"
-                    ]
-                  }
+                  "$ref": "#/$defs/WarningNameList"
                 }
               ]
             }
