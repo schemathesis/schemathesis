@@ -121,9 +121,9 @@ def _to_json_schema(
         if bundled:
             schema[BUNDLE_STORAGE_KEY] = bundled
     schema_type = schema.get("type")
-    # A nullable type with an `enum` accepts null, matching `nullable: true`; otherwise a
-    # documented null value is rejected for being absent from the enum.
-    if isinstance(schema_type, list) and "null" in schema_type:
+    # An `enum` that omits null makes null invalid even when `type` lists it. Responses tolerate the
+    # mismatch as a likely incomplete `enum`; requests keep the enum as written so generation never sends null.
+    if is_response_schema and isinstance(schema_type, list) and "null" in schema_type:
         enum = schema.get("enum")
         if isinstance(enum, list) and None not in enum:
             enum.append(None)

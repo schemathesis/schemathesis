@@ -669,15 +669,23 @@ def test_discriminator_property_pinned(schema, expected):
         [None],
     ],
 )
-def test_nullable_type_array_enum_accepts_null(value):
-    # `type: [string, "null"]` with an `enum` accepts null, matching `nullable: true`.
+def test_nullable_type_array_enum_accepts_null_in_responses(value):
+    # A documented null is accepted when validating a response, matching `nullable: true`.
     converted = to_json_schema(
         {"type": "array", "items": {"type": ["string", "null"], "enum": ["N", "E", "S", "W"]}},
         nullable_keyword="nullable",
+        is_response_schema=True,
     )
     validator = make_validator_for(converted)
     assert validator.is_valid(value)
     assert not validator.is_valid(["unknown"])
+
+
+def test_nullable_type_array_enum_keeps_enum_for_requests():
+    assert to_json_schema({"type": ["string", "null"], "enum": ["N", "E"]}, nullable_keyword="nullable") == {
+        "type": ["string", "null"],
+        "enum": ["N", "E"],
+    }
 
 
 def test_non_nullable_type_enum_still_rejects_null():
