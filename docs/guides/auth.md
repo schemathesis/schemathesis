@@ -29,10 +29,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 # Different auth for specific endpoints
 [[operations]]
 include-path = "/admin/"
-headers = {
-  Authorization = "Bearer ${ADMIN_TOKEN}",
-  X-Client-ID = "${CLIENT_ID}"
-}
+headers = { Authorization = "Bearer ${ADMIN_TOKEN}", X-Client-ID = "${CLIENT_ID}" }
 ```
 
 ```bash

@@ -6,7 +6,7 @@ import yaml
 
 import schemathesis.config._projects
 from schemathesis.checks import CHECKS
-from schemathesis.config import SchemathesisConfig
+from schemathesis.config import SchemathesisConfig, tomli
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.errors import HookError
 from schemathesis.core.transforms import resolve_pointer
@@ -87,6 +87,30 @@ def test_yaml_snippets_are_valid(filename: str, snippet: str):
         yaml.safe_load(snippet)
     except yaml.YAMLError as exc:
         pytest.fail(f"Invalid YAML in {filename}:\n{exc}")
+
+
+def collect_all_toml_snippets() -> list[tuple[str, str]]:
+    snippets = []
+
+    for block in extract_examples(str(README_FILE), format="toml"):
+        snippets.append((str(README_FILE), block))
+
+    for md_file in DOCS_DIR.rglob("*.md"):
+        for block in extract_examples(str(md_file), format="toml"):
+            snippets.append((str(md_file.relative_to(ROOT_DIR)), block))
+
+    return snippets
+
+
+TOML_SNIPPETS = collect_all_toml_snippets()
+
+
+@pytest.mark.parametrize(["filename", "snippet"], TOML_SNIPPETS)
+def test_toml_snippets_are_valid(filename: str, snippet: str):
+    try:
+        tomli.loads(snippet)
+    except tomli.TOMLDecodeError as exc:
+        pytest.fail(f"Invalid TOML in {filename}:\n{exc}")
 
 
 def _resolve(current):
