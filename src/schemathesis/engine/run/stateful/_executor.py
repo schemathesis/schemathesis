@@ -490,8 +490,11 @@ def validate_response(
         # Some failures (e.g. use-after-free) reference a prior case that may live on a
         # sibling branch; include it so the reproduce isn't missing the triggering step.
         related_case_ids = failure.related_case_ids()
+        # Each step is rendered with the headers it sent itself, so the chain reproduces the run as it happened.
         commands = [
-            chain_case.as_curl_command(headers=failure_data.headers, verify=failure_data.verify)
+            chain_case.as_curl_command(
+                headers=recorder.find_request_headers(case_id=chain_case.id), verify=failure_data.verify
+            )
             for chain_case in recorder.iter_chain_cases(case_id=failure_data.case.id, related_case_ids=related_case_ids)
         ]
         recorder.record_check_failure(

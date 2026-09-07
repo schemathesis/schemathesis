@@ -1063,3 +1063,85 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
 
     # Should not raise — the DELETE that explains the 404 is in A's subtree.
     assert ensure_resource_availability(check_ctx, response_404, get_b) is None
+
+
+def test_reproduce_chain_renders_each_step_with_its_own_headers(ctx, app_runner, stop_event):
+    # A bodyless step must not be printed with the failing step's `Content-Type`.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "operationId": "listItems",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                            "links": {
+                                "create": {
+                                    "operationId": "createItem",
+                                    "parameters": {"itemId": "$response.body#/itemId"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "post": {
+                    "operationId": "createItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["GET"])
+    def list_items():
+        return jsonify({"itemId": "linked"})
+
+    @app.route("/items/<item_id>", methods=["POST"])
+    def create_item(item_id):
+        if item_id == "linked":
+            return jsonify({"detail": "boom"}), 500
+        return jsonify({}), 200
+
+    port = app_runner.run_flask_app(app)
+    config = schemathesis.Config.from_dict(
+        {
+            "max-failures": 1,
+            "checks": {"enabled": False, "not_a_server_error": {"enabled": True}},
+            "generation": {"mode": "positive", "max-examples": 10, "database": "none"},
+            "phases": {"stateful": {"inference": {"algorithms": []}}},
+        }
+    )
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+    result = collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+    [failure] = result.failures
+    commands = failure.failure_info.code_sample.splitlines()
+    assert {command for command in commands if command.startswith("curl -X GET")} == {
+        f"curl -X GET http://127.0.0.1:{port}/items"
+    }
+    assert all(
+        command.startswith("curl -X POST -H 'Content-Type: multipart/form-data; boundary=")
+        for command in commands
+        if command.startswith("curl -X POST")
+    )

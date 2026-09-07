@@ -18,6 +18,11 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import Transition
 
 
+def _flatten_headers(headers: Headers) -> dict[str, str]:
+    """Collapse wire-form headers to a single value per name, the shape code samples expect."""
+    return {key: value[0] for key, value in headers.items()}
+
+
 class RecordedScenario(Protocol):
     """Read-only view of a recorded scenario, for consumers that report on a run rather than drive it."""
 
@@ -129,8 +134,14 @@ class ScenarioRecorder:
         request = self.interactions[case_id].request
         response = self.interactions[case_id].response
         assert isinstance(response, Response)
-        headers = {key: value[0] for key, value in request.headers.items()}
-        return FailureData(case=case, headers=headers, verify=response.verify)
+        return FailureData(case=case, headers=_flatten_headers(request.headers), verify=response.verify)
+
+    def find_request_headers(self, *, case_id: str) -> dict[str, str] | None:
+        """Retrieve the headers a given test case actually sent, if it reached the wire."""
+        interaction = self.interactions.get(case_id)
+        if interaction is None:
+            return None
+        return _flatten_headers(interaction.request.headers)
 
     def find_parent(self, *, case_id: str) -> Case | None:
         """Find the parent case of a given test case, if it exists."""
