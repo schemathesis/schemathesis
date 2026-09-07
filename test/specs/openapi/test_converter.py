@@ -516,6 +516,21 @@ def test_rewrite_write_only(schema, expected):
             },
             id="non_dict_allOf_branch_is_skipped",
         ),
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"legacy": False}},
+                ],
+                "required": ["legacy"],
+            },
+            False,
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"legacy": False}},
+                ],
+            },
+            id="boolean_false_property",
+        ),
     ],
 )
 def test_forbidden_in_allof_branch_strips_outer_required(schema, is_response_schema, expected):

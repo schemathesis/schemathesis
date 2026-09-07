@@ -21,6 +21,7 @@ from schemathesis.core.jsonschema import (
     FANCY_REGEX_OPTIONS,
     VALIDATED_FORMATS_BY_DRAFT,
     compile_ecma_pattern,
+    is_unsatisfiable,
     is_valid,
     make_validator,
     make_validator_for,
@@ -208,7 +209,7 @@ def _without_forbidden_keys(value: Any, schema: dict[str, Any]) -> Any:
     properties = schema.get("properties")
     if not isinstance(properties, dict):
         return NOT_SET
-    forbidden = {k for k, sub in properties.items() if isinstance(sub, dict) and sub.get("not") == {}}
+    forbidden = {k for k, sub in properties.items() if is_unsatisfiable(sub)}
     if not forbidden or forbidden.isdisjoint(value):
         return NOT_SET
     return {k: v for k, v in value.items() if k not in forbidden}

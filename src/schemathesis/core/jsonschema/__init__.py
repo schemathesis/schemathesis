@@ -300,6 +300,11 @@ def maybe_resolve_bundled(schema: dict[str, Any]) -> dict[str, Any]:
     return target if isinstance(target, dict) else schema
 
 
+def is_unsatisfiable(schema: object) -> bool:
+    """True for a schema no value satisfies — `false`, or `not` against the schema that accepts everything."""
+    return schema is False or (isinstance(schema, dict) and schema.get("not") == {})
+
+
 def is_valid(value: object, schema: JsonSchema) -> bool:
     """Return True if value satisfies schema, False if it does not.
 
@@ -331,6 +336,7 @@ __all__ = [
     "DRAFT_03_DIALECT",
     "VALIDATED_FORMATS_BY_DRAFT",
     "FANCY_REGEX_OPTIONS",
+    "is_unsatisfiable",
     "is_valid",
     "make_validator",
     "make_validator_for",
