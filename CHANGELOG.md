@@ -12,6 +12,7 @@
 - Non-ASCII header values delivered to ASGI applications with the wrong encoding.
 - Crash on a specification extension such as `x-codegen-contextRoot` beside the path templates.
 - False positive `positive_data_acceptance` when `type` lists `null` but `enum` omits it.
+- False positive `negative_data_rejection` for operations whose `security` lists alternative requirements.
 
 ## [4.26.0](https://github.com/schemathesis/schemathesis/compare/v4.25.2...v4.26.0) - 2026-09-07
 

@@ -185,6 +185,7 @@ SECURITY_CREDENTIAL_CASES = [
     ([{"basicAuth": []}, {"apiKeyAuth": []}], {"Authorization", "X-API-Key"}),
     ([{"basicAuth": []}, {"apiKeyAuth": []}, {}], set()),
 ]
+CREDENTIAL_HEADERS = {"Authorization", "X-API-Key"}
 
 
 def _schema_with_security(ctx, version, security):
@@ -206,7 +207,7 @@ def test_generated_credentials_in_coverage(ctx, version, security, expected):
         generation_modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
         generation_config=schema.config.generation_for(operation=operation),
     )
-    assert {name for case in cases for name in case.headers} == expected
+    assert {name for case in cases for name in case.headers} & CREDENTIAL_HEADERS == expected
 
 
 @pytest.mark.parametrize("version", ["2.0", "3.0.2"])
@@ -235,3 +236,22 @@ def test_optional_auth_keeps_configured_credentials(ctx):
         assert case.headers == {"Authorization": "Basic dXNlcjpzZWNyZXQ="}
 
     test()
+
+
+SECURITY_REQUIRED_CASES = [
+    ([{"basicAuth": []}], {"Authorization": True}),
+    ([{"basicAuth": [], "apiKeyAuth": []}], {"Authorization": True, "X-API-Key": True}),
+    ([{"basicAuth": []}, {"apiKeyAuth": []}], {"Authorization": False, "X-API-Key": False}),
+    ([{"basicAuth": []}, {"basicAuth": [], "apiKeyAuth": []}], {"Authorization": True, "X-API-Key": False}),
+]
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
+@pytest.mark.parametrize(
+    ("security", "expected"),
+    SECURITY_REQUIRED_CASES,
+    ids=["single", "combined", "alternatives", "shared-and-alternative"],
+)
+def test_only_schemes_demanded_by_every_alternative_are_required(ctx, version, security, expected):
+    operation = _schema_with_security(ctx, version, security)["/test"]["GET"]
+    assert {parameter["name"]: parameter["required"] for parameter in operation.security.iter_parameters()} == expected
