@@ -36,6 +36,10 @@ class PhaseName(str, enum.Enum):
         return cls(value.lower())
 
 
+# Internal phases are excluded from the reported test phases.
+INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS)
+
+
 # Phases worth repeating: their yield scales with the time given to them.
 ELASTIC_PHASES = (PhaseName.FUZZING, PhaseName.STATEFUL_TESTING)
 

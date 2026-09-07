@@ -439,3 +439,20 @@ def snapshot_cli(request, snapshot):
 
     snapshot.__class__ = SnapshotAssertion
     return snapshot.rebuild()
+
+
+@pytest.fixture
+def snapshot_html(snapshot):
+    class HtmlSnapshotExtension(SingleFileSnapshotExtension):
+        _write_mode = WriteMode.TEXT
+        file_extension = "html"
+
+        def serialize(self, data, *, exclude=None, include=None, matcher=None):
+            return str(data).replace("\r\n", "\n").replace("\r", "\n").rstrip("\n") + "\n"
+
+    class SnapshotAssertion(snapshot.__class__):
+        def rebuild(self):
+            return self.use_extension(extension_class=HtmlSnapshotExtension)
+
+    snapshot.__class__ = SnapshotAssertion
+    return snapshot.rebuild()

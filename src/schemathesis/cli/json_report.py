@@ -1,32 +1,21 @@
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.summary import running_time
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
 from schemathesis.engine.events import EngineFinished, EngineStarted
-from schemathesis.engine.run import PhaseName
+from schemathesis.engine.run import INTERNAL_PHASES
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
     from schemathesis.cli.summary import SummaryData
     from schemathesis.engine import events
-
-# Internal phases are not part of the reported test phases, matching the terminal.
-INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS)
-
-
-def _running_time(started_at: float | None, finished: events.EngineFinished | None) -> float | None:
-    if finished is not None:
-        return finished.running_time
-    if started_at is None:
-        return None
-    return time.time() - started_at
 
 
 def build_document(
@@ -46,7 +35,7 @@ def build_document(
         "command": command,
         "seed": seed,
         "started_at": format_timestamp(started_at) if started_at is not None else None,
-        "running_time": _running_time(started_at, finished),
+        "running_time": running_time(started_at, finished),
         "stop_reason": (finished.stop_reason if finished is not None else StopReason.INTERRUPTED).value,
         "complete": finished is not None,
         "exit_code": exit_code,

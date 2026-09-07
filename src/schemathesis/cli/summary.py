@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,14 @@ if TYPE_CHECKING:
 
 # Phases whose operations can error out before any test runs.
 UNIT_PHASES = (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING)
+
+
+def running_time(started_at: float | None, finished: events.EngineFinished | None) -> float | None:
+    if finished is not None:
+        return finished.running_time
+    if started_at is None:
+        return None
+    return time.time() - started_at
 
 
 @dataclass(slots=True)

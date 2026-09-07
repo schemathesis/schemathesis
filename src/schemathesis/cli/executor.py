@@ -10,6 +10,7 @@ import click
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.har import HarHandler
+from schemathesis.cli.commands.run.handlers.html import HtmlReportHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
@@ -42,9 +43,10 @@ try:
         NdjsonHandler,
         OutputHandler,
         AllureHandler,
+        HtmlReportHandler,
     )
 except ImportError:
-    _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, OutputHandler)
+    _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, OutputHandler, HtmlReportHandler)
 
 
 def is_built_in_handler(handler: EventHandler) -> bool:
@@ -88,6 +90,10 @@ def initialize_report_handlers(
         allure_path = config.reports.get_path(ReportFormat.ALLURE)
         prepare_directory(allure_path)
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
+    if config.reports.html.enabled:
+        html_path = config.reports.get_path(ReportFormat.HTML)
+        prepare_directory(html_path)
+        handlers.append(HtmlReportHandler(output_dir=html_path))
 
     if config.cache.enabled:
         from schemathesis.cli.commands.run.handlers.crashes import CrashHandler
@@ -149,7 +155,12 @@ def execute_event_loop(
     def shutdown() -> None:
         if ctx is not None:
             for h in handlers:
-                h.shutdown(ctx)
+                # The exit code is the API's verdict; a reporter failing at shutdown must not mask it,
+                # unlike a mid-run handler error, which aborts.
+                try:
+                    h.shutdown(ctx)
+                except Exception as exc:
+                    display_handler_error(h, exc)
 
     try:
         ctx = context_factory(config)

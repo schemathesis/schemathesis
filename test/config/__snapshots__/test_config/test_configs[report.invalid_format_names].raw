@@ -4,4 +4,4 @@ Error in [reports] section:
   - 'csv'
   - 'junitxml' -> Did you mean 'junit'?
 
-Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr', 'ndjson', 'json', 'allure'.
+Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr', 'ndjson', 'json', 'allure', 'html'.

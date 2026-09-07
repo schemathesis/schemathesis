@@ -22,6 +22,9 @@ Validate API responses against your schema in existing test suites without using
 ### [Allure Integration](allure.md)
 Export test results as Allure report files with per-operation status, failure steps, and severity labels.
 
+### [HTML Report](html-report.md)
+Generate a static HTML report with the run verdict, failures grouped by check, warnings, and errors.
+
 ### [CI/CD Integration](cicd.md)
 Integrate Schemathesis into automated testing pipelines. Includes GitHub Actions, GitLab CI configurations, and reporting best practices.
 

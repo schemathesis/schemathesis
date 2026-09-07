@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.26.0...HEAD) - TBD
 
+### :rocket: Added
+
+- `--report html` writes a run report with verdict, grouped failures, warnings and errors.
+
 ### :bug: Fixed
 
 - Stateful reproduce chain printing every step with the failing step's request headers.

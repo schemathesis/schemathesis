@@ -297,7 +297,7 @@ Rules:
     **Type**: `Boolean`  
     **Default**: `false`  
 
-    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, or `allure`. `ndjson` and `json` are CLI-only.
+    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`, or `html`. `ndjson`, `json`, and `html` are CLI-only.
 
     ```toml
     [reports.junit]
@@ -311,7 +311,7 @@ Rules:
     **Type**: `String`  
     **Default**: `null`  
 
-    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, or `allure`. For `allure`, this is a directory path.
+    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`, or `html`. For `allure` and `html`, this is a directory path.
 
     Setting this path automatically enables report generation without requiring `enabled = true`.
 

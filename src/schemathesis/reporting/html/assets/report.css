@@ -1,0 +1,447 @@
+:root {
+  /* Poppins/JetBrains Mono are not bundled; the report is read from disk in CI, so system stacks only. */
+  --font-family-default: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-monospace: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+  --color-background: #1a1a1a;
+  --color-surface-1: #212121;
+  --color-surface-2: #2a2a2a;
+  --color-border: #616161;
+  --color-border-subtle: #404040;
+
+  --color-text-primary: #eaebef;
+  --color-text-secondary: #b6b6b6;
+  /* Dimmest tone still above 4.5:1 on the card surface; used for eyebrows and key labels. */
+  --color-text-muted: #8a8a8a;
+
+  --color-brand-success: #51cd78;
+  --color-brand-warning: #f5b74c;
+  --color-brand-danger: #f76f61;
+  /* Lightened from the design system's #3b82f6, which sits at 4.4:1 on the card surface. */
+  --color-brand-info: #60a5fa;
+
+  --color-success-bg: rgba(81, 205, 120, 0.12);
+  --color-warning-bg: rgba(245, 183, 76, 0.12);
+  --color-danger-bg: rgba(247, 111, 97, 0.12);
+  --color-info-bg: rgba(96, 165, 250, 0.12);
+  --color-neutral-bg: rgba(182, 182, 182, 0.12);
+
+  --color-danger-fill: rgba(247, 111, 97, 0.85);
+  --color-success-fill: rgba(81, 205, 120, 0.45);
+  --color-warning-rail: rgba(245, 183, 76, 0.5);
+  --color-danger-rail: rgba(247, 111, 97, 0.6);
+  --color-track: rgba(255, 255, 255, 0.05);
+
+  --color-http-get: var(--color-brand-info);
+  --color-http-post: var(--color-brand-success);
+  --color-http-put: var(--color-brand-warning);
+  --color-http-patch: var(--color-brand-success);
+  --color-http-delete: var(--color-brand-danger);
+  --color-http-head: var(--color-brand-info);
+  --color-http-options: var(--color-text-secondary);
+  --color-http-trace: var(--color-text-secondary);
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-2xl: 1.5rem;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-default);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The verdict is an h1 and the section eyebrows are h2s; neither should inherit heading sizing. */
+h1,
+h2 { margin: 0; font-size: inherit; font-weight: inherit; line-height: inherit; }
+
+code {
+  font-family: var(--font-family-monospace);
+  font-size: 0.92em;
+  background: var(--color-background);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  color: var(--color-text-primary);
+}
+
+.container { max-width: 1240px; margin: 0 auto; padding: 0 30px var(--space-lg); }
+
+.report-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  min-height: 44px;
+  padding: var(--space-md) 0 var(--space-sm);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.brand { display: flex; align-items: center; gap: var(--space-sm); line-height: 1; }
+.brand-mark { display: inline-flex; align-items: center; }
+.brand-name { font-size: var(--font-size-lg); font-weight: 600; white-space: nowrap; }
+
+.brand-ver {
+  font-family: var(--font-family-monospace);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.top-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.top-meta b {
+  font-family: var(--font-family-monospace);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.tm-eyebrow {
+  font-family: var(--font-family-monospace);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+}
+
+.hero-strip {
+  display: grid;
+  grid-template-columns: 1.5fr 1.5fr 1fr 1fr 1fr;
+  margin: var(--space-lg) 0 var(--space-md);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.verdict-failed { border-left-color: var(--color-brand-danger); }
+.verdict-passed { border-left-color: var(--color-brand-success); }
+.verdict-errored { border-left-color: var(--color-brand-warning); }
+.verdict-interrupted,
+.verdict-empty { border-left-color: var(--color-text-muted); }
+
+.hs-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: 14px 18px;
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.hs-cell:first-child { border-left: none; }
+.hs-verdict { gap: 10px; }
+.hs-metric,
+.hs-top-failures { gap: 6px; }
+
+.hero-status-label {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  color: var(--color-text-secondary);
+}
+
+.verdict-failed .hero-status-label { color: var(--color-brand-danger); }
+.verdict-passed .hero-status-label { color: var(--color-brand-success); }
+.verdict-errored .hero-status-label { color: var(--color-brand-warning); }
+.verdict-interrupted .hero-status-label,
+.verdict-empty .hero-status-label { color: var(--color-text-secondary); }
+
+.fail-mix-bar {
+  display: flex;
+  height: 10px;
+  background: var(--color-track);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* The 1px border keeps both segments visible when forced-colours mode drops backgrounds. */
+.seg-failed { background: var(--color-danger-fill); border: 1px solid var(--color-brand-danger); }
+.seg-passed { background: var(--color-success-fill); border: 1px solid var(--color-brand-success); }
+
+.hs-sub,
+.hs-stop-note { font-family: var(--font-family-monospace); font-size: var(--font-size-xs); line-height: 1.4; }
+.hs-sub { color: var(--color-text-secondary); }
+.hs-stop-note { color: var(--color-brand-warning); }
+
+.m-label,
+.tk {
+  font-family: var(--font-family-monospace);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+}
+
+.m-value {
+  font-size: var(--font-size-2xl);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.m-sub {
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.tf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-xs); }
+
+.tf-list li {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: var(--space-sm);
+  align-items: baseline;
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+}
+
+.tf-n { text-align: right; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.tf-name { color: var(--color-text-primary); overflow-wrap: anywhere; }
+
+.target-block {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  align-items: baseline;
+  gap: 6px var(--space-md);
+  margin: 0 0 var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+}
+
+/* Seeds run to 38 digits and commands are arbitrarily long: wrap them, never truncate. */
+.tv { min-width: 0; color: var(--color-text-primary); font-weight: 500; overflow-wrap: anywhere; }
+.tv code { background: transparent; border: none; padding: 0; font-size: 1em; }
+
+.section { margin-top: var(--space-lg); }
+.section + .target-block { margin-top: var(--space-lg); }
+
+.section-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-text-secondary);
+}
+
+.num {
+  color: var(--color-text-primary);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rule { flex: 1; height: 1px; background: var(--color-border-subtle); }
+.section-note { margin: 0 0 var(--space-md); font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+.mg { border-left: 2px solid var(--color-warning-rail); padding: 2px 0 2px var(--space-md); }
+.op-mg { margin-top: var(--space-md); }
+/* Failures and errors are the same "failed" red; only warnings keep the amber accent. */
+.mg-error,
+.failures-section .mg { border-left-color: var(--color-danger-rail); }
+.mg-head { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-xs); }
+
+.mg-title {
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-brand-warning);
+}
+
+.mg-error .mg-title,
+.failures-section .mg-title { color: var(--color-brand-danger); }
+
+.mg-count {
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.mg-rule { flex: 1; height: 1px; background: var(--color-border-subtle); }
+
+.mg-desc {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* A method badge inside prose has no flex gap to lean on, unlike the one in a list row. */
+.mg-desc .method { margin-right: var(--space-xs); }
+
+.mg-list { list-style: none; margin: 0 0 var(--space-sm); padding: 0; }
+
+.mg-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--color-border-subtle);
+}
+
+.mg-list li:last-child { border-bottom: none; }
+.mg-detail { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; }
+
+.mg-code {
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  background: var(--color-background);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.mg-tip {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--font-size-xs);
+  line-height: 1.55;
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.tip-label {
+  margin-right: 6px;
+  font-family: var(--font-family-monospace);
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-text-primary);
+}
+
+.err-trace { margin-top: var(--space-sm); }
+
+.err-trace-summary {
+  cursor: pointer;
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.err-trace-summary:hover { color: var(--color-text-primary); }
+
+.err-trace-body {
+  margin: var(--space-sm) 0 0;
+  font-family: var(--font-family-monospace);
+  padding: var(--space-md);
+  background: var(--color-background);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  white-space: pre;
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.method {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.get { color: var(--color-http-get); background: var(--color-info-bg); }
+.post { color: var(--color-http-post); background: var(--color-success-bg); }
+.put { color: var(--color-http-put); background: var(--color-warning-bg); }
+.patch { color: var(--color-http-patch); background: var(--color-success-bg); }
+.delete { color: var(--color-http-delete); background: var(--color-danger-bg); }
+.head { color: var(--color-http-head); background: var(--color-info-bg); }
+.options { color: var(--color-http-options); background: var(--color-neutral-bg); }
+.trace { color: var(--color-http-trace); background: var(--color-neutral-bg); }
+
+.path {
+  min-width: 0;
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+@media print {
+  body { background: #ffffff; color: #1a1a1a; }
+  .hero-strip, .target-block { background: #ffffff; break-inside: avoid; }
+  .mg { break-inside: avoid; }
+  code, .brand-ver, .mg-code, .mg-count, .num { background: #ffffff; color: #1a1a1a; }
+  .hero-status-label, .m-value, .tf-name, .tv, .top-meta b, .mg-desc, .path, .tip-label { color: #1a1a1a; }
+  .m-label, .tk, .tm-eyebrow, .hs-sub, .m-sub, .tf-n, .section-eyebrow, .section-note, .mg-tip, .err-trace-summary,
+  .verdict-interrupted .hero-status-label,
+  .verdict-empty .hero-status-label { color: #4a4a4a; }
+  /* The dark-theme accents fall below 3:1 on white, and verb colours do not survive greyscale at all. */
+  .verdict-errored .hero-status-label, .hs-stop-note, .mg-title { color: #8a5300; }
+  .verdict-failed .hero-status-label, .mg-error .mg-title, .failures-section .mg-title { color: #b3261e; }
+  .verdict-passed .hero-status-label { color: #1c6b3a; }
+  .method { color: #1a1a1a; background: #ffffff; border-color: #8a8a8a; }
+  /* Tracebacks are the reason to print an errors page: reveal the collapsed ones and let them run long. */
+  details > *:not(summary) { display: block; }
+  details::details-content { content-visibility: visible; }
+  .err-trace-body { background: #ffffff; color: #1a1a1a; white-space: pre-wrap; max-height: none; overflow: visible; }
+}
