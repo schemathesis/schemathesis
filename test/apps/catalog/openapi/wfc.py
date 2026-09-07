@@ -6,6 +6,8 @@ from test.apps.builders import build_schema, make_flask_app_from_schema
 from test.apps.runtime import OpenAPIApp
 
 WFC_TOKEN = "secret-token-123"
+# Requests a freshly issued token serves before it starts answering 401.
+TOKEN_USES = 1
 WFC_SESSION = "sess-abc"
 WFC_USERNAME = "alice"
 WFC_PASSWORD = "secret"
@@ -186,3 +188,48 @@ def wfc_role_gated(deny_status: int = 403) -> OpenAPIApp:
 
 def wfc_role_gated_401() -> OpenAPIApp:
     return wfc_role_gated(deny_status=401)
+
+
+def wfc_expiring_token() -> OpenAPIApp:
+    """Login issues a token that dies after `TOKEN_USES` requests; re-login mints a fresh one."""
+    # Schema examples give the operation a fixed number of requests, so the token expires regardless
+    # of how many cases the generator happens to draw on a given platform.
+    spec = build_schema(
+        {
+            "/api/protected": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "schema": {"type": "integer"},
+                            "examples": {str(i): {"value": i} for i in range(1, 6)},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Token expired"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+    issued: dict[str, int] = {}
+    counter = {"n": 0}
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> object:
+        creds = request.get_json(silent=True) or request.form.to_dict()
+        counter["n"] += 1
+        token = f"{creds.get('user', '?')}-{counter['n']}"
+        issued[token] = 0
+        return jsonify({"access_token": token})
+
+    @app.route("/api/protected", methods=["GET"])
+    def protected() -> object:
+        token = (request.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+        used = issued.get(token)
+        if used is None or used >= TOKEN_USES:
+            return jsonify({"detail": "token expired"}), 401
+        issued[token] = used + 1
+        return jsonify({"ok": True})
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

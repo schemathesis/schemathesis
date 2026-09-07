@@ -590,10 +590,16 @@ unregister = GLOBAL_AUTH_STORAGE.unregister
 
 
 def _caching_providers_in(storage: AuthStorage) -> Iterator[CachingAuthProvider]:
+    from schemathesis.wfc.escalation import EscalatingAuthProvider
+
     for provider in storage.providers:
         if isinstance(provider, SelectiveAuthProvider):
             provider = provider.provider
-        if isinstance(provider, CachingAuthProvider):
+        # A provider holding one entry per identity keeps its cached tokens out of reach otherwise,
+        # leaving reactive reauth with nothing to refresh.
+        if isinstance(provider, EscalatingAuthProvider):
+            yield from (entry for entry in provider.providers if isinstance(entry, CachingAuthProvider))
+        elif isinstance(provider, CachingAuthProvider):
             yield provider
 
 
