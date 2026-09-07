@@ -1247,8 +1247,14 @@ def test_required_header_as_string(ctx):
             {"name": "X-API-Key-2", "in": "header", "required": True, "schema": {"type": "string"}},
         ],
     )
-    # Header is a string and we can't generate anything positive, except for a test case with missing headers
-    assert_negative_coverage(schema, [{}])
+    # Nothing about a bare string can be negated, so each required header is only tested by its own omission.
+    assert_negative_coverage(
+        schema,
+        [
+            {"headers": {"X-API-Key-1": ""}},
+            {"headers": {"X-API-Key-2": ""}},
+        ],
+    )
 
 
 @pytest.mark.parametrize(
@@ -1484,7 +1490,7 @@ def test_required_and_optional_headers_only_type(ctx):
         [
             # Can't really negate a parameter that can be anything, except for make it missing and injecting an unknown one
             {
-                "headers": {"x-schemathesis-unknown-property": "42"},
+                "headers": {"X-API-Key-1": "", "x-schemathesis-unknown-property": "42"},
             },
             {},
         ],
@@ -1736,10 +1742,12 @@ def test_optional_parameter_without_type(ctx):
             # Can't really negate a parameter that can be anything, except for make it missing and injecting an unknown one
             {
                 "query": {
+                    "query": "",
                     "x-schemathesis-unknown-property": "42",
                 },
             },
             {},
+            {"query": {"query": ["", ""]}},
         ],
     )
 
@@ -2105,7 +2113,8 @@ def test_path_parameters_with_unsupported_regex_pattern(ctx):
 
 
 def test_query_without_constraints_negative(ctx):
-    # When there are no constraints, then we can't generate negative values as everything will match the previous schema, only missing parameter
+    # When there are no constraints, then we can't generate negative values as everything will match the previous
+    # schema, only omitting or duplicating the parameter
     schema = build_schema(
         ctx,
         [
@@ -2117,7 +2126,7 @@ def test_query_without_constraints_negative(ctx):
             },
         ],
     )
-    assert_negative_coverage(schema, [{}])
+    assert_negative_coverage(schema, [{}, {"query": {"q": ["null", "null"]}}])
 
 
 @pytest.mark.parametrize(
@@ -4214,6 +4223,49 @@ def test_missing_required_header_case_uses_invalid_template_body(ctx):
 
 
 BODY_WITH_REQUIRED_PROPERTY = {"type": "object", "properties": {"key": {"type": "string"}}, "required": ["key"]}
+
+
+def _required_parameter_cases(ctx, location):
+    operation = body_operation(
+        ctx,
+        BODY_WITH_REQUIRED_PROPERTY,
+        parameters=[{"name": "X-Token", "in": location, "required": True, "schema": {"type": "string"}}],
+    )
+    return collect_cases(operation, GenerationMode.NEGATIVE)
+
+
+def _component_mode(case, location):
+    info = case.meta.components.get(location)
+    return info.mode if info is not None else None
+
+
+@pytest.mark.parametrize("location", ["header", "query", "cookie"])
+def test_required_parameter_without_negative_value_kept_in_negative_cases(ctx, location):
+    # A case that means to mutate the body must not also drop a required parameter it cannot mutate.
+    parameter_location = ParameterLocation(location)
+    assert {
+        (
+            tuple(sorted(getattr(case, parameter_location.container_name).items())),
+            _component_mode(case, parameter_location),
+        )
+        for case in _required_parameter_cases(ctx, location)
+        if case.meta.phase.data.parameter != "X-Token"
+    } == {((("X-Token", ""),), GenerationMode.POSITIVE)}
+
+
+@pytest.mark.parametrize("location", ["header", "query", "cookie"])
+def test_missing_required_parameter_case_omits_only_that_parameter(ctx, location):
+    parameter_location = ParameterLocation(location)
+    assert [
+        (
+            getattr(case, parameter_location.container_name),
+            _component_mode(case, parameter_location),
+            case.meta.generation.mode,
+            case.meta.phase.data.scenario,
+        )
+        for case in _required_parameter_cases(ctx, location)
+        if case.meta.phase.data.parameter == "X-Token"
+    ] == [({}, GenerationMode.NEGATIVE, GenerationMode.NEGATIVE, CoverageScenario.MISSING_PARAMETER)]
 
 
 def _missing_body_cases(operation):

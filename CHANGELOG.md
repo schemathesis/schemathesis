@@ -16,6 +16,7 @@
 - Operations answering 401 never escalating to the next user in a WFC auth document.
 - Expired tokens never refreshed when a WFC auth document lists several users.
 - Send header and cookie booleans and nulls as `true` / `false` / `null`.
+- Required headers, query and cookie parameters dropped from negative coverage cases.
 - `negative_data_rejection` and `missing_required_header` for 415 responses to requests without `Content-Type`.
 - Non-ASCII header values delivered to ASGI applications with the wrong encoding.
 - Crash on a specification extension such as `x-codegen-contextRoot` beside the path templates.
