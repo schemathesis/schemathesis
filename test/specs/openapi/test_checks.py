@@ -890,6 +890,7 @@ def test_missing_required_authorization_if_provided_explicitly(ctx, cli, tmp_pat
         (401, False),
         (403, False),
         (406, False),
+        (415, False),
         (422, False),
         (200, True),
         (500, True),

@@ -45,12 +45,12 @@ Reproduce with:
 - API accepted schema-violating request
 
     Invalid data should have been rejected
-    Expected: 400, 401, 403, 404, 405, 406, 409, 422, 428, 5xx
+    Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 5xx
     Invalid component: Missing `X-Required-Header` at header
 
 - Missing header not rejected
 
-    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406
+    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406, 415
 
 [201] Created:
 
