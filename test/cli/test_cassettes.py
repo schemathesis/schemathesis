@@ -3,6 +3,7 @@ import io
 import json
 import platform
 import sys
+import threading
 from pathlib import Path
 from unittest.mock import ANY
 
@@ -386,3 +387,18 @@ def test_write_double_quoted(text):
     stream = io.StringIO()
     write_double_quoted(stream, text)
     assert yaml.safe_load(stream.getvalue()) == text
+
+
+def test_rejected_report_path_leaves_no_writer_threads(cli, tmp_path):
+    # A rejected report path must not strand an already-started writer thread and hang the process on exit.
+    (tmp_path / "blocker").touch()
+    before = set(threading.enumerate())
+
+    result = cli.run(
+        "http://127.0.0.1:1/openapi.json",
+        "--report-vcr-path=cassette.yaml",
+        "--report-har-path=blocker/output.har",
+    )
+
+    assert result.exit_code == 2, result.stdout
+    assert sorted(thread.name for thread in set(threading.enumerate()) - before) == []

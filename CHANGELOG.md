@@ -17,6 +17,8 @@
 - Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
 - Malformed `components`, path item `parameters`, or non-object reference targets aborting the run.
 - Generated requests to ASGI applications sent with a different `Host` than the schema fetch.
+- Stray traceback and lost crash report when concurrent runs share a `.schemathesis` directory.
+- Run hanging forever when one report path is rejected and another report is enabled.
 - Coverage phase crashing on parameters and bodies whose schema is written as a boolean.
 - Operations answering 401 never escalating to the next user in a WFC auth document.
 - Expired tokens never refreshed when a WFC auth document lists several users.

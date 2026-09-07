@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
+import threading
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -21,6 +25,9 @@ from schemathesis.core.cache import (
     write,
 )
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+
+# Windows `chmod` cannot revoke directory write access, so only POSIX can force a real refusal on demand.
+requires_posix_permissions = pytest.mark.skipif(sys.platform == "win32", reason="Needs POSIX directory permissions")
 
 
 def _manifest(**overrides) -> Manifest:
@@ -194,3 +201,66 @@ def test_load_skips_entries_with_unknown_kind(tmp_path):
 )
 def test_sanitize_request(request_in, expected):
     assert sanitize_request(request_in, SanitizationConfig()) == expected
+
+
+def test_atomic_write_text_survives_concurrent_writers(tmp_path):
+    # Runs sharing an artifact directory must not consume each other's half-written file.
+    path = tmp_path / MANIFEST_FILENAME
+    payloads = [str(index) * 20_000 for index in range(8)]
+    barrier = threading.Barrier(len(payloads))
+    errors: list[OSError] = []
+
+    def write_repeatedly(payload: str) -> None:
+        barrier.wait()
+        for _ in range(50):
+            try:
+                storage.atomic_write_text(path, payload)
+            except OSError as exc:
+                errors.append(exc)
+
+    threads = [threading.Thread(target=write_repeatedly, args=(payload,)) for payload in payloads]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert path.read_text() in payloads
+
+
+@requires_posix_permissions
+def test_retry_while_locked_completes_once_permission_returns(tmp_path):
+    # Windows refuses to replace a file another run still has open; the write must survive that refusal.
+    source = tmp_path / "source.tmp"
+    source.write_text("payload")
+    destination = tmp_path / MANIFEST_FILENAME
+    destination.write_text("stale")
+    tmp_path.chmod(0o500)
+    unlock = threading.Timer(0.02, tmp_path.chmod, args=(0o700,))
+    unlock.start()
+
+    try:
+        storage.retry_while_locked(partial(os.replace, source, destination))
+    finally:
+        unlock.cancel()
+        tmp_path.chmod(0o700)
+
+    assert destination.read_text() == "payload"
+
+
+@requires_posix_permissions
+def test_retry_while_locked_raises_when_permission_never_returns(tmp_path):
+    # Reporting the refusal is the point: a swallowed one silently drops the data the caller asked to persist.
+    source = tmp_path / "source.tmp"
+    source.write_text("payload")
+    destination = tmp_path / MANIFEST_FILENAME
+    destination.write_text("stale")
+    tmp_path.chmod(0o500)
+
+    try:
+        with pytest.raises(PermissionError):
+            storage.retry_while_locked(partial(os.replace, source, destination))
+    finally:
+        tmp_path.chmod(0o700)
+
+    assert destination.read_text() == "stale"
