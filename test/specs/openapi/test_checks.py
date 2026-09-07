@@ -587,6 +587,67 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     )
 
 
+_READ_ONLY_COMPONENTS = {
+    "schemas": {
+        "Item": {
+            "type": "object",
+            "properties": {"id": {"type": "integer", "readOnly": True}, "name": {"type": "string"}},
+            "required": ["id", "name"],
+        },
+        "Fields": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+        "Items": {"type": "array", "items": {"$ref": "#/components/schemas/Item"}},
+        "Widget": {
+            "allOf": [
+                {"$ref": "#/components/schemas/Fields"},
+                {"type": "object", "properties": {"id": {"type": "integer", "readOnly": True}}},
+            ],
+            "required": ["id", "name"],
+        },
+    }
+}
+
+
+# A server may ignore a read-only property instead of rejecting it, so that alone is not a failure.
+@pytest.mark.parametrize(
+    ("ref", "body", "raises"),
+    [
+        ("Item", {"name": "", "id": {}}, False),
+        ("Widget", {"name": "", "id": {}}, False),
+        ("Item", {"name": 1, "id": {}}, True),
+        ("Item", {"id": {}}, True),
+        ("Items", [{"name": "", "id": {}}], False),
+        ("Items", [{"name": 1, "id": {}}], True),
+    ],
+    ids=["flat", "allOf", "other-violation", "missing-required", "array", "array-other-violation"],
+)
+def test_negative_data_rejection_read_only_property(ctx, response_factory, ref, body, raises):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": f"#/components/schemas/{ref}"}}},
+                    },
+                    "responses": {"201": {"description": "Created"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        },
+        components=_READ_ONLY_COMPONENTS,
+    )
+    case = schema["/items"]["POST"].Case(
+        body=body,
+        media_type="application/json",
+        _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+    )
+    response = response_factory.requests(status_code=201)
+    if raises:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+    else:
+        assert negative_data_rejection(check_context(), response, case) is None
+
+
 @pytest.mark.parametrize(
     ("media_type", "body_mode", "query_mode", "header_mode", "expected"),
     [
