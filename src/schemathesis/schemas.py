@@ -787,7 +787,10 @@ class APIOperation(Generic[P, R, S, SchemaT]):
 
     @property
     def has_skipped_required_body(self) -> bool:
-        """The operation declares a required body whose schema could not be parsed."""
+        """The operation declares a required body and none of its media types could be parsed."""
+        if self.body:
+            # At least one media type is usable, so valid data can still be sent.
+            return False
         return any(
             parameter.location == ParameterLocation.BODY.value and parameter.required
             for parameter in self.skipped_parameters

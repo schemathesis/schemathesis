@@ -4208,6 +4208,35 @@ def test_no_positive_cases_when_required_body_reference_is_unresolvable(ctx):
     assert iter_cases(operation, GenerationMode.POSITIVE) == []
 
 
+PARTIALLY_UNRESOLVABLE_REQUIRED_BODY = {
+    "required": True,
+    "content": {
+        "application/json": {
+            "schema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+        },
+        "application/xml": {"schema": {"$ref": "#/components/schemas/Missing"}},
+    },
+}
+
+
+def test_resolvable_media_type_is_covered_when_sibling_reference_is_unresolvable(ctx):
+    operation = load_schema(
+        ctx,
+        request_body=PARTIALLY_UNRESOLVABLE_REQUIRED_BODY,
+        parameters=[{"name": "tag", "in": "query", "required": True, "schema": {"type": "string"}}],
+    )["/foo"]["post"]
+
+    assert {
+        (case.media_type, case.meta.phase.data.parameter_location)
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+    } == {
+        (None, ParameterLocation.BODY),
+        ("application/json", None),
+        ("application/json", ParameterLocation.BODY),
+        ("application/json", ParameterLocation.QUERY),
+    }
+
+
 def test_missing_required_header_case_respects_before_call_hook_restoring_header(ctx):
     operation = load_schema(
         ctx,

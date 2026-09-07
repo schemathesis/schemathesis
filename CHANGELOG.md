@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Stateful reproduce chain printing every step with the failing step's request headers.
+- One unresolvable media type dropping an operation whose other request body media types resolve.
 - Malformed operation, `requestBody`, `content`, media type, or `security` nodes aborting the run.
 - Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
 - Malformed `components`, path item `parameters`, or non-object reference targets aborting the run.
