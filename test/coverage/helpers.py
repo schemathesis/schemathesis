@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unittest
 from urllib.parse import parse_qs, unquote
 
 import jsonschema_rs
@@ -84,7 +85,13 @@ def run_test(operation, test, modes=ALL_MODES, generate_duplicate_query_paramete
             settings=settings(phases=[Phase.explicit]),
         ),
     )
-    test_func()
+    try:
+        test_func()
+    except unittest.SkipTest as exc:
+        # An empty coverage phase would otherwise silently skip the test instead of failing it.
+        if "no test cases" not in str(exc):
+            raise
+        pytest.fail(f"Coverage phase generated no cases for {operation.label}")
 
 
 def run_positive_test(operation, test, **kwargs):
