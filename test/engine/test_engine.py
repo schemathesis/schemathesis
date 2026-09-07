@@ -704,6 +704,23 @@ def test_missing_path_parameter(ctx):
     assert len(event.recorder.cases) > 0
 
 
+def test_malformed_server_url_template(ctx):
+    # A malformed `servers` entry is a schema error, not a crash out of the engine.
+    schema = ctx.openapi.from_full_schema(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "T", "version": "1"},
+            "servers": [{"url": "https://x.test/{unclosed"}],
+            "paths": {"/p": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        }
+    )
+
+    stream = EventStream(schema, max_examples=1).execute()
+
+    stream.assert_errors()
+    assert "'servers[0].url' is not a valid URL template" in str(stream.find(events.NonFatalError).info)
+
+
 def test_max_failures(ctx):
     api = ctx.openapi.apps.failure_multiple_failures_unsatisfiable()
     schema = schemathesis.openapi.from_url(api.schema_url)

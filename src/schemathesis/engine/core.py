@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from schemathesis import auths
 from schemathesis.config import ConfigError, FuzzConfig
 from schemathesis.core import SpecificationFeature
-from schemathesis.core.errors import HookExecutionError
+from schemathesis.core.errors import HookExecutionError, InvalidSchema
 from schemathesis.engine import Status, StopReason, events, fuzz, run
 from schemathesis.engine._check_context import run_after_run_checks
 from schemathesis.engine.context import EngineContext
@@ -146,8 +146,14 @@ class ExecutionPlan:
         try:
             # Build checks up front: config errors surface here, not in a worker thread mid-run.
             _ = engine.checks
+            # Same for the base URL - a malformed `servers` entry is a schema error, not a phase crash.
+            engine.schema.get_base_url()
         except ConfigError as exc:
             yield events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="checks", related_to_operation=False)
+            yield events.EngineFinished(running_time=engine.running_time, stop_reason=engine.stop_reason)
+            return
+        except InvalidSchema as exc:
+            yield events.NonFatalError(error=exc, phase=PhaseName.PROBING, label="schema", related_to_operation=False)
             yield events.EngineFinished(running_time=engine.running_time, stop_reason=engine.stop_reason)
             return
         try:

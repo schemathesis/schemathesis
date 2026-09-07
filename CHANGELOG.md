@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Malformed `servers` URL templates aborting the run instead of reporting a schema error.
 - Stateful reproduce chain printing every step with the failing step's request headers.
 - One unresolvable media type dropping an operation whose other request body media types resolve.
 - Malformed operation, `requestBody`, `content`, media type, or `security` nodes aborting the run.
