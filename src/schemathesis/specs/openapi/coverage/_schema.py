@@ -1246,7 +1246,9 @@ _ANNOTATION_KEYWORDS = frozenset(
     }
 )
 # Keywords holding one subschema; two of them on a node both apply to the same values.
-_CHILD_SLOTS = frozenset({"items", "additionalProperties", "contains", "propertyNames", "additionalItems"})
+# `contains` is not one of them: two of them each want their own matching item, not one item
+# matching both, so folding them into a single subschema over-constrains the array.
+_CHILD_SLOTS = frozenset({"items", "additionalProperties", "propertyNames", "additionalItems"})
 _TIGHTEST_LOWER = frozenset({"minLength", "minItems", "minProperties", "minimum", "exclusiveMinimum"})
 _TIGHTEST_UPPER = frozenset({"maxLength", "maxItems", "maxProperties", "maximum", "exclusiveMaximum"})
 
@@ -1271,6 +1273,13 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
         for key, value in branch.items():
             if not _merge_keyword(merged, key, value):
                 return None
+    prefix_items = merged.get("prefixItems")
+    if prefix_items is not None and any(
+        "items" in branch and branch.get("prefixItems") != prefix_items for branch in folded_branches
+    ):
+        # `items` beside `prefixItems` only judges the positions past the prefix, so a branch
+        # naming `items` without that same prefix would stop judging the leading positions.
+        return None
     if merged.get("type") == [] or merged.get("enum") == []:
         # The branches leave no type or no value in common, so nothing satisfies all of them.
         return {"not": {}}

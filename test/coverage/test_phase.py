@@ -738,6 +738,62 @@ def test_positive_arrays_honor_contains(ctx, body):
     "body",
     [
         {
+            "allOf": [
+                {"type": "array", "items": {"type": "integer", "minimum": 5}},
+                {"type": "array", "prefixItems": [{"type": "integer"}], "minItems": 1},
+            ]
+        },
+        {
+            "allOf": [
+                {"type": "array", "prefixItems": [{"type": "integer"}], "minItems": 1},
+                {"type": "array", "items": {"type": "integer", "minimum": 5}},
+            ]
+        },
+        {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 5},
+            "anyOf": [{"prefixItems": [{"type": "integer"}], "minItems": 1}, {"maxItems": 0}],
+        },
+    ],
+    ids=["items-first", "prefix-first", "any-of"],
+)
+def test_positive_arrays_keep_sibling_items_beside_prefix_items(ctx, body):
+    # An `items` branch still judges the positions a sibling branch's `prefixItems` names.
+    assert collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {
+            "allOf": [
+                {"type": "array", "contains": {"type": "integer"}},
+                {"type": "array", "contains": {"type": "string"}},
+            ]
+        },
+        {
+            "type": "array",
+            "contains": {"type": "integer"},
+            "allOf": [{"contains": {"type": "string"}}],
+        },
+    ],
+    ids=["two-branches", "outer-and-branch"],
+)
+def test_positive_arrays_cover_disjoint_contains_branches(ctx, body):
+    # Two `contains` each want their own matching item, not one item matching both.
+    operation = body_operation(ctx, body, version="3.1.0")
+    validator = jsonschema_rs.Draft202012Validator(body)
+
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.POSITIVE) if case.body is not NOT_SET]
+
+    assert bodies, "No positive bodies generated"
+    assert [value for value in bodies if not validator.is_valid(value)] == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {
             "type": "object",
             "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
             "required": ["a"],
