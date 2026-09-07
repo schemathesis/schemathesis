@@ -39,6 +39,7 @@ from schemathesis.resources import ExtraDataSource, SemanticDraw
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
+from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
@@ -1711,20 +1712,14 @@ OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
 OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 
 
-def _ensure_object(value: object, label: str) -> None:
-    """Reject a schema node that must be an object but carries some other JSON value."""
-    if not isinstance(value, dict):
-        raise InvalidSchema(f"{label} must be an object")
-
-
-def _validated_parameters(definition: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
-    """Return the operation's `parameters` list, validating its shape."""
-    parameters = definition.get("parameters", [])
-    if not isinstance(parameters, list):
-        raise InvalidSchema("'parameters' must be a list of parameter objects")
+def _validated_parameters(parameters: object, label: str) -> Sequence[Mapping[str, Any]]:
+    """Return a `parameters` list, validating its shape."""
+    # Shared path item parameters arrive as a tuple.
+    if not isinstance(parameters, (list, tuple)):
+        raise InvalidSchema(f"{label} must be a list of parameter objects")
     for index, parameter in enumerate(parameters):
         if not isinstance(parameter, dict):
-            raise InvalidSchema(f"'parameters[{index}]' must be a parameter object")
+            raise InvalidSchema(f"{label}[{index}] must be a parameter object")
     return parameters
 
 
@@ -1738,7 +1733,7 @@ def iter_parameters_v2(
     bundle_cache: BundleCache,
     skipped: list[SkippedParameter],
 ) -> Iterator[OperationParameter]:
-    _ensure_object(definition, "Operation definition")
+    ensure_object(definition, "Operation definition")
     media_types = definition.get("consumes", default_media_types)
     # Wildcard `*/*` is valid Swagger but no real client sends it as Content-Type. Drop it when concrete
     # entries exist; otherwise fall through to the JSON default so downstream dispatch can route bodies.
@@ -1752,7 +1747,8 @@ def iter_parameters_v2(
     # the default because it is broader since it allows us to upload files.
     form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
 
-    operation_parameters = _validated_parameters(definition)
+    operation_parameters = _validated_parameters(definition.get("parameters", []), "'parameters'")
+    shared_parameters = _validated_parameters(shared_parameters, "Path item 'parameters'")
 
     form_parameters = []
     form_name_to_uri = {}
@@ -1816,13 +1812,14 @@ def iter_parameters_v3(
 ) -> Iterator[OperationParameter]:
     # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
     # TODO: Typing
-    _ensure_object(definition, "Operation definition")
+    ensure_object(definition, "Operation definition")
     operation = definition
 
     seen_querystring = False
     seen_query = False
 
-    operation_parameters = _validated_parameters(definition)
+    operation_parameters = _validated_parameters(definition.get("parameters", []), "'parameters'")
+    shared_parameters = _validated_parameters(shared_parameters, "Path item 'parameters'")
 
     for parameter in chain(operation_parameters, shared_parameters):
         bundled_parameter = _bundle_parameter(parameter, resolver, bundler, bundle_cache, skipped)
@@ -1849,15 +1846,15 @@ def iter_parameters_v3(
 
     request_body_or_ref = operation.get("requestBody")
     if request_body_or_ref is not None:
-        _ensure_object(request_body_or_ref, "`requestBody`")
+        ensure_object(request_body_or_ref, "`requestBody`")
         body_resolver, request_body_or_ref = maybe_resolve_with_resolver(request_body_or_ref, resolver)
         # It could be an object inside `requestBodies`, which could be a reference itself
         body_resolver, request_body = maybe_resolve_with_resolver(request_body_or_ref, body_resolver)
 
         required = request_body.get("required", False)
-        _ensure_object(request_body["content"], "`requestBody.content`")
+        ensure_object(request_body["content"], "`requestBody.content`")
         for media_type, content in request_body["content"].items():
-            _ensure_object(content, f"Media type `{media_type}`")
+            ensure_object(content, f"Media type `{media_type}`")
             resource_name = None
             schema = content.get("schema")
             name_to_uri = {}

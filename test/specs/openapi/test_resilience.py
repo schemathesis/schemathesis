@@ -177,6 +177,64 @@ def test_non_list_security_requirements_v3(ctx, security):
     assert "Location:\n    security" in str(result.err())
 
 
+@pytest.mark.parametrize(
+    "components",
+    ["oops", 42, {"securitySchemes": "oops"}],
+    ids=["string", "integer", "security_schemes_string"],
+)
+def test_malformed_components_node_v3(ctx, components):
+    result = _first_operation(ctx.openapi.load_schema({"/things": {"post": _OK_RESPONSES}}, components=components))
+    assert isinstance(result, Err)
+    assert isinstance(result.err(), InvalidSchema)
+    assert "Location:\n    components" in str(result.err())
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"], ids=["v2", "v3"])
+@pytest.mark.parametrize("parameters", [{"a": 1}, "not-a-list", 42], ids=["mapping", "string", "integer"])
+def test_malformed_path_item_parameters(ctx, version, parameters):
+    schema = ctx.openapi.load_schema(
+        {"/things": {"parameters": parameters, "post": _OK_RESPONSES}, "/ok": {"get": _OK_RESPONSES}},
+        version=version,
+    )
+    broken, valid = list(schema.get_all_operations())
+    assert isinstance(broken, Err)
+    assert isinstance(broken.err(), InvalidSchema)
+    assert "Location:\n    paths -> /things -> parameters" in str(broken.err())
+    assert isinstance(valid, Ok)
+
+
+@pytest.mark.parametrize(
+    ("operation", "components", "location"),
+    [
+        (
+            {"requestBody": {"$ref": "#/components/requestBodies/Broken"}, **_OK_RESPONSES},
+            {"requestBodies": {"Broken": "not-an-object"}},
+            "components -> requestBodies -> Broken",
+        ),
+        (
+            {"parameters": [{"$ref": "#/components/parameters/Broken"}], **_OK_RESPONSES},
+            {"parameters": {"Broken": "not-an-object"}},
+            "components -> parameters -> Broken",
+        ),
+        (
+            {"responses": {"200": {"$ref": "#/components/responses/Broken"}}},
+            {"responses": {"Broken": "not-an-object"}},
+            "components -> responses -> Broken",
+        ),
+    ],
+    ids=["request_body", "parameter", "response"],
+)
+def test_reference_to_non_object_node_v3(ctx, operation, components, location):
+    schema = ctx.openapi.load_schema(
+        {"/things": {"post": operation}, "/ok": {"get": _OK_RESPONSES}}, components=components
+    )
+    broken, valid = list(schema.get_all_operations())
+    assert isinstance(broken, Err)
+    assert isinstance(broken.err(), InvalidSchema)
+    assert f"Location:\n    {location}" in str(broken.err())
+    assert isinstance(valid, Ok)
+
+
 @pytest.mark.parametrize("required", [False, True], ids=["optional", "required"])
 def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
     schema = ctx.openapi.load_schema(
