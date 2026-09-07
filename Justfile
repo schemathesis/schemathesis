@@ -54,6 +54,7 @@ serve PORT="8081" FACTORY="kitchen_sink" *ARGS:
 
 check:
     uvx prek run --all-files
+    @just check-tooling
 
 fmt:
     uvx prek run ruff-format --all-files

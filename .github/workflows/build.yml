@@ -4,13 +4,14 @@ on:
   pull_request:
     paths:
       - "**.py"
-      - ".github/workflows/*.yml"
-      - ".pre-commit-config.yaml"
-      - ".relint.yml"
+      - "**.json"
+      - "**.toml"
+      - "**.yaml"
+      - "**.yml"
       - ".yamllint"
-      - "pyproject.toml"
-      - "tox.ini"
+      - "Justfile"
       - "mypy.ini"
+      - "tox.ini"
   push:
     branches:
       - master
@@ -146,11 +147,3 @@ jobs:
           fi
         working-directory: ./test/apps
         shell: bash
-
-  spell-check:
-    name: Spell Check
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: crate-ci/typos@d43b6c087ac471e2ea7b8af622ff15f05c0c365b # v1.50.1

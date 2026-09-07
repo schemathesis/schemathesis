@@ -221,3 +221,4 @@ reports/
 .worktrees/
 .schemathesis/
 test-corpus/.schemastore-cache/
+uv.lock
