@@ -49,6 +49,11 @@ def _is_specification_extension(path: object) -> bool:
     return isinstance(path, str) and path.startswith("x-")
 
 
+def is_parsable_operation(definition: object) -> bool:
+    """Whether an operation node carries something the adapters can read."""
+    return isinstance(definition, dict) and bool(definition)
+
+
 def _named_after_placeholder(parameters: list[OperationParameter], path: str) -> list[OperationParameter]:
     """Give a path parameter whose name is not text the placeholder it stands for.
 
@@ -233,8 +238,10 @@ class OperationLoader:
                 for method, definition in path_item.items():
                     if method not in HTTP_METHODS:
                         continue
-                    if not definition:
+                    # A malformed node is still an operation the document declares; it just cannot be parsed.
+                    if not is_parsable_operation(definition):
                         complete_walk = False
+                        statistic.operations.total += 1
                         continue
                     if self._serves_schema_document(path, method, definition):
                         # Keep a filter that targets it from being reported as matching nothing.
@@ -250,7 +257,11 @@ class OperationLoader:
                         if "operationId" in definition:
                             selected_operations_by_id.add(definition["operationId"])
                         selected_operations_by_path.add((method, path))
-                    for response in definition.get("responses", {}).values():
+                    responses = definition.get("responses", {})
+                    if not isinstance(responses, dict):
+                        complete_walk = False
+                        continue
+                    for response in responses.values():
                         # A vendor extension key inside `responses` may carry any JSON value.
                         if not isinstance(response, dict):
                             continue

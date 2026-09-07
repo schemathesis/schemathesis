@@ -145,10 +145,52 @@ _OK_RESPONSES = {"responses": {"200": {"description": "OK"}}}
 @pytest.mark.parametrize("version", ["2.0", "3.0.2"], ids=["v2", "v3"])
 @pytest.mark.parametrize("definition", [None, "not-an-object"], ids=["none", "string"])
 def test_malformed_operation_node(ctx, version, definition):
-    result = _first_operation(ctx.openapi.load_schema({"/things": {"post": definition}}, version=version))
-    assert isinstance(result, Err)
-    assert isinstance(result.err(), InvalidSchema)
-    assert "Location:\n    paths -> /things -> post" in str(result.err())
+    schema = ctx.openapi.load_schema({"/things": {"post": definition}, "/ok": {"get": _OK_RESPONSES}}, version=version)
+    results = list(schema.get_all_operations())
+    assert isinstance(results[0], Err)
+    assert isinstance(results[0].err(), InvalidSchema)
+    assert "Location:\n    paths -> /things -> post" in str(results[0].err())
+    assert schema.statistic.operations.total == len(results)
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"], ids=["v2", "v3"])
+@pytest.mark.parametrize("responses", [None, "not-an-object", 42], ids=["none", "string", "integer"])
+def test_malformed_responses_node(ctx, version, responses):
+    schema = ctx.openapi.load_schema(
+        {"/things": {"post": {"responses": responses}}, "/ok": {"get": _OK_RESPONSES}}, version=version
+    )
+    results = list(schema.get_all_operations())
+    assert isinstance(results[0], Err)
+    assert isinstance(results[0].err(), InvalidSchema)
+    assert schema.statistic.operations.total == len(results)
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"], ids=["v2", "v3"])
+@pytest.mark.parametrize("definition", [None, "not-an-object"], ids=["none", "string"])
+def test_operation_lookup_survives_malformed_sibling(ctx, version, definition):
+    schema = ctx.openapi.load_schema(
+        {"/things": {"post": definition}, "/ok": {"get": {"operationId": "ok", **_OK_RESPONSES}}},
+        version=version,
+    )
+    assert schema.find_operation_by_id("ok").label == "GET /ok"
+
+
+@pytest.mark.parametrize("body_schema", [True, False], ids=["true", "false"])
+def test_boolean_body_schema_v2(ctx, body_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/things": {
+                "post": {
+                    "parameters": [{"in": "body", "name": "body", "required": True, "schema": body_schema}],
+                    **_OK_RESPONSES,
+                }
+            }
+        },
+        version="2.0",
+    )
+    results = list(schema.get_all_operations())
+    assert isinstance(results[0], Ok)
+    assert schema.statistic.operations.total == len(results)
 
 
 @pytest.mark.parametrize(

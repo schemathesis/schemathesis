@@ -1772,8 +1772,9 @@ def iter_parameters_v2(
             resource_name = None
             for param in chain(operation_parameters, shared_parameters):
                 _, param = maybe_resolve_with_resolver(param, resolver)
-                if param.get("in") == ParameterLocation.BODY and "$ref" in param["schema"]:
-                    resource_name = resource_name_from_ref(param["schema"]["$ref"])
+                schema = param.get("schema")
+                if param.get("in") == ParameterLocation.BODY and isinstance(schema, dict) and "$ref" in schema:
+                    resource_name = resource_name_from_ref(schema["$ref"])
             for media_type in body_media_types:
                 yield OpenApiBody.from_definition(
                     definition=parameter,
