@@ -412,7 +412,8 @@ def to_json(item: Generated, name: str) -> None:
 
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
-    item[name] = delimiter.join(map(str, force_iterable(item[name] if item[name] is not None else ())))
+    values = force_iterable(item[name] if item[name] is not None else ())
+    item[name] = delimiter.join(_wire_item(value) for value in values)
 
 
 # Wire form of each delimiter. Comma and pipe are valid query/path characters and stay literal;
@@ -421,7 +422,7 @@ _WIRE_DELIMITERS = {",": ",", "|": "|", " ": "%20", "\t": "%09"}
 
 
 def _wire_item(value: object) -> str:
-    """Render one delimited item as a URL spells it: JSON scalars, not their Python repr."""
+    """Render one value as the wire spells it: JSON scalars, not their Python repr."""
     if isinstance(value, bool):
         return "true" if value else "false"
     if value is None:
@@ -640,4 +641,4 @@ def nothing(item: Generated, name: str) -> None:
 @conversion
 def to_string(item: Generated, name: str) -> None:
     """Convert the value to a string."""
-    item[name] = str(item[name])
+    item[name] = _wire_item(item[name])
