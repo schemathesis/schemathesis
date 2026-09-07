@@ -49,7 +49,7 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== WARNINGS ===================================
 
-Unsupported regex patterns: 3 operations contain regex patterns no value can be generated for
+Unsupported regex patterns: 3 operations contain regex patterns Schemathesis cannot use as written
 
   - POST /bar
     No value can be generated for `\p{Tibetan}`
@@ -79,7 +79,7 @@ Errors:
   🚫 Schema Error: 2
 
 Warnings:
-  ⚠️ Unsupported regex: 3 operations had ungeneratable regex patterns
+  ⚠️ Unsupported regex: 3 operations had unusable regex patterns
 
 Test cases:
   N generated, N passed

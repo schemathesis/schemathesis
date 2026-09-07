@@ -7,6 +7,7 @@ from schemathesis.specs.openapi.warnings import (
     UnresolvableReferenceWarning,
     detect_missing_deserializers,
     detect_unresolvable_references,
+    detect_unsupported_regex,
 )
 
 
@@ -334,3 +335,39 @@ def test_detect_unresolvable_references(ctx, operation, expected):
         UnresolvableReferenceWarning(operation_label="GET /users", subject=subject, reference=reference)
         for subject, reference in expected
     ]
+
+
+# A pattern the validator cannot compile is stripped from the schema, so values are drawn without it.
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("^.{1,2097152}", ["Dropped `^.{1,2097152}` - generated values may not match it"]),
+        (
+            "^(\\/|(\\/(?!\\.)+[^$#<>;`|&?{}^*/\\n]+){1,4})$",
+            ["Dropped `^(\\/|(\\/(?!\\.)+[^$#<>;`|&?{}^*/\\n]+){1,4})$` - generated values may not match it"],
+        ),
+        ("\\p{Tibetan}+", ["No value can be generated for `\\p{Tibetan}+`"]),
+        ("^[a-z]+$", []),
+    ],
+    ids=["dropped-python-valid", "dropped-lookahead", "kept-but-ungeneratable", "supported"],
+)
+def test_detect_unsupported_regex(ctx, pattern, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "filter",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": pattern},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Success"}},
+                }
+            }
+        }
+    )
+
+    assert [warning.message for warning in detect_unsupported_regex(schema["/users"]["GET"])] == expected

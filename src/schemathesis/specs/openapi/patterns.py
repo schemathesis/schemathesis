@@ -612,6 +612,15 @@ def is_valid_jsonschema_rs_regex(pattern: str) -> bool:
         return False
 
 
+def enforced_pattern(pattern: object) -> str | None:
+    """The pattern a schema keeps, or `None` when the validator cannot compile it and it is dropped."""
+    translated = normalize_regex(pattern)
+    current = translated if translated is not None else pattern
+    if not isinstance(current, str) or not is_valid_jsonschema_rs_regex(current):
+        return None
+    return current
+
+
 def is_valid_python_regex(pattern: object) -> TypeGuard[str]:
     """Check if a pattern is valid Python regex."""
     if not isinstance(pattern, str):

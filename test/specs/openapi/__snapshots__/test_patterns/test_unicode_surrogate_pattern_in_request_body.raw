@@ -41,6 +41,15 @@ Reproduce with:
 
     st replay <PLACEHOLDER>
 
+=================================== WARNINGS ===================================
+
+Unsupported regex patterns: 1 operation contain regex patterns Schemathesis cannot use as written
+
+  - POST /test
+    Dropped `[\uD800-\uDBFF]` - generated values may not match it
+
+💡 Supply examples for these operations, or narrow the pattern
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -56,9 +65,12 @@ Test Phases:
 Failures:
   ❌ API accepted schema-violating request: 1
 
+Warnings:
+  ⚠️ Unsupported regex: 1 operation had unusable regex patterns
+
 Test cases:
   N generated, N found N unique failures
 
 Seed: 42
 
-============================== 1 failure in 1.00s ==============================
+======================== 1 failure, 1 warning in 1.00s =========================

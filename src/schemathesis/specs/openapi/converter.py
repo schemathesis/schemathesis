@@ -8,8 +8,8 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_T
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.patterns import (
+    enforced_pattern,
     is_valid_jsonschema_rs_regex,
-    normalize_regex,
     pattern_length_bounds,
     update_quantifier,
 )
@@ -137,14 +137,13 @@ def _to_json_schema(
     # Handle unsupported regex patterns - try translation first, remove if that fails
     pattern = schema.get("pattern")
     if pattern is not None:
-        translated = normalize_regex(pattern)
-        if translated is not None:
-            schema["pattern"] = translated
         # One the validator compiles is kept even where Python cannot read it - the API enforces it,
         # so dropping it would draw values the API turns down.
-        current = schema.get("pattern")
-        if not isinstance(current, str) or not is_valid_jsonschema_rs_regex(current):
+        enforced = enforced_pattern(pattern)
+        if enforced is None:
             del schema["pattern"]
+        else:
+            schema["pattern"] = enforced
     if update_quantifiers:
         update_pattern_in_schema(schema)
     # Sometimes `required` is incorrectly has a boolean value
