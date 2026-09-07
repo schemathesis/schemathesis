@@ -26,7 +26,7 @@ from schemathesis.core.jsonschema import (
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, get_type
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue, as_object_schema, get_type
 from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
 from schemathesis.core.transforms import deepclone
@@ -2123,11 +2123,8 @@ class OpenApiParameterSet(ParameterSet):
                 )
                 usage_tracker = extra_data_source.usage_tracker
 
-        # `JsonSchema` can be boolean (`True` / `False`), normalize to an object schema for downstream usage.
-        if isinstance(schema, bool):
-            schema = {} if schema else {"not": {}}
-        assert isinstance(schema, dict)
-        schema_obj: JsonSchemaObject = schema
+        # A schema written as `true` / `false` needs the object spelling for downstream usage.
+        schema_obj: JsonSchemaObject = as_object_schema(schema)
 
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
@@ -2344,7 +2341,7 @@ class OpenApiParameterSet(ParameterSet):
             else:
                 header_filter = is_valid_header
                 # Headers with special format do not need filtration
-                if not (self.location.is_in_header and _can_skip_header_filter(schema)):
+                if not (self.location.is_in_header and _can_skip_header_filter(schema_obj)):
                     if is_negative:
                         strategy = strategy.filter(lambda x: header_filter(x.value))
                     else:
