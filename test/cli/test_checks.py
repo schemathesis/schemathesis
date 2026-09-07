@@ -1732,3 +1732,34 @@ def test_response_schema_conformance_large_pattern(ctx, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_alternative_security_requirements_should_not_trigger_negative_data_rejection(ctx, cli, snapshot_cli):
+    # OpenAPI OR-s security alternatives, so dropping one credential is fine while another one is supplied.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/me": {
+                "get": {
+                    "security": [{"cookie_auth": []}, {"basic_auth": []}],
+                    "responses": {"200": {"description": "200 OK"}, "403": {"description": "Forbidden"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "cookie_auth": {"type": "apiKey", "in": "cookie", "name": "sessionid"},
+                "basic_auth": {"type": "http", "scheme": "basic"},
+            }
+        },
+    )
+
+    @app.route("/me", methods=["GET"])
+    def me():
+        if request.headers.get("Authorization") == "Basic dXNlcjpwYXNz" or request.cookies.get("sessionid") == "real":
+            return jsonify({"username": "tester"})
+        return jsonify({"detail": "forbidden"}), 403
+
+    assert (
+        cli.run_openapi_app(app, "-c negative_data_rejection", "--phases=coverage", "--auth=user:pass") == snapshot_cli
+    )
