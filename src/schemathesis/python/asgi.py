@@ -270,7 +270,8 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
             headers = [(b"host", header_host.encode())]
         else:
             headers = [(b"host", f"{header_host}:{port}".encode())]
-        headers += [(key.lower().encode(), value.encode()) for key, value in request.headers.items()]
+        # Headers travel over the wire as latin-1, so the app gets the same octets a real server would give it.
+        headers += [(key.lower().encode("latin-1"), value.encode("latin-1")) for key, value in request.headers.items()]
 
         scope: Scope = {
             "type": "http",
