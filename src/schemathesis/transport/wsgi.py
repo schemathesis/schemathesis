@@ -135,7 +135,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
 
         requests_kwargs = REQUESTS_TRANSPORT.serialize_case(
             case,
-            base_url=normalize_base_url(case.operation.base_url),
+            base_url=normalize_base_url(case.operation.base_url, host=wsgi.HOST),
             headers=headers,
             params=params,
             cookies=cookies,
