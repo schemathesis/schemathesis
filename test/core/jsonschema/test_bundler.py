@@ -461,6 +461,20 @@ def test_bundle_non_recursive_inlined():
     assert Bundler().bundle(schema, resolver).schema == {"type": "object"}
 
 
+def test_bundle_not_inlined_when_a_sibling_also_references_the_target():
+    # Inlining the root `$ref` must not strip storage a sibling reference still points at.
+    schema = {"$ref": "#/definitions/User", "allOf": [{"$ref": "#/definitions/User"}]}
+    store = {"definitions": {"User": {"type": "object"}}}
+
+    resolver = make_root_resolver(store)
+
+    assert Bundler().bundle(schema, resolver).schema == {
+        "$ref": "#/x-bundled/schema1",
+        "allOf": [{"$ref": "#/x-bundled/schema1"}],
+        BUNDLE_STORAGE_KEY: {"schema1": {"type": "object"}},
+    }
+
+
 def _strip_remote_refs(value: Any) -> Any:
     if isinstance(value, dict):
         ref = value.get("$ref")
