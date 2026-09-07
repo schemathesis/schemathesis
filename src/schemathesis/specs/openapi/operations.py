@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.types import OperationObject
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"})
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
+SCHEMA_PARSING_ERRORS = (KeyError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
 
 _V3_1 = version.parse("3.1")
 
@@ -130,12 +130,14 @@ class OperationLoader:
             method = None
             try:
                 dispatch_before_process_path(schema, context, path, path_item)
-                if "$ref" in path_item:
+                if isinstance(path_item, dict) and "$ref" in path_item:
                     path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
                     scope = path_resolver.base_uri
                 else:
                     path_resolver = root_resolver
                     scope = path_resolver.base_uri
+                if not isinstance(path_item, dict):
+                    raise InvalidSchema("Path item must be an object", path=path)
                 shared_parameters = path_item.get("parameters", [])
                 for method, entry in path_item.items():
                     if not is_http_method_schema(method):
