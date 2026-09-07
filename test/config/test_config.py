@@ -2,7 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from schemathesis.config import ConfigError, OperationConfig, OperationsConfig, ProjectConfig, SchemathesisConfig
+from schemathesis.config import (
+    ConfigError,
+    OperationConfig,
+    OperationsConfig,
+    ProjectConfig,
+    SchemathesisConfig,
+    SchemathesisWarning,
+)
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.errors import HookError
 from schemathesis.filters import FilterSet
@@ -21,6 +28,7 @@ def get_all_config_files(*subdirectories: str) -> dict[str, Path]:
 
 
 ALL_CONFIGS = get_all_config_files("common", "report", "cache", "parameters", "operations", "fuzz", "dictionaries")
+WARNING_NAMES = [warning.value for warning in SchemathesisWarning]
 
 
 @pytest.mark.parametrize(
@@ -166,3 +174,43 @@ def test_filter_set_with_returns_copy_when_no_operations():
     original.exclude(path="/admin")
 
     assert ops.filter_set_with(include=original) is not original
+
+
+@pytest.mark.parametrize(
+    ("template", "select"),
+    [
+        ('warnings = ["{name}"]', lambda warnings: warnings.display),
+        ('[warnings]\ndisplay = ["{name}"]', lambda warnings: warnings.display),
+        ('[warnings]\nfail-on = ["{name}"]', lambda warnings: warnings.fail_on),
+    ],
+    ids=["shorthand", "display", "fail-on"],
+)
+@pytest.mark.parametrize("name", WARNING_NAMES, ids=WARNING_NAMES)
+def test_every_warning_name_is_usable_in_config(name, template, select):
+    config = SchemathesisConfig.from_str(template.format(name=name))
+
+    assert select(config.projects.default.warnings_for(operation=None)) == [SchemathesisWarning.from_str(name)]
+
+
+def test_warning_names_match_config_schema():
+    assert CONFIG_SCHEMA["$defs"]["WarningName"]["enum"] == WARNING_NAMES
+
+
+@pytest.mark.parametrize(
+    ("source", "section", "description"),
+    [
+        ('warnings = ["mising_auth"]', "root", "Item #0 in the 'warnings' array"),
+        ('[warnings]\ndisplay = ["mising_auth"]', "[warnings]", "Item #0 in the 'display' array"),
+        ('[warnings]\nfail-on = ["mising_auth"]', "[warnings]", "Item #0 in the 'fail-on' array"),
+    ],
+    ids=["shorthand", "display", "fail-on"],
+)
+def test_unknown_warning_name_is_reported_with_a_suggestion(source, section, description):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_str(source)
+
+    assert str(exc.value) == (
+        f"Error in {section} section:\n  Invalid value:\n\n"
+        f"  - {description} -> 'mising_auth' is not a valid value. Did you mean 'missing_auth'?\n\n"
+        f"Valid values are: {', '.join(repr(name) for name in sorted(WARNING_NAMES))}."
+    )
