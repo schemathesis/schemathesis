@@ -20,6 +20,13 @@ def get_type(schema: JsonSchema) -> list[str]:
     return [t for t in ALL_TYPES if t in ty]
 
 
+def as_object_schema(schema: JsonSchema) -> JsonSchemaObject:
+    """A schema written as `true` / `false` spelled as the equivalent object schema."""
+    if isinstance(schema, bool):
+        return {} if schema else {"not": {}}
+    return schema
+
+
 def to_json_type_name(v: object) -> str:
     if v is None:
         return "null"

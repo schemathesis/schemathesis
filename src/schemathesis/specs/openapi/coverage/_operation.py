@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, TypeGuard, cast
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.jsonschema.types import as_object_schema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
@@ -456,13 +456,6 @@ def _generate_coverage_values_from_custom_strategy(
     )
 
 
-def _as_object_schema(schema: JsonSchema) -> JsonSchemaObject:
-    """A schema written as `true` / `false` spelled as the object schema the coverage phase works with."""
-    if isinstance(schema, bool):
-        return {} if schema else {"not": {}}
-    return schema
-
-
 def _generate_multipart_body_from_custom_strategies(body: OpenApiBody) -> dict[str, Any] | None:
     """Generate a body dict for multipart forms using custom encoding strategies.
 
@@ -471,7 +464,7 @@ def _generate_multipart_body_from_custom_strategies(body: OpenApiBody) -> dict[s
     if body.media_type not in FORM_MEDIA_TYPES:
         return None
 
-    schema = _as_object_schema(body.definition.get("schema", {}))
+    schema = as_object_schema(body.definition.get("schema", {}))
     properties = schema.get("properties", {})
     required = schema.get("required", [])
 
@@ -644,7 +637,7 @@ def _seed_parameters(run: CoverageRun) -> None:
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
-        schema = _as_object_schema(parameter.unoptimized_schema)
+        schema = as_object_schema(parameter.unoptimized_schema)
         schema_is_clone = False
         if error_feedback is not None and isinstance(schema, dict):
             inferred_properties = _inferred_properties(location)
@@ -808,7 +801,7 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
             )
             continue
 
-        schema = _as_object_schema(body.unoptimized_schema)
+        schema = as_object_schema(body.unoptimized_schema)
         schema_is_clone = False
         if error_feedback is not None:
             adjusted = apply_adjustments(
@@ -818,7 +811,7 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
                 store=error_feedback,
             )
             if adjusted is not schema:
-                schema = _as_object_schema(adjusted)
+                schema = as_object_schema(adjusted)
                 schema_is_clone = True
         examples = body.examples
         if examples and schema_is_clone:
