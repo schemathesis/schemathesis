@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- `UnicodeEncodeError` when the output encoding cannot represent status glyphs, such as CP1252 on Windows.
 - `UnicodeDecodeError` on non-ASCII response headers from ASGI applications.
 - Malformed `servers` URL templates aborting the run instead of reporting a schema error.
 - Stateful reproduce chain printing every step with the failing step's request headers.
