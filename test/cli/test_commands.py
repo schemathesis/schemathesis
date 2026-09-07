@@ -1984,6 +1984,43 @@ def test_required_body_with_unresolvable_reference(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--max-examples=1") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_required_body_with_one_unresolvable_media_type(ctx, cli, snapshot_cli):
+    # A sibling media type that resolves keeps the operation in every phase
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/things": {
+                "post": {
+                    "parameters": [{"name": "tag", "in": "query", "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            },
+                            "application/xml": {"schema": {"$ref": "#/components/schemas/Missing"}},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/things", methods=["POST"])
+    def things_with_xml():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("name"), str):
+            return jsonify({"error": "invalid body"}), 400
+        return jsonify([])
+
+    assert cli.run_openapi_app(app, "--max-examples=1") == snapshot_cli
+
+
 @pytest.mark.parametrize("value", ["true", "false"])
 def test_output_sanitization(ctx, cli, hypothesis_max_examples, value):
     api = ctx.openapi.apps.failure()
