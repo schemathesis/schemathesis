@@ -3594,9 +3594,9 @@ def test_positive_body_under_allof_with_optional_outer_property_only(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
 
 
-def test_positive_body_under_unsatisfiable_allof_chain(ctx):
-    # Outer's `required` key is absent from a base with `additionalProperties: false`,
-    # so the strict canonical schema is unsatisfiable.
+def test_no_positive_body_under_unsatisfiable_allof_chain(ctx):
+    # Base forbids `first`/`second` and Wrapper forbids `baseField`, so the required keys can never be present;
+    # coverage may only emit schema-invalid negatives - never a relaxed body labelled positive.
     operation = body_operation(
         ctx,
         {
@@ -3625,7 +3625,16 @@ def test_positive_body_under_unsatisfiable_allof_chain(ctx):
             }
         },
     )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
+    validator = body_validator(operation)
+    cases = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_test(operation, collect)
+
+    assert {(body_mode(case), validator.is_valid(case.body)) for case in cases} == {(GenerationMode.NEGATIVE, False)}
 
 
 def test_positive_body_with_sibling_oneof_required_via_ref(ctx):
