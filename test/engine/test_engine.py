@@ -154,7 +154,7 @@ def test_asgi_interactions():
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     stream = EventStream(schema).execute()
     interactions = stream.find_all_interactions()
-    assert interactions[0].request.uri == "http://localhost/users"
+    assert interactions[0].request.uri == "http://testserver/users"
 
 
 def test_empty_response_interaction(ctx):

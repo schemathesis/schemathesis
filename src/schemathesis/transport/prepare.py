@@ -102,17 +102,17 @@ def prepare_body(case: Case) -> Body:
 
 
 @lru_cache(maxsize=128)
-def normalize_base_url(base_url: str | None) -> str | None:
+def normalize_base_url(base_url: str | None, host: str = "localhost") -> str | None:
     """Normalize base URL by ensuring proper hostname for local URLs.
 
-    If URL has no hostname (typical for WSGI apps), adds "localhost" as default hostname.
+    If URL has no hostname (typical for in-process apps), adds `host` as default hostname.
     """
     if base_url is None:
         return None
     parts = urlsplit(base_url)
     if not parts.hostname:
         path = cast(str, parts.path or "")
-        return urlunsplit(("http", "localhost", path or "", "", ""))
+        return urlunsplit(("http", host, path or "", "", ""))
     return base_url
 
 
