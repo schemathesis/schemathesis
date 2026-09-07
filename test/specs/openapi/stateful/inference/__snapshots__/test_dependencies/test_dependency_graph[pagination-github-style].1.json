@@ -9,7 +9,8 @@
           "path.runner_group_id": "$response.body#/runner_groups/*/id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }

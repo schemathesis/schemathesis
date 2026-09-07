@@ -70,6 +70,10 @@ def _replay_recorders_into_pool(extra_data_source: ResourceRecorder, recorders: 
                 extra_data_source.record_response(operation=operation, response=response, case=case)
             if extra_data_source.should_record_request(operation=operation.label):
                 extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
+            if 200 <= response.status_code < 300:
+                # Feed 2xx bodies into the runtime-synthesis store. Stateful-only by
+                # construction: unit phases never reach this replay.
+                extra_data_source.record_observed_body(operation=operation, response=response, case=case)
             if 200 <= response.status_code < 300 or response.status_code == 404:
                 extra_data_source.record_successful_delete(operation=operation, case=case)
             response.clear_cache()
@@ -198,7 +202,6 @@ def _unrecoverable_network_error(
 
 def execute_state_machine_loop(
     *,
-    state_machine: type[APIStateMachine],
     event_queue: queue.Queue,
     engine: EngineContext,
 ) -> None:
@@ -221,188 +224,233 @@ def execute_state_machine_loop(
         if generation.unique_inputs:
             ctx.store_step_outcome(case, outcome)
 
-    class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
-        """State machine with additional hooks for emitting events."""
+    def build_instrumented(base: type[APIStateMachine]) -> type[APIStateMachine]:
+        """Subclass the current state machine; called again whenever the graph is rebuilt."""
 
-        def __init__(self) -> None:
-            super().__init__()
-            # The state machine creates a fresh `TransitionController` per scenario.
-            # Inject the engine's supervisor so transitions targeting operations with
-            # a SKIP verdict (consistently-405 operations detected during the unit
-            # phases) are filtered out of rule preconditions before Hypothesis selects
-            # them.
-            self.control.supervisor = engine.supervisor
+        class _InstrumentedStateMachine(base):  # type: ignore[valid-type,misc]
+            """State machine with additional hooks for emitting events."""
 
-        def setup(self) -> None:
-            self._current_input: StepInput | None = None
-            scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
-            self._started_at = Instant()
-            self._scenario_id = scenario_started.id
-            event_queue.put(scenario_started)
+            def __init__(self) -> None:
+                super().__init__()
+                # The state machine creates a fresh `TransitionController` per scenario.
+                # Inject the engine's supervisor so transitions targeting operations with
+                # a SKIP verdict (consistently-405 operations detected during the unit
+                # phases) are filtered out of rule preconditions before Hypothesis selects
+                # them.
+                self.control.supervisor = engine.supervisor
 
-        def get_call_kwargs(self, case: Case) -> dict[str, Any]:
-            return engine.get_transport_kwargs(operation=case.operation)
-
-        def _repr_step(self, rule: Rule, data: dict, result: StepOutput) -> str:
-            return ""
-
-        def before_call(self, case: Case) -> None:
-            overrides.for_operation(engine.config, operation=case.operation).apply_to(case)
-            return super().before_call(case)
-
-        def step(self, input: StepInput) -> StepOutput | None:
-            # _current_input is set here and consumed once in validate_response(), then cleared.
-            # validate_response() is called at most once per step by the Hypothesis state machine.
-            self._current_input = input
-            # Checking the stop event once inside `step` is sufficient as it is called frequently
-            # The idea is to stop the execution as soon as possible
-            if engine.has_to_stop:
-                # Say which one stopped it: a spent budget is a planned finish, Ctrl-C is not.
-                if engine.has_reached_time_limit and not engine.is_interrupted:
-                    raise BudgetExpired
-                raise KeyboardInterrupt
-
-            operation_label = input.case.operation.label
-            use_probability = engine.health.frozen_use_probability(operation_label)
-            # Always draw — keeps data-tree topology stable across replays as `use_probability` transitions from 1.0 to <1.0.
-            if not current_build_context().data.draw_boolean(p=use_probability):
-                reject()
-
-            try:
-                if generation.unique_inputs:
-                    cached = ctx.get_step_outcome(input.case)
-                    if isinstance(cached, BaseException):
-                        raise cached
-                    elif cached is None:
-                        return None
-                self.before_call(input.case)
-                kwargs = self.get_call_kwargs(input.case)
-                auto_mode = engine.config.rate_limit_for(operation=input.case.operation) == "auto"
-
-                def call_fn() -> Response:
-                    r = self.call(input.case, **kwargs)
-                    self.after_call(r, input.case)
-                    return r
-
-                final_response = call_and_validate_with_retry(
-                    call_fn=call_fn,
-                    validate_fn=lambda r: self.validate_response(r, input.case),
-                    auto_mode=auto_mode,
-                    on_delay=lambda delay, retries_left: event_queue.put(
-                        events.RateLimitRetry(
-                            operation=input.case.operation.label,
-                            delay=delay,
-                            retries_left=retries_left,
-                        )
-                    ),
+            def setup(self) -> None:
+                self._current_input: StepInput | None = None
+                scenario_started = events.ScenarioStarted(
+                    label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id
                 )
-                result = StepOutput(final_response, input.case)
-                ctx.step_succeeded()
-                engine.health.record_completion(operation_label=operation_label)
-            except UnsatisfiedAssumption:
-                raise
-            except FailureGroup as exc:
-                engine.health.record_completion(operation_label=operation_label)
-                for failure in exc.exceptions:
-                    remember_step_outcome(input.case, failure)
-                ctx.step_failed()
-                raise
-            except Exception as exc:
-                # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level
-                # failures (reset, chunked-encoding break) usually mean the server crashed; surface
-                # those immediately on the first occurrence.
-                if isinstance(
-                    exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
-                ) and is_unrecoverable_network_error(exc):
-                    network_error = _unrecoverable_network_error(exc, case=input.case, engine=engine)
-                    if network_error is None:
-                        raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
-                    state.store_unrecoverable_network_error(network_error)
+                self._started_at = Instant()
+                self._scenario_id = scenario_started.id
+                event_queue.put(scenario_started)
 
-                remember_step_outcome(input.case, exc)
-                ctx.step_errored()
-                raise
-            except KeyboardInterrupt:
-                ctx.step_interrupted()
-                raise
-            except BaseException as exc:
-                remember_step_outcome(input.case, exc)
-                raise exc
-            else:
-                remember_step_outcome(input.case, None)
-            return result
+            def get_call_kwargs(self, case: Case) -> dict[str, Any]:
+                return engine.get_transport_kwargs(operation=case.operation)
 
-        def validate_response(
-            self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = (), **kwargs: Any
-        ) -> None:
-            ctx.collect_metric(case, response)
-            current_input = self._current_input
-            self._current_input = None
+            def _repr_step(self, rule: Rule, data: dict, result: StepOutput) -> str:
+                return ""
 
-            # Parse 4xx body once — reused by calibration and error-feedback.
-            observations: tuple[Observation, ...] = ()
-            if engine.error_feedback is not None or engine.link_calibration is not None:
-                observations = parse_observations(case.operation, case, response)
+            def before_call(self, case: Case) -> None:
+                overrides.for_operation(engine.config, operation=case.operation).apply_to(case)
+                return super().before_call(case)
 
-            # Record this step's outcome against the link's score.
-            if current_input is not None and engine.link_calibration is not None:
-                record_link_outcome(engine.link_calibration, response, observations, current_input, self.recorder)
-            ctx.current_response = response
+            def step(self, input: StepInput) -> StepOutput | None:
+                # _current_input is set here and consumed once in validate_response(), then cleared.
+                # validate_response() is called at most once per step by the Hypothesis state machine.
+                self._current_input = input
+                # Checking the stop event once inside `step` is sufficient as it is called frequently
+                # The idea is to stop the execution as soon as possible
+                if engine.has_to_stop:
+                    # Say which one stopped it: a spent budget is a planned finish, Ctrl-C is not.
+                    if engine.has_reached_time_limit and not engine.is_interrupted:
+                        raise BudgetExpired
+                    raise KeyboardInterrupt
 
-            if engine.error_feedback is not None:
-                engine.record_error_feedback(
-                    case=case,
-                    response=response,
+                operation_label = input.case.operation.label
+                use_probability = engine.health.frozen_use_probability(operation_label)
+                # Always draw — keeps data-tree topology stable across replays as `use_probability` transitions from 1.0 to <1.0.
+                if not current_build_context().data.draw_boolean(p=use_probability):
+                    reject()
+
+                try:
+                    if generation.unique_inputs:
+                        cached = ctx.get_step_outcome(input.case)
+                        if isinstance(cached, BaseException):
+                            raise cached
+                        elif cached is None:
+                            return None
+                    self.before_call(input.case)
+                    kwargs = self.get_call_kwargs(input.case)
+                    auto_mode = engine.config.rate_limit_for(operation=input.case.operation) == "auto"
+
+                    def call_fn() -> Response:
+                        r = self.call(input.case, **kwargs)
+                        self.after_call(r, input.case)
+                        return r
+
+                    final_response = call_and_validate_with_retry(
+                        call_fn=call_fn,
+                        validate_fn=lambda r: self.validate_response(r, input.case),
+                        auto_mode=auto_mode,
+                        on_delay=lambda delay, retries_left: event_queue.put(
+                            events.RateLimitRetry(
+                                operation=input.case.operation.label,
+                                delay=delay,
+                                retries_left=retries_left,
+                            )
+                        ),
+                    )
+                    result = StepOutput(final_response, input.case)
+                    ctx.step_succeeded()
+                    engine.health.record_completion(operation_label=operation_label)
+                except UnsatisfiedAssumption:
+                    raise
+                except FailureGroup as exc:
+                    engine.health.record_completion(operation_label=operation_label)
+                    for failure in exc.exceptions:
+                        remember_step_outcome(input.case, failure)
+                    ctx.step_failed()
+                    raise
+                except Exception as exc:
+                    # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level
+                    # failures (reset, chunked-encoding break) usually mean the server crashed; surface
+                    # those immediately on the first occurrence.
+                    if isinstance(
+                        exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
+                    ) and is_unrecoverable_network_error(exc):
+                        network_error = _unrecoverable_network_error(exc, case=input.case, engine=engine)
+                        if network_error is None:
+                            raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
+                        state.store_unrecoverable_network_error(network_error)
+
+                    remember_step_outcome(input.case, exc)
+                    ctx.step_errored()
+                    raise
+                except KeyboardInterrupt:
+                    ctx.step_interrupted()
+                    raise
+                except BaseException as exc:
+                    remember_step_outcome(input.case, exc)
+                    raise exc
+                else:
+                    remember_step_outcome(input.case, None)
+                return result
+
+            def validate_response(
+                self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = (), **kwargs: Any
+            ) -> None:
+                ctx.collect_metric(case, response)
+                current_input = self._current_input
+                self._current_input = None
+
+                # Parse 4xx body once — reused by calibration and error-feedback.
+                observations: tuple[Observation, ...] = ()
+                if engine.error_feedback is not None or engine.link_calibration is not None:
+                    observations = parse_observations(case.operation, case, response)
+
+                # Record this step's outcome against the link's score.
+                if current_input is not None and engine.link_calibration is not None:
+                    record_link_outcome(engine.link_calibration, response, observations, current_input, self.recorder)
+                ctx.current_response = response
+
+                if engine.error_feedback is not None:
+                    engine.record_error_feedback(
+                        case=case,
+                        response=response,
+                        recorder=self.recorder,
+                        observations=observations,
+                        transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
+                    )
+
+                cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")
+
+                check_ctx = CheckContext(
+                    override=cached.override,
+                    auth=cached.auth,
+                    headers=cached.headers,
+                    config=cached.config,
+                    transport_kwargs=cached.transport_kwargs,
                     recorder=self.recorder,
-                    observations=observations,
-                    transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
-                )
-
-            cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")
-
-            check_ctx = CheckContext(
-                override=cached.override,
-                auth=cached.auth,
-                headers=cached.headers,
-                config=cached.config,
-                transport_kwargs=cached.transport_kwargs,
-                recorder=self.recorder,
-                response_checks=engine.checks.for_responses(),
-                phase=PhaseName.STATEFUL_TESTING,
-            )
-            validate_response(
-                response=response,
-                case=case,
-                stateful_ctx=ctx,
-                check_ctx=check_ctx,
-                checks=check_ctx._checks,
-                control=engine.control,
-                recorder=self.recorder,
-                additional_checks=additional_checks,
-            )
-
-        def teardown(self) -> None:
-            build_ctx = current_build_context()
-            event_queue.put(
-                events.ScenarioFinished(
-                    id=self._scenario_id,
-                    suite_id=suite_id,
+                    response_checks=engine.checks.for_responses(),
                     phase=PhaseName.STATEFUL_TESTING,
-                    label=None,
-                    status=ctx.current_scenario_status or Status.SKIP,
-                    recorder=self.recorder,
-                    elapsed_time=self._started_at.elapsed,
-                    skip_reason=None,
-                    is_final=build_ctx.is_final,
                 )
-            )
-            if engine.extra_data_source is not None:
-                suite_recorders.append(self.recorder)
-            ctx.maximize_metrics()
-            ctx.reset_scenario()
-            super().teardown()
+                validate_response(
+                    response=response,
+                    case=case,
+                    stateful_ctx=ctx,
+                    check_ctx=check_ctx,
+                    checks=check_ctx._checks,
+                    control=engine.control,
+                    recorder=self.recorder,
+                    additional_checks=additional_checks,
+                )
+
+            def teardown(self) -> None:
+                build_ctx = current_build_context()
+                event_queue.put(
+                    events.ScenarioFinished(
+                        id=self._scenario_id,
+                        suite_id=suite_id,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        label=None,
+                        status=ctx.current_scenario_status or Status.SKIP,
+                        recorder=self.recorder,
+                        elapsed_time=self._started_at.elapsed,
+                        skip_reason=None,
+                        is_final=build_ctx.is_final,
+                    )
+                )
+                if engine.extra_data_source is not None:
+                    suite_recorders.append(self.recorder)
+                ctx.maximize_metrics()
+                ctx.reset_scenario()
+                super().teardown()
+
+        return _InstrumentedStateMachine
+
+    instrumented: type[APIStateMachine] | None = None
+    # Runtime schema synthesis can invalidate the dependency graph mid-run, so the state
+    # machine is built here rather than by the caller, and rebuilt when that happens.
+    graph_dirty = True
 
     while True:
+        if graph_dirty:
+            try:
+                constants_value_source = (
+                    engine.constants_extraction if not engine.constants_extraction.is_empty() else None
+                )
+                state_machine = engine.schema._build_state_machine(
+                    error_feedback=engine.error_feedback,
+                    link_calibration=engine.link_calibration,
+                    extra_data_source=engine.extra_data_source,
+                    constants_value_source=constants_value_source,
+                )
+            except Exception as exc:
+                suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
+                event_queue.put(suite_started)
+                event_queue.put(
+                    events.NonFatalError(
+                        error=exc,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        label=STATEFUL_TESTS_LABEL,
+                        related_to_operation=False,
+                    )
+                )
+                event_queue.put(
+                    events.SuiteFinished(
+                        id=suite_started.id,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        status=Status.ERROR,
+                    )
+                )
+                return
+            instrumented = build_instrumented(state_machine)
+            graph_dirty = False
+        assert instrumented is not None
         # Promote observations from the previous run into the stable read state.
         if engine.link_calibration is not None:
             engine.link_calibration.begin_iteration()
@@ -437,7 +485,7 @@ def execute_state_machine_loop(
         suite_status = Status.SUCCESS
         retry = False
         # A fresh seed per suite: a retry or a later cycle must not replay what an earlier suite did.
-        InstrumentedStateMachine = hypothesis.seed(engine.next_stateful_seed())(_InstrumentedStateMachine)
+        InstrumentedStateMachine = hypothesis.seed(engine.next_stateful_seed())(instrumented)
         try:
             with catch_warnings(), ignore_hypothesis_output():
                 filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
@@ -453,6 +501,9 @@ def execute_state_machine_loop(
             # are built; mirrors `record_extra_data_from_recorder` in the unit phase.
             if engine.extra_data_source is not None and suite_recorders:
                 _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
+            # Fold newly observed body shapes into the schema analysis. `.analysis` exists on
+            # both OpenAPI and GraphQL schemas (GraphQL's `checkpoint()` is a no-op).
+            graph_dirty = engine.schema.analysis.checkpoint()  # type: ignore[attr-defined]
             event_queue.put(
                 events.SuiteFinished(
                     id=suite_started.id,
@@ -461,7 +512,7 @@ def execute_state_machine_loop(
                 )
             )
             ctx.reset()
-        if retry:
+        if retry or graph_dirty:
             continue
         # One clean pass, then hand the budget back: under a time limit the engine repeats the whole
         # sequence, and holding on here would leave every later phase without a turn.

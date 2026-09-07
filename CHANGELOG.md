@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.26.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Recover dependency-analysis link extractors for `Cardinality.MANY` info-poor response schemas via runtime body-shape synthesis.
+
 ## [4.26.0](https://github.com/schemathesis/schemathesis/compare/v4.25.2...v4.26.0) - 2026-09-07
 
 ### :rocket: Added

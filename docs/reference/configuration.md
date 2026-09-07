@@ -737,7 +737,7 @@ These settings can only be applied at the project level.
 !!! note ""
 
     **Type**: `Array[String]`  
-    **Default**: `["location-headers", "dependency-analysis"]`  
+    **Default**: `["location-headers", "dependency-analysis", "runtime-synthesis"]`
 
     Specifies which inference algorithms to use during the **stateful** phase. Schemathesis will use the specified algorithms to automatically analyze API responses and generate OpenAPI links for stateful testing.
 
@@ -745,6 +745,7 @@ These settings can only be applied at the project level.
 
     - `location-headers` - Analyzes `Location` headers to infer parameter extraction rules between operations.  
     - `dependency-analysis` - Analyzes your OpenAPI schema to detect resource dependencies between operations.  
+    - `runtime-synthesis` - Synthesizes response schemas from observed 2xx bodies during the stateful phase, recovering descriptors for info-poor producers (e.g. opaque `PagedResponse` wrappers).
 
     Set to an empty array to disable automatic link inference entirely.
 

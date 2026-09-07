@@ -102,6 +102,15 @@ class GraphQLResourcePool:
             for handle, value in iter_operation_pool_values(operation_node, self._schema):
                 self.tombstone(handle=handle, value=value)
 
+    def record_observed_body(
+        self,
+        *,
+        operation: APIOperation,
+        response: Response,
+        case: Case,
+    ) -> None:
+        return None  # pragma: no cover
+
     def record_request(self, *, operation: APIOperation, case: Case, status_code: int) -> None:
         return None  # pragma: no cover
 

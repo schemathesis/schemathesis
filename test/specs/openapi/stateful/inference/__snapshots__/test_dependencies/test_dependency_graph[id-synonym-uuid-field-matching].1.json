@@ -9,7 +9,8 @@
           "path.conversation_id": "$response.body#/_embedded/conversations/*/uuid"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }

@@ -10,7 +10,8 @@
           "path.source": "$request.path.source"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }

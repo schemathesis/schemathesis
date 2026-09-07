@@ -394,3 +394,25 @@ def register_additional_properties_bug(app: Flask) -> None:
             if not isinstance(value, str):
                 return jsonify({"error": "values must be strings"}), 400
         return jsonify({"ok": True}), 200
+
+
+_ALBUM_SLUGS = ["album-a1b2c3", "album-d4e5f6"]
+
+
+def register_paged_response_albums(app: Flask) -> None:
+    @app.route("/api/albums", methods=["GET"])
+    def list_albums() -> Any:
+        return jsonify(
+            {
+                "content": [{"id": slug} for slug in _ALBUM_SLUGS],
+                "totalElements": len(_ALBUM_SLUGS),
+            }
+        )
+
+    @app.route("/api/photos", methods=["POST"])
+    def create_photo() -> Any:
+        body = request.get_json(silent=True) or {}
+        album_id = body.get("albumId")
+        if album_id not in _ALBUM_SLUGS:
+            return jsonify({"message": "Album not found"}), 404
+        return jsonify({"id": f"photo-{album_id}"}), 201

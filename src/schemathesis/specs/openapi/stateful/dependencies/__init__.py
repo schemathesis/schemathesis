@@ -36,7 +36,7 @@ from schemathesis.specs.openapi.stateful.dependencies.resources import (
     ResponseResourceCache,
     remove_unused_resources,
 )
-from schemathesis.specs.openapi.stateful.links import find_link_target
+from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION, find_link_target
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -50,8 +50,18 @@ __all__ = [
 ]
 
 
-def analyze(schema: OpenApiSchema) -> DependencyGraph:
-    """Build a dependency graph by inferring resource producers and consumers from API operations."""
+def analyze(
+    schema: OpenApiSchema,
+    *,
+    overlay: dict[tuple[str, int], dict[str, Any]] | None = None,
+) -> DependencyGraph:
+    """Build a dependency graph by inferring resource producers and consumers from API operations.
+
+    `overlay` is an optional `{(operation_label, status_code): synth_schema}` map that
+    replaces the declared response schema during resource extraction. Used by runtime
+    schema synthesis to recover descriptors for info-poor responses without mutating
+    `schema.raw_schema`.
+    """
     operations: OperationMap = {}
     resources: ResourceMap = {}
     # Track resources that got upgraded (e.g., from parameter inference to schema definition)
@@ -94,6 +104,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     resolver=schema.root_resolver,
                     canonicalization_cache=canonicalization_cache,
                     response_resource_cache=response_resource_cache,
+                    overlay=overlay,
                 )
                 operations[operation.label] = OperationNode(
                     method=operation.method,
@@ -204,6 +215,33 @@ def _find_operation_by_reference(schema: OpenApiSchema, reference: str, cache: d
         operation = schema.find_operation_by_reference(reference)
         cache[key] = operation
     return operation
+
+
+def strip_inferred_links(schema: OpenApiSchema) -> int:
+    """Remove dependency-analysis inferred links from every operation's response definitions.
+
+    Author-declared links (no `x-schemathesis` extension) and Location-Header inferred links
+    (`source: "location-headers"`) are preserved.
+    """
+    removed = 0
+    for result in schema.get_all_operations():
+        if not isinstance(result, Ok):
+            continue
+        operation = result.ok()
+        for _status, response in operation.responses.items():
+            links = response.definition.get(schema.adapter.links_keyword)
+            if not isinstance(links, dict):
+                continue
+            stale = [
+                name
+                for name, link in links.items()
+                if isinstance(link, dict)
+                and link.get(SCHEMATHESIS_LINK_EXTENSION, {}).get("source") == "dependency-analysis"
+            ]
+            for name in stale:
+                del links[name]
+                removed += 1
+    return removed
 
 
 def _normalize_link(link: Mapping[str, Any], schema: OpenApiSchema, cache: dict[str, APIOperation]) -> NormalizedLink:

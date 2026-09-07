@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import InferenceAlgorithm
 from schemathesis.core import NOT_SET, NotSet
@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.extra_data_source import (
     build_parameter_requirements,
 )
 from schemathesis.specs.openapi.resources import build_descriptors
+from schemathesis.specs.openapi.runtime_inference import _is_info_poor, synthesize_schema
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
@@ -62,6 +63,8 @@ class OpenAPIAnalysis:
         "_inferencer",
         "_warnings_cache",
         "_schema_warnings_cache",
+        "_last_overlay",
+        "_runtime_reinference_count",
     )
 
     def __init__(self, schema: OpenApiSchema) -> None:
@@ -74,12 +77,14 @@ class OpenAPIAnalysis:
         self._inferencer: LinkInferencer | None = None
         self._warnings_cache: Mapping[str, Sequence[SchemaWarning]] | None = None
         self._schema_warnings_cache: Sequence[SchemaWarning] | None = None
+        self._last_overlay: dict[tuple[str, int], dict[str, Any]] = {}
+        self._runtime_reinference_count: int = 0
 
     @property
     def dependency_graph(self) -> dependencies.DependencyGraph:
         """Graph of API operations and their resource dependencies."""
         if self._dependency_graph is None:
-            self._dependency_graph = dependencies.analyze(self.schema)
+            self._dependency_graph = dependencies.analyze(self.schema, overlay=self._last_overlay or None)
         return self._dependency_graph
 
     @property
@@ -193,6 +198,90 @@ class OpenAPIAnalysis:
         injected = dependencies.inject_links(self.schema)
         self._links_injected = True
         return injected
+
+    @property
+    def last_overlay(self) -> dict[tuple[str, int], dict[str, Any]]:
+        return dict(self._last_overlay)
+
+    def checkpoint(self) -> bool:
+        """Drain new shape observations, synthesize overlay entries, invalidate caches.
+
+        Returns True if the dependency graph was invalidated (state machine must rebuild).
+        """
+        inference_config = self.schema.config.phases.stateful.inference
+        if not inference_config.is_algorithm_enabled(InferenceAlgorithm.RUNTIME_SYNTHESIS):
+            return False
+
+        data_source = self.extra_data_source
+        if not isinstance(data_source, OpenApiExtraDataSource):
+            return False
+
+        info_poor_keys = set(self._iter_info_poor_responses())
+        # Cap re-inferences at 2x the info-poor target count: each target needs at most one
+        # round to learn its shape; a small extra budget absorbs the occasional retry where
+        # the first sample was too narrow (e.g. an empty array body).
+        if self._runtime_reinference_count >= max(1, len(info_poor_keys) * 2):
+            return False
+
+        dirty = data_source.observed_bodies.consume_dirty()
+        if not dirty:
+            return False
+
+        eligible = [(op, status) for op, status in dirty if (op, status) in info_poor_keys]
+        if not eligible:
+            return False
+
+        new_entries = self._synthesize_entries(eligible)
+        if not new_entries:
+            return False
+
+        merged = {**self._last_overlay, **new_entries}
+        if merged == self._last_overlay:
+            return False
+
+        self._last_overlay = merged
+        self._runtime_reinference_count += 1
+
+        dependencies.strip_inferred_links(self.schema)
+        self._dependency_graph = None
+        self._dependency_layers = NOT_SET
+        self._resource_descriptors = None
+        self._links_injected = False
+        # Refresh the data source's graph-derived fields in place: the cached repository,
+        # observed-body store, usage tracker, and tombstones must survive across
+        # re-inferences, but `requirements` and `inputs_by_label` are computed from the
+        # dependency graph and would be stale against the freshly-overlaid graph.
+        data_source.requirements = build_parameter_requirements(self.dependency_graph)
+        data_source.inputs_by_label = build_inputs_by_label(self.dependency_graph)
+        return True
+
+    def _iter_info_poor_responses(self) -> Iterator[tuple[str, int]]:
+        resolver = self.schema.root_resolver
+        for result in self.schema.get_all_operations():
+            if not isinstance(result, Ok):
+                continue
+            operation = result.ok()
+            for response in operation.responses.iter_successful_responses():
+                if not response.status_code.isdigit():
+                    continue
+                raw = response.get_raw_schema()
+                if _is_info_poor(raw, resolver):
+                    yield (operation.label, int(response.status_code))
+
+    def _synthesize_entries(self, eligible: list[tuple[str, int]]) -> dict[tuple[str, int], dict[str, Any]]:
+        data_source = self.extra_data_source
+        assert isinstance(data_source, OpenApiExtraDataSource)
+        entries: dict[tuple[str, int], dict[str, Any]] = {}
+        for op, status in eligible:
+            samples = data_source.observed_bodies.samples(operation=op, status_code=status)
+            synth = synthesize_schema(samples)
+            if not isinstance(synth, dict):
+                continue
+            has_properties = "properties" in synth and synth["properties"]
+            has_items = synth.get("type") == "array" and "items" in synth
+            if has_properties or has_items:
+                entries[(op, status)] = synth
+        return entries
 
     def iter_warnings(self) -> Iterator[SchemaWarning]:
         """Iterate over all cached schema warnings."""

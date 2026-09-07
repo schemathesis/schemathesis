@@ -25,6 +25,7 @@ from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import litestar as openapi_litestar
 from test.apps.catalog.openapi import marshmallow as openapi_marshmallow
 from test.apps.catalog.openapi import nested as openapi_nested
+from test.apps.catalog.openapi import paged as openapi_paged
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
@@ -59,6 +60,12 @@ def _start(parent: Context, app: OpenAPIApp | GraphQLApp) -> OpenAPIServer | Gra
 @dataclass(slots=True)
 class OpenAPIApps:
     parent: Context
+
+    def paged_response_albums(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_paged.paged_response_albums())
+
+    def paged_response_albums_declared(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_paged.paged_response_albums_declared())
 
     def success(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success())

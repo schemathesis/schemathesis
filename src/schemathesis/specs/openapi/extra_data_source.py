@@ -16,6 +16,7 @@ from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource, PoolDraw, PoolPick
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
+from schemathesis.specs.openapi.runtime_inference import ObservedBodyStore
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex, iter_ingestion_leaves
 from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
 from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_for_matching
@@ -315,6 +316,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
     semantic_index: SemanticValueIndex | None
     semantic_eligible_operations: frozenset[str]
     consumer_labels: frozenset[str]
+    observed_bodies: ObservedBodyStore
 
     def __init__(
         self,
@@ -333,6 +335,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         self.semantic_eligible_operations = semantic_eligible_operations
         # Operations whose strategies bind captured variants at build time (consumer side).
         self.consumer_labels: frozenset[str] = frozenset(key[0] for key in requirements)
+        self.observed_bodies = ObservedBodyStore()
         # Values that have been successfully DELETEd; pool draws skip them.
         self._tombstoned: set[tuple[str, Any]] = set()
 
@@ -736,6 +739,32 @@ class OpenApiExtraDataSource(ExtraDataSource):
                     value=leaf.value,
                     source_operation=operation.label,
                 )
+
+    def record_observed_body(
+        self,
+        *,
+        operation: APIOperation,
+        response: Response,
+        case: Case,
+    ) -> None:
+        """Capture a 2xx response body into the runtime-synthesis store.
+
+        Called from the stateful executor only; unit phases must not call this.
+        """
+        content_types = response.headers.get("content-type")
+        if not content_types:
+            return
+        content_type = content_types[0]
+        context = deserialization.DeserializationContext(operation=operation, case=case)
+        try:
+            payload = deserialization.deserialize_response(response, content_type, context=context)
+        except (TypeError, ValueError, json.JSONDecodeError, NotImplementedError):
+            return
+        self.observed_bodies.record(
+            operation=operation.label,
+            status_code=response.status_code,
+            body=payload,
+        )
 
     def record_successful_delete(
         self,

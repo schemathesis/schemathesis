@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from collections.abc import Callable, Container, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
@@ -335,6 +336,21 @@ def is_likely_root_transition(operation: APIOperation, node: OperationNode | Non
     return operation.method == "get" and not operation.path_parameters
 
 
+def _resolve_multimatch_in_body(value: Any, rng: random.Random) -> Any:
+    """Walk a request-body value and replace each MultiMatch with a single choice.
+
+    Mirrors the parameter-side handling — uses the same `use_true_random` instance
+    so per-step picks stay out of Hypothesis's data tree.
+    """
+    if isinstance(value, MultiMatch):
+        return rng.choice(value.values)
+    if isinstance(value, dict):
+        return {k: _resolve_multimatch_in_body(v, rng) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_resolve_multimatch_in_body(item, rng) for item in value]
+    return value
+
+
 def into_step_input(
     *,
     target: APIOperation,
@@ -410,6 +426,9 @@ def into_step_input(
                 and transition.request_body.value.ok() is not UNRESOLVABLE
             ):
                 request_body = transition.request_body.value.ok()
+                # Inferred wildcard expressions emit MultiMatch values; resolve here before any
+                # downstream merge/overlay decision so all branches see plain scalars.
+                request_body = _resolve_multimatch_in_body(request_body, random)
             else:
                 request_body = NOT_SET
 

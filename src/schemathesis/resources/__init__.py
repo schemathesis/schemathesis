@@ -85,6 +85,19 @@ class ResourceRecorder(Protocol):
         """Record a response for later use in test generation."""
         ...  # pragma: no cover
 
+    def record_observed_body(
+        self,
+        *,
+        operation: APIOperation,
+        response: Response,
+        case: Case,
+    ) -> None:
+        """Capture a 2xx response body for runtime schema synthesis.
+
+        Called from the stateful executor only.
+        """
+        ...  # pragma: no cover
+
     def record_request(
         self,
         *,

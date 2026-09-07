@@ -227,8 +227,10 @@ class OpenApiLink:
         if not isinstance(self.body, NotSet):
             value: Result[Any, Exception]
             try:
-                # `body` is `dict | NotSet`, never `str` — no wildcard expression to route.
-                value = Ok(expressions.evaluate(self.body, output, evaluate_nested=True))
+                if self.is_inferred:
+                    value = Ok(expressions.evaluate_nested_wildcard(self.body, output))
+                else:
+                    value = Ok(expressions.evaluate(self.body, output, evaluate_nested=True))
             except Exception as exc:
                 value = Err(exc)
             return ExtractedParam(definition=self.body, value=value, is_required=True)

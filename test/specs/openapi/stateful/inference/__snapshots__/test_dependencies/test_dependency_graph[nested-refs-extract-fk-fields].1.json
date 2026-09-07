@@ -9,7 +9,8 @@
           "path.id": "$response.body#/shipping/location/warehouse_id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }
@@ -24,7 +25,8 @@
           "path.id": "$response.body#/shipping/location/warehouse_id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }

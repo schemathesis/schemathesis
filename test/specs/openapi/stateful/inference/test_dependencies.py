@@ -3220,7 +3220,7 @@ def test_path_param_named_after_collection_links_create_to_read(ctx):
             {
                 "operationRef": "#/paths/~1sessions~1{session}/get",
                 "parameters": {"path.session": "$response.body#/id"},
-                "x-schemathesis": {"is_inferred": True},
+                "x-schemathesis": {"is_inferred": True, "source": "dependency-analysis"},
             },
         ]
     ]

@@ -291,6 +291,7 @@ class CoveragePhaseConfig(DiffBase):
 class InferenceAlgorithm(str, Enum):
     LOCATION_HEADERS = "location-headers"
     DEPENDENCY_ANALYSIS = "dependency-analysis"
+    RUNTIME_SYNTHESIS = "runtime-synthesis"
 
 
 @dataclass(repr=False)

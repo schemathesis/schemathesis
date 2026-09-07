@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
@@ -38,6 +38,7 @@ def extract_outputs(
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
     response_resource_cache: ResponseResourceCache,
+    overlay: dict[tuple[str, int], dict[str, Any]] | None = None,
 ) -> Iterator[OutputSlot]:
     """Extract resources from API operation's responses."""
     extracted_resource_names: set[str] = set()
@@ -48,6 +49,7 @@ def extract_outputs(
         resolver=resolver,
         canonicalization_cache=canonicalization_cache,
         cache=response_resource_cache,
+        overlay=overlay,
     ):
         extracted_resource_names.add(extracted.resource.name)
         yield OutputSlot(

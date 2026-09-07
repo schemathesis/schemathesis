@@ -875,3 +875,66 @@ def additional_properties_bug() -> dict[str, Any]:
             }
         }
     }
+
+
+def paged_response_albums() -> dict[str, Any]:
+    return {
+        "/api/albums": {
+            "get": {
+                "operationId": "listAlbums",
+                "responses": {
+                    "200": {"content": {"application/json": {"schema": {"type": "object", "title": "PagedResponse"}}}}
+                },
+            }
+        },
+        "/api/photos": {
+            "post": {
+                "operationId": "createPhoto",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"albumId": {"type": "string"}, "title": {"type": "string"}},
+                                "required": ["albumId", "title"],
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "string"}},
+                                    "required": ["id"],
+                                }
+                            }
+                        }
+                    },
+                    "404": {"description": "Album not found"},
+                },
+            }
+        },
+    }
+
+
+def paged_response_albums_declared() -> dict[str, Any]:
+    schema = paged_response_albums()
+    schema["/api/albums"]["get"]["responses"]["200"]["content"]["application/json"]["schema"] = {
+        "type": "object",
+        "properties": {
+            "content": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}},
+                    "required": ["id"],
+                },
+            },
+            "totalElements": {"type": "integer"},
+        },
+    }
+    return schema

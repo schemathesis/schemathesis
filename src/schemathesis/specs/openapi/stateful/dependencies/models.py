@@ -604,7 +604,7 @@ class LinkDefinition:
         """Convert to OpenAPI Links format."""
         links: dict[str, Any] = {
             "operationRef": self.operation_ref,
-            SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True},
+            SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True, "source": "dependency-analysis"},
         }
         if self.parameters:
             links["parameters"] = self.parameters

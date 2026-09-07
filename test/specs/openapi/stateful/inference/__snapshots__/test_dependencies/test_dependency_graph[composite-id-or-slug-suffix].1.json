@@ -9,7 +9,8 @@
           "path.league_id_or_slug": "$response.body#/*/id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }
@@ -24,7 +25,8 @@
           "path.league_id_or_slug": "$response.body#/*/id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }
@@ -39,7 +41,8 @@
           "path.league_id_or_slug": "$response.body#/id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }
@@ -54,7 +57,8 @@
           "path.league_id_or_slug": "$response.body#/*/league_id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }

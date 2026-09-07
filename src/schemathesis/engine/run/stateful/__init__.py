@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import Phase, PhaseName, PhaseSkipReason
-from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -17,24 +16,11 @@ EVENT_QUEUE_TIMEOUT = 0.01
 def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     from schemathesis.engine.run.stateful._executor import execute_state_machine_loop
 
-    try:
-        constants_value_source = engine.constants_extraction if not engine.constants_extraction.is_empty() else None
-        state_machine = engine.schema._build_state_machine(
-            error_feedback=engine.error_feedback,
-            link_calibration=engine.link_calibration,
-            extra_data_source=engine.extra_data_source,
-            constants_value_source=constants_value_source,
-        )
-    except Exception as exc:
-        yield events.NonFatalError(error=exc, phase=phase.name, label=STATEFUL_TESTS_LABEL, related_to_operation=False)
-        yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
-        return
-
     event_queue: queue.Queue = queue.Queue()
 
     thread = threading.Thread(
         target=execute_state_machine_loop,
-        kwargs={"state_machine": state_machine, "event_queue": event_queue, "engine": engine},
+        kwargs={"event_queue": event_queue, "engine": engine},
         name="schemathesis_stateful_tests",
     )
     status: Status | None = None

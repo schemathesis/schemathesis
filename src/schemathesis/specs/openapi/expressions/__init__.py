@@ -52,8 +52,12 @@ def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
     """
     if not isinstance(expr, str) or "/*" not in expr:
         return evaluate(expr, output)
-    [node] = parser.parse(expr)
-    assert isinstance(node, BodyResponse) and node.pointer is not None
+    try:
+        [node] = parser.parse(expr)
+    except ValueError:
+        return UNRESOLVABLE
+    if not isinstance(node, BodyResponse) or node.pointer is None:
+        return UNRESOLVABLE
     response = output.response
     content_type = response.headers.get("content-type", ["application/json"])[0]
     context = DeserializationContext(operation=output.case.operation, case=output.case)
@@ -82,6 +86,39 @@ def _evaluate_nested(expr: dict[str, Any] | list, output: StepOutput) -> Any:
     result_list = []
     for item in expr:
         new_value = evaluate(item, output, evaluate_nested=True)
+        if new_value is UNRESOLVABLE:
+            return new_value
+        result_list.append(new_value)
+    return result_list
+
+
+def evaluate_nested_wildcard(expr: dict[str, Any] | list, output: StepOutput) -> Any:
+    """Wildcard-aware variant of _evaluate_nested.
+
+    Routes string leaves through `evaluate_wildcard` so `$response.body#/.../*/...`
+    expressions land a `MultiMatch` instead of `UNRESOLVABLE`. Used by inferred
+    links produced by dependency analysis.
+    """
+    if isinstance(expr, dict):
+        result_dict: dict[str, Any] = {}
+        for key, value in expr.items():
+            new_key = _evaluate_object_key(key, output)
+            if new_key is UNRESOLVABLE:
+                return new_key
+            if isinstance(value, (dict, list)):
+                new_value = evaluate_nested_wildcard(value, output)
+            else:
+                new_value = evaluate_wildcard(value, output)
+            if new_value is UNRESOLVABLE:
+                return new_value
+            result_dict[new_key] = new_value
+        return result_dict
+    result_list: list[Any] = []
+    for item in expr:
+        if isinstance(item, (dict, list)):
+            new_value = evaluate_nested_wildcard(item, output)
+        else:
+            new_value = evaluate_wildcard(item, output)
         if new_value is UNRESOLVABLE:
             return new_value
         result_list.append(new_value)

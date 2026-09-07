@@ -9,7 +9,8 @@
           "path.id": "$response.body#/customer/id"
         },
         "x-schemathesis": {
-          "is_inferred": true
+          "is_inferred": true,
+          "source": "dependency-analysis"
         }
       }
     }

@@ -39,7 +39,10 @@ class OperationById:
     path: str
 
     def to_link_base(self) -> dict[str, Any]:
-        return {"operationId": self.value, SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True}}
+        return {
+            "operationId": self.value,
+            SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True, "source": "location-headers"},
+        }
 
 
 @dataclass(unsafe_hash=True, slots=True)
@@ -51,7 +54,10 @@ class OperationByRef:
     path: str
 
     def to_link_base(self) -> dict[str, Any]:
-        return {"operationRef": self.value, SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True}}
+        return {
+            "operationRef": self.value,
+            SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True, "source": "location-headers"},
+        }
 
 
 OperationReference = OperationById | OperationByRef

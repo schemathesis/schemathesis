@@ -71,3 +71,7 @@ class GraphQLAnalysis:
         if self._transition_count is None:
             self._transition_count = count_inferred_transitions(self.summaries, self.handles, self.schema_index)
         return self._transition_count
+
+    def checkpoint(self) -> bool:
+        """Runtime schema synthesis applies to OpenAPI only — always False for GraphQL."""
+        return False

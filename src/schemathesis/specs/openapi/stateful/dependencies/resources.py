@@ -57,6 +57,7 @@ def extract_resources_from_responses(
     updated_resources: set[str],
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
+    overlay: dict[tuple[str, int], dict[str, Any]] | None = None,
 ) -> Iterator[tuple[OpenApiResponse, ExtractedResource]]:
     """Extract resource definitions from operation's successful responses.
 
@@ -73,6 +74,8 @@ def extract_resources_from_responses(
             updated_resources=updated_resources,
             resolver=resolver,
             canonicalization_cache=canonicalization_cache,
+            operation_label=operation.label,
+            overlay=overlay,
         ):
             yield response, extracted
 
@@ -88,6 +91,7 @@ def cached_resources_from_responses(
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
     cache: ResponseResourceCache,
+    overlay: dict[tuple[str, int], dict[str, Any]] | None = None,
 ) -> list[tuple[OpenApiResponse, ExtractedResource]]:
     """Materialize an operation's response resources once; replay on repeat scans.
 
@@ -103,6 +107,7 @@ def cached_resources_from_responses(
                 updated_resources=updated_resources,
                 resolver=resolver,
                 canonicalization_cache=canonicalization_cache,
+                overlay=overlay,
             )
         )
         cache[operation.label] = cached
@@ -118,8 +123,16 @@ def iter_resources_from_response(
     updated_resources: set[str],
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
+    operation_label: str | None = None,
+    overlay: dict[tuple[str, int], dict[str, Any]] | None = None,
 ) -> Iterator[ExtractedResource]:
     schema = response.get_raw_schema()
+    # Splice: when an overlay entry exists for this (op, status), it replaces the declared
+    # response schema during resource extraction. Skip wildcard spec status codes.
+    if overlay and operation_label and response.status_code.isdigit():
+        synth = overlay.get((operation_label, int(response.status_code)))
+        if synth is not None:
+            schema = synth
 
     if isinstance(schema, bool):
         boolean_resource = _resource_from_boolean_schema(path=path, resources=resources)

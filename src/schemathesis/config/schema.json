@@ -625,7 +625,8 @@
                 "type": "string",
                 "enum": [
                   "location-headers",
-                  "dependency-analysis"
+                  "dependency-analysis",
+                  "runtime-synthesis"
                 ]
               },
               "uniqueItems": true
