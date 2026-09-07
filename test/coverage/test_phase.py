@@ -6866,3 +6866,39 @@ def test_combination_cases_deduplicate_on_wire_form(ctx):
         ),
         ("object_required_and_optional", "positive", None, {"X-Token": "secret"}),
     ]
+
+
+@pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
+@pytest.mark.parametrize("boolean_schema", [True, False], ids=["true", "false"])
+def test_boolean_parameter_schema(ctx, location, boolean_schema):
+    path = "/items/{p}" if location == "path" else "/items"
+    operation = load_schema(
+        ctx,
+        parameters=[{"name": "p", "in": location, "required": True, "schema": boolean_schema}],
+        path=path,
+        method="get",
+        version="3.1.0",
+    )[path]["get"]
+    cases = iter_cases(operation, GenerationMode.POSITIVE, GenerationMode.NEGATIVE)
+    assert cases
+    for case in cases:
+        assert_requests_call(case)
+
+
+@pytest.mark.parametrize(
+    "media_type",
+    [
+        "application/json",
+        "text/plain",
+        "application/xml",
+        "multipart/form-data",
+        "application/x-www-form-urlencoded",
+    ],
+)
+@pytest.mark.parametrize("boolean_schema", [True, False], ids=["true", "false"])
+def test_boolean_body_schema(ctx, media_type, boolean_schema):
+    operation = body_operation(ctx, boolean_schema, media_type=media_type, version="3.1.0")
+    cases = iter_cases(operation, GenerationMode.POSITIVE, GenerationMode.NEGATIVE)
+    assert cases
+    for case in cases:
+        assert_requests_call(case)
