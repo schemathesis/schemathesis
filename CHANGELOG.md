@@ -12,6 +12,7 @@
 - Generated requests to ASGI applications sent with a different `Host` than the schema fetch.
 - Coverage phase crashing on parameters and bodies whose schema is written as a boolean.
 - Operations answering 401 never escalating to the next user in a WFC auth document.
+- Expired tokens never refreshed when a WFC auth document lists several users.
 - Send header and cookie booleans and nulls as `true` / `false` / `null`.
 - `negative_data_rejection` and `missing_required_header` for 415 responses to requests without `Content-Type`.
 - Non-ASCII header values delivered to ASGI applications with the wrong encoding.

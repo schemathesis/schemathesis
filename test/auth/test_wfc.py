@@ -1010,6 +1010,49 @@ def test_escalation_walks_the_chain_until_admitted(cli, ctx, tmp_path):
     assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "editor", "admin"}
 
 
+EXPIRING_AUTH = {
+    "auth": [
+        {"name": "one", "loginEndpointAuth": {"payloadRaw": '{"user": "one"}'}},
+        {"name": "two", "loginEndpointAuth": {"payloadRaw": '{"user": "two"}'}},
+    ],
+    "authTemplate": {
+        "loginEndpointAuth": {
+            "verb": "POST",
+            "endpoint": "/api/login",
+            "contentType": "application/json",
+            "token": _token(),
+        }
+    },
+}
+
+
+def test_escalating_provider_exposes_its_caching_providers(ctx, tmp_path):
+    # Reactive reauth is driven off the caching providers reachable from the schema; an escalating
+    # provider must not hide the ones it wraps, or a stale token can never be refreshed.
+    auth = _write(tmp_path, EXPIRING_AUTH)
+    raw = ctx.openapi.build_schema({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema = schemathesis.openapi.from_dict(
+        raw, config=schemathesis.Config.from_dict({"auth": {"wfc": {"path": auth}}})
+    )
+
+    assert 401 in schema.reauth_retry_statuses
+
+
+def test_expired_token_is_refreshed_for_a_multi_user_document(cli, ctx, tmp_path):
+    # The identity stays valid; only its token dies. Without reactive reauth the run replays the dead
+    # token for the rest of the budget instead of logging in again.
+    api = ctx.openapi.apps.wfc_expiring_token()
+    auth = _write(tmp_path, EXPIRING_AUTH)
+
+    cli.run(api.schema_url, f"--auth-wfc={auth}", "--phases=examples")
+
+    protected = [r for r in api.requests if r.path == "/api/protected"]
+    logins = [r.json().get("user") for r in api.requests if r.path == "/api/login"]
+    assert len(protected) > 1, f"need repeat requests to outlive the token, got {len(protected)}"
+    assert len(logins) > 1, f"token never refreshed: {logins}"
+    assert set(logins) == {"one"}, f"escalated away from a refreshable identity: {logins}"
+
+
 def test_escalation_walks_the_chain_on_401(cli, ctx, tmp_path):
     # A 401 that survives the reauth replay means the identity is wrong, not that its token expired.
     api = ctx.openapi.apps.wfc_role_gated_401()
