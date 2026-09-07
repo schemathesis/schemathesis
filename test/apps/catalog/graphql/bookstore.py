@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 import uuid
@@ -20,15 +21,29 @@ except ImportError:
 logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
 
 
+class _SpacedJson:
+    # Keep the response spelling independent of the installed strawberry, which switched to compact separators.
+    def encode_json(self, data: object) -> str:
+        return json.dumps(data)
+
+
+class _View(_SpacedJson, GraphQLView):
+    pass
+
+
+class _Router(_SpacedJson, GraphQLRouter):
+    pass
+
+
 def _create_flask(endpoint: str, schema: strawberry.Schema) -> Flask:
     app = Flask("test_app")
-    app.add_url_rule(endpoint, view_func=GraphQLView.as_view("graphql", schema=schema))
+    app.add_url_rule(endpoint, view_func=_View.as_view("graphql", schema=schema))
     return app
 
 
 def _create_fastapi(endpoint: str, schema: strawberry.Schema) -> FastAPI:
     app = FastAPI()
-    app.include_router(GraphQLRouter(schema), prefix=endpoint)
+    app.include_router(_Router(schema), prefix=endpoint)
     return app
 
 
