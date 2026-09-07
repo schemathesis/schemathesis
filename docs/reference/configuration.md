@@ -935,10 +935,9 @@ These settings can only be applied at the project level.
     |-------|---------|-------------|
     | `path` | required | Path to a WFC authentication file (`.json`, `.yaml`, or `.yml`) |
     | `user` | `null` | Name of the auth entry to use. When omitted and the file lists more than one entry, Schemathesis tries each entry in document order per operation, moving on from the ones an operation rejects with `403` |
-    | `external_url` | `null` | Replace the host and port of every `externalEndpointURL` in the file. Accepts `HOST:PORT`, or a URL without a path to replace the scheme as well |
     | `refresh_interval` | `300` | Seconds to cache login credentials before re-authenticating |
 
-    Corresponds to the `--auth-wfc`, `--auth-wfc-user`, and `--auth-wfc-external-url` CLI options.
+    Corresponds to the `--auth-wfc` and `--auth-wfc-user` CLI options.
 
     !!! note
         `[auth.wfc]`, `[auth.basic]`, and `[auth.openapi.*]` / `[auth.dynamic.openapi.*]` are mutually exclusive — configuring more than one is an error.

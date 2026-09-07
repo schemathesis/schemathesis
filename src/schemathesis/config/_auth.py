@@ -132,22 +132,11 @@ class WFCAuthConfig(DiffBase):
 
     path: str
     user: str | None
-    external_url: str | None
     refresh_interval: int
 
-    def __init__(
-        self,
-        *,
-        path: str,
-        user: str | None = None,
-        external_url: str | None = None,
-        refresh_interval: int = 300,
-    ) -> None:
+    def __init__(self, *, path: str, user: str | None = None, refresh_interval: int = 300) -> None:
         self.path = resolve(path)
         self.user = resolve(user) if user is not None else None
-        self.external_url = resolve(external_url) if external_url is not None else None
-        if self.external_url is not None:
-            _validate_wfc_external_url(self.external_url)
         self.refresh_interval = refresh_interval
 
 
@@ -160,7 +149,6 @@ class AuthConfig(DiffBase):
     # Set only from the CLI. `wfc` merges as a whole, so values named there would be dropped
     # when the file itself comes from the config.
     wfc_user: str | None
-    wfc_external_url: str | None
 
     def __init__(
         self,
@@ -181,7 +169,6 @@ class AuthConfig(DiffBase):
             self.basic = None
 
         self.wfc_user = None
-        self.wfc_external_url = None
         self.openapi = OpenAPIAuthConfig(schemes=openapi)
 
         self.dynamic = OpenAPIDynamicAuthConfig(schemes=dynamic.get("openapi") if dynamic else None)
@@ -232,7 +219,6 @@ class AuthConfig(DiffBase):
         basic: tuple[str, str] | None = None,
         wfc_path: str | None = None,
         wfc_user: str | None = None,
-        wfc_external_url: str | None = None,
     ) -> None:
         """Update auth config with explicit override (from CLI or user code).
 
@@ -244,13 +230,9 @@ class AuthConfig(DiffBase):
             self.basic = basic
 
         if wfc_path is not None:
-            self.wfc = WFCAuthConfig(path=wfc_path, user=wfc_user, external_url=wfc_external_url)
-        else:
-            if wfc_user is not None:
-                self.wfc_user = wfc_user
-            if wfc_external_url is not None:
-                _validate_wfc_external_url(wfc_external_url)
-                self.wfc_external_url = wfc_external_url
+            self.wfc = WFCAuthConfig(path=wfc_path, user=wfc_user)
+        elif wfc_user is not None:
+            self.wfc_user = wfc_user
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AuthConfig:
@@ -271,15 +253,6 @@ class AuthConfig(DiffBase):
     @property
     def is_defined(self) -> bool:
         return self.basic is not None or self.openapi.is_defined or self.dynamic.is_defined or self.wfc is not None
-
-
-def _validate_wfc_external_url(value: str) -> None:
-    from schemathesis.wfc.external_url import parse_override
-
-    try:
-        parse_override(value)
-    except ValueError as exc:
-        raise ConfigError(str(exc)) from None
 
 
 def _validate_basic(username: str, password: str) -> None:
