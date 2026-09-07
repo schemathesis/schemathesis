@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import HttpMethod
     from schemathesis.resources import PoolDraw, ResourcePool
     from schemathesis.schemas import APIOperation, ParameterSet
-    from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
 
 
 class Template:
@@ -594,6 +594,26 @@ class CoverageRun:
     correlated: dict[tuple[ParameterLocation, str], Any]
 
 
+def _positive_fallback(run: CoverageRun, parameter: OpenApiParameter, schema: dict[str, Any]) -> GeneratedValue | None:
+    """The value a positive run would seed for this parameter, if any."""
+    generator = cover_schema_iter(
+        CoverageContext(
+            session=run.session,
+            root_schema=schema,
+            location=parameter.location,
+            media_type=None,
+            generation_modes=[GenerationMode.POSITIVE],
+            is_required=parameter.is_required,
+            custom_formats=run.custom_formats,
+            validator_cls=run.validator_cls,
+            update_pattern=run.update_pattern,
+            allow_extra_parameters=run.generation_config.allow_extra_parameters,
+        ),
+        schema,
+    )
+    return next(generator, None)
+
+
 def _seed_parameters(run: CoverageRun) -> None:
     operation = run.operation
     template = run.template
@@ -694,44 +714,31 @@ def _seed_parameters(run: CoverageRun) -> None:
                 description="Valid Content-Type pinned to body media type",
             )
         if isinstance(value, NotSet):
+            if location != ParameterLocation.PATH and not parameter.is_required:
+                continue
             if location == ParameterLocation.PATH:
-                # Can't skip path parameters - they should be filled
+                # Interpolated into the URL, so it needs a non-empty value even when its schema offers none.
                 schema = dict(schema)
                 schema.setdefault("type", "string")
                 schema.setdefault("minLength", 1)
-                gen = cover_schema_iter(
-                    CoverageContext(
-                        session=session,
-                        root_schema=schema,
-                        location=location,
-                        media_type=None,
-                        generation_modes=[GenerationMode.POSITIVE],
-                        is_required=parameter.is_required,
-                        custom_formats=custom_formats,
-                        validator_cls=validator_cls,
-                        update_pattern=update_pattern,
-                        allow_extra_parameters=generation_config.allow_extra_parameters,
-                    ),
-                    schema,
+            # Dropping a required parameter would leave it out of every case built off this template, so
+            # those cases would fail on the omission instead of the mutation they target.
+            fallback = _positive_fallback(run, parameter, schema)
+            if fallback is None and location == ParameterLocation.PATH:
+                fallback = GeneratedValue(
+                    "value",
+                    generation_mode=GenerationMode.NEGATIVE,
+                    scenario=CoverageScenario.UNSUPPORTED_PATH_PATTERN,
+                    description="Sample value for unsupported path parameter pattern",
+                    parameter=name,
+                    location="/",
                 )
-                value = next(
-                    gen,
-                    GeneratedValue(
-                        "value",
-                        generation_mode=GenerationMode.NEGATIVE,
-                        scenario=CoverageScenario.UNSUPPORTED_PATH_PATTERN,
-                        description="Sample value for unsupported path parameter pattern",
-                        parameter=name,
-                        location="/",
-                    ),
-                )
-                # A negative fallback means the required path parameter has no representable positive value.
-                if value.generation_mode == GenerationMode.NEGATIVE:
-                    template.unsatisfiable_required_parameter = True
-                template.add_parameter(location, name, value)
-                continue
-            if parameter.is_required:
+            # Without a positive value no case built off this template is a valid positive request.
+            if fallback is None or fallback.generation_mode == GenerationMode.NEGATIVE:
                 template.unsatisfiable_required_parameter = True
+            if fallback is None:
+                continue
+            template.add_parameter(location, name, fallback)
             continue
         # Positive values precede negative ones, so a negative seed means the required parameter has no
         # positive value; the positive case built from this template would be invalid.
