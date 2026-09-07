@@ -272,7 +272,7 @@ def test_combined_regex_filters_are_reported_as_one(ctx, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_report_when_an_operation_is_skipped_while_walking(ctx, cli, snapshot_cli):
-    # An empty definition is tested but not counted, so a filter cannot be called dead on this schema.
+    # An empty definition cannot be parsed, so the walk is incomplete and a filter cannot be called dead here.
     api = ctx.openapi.apps.success()
     assert (
         cli.run(

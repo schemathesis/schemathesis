@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 from schemathesis.core.errors import OperationNotFound, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.transforms import decode_pointer, encode_pointer
+from schemathesis.specs.openapi.operations import is_parsable_operation
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import HttpMethodSchema
@@ -93,6 +94,8 @@ class OperationLookup:
             shared_parameters = tuple(resolved_path_item.get("parameters", []))
             for method, definition in resolved_path_item.items():
                 if method not in self._http_methods:
+                    continue
+                if not is_parsable_operation(definition):
                     continue
                 entry = OperationLookupEntry(
                     path=path,
