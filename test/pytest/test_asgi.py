@@ -39,7 +39,7 @@ def test_api(case):
     result.assert_outcomes(failed=1)
     assert "ZeroDivisionError: division by zero" in result.stdout.str()
     assert "Reproduce with" in result.stdout.str()
-    assert "curl -X GET http://localhost/fail" in result.stdout.str()
+    assert "curl -X GET http://testserver/fail" in result.stdout.str()
 
 
 @pytest.mark.hypothesis_nested
@@ -461,5 +461,24 @@ def test_caller_supplied_session_is_used():
     @settings(max_examples=1, deadline=None, phases=[Phase.generate])
     def test(case):
         assert case.call(session=client).json() == {"header": "from-session"}
+
+    test()
+
+
+def test_curl_command_names_the_host_the_request_used():
+    # A reproduction naming a host the run never used cannot reproduce a `Host`-validating rejection.
+    app = FastAPI()
+
+    @app.get("/ping")
+    async def ping():
+        return {"ok": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+    @given(case=schema["/ping"]["GET"].as_strategy())
+    @settings(max_examples=1, deadline=None, phases=[Phase.generate])
+    def test(case):
+        response = case.call()
+        assert case.as_curl_command() == f"curl -X GET {response.request.url}"
 
     test()
