@@ -1010,6 +1010,16 @@ def test_escalation_walks_the_chain_until_admitted(cli, ctx, tmp_path):
     assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "editor", "admin"}
 
 
+def test_escalation_walks_the_chain_on_401(cli, ctx, tmp_path):
+    # A 401 that survives the reauth replay means the identity is wrong, not that its token expired.
+    api = ctx.openapi.apps.wfc_role_gated_401()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing")
+
+    assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "editor", "admin"}
+
+
 def test_rejected_payloads_do_not_block_escalation(cli, ctx, tmp_path):
     # `/api/validated` answers 400 before checking the role, so 403s arrive interleaved with 400s.
     api = ctx.openapi.apps.wfc_role_gated()

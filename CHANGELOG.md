@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Coverage phase crashing on parameters and bodies whose schema is written as a boolean.
+- Operations answering 401 never escalating to the next user in a WFC auth document.
 
 ## [4.26.0](https://github.com/schemathesis/schemathesis/compare/v4.25.2...v4.26.0) - 2026-09-07
 

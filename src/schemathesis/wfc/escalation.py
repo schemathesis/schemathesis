@@ -10,9 +10,9 @@ if TYPE_CHECKING:
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.generation.case import Case
 
-# 403 says the identity lacks the role. 401 belongs to `CachingAuthProvider`, which refreshes the
-# token and replays; counting it here would double-handle it.
-DENIED = 403
+# Both say the identity cannot do this operation. A 401 reaches this point only after
+# `reauth_and_replay` has already refreshed the token and replayed, so a stale token is ruled out.
+DENIED = frozenset({401, 403})
 
 
 def _is_admitted(status_code: int) -> bool:
@@ -21,7 +21,7 @@ def _is_admitted(status_code: int) -> bool:
     400 counts as neither: many stacks validate the payload before authorizing, so it says
     nothing about the identity.
     """
-    return status_code not in (400, 401, DENIED)
+    return status_code != 400 and status_code not in DENIED
 
 
 class EscalatingAuthProvider:
@@ -56,7 +56,7 @@ class EscalatingAuthProvider:
             if _is_admitted(status_code):
                 self._settled.add(label)
                 return
-            if status_code != DENIED:
+            if status_code not in DENIED:
                 return
             # One denial is enough: an operation may only get a couple of requests, and a
             # threshold above its budget could never flip.
