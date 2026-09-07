@@ -331,6 +331,32 @@ def test_inlined_definitions(deeply_nested_schema):
     test()
 
 
+def test_nullable_recursive_reference(ctx):
+    # Wrapping a nullable reference in `anyOf` must keep the storage its `$ref` points at.
+    schema = ctx.openapi.load_schema(
+        {
+            "/nodes": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"$ref": "#/components/schemas/Node", "nullable": True}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {"Node": {"type": "object", "properties": {"child": {"$ref": "#/components/schemas/Node"}}}}
+        },
+    )
+    strategy = schema["/nodes"]["POST"].as_strategy()
+
+    assert find(strategy, lambda case: case.body is None).body is None
+    assert find(strategy, lambda case: isinstance(case.body, dict)).body == {}
+
+
 @pytest.mark.hypothesis_nested
 def test_valid_headers():
     # When headers are generated
