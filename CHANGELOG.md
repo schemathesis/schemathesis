@@ -23,6 +23,7 @@
 - False positive `negative_data_rejection` for read-only properties a server ignores instead of rejecting.
 - False positive `positive_data_acceptance` when `type` lists `null` but `enum` omits it.
 - False positive `negative_data_rejection` for operations whose `security` lists alternative requirements.
+- False positive `positive_data_acceptance` for `nullable` / `x-nullable` fields whose `enum` omits null.
 - Flask-RESTX error responses such as `abort(404)` and 405 raised as internal errors under `from_wsgi`.
 - False positive `positive_data_acceptance` for `allOf` mixing `items` with a sibling branch's `prefixItems`.
 - Coverage phase generating no positive cases for `allOf` of two disjoint `contains`.
