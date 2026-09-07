@@ -19,6 +19,7 @@ Group related options together for better CLI organization:
 # cli_extensions.py
 import click
 from schemathesis import cli
+from schemathesis.engine import Status, events
 
 # Create a group for your options
 group = cli.add_group("Counter options")
