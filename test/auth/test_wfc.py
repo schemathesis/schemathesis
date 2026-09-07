@@ -10,12 +10,10 @@ from flask import Flask, jsonify, redirect
 
 import schemathesis
 from schemathesis.auths import AuthContext
-from schemathesis.config import ConfigError
 from schemathesis.core.cache import Manifest, write
 from schemathesis.core.cache.models import FORMAT_VERSION
 from schemathesis.wfc.converter import wfc_to_auth_provider
 from schemathesis.wfc.errors import WFCLoginError
-from schemathesis.wfc.external_url import override_external_urls
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
 from test.apps.catalog.openapi.wfc import WFC_PASSWORD, WFC_SESSION, WFC_TOKEN, WFC_USERNAME
@@ -212,125 +210,6 @@ def test_wfc_external_endpoint_url(cli, ctx, tmp_path):
 
     assert _run_wfc(cli, api, auth).exit_code == 0
     assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
-
-
-def _external_login(port, *, path="/api/login", query=""):
-    return {
-        "verb": "POST",
-        "externalEndpointURL": f"http://127.0.0.1:{port}{path}{query}",
-        "contentType": "application/json",
-        "payloadUserPwd": CREDENTIALS,
-        "token": _token(),
-    }
-
-
-@pytest.mark.parametrize("override", ["127.0.0.1:{port}", "http://127.0.0.1:{port}"], ids=["host-port", "full-url"])
-def test_wfc_external_url_override_redirects_login(cli, ctx, tmp_path, override):
-    api = ctx.openapi.apps.wfc_login()
-    auth_server = ctx.openapi.apps.wfc_login()
-    # Port 1 stands in for the unreachable authority a benchmark document hardcodes.
-    auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _external_login(1, query="?tenant=acme")}]})
-
-    result = cli.run(
-        api.schema_url,
-        "--max-examples=5",
-        f"--auth-wfc={auth}",
-        f"--auth-wfc-external-url={override.format(port=auth_server.port)}",
-    )
-
-    assert result.exit_code == 0, result.stdout
-    assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
-    assert [call.query for call in auth_server.calls_to("/api/login")] == [{"tenant": "acme"}]
-    assert api.calls_to("/api/login") == []
-
-
-def test_wfc_external_url_override_from_config(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.wfc_login()
-    auth_server = ctx.openapi.apps.wfc_login()
-    auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _external_login(1)}]})
-
-    result = _run_wfc(cli, api, auth, external_url=f"127.0.0.1:{auth_server.port}")
-
-    assert result.exit_code == 0, result.stdout
-    assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
-    assert auth_server.calls_to("/api/login")
-
-
-def test_wfc_external_url_override_from_cli_over_config_path(cli, ctx, tmp_path):
-    # The whole `[auth.wfc]` table merges as a unit, so a CLI-only override needs its own slot to survive.
-    api = ctx.openapi.apps.wfc_login()
-    auth_server = ctx.openapi.apps.wfc_login()
-    auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _external_login(1)}]})
-
-    result = _run_wfc(cli, api, auth, f"--auth-wfc-external-url=127.0.0.1:{auth_server.port}")
-
-    assert result.exit_code == 0, result.stdout
-    assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
-    assert auth_server.calls_to("/api/login")
-
-
-def test_wfc_external_url_rejects_malformed_value_from_python(ctx):
-    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    with pytest.raises(ConfigError, match="Expected 'HOST:PORT'"):
-        schema.config.auth.update(wfc_external_url="localhost")
-
-
-def test_wfc_external_url_override_ignored_without_external_endpoint(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.wfc_login()
-    auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _login(token=_token())}]})
-
-    result = cli.run(api.schema_url, "--max-examples=5", f"--auth-wfc={auth}", "--auth-wfc-external-url=127.0.0.1:1")
-
-    assert result.exit_code == 0, result.stdout
-    assert all(_header(c, "Authorization") == f"Bearer {WFC_TOKEN}" for c in _protected_calls(api))
-
-
-@pytest.mark.parametrize(
-    ("override", "expected"),
-    [
-        ("10.0.0.5:9000", "http://10.0.0.5:9000/azuread/token?tenant=acme"),
-        ("[::1]:8083", "http://[::1]:8083/azuread/token?tenant=acme"),
-        ("https://auth.internal:8443", "https://auth.internal:8443/azuread/token?tenant=acme"),
-        ("https://auth.internal/", "https://auth.internal/azuread/token?tenant=acme"),
-    ],
-    ids=["host-port", "ipv6", "url-with-port", "url-without-port"],
-)
-def test_wfc_external_url_override_accepted_forms(override, expected):
-    login = {
-        "verb": "POST",
-        "externalEndpointURL": "http://localhost:8083/azuread/token?tenant=acme",
-        "contentType": "application/json",
-        "payloadUserPwd": CREDENTIALS,
-        "token": _token(),
-    }
-    entries = load_from_dict({"auth": [{"name": "u", "loginEndpointAuth": login}]})
-
-    override_external_urls(entries, override)
-
-    assert entries[0].login_endpoint_auth.external_endpoint_url == expected
-
-
-@pytest.mark.parametrize(
-    "override",
-    ["localhost", "127.0.0.1:", "127.0.0.1:notaport", "http://127.0.0.1:8083/token", ""],
-    ids=["no-port", "empty-port", "non-numeric-port", "with-path", "empty"],
-)
-def test_wfc_external_url_override_rejects_malformed_value(override):
-    entries = load_from_dict({"auth": [{"name": "u", "loginEndpointAuth": _external_login(8083)}]})
-
-    with pytest.raises(ValueError, match="Expected 'HOST:PORT'"):
-        override_external_urls(entries, override)
-
-
-def test_wfc_external_url_override_rejects_malformed_config_value(cli, ctx, tmp_path):
-    api = ctx.openapi.apps.wfc_login()
-    auth = _write(tmp_path, {"auth": [{"name": "u", "loginEndpointAuth": _external_login(1)}]})
-
-    result = _run_wfc(cli, api, auth, max_examples=1, external_url="localhost")
-
-    assert result.exit_code != 0
-    assert "Expected 'HOST:PORT'" in result.stdout
 
 
 def test_wfc_selects_named_user(cli, ctx, tmp_path):

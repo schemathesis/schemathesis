@@ -245,12 +245,7 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
         from schemathesis.wfc.integration import register_wfc_auth
 
         try:
-            register_wfc_auth(
-                instance,
-                project_config.auth.wfc,
-                user=project_config.auth.wfc_user,
-                external_url=project_config.auth.wfc_external_url,
-            )
+            register_wfc_auth(instance, project_config.auth.wfc, user=project_config.auth.wfc_user)
         except WFCError as exc:
             raise LoaderError(
                 LoaderErrorKind.OPEN_API_INVALID_SCHEMA,

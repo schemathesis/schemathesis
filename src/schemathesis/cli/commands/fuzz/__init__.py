@@ -16,7 +16,6 @@ from schemathesis.cli.ext.groups import group, grouped_option
 from schemathesis.cli.options import (
     AUTH,
     AUTH_WFC,
-    AUTH_WFC_EXTERNAL_URL,
     AUTH_WFC_USER,
     BASE_URL,
     CHECKS_OPTION,
@@ -121,7 +120,6 @@ load_all_checks()
 @grouped_option(*AUTH.args, **AUTH.kwargs)
 @grouped_option(*AUTH_WFC.args, **AUTH_WFC.kwargs)
 @grouped_option(*AUTH_WFC_USER.args, **AUTH_WFC_USER.kwargs)
-@grouped_option(*AUTH_WFC_EXTERNAL_URL.args, **AUTH_WFC_EXTERNAL_URL.kwargs)
 @grouped_option(*PROXY.args, **PROXY.kwargs)
 @grouped_option(*TLS_VERIFY.args, **TLS_VERIFY.kwargs)
 @grouped_option(*RATE_LIMIT.args, **RATE_LIMIT.kwargs)
@@ -164,7 +162,6 @@ def fuzz(
     auth: tuple[str, str] | None,
     auth_wfc: str | None = None,
     auth_wfc_user: str | None = None,
-    auth_wfc_external_url: str | None = None,
     headers: dict[str, str],
     included_check_names: list[str] | None,
     excluded_check_names: list[str] | None,
@@ -280,7 +277,6 @@ def fuzz(
         basic_auth=auth,
         wfc_auth=auth_wfc,
         wfc_user=auth_wfc_user,
-        wfc_external_url=auth_wfc_external_url,
         workers=workers,
         continue_on_failure=continue_on_failure,
         rate_limit=rate_limit,
