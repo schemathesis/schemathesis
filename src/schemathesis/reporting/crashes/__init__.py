@@ -5,6 +5,7 @@ import json
 import re
 import time
 from dataclasses import asdict, dataclass, field, replace
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -13,7 +14,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure, is_reproducible_failure
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION
-from schemathesis.core.storage import atomic_write_text
+from schemathesis.core.storage import atomic_write_text, retry_while_locked
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import HttpMethod
@@ -251,7 +252,11 @@ class CrashWriter:
             except (OSError, json.JSONDecodeError):
                 continue
             if isinstance(data, dict) and data.get("operation") == operation:
-                path.unlink()
+                try:
+                    retry_while_locked(partial(path.unlink, missing_ok=True))
+                except PermissionError:
+                    # Healing is best-effort: a file still locked after the budget is left for the next run.
+                    continue
 
     def remove_files(self, filenames: set[str]) -> None:
         for filename in filenames:

@@ -24,7 +24,7 @@ class VcrHandler(EventHandler):
     config: OutputConfig
     preserve_bytes: bool
     queue: Queue[_Initialize | _Process | _Finalize]
-    worker: threading.Thread
+    worker: threading.Thread | None
     command: str
 
     def __init__(
@@ -39,6 +39,9 @@ class VcrHandler(EventHandler):
         self.preserve_bytes = preserve_bytes
         self.command = get_command_representation(config.sanitization if config.sanitization.enabled else None)
         self.queue = queue or Queue()
+        self.worker = None
+
+    def start(self, ctx: BaseExecutionContext) -> None:
         self.worker = threading.Thread(
             name="SchemathesisVcrWriter",
             target=_run,
@@ -51,8 +54,6 @@ class VcrHandler(EventHandler):
             },
         )
         self.worker.start()
-
-    def start(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Initialize(seed=ctx.config.seed))
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
@@ -61,7 +62,8 @@ class VcrHandler(EventHandler):
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Finalize())
-        self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+        if self.worker is not None:
+            self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
 
 
 def _run(

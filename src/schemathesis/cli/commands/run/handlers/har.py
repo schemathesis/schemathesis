@@ -23,7 +23,7 @@ class HarHandler(EventHandler):
     config: OutputConfig
     preserve_bytes: bool
     queue: Queue[_Initialize | _Process | _Finalize]
-    worker: threading.Thread
+    worker: threading.Thread | None
 
     def __init__(
         self,
@@ -36,6 +36,9 @@ class HarHandler(EventHandler):
         self.config = config
         self.preserve_bytes = preserve_bytes
         self.queue = queue or Queue()
+        self.worker = None
+
+    def start(self, ctx: BaseExecutionContext) -> None:
         self.worker = threading.Thread(
             name="SchemathesisHarWriter",
             target=_run,
@@ -47,8 +50,6 @@ class HarHandler(EventHandler):
             },
         )
         self.worker.start()
-
-    def start(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Initialize(seed=ctx.config.seed))
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
@@ -57,7 +58,8 @@ class HarHandler(EventHandler):
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Finalize())
-        self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+        if self.worker is not None:
+            self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
 
 
 def _run(

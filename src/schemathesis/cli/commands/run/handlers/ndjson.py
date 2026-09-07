@@ -29,20 +29,20 @@ class NdjsonHandler(EventHandler):
         self.output = output
         self.config = config
         self.queue: Queue[_Initialize | _Process | _Finalize] = queue or Queue()
-        sanitization = config.output.sanitization if config.output.sanitization.enabled else None
+        self.worker: threading.Thread | None = None
+
+    def start(self, ctx: BaseExecutionContext) -> None:
+        sanitization = self.config.output.sanitization
         self.worker = threading.Thread(
             name="SchemathesisNdjsonWriter",
             target=_run,
             kwargs={
                 "output": self.output,
                 "queue": self.queue,
-                "sanitization": sanitization,
+                "sanitization": sanitization if sanitization.enabled else None,
             },
         )
         self.worker.start()
-
-    def start(self, ctx: BaseExecutionContext) -> None:
-        sanitization = self.config.output.sanitization
         self.queue.put(
             _Initialize(
                 seed=ctx.config.seed,
@@ -55,7 +55,8 @@ class NdjsonHandler(EventHandler):
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Finalize())
-        self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+        if self.worker is not None:
+            self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
 
 
 def _run(

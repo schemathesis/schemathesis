@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
+import threading
 
+import pytest
 import requests
 
 from schemathesis.config import SanitizationConfig
@@ -20,6 +23,9 @@ from schemathesis.reporting.crashes import (
     build_crashes_from_recorder,
     load_manifest,
 )
+
+# Windows `chmod` cannot revoke directory write access, so only POSIX can force a real refusal on demand.
+requires_posix_permissions = pytest.mark.skipif(sys.platform == "win32", reason="Needs POSIX directory permissions")
 
 
 def _failure() -> Failure:
@@ -204,6 +210,69 @@ def test_remove_by_operation_skips_non_object_file(tmp_path):
 
     remaining = {f.name for f in tmp_path.glob("*.json") if f.name != MANIFEST_FILENAME}
     assert remaining == {"list.json"}
+
+
+@requires_posix_permissions
+def test_remove_by_operation_retries_a_locked_file(tmp_path):
+    # A crash file another run still has open must be dropped once its handle closes, not abandoned.
+    writer = CrashWriter(directory=tmp_path)
+    writer.open(schema_location="x", base_url="x")
+    writer.write(_crash(operation="GET /users", fingerprint="aaaaaaaa"))
+    tmp_path.chmod(0o500)
+    unlock = threading.Timer(0.02, tmp_path.chmod, args=(0o700,))
+    unlock.start()
+
+    try:
+        writer.remove_by_operation("GET /users")
+    finally:
+        unlock.cancel()
+        tmp_path.chmod(0o700)
+
+    assert not [f for f in tmp_path.glob("*.json") if f.name != MANIFEST_FILENAME]
+
+
+@requires_posix_permissions
+def test_remove_by_operation_skips_a_file_it_cannot_delete(tmp_path):
+    # Healing is best-effort: a file that stays locked is left for the next run rather than failing this one.
+    writer = CrashWriter(directory=tmp_path)
+    writer.open(schema_location="x", base_url="x")
+    crash = _crash(operation="GET /users", fingerprint="aaaaaaaa")
+    writer.write(crash)
+    tmp_path.chmod(0o500)
+
+    try:
+        writer.remove_by_operation("GET /users")
+    finally:
+        tmp_path.chmod(0o700)
+
+    assert [f.name for f in tmp_path.glob("*.json") if f.name != MANIFEST_FILENAME] == [crash.filename()]
+
+
+def test_remove_by_operation_tolerates_concurrent_removal(tmp_path):
+    # Two runs healing the same directory both see a file; only one of them gets to delete it.
+    writer = CrashWriter(directory=tmp_path)
+    writer.open(schema_location="x", base_url="x")
+    for index in range(200):
+        writer.write(_crash(operation="GET /users", fingerprint=f"{index:08x}"))
+
+    barrier = threading.Barrier(2)
+    errors: list[OSError] = []
+
+    def remove() -> None:
+        barrier.wait()
+        try:
+            CrashWriter(directory=tmp_path).remove_by_operation("GET /users")
+        except OSError as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=remove) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert not [f for f in tmp_path.glob("*.json") if f.name != MANIFEST_FILENAME]
 
 
 def test_remove_files_ignores_already_dropped_file(tmp_path):
