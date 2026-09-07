@@ -1192,7 +1192,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 title="Unsupported regex patterns",
                 warnings=ctx.warnings.unsupported_regex,
                 entity_name="operation",
-                suffix_text=" contain regex patterns no value can be generated for",
+                suffix_text=" contain regex patterns Schemathesis cannot use as written",
                 tips=["💡 Supply examples for these operations, or narrow the pattern"],
             )
 
@@ -1330,7 +1330,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 len(ctx.warnings.unsupported_regex),
                 "Unsupported regex",
                 "operation",
-                "had ungeneratable regex patterns",
+                "had unusable regex patterns",
             ),
             (
                 len(ctx.warnings.unmatched_filter),

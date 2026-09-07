@@ -21,6 +21,15 @@ Schemathesis dev
 
      ✅ 1 passed
 
+=================================== WARNINGS ===================================
+
+Unsupported regex patterns: 1 operation contain regex patterns Schemathesis cannot use as written
+
+  - GET /test
+    Dropped `([\u0020-\uD7FF\uE000-\uFFFD\uD800\uDBFF-\uDC00\uDFFF\t\r\n]){0,255}` - generated values may not match it
+
+💡 Supply examples for these operations, or narrow the pattern
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -33,9 +42,12 @@ Test Phases:
   ✅ Fuzzing
   ⏭  Stateful (disabled)
 
+Warnings:
+  ⚠️ Unsupported regex: 1 operation had unusable regex patterns
+
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+============================== 1 warning in 1.00s ==============================

@@ -12,7 +12,7 @@ from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema.resolver import find_unresolvable_reference
 from schemathesis.core.jsonschema.types import get_type
-from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex
+from schemathesis.specs.openapi.patterns import enforced_pattern, is_valid_python_regex, normalize_regex
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -139,7 +139,7 @@ def _find_closest_match(value: str, candidates: list[str]) -> str | None:
 
 @dataclass(slots=True)
 class UnsupportedRegexWarning:
-    """Warning for regex patterns not supported by Python."""
+    """Warning for a regex pattern Schemathesis cannot use as written."""
 
     operation_label: str | None
     """Label of the operation (e.g., 'GET /users')."""
@@ -147,12 +147,17 @@ class UnsupportedRegexWarning:
     pattern: str
     """The unsupported regex pattern."""
 
+    dropped: bool
+    """Whether the constraint left the schema, rather than staying in it with no value to draw for it."""
+
     @property
     def kind(self) -> SchemathesisWarning:
         return SchemathesisWarning.UNSUPPORTED_REGEX
 
     @property
     def message(self) -> str:
+        if self.dropped:
+            return f"Dropped `{self.pattern}` - generated values may not match it"
         return f"No value can be generated for `{self.pattern}`"
 
     @property
@@ -161,7 +166,7 @@ class UnsupportedRegexWarning:
 
 
 def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWarning]:
-    """Detect regex patterns not supported by Python."""
+    """Detect regex patterns Schemathesis cannot use as written."""
     warnings: list[UnsupportedRegexWarning] = []
 
     # Check all parameters
@@ -170,17 +175,22 @@ def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWa
             raw_schema = param.raw_schema
         except InvalidSchema:
             continue
-        for pattern in _iter_patterns(raw_schema):
-            if not is_valid_python_regex(pattern) and normalize_regex(pattern) is None:
-                warnings.append(UnsupportedRegexWarning(operation_label=operation.label, pattern=pattern))
+        warnings.extend(_iter_unsupported_regex(operation.label, raw_schema))
 
     # Check body schemas
     for body in operation.body:
-        for pattern in _iter_patterns(body.raw_schema):
-            if not is_valid_python_regex(pattern) and normalize_regex(pattern) is None:
-                warnings.append(UnsupportedRegexWarning(operation_label=operation.label, pattern=pattern))
+        warnings.extend(_iter_unsupported_regex(operation.label, body.raw_schema))
 
     return warnings
+
+
+def _iter_unsupported_regex(operation_label: str, schema: object) -> Iterator[UnsupportedRegexWarning]:
+    """Yield a warning for every pattern the schema loses, and for every one no value can be drawn for."""
+    for pattern in _iter_patterns(schema):
+        if enforced_pattern(pattern) is None:
+            yield UnsupportedRegexWarning(operation_label=operation_label, pattern=pattern, dropped=True)
+        elif not is_valid_python_regex(pattern) and normalize_regex(pattern) is None:
+            yield UnsupportedRegexWarning(operation_label=operation_label, pattern=pattern, dropped=False)
 
 
 def _iter_patterns(schema: Any) -> Iterator[str]:
