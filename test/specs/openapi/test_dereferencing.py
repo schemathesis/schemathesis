@@ -399,7 +399,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
-@pytest.mark.parametrize("extra", [{}, {"enum": ["foo"]}])
+@pytest.mark.parametrize("extra", [{}, {"enum": ["foo", None]}], ids=["no-enum", "enum-with-null"])
 @pytest.mark.parametrize("version", ["2.0", "3.0.2"])
 def test_nullable_parameters(ctx, testdir, version, extra):
     schema = ctx.openapi.build_schema(
@@ -539,6 +539,7 @@ def test_(request, case):
 
 
 def test_nullable_enum(testdir):
+    # An `enum` that omits null keeps null out of requests even though the parameter is nullable.
     testdir.make_test(
         """
 @schema.parametrize()
@@ -548,7 +549,7 @@ def test_(request, case):
     assert case.path == "/users"
     assert case.method == "GET"
     if not hasattr(case.meta.phase.data, "description"):
-        assert case.query["id"] in ("null", 1, 2)
+        assert case.query["id"] in (1, 2)
 """,
         **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
         generation_modes=[GenerationMode.POSITIVE],
@@ -556,7 +557,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
 
 
 def test_complex_dereference(complex_schema):

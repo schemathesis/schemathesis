@@ -116,10 +116,13 @@ def _to_json_schema(
 
     if schema.get(nullable_keyword):
         del schema[nullable_keyword]
-        bundled = schema.pop(BUNDLE_STORAGE_KEY, None)
-        schema = {"anyOf": [schema, {"type": "null"}]}
-        if bundled:
-            schema[BUNDLE_STORAGE_KEY] = bundled
+        enum = schema.get("enum")
+        # An `enum` that omits null forbids null, so requests keep it as written; responses stay lenient.
+        if is_response_schema or not isinstance(enum, list) or None in enum:
+            bundled = schema.pop(BUNDLE_STORAGE_KEY, None)
+            schema = {"anyOf": [schema, {"type": "null"}]}
+            if bundled:
+                schema[BUNDLE_STORAGE_KEY] = bundled
     schema_type = schema.get("type")
     # An `enum` that omits null makes null invalid even when `type` lists it. Responses tolerate the
     # mismatch as a likely incomplete `enum`; requests keep the enum as written so generation never sends null.

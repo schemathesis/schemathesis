@@ -819,17 +819,22 @@ def test_positive_objects_honor_dependencies(ctx, body):
     collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
 
 
-def test_positive_nullable_enum_omits_null(ctx):
+@pytest.mark.parametrize(
+    ("version", "status"),
+    [
+        ("3.1.0", {"type": ["string", "null"], "enum": ["active", "archived"]}),
+        ("3.0.2", {"type": "string", "enum": ["active", "archived"], "nullable": True}),
+        ("2.0", {"type": "string", "enum": ["active", "archived"], "x-nullable": True}),
+    ],
+    ids=["type-array", "nullable", "x-nullable"],
+)
+def test_positive_nullable_enum_omits_null(ctx, version, status):
     # A nullable type paired with an `enum` that lacks null still forbids null.
     collect_coverage_cases(
         ctx,
-        {
-            "type": "object",
-            "properties": {"status": {"type": ["string", "null"], "enum": ["active", "archived"]}},
-            "required": ["status"],
-        },
+        {"type": "object", "properties": {"status": status}, "required": ["status"]},
         positive=True,
-        version="3.1.0",
+        version=version,
     )
 
 
