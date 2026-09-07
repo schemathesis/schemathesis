@@ -136,12 +136,9 @@ class ScenarioRecorder:
         assert isinstance(response, Response)
         return FailureData(case=case, headers=_flatten_headers(request.headers), verify=response.verify)
 
-    def find_request_headers(self, *, case_id: str) -> dict[str, str] | None:
-        """Retrieve the headers a given test case actually sent, if it reached the wire."""
-        interaction = self.interactions.get(case_id)
-        if interaction is None:
-            return None
-        return _flatten_headers(interaction.request.headers)
+    def find_request_headers(self, *, case_id: str) -> dict[str, str]:
+        """Retrieve the headers a given test case actually sent."""
+        return _flatten_headers(self.interactions[case_id].request.headers)
 
     def find_parent(self, *, case_id: str) -> Case | None:
         """Find the parent case of a given test case, if it exists."""
