@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 
 from schemathesis.config import ApiKeyAuthConfig, DynamicTokenAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
 from schemathesis.config._error import ConfigError
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
@@ -264,7 +265,10 @@ def get_security_requirements(schema: Mapping[str, Any], operation: Mapping[str,
 
 
 def has_optional_auth(schema: Mapping[str, Any], operation: Mapping[str, Any]) -> bool:
-    return {} in operation.get("security", schema.get("security", []))
+    requirements = operation.get("security", schema.get("security", []))
+    if not isinstance(requirements, list):
+        raise InvalidSchema("`security` must be a list of security requirement objects")
+    return {} in requirements
 
 
 def effective_security_requirements(operation: APIOperation, raw_schema: Mapping[str, Any]) -> SecurityRequirements:

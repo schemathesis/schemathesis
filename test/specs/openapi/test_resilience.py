@@ -139,6 +139,44 @@ def _first_operation(schema):
     return next(iter(schema.get_all_operations()))
 
 
+_OK_RESPONSES = {"responses": {"200": {"description": "OK"}}}
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"], ids=["v2", "v3"])
+@pytest.mark.parametrize("definition", [None, "not-an-object"], ids=["none", "string"])
+def test_malformed_operation_node(ctx, version, definition):
+    result = _first_operation(ctx.openapi.load_schema({"/things": {"post": definition}}, version=version))
+    assert isinstance(result, Err)
+    assert isinstance(result.err(), InvalidSchema)
+    assert "Location:\n    paths -> /things -> post" in str(result.err())
+
+
+@pytest.mark.parametrize(
+    "request_body",
+    ["not-an-object", {"content": None}, {"content": "not-an-object"}, {"content": {"application/json": None}}],
+    ids=["request_body_string", "content_none", "content_string", "media_type_none"],
+)
+def test_malformed_request_body_node_v3(ctx, request_body):
+    schema = ctx.openapi.load_schema({"/things": {"post": {"requestBody": request_body, **_OK_RESPONSES}}})
+    result = _first_operation(schema)
+    assert isinstance(result, Err)
+    assert isinstance(result.err(), InvalidSchema)
+    assert "Location:\n    paths -> /things -> post -> requestBody" in str(result.err())
+
+
+@pytest.mark.parametrize("security", [{"api_key": []}, "api_key"], ids=["mapping", "string"])
+def test_non_list_security_requirements_v3(ctx, security):
+    schema = ctx.openapi.load_schema(
+        {"/things": {"post": _OK_RESPONSES}},
+        security=security,
+        components={"securitySchemes": {"api_key": {"type": "apiKey", "name": "k", "in": "header"}}},
+    )
+    result = _first_operation(schema)
+    assert isinstance(result, Err)
+    assert isinstance(result.err(), InvalidSchema)
+    assert "Location:\n    security" in str(result.err())
+
+
 @pytest.mark.parametrize("required", [False, True], ids=["optional", "required"])
 def test_body_parameter_with_unresolvable_ref_v2(ctx, required):
     schema = ctx.openapi.load_schema(
