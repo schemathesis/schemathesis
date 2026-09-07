@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- `UnicodeDecodeError` on non-ASCII response headers from ASGI applications.
 - Malformed `servers` URL templates aborting the run instead of reporting a schema error.
 - Stateful reproduce chain printing every step with the failing step's request headers.
 - One unresolvable media type dropping an operation whose other request body media types resolve.

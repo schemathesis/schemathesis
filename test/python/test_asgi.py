@@ -47,6 +47,13 @@ async def echo_header_app(scope, receive, send):
     await send({"type": "http.response.body", "body": value})
 
 
+async def latin1_response_header_app(scope, receive, send):
+    disposition = 'attachment; filename="café.pdf"'.encode("latin-1")
+    headers = [(b"content-type", b"text/plain"), (b"content-disposition", disposition)]
+    await send({"type": "http.response.start", "status": 200, "headers": headers})
+    await send({"type": "http.response.body", "body": b""})
+
+
 async def unknown_status_app(scope, receive, send):
     await send({"type": "http.response.start", "status": 599, "headers": []})
     await send({"type": "http.response.body", "body": b""})
@@ -117,6 +124,13 @@ def test_header_value_outside_the_wire_encoding_is_rejected(app_runner):
         requests.get(f"http://127.0.0.1:{port}/x", headers=headers)
     with pytest.raises(UnicodeEncodeError):
         ASGIClient(echo_header_app).get("/x", headers=headers)
+
+
+def test_response_header_value_uses_the_wire_encoding(app_runner):
+    port = app_runner.run_asgi_app(latin1_response_header_app)
+    over_http = requests.get(f"http://127.0.0.1:{port}/x").headers["Content-Disposition"]
+    in_process = ASGIClient(latin1_response_header_app).get("/x").headers["Content-Disposition"]
+    assert in_process == over_http == 'attachment; filename="café.pdf"'
 
 
 @pytest.mark.parametrize("url", ["/echo?a=1", b"/echo?a=1"], ids=["string", "bytes"])
