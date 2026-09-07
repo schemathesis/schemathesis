@@ -18,7 +18,8 @@ class ASGITransport(RequestsTransport):
     @override
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         if kwargs.get("base_url") is None:
-            kwargs["base_url"] = normalize_base_url(case.operation.base_url)
+            # The same host the schema was fetched with, so a `Host`-validating app sees one host per run.
+            kwargs["base_url"] = normalize_base_url(case.operation.base_url, host=asgi.HOST)
         application = kwargs.pop("app", case.operation.app)
 
         if session is not None:

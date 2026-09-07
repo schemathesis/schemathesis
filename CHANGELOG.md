@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Generated requests to ASGI applications sent with a different `Host` than the schema fetch.
 - Coverage phase crashing on parameters and bodies whose schema is written as a boolean.
 - Operations answering 401 never escalating to the next user in a WFC auth document.
 - Non-ASCII header values delivered to ASGI applications with the wrong encoding.

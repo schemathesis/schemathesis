@@ -109,7 +109,7 @@ schema = schemathesis.openapi.from_wsgi("/schema/?format=json", application)
 
 The `?format=json` is drf-spectacular's content negotiation; without it the view returns YAML, which Schemathesis also accepts.
 
-`ALLOWED_HOSTS` has to admit the host the in-process client uses - `localhost` for WSGI, `testserver` for ASGI - or Django's `CommonMiddleware` answers every request with `400 Bad Request`. Loading names the rejected host:
+`ALLOWED_HOSTS` has to admit the host the in-process client uses for the schema and for every generated request - `localhost` for WSGI, `testserver` for ASGI - or Django's `CommonMiddleware` answers every request with `400 Bad Request`. Loading names the rejected host:
 
 ```
 Failed to load schema due to client error (HTTP 400 Bad Request)
