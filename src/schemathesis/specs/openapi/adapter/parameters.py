@@ -41,7 +41,7 @@ from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import ParameterAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.adapter.validators import ensure_object
-from schemathesis.specs.openapi.converter import to_json_schema
+from schemathesis.specs.openapi.converter import permit_forbidden_properties, to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
 from schemathesis.transport.serialization import Binary, quote_all
@@ -900,6 +900,7 @@ class OpenApiComponent(ABC):
         "_optimized_schema",
         "_unoptimized_schema",
         "_raw_schema",
+        "_permissive_schema",
         "_validation_schema",
         "_examples",
         "_mutation_targets",
@@ -909,6 +910,7 @@ class OpenApiComponent(ABC):
         self._optimized_schema: JsonSchema | NotSet = NOT_SET
         self._unoptimized_schema: JsonSchema | NotSet = NOT_SET
         self._raw_schema: JsonSchema | NotSet = NOT_SET
+        self._permissive_schema: JsonSchema | NotSet = NOT_SET
         self._validation_schema: JsonSchema | NotSet = NOT_SET
         self._examples: list | NotSet = NOT_SET
         self._mutation_targets: tuple | NotSet = NOT_SET
@@ -928,6 +930,19 @@ class OpenApiComponent(ABC):
             self._unoptimized_schema = self._build_schema(optimize=False)
         assert not isinstance(self._unoptimized_schema, NotSet)
         return self._unoptimized_schema
+
+    @property
+    def permissive_schema(self) -> JsonSchema:
+        """`optimized_schema` with properties nothing can satisfy accepting any value.
+
+        Returns `optimized_schema` itself when no property was forbidden.
+        """
+        if self._permissive_schema is NOT_SET:
+            schema = self.optimized_schema
+            permissive = deepclone(schema) if isinstance(schema, dict) else schema
+            self._permissive_schema = permissive if permit_forbidden_properties(permissive) else schema
+        assert not isinstance(self._permissive_schema, NotSet)
+        return self._permissive_schema
 
     @property
     def raw_schema(self) -> JsonSchema:
@@ -1215,6 +1230,7 @@ class OpenApiBody(OpenApiComponent):
         "_optimized_schema",
         "_unoptimized_schema",
         "_raw_schema",
+        "_permissive_schema",
         "_validation_schema",
         "_examples",
         "_mutation_targets",

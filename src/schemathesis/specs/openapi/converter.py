@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, TypeGuard, overload
 
-from schemathesis.core.jsonschema import DRAFT_03_DIALECT
+from schemathesis.core.jsonschema import DRAFT_03_DIALECT, is_unsatisfiable
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.transforms import deepclone
@@ -260,7 +260,7 @@ def _forbidden_in_allof_branches(schema: dict[str, Any]) -> set[str]:
         if not isinstance(branch, dict):
             continue
         for name, subschema in (branch.get("properties") or {}).items():
-            if subschema == {"not": {}}:
+            if is_unsatisfiable(subschema):
                 forbidden.add(name)
         forbidden.update(_forbidden_in_allof_branches(branch))
     return forbidden
@@ -561,6 +561,27 @@ def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, An
         schema.pop("required", None)
     if not schema.get("properties"):
         schema.pop("properties", None)
+
+
+def permit_forbidden_properties(schema: object) -> bool:
+    """Let properties nothing can satisfy accept any value again.
+
+    Mutates `schema` in place; returns whether anything changed.
+    """
+    changed = False
+    if isinstance(schema, dict):
+        properties = schema.get("properties")
+        if isinstance(properties, dict):
+            for name, subschema in properties.items():
+                if is_unsatisfiable(subschema):
+                    properties[name] = {}
+                    changed = True
+        for value in schema.values():
+            changed |= permit_forbidden_properties(value)
+    elif isinstance(schema, list):
+        for value in schema:
+            changed |= permit_forbidden_properties(value)
+    return changed
 
 
 def is_write_only(schema: object) -> TypeGuard[dict[str, Any]]:

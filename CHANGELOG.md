@@ -30,6 +30,7 @@
 - Crashing on parameters and bodies whose schema is written as a boolean.
 - Required headers, query and cookie parameters dropped from negative cases.
 - No positive cases generated for `allOf` of two disjoint `contains`.
+- Unsatisfiable schema error when an `allOf` branch forbids a required property with `false`.
 
 #### Schema handling
 
