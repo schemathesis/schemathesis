@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import os
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
 from types import GeneratorType
@@ -143,6 +145,13 @@ def make_progress_bar(console: Console, *, indent: str = "", transient: bool = T
     )
 
 
+def _degrade_unencodable_glyphs(stream: object) -> None:
+    # Status glyphs have no representation in every output encoding (CP1252 is the Windows default, and
+    # redirecting to a file drops UTF-8). Substitute them instead of aborting the run mid-output.
+    if isinstance(stream, io.TextIOWrapper) and stream.errors == "strict":
+        stream.reconfigure(errors="replace")
+
+
 def make_console(**kwargs: Any) -> Console:
     """Create a Rich console, using a fixed width in test environments."""
     from rich.console import Console
@@ -152,6 +161,7 @@ def make_console(**kwargs: Any) -> Console:
         # Snapshots assume non-terminal rendering; force it even when CI sets FORCE_COLOR=1.
         kwargs.setdefault("force_terminal", False)
         kwargs.setdefault("color_system", None)
+    _degrade_unencodable_glyphs(kwargs.get("file") or sys.stdout)
     return Console(**kwargs)
 
 

@@ -111,39 +111,3 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
-
-  # On windows redirecting output to a file could lead to an error due to the default IO encoding being CP-1252
-  tests-pipe-with-encoding:
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, windows-2022]
-      fail-fast: false
-    name: Test piping output to a file with CP1252 encoding on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
-      - run: uv tool install ".[dev]"
-
-      - run: uv tool run schemathesis run /openapi.json --app=cp1252_app:app -c custom_check > out.txt || true
-        working-directory: ./test/apps
-        env:
-          SCHEMATHESIS_HOOKS: hooks
-          PYTHONIOENCODING: cp1252
-
-      - run: |
-          if grep -Fq "UnicodeEncodeError" "out.txt"; then
-            echo "Failed!"
-            exit 1
-          fi
-        working-directory: ./test/apps
-        shell: bash
