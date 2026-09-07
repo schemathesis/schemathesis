@@ -5,6 +5,7 @@ from flask import jsonify
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.result import Err, Ok
 from schemathesis.schemas import APIOperation
 
 
@@ -237,6 +238,41 @@ def test_non_object_response_vendor_extension(ctx, extension):
     assert [(status_code, dict(response.iter_links())) for status_code, response in operation.responses.items()] == [
         ("200", {"Self": {"operationId": "get_users"}})
     ]
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
+@pytest.mark.parametrize("extension", ["/apis/registry/v2", None, [], 42, {"note": "text"}])
+def test_paths_object_vendor_extension(ctx, version, extension):
+    # The Paths Object is extensible, so an `x-` key beside the path templates is not an operation.
+    schema = ctx.openapi.load_schema(
+        {
+            "x-codegen-contextRoot": extension,
+            "/things": {"get": {"operationId": "get_things", "responses": {"200": {"description": "OK"}}}},
+        },
+        version=version,
+    )
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (1, 1)
+    assert [
+        result.ok().label if isinstance(result, Ok) else repr(result.err()) for result in schema.get_all_operations()
+    ] == ["GET /things"]
+    assert schema.find_operation_by_path("GET", "/things").label == "GET /things"
+
+
+@pytest.mark.parametrize("path_item", ["invalid", None, 42, []])
+def test_non_object_path_item(ctx, path_item):
+    schema = ctx.openapi.load_schema(
+        {
+            "/broken": path_item,
+            "/things": {"get": {"operationId": "get_things", "responses": {"200": {"description": "OK"}}}},
+        }
+    )
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (1, 1)
+    results = list(schema.get_all_operations())
+    assert [(result.err().path, result.err().method) for result in results if isinstance(result, Err)] == [
+        ("/broken", None)
+    ]
+    assert [result.ok().label for result in results if isinstance(result, Ok)] == ["GET /things"]
+    assert schema.find_operation_by_path("GET", "/things").label == "GET /things"
 
 
 SELF_DOCUMENTED_PATHS = {

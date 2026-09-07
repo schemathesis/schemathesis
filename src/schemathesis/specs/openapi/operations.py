@@ -44,6 +44,11 @@ SCHEMA_PARSING_ERRORS = (KeyError, RefResolutionError, InvalidSchema, InfiniteRe
 _V3_1 = version.parse("3.1")
 
 
+def _is_specification_extension(path: object) -> bool:
+    """Whether a `paths` key is a Specification Extension rather than a path template."""
+    return isinstance(path, str) and path.startswith("x-")
+
+
 def _named_after_placeholder(parameters: list[OperationParameter], path: str) -> list[OperationParameter]:
     """Give a path parameter whose name is not text the placeholder it stands for.
 
@@ -127,6 +132,8 @@ class OperationLoader:
         make_operation = self.make_operation
         root_resolver = schema.root_resolver
         for path, path_item in paths.items():
+            if _is_specification_extension(path):
+                continue
             method = None
             try:
                 dispatch_before_process_path(schema, context, path, path_item)
@@ -173,9 +180,13 @@ class OperationLoader:
         filters_active = not schema.filter_set.is_empty()
         should_skip = self._should_skip
         for path, path_item in paths.items():
+            if _is_specification_extension(path):
+                continue
             try:
-                if "$ref" in path_item:
+                if isinstance(path_item, dict) and "$ref" in path_item:
                     _, path_item = resolve_reference(root_resolver, path_item["$ref"])
+                if not isinstance(path_item, dict):
+                    continue
                 for method, definition in path_item.items():
                     if method not in HTTP_METHODS:
                         continue
@@ -209,11 +220,16 @@ class OperationLoader:
         collected_links: list[dict] = []
 
         for path, path_item in paths.items():
+            if _is_specification_extension(path):
+                continue
             try:
-                if "$ref" in path_item:
+                if isinstance(path_item, dict) and "$ref" in path_item:
                     path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
                 else:
                     path_resolver = root_resolver
+                if not isinstance(path_item, dict):
+                    complete_walk = False
+                    continue
                 for method, definition in path_item.items():
                     if method not in HTTP_METHODS:
                         continue
