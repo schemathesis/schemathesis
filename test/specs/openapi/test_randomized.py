@@ -368,10 +368,7 @@ def _rewritten(document: dict[str, Any], media_types: list[str], pointer: str) -
 def _is_rejection(error: Exception) -> bool:
     if isinstance(error, IGNORED_EXCEPTIONS):
         return True
-    if not isinstance(error, InvalidSchema):
-        return False
-    # Parsing reports an `AttributeError` as an invalid schema, hiding a value the code misread.
-    return not isinstance(error.__cause__, AttributeError)
+    return isinstance(error, InvalidSchema)
 
 
 @pytest.mark.parametrize("version", sorted(SPECS))

@@ -85,6 +85,7 @@
 
 #### Schema handling
 
+- A path item or `responses` that is not an object reported as a generic parsing failure.
 - Header parameters written as a boolean schema crashing data generation.
 - XML bodies whose schema is written as a boolean crashing serialization.
 - Malformed `servers` URL templates crashing instead of reporting a schema error.

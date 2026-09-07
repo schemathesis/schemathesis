@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 import jsonschema_rs
 
 from schemathesis.core import NOT_SET, NotSet, media_types
-from schemathesis.core.errors import MalformedMediaType, RefResolutionError, unresolvable_reference
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType, RefResolutionError, unresolvable_reference
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.resolver import Resolver
@@ -290,11 +290,12 @@ def _iter_resolved_responses(
     adapter: ResponseAdapter,
 ) -> Iterator[tuple[str, OpenApiResponse]]:
     """Iterate and resolve response definitions."""
+    if not isinstance(definition, dict):
+        raise InvalidSchema("`responses` must be an object")
     for key, response in definition.items():
-        # A vendor extension key inside `responses` may carry any JSON value. The response types model
-        # only well-formed entries, hence the type checker sees this guard on raw input as unreachable.
+        # A vendor extension key inside `responses` may carry any JSON value.
         if not isinstance(response, dict):
-            continue  # type: ignore[unreachable]
+            continue
         status_code = str(key)
         response_resolver, resolved = maybe_resolve_with_resolver(response, resolver)
         # Resolve one more level to support slightly malformed schemas with nested $ref chains
