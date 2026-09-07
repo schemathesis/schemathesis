@@ -49,6 +49,12 @@ def sanitize_args(args: Sequence[str], *, config: SanitizationConfig) -> list[st
             result.append(pending(arg, config))
             pending = None
             continue
+        if arg.startswith("-") and not arg.startswith("--") and len(arg) > 2:
+            # Short option glued to its value, e.g. `-aSECRET` or `-HAuthorization: token`
+            sanitizer = _SANITIZERS.get(arg[:2])
+            if sanitizer is not None:
+                result.append(f"{arg[:2]}{sanitizer(arg[2:], config)}")
+                continue
         option, separator, value = arg.partition("=")
         sanitizer = _SANITIZERS.get(option)
         if sanitizer is None:

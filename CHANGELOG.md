@@ -6,6 +6,7 @@
 
 - Stateful reproduce chain printing every step with the failing step's request headers.
 - Malformed operation, `requestBody`, `content`, media type, or `security` nodes aborting the run.
+- Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
 - Generated requests to ASGI applications sent with a different `Host` than the schema fetch.
 - Coverage phase crashing on parameters and bodies whose schema is written as a boolean.
 - Operations answering 401 never escalating to the next user in a WFC auth document.
