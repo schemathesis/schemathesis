@@ -4173,6 +4173,14 @@ def test_missing_required_body_case_sends_no_content_type(ctx):
     assert "Content-Type" not in prepared.headers
 
 
+def test_missing_required_body_case_accepts_unsupported_media_type(ctx, response_factory):
+    # A body-less request carries no `Content-Type`, so 415 is a conformant rejection.
+    operation = body_operation(ctx, BODY_WITH_REQUIRED_PROPERTY)
+    (case,) = _missing_body_cases(operation)
+
+    assert negative_data_rejection(check_context(), response_factory.requests(status_code=415), case) is None
+
+
 def test_no_missing_body_case_for_optional_body(ctx):
     operation = body_operation(ctx, BODY_WITH_REQUIRED_PROPERTY, body_required=False)
 

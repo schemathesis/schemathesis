@@ -177,7 +177,7 @@ Verifies the API properly rejects invalid input data. When Schemathesis generate
 - API accepted schema-violating request
 
 Invalid data should have been rejected
-Expected: 400, 401, 403, 404, 405, 406, 409, 422, 428, 5xx
+Expected: 400, 401, 403, 404, 405, 406, 409, 415, 422, 428, 5xx
 Invalid component: Missing `Accept-Language` at header
 ```
 
@@ -210,12 +210,12 @@ By default, `expected-statuses` includes `401/403/404/409/5xx` to account for au
 
 Verifies the API rejects requests when required headers are missing.
 
-By default, non-`Authorization` headers are considered correctly rejected with `400`, `401`, `403`, `406`, or `422`. `Authorization` is stricter and expects `401 Unauthorized`.
+By default, non-`Authorization` headers are considered correctly rejected with `400`, `401`, `403`, `406`, `415`, or `422`. `Authorization` is stricter and expects `401 Unauthorized`.
 
 ```text
 - Missing header not rejected
 
-Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 422
+Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 415, 422
 ```
 
 !!! note "Coverage phase"

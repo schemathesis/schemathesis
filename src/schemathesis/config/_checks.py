@@ -11,9 +11,21 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
 NOT_A_SERVER_ERROR_EXPECTED_STATUSES = ["2xx", "3xx", "4xx"]
-NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES = ["400", "401", "403", "404", "405", "406", "409", "422", "428", "5xx"]
+NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES = [
+    "400",
+    "401",
+    "403",
+    "404",
+    "405",
+    "406",
+    "409",
+    "415",
+    "422",
+    "428",
+    "5xx",
+]
 POSITIVE_DATA_ACCEPTANCE_EXPECTED_STATUSES = ["2xx", "401", "403", "404", "409", "5xx"]
-MISSING_REQUIRED_HEADER_EXPECTED_STATUSES = ["400", "401", "403", "406", "422"]
+MISSING_REQUIRED_HEADER_EXPECTED_STATUSES = ["400", "401", "403", "406", "415", "422"]
 
 
 def validate_status_codes(value: Sequence[str] | None) -> Sequence[str] | None:
