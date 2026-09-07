@@ -1,5 +1,6 @@
 import json
 from email.message import EmailMessage
+from functools import partial
 from urllib.parse import quote, unquote, urlsplit
 
 import pytest
@@ -771,34 +772,34 @@ def prepared_query_string(case):
     return urlsplit(requests.Request("GET", kwargs["url"], params=kwargs["params"]).prepare().url).query
 
 
-def fuzzing_query_strings(operation):
+def fuzzing_rendered(operation, render):
     found = set()
 
     @given(case=operation.as_strategy())
     @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
     def test(case):
-        found.add(prepared_query_string(case))
+        found.add(render(case))
 
     test()
     return found
 
 
-def examples_query_strings(operation):
+def examples_rendered(operation, render):
     found = set()
     for strategy in get_strategies_from_examples(operation):
 
         @given(case=strategy)
         @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
         def test(case):
-            found.add(prepared_query_string(case))
+            found.add(render(case))
 
         test()
     return found
 
 
-def coverage_query_strings(operation):
+def coverage_rendered(operation, render):
     return {
-        prepared_query_string(case)
+        render(case)
         for case in iter_coverage_cases(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
@@ -826,9 +827,9 @@ def coverage_query_strings(operation):
 def test_delimited_query_items_use_json_wire_form(ctx, parameter, version, expected):
     operation = ctx.openapi.load_schema(delimited_query_paths(parameter), version=version)["/teapot"]["GET"]
 
-    assert fuzzing_query_strings(operation) == {expected}
-    assert examples_query_strings(operation) == {expected}
-    assert coverage_query_strings(operation) == {expected}
+    assert fuzzing_rendered(operation, prepared_query_string) == {expected}
+    assert examples_rendered(operation, prepared_query_string) == {expected}
+    assert coverage_rendered(operation, prepared_query_string) == {expected}
 
 
 @pytest.mark.parametrize(
@@ -846,6 +847,54 @@ def test_delimited_query_items_use_json_wire_form(ctx, parameter, version, expec
 def test_delimited_encoded_item_rendering(value, expected):
     # Only JSON scalars have a Python spelling to correct; container items keep their existing text form.
     assert delimited_encoded("color", delimiter="|")({"color": value})["color"] == expected
+
+
+def wire_form_parameters(location):
+    return [
+        {
+            "name": "flag",
+            "in": location,
+            "required": True,
+            "schema": {"type": "boolean", "enum": [True], "example": True},
+        },
+        {"name": "opt", "in": location, "required": True, "schema": {"type": ["string", "null"], "enum": [None]}},
+        {
+            "name": "arr",
+            "in": location,
+            "required": True,
+            "explode": False,
+            "schema": {"type": "array", "enum": [_WIRE_FORM_ARRAY], "example": _WIRE_FORM_ARRAY},
+        },
+    ]
+
+
+_WIRE_FORM_RENDERED = (("arr", "null,true,false,1,1.5,x"), ("flag", "true"), ("opt", "null"))
+
+
+def rendered_parameters(case, container):
+    return tuple(sorted(getattr(case, container).items()))
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(("location", "container"), [("header", "headers"), ("cookie", "cookies")])
+def test_header_and_cookie_values_use_json_wire_form(ctx, location, container):
+    operation = ctx.openapi.load_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": wire_form_parameters(location),
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )["/teapot"]["GET"]
+
+    render = partial(rendered_parameters, container=container)
+
+    assert fuzzing_rendered(operation, render) == {_WIRE_FORM_RENDERED}
+    assert examples_rendered(operation, render) == {_WIRE_FORM_RENDERED}
+    assert coverage_rendered(operation, render) == {_WIRE_FORM_RENDERED}
 
 
 def make_array_schema(location, style):

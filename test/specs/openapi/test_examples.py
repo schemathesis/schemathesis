@@ -1194,7 +1194,7 @@ def test_example_boolean_header_and_cookie_render_like_the_fuzzing_phase(ctx):
     operation = schema["/test"]["GET"]
     example = examples.generate_one(operation.get_strategies_from_examples()[0])
 
-    assert (dict(example.headers), example.cookies) == ({"X-Flag": "True"}, {"session": "False"})
+    assert (dict(example.headers), example.cookies) == ({"X-Flag": "true"}, {"session": "false"})
 
 
 def test_example_case_with_generated_query_stays_positive(ctx):

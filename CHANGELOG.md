@@ -8,6 +8,7 @@
 - Generated requests to ASGI applications sent with a different `Host` than the schema fetch.
 - Coverage phase crashing on parameters and bodies whose schema is written as a boolean.
 - Operations answering 401 never escalating to the next user in a WFC auth document.
+- Send header and cookie booleans and nulls as `true` / `false` / `null`.
 - Non-ASCII header values delivered to ASGI applications with the wrong encoding.
 - Crash on a specification extension such as `x-codegen-contextRoot` beside the path templates.
 - False positive `positive_data_acceptance` when `type` lists `null` but `enum` omits it.
