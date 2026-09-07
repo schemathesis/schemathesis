@@ -27,6 +27,15 @@ def get_template_fields(template: str) -> frozenset[str]:
         return frozenset()
 
 
+def to_wire_string(value: object) -> str:
+    """Render one value as the wire spells it: JSON scalars, not their Python repr."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    return str(value)
+
+
 def diff(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
     """Calculate the difference between two dictionaries."""
     diff = {}

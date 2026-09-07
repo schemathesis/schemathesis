@@ -11,7 +11,7 @@ from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.parameters import DelimitedValue, EncodedPath
-from schemathesis.core.transforms import transform
+from schemathesis.core.transforms import to_wire_string, transform
 
 
 def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
@@ -342,10 +342,8 @@ def _write_namespace(buffer: StringIO, options: dict[str, Any]) -> None:
 
 def _escape_xml(value: JsonValue) -> str:
     """Escape special characters in XML content."""
-    if isinstance(value, (int | float | bool)):
-        return str(value)
-    if value is None:
-        return ""
+    if value is None or isinstance(value, (int | float | bool)):
+        return to_wire_string(value)
 
     # Filter out invalid XML characters
     cleaned = "".join(

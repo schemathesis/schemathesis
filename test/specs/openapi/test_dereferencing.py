@@ -1313,8 +1313,7 @@ def test_nested_external_refs_in_response_for_stateful(ctx):
 
     graph = dependencies.analyze(schema)
 
-    # Should find the Item resource from the response schema
-    assert len(graph.resources) > 0 or len(graph.operations) > 0
+    assert {name: resource.fields for name, resource in graph.resources.items()} == {"Item": ["id", "name"]}
 
 
 def test_nested_external_refs_in_array_items_for_stateful(ctx):
@@ -1360,8 +1359,7 @@ def test_nested_external_refs_in_array_items_for_stateful(ctx):
 
     graph = dependencies.analyze(schema)
 
-    # Should find resources - the array items ref should resolve correctly
-    assert len(graph.resources) > 0 or len(graph.operations) > 0
+    assert {name: resource.fields for name, resource in graph.resources.items()} == {"Item": ["id", "name"]}
 
 
 @pytest.mark.hypothesis_nested

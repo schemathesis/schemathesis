@@ -478,7 +478,13 @@ def test_coverage_pool_overlay_dict_value_with_undeclared_keys(ctx):
         def pick_correlated_values(self, *, operation):
             return PoolPick(values={(ParameterLocation.BODY, "address"): {"city": "London", "country": "UK"}})
 
-    iter_cases(operation, GenerationMode.POSITIVE, extra_data_source=_FakeDataSource())
+    cases = iter_cases(operation, GenerationMode.POSITIVE, extra_data_source=_FakeDataSource())
+    assert [case.body for case in cases] == [
+        {"address": {"city": "London", "country": "UK"}},
+        {},
+        {"address": {"city": "London"}},
+        {"address": {}},
+    ]
 
 
 def test_coverage_pool_draws_multi_slot_correlated(ctx):

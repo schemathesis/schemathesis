@@ -290,9 +290,9 @@ def test_header_serialization_styles_openapi3(ctx, testdir, schema, explode, exp
 @pytest.mark.parametrize(
     ("schema", "explode", "expected"),
     [
-        (ARRAY_SCHEMA, True, {}),
+        (ARRAY_SCHEMA, True, {"SessionID": "blue,black,brown"}),
         (ARRAY_SCHEMA, False, {"SessionID": "blue,black,brown"}),
-        (OBJECT_SCHEMA, True, {}),
+        (OBJECT_SCHEMA, True, {"SessionID": DelimitedObject("r=100,g=200,b=150")}),
         (OBJECT_SCHEMA, False, {"SessionID": CommaDelimitedObject("r,100,g,200,b,150")}),
     ],
 )

@@ -266,6 +266,27 @@ def test_binary_data(ctx, media_type):
     assert_requests_call(case)
 
 
+@pytest.mark.parametrize(("value", "expected"), [(True, b"true"), (False, b"false"), (None, b"null")])
+def test_text_plain_boolean_and_null_use_json_spelling(ctx, value, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"text/plain": {"schema": {}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    case = schema["/test"]["POST"].Case(body=value, media_type="text/plain")
+
+    assert (REQUESTS_TRANSPORT.serialize_case(case)["data"], WSGI_TRANSPORT.serialize_case(case)["data"]) == (
+        expected,
+        expected.decode(),
+    )
+
+
 def multipart_echo_schema(ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1385,6 +1406,42 @@ def test_duplicate_xml_attributes(ctx):
 
     serialized_data = case.as_transport_kwargs()["data"].decode("utf8")
     ElementTree.fromstring(serialized_data)
+
+
+def test_xml_boolean_and_null_use_json_spelling(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "flag": {"type": "boolean"},
+                                        "note": {"type": "null"},
+                                        "mark": {"type": "boolean", "xml": {"attribute": True}},
+                                    },
+                                    "xml": {"name": "Root"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    case = schema["/test"]["POST"].Case(body={"flag": True, "note": None, "mark": False}, media_type="application/xml")
+
+    assert (
+        REQUESTS_TRANSPORT.serialize_case(case)["data"]
+        == b'<Root mark="false"><flag>true</flag><note>null</note></Root>'
+    )
 
 
 def test_xml_with_referenced_property_schema(ctx):

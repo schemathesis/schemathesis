@@ -8,6 +8,8 @@
 - `UnicodeDecodeError` on non-ASCII response headers from ASGI applications.
 - Crash on a malformed operation or `responses` node while counting operations.
 - Crash on a Swagger 2.0 body parameter whose schema is written as a boolean.
+- Send array and object cookie parameters instead of dropping them.
+- Send XML and `text/plain` body booleans and nulls as `true` / `false` / `null`.
 - Malformed `servers` URL templates aborting the run instead of reporting a schema error.
 - Stateful reproduce chain printing every step with the failing step's request headers.
 - One unresolvable media type dropping an operation whose other request body media types resolve.

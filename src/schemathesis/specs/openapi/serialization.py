@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, maybe_resolve_bundled
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, DelimitedValue, RawQueryString
+from schemathesis.core.transforms import to_wire_string
 from schemathesis.specs.openapi.checks import _COLLECTION_FORMAT_DELIMITERS
 
 Generated = dict[str, Any]
@@ -323,20 +324,9 @@ def _serialize_header_openapi3(
 def _serialize_cookie_openapi3(
     name: str, type_: str | None, explode: bool | None
 ) -> Generator[Callable | None, None, None]:
-    # Cookies should be coerced to a string so we can check it for validity later
-    yield to_string(name)
-    # Cookie parameters always use the "form" style
-    if explode and type_ in ("array", "object"):
-        # `explode=true` doesn't make sense
-        # I.e. we can't create multiple values for the same cookie
-        # We use the same behavior as in the examples - https://swagger.io/docs/specification/serialization/
-        # The item is removed
-        yield nothing(name)
-    if explode is False:
-        if type_ == "array":
-            yield delimited(name, delimiter=",")
-        if type_ == "object":
-            yield comma_delimited_object(name)
+    # A cookie holds a single value, so `explode=true` has no distinct wire form and arrays / objects
+    # collapse to the same comma-separated shape as headers instead of being dropped.
+    yield from _serialize_header_openapi3(name, type_, explode)
 
 
 def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | None, None, None]:
@@ -413,7 +403,7 @@ def to_json(item: Generated, name: str) -> None:
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
     values = force_iterable(item[name] if item[name] is not None else ())
-    item[name] = delimiter.join(_wire_item(value) for value in values)
+    item[name] = delimiter.join(to_wire_string(value) for value in values)
 
 
 # Wire form of each delimiter. Comma and pipe are valid query/path characters and stay literal;
@@ -421,19 +411,10 @@ def delimited(item: Generated, name: str, delimiter: str) -> None:
 _WIRE_DELIMITERS = {",": ",", "|": "|", " ": "%20", "\t": "%09"}
 
 
-def _wire_item(value: object) -> str:
-    """Render one value as the wire spells it: JSON scalars, not their Python repr."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if value is None:
-        return "null"
-    return str(value)
-
-
 @conversion
 def delimited_encoded(item: Generated, name: str, delimiter: str) -> None:
     """Join query/path items, percent-encoding each but keeping the delimiter literal and splittable."""
-    values = [_wire_item(value) for value in force_iterable(item[name] if item[name] is not None else ())]
+    values = [to_wire_string(value) for value in force_iterable(item[name] if item[name] is not None else ())]
     logical = delimiter.join(values)
     wire = _WIRE_DELIMITERS.get(delimiter, quote(delimiter, safe=""))
     encoded = wire.join(quote(value, safe="") for value in values)
@@ -633,12 +614,6 @@ def matrix_object(item: Generated, name: str, explode: bool | None) -> None:
 
 
 @conversion
-def nothing(item: Generated, name: str) -> None:
-    """Remove a key from an item."""
-    item.pop(name, None)
-
-
-@conversion
 def to_string(item: Generated, name: str) -> None:
     """Convert the value to a string."""
-    item[name] = _wire_item(item[name])
+    item[name] = to_wire_string(item[name])
