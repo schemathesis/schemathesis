@@ -763,6 +763,20 @@ def test_positive_objects_honor_dependencies(ctx, body):
     collect_coverage_cases(ctx, body, positive=True, version="3.1.0")
 
 
+def test_positive_nullable_enum_omits_null(ctx):
+    # A nullable type paired with an `enum` that lacks null still forbids null.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "properties": {"status": {"type": ["string", "null"], "enum": ["active", "archived"]}},
+            "required": ["status"],
+        },
+        positive=True,
+        version="3.1.0",
+    )
+
+
 def test_mixed_type_keyword(ctx):
     schema = build_schema(
         ctx,
