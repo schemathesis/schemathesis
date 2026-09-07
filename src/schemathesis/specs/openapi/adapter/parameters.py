@@ -1711,6 +1711,12 @@ OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
 OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 
 
+def _ensure_object(value: object, label: str) -> None:
+    """Reject a schema node that must be an object but carries some other JSON value."""
+    if not isinstance(value, dict):
+        raise InvalidSchema(f"{label} must be an object")
+
+
 def _validated_parameters(definition: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
     """Return the operation's `parameters` list, validating its shape."""
     parameters = definition.get("parameters", [])
@@ -1732,6 +1738,7 @@ def iter_parameters_v2(
     bundle_cache: BundleCache,
     skipped: list[SkippedParameter],
 ) -> Iterator[OperationParameter]:
+    _ensure_object(definition, "Operation definition")
     media_types = definition.get("consumes", default_media_types)
     # Wildcard `*/*` is valid Swagger but no real client sends it as Content-Type. Drop it when concrete
     # entries exist; otherwise fall through to the JSON default so downstream dispatch can route bodies.
@@ -1809,6 +1816,7 @@ def iter_parameters_v3(
 ) -> Iterator[OperationParameter]:
     # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
     # TODO: Typing
+    _ensure_object(definition, "Operation definition")
     operation = definition
 
     seen_querystring = False
@@ -1841,12 +1849,15 @@ def iter_parameters_v3(
 
     request_body_or_ref = operation.get("requestBody")
     if request_body_or_ref is not None:
+        _ensure_object(request_body_or_ref, "`requestBody`")
         body_resolver, request_body_or_ref = maybe_resolve_with_resolver(request_body_or_ref, resolver)
         # It could be an object inside `requestBodies`, which could be a reference itself
         body_resolver, request_body = maybe_resolve_with_resolver(request_body_or_ref, body_resolver)
 
         required = request_body.get("required", False)
+        _ensure_object(request_body["content"], "`requestBody.content`")
         for media_type, content in request_body["content"].items():
+            _ensure_object(content, f"Media type `{media_type}`")
             resource_name = None
             schema = content.get("schema")
             name_to_uri = {}
