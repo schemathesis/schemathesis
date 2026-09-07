@@ -41,6 +41,12 @@ async def echo_path_app(scope, receive, send):
     await send({"type": "http.response.body", "body": payload})
 
 
+async def echo_header_app(scope, receive, send):
+    value = dict(scope["headers"]).get(b"x-token", b"")
+    await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"text/plain")]})
+    await send({"type": "http.response.body", "body": value})
+
+
 async def unknown_status_app(scope, receive, send):
     await send({"type": "http.response.start", "status": 599, "headers": []})
     await send({"type": "http.response.body", "body": b""})
@@ -95,6 +101,22 @@ def test_caller_supplied_host_header_wins():
     body = ASGIClient(echo_scope_app).get("/x", headers={"Host": "example.com"}).text
     assert "(b'host', b'example.com')" in body
     assert "b'testserver'" not in body
+
+
+def test_header_value_uses_the_wire_encoding(app_runner):
+    headers = {"X-Token": "clé"}
+    port = app_runner.run_asgi_app(echo_header_app)
+    over_http = requests.get(f"http://127.0.0.1:{port}/x", headers=headers).content
+    assert ASGIClient(echo_header_app).get("/x", headers=headers).content == over_http == b"cl\xe9"
+
+
+def test_header_value_outside_the_wire_encoding_is_rejected(app_runner):
+    headers = {"X-Token": "日本"}
+    port = app_runner.run_asgi_app(echo_header_app)
+    with pytest.raises(UnicodeEncodeError):
+        requests.get(f"http://127.0.0.1:{port}/x", headers=headers)
+    with pytest.raises(UnicodeEncodeError):
+        ASGIClient(echo_header_app).get("/x", headers=headers)
 
 
 @pytest.mark.parametrize("url", ["/echo?a=1", b"/echo?a=1"], ids=["string", "bytes"])
