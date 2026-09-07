@@ -10,6 +10,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
+from schemathesis.specs.openapi.adapter.validators import ensure_object
 from schemathesis.specs.openapi.auths import (
     ApiKeyAuthProvider,
     DynamicTokenAuthProvider,
@@ -318,7 +319,9 @@ def extract_security_definitions_v2(schema: Mapping[str, Any], resolver: Resolve
 def extract_security_definitions_v3(schema: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
     """In Open API 3 security definitions are located in ``components`` and may have references inside."""
     components = schema.get("components", {})
+    ensure_object(components, "`components`")
     security_schemes = components.get("securitySchemes", {})
+    ensure_object(security_schemes, "`components.securitySchemes`")
     if "$ref" in security_schemes:
         return resolve_reference(resolver, security_schemes["$ref"])[1]
     return {

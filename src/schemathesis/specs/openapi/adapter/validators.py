@@ -7,6 +7,7 @@ from typing import Any
 from jsonschema_rs import ValidationError
 from packaging import version
 
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.specs.openapi.definitions import (
     OPENAPI_30_VALIDATOR,
     OPENAPI_31_VALIDATOR,
@@ -17,6 +18,12 @@ from schemathesis.specs.openapi.utils import parse_spec_version
 
 _V3_1 = version.parse("3.1")
 _V3_2 = version.parse("3.2")
+
+
+def ensure_object(value: object, label: str) -> None:
+    """Reject a schema node that must be an object but carries some other JSON value."""
+    if not isinstance(value, dict):
+        raise InvalidSchema(f"{label} must be an object")
 
 
 @contextmanager

@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
+from schemathesis.specs.openapi.adapter.validators import ensure_object
 
 
 def maybe_resolve_with_resolver(item: Mapping[str, Any], resolver: Resolver) -> tuple[Resolver, Mapping[str, Any]]:
@@ -25,3 +26,4 @@ def maybe_resolve_with_resolver(item: Mapping[str, Any], resolver: Resolver) -> 
         seen.add(reference)
 
         current_resolver, current_item = resolve_reference(current_resolver, reference)
+        ensure_object(current_item, f"Reference target `{reference}`")
