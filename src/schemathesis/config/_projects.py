@@ -24,7 +24,7 @@ from schemathesis.config._report import ReportsConfig
 from schemathesis.config._servers import ServersConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, NOT_SET, NotSet, hooks
-from schemathesis.core.validation import validate_base_url
+from schemathesis.core.validation import validate_base_url, validate_origin
 
 if TYPE_CHECKING:
     import hypothesis
@@ -52,6 +52,7 @@ def get_workers_count() -> int:
 class ProjectConfig(DiffBase):
     _parent: SchemathesisConfig | None
     base_url: str | None
+    origin: str | None
     headers: dict | None
     hooks: str | None
     proxy: str | None
@@ -78,6 +79,7 @@ class ProjectConfig(DiffBase):
     __slots__ = (
         "_parent",
         "base_url",
+        "origin",
         "headers",
         "hooks",
         "proxy",
@@ -108,6 +110,7 @@ class ProjectConfig(DiffBase):
         *,
         parent: SchemathesisConfig | None = None,
         base_url: str | None = None,
+        origin: str | None = None,
         headers: dict | None = None,
         hooks_: str | None = None,
         workers: int | Literal["auto"] = DEFAULT_WORKERS,
@@ -135,6 +138,9 @@ class ProjectConfig(DiffBase):
         if base_url is not None:
             _validate_base_url(base_url)
         self.base_url = base_url
+        if origin is not None:
+            _validate_origin(origin)
+        self.origin = origin
         self.headers = headers
         self.hooks = hooks_
         if hooks_:
@@ -170,6 +176,17 @@ class ProjectConfig(DiffBase):
         self.operations = operations or OperationsConfig()
 
     @classmethod
+    def from_hierarchy(cls, configs: list[ProjectConfig]) -> ProjectConfig:  # type: ignore[override]
+        merged: ProjectConfig = DiffBase.from_hierarchy.__func__(cls, configs)  # type: ignore[attr-defined]
+        # The target URL is a single decision, so the closest config that makes it wins entirely
+        for config in configs:
+            if config.base_url is not None or config.origin is not None:
+                merged.base_url = config.base_url
+                merged.origin = config.origin
+                break
+        return merged
+
+    @classmethod
     def from_dict(
         cls,
         data: dict[str, Any],
@@ -177,8 +194,11 @@ class ProjectConfig(DiffBase):
         dictionaries: dict[str, DictionaryDefinition] | None = None,
     ) -> ProjectConfig:
         dictionaries = dictionaries or {}
+        if "base-url" in data and "origin" in data:
+            raise ConfigError("`base-url` and `origin` are mutually exclusive - pick one.")
         return cls(
             base_url=resolve(data.get("base-url")),
+            origin=resolve(data.get("origin")),
             headers={resolve(key): resolve(value) for key, value in data.get("headers", {}).items()}
             if "headers" in data
             else None,
@@ -214,6 +234,7 @@ class ProjectConfig(DiffBase):
         self,
         *,
         base_url: str | None = None,
+        origin: str | None = None,
         headers: dict | None = None,
         basic_auth: tuple[str, str] | None = None,
         wfc_auth: str | None = None,
@@ -235,6 +256,10 @@ class ProjectConfig(DiffBase):
         if base_url is not None:
             _validate_base_url(base_url)
             self.base_url = base_url
+
+        if origin is not None:
+            _validate_origin(origin)
+            self.origin = origin
 
         if headers is not None:
             _headers = self.headers or {}
@@ -561,6 +586,13 @@ class ProjectConfig(DiffBase):
 def _validate_base_url(base_url: str) -> None:
     try:
         validate_base_url(base_url)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from None
+
+
+def _validate_origin(origin: str) -> None:
+    try:
+        validate_origin(origin)
     except ValueError as exc:
         raise ConfigError(str(exc)) from None
 

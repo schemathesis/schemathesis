@@ -43,6 +43,7 @@ from schemathesis.cli.options import (
     MAX_RESPONSE_TIME,
     MAX_TIME,
     NO_COLOR,
+    ORIGIN,
     OUTPUT_SANITIZE,
     OUTPUT_TRUNCATE,
     PROXY,
@@ -66,7 +67,7 @@ from schemathesis.cli.options import (
     WARNINGS,
     WORKERS,
 )
-from schemathesis.cli.validation import validate_auth_overlap
+from schemathesis.cli.validation import CONFLICTING_URL_MESSAGE, validate_auth_overlap
 from schemathesis.config import (
     DEFAULT_REPORT_DIRECTORY,
     HealthCheck,
@@ -86,6 +87,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 @click.argument(*LOCATION.args, **LOCATION.kwargs)  # type: ignore[untyped-decorator]
 @group("Options")
 @grouped_option(*BASE_URL.args, **BASE_URL.kwargs)
+@grouped_option(*ORIGIN.args, **ORIGIN.kwargs)
 @grouped_option(*WORKERS.args, **WORKERS.kwargs)
 @grouped_option(*MAX_TIME.args, **MAX_TIME.kwargs)
 @grouped_option(
@@ -206,6 +208,7 @@ def run(
     exclude_deprecated: bool | None = None,
     workers: int | None = None,
     base_url: str | None,
+    origin: str | None,
     wait_for_schema: float | None = None,
     suppress_health_check: list[HealthCheck] | None,
     warnings: bool | list[SchemathesisWarning] | None,
@@ -266,6 +269,9 @@ def run(
 
     validate_auth_overlap(auth, headers)
 
+    if base_url is not None and origin is not None:
+        raise click.UsageError(CONFLICTING_URL_MESSAGE)
+
     # Then override the global config from CLI options
     config.update(
         color=color,
@@ -291,6 +297,7 @@ def run(
     # Other CLI options work as an override for all defined projects
     config.projects.override.update(
         base_url=base_url,
+        origin=origin,
         headers=headers or None,
         basic_auth=auth,
         wfc_auth=auth_wfc,

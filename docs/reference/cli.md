@@ -66,6 +66,19 @@ $ st run [OPTIONS] SCHEMA
     $ st run openapi.yaml --url https://api.example.com
     ```
 
+#### `--origin URL`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `null`  
+
+    Specifies the API origin - scheme, host and port only. The base path comes from the schema's `basePath` or `servers[0].url`. Use it when the host is known only at run time, and `--url` when you want to set the path yourself. Mutually exclusive with `--url`.
+
+    ```console
+    $ st run openapi.yaml --origin http://127.0.0.1:8080
+    ```
+
 #### `-w, --workers VALUE`
 
 !!! note ""

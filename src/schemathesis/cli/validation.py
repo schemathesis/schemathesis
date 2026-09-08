@@ -12,7 +12,7 @@ import click
 
 from schemathesis.cli.ext.options import CsvEnumChoice
 from schemathesis.config import ReportFormat, SchemathesisWarning, get_workers_count
-from schemathesis.core import errors, rate_limit, string_to_boolean
+from schemathesis.core import errors, rate_limit, string_to_boolean, validation
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.filters import expression_to_filter_function
@@ -29,6 +29,11 @@ INVALID_BASE_URL_MESSAGE = (
     "Make sure it is a properly formatted URL."
 )
 MISSING_REQUEST_CERT_MESSAGE = "The `--request-cert` option must be specified if `--request-cert-key` is used."
+INVALID_ORIGIN_MESSAGE = (
+    "The provided origin is invalid. It must contain only the scheme, host and port, as the path comes "
+    "from the schema. Use `--url` if you want to set the path yourself."
+)
+CONFLICTING_URL_MESSAGE = "The `--url` and `--origin` options are mutually exclusive."
 
 
 def validate_schema_location(ctx: click.core.Context, param: click.core.Parameter, location: str) -> str:
@@ -65,6 +70,16 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
         raise click.UsageError(INVALID_BASE_URL_MESSAGE) from exc
     if raw_value and not netloc:
         raise click.UsageError(INVALID_BASE_URL_MESSAGE)
+    return raw_value
+
+
+def validate_origin(ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None) -> str | None:
+    if raw_value is None:
+        return None
+    try:
+        validation.validate_origin(raw_value)
+    except ValueError:
+        raise click.UsageError(INVALID_ORIGIN_MESSAGE) from None
     return raw_value
 
 
