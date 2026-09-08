@@ -27,6 +27,9 @@ on:
       - "tox.ini"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -43,6 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -69,12 +73,13 @@ jobs:
         python: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.14t"]
       fail-fast: false
 
-    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }} ${{ matrix.tox_env }})
+    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -86,11 +91,7 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
           cache-suffix: ${{ matrix.python }}-v2
 
-      - if: ${{ matrix.tox_env }}
-        run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox -e ${{ matrix.tox_env }}
-
-      - if: ${{ !matrix.tox_env }}
-        run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox
+      - run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
