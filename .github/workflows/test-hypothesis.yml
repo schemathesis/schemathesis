@@ -20,5 +20,8 @@ jobs:
           python-version: "3.14"
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+          cache-suffix: hypothesis-3.14-v1
 
       - run: uvx --from=".[tests]" pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI --ignore=test/tooling test

@@ -38,6 +38,9 @@ jobs:
           python-version: 3.11
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+          cache-suffix: docs-3.11-v1
 
       - run: uvx --from=".[tests]" pytest test/config/test_doc_examples.py -q
 

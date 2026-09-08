@@ -51,9 +51,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          cache-dependency-glob: |
-            **/pyproject.toml
-            **/uv.lock
+          cache-dependency-glob: "**/pyproject.toml"
           cache-suffix: corpus-tooling-3.14-v1
 
       - run: uvx ruff check tools scripts/analyze test/tooling
@@ -85,9 +83,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          cache-dependency-glob: |
-            **/pyproject.toml
-            **/uv.lock
+          cache-dependency-glob: "**/pyproject.toml"
           cache-suffix: ${{ matrix.python }}-v2
 
       - if: ${{ matrix.tox_env }}

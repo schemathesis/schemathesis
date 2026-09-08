@@ -41,6 +41,9 @@ jobs:
           python-version: "3.12"
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+          cache-suffix: bench-3.12-v1
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
@@ -59,6 +62,9 @@ jobs:
           python-version: "3.14"
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+          cache-suffix: bench-memory-3.14-v1
 
       # Whole-engine runs, too slow for the Valgrind job above but the only shape that catches
       # memory blowups in the engine rather than in a single generator. They sit under

@@ -16,6 +16,9 @@ jobs:
           submodules: true
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+          cache-suffix: update-pre-commit-v1
 
       - run: uvx prek autoupdate
 
