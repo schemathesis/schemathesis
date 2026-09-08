@@ -6243,6 +6243,56 @@ def test_explicit_content_type_header_does_not_collide_with_body_coverage(ctx):
     )
 
 
+def test_content_type_header_keeps_declared_value_when_body_media_type_conflicts(ctx):
+    # A declared Content-Type header must keep a value its own schema admits, even when the body media type differs.
+    operation = body_operation(
+        ctx,
+        {"type": "string", "format": "binary"},
+        media_type="application/octet-stream",
+        parameters=[
+            {
+                "in": "header",
+                "name": "Content-type",
+                "schema": {"type": "string", "default": "application/x-tar", "enum": ["application/x-tar"]},
+            }
+        ],
+    )
+    values = set()
+    for case in collect_cases(operation, GenerationMode.POSITIVE):
+        headers = case.meta.raw_containers.get(ParameterLocation.HEADER) or {}
+        if "Content-type" in headers:
+            values.add(headers["Content-type"])
+    assert values == {"application/x-tar"}
+
+
+def test_content_type_header_pins_to_a_declared_body_media_type_it_admits(ctx):
+    # With several bodies declared, the pinned value names one of them rather than any string the header allows.
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {
+                "in": "header",
+                "name": "Content-Type",
+                "schema": {"type": "string", "enum": ["text/plain", "application/xml"]},
+            }
+        ],
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {"schema": {"type": "object"}},
+                "application/xml": {"schema": {"type": "object"}},
+            },
+        },
+    )["/foo"]["post"]
+    values = set()
+    for case in collect_cases(operation, GenerationMode.POSITIVE):
+        if case.body is NOT_SET:
+            continue
+        headers = case.meta.raw_containers.get(ParameterLocation.HEADER) or {}
+        values.add(headers.get("Content-Type"))
+    assert values == {"application/xml"}
+
+
 def test_recursive_ref_negative_descends_past_self_reference(ctx):
     # Self-referential arms must receive a type-violating element at the inner-`$ref` position,
     # not just be skipped when the negative generator hits the recursion boundary.
