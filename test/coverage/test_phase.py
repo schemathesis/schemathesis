@@ -4179,6 +4179,29 @@ def test_unsatisfiable_required_param_suppresses_positive_from_other_params(ctx)
     assert positive == [], [(case.query, case.headers) for case in positive]
 
 
+def test_unsatisfiable_required_header_emits_no_positive_case(ctx):
+    # An optional sibling or a request body must not revive the positive cases the unsatisfiable header rules out.
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {
+                "name": "X-Required",
+                "in": "header",
+                "required": True,
+                "schema": {"type": "number", "format": "float", "exclusiveMinimum": 10**1000},
+            },
+            {"name": "X-Optional", "in": "header", "required": False, "schema": {"type": "string"}},
+        ],
+        body={"type": "object", "properties": {"a": {"type": "string"}}},
+        path="/route",
+        method="post",
+        version="3.1.0",
+    )["/route"]["post"]
+    cases = iter_cases(operation, *GenerationMode)
+    positive = [case for case in cases if case.meta.generation.mode == GenerationMode.POSITIVE]
+    assert positive == [], [(case.headers, case.body) for case in positive]
+
+
 def test_missing_required_header_case_uses_invalid_template_body(ctx):
     # In NEGATIVE-only mode the template body is set from the first negative mutation
     # (e.g. `0`). MISSING_PARAMETER test cases inherit that invalid body, so a server
@@ -6599,6 +6622,18 @@ def test_container_path_parameter_never_blanks_the_path_segment(ctx, item_schema
     )["/p/{v}"]["post"]
     for case in iter_cases(operation, *GenerationMode):
         assert case.formatted_path != "/p/", f"blank path segment from {case.path_parameters!r}"
+
+
+def test_path_parameter_enum_never_blanks_the_path_segment(ctx):
+    # A blank segment collapses the URL onto another operation, so the case tests something else.
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"name": "v", "in": "path", "required": True, "schema": {"type": "string", "enum": ["", "active"]}}
+        ],
+        path="/p/{v}",
+    )["/p/{v}"]["post"]
+    assert {case.path_parameters["v"] for case in collect_cases(operation, GenerationMode.POSITIVE)} == {"active"}
 
 
 @pytest.mark.parametrize("location", ["header", "cookie"])

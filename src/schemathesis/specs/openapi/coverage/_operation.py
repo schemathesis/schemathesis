@@ -757,6 +757,11 @@ def _seed_parameters(run: CoverageRun) -> None:
     template.has_required_body = bool(operation.body and any(b.is_required for b in operation.body))
 
 
+def _is_invalid_positive(template: Template, value: GeneratedValue) -> bool:
+    """Whether a required parameter without a positive value already invalidates this body case."""
+    return value.generation_mode == GenerationMode.POSITIVE and template.unsatisfiable_required_parameter
+
+
 def _drop_negatives_the_schema_admits(
     values: Generator[GeneratedValue, None, None],
     schema: JsonSchemaObject,
@@ -815,17 +820,18 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
             if "body" not in template:
                 template.seed_time += elapsed
                 template.set_body(first_custom_value, body.media_type)
-            data = template.with_body(value=first_custom_value, media_type=body.media_type)
-            yield emitter.build(
-                data,
-                mode=first_custom_value.generation_mode,
-                elapsed=elapsed,
-                scenario=first_custom_value.scenario,
-                description=first_custom_value.description,
-                location=first_custom_value.location,
-                parameter=body.media_type,
-                parameter_location=ParameterLocation.BODY,
-            )
+            if not _is_invalid_positive(template, first_custom_value):
+                data = template.with_body(value=first_custom_value, media_type=body.media_type)
+                yield emitter.build(
+                    data,
+                    mode=first_custom_value.generation_mode,
+                    elapsed=elapsed,
+                    scenario=first_custom_value.scenario,
+                    description=first_custom_value.description,
+                    location=first_custom_value.location,
+                    parameter=body.media_type,
+                    parameter_location=ParameterLocation.BODY,
+                )
             continue
 
         schema = as_object_schema(body.unoptimized_schema)
@@ -929,25 +935,28 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
                     template.set_body(value, body.media_type)
                 else:
                     template.set_body(first_positive, body.media_type)
-        data = template.with_body(value=value, media_type=body.media_type)
-        case = emitter.emit(
-            data,
-            mode=value.generation_mode,
-            elapsed=elapsed,
-            scenario=value.scenario,
-            description=value.description,
-            location=value.location,
-            parameter=body.media_type,
-            parameter_location=ParameterLocation.BODY,
-        )
-        if case is None:
-            continue
-        yield case
+        if not _is_invalid_positive(template, value):
+            data = template.with_body(value=value, media_type=body.media_type)
+            case = emitter.emit(
+                data,
+                mode=value.generation_mode,
+                elapsed=elapsed,
+                scenario=value.scenario,
+                description=value.description,
+                location=value.location,
+                parameter=body.media_type,
+                parameter_location=ParameterLocation.BODY,
+            )
+            if case is None:
+                continue
+            yield case
         iterator = iter(gen)
         while True:
             instant = Instant()
             try:
                 next_value = next(iterator)
+                if _is_invalid_positive(template, next_value):
+                    continue
                 data = template.with_body(value=next_value, media_type=body.media_type)
                 case = emitter.emit(
                     data,
@@ -1273,9 +1282,7 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
-            if GenerationMode.POSITIVE in generation_modes and not (
-                template.has_required_body and not template.has_generated_required_body
-            ):
+            if GenerationMode.POSITIVE in generation_modes and template.can_emit(GenerationMode.POSITIVE):
                 case = make_case(
                     only_required,
                     CoverageScenario.OBJECT_ONLY_REQUIRED,
@@ -1295,7 +1302,7 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
             if combo != base_container and GenerationMode.POSITIVE in generation_modes:
-                if not (template.has_required_body and not template.has_generated_required_body):
+                if template.can_emit(GenerationMode.POSITIVE):
                     case = make_case(
                         combo,
                         CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
@@ -1315,7 +1322,7 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
         if (
             len(optional) > 1
             and GenerationMode.POSITIVE in generation_modes
-            and not (template.has_required_body and not template.has_generated_required_body)
+            and template.can_emit(GenerationMode.POSITIVE)
         ):
             for size in range(2, len(optional)):
                 for combination in combinations(optional, size):
