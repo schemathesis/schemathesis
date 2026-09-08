@@ -2177,8 +2177,8 @@ def test_query_without_constraints_negative(ctx):
             {"type": "array", "items": {"type": "string", "pattern": "^[0-9]{3,5}$"}},
             True,
             [
-                "http://127.0.0.1/foo?q=0&q=0",
                 "http://127.0.0.1/foo",
+                "http://127.0.0.1/foo?q=0&q=0",
                 "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null&q=null",
                 "http://127.0.0.1/foo?q=0",
@@ -7075,3 +7075,77 @@ def test_boolean_body_schema(ctx, media_type, boolean_schema):
     assert cases
     for case in cases:
         assert_requests_call(case)
+
+
+ARRAY_QUERY_PARAMETER = {
+    "in": "query",
+    "name": "ids",
+    "required": True,
+    "schema": {"type": "array", "items": {"type": "string"}, "minItems": 0},
+}
+ARRAY_QUERY_PARAMETER_WITH_MIN_ITEMS = {
+    "in": "query",
+    "name": "ids",
+    "required": True,
+    "schema": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+}
+STRING_QUERY_PARAMETER_DISALLOWING_EMPTY = {
+    "in": "query",
+    "name": "ids",
+    "required": True,
+    "allowEmptyValue": False,
+    "schema": {"type": "string"},
+}
+STRING_QUERY_PARAMETER_WITH_MIN_LENGTH = {
+    "in": "query",
+    "name": "ids",
+    "required": True,
+    "allowEmptyValue": False,
+    "schema": {"type": "string", "minLength": 1},
+}
+
+
+@pytest.mark.parametrize(
+    ("parameter", "scenario", "empty_value", "violates_schema"),
+    [
+        (ARRAY_QUERY_PARAMETER, CoverageScenario.ARRAY_BELOW_MIN_ITEMS, [], False),
+        (ARRAY_QUERY_PARAMETER_WITH_MIN_ITEMS, CoverageScenario.ARRAY_BELOW_MIN_ITEMS, [], True),
+        (STRING_QUERY_PARAMETER_DISALLOWING_EMPTY, CoverageScenario.STRING_BELOW_MIN_LENGTH, "", False),
+        (STRING_QUERY_PARAMETER_WITH_MIN_LENGTH, CoverageScenario.STRING_BELOW_MIN_LENGTH, "", True),
+    ],
+    ids=["array-without-min-items", "array-with-min-items", "string-without-min-length", "string-with-min-length"],
+)
+def test_empty_query_value_is_negative_only_when_the_schema_forbids_it(
+    ctx, parameter, scenario, empty_value, violates_schema
+):
+    # An empty value serializes to nothing, so generation avoids it — but the published schema may still admit it.
+    operation = load_schema(ctx, parameters=[parameter], method="get")["/foo"]["GET"]
+
+    matching = [
+        case
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.scenario == scenario and case.query.get("ids") == empty_value
+    ]
+
+    assert bool(matching) is violates_schema, f"{empty_value!r} labelled negative: {not violates_schema}"
+
+
+@pytest.mark.parametrize(
+    ("parameter", "reports_failure"),
+    [(STRING_QUERY_PARAMETER_DISALLOWING_EMPTY, False), (STRING_QUERY_PARAMETER_WITH_MIN_LENGTH, True)],
+    ids=["without-min-length", "with-min-length"],
+)
+def test_negative_data_rejection_for_empty_query_string(ctx, response_factory, parameter, reports_failure):
+    operation = load_schema(ctx, parameters=[parameter], method="get")["/foo"]["GET"]
+    response = response_factory.requests(status_code=200)
+
+    reported = []
+    for case in collect_cases(operation, GenerationMode.NEGATIVE):
+        if case.query.get("ids") != "":
+            continue
+        try:
+            negative_data_rejection(check_context(), response, case)
+        except AcceptedNegativeData as exc:
+            reported.append(str(exc))
+
+    assert bool(reported) is reports_failure, reported

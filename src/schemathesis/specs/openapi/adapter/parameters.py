@@ -1124,30 +1124,62 @@ class OpenApiParameter(OpenApiComponent):
         # (`EnumType.__call__` → `Enum.__new__`) is the slow path here.
         return _IN_TO_LOCATION.get(self.definition.get("in"), ParameterLocation.UNKNOWN)
 
-    def _build_schema(self, *, optimize: bool) -> JsonSchema:
-        schema = super()._build_schema(optimize=optimize)
+    @property
+    def wire_bounds(self) -> dict[str, int]:
+        """Lower bounds that serialization implies but the document does not declare.
+
+        Generation honors them so an empty value never leaves the parameter off the wire; whatever
+        judges a value against the API contract must not, because the document admits that value.
+        """
+        allow_empty_value = self.definition.get("allowEmptyValue")
+        if not self.is_required and allow_empty_value is not False:
+            return {}
+        # Derived from the contract, so every schema built off this parameter reads the same bounds.
+        schema = self.validation_schema
+        if not isinstance(schema, dict):
+            return {}
+        bounds: dict[str, int] = {}
         # A required parameter with an empty array value serializes to nothing (form/simple styles
         # drop empty arrays), leaving the parameter absent from the request and violating `required`.
         if (
             self.is_required
-            and isinstance(schema, dict)
             and schema.get("type") == "array"
             and schema.get("minItems", 0) < 1
             and schema.get("maxItems", 1) >= 1
         ):
-            schema = {**schema, "minItems": 1}
+            bounds["minItems"] = 1
         # An explicit `allowEmptyValue: false` forbids sending the parameter with an empty value.
         # The default is not applied — it would strip empty strings from every query parameter,
         # and most schemas that omit the keyword do accept them.
         if (
-            self.definition.get("allowEmptyValue") is False
+            allow_empty_value is False
             and self.location is ParameterLocation.QUERY
-            and isinstance(schema, dict)
             and schema.get("type") == "string"
             and schema.get("minLength", 0) < 1
             and schema.get("maxLength", 1) >= 1
         ):
-            schema = {**schema, "minLength": 1}
+            bounds["minLength"] = 1
+        return bounds
+
+    def without_wire_bounds(self, schema: JsonSchemaObject) -> JsonSchemaObject:
+        """Put back what the document declares wherever a serialization-implied bound replaced it."""
+        declared = self.validation_schema
+        result = dict(schema)
+        for keyword, bound in self.wire_bounds.items():
+            if result.get(keyword) != bound:
+                continue
+            value = declared.get(keyword) if isinstance(declared, dict) else None
+            if value is None:
+                result.pop(keyword, None)
+            else:
+                result[keyword] = value
+        return result
+
+    def _build_schema(self, *, optimize: bool) -> JsonSchema:
+        schema = super()._build_schema(optimize=optimize)
+        bounds = self.wire_bounds
+        if bounds and isinstance(schema, dict):
+            schema = {**schema, **bounds}
         return schema
 
     def _get_raw_schema(self) -> JsonSchema:
