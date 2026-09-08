@@ -2637,6 +2637,22 @@ class EventCounter(cli.EventHandler):
     )
 
 
+def test_custom_handler_shutdown_error_keeps_exit_code(ctx, cli):
+    # A reporter failing at shutdown must not mask the run's verdict.
+    @schemathesis.cli.handler()
+    class BrokenShutdown(schemathesis.cli.EventHandler):
+        def handle_event(self, run_ctx, event) -> None:
+            pass
+
+        def shutdown(self, run_ctx) -> None:
+            raise RuntimeError("oops")
+
+    api = ctx.openapi.apps.success()
+    result = cli.run(api.schema_url, "--max-examples=1")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "CLI Handler Error" in result.stdout
+
+
 @pytest.mark.parametrize(
     ["ordering_mode", "expected"],
     [

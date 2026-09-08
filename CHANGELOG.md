@@ -75,6 +75,7 @@
 - Stateful reproduce chain printing every step with the failing step's request headers.
 - Accept `base_url_mismatch`, `unsupported_regex`, `unresolvable_reference` in `[warnings]`, and report invalid warning names clearly.
 - Warn about an unsupported `pattern` dropped from a request parameter or body.
+- Custom CLI handler errors at shutdown crashing the run instead of being reported.
 
 ## [4.26.0](https://github.com/schemathesis/schemathesis/compare/v4.25.2...v4.26.0) - 2026-09-07
 
