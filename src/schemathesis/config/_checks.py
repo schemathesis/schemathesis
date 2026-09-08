@@ -163,6 +163,8 @@ class ChecksConfig(DiffBase):
     _unknown: dict[str, SimpleCheckConfig]
     # Kwargs forwarded to __init__ of class-based checks, keyed by check class name.
     _custom_kwargs: dict[str, dict[str, Any]]
+    # Checks named on the command line, so merging can tell an explicit `enabled` from the default.
+    _explicit: dict[str, bool]
 
     def __init__(
         self,
@@ -198,6 +200,7 @@ class ChecksConfig(DiffBase):
         self.max_response_time = max_response_time or MaxResponseTimeConfig()
         self._unknown = {}
         self._custom_kwargs = {}
+        self._explicit = {}
 
     @property
     def custom_kwargs(self) -> dict[str, dict[str, Any]]:
@@ -275,6 +278,13 @@ class ChecksConfig(DiffBase):
             for name, kwargs in config._custom_kwargs.items():
                 custom_kwargs.setdefault(name, {}).update(kwargs)
         merged._custom_kwargs = custom_kwargs
+        # `enabled = True` is the default, so the generic merge cannot tell it from "not configured";
+        # without this a lower-priority `false` would win over a check named on the command line.
+        known_names = {f.name for f in fields(cls) if not f.name.startswith("_")}
+        for config in configs:
+            for name, enabled in config._explicit.items():
+                if name not in merged._explicit:
+                    merged._set_enabled(name, known_names=known_names, enabled=enabled)
         return merged
 
     def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:
@@ -286,6 +296,7 @@ class ChecksConfig(DiffBase):
             return existing if existing is not None else SimpleCheckConfig()
 
     def _set_enabled(self, name: str, *, known_names: set[str], enabled: bool) -> None:
+        self._explicit[name] = enabled
         if name in known_names:
             self.get_by_name(name=name).enabled = enabled
         else:
@@ -315,9 +326,10 @@ class ChecksConfig(DiffBase):
                 and name not in included_check_names
             ):
                 self._set_enabled(name, known_names=known_names, enabled=False)
-            elif included_check_names is not None and name in included_check_names:
+            elif included_check_names is not None and ("all" in included_check_names or name in included_check_names):
                 self._set_enabled(name, known_names=known_names, enabled=True)
 
         if max_response_time is not None:
+            self._explicit["max_response_time"] = True
             self.max_response_time.enabled = True
             self.max_response_time.limit = max_response_time

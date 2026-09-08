@@ -72,6 +72,7 @@
 - Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
 - Run hanging forever when one report path is rejected and another report is enabled.
 - Stray traceback and lost crash report when concurrent runs share a `.schemathesis` directory.
+- Checks disabled in a config file staying disabled when selected via `--checks`, including `--checks all`.
 - `st replay` reporting sanitized crash files as fixed and deleting them.
 - Stateful reproduce chain printing every step with the failing step's request headers.
 - Accept `base_url_mismatch`, `unsupported_regex`, `unresolvable_reference` in `[warnings]`, and report invalid warning names clearly.

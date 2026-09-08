@@ -3,6 +3,8 @@ import platform
 import textwrap
 
 import pytest
+from _pytest.main import ExitCode
+from flask import jsonify
 
 
 @pytest.mark.parametrize(
@@ -136,3 +138,48 @@ def test_permission_denied(cli, tmp_path, snapshot_cli):
         assert cli.main(f"--config-file={config_file}", "run", "http://127.0.0.1") == snapshot_cli
     finally:
         os.chmod(config_file, 0o644)
+
+
+@pytest.mark.parametrize("selection", ["response_schema_conformance", "all"])
+def test_cli_check_selection_re_enables_check_disabled_in_config(
+    ctx, cli, app_runner, tmp_path, monkeypatch, selection
+):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["id"],
+                                        "properties": {"id": {"type": "integer"}},
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    @app.route("/api/data")
+    def data():
+        return jsonify({})
+
+    (tmp_path / "schemathesis.toml").write_text("[checks.response_schema_conformance]\nenabled = false\n")
+    monkeypatch.chdir(tmp_path)
+    url = app_runner.openapi_url(app)
+
+    cli.run_and_assert(url, "--max-examples=1", "--phases=fuzzing", exit_code=ExitCode.OK)
+    cli.run_and_assert(
+        url,
+        f"--checks={selection}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        exit_code=ExitCode.TESTS_FAILED,
+    )
