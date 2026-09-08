@@ -101,7 +101,6 @@ class Template:
         container = self._template.setdefault(location.container_name, {})
         container[name] = value.value
         self._parameter_modes.setdefault(location, {})[name] = value.generation_mode
-        # A parameter declared twice replaces the value it was mutating, so its location stops carrying that mutation.
         self._components[location] = ComponentInfo(mode=self._mode_for(location, container))
 
     def _mode_for(self, location: ParameterLocation, container: dict[str, Any]) -> GenerationMode:
