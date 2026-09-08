@@ -33,7 +33,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, to_wire_string
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import custom_formats_cache
@@ -1023,10 +1023,8 @@ def jsonify_python_specific_types(value: Any) -> Any:
 
     Builds a new value: the input may be a spec-declared example that every other case reuses.
     """
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if value is None:
-        return "null"
+    if value is None or isinstance(value, bool):
+        return to_wire_string(value)
     if isinstance(value, dict):
         return {key: jsonify_python_specific_types(item) for key, item in value.items()}
     if isinstance(value, list):

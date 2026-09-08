@@ -19,7 +19,7 @@ from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schem
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, to_wire_string
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
@@ -353,14 +353,8 @@ def _dedup_key(kwargs: dict[str, Any]) -> dict[str, Any]:
 
 
 def _stringify_value(val: Any, container_name: str) -> Any:
-    if val is None:
-        return "null"
-    if val is True:
-        return "true"
-    if val is False:
-        return "false"
-    if isinstance(val, int | float):
-        return str(val)
+    if val is None or isinstance(val, int | float | bool):
+        return to_wire_string(val)
     if isinstance(val, list):
         if container_name == "query":
             # Having a list here ensures there will be multiple query parameters with the same name
