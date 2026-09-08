@@ -1730,10 +1730,10 @@ def _cover_positive_for_type(
         const = schema.get("const", NOT_SET)
         if enum is not NOT_SET:
             for value in enum:
-                if _is_valid_with_formats(value, schema, ctx):
+                if _is_valid_with_formats(value, schema, ctx) and _is_representable(value, ctx):
                     yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
         elif const is not NOT_SET:
-            if _is_valid_with_formats(const, schema, ctx):
+            if _is_valid_with_formats(const, schema, ctx) and _is_representable(const, ctx):
                 yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
         elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
             yield from _positive_for_describing_keywords(ctx, schema, ty, template)
@@ -2469,20 +2469,22 @@ def _positive_for_describing_keywords(
             yield from _drop_invalid_for_location(_positive_array(ctx, schema, cast(list, template)), ctx)
 
 
+def _is_representable(value: Any, ctx: CoverageContext) -> bool:
+    """Whether the location can carry this value, e.g. without blanking a path segment."""
+    if isinstance(value, dict):
+        # `representable` judges a dict by its `repr`, which is not what a path
+        # parameter sends; only an empty object is unrepresentable there.
+        return not (ctx.location == ParameterLocation.PATH and not value)
+    return ctx.wire.representable(value)
+
+
 def _drop_invalid_for_location(
     cases: Generator[GeneratedValue, None, None], ctx: CoverageContext
 ) -> Generator[GeneratedValue, None, None]:
     """Drop containers the location cannot carry, e.g. ones whose rendering blanks a path segment."""
     for case in cases:
-        value = case.value
-        if isinstance(value, dict):
-            # `representable` judges a dict by its `repr`, which is not what a path
-            # parameter sends; only an empty object is unrepresentable there.
-            if ctx.location == ParameterLocation.PATH and not value:
-                continue
-        elif not ctx.wire.representable(value):
-            continue
-        yield case
+        if _is_representable(case.value, ctx):
+            yield case
 
 
 def _filter_against_not(

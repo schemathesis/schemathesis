@@ -28,6 +28,8 @@
 #### Coverage phase
 
 - Crashing on parameters and bodies whose schema is written as a boolean.
+- Positive cases emitted when a required parameter has no satisfiable value.
+- Empty string from a path parameter's `enum` collapsing the URL segment.
 - Required headers, query and cookie parameters dropped from negative cases.
 - No positive cases generated for `allOf` of two disjoint `contains`.
 - Unsatisfiable schema error when an `allOf` branch forbids a required property with `false`.
