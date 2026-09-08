@@ -76,6 +76,7 @@ Runs scale with schema size and server performance. For thorough release testing
 **Reference guides:**
 
 - **[Triaging Failures](guides/triage.md)** – systematic workflow when your first run produces many failures
+- **[Testing multi-step workflows](guides/stateful-testing.md)** – when a bug only appears across a sequence like create -> fetch -> delete
 - **[CI/CD Integration](guides/cicd.md)** – export results as JUnit XML, HAR, or VCR cassettes
 - **[Using Schemathesis with Docker](guides/docker.md)** — run without installing Python
 - **[CLI Reference](reference/cli.md)** – full list of options and checks

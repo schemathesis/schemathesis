@@ -63,7 +63,7 @@ Add custom command-line options and event handlers for integration with external
 Run `st fuzz` for extended sessions that keep generating test cases until stopped or a time limit is reached.
 
 ### [Customizing Stateful Testing](stateful-testing.md)
-Configure authentication, data initialization, and scenario setup for stateful API testing workflows.
+Schemathesis chains operations into workflows on its own — configure authentication, data initialization, and scenario setup for the cases where the defaults don't fit.
 
 ### [Using Hypothesis Strategies](hypothesis-strategies.md)
 Combine Schemathesis with custom Hypothesis strategies or use Schemathesis strategies in other testing frameworks.

@@ -1,6 +1,6 @@
 # Schemathesis
 
-Schemathesis automatically generates property-based tests from your OpenAPI or GraphQL schema and exercises the edge cases that break your API.
+Schemathesis automatically generates property-based tests from your OpenAPI or GraphQL schema, chains operations into realistic workflows, and exercises the edge cases that break your API.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis automatically finding a server error"/>
@@ -31,6 +31,7 @@ This command will immediately find real bugs in a demo API and show you exactly 
 
 - 🎯 Find real bugs on the first run (commonly 5–15 in production schemas).
 - 🧠 Adapts as it runs: learns from server responses, threads real values into later requests, and shifts effort away from operations that aren't producing useful signal.
+- 🔄 Tests multi-step workflows, not single requests in isolation: follows OpenAPI `links`, infers relationships where they aren't declared, and carries real identifiers between operations.
 - ⏱️ No per-endpoint tests to maintain — point it at your schema and run.
 - 🐛 Every finding ships with a minimal `curl` reproducer.
 - 🔌 Plugs into existing setups: CLI, `pytest`, GitHub Actions, plus Allure, JUnit XML, and HAR output.
@@ -61,6 +62,7 @@ This command will immediately find real bugs in a demo API and show you exactly 
     Practical guides for common scenarios:
 
      - [:octicons-arrow-right-24: CI/CD Integration](guides/cicd.md)
+     - [:octicons-arrow-right-24: Testing multi-step workflows](guides/stateful-testing.md)
      - [:octicons-arrow-right-24: Extending Schemathesis](guides/extending.md)
      - [:octicons-arrow-right-24: More...](guides/index.md)
 
