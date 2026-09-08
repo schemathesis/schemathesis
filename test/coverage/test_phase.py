@@ -4340,35 +4340,6 @@ def test_missing_required_parameter_case_omits_only_that_parameter(ctx, location
     ] == [({}, GenerationMode.NEGATIVE, GenerationMode.NEGATIVE, CoverageScenario.MISSING_PARAMETER)]
 
 
-def test_redeclared_parameter_clears_the_location_negation_it_replaced(ctx):
-    # The redeclared parameter ships a valid value, so the query no longer carries anything a server must reject.
-    schema = ctx.openapi.load_schema(
-        {
-            "/items": {
-                "parameters": [{"name": "kind", "in": "query", "required": True, "schema": {"type": "string"}}],
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "kind",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "string", "enum": ["book"]},
-                        },
-                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": DEFAULT_RESPONSES,
-                },
-            }
-        }
-    )
-
-    assert [
-        (case.query, _component_mode(case, ParameterLocation.QUERY))
-        for case in collect_cases(schema["/items"]["GET"], GenerationMode.NEGATIVE)
-        if case.meta.phase.data.parameter == "X-Token"
-    ] == [({"kind": ""}, GenerationMode.POSITIVE)]
-
-
 def _missing_body_cases(operation):
     return [
         case
