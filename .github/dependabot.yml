@@ -4,6 +4,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "pip"
     directory: "/"
@@ -13,3 +15,5 @@ updates:
       python-dependencies:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7

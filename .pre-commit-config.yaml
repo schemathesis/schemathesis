@@ -24,6 +24,20 @@ repos:
     hooks:
       - id: yamllint
 
+  - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
+    rev: v1.7.12.24
+    hooks:
+      - id: actionlint
+        # CI runners ship shellcheck, so pin it here too or the hook is stricter on CI than locally.
+        additional_dependencies: [shellcheck-py==0.11.0.1]
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.30.0
+    hooks:
+      - id: zizmor
+        # Offline keeps the hook deterministic; online audits would need a GitHub token.
+        args: [--no-progress, --offline]
+
   - repo: https://github.com/crate-ci/typos
     rev: v1.50.1
     hooks:

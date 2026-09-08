@@ -6,40 +6,50 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   create-release:
+    permissions:
+      # Creates the GitHub release.
+      contents: write
     name: Create GitHub release
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Get release notes
-        run: python changelog.py notes ${{ steps.version.outputs.version }} > release_notes.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: python changelog.py notes "$VERSION" > release_notes.md
 
       - name: Create GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          TAG="${{ github.ref_name }}"
           PRERELEASE=""
           if [[ "$TAG" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
             PRERELEASE="--prerelease"
           fi
           gh release create "$TAG" \
-            --title "Release ${{ steps.version.outputs.version }}" \
+            --title "Release $VERSION" \
             --notes-file release_notes.md \
             --verify-tag \
             $PRERELEASE
 
   containers:
+    permissions:
+      # Pushes the container images to ghcr.io.
+      packages: write
     name: Build container images
     needs: create-release
     runs-on: ubuntu-24.04
@@ -55,30 +65,35 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Detect pre-release
+        env:
+          TAG_NAME: ${{ github.ref_name }}
         run: |
-          TAG_NAME="${{ github.ref_name }}"
           if [[ "$TAG_NAME" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
-            echo "is_prerelease=true" >> $GITHUB_ENV
+            echo "is_prerelease=true" >> "$GITHUB_ENV"
           else
-            echo "is_prerelease=false" >> $GITHUB_ENV
+            echo "is_prerelease=false" >> "$GITHUB_ENV"
           fi
         shell: bash
 
       - name: Generate stable tag
         id: stable-tag
+        env:
+          TAG_SUFFIX: ${{ matrix.tag-suffix }}
         run: |
-          if [ "${{ env.is_prerelease }}" == "false" ]; then
-            if [ "${{ matrix.tag-suffix }}" == "" ]; then
-              echo "stable_tag=type=raw,value=stable" >> $GITHUB_OUTPUT
-            elif [ "${{ matrix.tag-suffix }}" == "-trixie" ]; then
-              echo "stable_tag=type=raw,value=stable-trixie" >> $GITHUB_OUTPUT
+          if [ "$is_prerelease" == "false" ]; then
+            if [ "$TAG_SUFFIX" == "" ]; then
+              echo "stable_tag=type=raw,value=stable" >> "$GITHUB_OUTPUT"
+            elif [ "$TAG_SUFFIX" == "-trixie" ]; then
+              echo "stable_tag=type=raw,value=stable-trixie" >> "$GITHUB_OUTPUT"
             else
-              echo "stable_tag=" >> $GITHUB_OUTPUT
+              echo "stable_tag=" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "stable_tag=" >> $GITHUB_OUTPUT
+            echo "stable_tag=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Docker meta
@@ -96,10 +111,13 @@ jobs:
             ${{ steps.stable-tag.outputs.stable_tag }}
 
       - name: Build metadata
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          TAG_SUFFIX: ${{ matrix.tag-suffix }}
         run: |
-          echo "Tags: ${{ steps.meta.outputs.tags }}"
-          echo "Is prerelease: ${{ env.is_prerelease }}"
-          echo "Tag suffix: '${{ matrix.tag-suffix }}'"
+          echo "Tags: $TAGS"
+          echo "Is prerelease: $is_prerelease"
+          echo "Tag suffix: '$TAG_SUFFIX'"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
@@ -133,12 +151,17 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/schemathesis/schemathesis:buildcache${{ matrix.tag-suffix }},mode=max
 
   release_package:
+    permissions:
+      # Trusted Publishing exchanges this for a short-lived PyPI token.
+      id-token: write
+    environment: pypi
     name: Build and publish package to pypi.org
     needs: create-release
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -155,5 +178,3 @@ jobs:
 
       - name: Publish distribution package to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
