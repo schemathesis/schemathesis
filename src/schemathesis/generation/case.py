@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import jsonschema_rs
 from jsonschema_rs import Validator
+from typing_extensions import assert_never
 
 from schemathesis import hooks, transport
 from schemathesis.auths import reauth_and_replay
@@ -228,17 +229,21 @@ class Case(Generic[OperationT]):
     def get_container(self, location: ParameterLocation) -> dict[str, Any] | CaseInsensitiveDict | Body | None:
         """Return the value container for a parameter location; `None` for unknown locations."""
         # Hand-rolled chain — queried per parameter in hot check / generation paths.
-        if location == ParameterLocation.QUERY:
-            return self.query
-        if location == ParameterLocation.HEADER:
-            return self.headers
-        if location == ParameterLocation.PATH:
-            return self.path_parameters
-        if location == ParameterLocation.COOKIE:
-            return self.cookies
-        if location == ParameterLocation.BODY:
-            return self.body
-        return None
+        match location:
+            case ParameterLocation.QUERY:
+                return self.query
+            case ParameterLocation.HEADER:
+                return self.headers
+            case ParameterLocation.PATH:
+                return self.path_parameters
+            case ParameterLocation.COOKIE:
+                return self.cookies
+            case ParameterLocation.BODY:
+                return self.body
+            case ParameterLocation.UNKNOWN:
+                return None
+            case _:
+                assert_never(location)
 
     def _init_hashes(self) -> None:
         """Initialize hash tracking in metadata for generated components only."""
