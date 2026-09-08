@@ -36,5 +36,6 @@ jobs:
 
       - run: uvx prek run --all-files
 
+      # The published image; the action itself builds its Dockerfile on every run.
       - name: Run commitsar
-        uses: aevea/commitsar@909c3ab676c9af63cb84f2e38f395c7e89829b04 # v1.0.3
+        uses: docker://aevea/commitsar:1.0.3@sha256:b7f965c7717aae9339a92cc5975b5e0130b3a5b5f6e4323a57ab421d8c39f13d
