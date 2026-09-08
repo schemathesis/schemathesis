@@ -37,7 +37,7 @@ from schemathesis.specs.openapi.stateful import dependencies
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
-from tools.corpus.conformance import check_body_conformance  # noqa: E402
+from tools.corpus.conformance import check_conformance  # noqa: E402
 from tools.corpus.io import json_loads, read_corpus_file  # noqa: E402
 
 CORPUS_FILE_NAMES = (
@@ -113,7 +113,7 @@ KNOWN_ISSUES = {
     ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /collaborations"),
     ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /configuredTables"),
 }
-# Coverage-phase JSON body conformance failures expected until each is fixed. Drive to zero.
+# JSON body conformance failures expected until each is fixed. Drive to zero.
 # All entries here are Python-vs-Rust regex semantic differences — the Rust-backed generator
 # emits strings the Python `re`-based validator rejects (Unicode whitespace/digits matched
 # against ASCII char classes, nested-set `[[…]]` parsed differently, etc.) — or Rust regex
@@ -183,32 +183,35 @@ def _run_registered_checks(ctx, response, case):
             pass
 
 
-def _check_body_conformance_violation(case):
-    if case.meta is None or case.meta.phase.name != TestPhase.COVERAGE:
+def _check_conformance_violation(case):
+    if case.meta is None:
         return
-    violation = check_body_conformance(case)
+    violation = check_conformance(case)
     if violation is None:
         return
+    phase = case.meta.phase
+    details = [
+        f"Location: {violation.location.value}",
+        f"Phase: {phase.name.value}",
+    ]
+    if phase.name == TestPhase.COVERAGE:
+        details.append(f"Scenario: {phase.data.scenario.value}")
+    if violation.media_type is not None:
+        details.append(f"Media type: {violation.media_type}")
+    details.append(f"Value: {violation.value!r}")
     if violation.expected_valid:
-        raise AssertionError(
-            f"Positive coverage case produced an invalid body.\n"
-            f"Media type: {violation.media_type}\n"
-            f"Body: {violation.body!r}\n"
-            f"Errors: {list(violation.errors)}"
-        )
-    raise AssertionError(
-        f"Negative coverage case produced a valid body (mutation had no effect).\n"
-        f"Media type: {violation.media_type}\n"
-        f"Body: {violation.body!r}\n"
-        f"Scenario: {case.meta.phase.data.scenario}"
-    )
+        details.append(f"Errors: {list(violation.errors)}")
+        headline = "Positive case produced invalid data."
+    else:
+        headline = "Negative case produced valid data (mutation had no effect)."
+    raise AssertionError("\n".join([headline, *details]))
 
 
 @schemathesis.check
 def combined_check(ctx, response, case):
     case.as_curl_command()
     _run_registered_checks(ctx, response, case)
-    _check_body_conformance_violation(case)
+    _check_conformance_violation(case)
 
 
 @schemathesis.check
@@ -216,7 +219,7 @@ def combined_check_coverage(ctx, response, case):
     # Coverage-phase case counts are orders of magnitude higher than fuzzing/examples, and
     # `as_curl_command` scans the whole body per case; skip it here to keep the test runnable.
     _run_registered_checks(ctx, response, case)
-    _check_body_conformance_violation(case)
+    _check_conformance_violation(case)
 
 
 def test_default(corpus, filename):
@@ -313,10 +316,11 @@ def assert_invalid_schema(exc: LoaderError) -> NoReturn:
     raise exc
 
 
-_BODY_CONFORMANCE_FAILURE_PREFIXES = (
-    "Positive coverage case produced an invalid body.",
-    "Negative coverage case produced a valid body",
+_CONFORMANCE_FAILURE_PREFIXES = (
+    "Positive case produced invalid data.",
+    "Negative case produced valid data",
 )
+_BODY_LOCATION_MARKER = "\nLocation: body\n"
 # Drained as entries fire; whatever remains at session end is now-passing rot.
 _PENDING_BODY_VIOLATIONS: set[tuple[str, str]] = set(KNOWN_BODY_VIOLATIONS)
 
@@ -325,7 +329,9 @@ def _is_known_body_conformance_failure(schema_id: str, label: str, check) -> boo
     if check.failure_info is None:
         return False
     failure_text = str(check.failure_info.failure)
-    if not any(prefix in failure_text for prefix in _BODY_CONFORMANCE_FAILURE_PREFIXES):
+    if not any(prefix in failure_text for prefix in _CONFORMANCE_FAILURE_PREFIXES):
+        return False
+    if _BODY_LOCATION_MARKER not in failure_text:
         return False
     key = (schema_id, label)
     if key in KNOWN_BODY_VIOLATIONS:
