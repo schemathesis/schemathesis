@@ -149,7 +149,12 @@ def execute_event_loop(
     def shutdown() -> None:
         if ctx is not None:
             for h in handlers:
-                h.shutdown(ctx)
+                # The exit code is the API's verdict; a reporter failing at shutdown must not mask it,
+                # unlike a mid-run handler error, which aborts.
+                try:
+                    h.shutdown(ctx)
+                except Exception as exc:
+                    display_handler_error(h, exc)
 
     try:
         ctx = context_factory(config)
