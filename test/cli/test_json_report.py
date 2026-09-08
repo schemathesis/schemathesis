@@ -15,13 +15,14 @@ def load_report(path):
 
 def test_report_shape(ctx, cli, json_path):
     api = ctx.openapi.apps.success()
-    cli.run_and_assert(
+    result = cli.run_and_assert(
         api.schema_url,
         f"--report-json-path={json_path}",
         "--max-examples=1",
         "--phases=fuzzing",
         "--seed=42",
     )
+    assert f"- JSON: {json_path}" in result.stdout
     report = load_report(json_path)
     # Wall-clock and generated-case counts are not stable across runs; everything else is.
     generated = report["test_cases"].pop("generated")
