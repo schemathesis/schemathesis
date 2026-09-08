@@ -7184,3 +7184,43 @@ def test_negative_data_rejection_for_empty_query_string(ctx, response_factory, p
             reported.append(str(exc))
 
     assert bool(reported) is reports_failure, reported
+
+
+SECOND_REQUIRED_QUERY_PARAMETER = {"in": "query", "name": "kind", "required": True, "schema": {"type": "string"}}
+OPTIONAL_QUERY_PARAMETER = {"in": "query", "name": "extra", "schema": {"type": "string"}}
+# An exploded empty array leaves the wire request identical to one that omits the parameter.
+ARRAY_QUERY_PARAMETER_NOT_EXPLODED = {**ARRAY_QUERY_PARAMETER, "style": "form", "explode": False}
+ARRAY_QUERY_PARAMETER_NOT_EXPLODED_WITH_MIN_ITEMS = {
+    **ARRAY_QUERY_PARAMETER_WITH_MIN_ITEMS,
+    "style": "form",
+    "explode": False,
+}
+
+
+@pytest.mark.parametrize(
+    ("parameter", "scenario", "empty_value", "violates_schema"),
+    [
+        (ARRAY_QUERY_PARAMETER_NOT_EXPLODED, CoverageScenario.ARRAY_BELOW_MIN_ITEMS, [], False),
+        (ARRAY_QUERY_PARAMETER_NOT_EXPLODED_WITH_MIN_ITEMS, CoverageScenario.ARRAY_BELOW_MIN_ITEMS, [], True),
+        (STRING_QUERY_PARAMETER_DISALLOWING_EMPTY, CoverageScenario.STRING_BELOW_MIN_LENGTH, "", False),
+        (STRING_QUERY_PARAMETER_WITH_MIN_LENGTH, CoverageScenario.STRING_BELOW_MIN_LENGTH, "", True),
+    ],
+    ids=["array-without-min-items", "array-with-min-items", "string-without-min-length", "string-with-min-length"],
+)
+def test_empty_query_value_is_negative_only_when_the_schema_forbids_it_among_other_parameters(
+    ctx, parameter, scenario, empty_value, violates_schema
+):
+    operation = load_schema(
+        ctx,
+        parameters=[parameter, SECOND_REQUIRED_QUERY_PARAMETER, OPTIONAL_QUERY_PARAMETER],
+        method="get",
+    )["/foo"]["GET"]
+
+    matching = [
+        case
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.scenario == scenario
+        and case.meta.raw_containers.get(ParameterLocation.QUERY, {}).get("ids") == empty_value
+    ]
+
+    assert bool(matching) is violates_schema, f"{empty_value!r} labelled negative: {not violates_schema}"
