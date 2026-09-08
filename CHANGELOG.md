@@ -33,6 +33,7 @@
 - Required headers, query and cookie parameters dropped from negative cases.
 - No positive cases generated for `allOf` of two disjoint `contains`.
 - Unsatisfiable schema error when an `allOf` branch forbids a required property with `false`.
+- Positive cases sending a `Content-Type` header value its own schema rejects.
 
 #### Schema handling
 

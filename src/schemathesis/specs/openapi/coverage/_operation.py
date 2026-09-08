@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from schemathesis.core.parameters import ContainerName
     from schemathesis.core.transport import HttpMethod
     from schemathesis.resources import PoolDraw, ResourcePool
-    from schemathesis.schemas import APIOperation, ParameterSet
+    from schemathesis.schemas import APIOperation, ParameterSet, PayloadAlternatives
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
 
 
@@ -710,11 +710,13 @@ def _seed_parameters(run: CoverageRun) -> None:
         # header parameter — otherwise body cases inherit a fuzzed CT (often empty) and ship bodies
         # that downstream tools can't dispatch. CT-mutation variants still flow through the iterator.
         if location == ParameterLocation.HEADER and name.lower() == "content-type" and operation.body:
-            value = GeneratedValue.with_positive(
-                value=operation.body[0].media_type,
-                scenario=CoverageScenario.VALID_STRING,
-                description="Valid Content-Type pinned to body media type",
-            )
+            media_type = _media_type_the_header_admits(parameter, operation.body, validator_cls)
+            if media_type is not None:
+                value = GeneratedValue.with_positive(
+                    value=media_type,
+                    scenario=CoverageScenario.VALID_STRING,
+                    description="Valid Content-Type pinned to body media type",
+                )
         if isinstance(value, NotSet):
             if location != ParameterLocation.PATH and not parameter.is_required:
                 continue
@@ -775,6 +777,28 @@ def _container_without_wire_bounds(
     if not declared:
         return None
     return {**schema, "properties": {**properties, **declared}}
+
+
+def _media_type_the_header_admits(
+    parameter: OpenApiParameter,
+    body: PayloadAlternatives[OpenApiBody],
+    validator_cls: type[jsonschema_rs.Validator],
+) -> str | None:
+    """First declared body media type the header's own contract accepts, or `None` when it accepts none."""
+    declared = parameter.validation_schema
+    validator = None
+    if isinstance(declared, dict):
+        try:
+            validator = make_validator(declared, validator_cls)
+        except Exception:
+            # Schema rejected by `jsonschema_rs` — validity is unknown, so keep the body's media type.
+            pass
+    if validator is None:
+        return body[0].media_type
+    for alternative in body:
+        if validator.is_valid(alternative.media_type):
+            return alternative.media_type
+    return None
 
 
 def _drop_negatives_the_schema_admits(
