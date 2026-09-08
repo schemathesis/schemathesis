@@ -1385,6 +1385,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 (ReportFormat.VCR, reports.vcr),
                 (ReportFormat.HAR, reports.har),
                 (ReportFormat.NDJSON, reports.ndjson),
+                (ReportFormat.JSON, reports.json),
                 (ReportFormat.ALLURE, reports.allure),
             )
             if report.enabled

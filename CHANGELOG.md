@@ -66,6 +66,7 @@
 
 #### Others
 
+- `--report json` missing from the list of written reports in the run summary.
 - `UnicodeEncodeError` when the output encoding cannot represent status glyphs, such as CP1252 on Windows.
 - `allow-extra-parameters = false` ignored for request bodies in the fuzzing phase.
 - Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
