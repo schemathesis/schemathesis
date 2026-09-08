@@ -2787,6 +2787,54 @@ def test_no_missing_header_duplication(ctx):
     assert "Missing `X-Key-3` at header" in descriptions
 
 
+@pytest.mark.parametrize(
+    ("declared", "security_scheme"),
+    [
+        ("x-vtex-api-appkey", {"type": "apiKey", "in": "header", "name": "X-VTEX-API-AppKey"}),
+        ("authorization", {"type": "http", "scheme": "oauth"}),
+    ],
+    ids=["api-key", "http-auth"],
+)
+def test_security_scheme_does_not_shadow_declared_header(ctx, declared, security_scheme):
+    # Header names are case-insensitive, so a credential spelled differently would replace the generated value.
+    schema = load_schema(
+        ctx,
+        [{"name": declared, "in": "header", "required": True, "schema": {"type": "string", "minLength": 5}}],
+        components={"securitySchemes": {"scheme": security_scheme}},
+        security=[{"scheme": []}],
+    )
+    cases = collect_cases(schema["/foo"]["post"], GenerationMode.POSITIVE)
+    assert [dict(case.headers) for case in cases] == [
+        case.meta.raw_containers[ParameterLocation.HEADER] for case in cases
+    ]
+
+
+def test_path_item_header_does_not_shadow_operation_header(ctx):
+    # Header names are case-insensitive, so a path-level spelling would replace the operation's generated value.
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "parameters": [{"name": "X-Amz-Content-Sha256", "in": "header", "schema": {"type": "string"}}],
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "x-amz-content-sha256",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "minLength": 5},
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                },
+            }
+        }
+    )
+    cases = collect_cases(schema["/foo"]["post"], GenerationMode.POSITIVE)
+    assert [dict(case.headers) for case in cases] == [
+        case.meta.raw_containers[ParameterLocation.HEADER] for case in cases
+    ]
+
+
 def test_binary_format_should_not_generate_empty_string_as_invalid(ctx, cli, snapshot_cli):
     raw_schema = build_schema(
         ctx,
@@ -7021,9 +7069,8 @@ def test_each_custom_media_type_alternative_yields_its_own_body(ctx):
     ]
 
 
-def test_combination_cases_deduplicate_on_wire_form(ctx):
-    # 'x-token' and 'X-Token' collapse into one header on the wire; combination cases that
-    # repeat an already-emitted request are suppressed.
+def test_combination_cases_deduplicate_repeated_requests(ctx):
+    # 'X-Token' is the same header as 'x-token', so the all-headers combination repeats the default request.
     schema = ctx.openapi.load_schema(
         {
             "/items": {
@@ -7064,29 +7111,22 @@ def test_combination_cases_deduplicate_on_wire_form(ctx):
         for case in iter_cases(operation, GenerationMode.POSITIVE, GenerationMode.NEGATIVE)
     ]
     assert stream == [
-        ("default_positive_test", "positive", None, {"X-Token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
-        ("invalid_enum_value", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "X-Token", {"X-Token": "0", "X-Other": "other"}),
-        ("incorrect_type", "negative", "X-Token", {"X-Token": "0.5", "X-Other": "other"}),
-        ("incorrect_type", "negative", "X-Token", {"X-Token": "true", "X-Other": "other"}),
-        ("incorrect_type", "negative", "X-Token", {"X-Token": "null", "X-Other": "other"}),
-        ("incorrect_type", "negative", "X-Token", {"X-Token": "null,null", "X-Other": "other"}),
-        ("incorrect_type", "negative", "X-Token", {"X-Token": "{}", "X-Other": "other"}),
-        ("invalid_enum_value", "negative", "X-Token", {"X-Token": "AAA", "X-Other": "other"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "0"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "0.5"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "true"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "null"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "null,null"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Token": "secret", "X-Other": "{}"}),
-        ("invalid_enum_value", "negative", "X-Other", {"X-Token": "secret", "X-Other": "AAA"}),
-        ("missing_parameter", "negative", "x-token", {"X-Token": "secret", "X-Other": "other"}),
+        ("default_positive_test", "positive", None, {"x-token": "secret", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "0", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "0.5", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "true", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "null", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "null,null", "X-Other": "other"}),
+        ("incorrect_type", "negative", "x-token", {"x-token": "{}", "X-Other": "other"}),
+        ("invalid_enum_value", "negative", "x-token", {"x-token": "AAA", "X-Other": "other"}),
+        ("incorrect_type", "negative", "X-Other", {"x-token": "secret", "X-Other": "0"}),
+        ("incorrect_type", "negative", "X-Other", {"x-token": "secret", "X-Other": "0.5"}),
+        ("incorrect_type", "negative", "X-Other", {"x-token": "secret", "X-Other": "true"}),
+        ("incorrect_type", "negative", "X-Other", {"x-token": "secret", "X-Other": "null"}),
+        ("incorrect_type", "negative", "X-Other", {"x-token": "secret", "X-Other": "null,null"}),
+        ("incorrect_type", "negative", "X-Other", {"x-token": "secret", "X-Other": "{}"}),
+        ("invalid_enum_value", "negative", "X-Other", {"x-token": "secret", "X-Other": "AAA"}),
+        ("missing_parameter", "negative", "x-token", {"X-Other": "other"}),
         ("object_only_required", "positive", None, {"x-token": "secret"}),
         ("incorrect_type", "negative", "x-token", {"x-token": "0"}),
         ("incorrect_type", "negative", "x-token", {"x-token": "0.5"}),
@@ -7101,28 +7141,6 @@ def test_combination_cases_deduplicate_on_wire_form(ctx):
             None,
             {"x-token": "secret", "x-schemathesis-unknown-property": "42"},
         ),
-        ("object_required_and_optional", "positive", None, {"x-token": "secret", "X-Other": "other"}),
-        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "0"}),
-        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "0.5"}),
-        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "true"}),
-        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "null"}),
-        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "null,null"}),
-        ("incorrect_type", "negative", "x-token", {"X-Other": "other", "x-token": "{}"}),
-        ("invalid_enum_value", "negative", "x-token", {"X-Other": "other", "x-token": "AAA"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Other": "0", "x-token": "secret"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Other": "0.5", "x-token": "secret"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Other": "true", "x-token": "secret"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Other": "null", "x-token": "secret"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Other": "null,null", "x-token": "secret"}),
-        ("incorrect_type", "negative", "X-Other", {"X-Other": "{}", "x-token": "secret"}),
-        ("invalid_enum_value", "negative", "X-Other", {"X-Other": "AAA", "x-token": "secret"}),
-        (
-            "object_unexpected_properties",
-            "negative",
-            None,
-            {"X-Other": "other", "x-token": "secret", "x-schemathesis-unknown-property": "42"},
-        ),
-        ("object_required_and_optional", "positive", None, {"X-Token": "secret"}),
     ]
 
 
