@@ -2032,19 +2032,22 @@ class OpenApiParameterSet(ParameterSet):
         self._strict_validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
     def add(self, parameter: OpenApiParameter) -> None:
-        # Two spellings are one HTTP header: the first definition wins, and a required duplicate promotes it.
+        # An operation's own parameter is seen first and overrides a path item declaring the same name.
         if self.location == ParameterLocation.HEADER:
             lowered = parameter.name.lower()
             for index, existing in enumerate(self.items):
                 if existing.name.lower() != lowered:
                     continue
-                if parameter.is_required and not existing.is_required:
+                # Two spellings are one HTTP header, so a required duplicate promotes the one that won.
+                if existing.name != parameter.name and parameter.is_required and not existing.is_required:
                     self.items[index] = OpenApiParameter.from_definition(
                         definition={**existing.definition, "required": True},
                         name_to_uri=existing.name_to_uri,
                         adapter=existing.adapter,
                     )
                 return
+        elif parameter.name in self:
+            return
         self.items.append(parameter)
 
     def get_strict_validator(self) -> jsonschema_rs.Validator:
