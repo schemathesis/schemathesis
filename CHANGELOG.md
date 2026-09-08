@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - `UnicodeEncodeError` when the output encoding cannot represent status glyphs, such as CP1252 on Windows.
+- False positive `negative_data_rejection` for an empty array or string the schema admits.
 - `UnicodeDecodeError` on non-ASCII response headers from ASGI applications.
 - Crash on a malformed operation or `responses` node while counting operations.
 - Crash on a Swagger 2.0 body parameter whose schema is written as a boolean.

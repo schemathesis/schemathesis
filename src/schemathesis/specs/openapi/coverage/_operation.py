@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, TypeGuard, cast
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator
-from schemathesis.core.jsonschema.types import as_object_schema
+from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
@@ -703,6 +703,8 @@ def _seed_parameters(run: CoverageRun) -> None:
             ),
             schema,
         )
+        if parameter.wire_bounds:
+            gen = _drop_negatives_the_schema_admits(gen, parameter.without_wire_bounds(schema), validator_cls)
         value = next(gen, NOT_SET)
         # Pin the template's Content-Type to the body media type when CT is declared as an explicit
         # header parameter — otherwise body cases inherit a fuzzed CT (often empty) and ship bodies
@@ -753,6 +755,24 @@ def _seed_parameters(run: CoverageRun) -> None:
         generators[(location, name)] = gen
     template.seed_time = instant.elapsed
     template.has_required_body = bool(operation.body and any(b.is_required for b in operation.body))
+
+
+def _drop_negatives_the_schema_admits(
+    values: Generator[GeneratedValue, None, None],
+    schema: JsonSchemaObject,
+    validator_cls: type[jsonschema_rs.Validator],
+) -> Generator[GeneratedValue, None, None]:
+    """Keep only the negatives the API contract actually rejects."""
+    try:
+        validator = make_validator(schema, validator_cls)
+    except Exception:
+        # Schema rejected by `jsonschema_rs` — validity is unknown, so keep everything.
+        yield from values
+        return
+    for value in values:
+        if value.generation_mode == GenerationMode.NEGATIVE and validator.is_valid(value.value):
+            continue
+        yield value
 
 
 def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
