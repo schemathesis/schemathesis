@@ -17,7 +17,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_vali
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
-from schemathesis.core.transport import Response, expand_status_code
+from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData
 from schemathesis.openapi.checks import (
@@ -1009,8 +1009,6 @@ IMPLICIT_METHODS = frozenset({"head", "options"})
 @schemathesis.check
 @requires_openapi_schema
 def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    from schemathesis.specs.openapi.operations import HTTP_METHODS
-
     if response.request.method != "OPTIONS":
         return None
     values = response.headers.get("allow")
@@ -1021,7 +1019,7 @@ def allow_header_conformance(ctx: CheckContext, response: Response, case: Case) 
     if not advertised:
         return None
     declared = {method.lower() for method in case.operation.schema[case.operation.path]}
-    declared &= HTTP_METHODS
+    declared &= HTTP_METHODS_SCHEMA
     missing = sorted(declared - advertised - IMPLICIT_METHODS)
     undocumented = sorted(advertised - declared - IMPLICIT_METHODS)
     if not missing and not undocumented:

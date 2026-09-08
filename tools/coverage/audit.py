@@ -22,12 +22,12 @@ from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema import is_valid
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import deepclone
+from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
-from schemathesis.specs.openapi.schemas import HTTP_METHODS
 from schemathesis.transport.prepare import normalize_base_url, prepare_request
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
@@ -177,7 +177,7 @@ def _strip_known_unsupported_media_types(raw_schema: dict[str, Any]) -> tuple[di
             if not isinstance(path_item, dict):
                 continue
             for method, operation in list(path_item.items()):
-                if method not in HTTP_METHODS or not isinstance(operation, dict):
+                if method not in HTTP_METHODS_SCHEMA or not isinstance(operation, dict):
                     continue
                 body = operation.get("requestBody")
                 if isinstance(body, dict) and isinstance(body.get("content"), dict):

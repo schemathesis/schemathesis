@@ -28,7 +28,13 @@ from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, 
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
-from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response, restful_method_priority
+from schemathesis.core.transport import (
+    HTTP_METHODS_SCHEMA,
+    HttpMethod,
+    HttpMethodSchema,
+    Response,
+    restful_method_priority,
+)
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
@@ -48,7 +54,7 @@ from ...schemas import APIOperation, APIOperationMap, BaseSchema
 from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
-from .operations import HTTP_METHODS, SCHEMA_PARSING_ERRORS, OperationLoader
+from .operations import SCHEMA_PARSING_ERRORS, OperationLoader
 from .stateful import create_state_machine
 from .utils import parse_spec_version
 from .validation import ResponseValidator
@@ -98,7 +104,7 @@ class OpenApiSchema(BaseSchema):
         self.analysis = OpenAPIAnalysis(self)
         self._bundler = Bundler()
         self._bundle_cache: BundleCache = {}
-        self._operation_lookup = OperationLookup(self, HTTP_METHODS)
+        self._operation_lookup = OperationLookup(self, HTTP_METHODS_SCHEMA)
         self._operations = OperationLoader(self)
         self._response_validator = ResponseValidator(self)
         # Path-level dedup of undeclared-method coverage probes for callers that pass no run-scoped set.
@@ -769,7 +775,7 @@ class MethodMap(Mapping):
         try:
             return self._init_operation(item)
         except LookupError as exc:
-            available_methods = ", ".join(key.upper() for key in self if key in HTTP_METHODS)
+            available_methods = ", ".join(key.upper() for key in self if key in HTTP_METHODS_SCHEMA)
             message = f"Method `{item.upper()}` not found."
             if available_methods:
                 message += f" Available methods: {available_methods}"
