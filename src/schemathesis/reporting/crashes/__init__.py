@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import schemathesis
+from schemathesis.config._output import DEFAULT_REPLACEMENT
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure, is_reproducible_failure
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
@@ -184,6 +185,15 @@ class CrashFile:
     case_id: str
     code_sample: str
     sequence: list[CrashStep]
+
+    def has_sanitized_values(self) -> bool:
+        """Whether a stored request lost values to sanitization, so a replay cannot be faithful."""
+        return any(
+            DEFAULT_REPLACEMENT in str(value)
+            for step in self.sequence
+            for container in (step.request_headers, step.query, step.case_headers, step.path_parameters)
+            for value in container.values()
+        )
 
     def filename(self) -> str:
         terminal = self.sequence[-1]

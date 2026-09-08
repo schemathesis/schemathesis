@@ -164,6 +164,10 @@ def _replay_directory(
     files_to_remove: set[str] = set()
     if not keep and not interrupted:
         for unit, outcome in zip(units, outcomes, strict=True):
+            # Sanitization stripped values the replay cannot restore, so a `fixed` verdict here says
+            # nothing about the API. Report it, keep the file - same rule as incompatible files.
+            if unit.crash.has_sanitized_values():
+                continue
             fixed = {check.name for check in outcome.check_outcomes if check.status is ReplayStatus.FIXED}
             for path, check_name in unit.sources:
                 if check_name in fixed:

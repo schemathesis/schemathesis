@@ -41,6 +41,7 @@ def _write_crash(
     body: str,
     check: str = "not_a_server_error",
     case_id: str = "Ab1Cd2",
+    request_headers: dict[str, str] | None = None,
 ) -> Path:
     base_url = url.rsplit(path_template, 1)[0]
     crash = crash_factory.single(
@@ -49,6 +50,7 @@ def _write_crash(
         status=status,
         body=body.encode(),
         request_url=url,
+        request_headers=request_headers,
         checks=[FailingCheck(name=check, message=f"{status} error")],
         code_sample=f"curl -X {method} {url}",
     )
@@ -1769,3 +1771,23 @@ def test_replay_partial_fix_shows_per_check_breakdown(cli, app_runner, ctx, cras
 
     assert cli.main("replay") == snapshot_cli
     assert len(_list_crash_files(crash_dir)) == 1
+
+
+def test_sanitized_crash_is_never_removed(cli, app_runner, ctx, crash_factory, tmp_path):
+    # The stored request carries `[Filtered]` instead of the credential, so a `fixed` verdict from
+    # replaying it is meaningless - the file must survive.
+    schema_url, base = _users_app(ctx, app_runner)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{base}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "was broken"}',
+        request_headers={"Authorization": "[Filtered]"},
+    )
+
+    cli.main("replay", str(tmp_path))
+
+    assert crash_file.exists()
