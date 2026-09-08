@@ -241,7 +241,17 @@ def test_non_object_response_vendor_extension(ctx, extension):
 
 
 @pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
-@pytest.mark.parametrize("extension", ["/apis/registry/v2", None, [], 42, {"note": "text"}])
+@pytest.mark.parametrize(
+    "extension",
+    [
+        "/apis/registry/v2",
+        None,
+        [],
+        42,
+        {"note": "text"},
+        {"get": {"operationId": "hidden", "responses": {"200": {"description": "OK"}}}},
+    ],
+)
 def test_paths_object_vendor_extension(ctx, version, extension):
     # The Paths Object is extensible, so an `x-` key beside the path templates is not an operation.
     schema = ctx.openapi.load_schema(

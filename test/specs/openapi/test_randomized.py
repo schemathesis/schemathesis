@@ -18,10 +18,13 @@ from schemathesis.config import HealthCheck as SchemathesisHealthCheck
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
+from schemathesis.core.result import Ok
 from schemathesis.engine import events
 from schemathesis.generation.jsonschema import build
 from schemathesis.specs.openapi import definitions
 from schemathesis.specs.openapi.formats import get_default_format_strategies
+from schemathesis.specs.openapi.operations import HTTP_METHODS
+from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, hypothesis.errors.FailedHealthCheck)
 config = SchemathesisConfig.from_dict({})
@@ -322,13 +325,15 @@ def _items(entries: list[Entry]) -> dict[str, dict[str, Any]]:
         item = entry.item
         shared = item.get("parameters")
         if isinstance(shared, list):
-            # A reference carries nothing else, so naming it would make the document invalid.
+            # A reference carries nothing to name, and all are repointed at the same seed, so keep at most one.
+            references = [parameter for parameter in shared if isinstance(parameter, dict) and "$ref" in parameter]
             item = {
                 **item,
-                "parameters": [
-                    _named(parameter, f"i{position}") if "$ref" not in parameter else parameter
+                "parameters": references[:1]
+                + [
+                    _named(parameter, f"i{position}")
                     for position, parameter in enumerate(shared)
-                    if isinstance(parameter, dict)
+                    if isinstance(parameter, dict) and "$ref" not in parameter
                 ],
             }
         names = [
@@ -383,3 +388,120 @@ def test_random_schemas(version, data):
         assert not isinstance(event, events.FatalError), repr(event)
         if isinstance(event, events.NonFatalError) and not _is_rejection(event.value):
             raise AssertionError(str(event.info)) from event.value
+
+
+_OK_RESPONSES = {"responses": {"200": {"description": "OK"}}}
+# `paths` entries that are not usable path templates, spliced beside the drawn operations.
+HOSTILE_PATHS: dict[str, dict[str, JsonValue]] = {
+    "extension_object": {"x-vendor": {"note": "text"}},
+    "extension_array": {"x-vendor": []},
+    "path_item_array": {"/broken": []},
+    "path_item_without_methods": {"/only-parameters": {"parameters": []}},
+    "uppercase_method": {"/upper": {"GET": _OK_RESPONSES}},
+    "path_item_reference_to_array": {"/alias": {"$ref": "#/paths/~1vendor"}, "/vendor": []},
+    "duplicate_operation_ids": {
+        "/first": {"get": {"operationId": "shared", **_OK_RESPONSES}},
+        "/second": {"get": {"operationId": "shared", **_OK_RESPONSES}},
+    },
+    "malformed_parameters": {"/bad-parameters": {"get": {"parameters": "oops", **_OK_RESPONSES}}},
+    "unresolvable_parameter_reference": {
+        "/dangling": {"get": {"parameters": [{"$ref": "#/components/parameters/Missing"}], **_OK_RESPONSES}}
+    },
+}
+
+
+# Operation nodes that carry nothing an adapter can read, spliced beside a healthy operation.
+UNPARSABLE_OPERATIONS: dict[str, dict[str, JsonValue]] = {
+    "empty_operation": {"/empty": {"get": {}}},
+    "scalar_operation": {"/scalar": {"get": "text"}},
+    "array_operation": {"/array": {"get": []}},
+}
+
+
+def _hostile_document(version: str, hostile: dict[str, JsonValue]) -> dict[str, Any]:
+    """The smallest document a version accepts, carrying one healthy operation beside a hostile entry."""
+    # The hostile entry is the subject here, so a drawn envelope around it would only cost time.
+    root = {"swagger": "2.0"} if version == "2.0" else {"openapi": f"{version}.0"}
+    healthy = {"/healthy": {"get": _OK_RESPONSES}}
+    return {**root, "info": {"title": "Test", "version": "1.0"}, "paths": {**healthy, **hostile}}
+
+
+def _without_empty_operations(document: dict[str, Any]) -> dict[str, Any]:
+    # An operation with an empty definition is reached by the parsing walks, but is neither a lookup entry
+    # nor a selected operation.
+    paths = {
+        path: {key: value for key, value in item.items() if value != {} or key not in HTTP_METHODS}
+        for path, item in document["paths"].items()
+    }
+    return {**document, "paths": paths}
+
+
+def _walker_labels(schema: OpenApiSchema) -> dict[str, list[str]]:
+    """What each separate walk over `paths` reports, as `METHOD /path` labels."""
+    from_all_operations = []
+    for result in schema.get_all_operations():
+        if isinstance(result, Ok):
+            reached = result.ok()
+        else:
+            reached = result.err()
+            # A broken path item names no method, and no other walk reports it at all.
+            if reached.method is None:
+                continue
+        from_all_operations.append(f"{reached.method.upper()} {reached.path}")
+    return {
+        "get_all_operations": sorted(from_all_operations),
+        "iter_operations": sorted(
+            f"{method.upper()} {path}" for method, path, _ in schema._operations.iter_operations()
+        ),
+        "path_and_method_maps": sorted(
+            f"{method.upper()} {path}" for path in list(schema) for method in schema[path] if method in HTTP_METHODS
+        ),
+        "operation_lookup": sorted(
+            f"{entry.method.upper()} {entry.path}"
+            for entry in schema._operation_lookup._get_operations_by_reference().values()
+        ),
+    }
+
+
+def _assert_walkers_agree(schema: OpenApiSchema) -> int:
+    """Assert every walk over `paths` reaches the same operations, and answer how many."""
+    labels = _walker_labels(schema)
+    assert labels == dict.fromkeys(labels, labels["get_all_operations"])
+    total = len(labels["get_all_operations"])
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (total, total)
+    return total
+
+
+@pytest.mark.parametrize("version", sorted(SPECS))
+@given(data=st.data())
+@settings(phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck), max_examples=10)
+def test_walkers_agree_on_valid_documents(version, data):
+    raw = _without_empty_operations(data.draw(openapi_documents(version)))
+    assert SPECS[version].validator.is_valid(raw), raw
+    schema = schemathesis.openapi.from_dict(raw)
+    total = _assert_walkers_agree(schema)
+    # No path item is broken here, so every result names an operation the other walks reach too.
+    assert len(list(schema.get_all_operations())) == total
+
+
+@pytest.mark.parametrize("hostile", sorted(HOSTILE_PATHS))
+@pytest.mark.parametrize("version", sorted(SPECS))
+def test_walkers_agree_on_hostile_paths(version, hostile):
+    _assert_walkers_agree(schemathesis.openapi.from_dict(_hostile_document(version, HOSTILE_PATHS[hostile])))
+
+
+@pytest.mark.parametrize("unparsable", sorted(UNPARSABLE_OPERATIONS))
+@pytest.mark.parametrize("version", sorted(SPECS))
+def test_unparsable_operations_are_neither_looked_up_nor_selected(version, unparsable):
+    entry = UNPARSABLE_OPERATIONS[unparsable]
+    schema = schemathesis.openapi.from_dict(_hostile_document(version, entry))
+    reached = sorted(("GET /healthy", *(f"GET {path}" for path in entry)))
+    assert _walker_labels(schema) == {
+        "get_all_operations": reached,
+        "iter_operations": reached,
+        "path_and_method_maps": reached,
+        # A node with nothing to read cannot become an operation, so no reference names it.
+        "operation_lookup": ["GET /healthy"],
+    }
+    # The document still declares it, but a run can never pick it up.
+    assert (schema.statistic.operations.total, schema.statistic.operations.selected) == (len(reached), 1)
