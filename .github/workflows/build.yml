@@ -100,3 +100,13 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      # Runs on failure too: a red job is exactly the sample flake detection needs.
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
+        with:
+          files: junit.xml
+          disable_search: true
+          flags: ${{ matrix.os }}-${{ matrix.python }}
+          token: ${{ secrets.CODECOV_TOKEN }}
