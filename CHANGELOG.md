@@ -4,41 +4,64 @@
 
 ### :bug: Fixed
 
-- `UnicodeEncodeError` when the output encoding cannot represent status glyphs, such as CP1252 on Windows.
-- False positive `negative_data_rejection` for an empty array or string the schema admits.
-- `UnicodeDecodeError` on non-ASCII response headers from ASGI applications.
-- Crash on a malformed operation or `responses` node while counting operations.
-- Crash on a Swagger 2.0 body parameter whose schema is written as a boolean.
-- Send array and object cookie parameters instead of dropping them.
-- Send XML and `text/plain` body booleans and nulls as `true` / `false` / `null`.
-- Malformed `servers` URL templates aborting the run instead of reporting a schema error.
-- Stateful reproduce chain printing every step with the failing step's request headers.
-- One unresolvable media type dropping an operation whose other request body media types resolve.
+#### ASGI applications
+
+- `UnicodeDecodeError` on non-ASCII response headers.
+- Non-ASCII header values delivered with the wrong encoding.
+- Generated requests sent with a different `Host` than the schema fetch.
+
+#### WSGI applications
+
+- Flask-RESTX error responses such as `abort(404)` and 405 raised as internal errors.
+
+#### WFC authentication
+
+- Operations answering 401 never escalating to the next user.
+- Expired tokens never refreshed when the auth document lists several users.
+
+#### Request serialization
+
+- Array and object cookie parameters dropped instead of sent.
+- Header and cookie booleans and nulls sent as Python literals instead of `true` / `false` / `null`.
+- XML and `text/plain` body booleans and nulls sent as Python literals instead of `true` / `false` / `null`.
+
+#### Coverage phase
+
+- Crashing on parameters and bodies whose schema is written as a boolean.
+- Required headers, query and cookie parameters dropped from negative cases.
+- No positive cases generated for `allOf` of two disjoint `contains`.
+
+#### Schema handling
+
+- Malformed operation or `responses` node crashing operation counting.
 - Malformed operation, `requestBody`, `content`, media type, or `security` nodes aborting the run.
-- Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
 - Malformed `components`, path item `parameters`, or non-object reference targets aborting the run.
-- Generated requests to ASGI applications sent with a different `Host` than the schema fetch.
-- Stray traceback and lost crash report when concurrent runs share a `.schemathesis` directory.
-- Run hanging forever when one report path is rejected and another report is enabled.
-- Coverage phase crashing on parameters and bodies whose schema is written as a boolean.
-- Operations answering 401 never escalating to the next user in a WFC auth document.
-- Expired tokens never refreshed when a WFC auth document lists several users.
-- Send header and cookie booleans and nulls as `true` / `false` / `null`.
-- Required headers, query and cookie parameters dropped from negative coverage cases.
-- `negative_data_rejection` and `missing_required_header` for 415 responses to requests without `Content-Type`.
-- Non-ASCII header values delivered to ASGI applications with the wrong encoding.
-- Crash on a specification extension such as `x-codegen-contextRoot` beside the path templates.
-- Accept `base_url_mismatch`, `unsupported_regex`, `unresolvable_reference` in `[warnings]`, and report invalid warning names clearly.
-- False positive `negative_data_rejection` for read-only properties a server ignores instead of rejecting.
-- False positive `positive_data_acceptance` when `type` lists `null` but `enum` omits it.
-- False positive `negative_data_rejection` for operations whose `security` lists alternative requirements.
-- False positive `positive_data_acceptance` for `nullable` / `x-nullable` fields whose `enum` omits null.
-- Flask-RESTX error responses such as `abort(404)` and 405 raised as internal errors under `from_wsgi`.
-- False positive `positive_data_acceptance` for `allOf` mixing `items` with a sibling branch's `prefixItems`.
-- Coverage phase generating no positive cases for `allOf` of two disjoint `contains`.
-- Warn about an unsupported `pattern` dropped from a request parameter or body.
+- Malformed `servers` URL templates aborting the run at startup instead of reporting a schema error.
+- Swagger 2.0 body parameters written as a boolean schema crashing.
+- Specification extensions such as `x-codegen-contextRoot` beside the path templates crashing.
+- One unresolvable media type dropping an operation whose other media types resolve.
 - Unresolvable reference when a `$ref` and a sibling keyword point at the same target.
+
+#### False positives
+
+- `negative_data_rejection` for an empty array or string the schema admits.
+- `negative_data_rejection` for read-only properties a server ignores instead of rejecting.
+- `negative_data_rejection` for operations whose `security` lists alternative requirements.
+- `negative_data_rejection` and `missing_required_header` for 415 responses to requests without `Content-Type`.
+- `positive_data_acceptance` when `type` lists `null` but `enum` omits it.
+- `positive_data_acceptance` for `nullable` / `x-nullable` fields whose `enum` omits null.
+- `positive_data_acceptance` for `allOf` mixing `items` with a sibling branch's `prefixItems`.
+
+#### Others
+
+- `UnicodeEncodeError` when the output encoding cannot represent status glyphs, such as CP1252 on Windows.
+- Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
+- Run hanging forever when one report path is rejected and another report is enabled.
+- Stray traceback and lost crash report when concurrent runs share a `.schemathesis` directory.
 - `st replay` reporting sanitized crash files as fixed and deleting them.
+- Stateful reproduce chain printing every step with the failing step's request headers.
+- Accept `base_url_mismatch`, `unsupported_regex`, `unresolvable_reference` in `[warnings]`, and report invalid warning names clearly.
+- Warn about an unsupported `pattern` dropped from a request parameter or body.
 
 ## [4.26.0](https://github.com/schemathesis/schemathesis/compare/v4.25.2...v4.26.0) - 2026-09-07
 
