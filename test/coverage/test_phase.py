@@ -30,6 +30,7 @@ from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
 from schemathesis.transport.prepare import prepare_request
 from test.coverage.helpers import (
+    DEFAULT_RESPONSES,
     assert_bodies,
     assert_coverage,
     assert_negative_coverage,
@@ -4339,6 +4340,35 @@ def test_missing_required_parameter_case_omits_only_that_parameter(ctx, location
     ] == [({}, GenerationMode.NEGATIVE, GenerationMode.NEGATIVE, CoverageScenario.MISSING_PARAMETER)]
 
 
+def test_redeclared_parameter_clears_the_location_negation_it_replaced(ctx):
+    # The redeclared parameter ships a valid value, so the query no longer carries anything a server must reject.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "parameters": [{"name": "kind", "in": "query", "required": True, "schema": {"type": "string"}}],
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "kind",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["book"]},
+                        },
+                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": DEFAULT_RESPONSES,
+                },
+            }
+        }
+    )
+
+    assert [
+        (case.query, _component_mode(case, ParameterLocation.QUERY))
+        for case in collect_cases(schema["/items"]["GET"], GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "X-Token"
+    ] == [({"kind": ""}, GenerationMode.POSITIVE)]
+
+
 def _missing_body_cases(operation):
     return [
         case
@@ -4364,6 +4394,37 @@ def test_missing_required_body_case_sends_no_content_type(ctx):
 
     assert prepared.body is None
     assert "Content-Type" not in prepared.headers
+
+
+def test_missing_body_case_clears_the_content_type_negation_it_drops(ctx):
+    # The body-less request never sends the mutated `Content-Type`, so its headers carry no negation.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "in": "header",
+                            "required": False,
+                            "schema": {"type": "string", "enum": ["application/zip"]},
+                        },
+                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": BODY_WITH_REQUIRED_PROPERTY}},
+                    },
+                    "responses": DEFAULT_RESPONSES,
+                }
+            }
+        }
+    )
+
+    assert [
+        (dict(case.headers), _component_mode(case, ParameterLocation.HEADER))
+        for case in _missing_body_cases(schema["/items"]["POST"])
+    ] == [({"X-Token": ""}, GenerationMode.POSITIVE)]
 
 
 def test_missing_required_body_case_accepts_unsupported_media_type(ctx, response_factory):

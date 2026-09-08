@@ -34,6 +34,7 @@
 - Crashing on parameters and bodies whose schema is written as a boolean.
 - Generated header value replaced by a security scheme spelling the same header differently.
 - Generated header value replaced by a path-level parameter spelling the same header differently.
+- Negative cases treating valid query, header and path values as invalid data.
 - Positive cases emitted when a required parameter has no satisfiable value.
 - Empty string from a path parameter's `enum` collapsing the URL segment.
 - Required headers, query and cookie parameters dropped from negative cases.

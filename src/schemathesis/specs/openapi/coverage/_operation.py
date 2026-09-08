@@ -55,6 +55,7 @@ class Template:
     __slots__ = (
         "_components",
         "_optional_query",
+        "_parameter_modes",
         "_serializers",
         "_template",
         "body_is_fallback_negative",
@@ -66,6 +67,7 @@ class Template:
 
     def __init__(self, serializers: dict[str, Callable], optional_query: frozenset[str]) -> None:
         self._components: dict[ParameterLocation, ComponentInfo] = {}
+        self._parameter_modes: dict[ParameterLocation, dict[str, GenerationMode]] = {}
         self._template: dict[str, Any] = {}
         self._serializers = serializers
         self._optional_query = optional_query
@@ -96,14 +98,18 @@ class Template:
         return self._template.get(key, default)
 
     def add_parameter(self, location: ParameterLocation, name: str, value: GeneratedValue) -> None:
-        info = self._components.get(location)
-        if info is None:
-            self._components[location] = ComponentInfo(mode=value.generation_mode)
-        elif value.generation_mode == GenerationMode.NEGATIVE:
-            info.mode = GenerationMode.NEGATIVE
-
         container = self._template.setdefault(location.container_name, {})
         container[name] = value.value
+        self._parameter_modes.setdefault(location, {})[name] = value.generation_mode
+        # A parameter declared twice replaces the value it was mutating, so its location stops carrying that mutation.
+        self._components[location] = ComponentInfo(mode=self._mode_for(location, container))
+
+    def _mode_for(self, location: ParameterLocation, container: dict[str, Any]) -> GenerationMode:
+        """The mode a location carries, given the values its container currently holds."""
+        modes = self._parameter_modes.get(location, {})
+        if any(modes.get(name) == GenerationMode.NEGATIVE for name in container):
+            return GenerationMode.NEGATIVE
+        return GenerationMode.POSITIVE
 
     def set_body(self, body: GeneratedValue, media_type: str) -> None:
         self._template["body"] = body.value
@@ -154,10 +160,15 @@ class Template:
     def without_body(self) -> TemplateValue:
         # A `Content-Type` describing a body that is not there is a different oddity than sending no body at all.
         raw = {key: value for key, value in self._template.items() if key not in ("body", "media_type")}
+        components = {**self._components, ParameterLocation.BODY: ComponentInfo(mode=GenerationMode.NEGATIVE)}
         headers = raw.get("headers")
         if isinstance(headers, dict):
-            raw["headers"] = {name: value for name, value in headers.items() if name.lower() != "content-type"}
-        components = {**self._components, ParameterLocation.BODY: ComponentInfo(mode=GenerationMode.NEGATIVE)}
+            headers = {name: value for name, value in headers.items() if name.lower() != "content-type"}
+            raw["headers"] = headers
+            if ParameterLocation.HEADER in components:
+                components[ParameterLocation.HEADER] = ComponentInfo(
+                    mode=self._mode_for(ParameterLocation.HEADER, headers)
+                )
         kwargs = self._serialize(raw, components)
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
