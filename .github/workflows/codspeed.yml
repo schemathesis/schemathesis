@@ -4,7 +4,17 @@ on:
   push:
     branches:
       - "master"
+    paths:
+      - "src/**"
+      - "benches/**"
+      - "pyproject.toml"
+      - ".github/workflows/codspeed.yml"
   pull_request:
+    paths:
+      - "src/**"
+      - "benches/**"
+      - "pyproject.toml"
+      - ".github/workflows/codspeed.yml"
   workflow_dispatch:
 
 permissions:
@@ -23,10 +33,7 @@ jobs:
   benchmarks:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    strategy:
-      matrix:
-        shard: [1, 2, 3, 4]
-    name: "Run benchmarks (Shard #${{ matrix.shard }})"
+    name: "Run benchmarks"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -39,7 +46,7 @@ jobs:
         uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
           mode: "simulation"
-          run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio --test-group=${{ matrix.shard }} --test-group-count=4
+          run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
 
   memory:
     runs-on: ubuntu-22.04
