@@ -15,6 +15,16 @@ on:
   push:
     branches:
       - master
+    paths:
+      - "**.py"
+      - "**.json"
+      - "**.toml"
+      - "**.yaml"
+      - "**.yml"
+      - ".yamllint"
+      - "Justfile"
+      - "mypy.ini"
+      - "tox.ini"
   workflow_dispatch:
 
 concurrency:

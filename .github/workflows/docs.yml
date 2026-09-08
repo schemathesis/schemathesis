@@ -1,0 +1,44 @@
+name: Docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "mkdocs.yml"
+      - "**.md"
+      - ".github/workflows/docs.yml"
+  push:
+    branches:
+      - master
+    paths:
+      - "docs/**"
+      - "README.md"
+      - "mkdocs.yml"
+      - "**.md"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Docs
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: 3.11
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - run: uvx --from=".[tests]" pytest test/config/test_doc_examples.py -q
+
+      - run: uvx --from=".[docs]" mkdocs build --strict
