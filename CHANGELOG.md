@@ -38,6 +38,7 @@
 - Coverage phase generating no positive cases for `allOf` of two disjoint `contains`.
 - Warn about an unsupported `pattern` dropped from a request parameter or body.
 - Unresolvable reference when a `$ref` and a sibling keyword point at the same target.
+- `st replay` reporting sanitized crash files as fixed and deleting them.
 
 ## [4.26.0](https://github.com/schemathesis/schemathesis/compare/v4.25.2...v4.26.0) - 2026-09-07
 
