@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import unquote
 
 import jsonschema_rs
+from typing_extensions import assert_never
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet
@@ -2272,79 +2273,87 @@ class OpenApiParameterSet(ParameterSet):
             # `True` / `False` / `None` improves chances of them passing validation in apps
             # that expect boolean / null types
             # and not aware of Python-specific representation of those types
-            if self.location == ParameterLocation.PATH:
-                if is_negative:
-                    strategy = strategy.map(
-                        lambda x: GeneratedValue(
-                            _quote_all_safe(jsonify_python_specific_types(x.value)),
-                            x.meta,
-                            x.pool_draws,
-                            x.semantic_draws,
-                            x.dictionary_draws,
-                            x.constants_draws,
-                        )
-                    )
-                    # Keep strict anti-misrouting defaults for negative generation.
-                    # Explicit %2F allowances apply only to positive data.
-                    strategy = strategy.filter(lambda x: is_valid_path(x.value))
-                else:
-                    # Dictionary / semantic overlays can wrap the value in `GeneratedValue`
-                    # under positive mode; route both helpers through the unwrap-rewrap
-                    # adapters so substituted path values still serialize correctly.
-                    from schemathesis.specs.openapi.negative import (
-                        wrap_filter_hook_for_generated_value,
-                        wrap_map_hook_for_generated_value,
-                    )
-
-                    strategy = strategy.map(
-                        wrap_map_hook_for_generated_value(_quote_all_safe, prune_constants=False)
-                    ).map(wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False))
-                    strategy = strategy.filter(
-                        wrap_filter_hook_for_generated_value(
-                            lambda x, allow=explicit_intent_path_names: is_valid_path(x, allow_encoded_slash_for=allow)
-                        )
-                    )
-            elif self.location == ParameterLocation.QUERY:
-                query_filter = is_valid_query
-                if is_negative:
-                    strategy = strategy.filter(lambda x: query_filter(x.value))
-                else:
-                    from schemathesis.specs.openapi.negative import (
-                        wrap_filter_hook_for_generated_value,
-                        wrap_map_hook_for_generated_value,
-                    )
-
-                    strategy = strategy.filter(wrap_filter_hook_for_generated_value(query_filter))
-                if is_negative:
-                    strategy = strategy.map(
-                        lambda x: GeneratedValue(
-                            jsonify_python_specific_types(x.value),
-                            x.meta,
-                            x.pool_draws,
-                            x.semantic_draws,
-                            x.dictionary_draws,
-                            x.constants_draws,
-                        )
-                    )
-                else:
-                    optional = frozenset(schema_obj.get("properties") or ()) - frozenset(
-                        schema_obj.get("required") or ()
-                    )
-                    strategy = strategy.map(
-                        wrap_map_hook_for_generated_value(
-                            partial(jsonify_query_parameters, optional=optional), prune_constants=False
-                        )
-                    )
-            else:
-                header_filter = is_valid_header
-                # Headers with special format do not need filtration
-                if not (self.location.is_in_header and _can_skip_header_filter(schema_obj)):
+            match self.location:
+                case ParameterLocation.PATH:
                     if is_negative:
-                        strategy = strategy.filter(lambda x: header_filter(x.value))
+                        strategy = strategy.map(
+                            lambda x: GeneratedValue(
+                                _quote_all_safe(jsonify_python_specific_types(x.value)),
+                                x.meta,
+                                x.pool_draws,
+                                x.semantic_draws,
+                                x.dictionary_draws,
+                                x.constants_draws,
+                            )
+                        )
+                        # Keep strict anti-misrouting defaults for negative generation.
+                        # Explicit %2F allowances apply only to positive data.
+                        strategy = strategy.filter(lambda x: is_valid_path(x.value))
                     else:
-                        from schemathesis.specs.openapi.negative import wrap_filter_hook_for_generated_value
+                        # Dictionary / semantic overlays can wrap the value in `GeneratedValue`
+                        # under positive mode; route both helpers through the unwrap-rewrap
+                        # adapters so substituted path values still serialize correctly.
+                        from schemathesis.specs.openapi.negative import (
+                            wrap_filter_hook_for_generated_value,
+                            wrap_map_hook_for_generated_value,
+                        )
 
-                        strategy = strategy.filter(wrap_filter_hook_for_generated_value(header_filter))
+                        strategy = strategy.map(
+                            wrap_map_hook_for_generated_value(_quote_all_safe, prune_constants=False)
+                        ).map(wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False))
+                        strategy = strategy.filter(
+                            wrap_filter_hook_for_generated_value(
+                                lambda x, allow=explicit_intent_path_names: is_valid_path(
+                                    x, allow_encoded_slash_for=allow
+                                )
+                            )
+                        )
+                case ParameterLocation.QUERY:
+                    query_filter = is_valid_query
+                    if is_negative:
+                        strategy = strategy.filter(lambda x: query_filter(x.value))
+                    else:
+                        from schemathesis.specs.openapi.negative import (
+                            wrap_filter_hook_for_generated_value,
+                            wrap_map_hook_for_generated_value,
+                        )
+
+                        strategy = strategy.filter(wrap_filter_hook_for_generated_value(query_filter))
+                    if is_negative:
+                        strategy = strategy.map(
+                            lambda x: GeneratedValue(
+                                jsonify_python_specific_types(x.value),
+                                x.meta,
+                                x.pool_draws,
+                                x.semantic_draws,
+                                x.dictionary_draws,
+                                x.constants_draws,
+                            )
+                        )
+                    else:
+                        optional = frozenset(schema_obj.get("properties") or ()) - frozenset(
+                            schema_obj.get("required") or ()
+                        )
+                        strategy = strategy.map(
+                            wrap_map_hook_for_generated_value(
+                                partial(jsonify_query_parameters, optional=optional), prune_constants=False
+                            )
+                        )
+                case ParameterLocation.HEADER | ParameterLocation.COOKIE:
+                    header_filter = is_valid_header
+                    # Headers with special format do not need filtration
+                    if not (self.location.is_in_header and _can_skip_header_filter(schema_obj)):
+                        if is_negative:
+                            strategy = strategy.filter(lambda x: header_filter(x.value))
+                        else:
+                            from schemathesis.specs.openapi.negative import wrap_filter_hook_for_generated_value
+
+                            strategy = strategy.filter(wrap_filter_hook_for_generated_value(header_filter))
+                case ParameterLocation.BODY | ParameterLocation.UNKNOWN:
+                    # Parameter sets are only built for path, query, header and cookie.
+                    pass
+                case _:
+                    assert_never(self.location)
 
         # Apply hybrid approach when captured variants are available
         if captured_variants and usage_tracker is not None:
