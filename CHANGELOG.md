@@ -67,6 +67,7 @@
 #### Others
 
 - `UnicodeEncodeError` when the output encoding cannot represent status glyphs, such as CP1252 on Windows.
+- `allow-extra-parameters = false` ignored for request bodies in the fuzzing phase.
 - Credentials in attached short options (`-aUSER:PASS`, `-HAuthorization: ...`) leaking into report command lines.
 - Run hanging forever when one report path is rejected and another report is enabled.
 - Stray traceback and lost crash report when concurrent runs share a `.schemathesis` directory.

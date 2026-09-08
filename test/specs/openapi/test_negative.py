@@ -717,6 +717,42 @@ def test_negative_query_respects_allow_extra_parameter_toggle(data):
         assert "x-schemathesis-unknown-property" not in value
 
 
+@pytest.mark.hypothesis_nested
+def test_negative_body_respects_allow_extra_parameter_toggle(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string", "minLength": 3}},
+                                    "required": ["name"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema.config.generation.update(allow_extra_parameters=False)
+
+    # Roughly one negative body in five carries an extra property; enough draws to surface it reliably.
+    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, max_examples=50, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        if isinstance(case.body, dict):
+            assert set(case.body) <= {"name"}, f"undeclared body properties: {sorted(set(case.body) - {'name'})}"
+
+    test()
+
+
 @pytest.mark.parametrize(
     ("schema", "new_type"),
     [

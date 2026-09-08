@@ -917,7 +917,13 @@ def is_negatable_keyword(key: str, value: Any, *, location: ParameterLocation, a
     if (
         not allow_extra_parameters
         and key == "additionalProperties"
-        and location in (ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE)
+        and location
+        in (
+            ParameterLocation.QUERY,
+            ParameterLocation.HEADER,
+            ParameterLocation.COOKIE,
+            ParameterLocation.BODY,
+        )
     ):
         return False
     return not (
