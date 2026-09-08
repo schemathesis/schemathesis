@@ -10,6 +10,7 @@ The major behavior changes include:
 
 - Running all data generation modes by default
 - Running all available checks by default
+- Measuring `--request-timeout` and `--max-response-time` in seconds rather than milliseconds
 
 ## Command-Line Interface
 
@@ -77,6 +78,17 @@ The following options have alternatives:
 | `--store-network-log` / `--cassette-path` | `--report-vcr-path` |
 | `--tag` | `--include-tag` / `--exclude-tag` |
 | `--targets` | `--generation-maximize` |
+
+### Changed
+
+`--request-timeout` and `--max-response-time` are measured in seconds. In v3 both took milliseconds, and both still accept the old values without an error:
+
+```bash
+# v3: 5 seconds. v4: 5000 seconds.
+schemathesis run --request-timeout=5000 <SCHEMA_URL>
+```
+
+Divide any value carried over from v3 by 1000. The same applies to `request-timeout` in `schemathesis.toml`.
 
 ### Reports
 
