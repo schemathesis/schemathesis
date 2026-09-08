@@ -895,3 +895,76 @@ def test_non_string_path_parameter_name_recovered_from_template(ctx):
         assert case.formatted_path == "/foo/ALPHA"
 
     test()
+
+
+@pytest.mark.parametrize(
+    ("version", "path_item_parameter", "operation_parameter"),
+    [
+        pytest.param(
+            "3.0.2",
+            {"in": "query", "name": "Action", "schema": {"type": "string"}},
+            {"in": "query", "name": "Action", "required": True, "schema": {"type": "string", "enum": ["CancelJob"]}},
+            id="openapi-3",
+        ),
+        pytest.param(
+            "2.0",
+            {"in": "query", "name": "Action", "type": "string"},
+            {"in": "query", "name": "Action", "required": True, "type": "string", "enum": ["CancelJob"]},
+            id="swagger-2",
+        ),
+    ],
+)
+def test_operation_parameter_overrides_path_item_parameter(ctx, version, path_item_parameter, operation_parameter):
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "parameters": [path_item_parameter],
+                "get": {"parameters": [operation_parameter], "responses": {"200": {"description": "OK"}}},
+            }
+        },
+        version=version,
+    )
+    operation = schema["/foo"]["GET"]
+    assert [parameter.definition for parameter in operation.query] == [operation_parameter]
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert case.query == {"Action": "CancelJob"}
+
+    test()
+
+
+# Overriding replaces the whole declaration, so a path item's required parameter turns optional.
+@pytest.mark.parametrize(
+    ("version", "path_item_parameter", "operation_parameter"),
+    [
+        pytest.param(
+            "3.0.2",
+            {"in": "query", "name": "Action", "required": True, "schema": {"type": "string"}},
+            {"in": "query", "name": "Action", "schema": {"type": "string", "enum": ["CancelJob"]}},
+            id="openapi-3",
+        ),
+        pytest.param(
+            "2.0",
+            {"in": "query", "name": "Action", "required": True, "type": "string"},
+            {"in": "query", "name": "Action", "type": "string", "enum": ["CancelJob"]},
+            id="swagger-2",
+        ),
+    ],
+)
+def test_operation_parameter_override_relaxes_required(ctx, version, path_item_parameter, operation_parameter):
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "parameters": [path_item_parameter],
+                "get": {"parameters": [operation_parameter], "responses": {"200": {"description": "OK"}}},
+            }
+        },
+        version=version,
+    )
+    assert schema["/foo"]["GET"].query.schema == {
+        "properties": {"Action": {"type": "string", "enum": ["CancelJob"]}},
+        "additionalProperties": False,
+        "type": "object",
+    }

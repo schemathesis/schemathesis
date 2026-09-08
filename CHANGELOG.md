@@ -42,6 +42,7 @@
 - Malformed operation or `responses` node crashing operation counting.
 - Malformed operation, `requestBody`, `content`, media type, or `security` nodes aborting the run.
 - Malformed `components`, path item `parameters`, or non-object reference targets aborting the run.
+- Operation-level parameters ignored when a path item declares the same name and location.
 - Malformed `servers` URL templates aborting the run at startup instead of reporting a schema error.
 - Swagger 2.0 body parameters written as a boolean schema crashing.
 - Specification extensions such as `x-codegen-contextRoot` beside the path templates crashing.
