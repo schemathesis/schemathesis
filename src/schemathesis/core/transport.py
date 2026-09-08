@@ -5,7 +5,7 @@ import json
 import string
 from collections.abc import Mapping
 from itertools import product
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -20,14 +20,12 @@ HttpMethod: TypeAlias = Literal["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD",
 # Schema-form HTTP method (lowercase). OpenAPI declares operations under lowercase verb keys,
 # so `APIOperation.method` carries this form; the wire `HttpMethod` is its uppercase counterpart.
 HttpMethodSchema: TypeAlias = Literal["get", "post", "put", "patch", "delete", "head", "options", "trace", "query"]
-_HTTP_METHODS_SCHEMA: frozenset[str] = frozenset(
-    {"get", "post", "put", "patch", "delete", "head", "options", "trace", "query"}
-)
+HTTP_METHODS_SCHEMA: frozenset[HttpMethodSchema] = frozenset(get_args(HttpMethodSchema))
 
 
 def is_http_method_schema(value: str) -> TypeGuard[HttpMethodSchema]:
     """Narrow a string to `HttpMethodSchema` when it matches a supported lowercase method."""
-    return value in _HTTP_METHODS_SCHEMA
+    return value in HTTP_METHODS_SCHEMA
 
 
 # OpenAPI status code key — concrete (`"200"`), class wildcard (`"2XX"`), or fallback (`"default"`).

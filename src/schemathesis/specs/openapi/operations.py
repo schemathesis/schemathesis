@@ -22,7 +22,7 @@ from schemathesis.core.parameters import ParameterLocation, SkippedParameter
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transforms import get_template_fields
-from schemathesis.core.transport import is_http_method_schema
+from schemathesis.core.transport import HTTP_METHODS_SCHEMA, is_http_method_schema
 from schemathesis.filters import FilterUsage
 from schemathesis.hooks import HookContext, dispatch_before_init_operation, dispatch_before_process_path
 from schemathesis.schemas import APIOperation, OperationDefinition
@@ -38,7 +38,6 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiSchema
     from schemathesis.specs.openapi.types import OperationObject
 
-HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"})
 SCHEMA_PARSING_ERRORS = (KeyError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
 
 _V3_1 = version.parse("3.1")
@@ -193,7 +192,7 @@ class OperationLoader:
                 if not isinstance(path_item, dict):
                     continue
                 for method, definition in path_item.items():
-                    if method not in HTTP_METHODS:
+                    if method not in HTTP_METHODS_SCHEMA:
                         continue
                     if filters_active and should_skip(path, method, definition):
                         continue
@@ -236,7 +235,7 @@ class OperationLoader:
                     complete_walk = False
                     continue
                 for method, definition in path_item.items():
-                    if method not in HTTP_METHODS:
+                    if method not in HTTP_METHODS_SCHEMA:
                         continue
                     # A malformed node is still an operation the document declares; it just cannot be parsed.
                     if not is_parsable_operation(definition):

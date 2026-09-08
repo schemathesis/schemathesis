@@ -19,11 +19,11 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, JsonValue
 from schemathesis.core.result import Ok
+from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.engine import events
 from schemathesis.generation.jsonschema import build
 from schemathesis.specs.openapi import definitions
 from schemathesis.specs.openapi.formats import get_default_format_strategies
-from schemathesis.specs.openapi.operations import HTTP_METHODS
 from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, hypothesis.errors.FailedHealthCheck)
@@ -430,7 +430,7 @@ def _without_empty_operations(document: dict[str, Any]) -> dict[str, Any]:
     # An operation with an empty definition is reached by the parsing walks, but is neither a lookup entry
     # nor a selected operation.
     paths = {
-        path: {key: value for key, value in item.items() if value != {} or key not in HTTP_METHODS}
+        path: {key: value for key, value in item.items() if value != {} or key not in HTTP_METHODS_SCHEMA}
         for path, item in document["paths"].items()
     }
     return {**document, "paths": paths}
@@ -454,7 +454,10 @@ def _walker_labels(schema: OpenApiSchema) -> dict[str, list[str]]:
             f"{method.upper()} {path}" for method, path, _ in schema._operations.iter_operations()
         ),
         "path_and_method_maps": sorted(
-            f"{method.upper()} {path}" for path in list(schema) for method in schema[path] if method in HTTP_METHODS
+            f"{method.upper()} {path}"
+            for path in list(schema)
+            for method in schema[path]
+            if method in HTTP_METHODS_SCHEMA
         ),
         "operation_lookup": sorted(
             f"{entry.method.upper()} {entry.path}"
