@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 import click
-from click.utils import LazyFile
 
 from schemathesis.checks import load_all_checks
 from schemathesis.cli.commands.fuzz import executor
@@ -207,11 +206,11 @@ def fuzz(
     request_proxy: str | None = None,
     report_formats: list[ReportFormat] | None,
     report_directory: Path | str = DEFAULT_REPORT_DIRECTORY,
-    report_junit_path: LazyFile | None = None,
-    report_vcr_path: LazyFile | None = None,
-    report_har_path: LazyFile | None = None,
-    report_ndjson_path: LazyFile | None = None,
-    report_json_path: LazyFile | None = None,
+    report_junit_path: IO[str] | None = None,
+    report_vcr_path: IO[str] | None = None,
+    report_har_path: IO[str] | None = None,
+    report_ndjson_path: IO[str] | None = None,
+    report_json_path: IO[str] | None = None,
     report_allure_path: str | None = None,
     report_preserve_bytes: bool | None = None,
     output_sanitize: bool | None = None,
