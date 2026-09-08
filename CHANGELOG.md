@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.26.0...HEAD) - TBD
 
+### :rocket: Added
+
+- `--origin` option that takes scheme, host and port, and appends the schema's own base path.
+
 ### :bug: Fixed
 
 #### ASGI applications

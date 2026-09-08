@@ -17,6 +17,7 @@ from schemathesis.cli.validation import (
     validate_generation_codec,
     validate_headers,
     validate_hypothesis_database,
+    validate_origin,
     validate_preserve_bytes,
     validate_rate_limit,
     validate_request_cert_key,
@@ -61,6 +62,16 @@ BASE_URL = OptionSpec(
     type=str,
     callback=validate_base_url,
     envvar="SCHEMATHESIS_BASE_URL",
+)
+
+ORIGIN = OptionSpec(
+    "--origin",
+    "origin",
+    help="API origin (scheme, host and port) to which the schema's own base path is appended",
+    metavar="URL",
+    type=str,
+    callback=validate_origin,
+    envvar="SCHEMATHESIS_ORIGIN",
 )
 
 WORKERS = OptionSpec(

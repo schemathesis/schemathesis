@@ -79,3 +79,18 @@ def validate_base_url(value: str) -> None:
         raise ValueError(INVALID_BASE_URL_MESSAGE) from exc
     if value and not netloc:
         raise ValueError(INVALID_BASE_URL_MESSAGE)
+
+
+INVALID_ORIGIN_MESSAGE = (
+    "The provided origin is invalid. It must contain only the scheme, host and port, as the path comes "
+    "from the schema. Use the base URL option if you want to set the path yourself."
+)
+
+
+def validate_origin(value: str) -> None:
+    try:
+        parsed = urlparse(value)
+    except ValueError as exc:
+        raise ValueError(INVALID_ORIGIN_MESSAGE) from exc
+    if not parsed.netloc or parsed.path.strip("/") or parsed.query or parsed.fragment:
+        raise ValueError(INVALID_ORIGIN_MESSAGE)

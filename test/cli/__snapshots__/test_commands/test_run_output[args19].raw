@@ -15,6 +15,8 @@ Usage: schemathesis run [OPTIONS] LOCATION
 
 Options:
   -u, --url URL                  API base URL (required for file-based schemas)
+  --origin URL                   API origin (scheme, host and port) to which the
+                                 schema's own base path is appended
   -w, --workers                  Number of concurrent workers for testing. Auto-
                                  adjusts if 'auto' is specified[auto, 1-64]
   --max-time SECONDS             Time budget for the whole run; fuzzing and

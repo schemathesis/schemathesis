@@ -83,6 +83,9 @@
     "base-url": {
       "type": "string"
     },
+    "origin": {
+      "type": "string"
+    },
     "servers": {
       "$ref": "#/$defs/ServersConfig"
     },
@@ -931,6 +934,9 @@
           "type": "string"
         },
         "base-url": {
+          "type": "string"
+        },
+        "origin": {
           "type": "string"
         },
         "servers": {

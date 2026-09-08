@@ -43,6 +43,9 @@ def into_event_stream(
 
     try:
         schema = load_schema(location=location, config=config)
+        # An explicitly configured base URL carries its own path, so the origin only applies without one.
+        if schema.config.origin is not None and schema.config.base_url is None:
+            schema.config.base_url = schema.config.origin.rstrip("/") + schema.base_path.rstrip("/")
         # Schemas don't (yet?) use configs for deciding what operations should be tested, so
         # a separate FilterSet is passed there. It combines both config file filters + CLI options.
         schema.filter_set = schema.config.operations.create_filter_set(**filter_set)

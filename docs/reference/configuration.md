@@ -489,6 +489,21 @@ These settings can only be applied at the project level.
     base-url = "https://api.example.com"
     ```
 
+#### `origin`
+
+!!! note ""
+
+    **Type:** `String`  
+    **Default:** `null`  
+
+    Sets the API origin - scheme, host and port only. The base path comes from the schema's `basePath` or `servers[0].url`. Cannot be combined with `base-url` in the same project; `--url` and `--origin` on the command line take precedence over both.
+
+    ```toml
+    # Optionally under a named project
+    # [[project]]
+    origin = "http://127.0.0.1:8080"
+    ```
+
 #### `servers.variables`
 
 !!! note ""
