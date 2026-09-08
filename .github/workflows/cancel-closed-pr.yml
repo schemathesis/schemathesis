@@ -1,0 +1,47 @@
+name: Cancel closed PR runs
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  cancel:
+    name: Cancel closed PR runs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      # Cancels the workflow runs left over from the closed pull request.
+      actions: write
+    steps:
+      # Merging leaves the pull request's runs going: they are keyed on `refs/pull/N/merge`, which no
+      # later push to master shares, so no concurrency group ever cancels them.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CLOSED_AT: ${{ github.event.pull_request.closed_at }}
+        shell: bash
+        run: |
+          # A rebase merge gives master the same SHA, so restrict to this pull request's own runs.
+          runs=$(gh api "repos/$REPO/actions/runs?head_sha=$HEAD_SHA&per_page=100" --jq '
+            .workflow_runs[]
+            | select(.event == "pull_request")
+            | select(.status == "queued" or .status == "in_progress")
+            | "\(.id) \(.created_at)"')
+          while read -r id created; do
+            if [ -z "$id" ] || [ "$id" = "$GITHUB_RUN_ID" ]; then
+              continue
+            fi
+            # Skip anything started after the close, so reopening the pull request keeps its new runs.
+            if [[ "$created" > "$CLOSED_AT" ]]; then
+              continue
+            fi
+            if gh api -X POST "repos/$REPO/actions/runs/$id/cancel" >/dev/null 2>&1; then
+              echo "cancelled $id"
+            else
+              echo "already finished or not cancellable: $id"
+            fi
+          done <<< "$runs"
