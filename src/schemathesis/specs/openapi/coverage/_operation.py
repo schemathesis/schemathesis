@@ -762,6 +762,21 @@ def _is_invalid_positive(template: Template, value: GeneratedValue) -> bool:
     return value.generation_mode == GenerationMode.POSITIVE and template.unsatisfiable_required_parameter
 
 
+def _container_without_wire_bounds(
+    schema: JsonSchemaObject, parameter_set: ParameterSet[OpenApiParameter]
+) -> JsonSchemaObject | None:
+    """Restore what the document declares wherever a serialization-implied bound replaced it."""
+    properties = schema["properties"]
+    declared = {
+        parameter.name: parameter.without_wire_bounds(properties[parameter.name])
+        for parameter in parameter_set
+        if parameter.wire_bounds and isinstance(properties.get(parameter.name), dict)
+    }
+    if not declared:
+        return None
+    return {**schema, "properties": {**properties, **declared}}
+
+
 def _drop_negatives_the_schema_admits(
     values: Generator[GeneratedValue, None, None],
     schema: JsonSchemaObject,
@@ -1239,25 +1254,29 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
             return schema
 
         def _yield_negative(
-            subschema: dict[str, Any], _location: ParameterLocation, is_required: bool, _dedup: Dedup
+            subschema: dict[str, Any],
+            _location: ParameterLocation,
+            is_required: bool,
+            _dedup: Dedup,
+            _declared: JsonSchemaObject | None,
         ) -> Generator[Case, None, None]:
-            iterator = iter(
-                cover_schema_iter(
-                    CoverageContext(
-                        session=session,
-                        root_schema=subschema,
-                        location=_location,
-                        media_type=None,
-                        generation_modes=[GenerationMode.NEGATIVE],
-                        is_required=is_required,
-                        custom_formats=custom_formats,
-                        validator_cls=validator_cls,
-                        update_pattern=update_pattern,
-                        allow_extra_parameters=generation_config.allow_extra_parameters,
-                    ),
-                    subschema,
-                )
+            iterator = cover_schema_iter(
+                CoverageContext(
+                    session=session,
+                    root_schema=subschema,
+                    location=_location,
+                    media_type=None,
+                    generation_modes=[GenerationMode.NEGATIVE],
+                    is_required=is_required,
+                    custom_formats=custom_formats,
+                    validator_cls=validator_cls,
+                    update_pattern=update_pattern,
+                    allow_extra_parameters=generation_config.allow_extra_parameters,
+                ),
+                subschema,
             )
+            if _declared is not None:
+                iterator = _drop_negatives_the_schema_admits(iterator, _declared, validator_cls)
             while True:
                 instant = Instant()
                 try:
@@ -1296,7 +1315,8 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
                     yield case
             if GenerationMode.NEGATIVE in generation_modes:
                 subschema = _combination_schema(only_required, required, parameter_set)
-                yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_NEGATIVE_SET)
+                declared = _container_without_wire_bounds(subschema, parameter_set)
+                yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_NEGATIVE_SET, declared)
 
         # 2. Generate combinations with required properties and one optional property
         for opt_param in optional:
@@ -1316,7 +1336,8 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
                         yield case
                 if GenerationMode.NEGATIVE in generation_modes:
                     subschema = _combination_schema(combo, required, parameter_set)
-                    yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_REQUEST)
+                    declared = _container_without_wire_bounds(subschema, parameter_set)
+                    yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_REQUEST, declared)
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
         if (
