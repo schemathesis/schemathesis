@@ -31,7 +31,7 @@ env:
 
 jobs:
   benchmarks:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     name: "Run benchmarks"
     steps:
@@ -49,7 +49,7 @@ jobs:
           run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
 
   memory:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     name: "Track memory usage"
     steps:
