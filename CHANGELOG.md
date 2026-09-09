@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.26.1...HEAD) - TBD
 
+### :rocket: Added
+
+- Dependency inference links body fields to the collection listing their accepted values.
+
 ### :bug: Fixed
 
 #### WFC authentication

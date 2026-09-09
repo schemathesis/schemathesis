@@ -6311,3 +6311,51 @@ def test_self_referencing_component_terminates(ctx):
     _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"Node": node}})
 
     assert [entry.producer_operation_ref for entry in graph.iter_links()] == ["#/paths/~1nodes/post"]
+
+
+def test_scalar_body_field_named_after_collection_links_to_its_producer(ctx):
+    # `country` carries no identifier suffix, but it names a collection whose 200 is the list of
+    # values the field accepts.
+    paths = {
+        "/countries": {
+            "get": {
+                "operationId": "listCountries",
+                "responses": {
+                    "200": {"content": {"application/json": {"schema": {"type": "array", "items": {"type": "string"}}}}}
+                },
+            }
+        },
+        "/news": {
+            "post": {
+                "operationId": "createNews",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"country": {"type": "string"}, "text": {"type": "string"}},
+                                "required": ["country"],
+                            }
+                        }
+                    }
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ] == [
+        [
+            "#/paths/~1countries/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1news/post",
+                "requestBody": {"country": "$response.body#/*"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
