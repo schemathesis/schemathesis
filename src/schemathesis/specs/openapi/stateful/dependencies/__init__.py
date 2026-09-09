@@ -65,6 +65,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # Nested-body FK lookups whose target resource wasn't yet registered when the consumer
     # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
     deferred_nested_fks: dict[str, list[tuple[str, str, str]]] = {}
+    deferred_named_scalars: dict[str, list[tuple[str, str]]] = {}
 
     # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
     candidate_resource_names = naming.collect_candidate_resource_names(schema.raw_schema)
@@ -74,6 +75,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             operation = result.ok()
             try:
                 pending: list[tuple[str, str, str]] = []
+                pending_named_scalars: list[tuple[str, str]] = []
                 inputs = list(
                     extract_inputs(
                         operation=operation,
@@ -83,6 +85,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                         canonicalization_cache=canonicalization_cache,
                         response_resource_cache=response_resource_cache,
                         deferred_nested_fks=pending,
+                        deferred_named_scalars=pending_named_scalars,
                         candidate_resource_names=candidate_resource_names,
                     )
                 )
@@ -103,6 +106,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 )
                 if pending:
                     deferred_nested_fks[operation.label] = pending
+                if pending_named_scalars:
+                    deferred_named_scalars[operation.label] = pending_named_scalars
             except RefResolutionError:
                 # Skip operations with unresolvable $refs (e.g., unavailable external references or references with typos)
                 # These won't participate in dependency detection
@@ -124,6 +129,33 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     parameter_location=ParameterLocation.BODY,
                 )
             )
+
+    # Bind body fields named after a collection whose responses list the values they accept
+    # (`country` <- `GET /countries`). Deferred to here so the producer is known.
+    primitive_producers = {
+        output.resource.name
+        for node in operations.values()
+        for output in node.outputs
+        if output.is_primitive_identifier
+    }
+    for label, named_scalars in deferred_named_scalars.items():
+        node = operations[label]
+        bound = {slot.parameter_name for slot in node.inputs}
+        for resource_name, property_name in named_scalars:
+            if property_name in bound or resource_name not in primitive_producers:
+                continue
+            target = resources[resource_name]
+            if any(output.resource.name == resource_name for output in node.outputs):
+                continue
+            node.inputs.append(
+                InputSlot(
+                    resource=target,
+                    resource_field=target.fields[0] if target.fields else "id",
+                    parameter_name=property_name,
+                    parameter_location=ParameterLocation.BODY,
+                )
+            )
+            bound.add(property_name)
 
     # Update input slots with improved resource definitions discovered during extraction
     #

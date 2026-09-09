@@ -491,6 +491,13 @@
           "parameter_name": "clientId",
           "resource": "Client",
           "resource_field": "clientId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "channel",
+          "resource": "Channel",
+          "resource_field": "id"
         }
       ],
       "outputs": []

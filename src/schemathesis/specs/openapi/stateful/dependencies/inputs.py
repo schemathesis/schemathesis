@@ -7,7 +7,7 @@ from schemathesis.core import media_types
 from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema import maybe_resolve_bundled
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.jsonschema.types import get_type
+from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -40,6 +40,7 @@ def extract_inputs(
     canonicalization_cache: CanonicalizationCache,
     response_resource_cache: ResponseResourceCache,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
+    deferred_named_scalars: list[tuple[str, str]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
@@ -81,6 +82,7 @@ def extract_inputs(
                     resources=resources,
                     known_dependencies=known_dependencies,
                     deferred_nested_fks=deferred_nested_fks,
+                    deferred_named_scalars=deferred_named_scalars,
                     candidate_resource_names=candidate_resource_names,
                 )
         except MalformedMediaType:
@@ -302,6 +304,13 @@ def _flatten_composition(schema: dict[str, Any]) -> tuple[dict[str, Any], list[s
     return properties, required
 
 
+_SCALAR_TYPES = frozenset({"string", "integer", "number"})
+
+
+def _is_scalar(schema: JsonSchema) -> bool:
+    return isinstance(schema, dict) and bool(_SCALAR_TYPES & set(get_type(schema)))
+
+
 def _resolve_body_dependencies(
     *,
     body: OpenApiBody,
@@ -309,6 +318,7 @@ def _resolve_body_dependencies(
     resources: ResourceMap,
     known_dependencies: set[str],
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
+    deferred_named_scalars: list[tuple[str, str]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
@@ -383,6 +393,11 @@ def _resolve_body_dependencies(
                 parameter_location=ParameterLocation.BODY,
             )
             continue
+
+        if resource_name is None and deferred_named_scalars is not None and _is_scalar(subschema):
+            # A field carrying no identifier suffix may still name the collection listing its
+            # accepted values (`country` <- `GET /countries`). The producer is confirmed later.
+            deferred_named_scalars.append((naming.to_pascal_case(property_name), property_name))
 
         # Skip generic property names & optional fields (at least for now)
         if property_name in GENERIC_FIELD_NAMES or property_name not in required:
