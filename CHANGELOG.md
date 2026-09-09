@@ -16,6 +16,7 @@
 - Operations refusing every configured identity never retried without credentials.
 - Operations no identity can reach left unauthenticated instead of keeping the one that got furthest.
 - Every identity tried before anonymous, spending a short run on credentials that never work.
+- Identity escalation stopped by a 404, leaving role-gated operations pinned to the first user.
 
 #### Others
 

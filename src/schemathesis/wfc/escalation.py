@@ -16,12 +16,12 @@ DENIED = frozenset({401, 403})
 
 
 def _is_admitted(status_code: int) -> bool:
-    """Whether the response shows the request got past authorization.
+    """Whether the response proves the request got past authorization.
 
-    400 counts as neither: many stacks validate the payload before authorizing, so it says
-    nothing about the identity.
+    Only a served response does. A rejected payload or a missing resource is decided before the
+    role is looked at, so it says nothing about the identity and must not settle the assignment.
     """
-    return status_code != 400 and status_code not in DENIED
+    return 200 <= status_code < 400
 
 
 ANONYMOUS = "<anonymous>"
@@ -83,7 +83,9 @@ class EscalatingAuthProvider:
             current = self._assigned.get(label, 0)
             rank = _DENIAL_RANK[status_code]
             best = self._best.get(label)
-            if best is None or rank > best[0]:
+            # Ties go to the later rung: among identities that got equally far, it is the one with
+            # the most privilege, and so the one a later request has any chance with.
+            if best is None or rank >= best[0]:
                 self._best[label] = (rank, current)
             # One denial is enough: an operation may only get a couple of requests, and a
             # threshold above its budget could never flip.

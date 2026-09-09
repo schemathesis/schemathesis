@@ -1063,6 +1063,16 @@ def test_escalation_walks_the_chain_on_401(cli, ctx, tmp_path):
     assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "", "editor", "admin"}
 
 
+def test_a_missing_resource_does_not_settle_the_identity(cli, ctx, tmp_path):
+    # A 404 says the id was wrong, not that the identity was accepted.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=15", f"--auth-wfc={auth}", "--phases=fuzzing")
+
+    assert "admin" in _identities(api, "DELETE", "/api/missing-first")
+
+
 def test_rejected_payloads_do_not_block_escalation(cli, ctx, tmp_path):
     # `/api/validated` answers 400 before checking the role, so 403s arrive interleaved with 400s.
     api = ctx.openapi.apps.wfc_role_gated()
@@ -1151,7 +1161,8 @@ def test_exhausted_chain_stops_rather_than_wrapping(cli, ctx, tmp_path):
         if r.method == "DELETE" and r.path.startswith("/api/nobody")
     ]
     assert seen, "operation was never dispatched"
-    assert seen[-1] == "viewer"
+    # Which identity it keeps is the subject of another test; here it only has to stop moving.
+    assert len(set(seen[-3:])) == 1, f"kept cycling through the chain: {seen}"
 
 
 def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
@@ -1208,6 +1219,23 @@ def test_exhausted_chain_keeps_the_identity_that_got_furthest(cli, ctx, tmp_path
     ]
     assert seen, "operation was never dispatched"
     assert seen[-1] != ""
+
+
+def test_exhausted_chain_keeps_the_most_privileged_of_equals(cli, ctx, tmp_path):
+    # Every identity is refused, so none is provably better; the last one to reach authorization is
+    # the one a later request has any chance with.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=20", "--phases=fuzzing", f"--auth-wfc={auth}")
+
+    seen = [
+        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
+        for r in api.requests
+        if r.method == "DELETE" and r.path.startswith("/api/nobody")
+    ]
+    assert seen, "operation was never dispatched"
+    assert seen[-1] == "admin", f"settled on a weaker identity: {seen}"
 
 
 def test_credentials_that_never_work_reach_anonymous_early(cli, ctx, tmp_path):
