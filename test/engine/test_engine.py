@@ -2031,3 +2031,18 @@ def test_planted_bug_behind_an_id_only_the_listing_carries(ctx):
     )
 
     assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
+
+
+def test_planted_bug_behind_an_undocumented_collection(ctx):
+    # The spec declares no response shape, so the listing body is the only place the tag exists.
+    api = ctx.openapi.apps.undocumented_collection_with_planted_bug()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(
+        schema,
+        max_time=10,
+        max_examples=100_000,
+        checks=(not_a_server_error,),
+        phases=[PhaseName.FUZZING],
+    )
+
+    assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
