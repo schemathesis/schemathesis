@@ -18,10 +18,16 @@ class BoundedCache:
         self._maxsize = maxsize
 
     def get(self, key: Any, default: Any = MISSING) -> Any:
-        if key in self._data:
+        # Read before touching the LRU order: another worker may evict `key` in between,
+        # and on free-threaded builds it regularly does.
+        value = self._data.get(key, MISSING)
+        if value is MISSING:
+            return default
+        try:
             self._data.move_to_end(key)
-            return self._data[key]
-        return default
+        except KeyError:
+            pass
+        return value
 
     def clear(self) -> None:
         self._data.clear()
