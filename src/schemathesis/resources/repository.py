@@ -72,14 +72,16 @@ class ResourceRepository:
 
         Returns instances from all contexts, providing diversity across parent resources.
         """
-        context_buckets = self._resource_buckets.get(resource_name)
-        if not context_buckets:
-            return ()
-        # Collect instances from all context buckets
-        instances: list[ResourceInstance] = []
-        for bucket in context_buckets.values():
-            instances.extend(bucket)
-        return tuple(instances)
+        # Under the lock: workers record responses into these buckets while others draw from them.
+        with self._lock:
+            context_buckets = self._resource_buckets.get(resource_name)
+            if not context_buckets:
+                return ()
+            # Collect instances from all context buckets
+            instances: list[ResourceInstance] = []
+            for bucket in context_buckets.values():
+                instances.extend(bucket)
+            return tuple(instances)
 
     def remove_by_value(self, resource_name: str, value: object) -> int:
         """Drop instances whose data carries the given value; returns the number removed.
