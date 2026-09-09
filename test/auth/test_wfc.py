@@ -1007,7 +1007,7 @@ def test_escalation_walks_the_chain_until_admitted(cli, ctx, tmp_path):
 
     assert _identities(api, "GET", "/api/open") == {"viewer"}
     assert "admin" not in _identities(api, "DELETE", "/api/editor-only")
-    assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "editor", "admin"}
+    assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "", "editor", "admin"}
 
 
 EXPIRING_AUTH = {
@@ -1060,7 +1060,7 @@ def test_escalation_walks_the_chain_on_401(cli, ctx, tmp_path):
 
     cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing")
 
-    assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "editor", "admin"}
+    assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "", "editor", "admin"}
 
 
 def test_rejected_payloads_do_not_block_escalation(cli, ctx, tmp_path):
@@ -1208,3 +1208,15 @@ def test_exhausted_chain_keeps_the_identity_that_got_furthest(cli, ctx, tmp_path
     ]
     assert seen, "operation was never dispatched"
     assert seen[-1] != ""
+
+
+def test_credentials_that_never_work_reach_anonymous_early(cli, ctx, tmp_path):
+    # Walking every identity first spends a short run discovering what the second request could show.
+    api = ctx.openapi.apps.wfc_credentials_rejected()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=2", f"--auth-wfc={auth}", "--phases=fuzzing")
+
+    public = [r for r in api.requests if r.path.startswith("/api/public")]
+    assert public, "operation was never called"
+    assert any(r.headers.get("Authorization") is None for r in public)
