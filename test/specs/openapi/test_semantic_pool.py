@@ -2102,8 +2102,10 @@ def test_schemaless_walker_respects_max_nodes():
     assert 0 < len(leaves) < 10
 
 
-def test_schemaless_walker_skips_top_level_array_body():
-    assert list(iter_ingestion_leaves(None, [{"email": "a@b.com"}])) == []
+def test_schemaless_walker_ingests_top_level_array_body():
+    assert list(iter_ingestion_leaves(None, [{"email": "a@b.com"}])) == [
+        IngestionLeaf("string", "email", None, "email", "a@b.com")
+    ]
 
 
 def test_schemaless_walker_skips_nameless_scalar_body():
@@ -2483,6 +2485,24 @@ def test_walker_ingests_scalar_arrays_under_the_singular_name():
     # A collection answers `{"projects": [...]}` and the next path consumes one as `{project}`.
     schema = {"type": "object", "properties": {"projects": {"type": "array", "items": {"type": "string"}}}}
     assert list(iter_ingestion_leaves(schema, {"projects": ["paper", "velocity"]})) == [
+        IngestionLeaf("string", None, None, "project", "paper"),
+        IngestionLeaf("string", None, None, "project", "velocity"),
+    ]
+
+
+def test_schemaless_walker_recurses_into_arrays():
+    # Specs that declare no response schema still answer with collections; the walk is all we have.
+    body = [{"region": "Europe", "demonym": "Norwegian"}, {"region": "Asia", "demonym": "Thai"}]
+    assert list(iter_ingestion_leaves(None, body)) == [
+        IngestionLeaf("string", None, None, "region", "Europe"),
+        IngestionLeaf("string", None, None, "demonym", "Norwegian"),
+        IngestionLeaf("string", None, None, "region", "Asia"),
+        IngestionLeaf("string", None, None, "demonym", "Thai"),
+    ]
+
+
+def test_schemaless_walker_ingests_scalar_arrays_under_the_singular_name():
+    assert list(iter_ingestion_leaves(None, {"projects": ["paper", "velocity"]})) == [
         IngestionLeaf("string", None, None, "project", "paper"),
         IngestionLeaf("string", None, None, "project", "velocity"),
     ]

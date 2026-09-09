@@ -498,3 +498,32 @@ def collection_with_planted_bug() -> OpenAPIApp:
         return jsonify({"detail": "unknown"}), 404
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def undocumented_collection_with_planted_bug() -> OpenAPIApp:
+    """The listing names the only tag the search accepts, and the spec declares no response shape."""
+    tag = "aurora-borealis-7"
+    spec = build_schema(
+        {
+            "/api/tags": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/search": {
+                "get": {
+                    "parameters": [{"name": "tag", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Unknown"}},
+                }
+            },
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/api/tags", methods=["GET"])
+    def list_tags() -> object:
+        return jsonify([{"tag": tag}])
+
+    @app.route("/api/search", methods=["GET"])
+    def search() -> object:
+        if request.args.get("tag") == tag:
+            raise RuntimeError("boom")
+        return jsonify({"detail": "unknown"}), 404
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

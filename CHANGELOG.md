@@ -6,6 +6,7 @@
 
 - Dependency inference links body fields to the collection listing their accepted values.
 - Generated data reuses values from list responses, not only single-object ones.
+- Generated data reuses values from responses whose schema the spec omits.
 
 ### :bug: Fixed
 

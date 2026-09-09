@@ -454,6 +454,15 @@ def _walk_ingestion_schemaless(
             )
         return
     if isinstance(body, list):
+        # Items are unnamed, so a list of scalars borrows its collection's name in the singular.
+        element_name = to_singular(name) if name is not None else None
+        for element in body[:MAX_ARRAY_ITEMS]:
+            budget.nodes_left -= 1
+            if budget.nodes_left < 0:
+                return
+            yield from _walk_ingestion_schemaless(
+                element, name=element_name, depth=depth + 1, excluded=excluded, budget=budget, max_depth=max_depth
+            )
         return
     if name is None:
         return
