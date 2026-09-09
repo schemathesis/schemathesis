@@ -514,6 +514,52 @@ def test_spring_parser_recognizes_size_bound_message_variants(
     ]
 
 
+def test_spring_parser_locates_declared_query_parameters(ctx, case_factory):
+    # Spring names the field without saying where it came from, so a declared query parameter
+    # must not be mistaken for a body field.
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/stats": {
+                "get": {
+                    "parameters": [{"name": "month", "in": "query", "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/api/stats"]["GET"]
+    body = {"errors": [{"field": "month", "defaultMessage": "must be between 1 and 12"}]}
+    obs = SpringParser().parse(operation=operation, body=body, case=case_factory(operation=operation))
+    assert obs
+    assert {o.location for o in obs} == {ParameterLocation.QUERY}
+
+
+def test_spring_parser_recognizes_hibernate_range_message(make_operation, case_factory):
+    # Hibernate's `@Range` reports a numeric interval; the `size`/`length` prefix marks a length one.
+    body = {
+        "errors": [
+            {
+                "field": "month",
+                "defaultMessage": "must be between 1 and 12",
+                "rejectedValue": [-2147483648],
+            }
+        ]
+    }
+    obs = parse_observations(SpringParser(), body, make_operation, case_factory)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (
+            ("month",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=1.0, direction=BoundDirection.MIN, exclusive=False),
+        ),
+        (
+            ("month",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=12.0, direction=BoundDirection.MAX, exclusive=False),
+        ),
+    ]
+
+
 @pytest.mark.parametrize(
     "message, expected_name",
     [
@@ -8272,6 +8318,45 @@ def test_numeric_bound_adjustment_applies_correctly_draft2020(input_schema, item
     )
     _assert_valid_schema_object(input_schema, out, draft="3.1")
     assert out == expected
+
+
+def test_numeric_bound_adjustment_tightens_a_format_derived_bound(case_factory):
+    # `format: int32` is widened into real keywords before generation; a server-reported bound is
+    # sharper information than the width of the integer type and must win over it.
+    schema = {
+        "type": "object",
+        "properties": {"month": {"type": "integer", "format": "int32", "minimum": -(2**31), "maximum": 2**31 - 1}},
+    }
+    out = NumericBoundAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.QUERY,
+        schema=schema,
+        observations=_build_numeric_bound_observations(
+            (("month",), 1.0, BoundDirection.MIN, False),
+            (("month",), 12.0, BoundDirection.MAX, False),
+        ),
+    )
+    assert out["properties"]["month"]["minimum"] == 1
+    assert out["properties"]["month"]["maximum"] == 12
+
+
+def test_numeric_bound_adjustment_reaches_array_items(case_factory):
+    # A repeated query parameter reports its bound under the field name while the constraint
+    # belongs to each element.
+    schema = {"type": "object", "properties": {"month": {"type": "array", "items": {"type": "integer"}}}}
+    out = NumericBoundAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.QUERY,
+        schema=schema,
+        observations=_build_numeric_bound_observations(
+            (("month",), 1.0, BoundDirection.MIN, False),
+            (("month",), 12.0, BoundDirection.MAX, False),
+        ),
+    )
+    assert out == {
+        "type": "object",
+        "properties": {"month": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 12}}},
+    }
 
 
 def _build_pattern_observations(*items: tuple[tuple[str | int, ...], str]) -> tuple[Observation, ...]:

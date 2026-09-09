@@ -25,6 +25,10 @@
 - Inferred links dropped for every consumer of a resource after the first with the same method.
 - `KeyError` from an evicted cache entry on free-threaded Python.
 - Crash with `dictionary changed size during iteration` when several workers reuse values from responses.
+- Bean-validation `@Range` bounds ignored in Spring error responses.
+- Spring validation errors for query parameters applied to the request body.
+- Server-reported numeric bounds not applied to the items of a repeated parameter.
+- Server-reported numeric bounds discarded in favour of the wider `format: int32`/`int64` range.
 
 ## [4.26.1](https://github.com/schemathesis/schemathesis/compare/v4.26.0...v4.26.1) - 2026-09-09
 

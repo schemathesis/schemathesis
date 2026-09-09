@@ -43,6 +43,13 @@ _SIZE_BOUND = re.compile(
     re.IGNORECASE,
 )
 
+# Hibernate's `@Range` reports a numeric interval with the same wording minus the
+# `size`/`length` prefix, so it is only reachable once `_SIZE_BOUND` has declined.
+_RANGE_BOUND = re.compile(
+    r"must be between (-?\d+(?:\.\d+)?) and (-?\d+(?:\.\d+)?)",
+    re.IGNORECASE,
+)
+
 # Bean-validation format constraints. Hibernate's `@Email` emits "must be a
 # well-formed email address"; `@URL`/`@UUID` extensions emit "must be a valid
 # URL"/"must be a valid UUID". Custom @ControllerAdvice handlers also use
@@ -166,53 +173,78 @@ def _split_path(field: str) -> ParameterPath:
     return tuple(field.split(".")) if field else ()
 
 
-def _classify(message: str) -> tuple[ObservationKind, ObservationPayload] | None:
+def _classify(message: str) -> tuple[tuple[ObservationKind, ObservationPayload], ...]:
     if _NON_BLANK.search(message):
-        return ObservationKind.MUST_NOT_BE_BLANK, None
+        return ((ObservationKind.MUST_NOT_BE_BLANK, None),)
     size_match = _SIZE_BOUND.search(message)
     if size_match:
-        return ObservationKind.SIZE_BOUND, SizeBoundPayload(
-            min=int(size_match.group(1)),
-            max=int(size_match.group(2)),
+        return (
+            (
+                ObservationKind.SIZE_BOUND,
+                SizeBoundPayload(min=int(size_match.group(1)), max=int(size_match.group(2))),
+            ),
+        )
+    range_match = _RANGE_BOUND.search(message)
+    if range_match:
+        return (
+            (
+                ObservationKind.NUMERIC_BOUND,
+                NumericBoundPayload(bound=float(range_match.group(1)), direction=BoundDirection.MIN, exclusive=False),
+            ),
+            (
+                ObservationKind.NUMERIC_BOUND,
+                NumericBoundPayload(bound=float(range_match.group(2)), direction=BoundDirection.MAX, exclusive=False),
+            ),
         )
     numeric_match = _NUMERIC_BOUND.search(message)
     if numeric_match:
         direction = BoundDirection.MIN if numeric_match.group("dir").lower() == "greater" else BoundDirection.MAX
-        return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
-            bound=float(numeric_match.group("value")),
-            direction=direction,
-            exclusive=numeric_match.group("inclusive") is None,
+        return (
+            (
+                ObservationKind.NUMERIC_BOUND,
+                NumericBoundPayload(
+                    bound=float(numeric_match.group("value")),
+                    direction=direction,
+                    exclusive=numeric_match.group("inclusive") is None,
+                ),
+            ),
         )
     keyword_match = _NUMERIC_KEYWORD.search(message)
     if keyword_match:
         # Normalise `non-negative` / `non negative` to a single key.
         kind = re.sub(r"[-\s]+", "", keyword_match.group("kind").lower())
-        return ObservationKind.NUMERIC_BOUND, _NUMERIC_KEYWORD_PAYLOADS[kind]
+        return ((ObservationKind.NUMERIC_BOUND, _NUMERIC_KEYWORD_PAYLOADS[kind]),)
     pattern_match = _PATTERN.search(message)
     if pattern_match:
-        return ObservationKind.PATTERN, PatternPayload(regex=pattern_match.group("regex"))
+        return ((ObservationKind.PATTERN, PatternPayload(regex=pattern_match.group("regex"))),)
     for pattern, name in _FORMAT_PATTERNS:
         if pattern.search(message):
-            return ObservationKind.FORMAT, FormatPayload(name=name)
-    return None
+            return ((ObservationKind.FORMAT, FormatPayload(name=name)),)
+    return ()
 
 
-def _emit(operation: APIOperation, field: str, message: str) -> Observation | None:
-    classification = _classify(message)
-    if classification is None or not field:
-        return None
-    kind, payload = classification
-    # Spring envelopes don't carry a location tag; treat the field as a path
-    # parameter when the operation declares one with that name, otherwise body.
-    location = ParameterLocation.PATH if field in operation.path_parameters else ParameterLocation.BODY
-    return Observation(
-        operation_label=operation.label,
-        location=location,
-        parameter_path=_split_path(field),
-        kind=kind,
-        raw_message=message,
-        payload=payload,
-    )
+def _emit(operation: APIOperation, field: str, message: str) -> list[Observation]:
+    if not field:
+        return []
+    # Spring envelopes don't carry a location tag; match the name against what the operation
+    # declares, and fall back to the body when nothing matches.
+    if field in operation.path_parameters:
+        location = ParameterLocation.PATH
+    elif field in operation.query:
+        location = ParameterLocation.QUERY
+    else:
+        location = ParameterLocation.BODY
+    return [
+        Observation(
+            operation_label=operation.label,
+            location=location,
+            parameter_path=_split_path(field),
+            kind=kind,
+            raw_message=message,
+            payload=payload,
+        )
+        for kind, payload in _classify(message)
+    ]
 
 
 @PARSERS.register
@@ -297,9 +329,7 @@ class SpringParser:
             match = _MESSAGE_LINE.match(line)
             if match is None:
                 continue
-            observation = _emit(operation, match.group(1), match.group(2))
-            if observation is not None:
-                yield observation
+            yield from _emit(operation, match.group(1), match.group(2))
 
     @staticmethod
     def _extract_sub_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
@@ -314,9 +344,7 @@ class SpringParser:
             field = item.get("field") or ""
             message = item.get("message") or ""
             if isinstance(field, str) and isinstance(message, str):
-                observations = _emit(operation, field, message)
-                if observations is not None:
-                    yield observations
+                yield from _emit(operation, field, message)
 
     @staticmethod
     def _extract_problem_detail(operation: APIOperation, body: dict) -> Iterable[Observation]:
@@ -325,9 +353,7 @@ class SpringParser:
         if not isinstance(detail, str):
             return
         for match in _PROBLEM_DETAIL.finditer(detail):
-            observations = _emit(operation, match.group(1), match.group(2))
-            if observations is not None:
-                yield observations
+            yield from _emit(operation, match.group(1), match.group(2))
 
     @staticmethod
     def _extract_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
@@ -342,9 +368,7 @@ class SpringParser:
             field = item.get("field") or ""
             message = item.get("defaultMessage") or item.get("message") or ""
             if isinstance(field, str) and isinstance(message, str):
-                observations = _emit(operation, field, message)
-                if observations is not None:
-                    yield observations
+                yield from _emit(operation, field, message)
 
     @staticmethod
     def _extract_field_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
@@ -359,9 +383,7 @@ class SpringParser:
             field = item.get("property") or item.get("field") or item.get("path") or ""
             message = item.get("message") or item.get("defaultMessage") or ""
             if isinstance(field, str) and isinstance(message, str):
-                observations = _emit(operation, field, message)
-                if observations is not None:
-                    yield observations
+                yield from _emit(operation, field, message)
 
     @staticmethod
     def _extract_top_level_message(operation: APIOperation, body: dict) -> Iterable[Observation]:
