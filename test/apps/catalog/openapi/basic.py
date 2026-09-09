@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from flask import jsonify, request
+
 from test.apps.builders import build_schema, make_flask_app_from_schema
 from test.apps.fragments import handlers, schemas
 from test.apps.runtime import OpenAPIApp
@@ -455,4 +457,44 @@ def kitchen_sink() -> OpenAPIApp:
         register = getattr(handlers, f"register_{fragment}", None)
         if register is not None:
             register(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def collection_with_planted_bug() -> OpenAPIApp:
+    """The listing carries the only token that reaches the planted 500; generated ones are rejected."""
+    token = "b7e2a41c9f3d4c8a92e51d6f0a7c3b58"
+    entry = {"type": "object", "properties": {"token": {"type": "string"}}}
+    spec = build_schema(
+        {
+            "/api/tokens": {
+                "get": {
+                    "responses": {
+                        "200": {"content": {"application/json": {"schema": {"type": "array", "items": entry}}}}
+                    }
+                }
+            },
+            "/api/verify": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {**entry, "required": ["token"]}}},
+                    },
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Unknown"}},
+                }
+            },
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/api/tokens", methods=["GET"])
+    def list_tokens() -> object:
+        return jsonify([{"token": token}])
+
+    @app.route("/api/verify", methods=["POST"])
+    def verify() -> object:
+        body = request.get_json(silent=True)
+        if isinstance(body, dict) and body.get("token") == token:
+            raise RuntimeError("boom")
+        return jsonify({"detail": "unknown"}), 404
+
     return OpenAPIApp(spec=spec, server=app, kind="flask")

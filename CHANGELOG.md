@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Dependency inference links body fields to the collection listing their accepted values.
+- Generated data reuses values from list responses, not only single-object ones.
 
 ### :bug: Fixed
 

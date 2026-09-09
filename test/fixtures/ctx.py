@@ -275,6 +275,9 @@ class OpenAPIApps:
     def planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug())
 
+    def collection_with_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.collection_with_planted_bug())
+
     def planted_bug_with_quiet_operation(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug_with_quiet_operation())
 

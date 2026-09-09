@@ -2016,3 +2016,18 @@ def test_max_time_stateful_suite_with_no_time_left_is_not_a_pass(ctx, app_runner
     )
 
     assert [event.status for event in stream.find_all(events.SuiteFinished)] == [Status.FAILURE, Status.SKIP]
+
+
+def test_planted_bug_behind_an_id_only_the_listing_carries(ctx):
+    # The 500 sits behind an id that generation cannot invent; only the listing response holds it.
+    api = ctx.openapi.apps.collection_with_planted_bug()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(
+        schema,
+        max_time=10,
+        max_examples=100_000,
+        checks=(not_a_server_error,),
+        phases=[PhaseName.FUZZING],
+    )
+
+    assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
