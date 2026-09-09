@@ -116,6 +116,7 @@ def build_semantic_overlay(
     semantic_index: SemanticValueIndex,
     validator_cls: type[jsonschema_rs.Validator],
     container_schema: JsonSchema | None = None,
+    name_only: bool = False,
 ) -> st.SearchStrategy:
     """Replace generated leaf values with semantic-pool draws that pass leaf and container validation.
 
@@ -182,6 +183,7 @@ def build_semantic_overlay(
                 format_token=descriptor.format,
                 pattern_hash=descriptor.pattern_hash,
                 normalized_name=descriptor.normalized_name,
+                name_only=name_only,
             )
             if not candidates:
                 continue
@@ -2268,12 +2270,12 @@ class OpenApiParameterSet(ParameterSet):
                     container_schema=schema_obj if isinstance(schema_obj, dict) else None,
                 )
 
-            # Path parameters are always identity values; semantic substitution does not apply.
+            # A path segment takes a pooled value only when the producer named it identically; matching
+            # a bare `format` there would put any pooled identifier into any path.
             # Runs before serialization and location-specific filters so substituted values pass through
             # the same `_quote_all_safe` / `is_valid_query` / `is_valid_header` paths as generated ones.
             if (
                 extra_data_source is not None
-                and self.location != ParameterLocation.PATH
                 and not is_negative
                 and isinstance(extra_data_source, OpenApiExtraDataSource)
                 and extra_data_source.semantic_index is not None
@@ -2288,6 +2290,7 @@ class OpenApiParameterSet(ParameterSet):
                         extra_data_source.semantic_index,
                         operation.schema.adapter.jsonschema_validator_cls,
                         container_schema=schema_obj,
+                        name_only=self.location == ParameterLocation.PATH,
                     )
 
             explicit_intent_path_names: frozenset[str] = frozenset()

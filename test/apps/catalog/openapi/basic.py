@@ -527,3 +527,32 @@ def undocumented_collection_with_planted_bug() -> OpenAPIApp:
         return jsonify({"detail": "unknown"}), 404
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def vocabulary_path_with_planted_bug() -> OpenAPIApp:
+    """The listing names the only genre the catalog accepts; the schema declares no response shape."""
+    genre = "post-bop"
+    spec = build_schema(
+        {
+            "/api/genres": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/catalog/{genre}": {
+                "get": {
+                    "parameters": [{"name": "genre", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Unknown"}},
+                }
+            },
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/api/genres", methods=["GET"])
+    def list_genres() -> object:
+        return jsonify([{"genre": genre}])
+
+    @app.route("/api/catalog/<value>", methods=["GET"])
+    def catalog(value: str) -> object:
+        if value == genre:
+            raise RuntimeError("boom")
+        return jsonify({"detail": "unknown"}), 404
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

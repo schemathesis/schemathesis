@@ -7,6 +7,7 @@
 - Dependency inference links body fields to the collection listing their accepted values.
 - Generated data reuses values from list responses, not only single-object ones.
 - Generated data reuses values from responses whose schema the spec omits.
+- Path parameters take values seen under the same name in earlier responses.
 
 ### :bug: Fixed
 

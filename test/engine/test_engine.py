@@ -2046,3 +2046,18 @@ def test_planted_bug_behind_an_undocumented_collection(ctx):
     )
 
     assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
+
+
+def test_planted_bug_behind_a_vocabulary_path_parameter(ctx):
+    # The path segment is a vocabulary value, not an identifier, and only the listing carries it.
+    api = ctx.openapi.apps.vocabulary_path_with_planted_bug()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(
+        schema,
+        max_time=10,
+        max_examples=100_000,
+        checks=(not_a_server_error,),
+        phases=[PhaseName.FUZZING],
+    )
+
+    assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
