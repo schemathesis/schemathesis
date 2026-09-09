@@ -8,6 +8,10 @@
 
 - Operations refusing every configured identity never retried without credentials.
 
+#### Others
+
+- `missing_auth` warning for operations that returned 2xx responses later in the run.
+
 ## [4.26.1](https://github.com/schemathesis/schemathesis/compare/v4.26.0...v4.26.1) - 2026-09-09
 
 ### :rocket: Added

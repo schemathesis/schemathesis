@@ -13,7 +13,7 @@ from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.engine import Status, events
-from schemathesis.engine.recorder import Interaction, RecordedScenario
+from schemathesis.engine.recorder import CaseNode, Interaction, RecordedScenario
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
@@ -133,31 +133,42 @@ def missing_base_path(operation: APIOperation) -> str | None:
     return declared if not urlsplit(configured).path.rstrip("/").endswith(declared) else None
 
 
+def _is_positive(case: CaseNode) -> bool:
+    return case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE
+
+
+def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
+    """Whether a positive test case got a 2xx response.
+
+    Negative cases are excluded: an undocumented method may well be served while the operation
+    itself is refused.
+    """
+    for case in recorder.cases.values():
+        if not _is_positive(case):
+            continue
+        interaction = recorder.interactions.get(case.value.id)
+        if interaction is None or interaction.response is None:
+            continue
+        if 200 <= interaction.response.status_code < 300:
+            return True
+    return False
+
+
 def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
     """Whether the scenario generated positive test cases and none of them got a 2xx response."""
-    seen_positive = False
-    for case in recorder.cases.values():
-        if not (case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE):
-            continue
-        seen_positive = True
-        interaction = recorder.interactions.get(case.value.id)
-        if not (interaction is not None and interaction.response is not None):
-            continue
-        # At least one positive response for positive test case
-        if 200 <= interaction.response.status_code < 300:
-            return False
-    # If there are positive test cases, and we ended up here, then there are no 2xx responses for them
-    # Otherwise, there are no positive test cases at all and this check should pass
-    return seen_positive
+    return any(_is_positive(case) for case in recorder.cases.values()) and not any_positive_is_accepted(recorder)
 
 
 class WarningCollector:
     config: ProjectConfig
     data: WarningData
+    # Operations that got past authentication at some point in the run.
+    authenticated: set[str]
 
     def __init__(self, config: ProjectConfig) -> None:
         self.config = config
         self.data = WarningData()
+        self.authenticated = set()
 
     def on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.phase in (PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING):
@@ -230,7 +241,10 @@ class WarningCollector:
 
         warnings = self.config.warnings_for(operation=operation)
 
-        if warnings.should_display(SchemathesisWarning.MISSING_AUTH):
+        if any_positive_is_accepted(event.recorder):
+            self._mark_authenticated(event.recorder.label)
+
+        if warnings.should_display(SchemathesisWarning.MISSING_AUTH) and event.recorder.label not in self.authenticated:
             for status_code in auth_error_codes(statistic, event.recorder):
                 self.data.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
                 # Check if this warning should cause test failure
@@ -279,6 +293,14 @@ class WarningCollector:
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
                 )
+
+    def _mark_authenticated(self, label: str) -> None:
+        """Take an operation out of the auth warning, and keep it out for the rest of the run."""
+        self.authenticated.add(label)
+        for status_code, labels in list(self.data.missing_auth.items()):
+            labels.discard(label)
+            if not labels:
+                del self.data.missing_auth[status_code]
 
     def _handle_warning(
         self, ctx: BaseExecutionContext, kind: SchemathesisWarning, record_callback: Callable[[], None]

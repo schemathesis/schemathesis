@@ -380,3 +380,31 @@ def test_silent_when_the_schema_declares_no_base_path(ctx, cli, app_runner, snap
     base = schema_url.rsplit("/", 1)[0]
 
     assert cli.run(schema_url, f"--url={base}", "--max-examples=2", "--phases=fuzzing") == snapshot_cli
+
+
+def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app_runner):
+    # Rejected once, served afterwards: the run as a whole got past authentication.
+    schema = ctx.openapi.build_schema(
+        {
+            "/thing": {
+                "get": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "schema": {"type": "integer"}, "examples": {"only": {"value": 7}}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    calls = {"n": 0}
+
+    def thing():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return Response(status=401)
+        return Response('{"ok": true}', status=200, content_type="application/json")
+
+    schema_url = _serve_schema(ctx, cli, app_runner, schema, [("GET", "/thing", thing)])
+    result = cli.run(schema_url, "-c not_a_server_error", "--max-examples=5", "--phases=examples,fuzzing")
+
+    assert "Missing authentication" not in result.stdout
