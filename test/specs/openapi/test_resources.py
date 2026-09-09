@@ -113,6 +113,50 @@ def test_repr_survives_concurrent_semantic_pool_writes(user_data_source):
     assert not errors, errors[0]
 
 
+def test_iter_instances_survives_concurrent_writes():
+    # One worker draws from the pool while another records responses into it.
+    repository = ResourceRepository(
+        [
+            ResourceDescriptor(
+                resource_name="Item",
+                operation="GET /items",
+                status_code="200",
+                pointer="",
+                cardinality=Cardinality.ONE,
+            )
+        ]
+    )
+
+    errors: list[Exception] = []
+    stop = threading.Event()
+
+    def record() -> None:
+        i = 0
+        while not stop.is_set():
+            repository.record_response(
+                operation="GET /items",
+                status_code=200,
+                payload={"id": str(i)},
+                context={"parent": i % (MAX_CONTEXTS_PER_TYPE * 2)},
+            )
+            i += 1
+
+    worker = threading.Thread(target=record)
+    worker.start()
+    try:
+        for _ in range(100000):
+            try:
+                repository.iter_instances("Item")
+            except Exception as exc:
+                errors.append(exc)
+                break
+    finally:
+        stop.set()
+        worker.join()
+
+    assert not errors, errors[0]
+
+
 def test_store_single_resource(user_data_source):
     user_data_source.repository.record_response(
         operation=POST_USERS, status_code=CREATED, payload={"id": "123", "name": "Jane"}
