@@ -4112,3 +4112,69 @@ def test_array_with_undrawable_items_and_a_floor_declines():
 
     with pytest.raises(UnsupportedRegexPattern, match="Tibetan"):
         _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+
+BOUNDED_INTEGER = {"type": "integer", "minimum": 1, "maximum": 100}
+
+
+def _positive_values(schema, location, media_type, validator_cls, count=25):
+    values = []
+
+    @given(make_positive_strategy(schema, "test", location, media_type, GenerationConfig(), validator_cls))
+    # Both spellings need enough draws to show up.
+    @settings(max_examples=count, deadline=None, suppress_health_check=list(HealthCheck), database=None)
+    def test(value):
+        values.append(value)
+
+    test()
+    return values
+
+
+def test_integer_json_body_drawn_as_whole_float():
+    # From draft 6 on a zero fractional part is an integer, so a server decoding `2.0` as a float
+    # alone rejects a value its own schema admits.
+    values = _positive_values(
+        BOUNDED_INTEGER, ParameterLocation.BODY, "application/json", jsonschema_rs.Draft202012Validator
+    )
+
+    assert any(isinstance(value, float) for value in values)
+    is_valid = jsonschema_rs.Draft202012Validator(BOUNDED_INTEGER).is_valid
+    assert all(is_valid(value) for value in values), values
+
+
+def test_integer_json_body_stays_whole_on_draft_4():
+    # Draft 4 reads a fractional spelling as a number, not an integer.
+    values = _positive_values(
+        BOUNDED_INTEGER, ParameterLocation.BODY, "application/json", jsonschema_rs.Draft4Validator
+    )
+
+    assert all(isinstance(value, int) for value in values), values
+
+
+@pytest.mark.parametrize(
+    ("location", "media_type"),
+    [
+        (ParameterLocation.QUERY, None),
+        (ParameterLocation.PATH, None),
+        (ParameterLocation.HEADER, None),
+        (ParameterLocation.BODY, "application/xml"),
+        (ParameterLocation.BODY, "application/x-www-form-urlencoded"),
+        (ParameterLocation.BODY, "application.json"),
+    ],
+    ids=["query", "path", "header", "xml-body", "form-body", "malformed-media-type"],
+)
+def test_integer_stays_whole_outside_a_json_body(location, media_type):
+    # Everywhere else the value goes out as text, where `2.0` is a different string than `2`.
+    values = _positive_values(BOUNDED_INTEGER, location, media_type, jsonschema_rs.Draft202012Validator)
+
+    assert all(isinstance(value, int) for value in values), values
+
+
+def test_whole_float_never_misrepresents_a_large_integer():
+    # Past 2**53 no float spells the integer back, and the shifted value can leave the bounds.
+    schema = {"type": "integer", "minimum": 2**53 + 1, "maximum": 2**53 + 1000}
+    is_valid = jsonschema_rs.Draft202012Validator(schema).is_valid
+
+    values = _positive_values(schema, ParameterLocation.BODY, "application/json", jsonschema_rs.Draft202012Validator)
+
+    assert all(is_valid(value) for value in values), values

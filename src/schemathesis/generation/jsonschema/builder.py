@@ -41,6 +41,7 @@ def build(
     draft: int,
     formats: dict[str, SearchStrategy],
     alphabet: Alphabet | None = None,
+    whole_floats: bool = False,
 ) -> SearchStrategy[JsonValue]:
     """Values the schema admits; `UnsupportedSchema` when this engine does not fully model it."""
     alphabet = alphabet if alphabet is not None else Alphabet()
@@ -50,12 +51,14 @@ def build(
         schema_key = None
     # Negative generation reaches this from a `flatmap`, so the same mutated schema comes back on
     # every draw; rebuilding its strategy each time is what the cache is for.
-    key = (schema_key, draft, id(formats), alphabet) if schema_key is not None else None
+    key = (schema_key, draft, id(formats), alphabet, whole_floats) if schema_key is not None else None
     if key is not None:
         cached = canonical_strategy_cache.get(key)
         if cached is not MISSING:
             return cached[1]
-    strategy = _build(schema, draft=draft, formats=formats, alphabet=alphabet, schema_key=schema_key)
+    strategy = _build(
+        schema, draft=draft, formats=formats, alphabet=alphabet, schema_key=schema_key, whole_floats=whole_floats
+    )
     if key is not None:
         # Keeping `formats` alive next to the strategy stops its `id` from being recycled
         # into a stale hit once the caller drops it.
@@ -70,6 +73,7 @@ def _build(
     formats: dict[str, SearchStrategy],
     alphabet: Alphabet,
     schema_key: tuple[str, ...] | None = None,
+    whole_floats: bool = False,
 ) -> SearchStrategy[JsonValue]:
     # The canonical form answers to the schema and draft alone, so a differing alphabet or format map reuses it.
     canonical_key = (schema_key, draft) if schema_key is not None else None
@@ -94,7 +98,10 @@ def _build(
     # Spelled out so the caller reports an unsatisfiable schema; no other engine gets a say.
     if canonical_schema.satisfiability() is canonical.Satisfiability.NO:
         return EMPTY_STRATEGY
-    context = StrategyContext(root=canonical_schema, alphabet=alphabet, formats=formats)
+    # Draft 4 alone reads a fractional spelling as a number rather than an integer.
+    context = StrategyContext(
+        root=canonical_schema, alphabet=alphabet, formats=formats, whole_floats=whole_floats and draft >= 6
+    )
     # Folding an `allOf` canonicalizes again, so a rejected schema and both spellings of
     # "not modeled here" can arrive from this block too.
     with _reported():

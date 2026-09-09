@@ -8,6 +8,7 @@
 - Generated data reuses values from list responses, not only single-object ones.
 - Generated data reuses values from responses whose schema the spec omits.
 - Path parameters take values seen under the same name in earlier responses.
+- Integer fields in JSON bodies draw float spellings (`2.0`) under Open API 3.1 and 3.2.
 
 ### :bug: Fixed
 
