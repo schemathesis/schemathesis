@@ -1138,8 +1138,8 @@ def test_ndjson_records_the_identity(cli, ctx, tmp_path):
     assert "admin" in identities
 
 
-def test_exhausted_chain_stops_at_the_anonymous_rung(cli, ctx, tmp_path):
-    # No identity can reach this operation; escalation must stop at the end rather than wrap.
+def test_exhausted_chain_stops_rather_than_wrapping(cli, ctx, tmp_path):
+    # No identity can reach this operation, and dropping credentials is no better, so it keeps one.
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
 
@@ -1151,7 +1151,7 @@ def test_exhausted_chain_stops_at_the_anonymous_rung(cli, ctx, tmp_path):
         if r.method == "DELETE" and r.path.startswith("/api/nobody")
     ]
     assert seen, "operation was never dispatched"
-    assert seen[-1] == ""
+    assert seen[-1] == "viewer"
 
 
 def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
@@ -1192,3 +1192,19 @@ def test_escalation_falls_back_to_anonymous(cli, ctx, tmp_path):
     public = [r for r in api.requests if r.path.startswith("/api/public")]
     assert public, "operation was never called"
     assert any(r.headers.get("Authorization") is None for r in public)
+
+
+def test_exhausted_chain_keeps_the_identity_that_got_furthest(cli, ctx, tmp_path):
+    # A 403 reached authorization; dropping credentials only earns a 401, so it is not an improvement.
+    api = ctx.openapi.apps.wfc_role_gated_401_when_anonymous()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=12", "--phases=fuzzing", f"--auth-wfc={auth}", "-c", "not_a_server_error")
+
+    seen = [
+        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
+        for r in api.requests
+        if r.method == "DELETE" and r.path.startswith("/api/nobody")
+    ]
+    assert seen, "operation was never dispatched"
+    assert seen[-1] != ""

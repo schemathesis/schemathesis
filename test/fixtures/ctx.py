@@ -269,6 +269,9 @@ class OpenAPIApps:
     def wfc_role_gated_401(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_role_gated_401())
 
+    def wfc_role_gated_401_when_anonymous(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_role_gated_401_when_anonymous())
+
     def wfc_credentials_rejected(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_credentials_rejected())
 

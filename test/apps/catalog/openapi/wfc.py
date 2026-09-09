@@ -256,3 +256,35 @@ def wfc_credentials_rejected() -> OpenAPIApp:
         return jsonify({"ok": True})
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def wfc_role_gated_401_when_anonymous() -> OpenAPIApp:
+    """No identity is authorized, and dropping credentials only moves the refusal earlier."""
+    spec = build_schema(_ROLE_GATED)
+    app = make_flask_app_from_schema(spec)
+
+    def refuse() -> object:
+        if not request.headers.get("Authorization"):
+            return jsonify({"detail": "unauthenticated"}), 401
+        return jsonify({"detail": "denied"}), 403
+
+    @app.route("/api/open", methods=["GET"])
+    def open_endpoint() -> object:
+        return jsonify({"ok": True})
+
+    @app.route("/api/nobody/<item_id>", methods=["DELETE"])
+    def nobody(item_id: str) -> object:
+        return refuse()
+
+    for path, name in (
+        ("/api/editor-only/<item_id>", "editor_only"),
+        ("/api/admin-only/<item_id>", "admin_only"),
+        ("/api/admin-boom/<item_id>", "admin_boom"),
+    ):
+        app.add_url_rule(path, name, refuse, methods=["DELETE"])
+
+    @app.route("/api/validated", methods=["POST"])
+    def validated() -> object:
+        return refuse()
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

@@ -37,10 +37,14 @@ class _AnonymousAuthProvider:
         pass
 
 
+# A 403 got past authentication into authorization; a 401 did not reach that far.
+_DENIAL_RANK = {401: 0, 403: 1}
+
+
 class EscalatingAuthProvider:
     """Try each identity in document order, moving on from the ones an operation refuses."""
 
-    __slots__ = ("providers", "names", "_assigned", "_settled", "_lock")
+    __slots__ = ("providers", "names", "_assigned", "_settled", "_best", "_lock")
 
     def __init__(self, providers: list[AuthProvider], names: list[str]) -> None:
         # Credentials an operation rejects are worse than none: a stack that refuses a bad
@@ -50,6 +54,8 @@ class EscalatingAuthProvider:
         self._assigned: dict[str, int] = {}
         # Operations that have been admitted keep their identity for the rest of the run.
         self._settled: set[str] = set()
+        # Best (rank, index) seen per operation, so an exhausted chain keeps its furthest rung.
+        self._best: dict[str, tuple[int, int]] = {}
         self._lock = threading.Lock()
 
     def index_for(self, label: str) -> int:
@@ -73,11 +79,19 @@ class EscalatingAuthProvider:
                 return
             if status_code not in DENIED:
                 return
+            current = self._assigned.get(label, 0)
+            rank = _DENIAL_RANK[status_code]
+            best = self._best.get(label)
+            if best is None or rank > best[0]:
+                self._best[label] = (rank, current)
             # One denial is enough: an operation may only get a couple of requests, and a
             # threshold above its budget could never flip.
-            current = self._assigned.get(label, 0)
             if current + 1 < len(self.providers):
                 self._assigned[label] = current + 1
+                return
+            # Chain exhausted: keep whichever rung got furthest and stop moving.
+            self._assigned[label] = self._best[label][1]
+            self._settled.add(label)
 
     def snapshot(self) -> dict[str, str]:
         """Identity per operation, including the ones that never had to escalate."""

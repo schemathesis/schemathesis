@@ -14,6 +14,7 @@
 #### WFC authentication
 
 - Operations refusing every configured identity never retried without credentials.
+- Operations no identity can reach left unauthenticated instead of keeping the one that got furthest.
 
 #### Others
 
