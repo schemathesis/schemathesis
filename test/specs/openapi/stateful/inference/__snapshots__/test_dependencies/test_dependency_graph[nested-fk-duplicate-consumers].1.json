@@ -41,6 +41,15 @@
         "x-schemathesis": {
           "is_inferred": true
         }
+      },
+      "GetWarehouse2": {
+        "operationRef": "#/paths/~1warehouses~1{warehouseId}/get",
+        "parameters": {
+          "path.warehouseId": "$response.body#/shipping/warehouse_id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
       }
     }
   ]

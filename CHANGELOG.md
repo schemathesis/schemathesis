@@ -16,6 +16,7 @@
 #### Others
 
 - `missing_auth` warning for operations that returned 2xx responses later in the run.
+- Inferred links dropped for every consumer of a resource after the first with the same method.
 
 ## [4.26.1](https://github.com/schemathesis/schemathesis/compare/v4.26.0...v4.26.1) - 2026-09-09
 
