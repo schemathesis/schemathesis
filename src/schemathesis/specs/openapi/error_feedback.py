@@ -21,6 +21,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.adapter import v3_1
+from schemathesis.specs.openapi.converter import INTEGER_FORMAT_BOUNDS
 from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex
 
 if TYPE_CHECKING:
@@ -301,11 +302,22 @@ def _apply_numeric_bound_to_property(
 ) -> None:
     """Write one numeric bound onto `prop`; skip when an existing constraint covers this direction."""
     types = get_type(prop)
+    if "array" in types:
+        # A repeated parameter is reported under its own name while the bound constrains each element.
+        items = prop.get("items")
+        if isinstance(items, dict):
+            _apply_numeric_bound_to_property(items, payload, is_2020_12=is_2020_12)
+        return
     if "number" not in types and "integer" not in types:
         return
     bound = _coerce_numeric_bound(payload.bound, types)
+    format = prop.get("format")
+    format_bounds = INTEGER_FORMAT_BOUNDS.get(format) if "integer" in types and isinstance(format, str) else None
     if payload.direction is BoundDirection.MIN:
-        if "minimum" in prop or "exclusiveMinimum" in prop:
+        # A bound matching the integer format's own width was synthesized from `format`, not declared,
+        # so what the server reports is sharper.
+        synthetic = format_bounds is not None and prop.get("minimum") == format_bounds[0]
+        if not synthetic and ("minimum" in prop or "exclusiveMinimum" in prop):
             return
         if is_2020_12 and payload.exclusive:
             prop["exclusiveMinimum"] = bound
@@ -314,7 +326,8 @@ def _apply_numeric_bound_to_property(
             if payload.exclusive:
                 prop["exclusiveMinimum"] = True
     else:
-        if "maximum" in prop or "exclusiveMaximum" in prop:
+        synthetic = format_bounds is not None and prop.get("maximum") == format_bounds[1]
+        if not synthetic and ("maximum" in prop or "exclusiveMaximum" in prop):
             return
         if is_2020_12 and payload.exclusive:
             prop["exclusiveMaximum"] = bound

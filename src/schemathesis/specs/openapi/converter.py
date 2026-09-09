@@ -429,7 +429,7 @@ def _rewrite_if_then_else(schema: dict[str, Any]) -> None:
         schema["anyOf"] = new_anyof
 
 
-_INTEGER_FORMAT_BOUNDS = {
+INTEGER_FORMAT_BOUNDS = {
     "int32": (-(2**31), 2**31 - 1),
     "int64": (-(2**63), 2**63 - 1),
 }
@@ -442,7 +442,7 @@ def _restrict_integer_format(schema: dict[str, Any]) -> None:
     format = schema.get("format")
     if not isinstance(format, str):
         return
-    bounds = _INTEGER_FORMAT_BOUNDS.get(format)
+    bounds = INTEGER_FORMAT_BOUNDS.get(format)
     if bounds is None or "integer" not in get_type(schema):
         return
     minimum, maximum = bounds
