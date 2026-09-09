@@ -48,9 +48,10 @@ class EscalatingAuthProvider:
 
     def __init__(self, providers: list[AuthProvider], names: list[str]) -> None:
         # Credentials an operation rejects are worse than none: a stack that refuses a bad
-        # `Authorization` header serves the same request once it is absent.
-        self.providers = [*providers, _AnonymousAuthProvider()]
-        self.names = [*names, ANONYMOUS]
+        # `Authorization` header serves the same request once it is absent. Second in line, so a
+        # document whose credentials never work costs one request to find out rather than all of them.
+        self.providers = [providers[0], _AnonymousAuthProvider(), *providers[1:]]
+        self.names = [names[0], ANONYMOUS, *names[1:]]
         self._assigned: dict[str, int] = {}
         # Operations that have been admitted keep their identity for the rest of the run.
         self._settled: set[str] = set()
