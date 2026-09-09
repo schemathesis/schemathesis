@@ -783,6 +783,26 @@ class ResourceDefinition:
             nested_fk_fields=[],
         )
 
+    def merge(
+        self,
+        *,
+        fields: list[str],
+        types: dict[str, set[str]],
+        fk_fields: list[FKField],
+        nested_fk_fields: list[NestedFKField],
+    ) -> bool:
+        """Union equally reliable information into this definition. Returns whether anything was added."""
+        new_fields = [field for field in fields if field not in self.fields]
+        new_fk_fields = [fk for fk in fk_fields if fk not in self.fk_fields]
+        new_nested_fk_fields = [fk for fk in nested_fk_fields if fk not in self.nested_fk_fields]
+        for field, field_types in types.items():
+            self.types.setdefault(field, set()).update(field_types)
+        if new_fields:
+            self.fields = sorted(self.fields + new_fields)
+        self.fk_fields.extend(new_fk_fields)
+        self.nested_fk_fields.extend(new_nested_fk_fields)
+        return bool(new_fields or new_fk_fields or new_nested_fk_fields)
+
 
 def _unique_link_name(base: str, links: dict[str, LinkDefinition], operation_ref: str) -> str | None:
     """Keep the first link's name, and give a different destination sharing it one of its own."""

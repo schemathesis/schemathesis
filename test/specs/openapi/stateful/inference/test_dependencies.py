@@ -6381,3 +6381,35 @@ def test_second_consumer_of_a_foreign_key_gets_its_own_link(ctx):
     assert sorted(
         definition.to_openapi()["operationRef"] for entry in graph.iter_links() for definition in entry.links.values()
     ) == ["#/paths/~1customers~1{id}/get", "#/paths/~1customers~1{id}~1invoices/get"]
+
+
+
+def test_fk_declared_by_the_second_definition_of_a_resource_links_to_its_consumer(ctx):
+    # Both order versions describe `Order`; the FK only the newer one declares must survive.
+    order_v1 = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    order_v2 = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "customer_id": {"type": "string"}},
+        "required": ["id"],
+    }
+    paths = {
+        **operation("get", "/customers/{id}", "200", parameters=[path_param("id")], operation_id="getCustomer"),
+        **operation("post", "/v1/orders", "201", order_v1, operation_id="createOrderV1"),
+        **operation("post", "/v2/orders", "201", order_v2, operation_id="createOrderV2"),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    link = {
+        "operationRef": "#/paths/~1customers~1{id}/get",
+        "parameters": {"path.id": "$response.body#/customer_id"},
+        "x-schemathesis": {"is_inferred": True},
+    }
+    assert [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ] == [
+        ["#/paths/~1v1~1orders/post", "201", link],
+        ["#/paths/~1v2~1orders/post", "201", link],
+    ]

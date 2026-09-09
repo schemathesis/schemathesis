@@ -5421,6 +5421,7 @@
     "CredentialListMappings.json": {
       "fields": [
         "contents",
+        "credential_list_mappings",
         "end",
         "first_page_uri",
         "next_page_uri",
@@ -5432,6 +5433,9 @@
       ],
       "types": {
         "contents": [
+          "array"
+        ],
+        "credential_list_mappings": [
           "array"
         ],
         "end": [
@@ -5823,6 +5827,7 @@
         "contents",
         "end",
         "first_page_uri",
+        "ip_access_control_list_mappings",
         "next_page_uri",
         "page",
         "page_size",
@@ -5839,6 +5844,9 @@
         ],
         "first_page_uri": [
           "string"
+        ],
+        "ip_access_control_list_mappings": [
+          "array"
         ],
         "next_page_uri": [
           "string"
@@ -6033,6 +6041,7 @@
         "available_phone_numbers",
         "end",
         "first_page_uri",
+        "incoming_phone_numbers",
         "next_page_uri",
         "page",
         "page_size",
@@ -6049,6 +6058,9 @@
         ],
         "first_page_uri": [
           "string"
+        ],
+        "incoming_phone_numbers": [
+          "array"
         ],
         "next_page_uri": [
           "string"
@@ -6249,6 +6261,7 @@
         "available_phone_numbers",
         "end",
         "first_page_uri",
+        "incoming_phone_numbers",
         "next_page_uri",
         "page",
         "page_size",
@@ -6265,6 +6278,9 @@
         ],
         "first_page_uri": [
           "string"
+        ],
+        "incoming_phone_numbers": [
+          "array"
         ],
         "next_page_uri": [
           "string"
@@ -6917,6 +6933,7 @@
         "available_phone_numbers",
         "end",
         "first_page_uri",
+        "incoming_phone_numbers",
         "next_page_uri",
         "page",
         "page_size",
@@ -6933,6 +6950,9 @@
         ],
         "first_page_uri": [
           "string"
+        ],
+        "incoming_phone_numbers": [
+          "array"
         ],
         "next_page_uri": [
           "string"

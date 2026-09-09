@@ -750,12 +750,14 @@
     },
     "Message": {
       "fields": [
+        "channel",
         "clientId",
         "connectionId",
         "data",
         "encoding",
         "extras",
         "id",
+        "messageId",
         "name",
         "timestamp"
       ],
@@ -771,9 +773,18 @@
           "is_array": false,
           "target_field": "id",
           "target_resource": "Connection"
+        },
+        {
+          "field_name": "messageId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Message"
         }
       ],
       "types": {
+        "channel": [
+          "string"
+        ],
         "clientId": [
           "string"
         ],
@@ -790,6 +801,9 @@
           "object"
         ],
         "id": [
+          "string"
+        ],
+        "messageId": [
           "string"
         ],
         "name": [

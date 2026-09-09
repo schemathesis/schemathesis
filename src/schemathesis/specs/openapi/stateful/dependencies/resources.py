@@ -470,52 +470,57 @@ def _extract_resource_from_schema(
 
     resource = resources.get(resource_name)
 
-    if resource is None or resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
-        _, resolved = maybe_resolve_with_resolver(schema, resolver)
+    _, resolved = maybe_resolve_with_resolver(schema, resolver)
 
-        if "type" in resolved and resolved["type"] != "object" and "properties" not in resolved:
-            # Skip strings, etc
-            return None
+    if "type" in resolved and resolved["type"] != "object" and "properties" not in resolved:
+        # Skip strings, etc - but keep an already fully described resource available for linking
+        if resource is not None and resource.source == DefinitionSource.SCHEMA_WITH_PROPERTIES:
+            return resource
+        return None
 
-        properties = resolved.get("properties")
-        if isinstance(properties, dict) and properties:
-            fields = sorted(properties)
-            types = {}
-            for field, subschema in properties.items():
-                if isinstance(subschema, dict):
-                    _, resolved_subschema = maybe_resolve_with_resolver(subschema, resolver)
-                else:
-                    resolved_subschema = subschema
-                types[field] = set(get_type(cast(dict, resolved_subschema)))
-            source = DefinitionSource.SCHEMA_WITH_PROPERTIES
-            # Pre-compute FK fields for efficient link generation
-            fk_fields = extract_fk_fields(fields)
-            # Extract nested FK fields from the schema
-            nested_fk_fields = extract_nested_fk_fields(resolved, resolver)
-        else:
-            fields = []
-            types = {}
-            source = DefinitionSource.SCHEMA_WITHOUT_PROPERTIES
-            fk_fields = []
-            nested_fk_fields = []
-        if resource is not None:
-            if resource.source < source:
-                resource.source = source
-                resource.fields = fields
-                resource.types = types
-                resource.fk_fields = fk_fields
-                resource.nested_fk_fields = nested_fk_fields
-                updated_resources.add(resource_name)
-        else:
-            resource = ResourceDefinition(
-                name=resource_name,
-                fields=fields,
-                types=types,
-                source=source,
-                fk_fields=fk_fields,
-                nested_fk_fields=nested_fk_fields,
-            )
-            resources[resource_name] = resource
+    properties = resolved.get("properties")
+    if isinstance(properties, dict) and properties:
+        fields = sorted(properties)
+        types = {}
+        for field, subschema in properties.items():
+            if isinstance(subschema, dict):
+                _, resolved_subschema = maybe_resolve_with_resolver(subschema, resolver)
+            else:
+                resolved_subschema = subschema
+            types[field] = set(get_type(cast(dict, resolved_subschema)))
+        source = DefinitionSource.SCHEMA_WITH_PROPERTIES
+        # Pre-compute FK fields for efficient link generation
+        fk_fields = extract_fk_fields(fields)
+        # Extract nested FK fields from the schema
+        nested_fk_fields = extract_nested_fk_fields(resolved, resolver)
+    else:
+        fields = []
+        types = {}
+        source = DefinitionSource.SCHEMA_WITHOUT_PROPERTIES
+        fk_fields = []
+        nested_fk_fields = []
+    if resource is not None:
+        if resource.source < source:
+            resource.source = source
+            resource.fields = fields
+            resource.types = types
+            resource.fk_fields = fk_fields
+            resource.nested_fk_fields = nested_fk_fields
+            updated_resources.add(resource_name)
+        elif resource.source == source and resource.merge(
+            fields=fields, types=types, fk_fields=fk_fields, nested_fk_fields=nested_fk_fields
+        ):
+            updated_resources.add(resource_name)
+    else:
+        resource = ResourceDefinition(
+            name=resource_name,
+            fields=fields,
+            types=types,
+            source=source,
+            fk_fields=fk_fields,
+            nested_fk_fields=nested_fk_fields,
+        )
+        resources[resource_name] = resource
 
     return resource
 

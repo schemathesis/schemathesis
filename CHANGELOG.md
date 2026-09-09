@@ -16,6 +16,7 @@
 
 #### Others
 
+- Missing inferred links when two schemas describe the same resource with different fields.
 - `missing_auth` warning for operations that returned 2xx responses later in the run.
 - Inferred links dropped for every consumer of a resource after the first with the same method.
 

@@ -450,6 +450,7 @@
       "fields": [
         "date",
         "description",
+        "details",
         "id",
         "issuer",
         "mime",
@@ -465,6 +466,9 @@
         ],
         "description": [
           "string"
+        ],
+        "details": [
+          "object"
         ],
         "id": [
           "string"
@@ -538,11 +542,55 @@
     },
     "Issued": {
       "fields": [
-        "details"
+        "date",
+        "description",
+        "details",
+        "doctype",
+        "issuer",
+        "issuerid",
+        "mime",
+        "name",
+        "parent",
+        "size",
+        "type",
+        "uri"
       ],
       "types": {
+        "date": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
         "details": [
           "object"
+        ],
+        "doctype": [
+          "string"
+        ],
+        "issuer": [
+          "string"
+        ],
+        "issuerid": [
+          "string"
+        ],
+        "mime": [
+          "array"
+        ],
+        "name": [
+          "string"
+        ],
+        "parent": [
+          "string"
+        ],
+        "size": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ],
+        "uri": [
+          "string"
         ]
       }
     },
