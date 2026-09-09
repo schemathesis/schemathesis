@@ -1138,7 +1138,7 @@ def test_ndjson_records_the_identity(cli, ctx, tmp_path):
     assert "admin" in identities
 
 
-def test_exhausted_chain_stays_on_the_last_identity(cli, ctx, tmp_path):
+def test_exhausted_chain_stops_at_the_anonymous_rung(cli, ctx, tmp_path):
     # No identity can reach this operation; escalation must stop at the end rather than wrap.
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
@@ -1151,7 +1151,7 @@ def test_exhausted_chain_stays_on_the_last_identity(cli, ctx, tmp_path):
         if r.method == "DELETE" and r.path.startswith("/api/nobody")
     ]
     assert seen, "operation was never dispatched"
-    assert seen[-1] == "admin"
+    assert seen[-1] == ""
 
 
 def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
@@ -1180,3 +1180,15 @@ def test_unknown_cached_identity_is_ignored(cli, ctx, tmp_path):
     )
 
     assert _identities(api, "GET", "/api/open") == {"viewer"}
+
+
+def test_escalation_falls_back_to_anonymous(cli, ctx, tmp_path):
+    # A bad `Authorization` header is worse than none: stacks reject it instead of serving the caller.
+    api = ctx.openapi.apps.wfc_credentials_rejected()
+    auth = _write(tmp_path, ROLE_AUTH)
+
+    cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=fuzzing")
+
+    public = [r for r in api.requests if r.path.startswith("/api/public")]
+    assert public, "operation was never called"
+    assert any(r.headers.get("Authorization") is None for r in public)

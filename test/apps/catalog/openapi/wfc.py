@@ -233,3 +233,26 @@ def wfc_expiring_token() -> OpenAPIApp:
         return jsonify({"ok": True})
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def wfc_credentials_rejected() -> OpenAPIApp:
+    """Every credential is invalid; the endpoint serves anonymous callers and 401s any `Authorization`."""
+    spec = build_schema(
+        {
+            "/api/public/{itemId}": {
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/api/public/<item_id>", methods=["GET"])
+    def public(item_id: str) -> object:
+        if request.headers.get("Authorization"):
+            return jsonify({"detail": "Bad credentials"}), 401
+        return jsonify({"ok": True})
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

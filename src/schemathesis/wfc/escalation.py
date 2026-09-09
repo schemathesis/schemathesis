@@ -24,14 +24,29 @@ def _is_admitted(status_code: int) -> bool:
     return status_code != 400 and status_code not in DENIED
 
 
+ANONYMOUS = "<anonymous>"
+
+
+class _AnonymousAuthProvider:
+    """Send no credentials. Returning `None` leaves the request untouched."""
+
+    def get(self, case: Case, context: AuthContext) -> Any:
+        return None
+
+    def set(self, case: Case, data: Any, context: AuthContext) -> None:  # pragma: no cover
+        pass
+
+
 class EscalatingAuthProvider:
     """Try each identity in document order, moving on from the ones an operation refuses."""
 
     __slots__ = ("providers", "names", "_assigned", "_settled", "_lock")
 
     def __init__(self, providers: list[AuthProvider], names: list[str]) -> None:
-        self.providers = providers
-        self.names = names
+        # Credentials an operation rejects are worse than none: a stack that refuses a bad
+        # `Authorization` header serves the same request once it is absent.
+        self.providers = [*providers, _AnonymousAuthProvider()]
+        self.names = [*names, ANONYMOUS]
         self._assigned: dict[str, int] = {}
         # Operations that have been admitted keep their identity for the rest of the run.
         self._settled: set[str] = set()
