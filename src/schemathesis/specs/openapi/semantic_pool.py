@@ -133,12 +133,18 @@ class SemanticValueIndex:
         format_token: str | None,
         pattern_hash: str | None,
         normalized_name: str | None,
+        name_only: bool = False,
     ) -> tuple[SemanticCandidate, ...]:
         # Short-circuit excluded formats so pattern/name fallbacks can't smuggle in an identity-shaped value
         # (e.g. a UUID stored under a name bucket because the producer omitted `format`).
         if format_token is not None and not is_pool_eligible(type_token=type_token, format_token=format_token):
             return ()
         with self._lock:
+            if name_only:
+                if not normalized_name:
+                    return ()
+                bucket = self.by_name.get((type_token, normalized_name))
+                return bucket.entries() if bucket is not None and len(bucket) > 0 else ()
             if format_token is not None:
                 bucket = self.by_format.get((type_token, format_token))
                 if bucket is not None and len(bucket) > 0:

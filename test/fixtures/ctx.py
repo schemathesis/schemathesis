@@ -281,6 +281,9 @@ class OpenAPIApps:
     def undocumented_collection_with_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.undocumented_collection_with_planted_bug())
 
+    def vocabulary_path_with_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.vocabulary_path_with_planted_bug())
+
     def planted_bug_with_quiet_operation(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug_with_quiet_operation())
 
