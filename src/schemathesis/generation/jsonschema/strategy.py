@@ -156,7 +156,7 @@ def _build(schema: jsonschema_rs.CanonicalSchema, ctx: StrategyContext) -> Searc
     if isinstance(view, canonical.AnyOfView):
         return _any_of(view, ctx)
     if isinstance(view, canonical.IntegerView):
-        return _integer(view)
+        return _integer(view, ctx)
     if isinstance(view, canonical.NumberView):
         return _number(view)
     if isinstance(view, canonical.StringView):
@@ -259,7 +259,11 @@ def _not(
         if barred in ctx.complementing:
             raise UnsupportedSchema.from_reason("a `not` reaching back into its own complement")
         nested = StrategyContext(
-            root=complement, alphabet=ctx.alphabet, formats=ctx.formats, complementing=ctx.complementing
+            root=complement,
+            alphabet=ctx.alphabet,
+            formats=ctx.formats,
+            complementing=ctx.complementing,
+            whole_floats=ctx.whole_floats,
         )
         ctx.complementing.add(barred)
         try:
@@ -1229,7 +1233,7 @@ def _closed_names(schema: jsonschema_rs.CanonicalSchema) -> set[str] | None:
     return names
 
 
-def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonValue]:
+def _integer(view: jsonschema_rs.canonical.IntegerView, ctx: StrategyContext) -> SearchStrategy[JsonValue]:
     multiple_of = _combined_multiple_of(view.multiple_of)
     barred = _barred_divisors(view.not_multiple_of)
     if _every_step_is_barred(multiple_of or Fraction(1), barred):
@@ -1242,7 +1246,21 @@ def _integer(view: jsonschema_rs.canonical.IntegerView) -> SearchStrategy[JsonVa
         low = None if view.minimum is None else -(-view.minimum // stride)
         high = None if view.maximum is None else view.maximum // stride
         strategy = _steps(low, high).map(lambda step: step * stride)
-    return _outside_divisors(strategy, barred)
+    strategy = _outside_divisors(strategy, barred)
+    if ctx.whole_floats:
+        # `2.0` is the same integer as `2`, and a reader that takes only the second rejects a value
+        # its own schema admits. The plain spelling comes first so a failure shrinks back to it.
+        return st.one_of(strategy, strategy.map(_as_whole_float))
+    return strategy
+
+
+# Past this magnitude no float spells the integer back, and the shifted value could leave the bounds.
+_EXACTLY_SPELLED = 2**53
+
+
+def _as_whole_float(value: JsonValue) -> JsonValue:
+    assert isinstance(value, int)
+    return float(value) if -_EXACTLY_SPELLED <= value <= _EXACTLY_SPELLED else value
 
 
 def _barred_divisors(values: list[Numeric]) -> list[Fraction]:

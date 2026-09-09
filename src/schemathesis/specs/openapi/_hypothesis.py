@@ -1207,7 +1207,7 @@ def make_positive_strategy(
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     schema = snapped_float32_clone(schema)
-    return _canonical_strategy(schema, generation_config, validator_cls, location=location)
+    return _canonical_strategy(schema, generation_config, validator_cls, location=location, media_type=media_type)
 
 
 def _canonical_strategy(
@@ -1216,6 +1216,7 @@ def _canonical_strategy(
     validator_cls: type[jsonschema_rs.Validator],
     *,
     location: ParameterLocation | None = None,
+    media_type: str | None = None,
 ) -> st.SearchStrategy[JsonValue]:
     """Strategy for a fully modeled document; raises `UnsupportedSchema` when the schema is not one."""
     if location is not None and location.is_in_header:
@@ -1231,7 +1232,18 @@ def _canonical_strategy(
         draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
         formats=formats,
         alphabet=alphabet,
+        # Every other carrier renders the value as text, where `2.0` is a different string than `2`.
+        whole_floats=_carries_json(media_type),
     )
+
+
+def _carries_json(media_type: str | None) -> bool:
+    if media_type is None:
+        return False
+    try:
+        return media_types.is_json(media_type)
+    except MalformedMediaType:
+        return False
 
 
 def _build_header_formats(generation_config: GenerationConfig, mode: GenerationMode) -> dict[str, st.SearchStrategy]:

@@ -75,3 +75,5 @@ class StrategyContext:
     folding: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
     # Schemas whose complement is currently being built, so a bar reaching back is spotted.
     complementing: set[jsonschema_rs.CanonicalSchema] = field(default_factory=set)
+    # Whether an integer may be drawn spelled as a float, which only a JSON carrier keeps apart.
+    whole_floats: bool = False
