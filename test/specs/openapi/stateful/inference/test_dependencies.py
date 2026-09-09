@@ -6359,3 +6359,25 @@ def test_scalar_body_field_named_after_collection_links_to_its_producer(ctx):
             },
         ]
     ]
+
+
+def test_second_consumer_of_a_foreign_key_gets_its_own_link(ctx):
+    # Two reads of the same resource are distinct destinations, not one.
+    order = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "customer_id": {"type": "string"}},
+        "required": ["id", "customer_id"],
+    }
+    paths = {
+        **operation("post", "/orders", "201", order, operation_id="createOrder"),
+        **operation("get", "/customers/{id}", "200", parameters=[path_param("id")], operation_id="getCustomer"),
+        **operation(
+            "get", "/customers/{id}/invoices", "200", parameters=[path_param("id")], operation_id="listInvoices"
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert sorted(
+        definition.to_openapi()["operationRef"] for entry in graph.iter_links() for definition in entry.links.values()
+    ) == ["#/paths/~1customers~1{id}/get", "#/paths/~1customers~1{id}~1invoices/get"]

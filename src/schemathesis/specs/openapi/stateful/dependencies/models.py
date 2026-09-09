@@ -262,17 +262,18 @@ class DependencyGraph:
                                     output_slot.pointer, fk_field.field_name, output_slot.cardinality
                                 )
 
-                            link_name = f"{consumer.method.capitalize()}{fk_field.target_resource}"
                             parameters = {
                                 f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
                             }
-
-                            # Avoid duplicate links (same target operation)
-                            if link_name in fk_links:
+                            operation_ref = f"#/paths/{consumer_path}/{consumer.method}"
+                            link_name = _unique_link_name(
+                                f"{consumer.method.capitalize()}{fk_field.target_resource}", fk_links, operation_ref
+                            )
+                            if link_name is None:
                                 continue
 
                             fk_links[link_name] = LinkDefinition(
-                                operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
+                                operation_ref=operation_ref,
                                 parameters=parameters,
                                 request_body={},
                             )
@@ -306,12 +307,15 @@ class DependencyGraph:
                             if nested_fk.is_array:
                                 body_pointer += "/*"
 
-                            link_name = f"{consumer.method.capitalize()}{nested_fk.target_resource}"
-                            if link_name in fk_links:
+                            operation_ref = f"#/paths/{consumer_path}/{consumer.method}"
+                            link_name = _unique_link_name(
+                                f"{consumer.method.capitalize()}{nested_fk.target_resource}", fk_links, operation_ref
+                            )
+                            if link_name is None:
                                 continue
 
                             fk_links[link_name] = LinkDefinition(
-                                operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
+                                operation_ref=operation_ref,
                                 parameters={
                                     f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
                                 },
@@ -778,6 +782,19 @@ class ResourceDefinition:
             fk_fields=[],
             nested_fk_fields=[],
         )
+
+
+def _unique_link_name(base: str, links: dict[str, LinkDefinition], operation_ref: str) -> str | None:
+    """Keep the first link's name, and give a different destination sharing it one of its own."""
+    existing = links.get(base)
+    if existing is None:
+        return base
+    if existing.operation_ref == operation_ref:
+        return None
+    suffix = 2
+    while f"{base}{suffix}" in links:
+        suffix += 1
+    return f"{base}{suffix}"
 
 
 class DefinitionSource(enum.IntEnum):
