@@ -533,7 +533,9 @@ def test_additional_properties_hint_follows_response_attribution(ctx, response_f
     response = Response.from_requests(response_factory.requests(status_code=400, content=error_body), verify=True)
     with pytest.raises(RejectedPositiveData) as exc:
         positive_data_acceptance(check_context(), response, case)
-    assert exc.value.message == f"Valid data should have been accepted\nExpected: 2xx, 401, 403, 404, 409, 5xx{hint}"
+    assert (
+        exc.value.message == f"Valid data should have been accepted\nExpected: 2xx, 401, 403, 404, 409, 429, 5xx{hint}"
+    )
 
 
 @pytest.mark.parametrize(
@@ -543,6 +545,8 @@ def test_additional_properties_hint_follows_response_attribution(ctx, response_f
         # 409 short-circuits validation on uniqueness-gated endpoints (duplicate email etc.)
         # before the server reaches the mutated field — treating it as "accepted" is a false positive.
         pytest.param(409, False, id="409-conflict-passes"),
+        # A throttle refuses the request without judging its data.
+        pytest.param(429, False, id="429-too-many-requests-passes"),
         pytest.param(200, True, id="200-still-flagged"),
     ],
 )
@@ -871,6 +875,12 @@ def test_positive_data_acceptance(
         assert "API rejected schema-compliant request" in exc_info.value.title
     else:
         assert positive_data_acceptance(ctx, response, case) is None
+
+
+def test_positive_data_acceptance_passes_for_rate_limiting(response_factory, sample_schema):
+    # A throttle refuses the request without judging its data.
+    case = sample_schema["/test"]["POST"].Case(_meta=build_metadata())
+    assert positive_data_acceptance(check_context(), response_factory.requests(status_code=429), case) is None
 
 
 @pytest.mark.parametrize(
