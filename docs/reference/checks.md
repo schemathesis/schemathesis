@@ -267,6 +267,8 @@ List exactly the methods this resource supports in `Allow`
 
 These checks verify API behavior across sequences of operations. They only trigger when links between operations are available. See the [stateful testing guide](../guides/stateful-testing.md) for details.
 
+They need a multi-step scenario, so they run under `st run`'s stateful phase and under `schema.as_state_machine()`. A single `case.call_and_validate()` has no scenario history, so these two never fire there.
+
 ### `use_after_free`
 
 Detects when deleted resources remain accessible. After a successful `DELETE`, subsequent requests to the same resource should return `404 Not Found`.
