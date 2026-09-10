@@ -32,7 +32,7 @@ ________________________ GET /v1/hospitais/maisProximo _________________________
 - API rejected schema-compliant request
 
     Valid data should have been accepted
-    Expected: 2xx, 401, 403, 404, 409, 5xx
+    Expected: 2xx, 401, 403, 404, 409, 429, 5xx
 
 [400] Bad Request:
 
