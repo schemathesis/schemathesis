@@ -452,6 +452,10 @@ class BaseSchema(Mapping):
     ) -> SearchStrategy[Case]:
         raise NotImplementedError
 
+    def operations_with_incoming_links(self) -> set[str]:
+        """Labels of operations that another operation links to; empty when the spec has no links."""
+        return set()
+
     def as_state_machine(self) -> type[APIStateMachine]:
         """Create a state machine class for stateful testing of linked API operations.
 

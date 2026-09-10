@@ -1,6 +1,6 @@
 import pytest
 from _pytest.main import ExitCode
-from flask import Response
+from flask import Response, jsonify
 
 import schemathesis
 from schemathesis.python._constants.registry import default_registry
@@ -313,6 +313,88 @@ def test_warning_on_many_operations(ctx, cli, snapshot_cli):
             f"--url={api.base_url}/v4/",
             "-c not_a_server_error",
             "--phases=fuzzing",
+            "--mode=positive",
+            "-n 10",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_test_data_advice_for_linked_operations(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud()
+    assert (
+        cli.run(
+            api.schema_url,
+            "-c not_a_server_error",
+            "--phases=fuzzing",
+            "--mode=positive",
+            "-n 10",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_test_data_advice_for_unusable_linked_data(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"item_id": "$response.body#/id"}}
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{item_id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"in": "path", "name": "item_id", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": "unknown"}), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({"message": "Not found"}), 404
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "-c not_a_server_error",
+            "--phases=fuzzing,stateful",
+            "--mode=positive",
+            "-n 10",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_test_data_advice_grouped_by_cause(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud()
+    assert (
+        cli.run(
+            api.schema_url,
+            f"--url={api.base_url}/v4/",
+            "-c not_a_server_error",
+            "--phases=fuzzing,stateful",
             "--mode=positive",
             "-n 10",
         )

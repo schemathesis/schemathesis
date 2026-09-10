@@ -20,6 +20,7 @@ from schemathesis.config import (
 from schemathesis.core import NOT_SET, Body, Specification
 from schemathesis.core.errors import (
     InvalidSchema,
+    InvalidStateMachine,
     OperationNotFound,
 )
 from schemathesis.core.jsonschema import Bundler
@@ -55,7 +56,7 @@ from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
 from .operations import SCHEMA_PARSING_ERRORS, OperationLoader
-from .stateful import create_state_machine
+from .stateful import collect_transitions, create_state_machine
 from .utils import parse_spec_version
 from .validation import ResponseValidator
 
@@ -271,6 +272,15 @@ class OpenApiSchema(BaseSchema):
                 meta.generation.mode = GenerationMode.POSITIVE
             else:
                 meta.generation.mode = GenerationMode.NEGATIVE
+
+    @override
+    def operations_with_incoming_links(self) -> set[str]:
+        operations = [result.ok() for result in self.get_all_operations() if isinstance(result, Ok)]
+        try:
+            transitions = collect_transitions(operations)
+        except InvalidStateMachine:
+            return set()
+        return {label for label, entry in transitions.operations.items() if entry.incoming}
 
     @override
     def as_state_machine(self) -> type[APIStateMachine]:
