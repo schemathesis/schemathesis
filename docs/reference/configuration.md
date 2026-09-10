@@ -322,6 +322,16 @@ Rules:
 
 ### Output
 
+!!! warning "Sanitization is key-based, and skips response bodies"
+
+    Values are replaced when their **key** matches `keys-to-sanitize` or contains a marker from
+    `sensitive-markers`. That covers request and response headers, query parameters, URL credentials,
+    request body fields, and the reproduction command.
+
+    **Response bodies are written verbatim** — to the terminal and to every report format. A secret the
+    API returns in a body is not redacted, whatever its key is named. Treat failure output and report
+    artifacts as sensitive.
+
 #### `output.sanitization.enabled`
 
 !!! note ""
