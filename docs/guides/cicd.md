@@ -121,3 +121,26 @@ schemathesis run http://localhost:8080/openapi.json
 | `2` | Run aborted due to config or schema error |
 
 See the [CLI reference](../reference/cli.md#exit-codes) for the complete list of exit codes.
+
+## Machine-Readable Results
+
+An exit code says whether something failed, not what ran — a run that selected zero operations exits `1` just like a run with real findings. `--report json` writes the run's verdict as a single JSON document so a pipeline can tell those apart:
+
+```bash
+schemathesis run http://localhost:8080/openapi.json --report json
+```
+
+```json
+{
+  "exit_code": 1,
+  "stop_reason": "completed",
+  "operations": { "total": 42, "selected": 40, "tested": 38, "errored": 1, "skipped": 1, "skip_reasons": [] },
+  "test_cases": { "generated": 3800, "with_failures": 12, "unique_failures": 4, "without_checks": 0 },
+  "phases": { "fuzzing": { "status": "success", "skip_reason": null } },
+  "failures": [],
+  "errors": [],
+  "warnings": {}
+}
+```
+
+Gate on `operations.tested` to catch a run that graded nothing, and on `failures[].type` — the failure class name — to react to specific finding kinds. The report lands in `schemathesis-report/json-<timestamp>.json`; pass `--report-json-path` for a fixed name.
