@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import re
 import sys
 
 PYPROJECT_PATH = "pyproject.toml"
 CHANGELOG_PATH = "CHANGELOG.md"
 COMPARE_URL_PREFIX = "https://github.com/schemathesis/schemathesis/compare/"
+ISSUE_REFERENCE = re.compile(r"\[#\d+\]\(https://github\.com/schemathesis/schemathesis/issues/(\d+)\)")
 
 
 def _read_changelog() -> list[str]:
@@ -66,8 +68,7 @@ def bump(new_version: str) -> None:
         f.writelines(pyproject)
 
 
-def notes(version: str) -> None:
-    changelog = _read_changelog()
+def _release_block(changelog: list[str], version: str) -> list[str]:
     # Find the release header for the provided version
     start_idx = _find_line_by_prefix(changelog, f"## [{version}](")
     if start_idx is None:
@@ -77,7 +78,21 @@ def notes(version: str) -> None:
         (i for i, line in enumerate(changelog[start_idx + 1 :], start=start_idx + 1) if line.startswith("## [")),
         len(changelog),
     )
-    sys.stdout.write("".join(changelog[start_idx + 1 : end_idx]))
+    return changelog[start_idx + 1 : end_idx]
+
+
+def _issue_numbers(changelog: list[str], version: str) -> list[int]:
+    block = _release_block(changelog, version)
+    return sorted({int(match.group(1)) for line in block for match in ISSUE_REFERENCE.finditer(line)})
+
+
+def notes(version: str) -> None:
+    sys.stdout.write("".join(_release_block(_read_changelog(), version)))
+
+
+def issues(version: str) -> None:
+    for number in _issue_numbers(_read_changelog(), version):
+        sys.stdout.write(f"{number}\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -90,6 +105,9 @@ def build_parser() -> argparse.ArgumentParser:
     notes = subparsers.add_parser("notes", help="Output the changelog for a specific version")
     notes.add_argument("version", type=str, help="The version to output a changelog")
 
+    issues = subparsers.add_parser("issues", help="Output the issues referenced by a specific version")
+    issues.add_argument("version", type=str, help="The version to output referenced issues for")
+
     return argument_parser
 
 
@@ -100,5 +118,7 @@ if __name__ == "__main__":
         bump(args.new_version)
     elif args.subcommand == "notes":
         notes(args.version)
+    elif args.subcommand == "issues":
+        issues(args.version)
     else:
         parser.error("Missing subcommand")
