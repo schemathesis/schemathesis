@@ -53,7 +53,16 @@ def test_warnings_for_without_operations():
 
 
 def test_project_key_config_sync():
-    ignored_in_operations_config = {"operations", "hooks", "workers", "base_url", "origin", "fuzz", "analysis"}
+    ignored_in_operations_config = {
+        "operations",
+        "hooks",
+        "workers",
+        "base_url",
+        "origin",
+        "fuzz",
+        "analysis",
+        "baseline",
+    }
     for key in ProjectConfig.__slots__:
         if key.startswith("_"):
             continue

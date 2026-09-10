@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from schemathesis.baseline import Baseline
 from schemathesis.config._analysis import AnalysisConfig
 from schemathesis.config._auth import AuthConfig
 from schemathesis.config._cache import CacheConfig
@@ -51,6 +53,7 @@ def get_workers_count() -> int:
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
     _parent: SchemathesisConfig | None
+    baseline: str | None
     base_url: str | None
     origin: str | None
     headers: dict | None
@@ -78,6 +81,8 @@ class ProjectConfig(DiffBase):
 
     __slots__ = (
         "_parent",
+        "baseline",
+        "_baseline_cache",
         "base_url",
         "origin",
         "headers",
@@ -109,6 +114,7 @@ class ProjectConfig(DiffBase):
         self,
         *,
         parent: SchemathesisConfig | None = None,
+        baseline: str | None = None,
         base_url: str | None = None,
         origin: str | None = None,
         headers: dict | None = None,
@@ -137,6 +143,8 @@ class ProjectConfig(DiffBase):
         self._parent = parent
         if base_url is not None:
             _validate_base_url(base_url)
+        self.baseline = baseline
+        self._baseline_cache: Baseline | None = None
         self.base_url = base_url
         if origin is not None:
             _validate_origin(origin)
@@ -197,6 +205,7 @@ class ProjectConfig(DiffBase):
         if "base-url" in data and "origin" in data:
             raise ConfigError("`base-url` and `origin` are mutually exclusive - pick one.")
         return cls(
+            baseline=resolve(data.get("baseline")),
             base_url=resolve(data.get("base-url")),
             origin=resolve(data.get("origin")),
             headers={resolve(key): resolve(value) for key, value in data.get("headers", {}).items()}
@@ -234,6 +243,7 @@ class ProjectConfig(DiffBase):
         self,
         *,
         base_url: str | None = None,
+        baseline: str | None = None,
         origin: str | None = None,
         headers: dict | None = None,
         basic_auth: tuple[str, str] | None = None,
@@ -257,6 +267,10 @@ class ProjectConfig(DiffBase):
             _validate_base_url(base_url)
             self.base_url = base_url
             self._mark_source_keys(("base_url",))
+
+        if baseline is not None:
+            self.baseline = baseline
+            self._mark_source_keys(("baseline",))
 
         if origin is not None:
             _validate_origin(origin)
@@ -302,6 +316,14 @@ class ProjectConfig(DiffBase):
             suppress_health_check=suppress_health_check,
             warnings=warnings,
         )
+
+    def load_baseline(self) -> Baseline | None:
+        """Known failures recorded for this project, or `None` when no baseline is configured."""
+        if self.baseline is None:
+            return None
+        if self._baseline_cache is None:
+            self._baseline_cache = Baseline.load(Path(self.baseline))
+        return self._baseline_cache
 
     @property
     def config_path(self) -> str | None:

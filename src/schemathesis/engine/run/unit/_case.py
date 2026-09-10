@@ -204,6 +204,7 @@ def _do_call_and_validate(
         response=response,
         continue_on_failure=continue_on_failure,
         recorder=recorder,
+        baseline=ctx.config.load_baseline(),
     )
     response.clear_cache()
 

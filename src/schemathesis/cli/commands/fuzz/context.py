@@ -9,6 +9,7 @@ from schemathesis.cli.summary import (
     SummaryData,
     WarningData,
     build_operations,
+    reduce_baseline,
     reduce_errors,
     reduce_failures,
     reduce_test_cases,
@@ -37,6 +38,7 @@ class FuzzExecutionContext(BaseExecutionContext):
             failures=reduce_failures(self.statistic),
             errors=reduce_errors(self.errors),
             warnings=WarningData(),
+            baseline=reduce_baseline(self.statistic),
         )
 
     def on_event(self, event: events.EngineEvent) -> None:

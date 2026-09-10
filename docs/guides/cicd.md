@@ -143,4 +143,6 @@ schemathesis run http://localhost:8080/openapi.json --report json
 }
 ```
 
+If the API already has failures you are not fixing yet, a [baseline](baseline.md) keeps CI red only for new ones.
+
 Gate on `operations.tested` to catch a run that graded nothing, and on `failures[].type` — the failure class name — to react to specific finding kinds. The report lands in `schemathesis-report/json-<timestamp>.json`; pass `--report-json-path` for a fixed name.

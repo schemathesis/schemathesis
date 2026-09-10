@@ -19,6 +19,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
+from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._rate_limit_retry import call_with_retry
 from schemathesis.engine._validate import validate_response
@@ -417,10 +418,11 @@ def _run_forever_thread(
                     response=interaction.response,
                     continue_on_failure=continue_on_failure,
                     recorder=recorder,
+                    baseline=ctx.config.load_baseline(),
                 )
             # If any case used continue_on_failure=True, failures were recorded without raising.
             # Check the recorder to set the correct scenario status.
-            if any(node.status == Status.FAILURE for check_nodes in recorder.checks.values() for node in check_nodes):
+            if has_new_failures(recorder, ctx.config.load_baseline()):
                 status = Status.FAILURE
         except FailureGroup:
             # continue_on_failure=False: stop checking remaining steps and stop the campaign.

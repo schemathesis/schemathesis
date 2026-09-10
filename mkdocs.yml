@@ -18,6 +18,7 @@ nav:
       - guides/auth.md
       - guides/schema-conformance.md
       - guides/cicd.md
+      - Baseline: guides/baseline.md
       - Allure Integration: guides/allure.md
       - Docker: guides/docker.md
       - guides/coverage.md

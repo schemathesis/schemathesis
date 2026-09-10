@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from itertools import groupby
 from json.decoder import JSONDecodeError
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
@@ -17,6 +18,7 @@ from schemathesis.cli.output import (
     LoadingProgressManager,
     _style,
     display_api_operations,
+    display_baseline_summary,
     display_errors_summary,
     display_failures,
     display_failures_summary,
@@ -687,6 +689,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         table.add_row("Operations:", f"{statistic.selected} selected / {statistic.total} total")
         if event.config.config_path:
             table.add_row("Configuration:", event.config.config_path)
+        baseline = event.config.load_baseline()
+        if baseline is not None and event.config.baseline is not None:
+            if not Path(event.config.baseline).exists():
+                detail = "new file"
+            else:
+                entry_word = "entry" if len(baseline.entries) == 1 else "entries"
+                detail = f"{len(baseline.entries)} {entry_word}"
+            table.add_row("Baseline:", f"{event.config.baseline} / {detail}")
         dictionaries = event.config.dictionaries
         if dictionaries:
             total_values = sum(len(d.entries) for d in dictionaries.values())
@@ -1486,6 +1496,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         if summary.failures:
             display_failures_summary(summary.failures)
+
+        if summary.baseline is not None:
+            display_baseline_summary(summary.baseline)
 
         if summary.errors:
             display_errors_summary(summary.errors)

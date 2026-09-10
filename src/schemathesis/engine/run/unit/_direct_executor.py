@@ -10,6 +10,7 @@ from schemathesis.core.errors import AuthenticationError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, StopReason, events
+from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine.errors import TestingState, UnexpectedError, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
@@ -156,11 +157,7 @@ def run_driver(
         elif any_case_errored:
             status = Status.ERROR
 
-    if (
-        status == Status.SUCCESS
-        and continue_on_failure
-        and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
-    ):
+    if status == Status.SUCCESS and continue_on_failure and has_new_failures(recorder, ctx.config.load_baseline()):
         status = Status.FAILURE
 
     for event in iter_controller_error_events(

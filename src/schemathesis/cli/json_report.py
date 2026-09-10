@@ -83,6 +83,18 @@ def build_document(
             for group in summary.failures
         ],
         "errors": [{"title": group.title, "count": group.count} for group in summary.errors],
+        "baseline": {
+            "known": summary.baseline.known,
+            "new": summary.baseline.new,
+            "recorded": summary.baseline.recorded,
+            "pruned_ids": summary.baseline.pruned,
+            "unobserved": summary.baseline.unobserved,
+            "known_ids": summary.baseline.known_ids,
+            "unobserved_ids": summary.baseline.unobserved_ids,
+            "expired_ids": summary.baseline.expired_ids,
+        }
+        if summary.baseline is not None
+        else None,
         "warnings": summary.warnings.as_labels(),
         "auth": {
             "reauth_count": payload.reauth_count if payload is not None else 0,
