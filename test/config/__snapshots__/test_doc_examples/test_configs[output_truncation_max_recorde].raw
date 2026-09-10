@@ -1,0 +1,1 @@
+SchemathesisConfig(output=OutputConfig(truncation=TruncationConfig(max_recorded_payload_size=65536)))

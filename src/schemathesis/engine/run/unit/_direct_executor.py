@@ -50,7 +50,7 @@ def run_driver(
     errors: list[Exception] = []
     skip_reason: str | None = None
     started_at = Instant()
-    recorder = ScenarioRecorder(label=operation.label)
+    recorder = ScenarioRecorder(label=operation.label, config=ctx.config.output)
     state = TestingState()
 
     def non_fatal_error(error: Exception, code_sample: str | None = None) -> events.NonFatalError:

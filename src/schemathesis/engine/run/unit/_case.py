@@ -222,6 +222,7 @@ def record_extra_data_from_recorder(ctx: EngineContext, operation: APIOperation,
     extra_data_source = ctx.extra_data_source
     if extra_data_source is None:
         return
+    # Bodies over the recorded payload limit are replayed as a prefix, so values living past it are not reused.
     for case_id, interaction in recorder.interactions.items():
         response = interaction.response
         if response is None:

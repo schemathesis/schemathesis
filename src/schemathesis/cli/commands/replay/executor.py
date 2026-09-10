@@ -105,7 +105,7 @@ def _replay_sequence(
     instant = Instant()
 
     # Record the replayed steps so history-dependent checks see the same sequence, each linked to its parent.
-    recorder = ScenarioRecorder(label="replay")
+    recorder = ScenarioRecorder(label="replay", config=schema.config.output)
     step_outputs: list[StepOutput] = []
 
     terminal_case: Case | None = None

@@ -921,6 +921,10 @@
             "max-width": {
               "type": "integer",
               "minimum": 1
+            },
+            "max-recorded-payload-size": {
+              "type": "integer",
+              "minimum": 0
             }
           }
         }

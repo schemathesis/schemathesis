@@ -14,7 +14,7 @@ from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.transport import Headers
+from schemathesis.core.transport import Headers, Response
 from schemathesis.engine.recorder import RecordedScenario
 
 if TYPE_CHECKING:
@@ -78,6 +78,7 @@ class HarWriter:
                     if interaction.response.content is not None
                     else None,
                     encoding="base64" if interaction.response.content is not None and self._preserve_bytes else None,
+                    comment=_truncation_comment(interaction.response),
                 )
                 http_version = f"HTTP/{interaction.response.http_version}"
                 if config.sanitization.enabled:
@@ -145,6 +146,13 @@ class HarWriter:
         exc_tb: TracebackType | None,
     ) -> None:
         self.close()
+
+
+def _truncation_comment(response: Response) -> str | None:
+    """Say how much of the body `text` holds — `size` alone cannot be told apart from compression."""
+    if not response.is_truncated:
+        return None
+    return f"Body truncated: {len(response.content)} of {response.content_size} bytes recorded"
 
 
 def _headers_size(headers: Headers) -> int:

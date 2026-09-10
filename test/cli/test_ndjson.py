@@ -1,3 +1,4 @@
+import base64
 import json
 import platform
 import sys
@@ -5,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from _pytest.main import ExitCode
-from flask import jsonify, request
+from flask import Response, jsonify, request
 
 
 @pytest.fixture
@@ -29,6 +30,37 @@ def get_event_type(event):
 def get_event_data(event):
     """Get the event data from externally tagged format."""
     return next(iter(event.values()))
+
+
+LARGE_RESPONSE_BODY = json.dumps({"padding": "x" * 2000}).encode()
+
+
+def test_ndjson_records_truncated_response_body(cli, ctx, ndjson_path):
+    app, _ = ctx.openapi.make_flask_app({"/api/large": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/large")
+    def large():
+        return Response(LARGE_RESPONSE_BODY, content_type="application/json")
+
+    cli.run_openapi_app(
+        app,
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--mode=positive",
+        config={"output": {"truncation": {"max-recorded-payload-size": 64}}},
+    )
+    assert [
+        {"content": interaction["response"]["content"], "content_size": interaction["response"].get("content_size")}
+        for event in load_ndjson(ndjson_path)
+        if get_event_type(event) == "ScenarioFinished"
+        for interaction in get_event_data(event)["recorder"].get("interactions", {}).values()
+    ] == [
+        {
+            "content": {"$base64": base64.b64encode(LARGE_RESPONSE_BODY[:64]).decode()},
+            "content_size": len(LARGE_RESPONSE_BODY),
+        }
+    ]
 
 
 def test_ndjson_includes_case_meta(cli, ctx, ndjson_path):

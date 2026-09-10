@@ -102,12 +102,16 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
             sanitize_value(headers, config=sanitization)
         # Filter out headers that are not useful for analysis
         headers = {k: v for k, v in headers.items() if k.lower() not in {h.lower() for h in SKIP_RESPONSE_HEADERS}}
-        return {
+        data: dict[str, Any] = {
             "status_code": obj.status_code,
             "headers": headers,
             "content": serialize(obj.content, sanitization=sanitization),
             "elapsed": obj.elapsed,
         }
+        # Present only for a body kept as a prefix, so a consumer can tell how much of it is missing.
+        if obj.is_truncated:
+            data["content_size"] = obj.content_size
+        return data
     if isinstance(obj, requests.PreparedRequest):
         url = obj.url or ""
         if sanitization is not None:

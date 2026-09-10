@@ -40,14 +40,14 @@ class PytestReportDispatcher:
     def _on_after_call(self, context: HookContext, case: Case, response: Response) -> None:
         label = case.operation.label
         self._start_times.setdefault(label, time.monotonic())
-        recorder = self._recorders.setdefault(label, ScenarioRecorder(label=label))
+        recorder = self._recorders.setdefault(label, ScenarioRecorder(label=label, config=self._schema.config.output))
         recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
         recorder.record_response(case_id=case.id, response=response)
 
     def _on_after_network_error(self, context: HookContext, case: Case, request: requests.PreparedRequest) -> None:
         label = case.operation.label
         self._start_times.setdefault(label, time.monotonic())
-        recorder = self._recorders.setdefault(label, ScenarioRecorder(label=label))
+        recorder = self._recorders.setdefault(label, ScenarioRecorder(label=label, config=self._schema.config.output))
         recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
         recorder.record_request(case_id=case.id, request=request)
 

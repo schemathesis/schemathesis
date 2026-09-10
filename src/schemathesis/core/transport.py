@@ -88,7 +88,9 @@ class Response:
     headers: Headers
     """Response headers with lowercase keys and list values."""
     content: bytes
-    """Raw response body as bytes."""
+    """Raw response body as bytes, or its leading bytes when the body was kept only in part."""
+    content_size: int
+    """Size of the body the server sent, which exceeds `len(content)` for a partially kept body."""
     request: requests.PreparedRequest
     """The request that generated this response."""
     elapsed: float
@@ -107,6 +109,7 @@ class Response:
         "status_code",
         "headers",
         "content",
+        "content_size",
         "request",
         "elapsed",
         "verify",
@@ -129,12 +132,14 @@ class Response:
         message: str = "",
         http_version: str = "1.1",
         encoding: str | None = None,
+        content_size: int | None = None,
         _override: Override | None = None,
     ):
         self.status_code = status_code
         self.headers = {key.lower(): value for key, value in headers.items()}
         assert all(isinstance(v, list) for v in headers.values())
         self.content = content
+        self.content_size = content_size if content_size is not None else len(content or b"")
         self.request = request
         self.elapsed = elapsed
         self.verify = verify
@@ -296,10 +301,31 @@ class Response:
         """Drop the parsed-JSON cache so it doesn't pin memory after checks finish."""
         self._deserialized = NOT_SET
 
+    def truncated(self, limit: int) -> Response:
+        """A copy keeping at most `limit` bytes of the body; `body_size` still reports the full size."""
+        return Response(
+            status_code=self.status_code,
+            headers=self.headers,
+            content=self.content[:limit] if self.content else self.content,
+            request=self.request,
+            elapsed=self.elapsed,
+            verify=self.verify,
+            message=self.message,
+            http_version=self.http_version,
+            encoding=self.encoding,
+            content_size=self.content_size,
+            _override=self._override,
+        )
+
+    @property
+    def is_truncated(self) -> bool:
+        """Whether `content` holds only a prefix of the body the server sent."""
+        return len(self.content or b"") < self.content_size
+
     @property
     def body_size(self) -> int | None:
         """Size of response body in bytes, or None if no content."""
-        return len(self.content) if self.content else None
+        return self.content_size or None
 
     @property
     def encoded_body(self) -> str | None:

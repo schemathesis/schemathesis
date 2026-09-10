@@ -50,7 +50,7 @@ class OpenAPIStateMachine(APIStateMachine):
     _transitions: ApiTransitions
 
     def __init__(self) -> None:
-        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL)
+        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL, config=self.schema.config.output)
         self.control = TransitionController(self._transitions)
         super().__init__()
 

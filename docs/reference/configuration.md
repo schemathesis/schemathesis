@@ -444,6 +444,21 @@ Rules:
     max-width = 100
     ```
 
+#### `output.truncation.max-recorded-payload-size`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Default**: `1048576`  
+
+    Maximum size in bytes of a response body kept in reports. A larger body is recorded as a prefix, and the report
+    carries the size the server sent. Checks always run against the whole body. Set to `0` to record bodies in full.
+
+    ```toml
+    [output.truncation]
+    max-recorded-payload-size = 65536
+    ```
+
 ### Cache
 
 Schemathesis caches discoveries that survive across runs — error-feedback observations parsed from 4xx bodies, operations that require authentication beyond what the spec declares, and operations that consistently return `405 Method Not Allowed`. On startup the cache is replayed during the probing phase so subsequent phases skip rediscovery.
