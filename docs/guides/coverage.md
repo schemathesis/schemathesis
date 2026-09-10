@@ -77,6 +77,8 @@ Schemathesis automatically targets schema constraints through its coverage phase
 
 For cases where neither the coverage phase nor explicit examples are sufficient, [hooks](../reference/hooks.md) let you control generation directly - filtering values, mapping them to specific shapes, or replacing a strategy entirely.
 
+The **Responses** dimension records status codes the API actually returned, so it does not always reach 100%. Documented statuses that require server state - `409 Conflict`, `429 Too Many Requests`, `503 Service Unavailable` - stay uncovered until a test puts the API in that state. [Stateful testing](stateful-testing.md) reaches some of them by chaining linked operations; the rest need a request your own tests make.
+
 ## Docker
 
 The official Schemathesis Docker image has tracecov pre-installed and enabled by default. The coverage report is written to `/app/schema-coverage.html` inside the container. Mount a host directory and override the path to retrieve it:

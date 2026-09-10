@@ -12,6 +12,18 @@ docker run ghcr.io/schemathesis/schemathesis:stable \
 !!! tip "Free-threaded Python"
     The image uses free-threaded Python (3.14t). `-w auto` lets Schemathesis use all available CPUs in parallel.
 
+## Image Tags
+
+| Tag | Points at |
+|---|---|
+| `stable` | The newest stable release. Pre-releases do not move it. |
+| `X.Y.Z` | That exact release. Immutable. |
+| `latest` | Unreleased `master`, rebuilt on every push. |
+
+Add the `-trixie` suffix (`stable-trixie`, `latest-trixie`) for the Debian trixie variant. All tags are published to both `ghcr.io/schemathesis/schemathesis` and `schemathesis/schemathesis` on Docker Hub.
+
+Pin `X.Y.Z` in CI if you need reproducible runs; use `latest` only to try unreleased changes.
+
 ## File-Based Schema
 
 Mount your local schema file into the container and point at your running API:
