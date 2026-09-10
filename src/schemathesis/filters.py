@@ -176,6 +176,13 @@ class FilterSet:
             return any(filter_.match(ctx) for filter_ in self._includes)
         return any(entry.filter.match(ctx) for entry in self._declared if entry.include)
 
+    def is_explicitly_excluded(self, operation: APIOperation) -> bool:
+        """Whether a filter the user wrote rejects this operation."""
+        ctx = SimpleNamespace(operation=operation)
+        if self._declared is None:
+            return any(filter_.match(ctx) for filter_ in self._excludes)
+        return any(entry.filter.match(ctx) for entry in self._declared if not entry.include)
+
     def match(self, ctx: HasAPIOperation) -> bool:
         """Determines whether the given operation should be included based on the defined filters.
 
