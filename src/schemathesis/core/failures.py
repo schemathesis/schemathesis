@@ -106,8 +106,10 @@ class Failure(AssertionError):
         return type(self) is type(other) and self.operation == other.operation and self._unique_key == other._unique_key
 
     @property
-    def _unique_key(self) -> Any:
-        return self.message
+    def _unique_key(self) -> str:
+        # Coarse but stable: one finding per operation per failure class. A message-derived key
+        # would change every time wording improves, which a stored key cannot survive.
+        return ""
 
     def related_case_ids(self) -> tuple[str, ...]:
         """Other case IDs whose request/response history is needed to reproduce this failure.
@@ -161,9 +163,9 @@ class CustomFailure(Failure):
         self.origin = get_origin(exception)
 
     @property
-    def _unique_key(self) -> Any:
+    def _unique_key(self) -> str:
         # Include `title` (the check) so distinct checks raising at the same line don't collapse.
-        return (self.title, self.origin)
+        return f"{self.title}|{self.origin}"
 
 
 class ResponseTimeExceeded(Failure):
@@ -266,7 +268,7 @@ class MalformedJson(Failure):
         self.severity = Severity.MEDIUM
 
     @property
-    def _unique_key(self) -> Any:
+    def _unique_key(self) -> str:
         return self.title
 
     @classmethod

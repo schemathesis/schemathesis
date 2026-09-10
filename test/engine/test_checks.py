@@ -15,7 +15,14 @@ from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode, UseAfterFree
+from schemathesis.openapi.checks import (
+    JsonSchemaError,
+    MalformedMediaType,
+    MissingHeaders,
+    UndefinedContentType,
+    UndefinedStatusCode,
+    UseAfterFree,
+)
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (
     _coerce_header_value,
@@ -1568,3 +1575,31 @@ def test_response_headers_conformance_skips_unresolvable_reference(ctx, response
     else:
         with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
             response_headers_conformance(CTX, response, case)
+
+
+def test_missing_headers_identity_ignores_message():
+    # The same missing headers are one finding however the message is worded.
+    assert MissingHeaders(
+        operation="GET /users", missing_headers=["X-Rate-Limit"], message="one wording"
+    ) == MissingHeaders(operation="GET /users", missing_headers=["X-Rate-Limit"], message="another wording")
+
+
+def test_malformed_media_type_identity_ignores_message():
+    assert MalformedMediaType(
+        operation="GET /users", actual="application.json", defined="application/json", message="one wording"
+    ) == MalformedMediaType(
+        operation="GET /users", actual="application.json", defined="application/json", message="another wording"
+    )
+
+
+def test_no_failure_class_keys_on_its_message():
+    # A message-derived key changes whenever wording improves, which a stored key cannot survive.
+    schemathesis.checks.load_all_checks()
+    subclasses = []
+    stack = [Failure]
+    while stack:
+        for subclass in stack.pop().__subclasses__():
+            subclasses.append(subclass)
+            stack.append(subclass)
+
+    assert [cls.__name__ for cls in subclasses if cls._unique_key is Failure._unique_key] == []
