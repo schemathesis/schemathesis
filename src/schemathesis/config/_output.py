@@ -105,6 +105,7 @@ class SanitizationConfig(DiffBase):
 MAX_PAYLOAD_SIZE = 512
 MAX_LINES = 10
 MAX_WIDTH = 80
+MAX_RECORDED_PAYLOAD_SIZE = 1024 * 1024
 
 
 @dataclass(repr=False, slots=True)
@@ -115,6 +116,9 @@ class TruncationConfig(DiffBase):
     max_payload_size: int
     max_lines: int
     max_width: int
+    # Bytes of a response body kept for reports; `0` keeps whole bodies. Independent of `enabled`,
+    # which only governs terminal display.
+    max_recorded_payload_size: int
 
     def __init__(
         self,
@@ -123,11 +127,13 @@ class TruncationConfig(DiffBase):
         max_payload_size: int = MAX_PAYLOAD_SIZE,
         max_lines: int = MAX_LINES,
         max_width: int = MAX_WIDTH,
+        max_recorded_payload_size: int = MAX_RECORDED_PAYLOAD_SIZE,
     ) -> None:
         self.enabled = enabled
         self.max_payload_size = max_payload_size
         self.max_lines = max_lines
         self.max_width = max_width
+        self.max_recorded_payload_size = max_recorded_payload_size
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TruncationConfig:
@@ -136,6 +142,7 @@ class TruncationConfig(DiffBase):
             max_payload_size=data.get("max-payload-size", MAX_PAYLOAD_SIZE),
             max_lines=data.get("max-lines", MAX_LINES),
             max_width=data.get("max-width", MAX_WIDTH),
+            max_recorded_payload_size=data.get("max-recorded-payload-size", MAX_RECORDED_PAYLOAD_SIZE),
         )
 
     def update(self, *, enabled: bool | None = None) -> None:

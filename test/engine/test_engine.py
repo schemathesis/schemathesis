@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import _thread
+import json
 import platform
 import sys
 import threading
@@ -168,6 +169,65 @@ def test_empty_response_interaction(ctx):
         assert interaction.request.body is None
         # And response encoding is missing
         assert interaction.response.encoding is None
+
+
+LARGE_RESPONSE_BODY = json.dumps({"padding": "x" * 2000, "marker": "tail"}).encode()
+
+
+def _large_response_schema(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/large": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["marker"],
+                                        "properties": {"marker": {"enum": ["tail"]}},
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    @app.route("/api/large")
+    def large():
+        return flask.Response(LARGE_RESPONSE_BODY, content_type="application/json")
+
+    return schemathesis.openapi.from_url(app_runner.openapi_url(app))
+
+
+def test_checks_see_full_body_when_recorded_copy_is_truncated(ctx, app_runner):
+    schema = _large_response_schema(ctx, app_runner)
+    schema.config.output.truncation.max_recorded_payload_size = 64
+    stream = EventStream(
+        schema, checks=[response_schema_conformance], phases=[PhaseName.FUZZING], max_examples=1
+    ).execute()
+
+    assert [(check.name, check.status) for check in _last_scenario_checks(stream)] == [
+        ("response_schema_conformance", Status.SUCCESS)
+    ]
+    response = _scenario_interactions(stream)[0].response
+    assert (response.content, response.body_size) == (LARGE_RESPONSE_BODY[:64], len(LARGE_RESPONSE_BODY))
+
+
+def test_response_under_recorded_payload_limit_is_kept_intact(ctx, app_runner):
+    schema = _large_response_schema(ctx, app_runner)
+    schema.config.output.truncation.max_recorded_payload_size = len(LARGE_RESPONSE_BODY) + 1
+    stream = EventStream(
+        schema, checks=[response_schema_conformance], phases=[PhaseName.FUZZING], max_examples=1
+    ).execute()
+
+    response = _scenario_interactions(stream)[0].response
+    assert (response.content, response.body_size) == (LARGE_RESPONSE_BODY, len(LARGE_RESPONSE_BODY))
 
 
 def test_empty_string_response_interaction(ctx):

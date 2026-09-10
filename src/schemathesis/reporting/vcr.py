@@ -199,6 +199,9 @@ class VcrWriter:
                 write_headers(interaction.response.headers)
                 stream.write("\n")
                 write_response_body(interaction.response)
+                # Present only for a body kept as a prefix, so a cassette never looks complete when it is not.
+                if interaction.response.is_truncated:
+                    stream.write(f"\n    truncated_from: {interaction.response.content_size}")
                 stream.write(f"\n    http_version: '{interaction.response.http_version}'")
             else:
                 stream.write("\n  response: null")

@@ -42,7 +42,7 @@ class GraphQLStateMachine(APIStateMachine):
                 "GraphQL stateful testing requires at least one producer mutation "
                 "(a mutation returning an Object type with an `id` field)."
             )
-        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL)
+        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL, config=self.schema.config.output)
         self._id_origins: dict[tuple[Handle, str], str] = {}
         self._deleted_id_origins: dict[tuple[Handle, str], str] = {}
         self.control = TransitionController(self._transitions)

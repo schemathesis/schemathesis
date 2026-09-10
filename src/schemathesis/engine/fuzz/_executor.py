@@ -305,7 +305,7 @@ def _run_forever_thread(
 
         # Capture timing before any draws so elapsed_time covers HTTP calls made in the strategy.
         scenario_started_at = time.monotonic()
-        recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL)
+        recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL, config=ctx.config.output)
         excluded_operations: set[str] = set()
 
         last_step: tuple[APIOperation, Case, Response] | None = None

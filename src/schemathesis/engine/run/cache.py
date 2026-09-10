@@ -285,7 +285,7 @@ def _verify_auth_required(ctx: EngineContext, entry: Entry, operation: APIOperat
     if unauth_response.status_code not in (401, 403):
         return _Outcome.CONTRADICTED
 
-    recorder = ScenarioRecorder(label="cache-auth-replay")
+    recorder = ScenarioRecorder(label="cache-auth-replay", config=ctx.config.output)
     recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
     recorder.record_response(case_id=case.id, response=unauth_response)
 
