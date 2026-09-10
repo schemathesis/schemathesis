@@ -2540,6 +2540,36 @@ def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.parametrize(
+    ("flags", "expected"),
+    [
+        ([], {"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "TRACE", "QUERY"}),
+        (["--exclude-method=TRACE"], {"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "QUERY"}),
+        (["--exclude-method-regex=^TRA"], {"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "QUERY"}),
+        (["--exclude-name=TRACE /items"], {"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "QUERY"}),
+        (["--include-method=GET"], {"GET", "PUT", "DELETE", "OPTIONS", "PATCH", "TRACE", "QUERY"}),
+    ],
+    ids=["no-filters", "exclude-method", "exclude-method-regex", "exclude-name", "include-method"],
+)
+def test_unexpected_methods_respect_exclusion_filters(ctx, cli, flags, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        }
+    )
+
+    @app.route("/items", methods=["GET", "POST"])
+    def items():
+        return "", 200
+
+    cli.run_openapi_app(app, "--phases=coverage", "--max-examples=5", *flags)
+
+    assert {request.method for request in app.config["captured_requests"]} == expected
+
+
 def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # Regression test for GH-3322

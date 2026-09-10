@@ -7,7 +7,7 @@ response coverage into concrete `Case` instances.
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, auto
 from itertools import combinations
 from typing import TYPE_CHECKING, Any, TypeGuard, cast
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.parameters import ContainerName
-    from schemathesis.core.transport import HttpMethod
+    from schemathesis.core.transport import HttpMethod, HttpMethodSchema
     from schemathesis.resources import PoolDraw, ResourcePool
     from schemathesis.schemas import APIOperation, ParameterSet, PayloadAlternatives
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
@@ -1096,7 +1096,11 @@ def _unexpected_methods(
     emitter = run.emitter
     # Path-level: each `(path, method)` pair runs once across declared operations.
     methods = sorted(unexpected_methods - set(operation.schema[operation.path]))
+    filter_set = operation.schema.filter_set
     for method in methods:
+        # Excluding an operation means "never send this request", even when the schema does not declare it.
+        if filter_set.is_explicitly_excluded(replace(operation, method=cast("HttpMethodSchema", method), label="")):
+            continue
         if unexpected_methods_seen is not None:
             key = (operation.path, method)
             if key in unexpected_methods_seen:
