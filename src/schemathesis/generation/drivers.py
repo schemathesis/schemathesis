@@ -26,6 +26,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
+from schemathesis.generation.hypothesis.reporting import GENERIC_UNSATISFIABLE_MESSAGE, find_unsatisfiable_parameter
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -230,7 +231,7 @@ class ExamplesGenerator:
             return []
 
     def _defer_materialization_error(self, exc: Exception) -> None:
-        translated = _translate_examples_materialization_error(exc)
+        translated = _translate_examples_materialization_error(exc, self._operation)
         # `InvalidSchema` and non-regex `ValidationError` are silently absorbed: they
         # surface during the Coverage phase, where the schema-quality signal belongs.
         if translated is not None:
@@ -267,14 +268,23 @@ class ExamplesGenerator:
             yield case
 
 
-def _translate_examples_materialization_error(exc: Exception) -> Exception | None:
+EXAMPLES_GENERATION_FAILURE = "Failed to generate test cases from examples for this API operation"
+
+
+def _translate_examples_materialization_error(exc: Exception, operation: APIOperation) -> Exception | None:
     """Wrap a materialization-time exception into the user-facing form, or `None` to absorb."""
     if isinstance(exc, Unsatisfiable):
-        return Unsatisfiable("Failed to generate test cases from examples for this API operation")
+        # Probing every parameter is costly, hence only on the error path.
+        unsatisfiable = find_unsatisfiable_parameter(operation)
+        if unsatisfiable is not None:
+            cause = unsatisfiable.get_error_message(operation.schema.config.output)
+        else:
+            cause = GENERIC_UNSATISFIABLE_MESSAGE
+        return Unsatisfiable(f"{EXAMPLES_GENERATION_FAILURE}\n\n{cause}")
     if isinstance(exc, SerializationNotPossible):
         media_types = ", ".join(exc.media_types)
         return SerializationNotPossible(
-            "Failed to generate test cases from examples for this API operation because of"
+            f"{EXAMPLES_GENERATION_FAILURE} because of"
             f" unsupported payload media types: {media_types}\n{SERIALIZERS_SUGGESTION_MESSAGE}",
             media_types=exc.media_types,
         )

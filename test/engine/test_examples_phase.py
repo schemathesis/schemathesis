@@ -162,8 +162,69 @@ def test_examples_phase_translates_unsatisfiable_during_generation(ctx):
     stream = _hooked_examples_stream(ctx, _raise_unsatisfiable)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
-    assert any(isinstance(event.value, hypothesis.errors.Unsatisfiable) for event in errors), [
-        type(e.value).__name__ for e in errors
+    assert [(type(event.value), str(event.value)) for event in errors] == [
+        (
+            hypothesis.errors.Unsatisfiable,
+            """Failed to generate test cases from examples for this API operation
+
+Cannot generate test data for this operation
+
+Unable to identify the specific parameter. Common causes:
+  - Type mismatch (e.g., enum with strings but type: integer)
+  - Contradictory constraints (e.g., minimum > maximum)
+  - Regex that's too complex to generate values for""",
+        )
+    ]
+
+
+def test_examples_phase_unsatisfiable_names_the_offending_parameter(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "kind",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "alpha",
+                        },
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 5, "maximum": 4},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    stream = _examples_only(schema)
+
+    errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
+    assert [(type(event.value), str(event.value)) for event in errors] == [
+        (
+            hypothesis.errors.Unsatisfiable,
+            """Failed to generate test cases from examples for this API operation
+
+Cannot generate test data for query parameter 'key'
+Schema:
+
+{
+    "type": "integer",
+    "minimum": 5,
+    "maximum": 4
+}
+
+This usually means:
+  - Type mismatch (e.g., enum with strings but type: integer)
+  - Contradictory constraints (e.g., minimum > maximum)
+  - Regex that's too complex to generate values for""",
+        )
     ]
 
 
