@@ -10,7 +10,6 @@ Schemathesis dev
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       2 selected / 2 total
-     Configuration:    /tmp/config.toml
 
 
  ✅  API capabilities:
@@ -22,13 +21,20 @@ Schemathesis dev
 
      ✅ 2 passed
 
+ ✅  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total
+
+     ✅ N passed
+
 =================================== WARNINGS ===================================
 
 Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
-  - GET /users/{user_id}
+  - GET /items/{item_id}
 
-💡 Enable the `stateful` phase so declared links can supply real identifiers
+💡 Check the operations that create this data - their responses do not yield usable identifiers
 
 =================================== SUMMARY ====================================
 
@@ -40,7 +46,7 @@ Test Phases:
   ⏭  Examples (disabled)
   ⏭  Coverage (disabled)
   ✅ Fuzzing
-  ⏭  Stateful (disabled)
+  ✅ Stateful
 
 Warnings:
   ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses

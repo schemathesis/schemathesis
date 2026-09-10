@@ -33,6 +33,10 @@ class WarningData:
     constants_extraction: set[str]
     unmatched_filter: set[str]
     unresolvable_reference: dict[str, set[str]]
+    # Operations the stateful phase actually sent a request for.
+    stateful_exercised: set[str]
+    # Operations some other operation links to; `None` until an operation warns.
+    linked_operations: set[str] | None
 
     def __init__(
         self,
@@ -48,6 +52,8 @@ class WarningData:
         constants_extraction: set[str] | None = None,
         unmatched_filter: set[str] | None = None,
         unresolvable_reference: dict[str, set[str]] | None = None,
+        stateful_exercised: set[str] | None = None,
+        linked_operations: set[str] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
@@ -61,6 +67,8 @@ class WarningData:
         self.constants_extraction = constants_extraction or set()
         self.unmatched_filter = unmatched_filter or set()
         self.unresolvable_reference = unresolvable_reference or {}
+        self.stateful_exercised = stateful_exercised or set()
+        self.linked_operations = linked_operations
 
     def as_labels(self) -> dict[str, list[str]]:
         """Every warning kind mapped to the affected labels; empty kinds stay present."""

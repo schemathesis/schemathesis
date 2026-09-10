@@ -1,0 +1,66 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/v4
+     Specification:    Open API 3.0.2
+     Operations:       3 selected / 3 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 3 passed
+
+ ✅  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 4 selected / 4 total
+
+     ✅ N passed
+
+=================================== WARNINGS ===================================
+
+Missing test data: 3 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+No links point to these operations (1 operation):
+  - POST /users/
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
+
+Reachable via links, but stateful testing never reached them (2 operations):
+  - GET /users/{user_id}
+  - PATCH /users/{user_id}
+
+💡 Raise `phases.stateful.max-steps` or run longer so stateful testing reaches these operations
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 3
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ✅ Fuzzing
+  ✅ Stateful
+
+Warnings:
+  ⚠️ Missing valid test data: 3 operations repeatedly returned 404 responses
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================== 1 warning in 1.00s ==============================

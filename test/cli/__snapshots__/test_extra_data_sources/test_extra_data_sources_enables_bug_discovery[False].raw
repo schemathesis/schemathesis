@@ -28,7 +28,7 @@ Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tes
 
   - GET /items/{id}
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Enable the `stateful` phase so declared links can supply real identifiers
 
 =================================== SUMMARY ====================================
 

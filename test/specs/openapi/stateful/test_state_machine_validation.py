@@ -109,6 +109,31 @@ def test_missing_operation(ctx):
     assert "Operation 'unknown' not found" in str(exc.value)
 
 
+def test_operations_with_incoming_links_ignores_broken_links(ctx):
+    # A link nobody can follow must not take down the run that only wanted to report a warning.
+    schema = ctx.openapi.load_schema(
+        {
+            "/users/": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "OK",
+                            "links": {
+                                "GetUserByUserId": {
+                                    "operationId": "unknown",
+                                    "parameters": {"path.user_id": "$response.body#/id"},
+                                },
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+    assert schema.operations_with_incoming_links() == set()
+
+
 def count_links(schema):
     total = 0
     for result in schema.get_all_operations():

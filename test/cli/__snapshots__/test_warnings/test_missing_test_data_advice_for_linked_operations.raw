@@ -9,8 +9,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
-     Configuration:    /tmp/config.toml
+     Operations:       3 selected / 3 total
 
 
  ✅  API capabilities:
@@ -20,21 +19,22 @@ Schemathesis dev
 
  ✅  Fuzzing (in 0.00s)
 
-     ✅ 2 passed
+     ✅ 3 passed
 
 =================================== WARNINGS ===================================
 
-Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
   - GET /users/{user_id}
+  - PATCH /users/{user_id}
 
 💡 Enable the `stateful` phase so declared links can supply real identifiers
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
-  Tested: 2
+  Selected: 3/3
+  Tested: 3
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -43,7 +43,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
 
 Test cases:
   N generated, N passed

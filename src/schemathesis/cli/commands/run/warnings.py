@@ -285,7 +285,7 @@ class WarningCollector:
                 self._handle_warning(
                     ctx,
                     SchemathesisWarning.MISSING_TEST_DATA,
-                    lambda: self.data.missing_test_data.add(event.recorder.label),
+                    lambda: self._record_missing_test_data(event.recorder.label, operation),
                 )
             if statistic.should_warn_about_validation_mismatch():
                 self._handle_warning(
@@ -293,6 +293,12 @@ class WarningCollector:
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
                 )
+
+    def _record_missing_test_data(self, label: str, operation: APIOperation | None) -> None:
+        """Record the operation, capturing the link graph the first time one warns."""
+        if self.data.linked_operations is None and operation is not None:
+            self.data.linked_operations = operation.schema.operations_with_incoming_links()
+        self.data.missing_test_data.add(label)
 
     def _mark_authenticated(self, label: str) -> None:
         """Take an operation out of the auth warning, and keep it out for the rest of the run."""
@@ -388,10 +394,9 @@ class WarningCollector:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
         # warnings, then remove them from warnings
         for key, node in event.recorder.cases.items():
-            if not self.data.missing_test_data:
-                break
-            if node.value.operation.label in self.data.missing_test_data and key in event.recorder.interactions:
+            label = node.value.operation.label
+            self.data.stateful_exercised.add(label)
+            if label in self.data.missing_test_data and key in event.recorder.interactions:
                 response = event.recorder.interactions[key].response
                 if response is not None and response.status_code < 300:
-                    self.data.missing_test_data.remove(node.value.operation.label)
-                    continue
+                    self.data.missing_test_data.remove(label)

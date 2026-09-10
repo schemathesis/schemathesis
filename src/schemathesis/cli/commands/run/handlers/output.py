@@ -90,6 +90,31 @@ def bold(option: str) -> str:
     return click.style(option, bold=True)
 
 
+def _missing_test_data_advice(
+    label: str, *, linked: set[str], stateful_ran: bool, exercised: set[str]
+) -> tuple[str, str]:
+    """What actually stands between this operation and real data, and the tip that addresses it."""
+    if label not in linked:
+        return (
+            "No links point to these operations",
+            "💡 Provide realistic parameter values in your config file so tests can access existing resources",
+        )
+    if not stateful_ran:
+        return (
+            "Reachable via links, but stateful testing did not run",
+            "💡 Enable the `stateful` phase so declared links can supply real identifiers",
+        )
+    if label not in exercised:
+        return (
+            "Reachable via links, but stateful testing never reached them",
+            "💡 Raise `phases.stateful.max-steps` or run longer so stateful testing reaches these operations",
+        )
+    return (
+        "Reached via links, but the linked data was not usable",
+        "💡 Check the operations that create this data - their responses do not yield usable identifiers",
+    )
+
+
 TRUNCATION_PLACEHOLDER = "[...]"
 
 
@@ -1113,6 +1138,34 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         self._print_warning_tips(tips)
 
+    def _display_missing_test_data_block(self, ctx: ExecutionContext) -> None:
+        """Display 404-ed operations grouped by what would actually make them reachable."""
+        linked = ctx.warnings.linked_operations or set()
+        stateful_ran = ctx.phases[PhaseName.STATEFUL_TESTING][0] != Status.SKIP
+        groups: dict[tuple[str, str], set[str]] = {}
+        for label in ctx.warnings.missing_test_data:
+            advice = _missing_test_data_advice(
+                label, linked=linked, stateful_ran=stateful_ran, exercised=ctx.warnings.stateful_exercised
+            )
+            groups.setdefault(advice, set()).add(label)
+
+        self._print_warning_header(
+            "Missing test data",
+            len(ctx.warnings.missing_test_data),
+            "operation",
+            " repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
+        )
+        if len(groups) == 1:
+            (_, tip), labels = next(iter(groups.items()))
+            self._print_items(labels)
+            self._print_warning_tips([tip])
+            return
+        for (cause, tip), labels in sorted(groups.items()):
+            plural = "" if len(labels) == 1 else "s"
+            click.echo(_style(f"{cause} ({len(labels)} operation{plural}):", fg="yellow"))
+            self._print_items(labels)
+            self._print_warning_tips([tip])
+
     def display_warnings(self, ctx: ExecutionContext) -> None:
         display_section_name("WARNINGS")
         click.echo()
@@ -1133,14 +1186,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             )
 
         if ctx.warnings.missing_test_data:
-            self._display_warning_block(
-                title="Missing test data",
-                operations=ctx.warnings.missing_test_data,
-                suffix_text=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
-                tips=[
-                    "💡 Provide realistic parameter values in your config file so tests can access existing resources",
-                ],
-            )
+            self._display_missing_test_data_block(ctx)
 
         if ctx.warnings.validation_mismatch:
             self._display_warning_block(
