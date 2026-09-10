@@ -228,11 +228,14 @@ class AuthConfig(DiffBase):
         if basic is not None:
             _validate_basic(*basic)
             self.basic = basic
+            self._mark_source_keys(("basic",))
 
         if wfc_path is not None:
             self.wfc = WFCAuthConfig(path=wfc_path, user=wfc_user)
+            self._mark_source_keys(("wfc",))
         elif wfc_user is not None:
             self.wfc_user = wfc_user
+            self._mark_source_keys(("wfc_user",))
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AuthConfig:
@@ -241,7 +244,7 @@ class AuthConfig(DiffBase):
             openapi=data.get("openapi"),
             dynamic=data.get("dynamic"),
             wfc=data.get("wfc"),
-        )
+        )._mark_source_keys(data)
 
     @property
     def all_openapi_schemes(

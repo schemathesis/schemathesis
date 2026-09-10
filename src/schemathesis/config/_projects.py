@@ -228,7 +228,7 @@ class ProjectConfig(DiffBase):
                     for operation in data.get("operations", [])
                 ]
             ),
-        )
+        )._mark_source_keys(data)
 
     def update(
         self,
@@ -256,15 +256,18 @@ class ProjectConfig(DiffBase):
         if base_url is not None:
             _validate_base_url(base_url)
             self.base_url = base_url
+            self._mark_source_keys(("base_url",))
 
         if origin is not None:
             _validate_origin(origin)
             self.origin = origin
+            self._mark_source_keys(("origin",))
 
         if headers is not None:
             _headers = self.headers or {}
             _headers.update(headers)
             self.headers = _headers
+            self._mark_source_keys(("headers",))
 
         if basic_auth is not None:
             self.auth.update(basic=basic_auth)
@@ -277,45 +280,28 @@ class ProjectConfig(DiffBase):
                 self.workers = workers
             else:
                 self.workers = get_workers_count()
-
-        if continue_on_failure is not None:
-            self.continue_on_failure = continue_on_failure
+            self._mark_source_keys(("workers",))
 
         if rate_limit is not None:
             if rate_limit != "auto":
                 self.rate_limit = build_limiter(rate_limit)
             else:
                 self.rate_limit = rate_limit
+            self._mark_source_keys(("rate_limit",))
 
-        if max_redirects is not None:
-            self.max_redirects = max_redirects
-
-        if request_timeout is not None:
-            self.request_timeout = request_timeout
-
-        if request_retries is not None:
-            self.request_retries = request_retries
-
-        if tls_verify is not None:
-            self.tls_verify = tls_verify
-
-        if request_cert is not None:
-            self.request_cert = request_cert
-
-        if request_cert_key is not None:
-            self.request_cert_key = request_cert_key
-
-        if proxy is not None:
-            self.proxy = proxy
-
-        if parameters is not None:
-            self.parameters = parameters
-
-        if suppress_health_check is not None:
-            self.suppress_health_check = suppress_health_check
-
-        if warnings is not None:
-            self.warnings = warnings
+        self._apply(
+            continue_on_failure=continue_on_failure,
+            max_redirects=max_redirects,
+            request_timeout=request_timeout,
+            request_retries=request_retries,
+            tls_verify=tls_verify,
+            request_cert=request_cert,
+            request_cert_key=request_cert_key,
+            proxy=proxy,
+            parameters=parameters,
+            suppress_health_check=suppress_health_check,
+            warnings=warnings,
+        )
 
     @property
     def config_path(self) -> str | None:
@@ -634,7 +620,7 @@ class ProjectsConfig(DiffBase):
                 project["title"]: ProjectConfig.from_dict(project, dictionaries=dictionaries)
                 for project in data.get("project", [])
             },
-        )
+        )._mark_source_keys(data)
 
     def _set_parent(self, parent: SchemathesisConfig) -> None:
         self.default._parent = parent

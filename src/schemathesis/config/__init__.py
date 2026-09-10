@@ -194,18 +194,15 @@ class SchemathesisConfig(DiffBase):
         max_time: int | None = None,
     ) -> None:
         """Set top-level configuration options."""
-        if color is not None:
-            self.color = color
-        if suppress_health_check is not None:
-            self.suppress_health_check = suppress_health_check
         if seed is not None:
             self._seed = seed
-        if wait_for_schema is not None:
-            self.wait_for_schema = wait_for_schema
-        if max_failures is not None:
-            self.max_failures = max_failures
-        if max_time is not None:
-            self.max_time = max_time
+        self._apply(
+            color=color,
+            suppress_health_check=suppress_health_check,
+            wait_for_schema=wait_for_schema,
+            max_failures=max_failures,
+            max_time=max_time,
+        )
 
     @classmethod
     def from_path(cls, path: PathLike | str) -> SchemathesisConfig:

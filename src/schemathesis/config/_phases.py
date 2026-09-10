@@ -34,7 +34,7 @@ class ExtraDataSourcesConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> ExtraDataSourcesConfig:
         return cls(
             responses=data.get("responses", True),
-        )
+        )._mark_source_keys(data)
 
     @property
     def is_enabled(self) -> bool:
@@ -46,6 +46,8 @@ class ExtraDataSourcesConfig(DiffBase):
 class ErrorFeedbackConfig(DiffBase):
     """Configuration for the error-feedback subsystem (4xx response analysis)."""
 
+    _key_aliases = {"enabled": "is_enabled"}
+
     is_enabled: bool
 
     __slots__ = ("is_enabled", "_is_default")
@@ -56,7 +58,7 @@ class ErrorFeedbackConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ErrorFeedbackConfig:
-        return cls(enabled=data.get("enabled", True))
+        return cls(enabled=data.get("enabled", True))._mark_source_keys(data)
 
 
 class OperationOrdering(str, Enum):
@@ -143,7 +145,7 @@ class FuzzingPhaseConfig(DiffBase):
             operation_ordering=data.get("operation-ordering", "auto"),
             extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {})),
             error_feedback=ErrorFeedbackConfig.from_dict(data.get("error-feedback", {})),
-        )
+        )._mark_source_keys(data)
 
 
 @dataclass(repr=False)
@@ -210,7 +212,7 @@ class ExamplesPhaseConfig(DiffBase):
             extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {}))
             if "extra-data-sources" in data
             else None,
-        )
+        )._mark_source_keys(data)
 
 
 @dataclass(repr=False)
@@ -285,7 +287,7 @@ class CoveragePhaseConfig(DiffBase):
             extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {}))
             if "extra-data-sources" in data
             else None,
-        )
+        )._mark_source_keys(data)
 
 
 class InferenceAlgorithm(str, Enum):
@@ -312,7 +314,7 @@ class InferenceConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> InferenceConfig:
         return cls(
             algorithms=data.get("algorithms", list(InferenceAlgorithm)),
-        )
+        )._mark_source_keys(data)
 
     @property
     def is_enabled(self) -> bool:
@@ -373,7 +375,7 @@ class StatefulPhaseConfig(DiffBase):
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             inference=InferenceConfig.from_dict(data.get("inference", {})),
             link_calibration=data.get("link-calibration", True),
-        )
+        )._mark_source_keys(data)
 
 
 @dataclass(repr=False)
@@ -429,7 +431,7 @@ class PhasesConfig(DiffBase):
             coverage=CoveragePhaseConfig.from_dict(merge(data.get("coverage", {})), dictionaries=dictionaries),
             fuzzing=FuzzingPhaseConfig.from_dict(merge(data.get("fuzzing", {})), dictionaries=dictionaries),
             stateful=StatefulPhaseConfig.from_dict(merge(data.get("stateful", {})), dictionaries=dictionaries),
-        )
+        )._mark_source_keys(data)
 
     def update(self, *, phases: list[str]) -> None:
         known = ["examples", "coverage", "fuzzing", "stateful"]

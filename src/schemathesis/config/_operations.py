@@ -384,4 +384,4 @@ class OperationConfig(DiffBase):
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             phases=PhasesConfig.from_dict(data.get("phases", {}), dictionaries=dictionaries),
             generation=GenerationConfig.from_dict(data.get("generation", {}), dictionaries=dictionaries),
-        )
+        )._mark_source_keys(data)

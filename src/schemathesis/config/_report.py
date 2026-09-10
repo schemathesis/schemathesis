@@ -49,9 +49,9 @@ class ReportConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> ReportConfig:
         path = resolve(data.get("path"))
         if path is not None:
-            return cls(enabled=True, path=Path(path))
+            return cls(enabled=True, path=Path(path))._mark_source_keys(data)
         enabled = data.get("enabled", False)
-        return cls(enabled=enabled, path=path)
+        return cls(enabled=enabled, path=path)._mark_source_keys(data)
 
 
 @dataclass(repr=False, slots=True)
@@ -99,7 +99,7 @@ class ReportsConfig(DiffBase):
             ndjson=ReportConfig.from_dict(data.get("ndjson", {})),
             json=ReportConfig.from_dict(data.get("json", {})),
             allure=ReportConfig.from_dict(data.get("allure", {})),
-        )
+        )._mark_source_keys(data)
 
     def update(
         self,
