@@ -32,7 +32,7 @@ In CI against a shared environment, make this a precondition of the job rather t
 
 ## Narrow the First Run
 
-Four settings account for most of the volume. Each one silences a real class of finding, so turn on only the ones you have decided not to act on yet.
+Four settings account for most of the volume. Each one silences a whole class of finding everywhere, including instances you have not seen yet - reach for them when you do not want that class at all. To accept a specific set of failures while keeping the check live, use a [baseline](baseline.md) instead.
 
 **Timestamps without a timezone.** A field declared `format: date-time` comes back as `2026-09-06T10:19:14.561638` instead of `2026-09-06T10:19:14.561638Z`. RFC 3339 requires the offset, and stacks whose default timestamp type is timezone-naive omit it. A real violation, and usually not the one you are hunting today.
 
@@ -116,6 +116,16 @@ Or `--include-tag users` if your schema uses tags.
 ## Server Errors
 
 Fewest and most severe. Run the reproduction `curl`, read the body, trace the minimal failing input back to its schema definition — there is no batch fix. After a fix, confirm with [`st replay`](crash-reproduction.md) instead of re-running the suite.
+
+## Accept What You Are Not Fixing Yet
+
+What is left after the batch fixes is usually real, known, and not this quarter's work. Record it in a [baseline](baseline.md) rather than disabling the checks that found it:
+
+```bash
+uvx schemathesis run https://api.example.com/openapi.json --baseline schemathesis-baseline.json
+```
+
+Every later run reports those failures and exits `0`; a new one still fails the build. Entries are yours to annotate, and an `expires` date on one makes it fail again if nobody got to it.
 
 ## What's Next
 

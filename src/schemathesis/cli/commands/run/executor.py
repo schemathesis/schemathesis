@@ -41,5 +41,9 @@ def _execute(
         args=args,
         params=params,
         output_handler=OutputHandler(config=config),
-        context_factory=lambda cfg: ExecutionContext(config=cfg),
+        context_factory=lambda cfg: ExecutionContext(
+            config=cfg,
+            baseline_update=params.get("baseline_update", False),
+            baseline_prune=params.get("baseline_prune", False),
+        ),
     )

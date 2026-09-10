@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
 
+from schemathesis.baseline import Baseline, BaselineEntry
 from schemathesis.cli.commands.run.warnings import WarningCollector
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.summary import SummaryData, WarningData
-from schemathesis.core.failures import RUN_CHECKS_LABEL
+from schemathesis.core.failures import RUN_CHECKS_LABEL, is_reproducible_failure
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
@@ -34,8 +37,13 @@ class ExecutionContext(BaseExecutionContext):
     skip_reasons: dict[str, set[str]] = field(default_factory=dict)
     stop_reason: StopReason = StopReason.INTERRUPTED
     warning_collector: WarningCollector | None = None
+    baseline_update: bool = False
+    baseline_prune: bool = False
+    baseline_recorded: int | None = None
+    baseline_pruned: list[str] | None = None
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         self.warning_collector = WarningCollector(config=self.config)
 
     def on_event(self, event: events.EngineEvent) -> None:
@@ -71,6 +79,7 @@ class ExecutionContext(BaseExecutionContext):
             if event.failures:
                 self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
                 self.exit_code = 1
+            self._write_baseline()
         if isinstance(event, events.NonFatalError):
             self.errors.add(event)
         if isinstance(event, events.NonFatalError) or (
@@ -79,6 +88,46 @@ class ExecutionContext(BaseExecutionContext):
             and event.status in (Status.FAILURE, Status.ERROR)
         ):
             self.exit_code = 1
+
+    def _write_baseline(self) -> None:
+        if self.config.baseline is None:
+            return
+        path = Path(self.config.baseline)
+        # A baseline that does not exist yet is created from this run, the way a lockfile is.
+        creating = not path.exists()
+        if not (creating or self.baseline_update or self.baseline_prune):
+            return
+        loaded = self.statistic.baseline or Baseline(entries=[])
+        # Work off a copy so the summary still reports against the baseline as the run loaded it.
+        entries = list(loaded.entries)
+        if self.baseline_prune:
+            observed = set(self.statistic.known_failures.values())
+            kept = [
+                entry
+                for entry in entries
+                if entry.id in observed or entry.operation not in self.statistic.tested_operations
+            ]
+            dropped = {entry.id for entry in entries} - {entry.id for entry in kept}
+            self.baseline_pruned = sorted(dropped)
+            entries = kept
+        if self.baseline_update or creating:
+            today = date.today().isoformat()
+            existing = {entry.identity: entry for entry in entries}
+            seen = set(existing)
+            self.baseline_recorded = 0
+            for failure, check in self.statistic.observed_failures.values():
+                # Response time flaps with machine load, so an entry for it would never settle.
+                if not is_reproducible_failure(failure):
+                    continue
+                entry = BaselineEntry.from_failure(failure, check=check)
+                seen_before = existing.get(entry.identity)
+                if seen_before is not None:
+                    seen_before.last_seen = today
+                if entry.identity not in seen:
+                    entries.append(entry)
+                    seen.add(entry.identity)
+                    self.baseline_recorded += 1
+        Baseline(entries=entries).save(path)
 
     @property
     def warnings(self) -> WarningData:
@@ -93,4 +142,6 @@ class ExecutionContext(BaseExecutionContext):
             skip_reasons=self.skip_reasons,
             stop_reason=self.stop_reason,
             warnings=self.warnings,
+            baseline_recorded=self.baseline_recorded,
+            baseline_pruned=self.baseline_pruned,
         )

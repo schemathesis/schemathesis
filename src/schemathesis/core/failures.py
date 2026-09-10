@@ -8,6 +8,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from json import JSONDecodeError
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.compat import BaseExceptionGroup
@@ -120,10 +121,19 @@ class Failure(AssertionError):
         return ()
 
 
+def _portable_filename(filename: str) -> str:
+    # Origins are part of a stored failure's identity, so an absolute checkout root would tie it to one machine.
+    try:
+        return Path(filename).resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except (ValueError, OSError):
+        return filename
+
+
 def get_origin(exception: BaseException, seen: tuple[BaseException, ...] = ()) -> tuple:
     filename, lineno = None, None
     if tb := exception.__traceback__:
         filename, lineno, *_ = traceback.extract_tb(tb)[-1]
+        filename = _portable_filename(filename)
     seen = (*seen, exception)
     context = ()
     if exception.__context__ is not None and exception.__context__ not in seen:

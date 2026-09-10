@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import TYPE_CHECKING
 
 from schemathesis.config import SchemathesisWarning
@@ -157,6 +158,24 @@ class FailureGroup:
 
 
 @dataclass(slots=True)
+class BaselineSummary:
+    """How the run lined up with the recorded known failures."""
+
+    known: int
+    new: int
+    # Entries `--baseline-update` added to the file; `None` when the run did not update it.
+    recorded: int | None
+    # Entries `--baseline-prune` dropped; `None` when the run did not prune.
+    pruned: list[str] | None
+    # Entries the run never hit. Not evidence they are fixed - the run may not have reached them.
+    unobserved: int
+    known_ids: list[str]
+    unobserved_ids: list[str]
+    # Entries whose `expires` date has passed, so they no longer suppress anything.
+    expired_ids: list[str]
+
+
+@dataclass(slots=True)
 class ErrorGroup:
     title: str
     count: int
@@ -172,6 +191,8 @@ class SummaryData:
     failures: list[FailureGroup]
     errors: list[ErrorGroup]
     warnings: WarningData
+    # `None` when no baseline is configured.
+    baseline: BaselineSummary | None
 
     @classmethod
     def from_run(
@@ -184,6 +205,8 @@ class SummaryData:
         skip_reasons: dict[str, set[str]],
         stop_reason: StopReason,
         warnings: WarningData,
+        baseline_recorded: int | None = None,
+        baseline_pruned: list[str] | None = None,
     ) -> SummaryData:
         return cls(
             operations=_reduce_operations(
@@ -201,6 +224,7 @@ class SummaryData:
             failures=reduce_failures(statistic),
             errors=reduce_errors(errors),
             warnings=warnings,
+            baseline=reduce_baseline(statistic, recorded=baseline_recorded, pruned=baseline_pruned),
         )
 
 
@@ -268,6 +292,29 @@ def build_operations(
         errored=errored,
         skipped=0,
         skip_reasons=[],
+    )
+
+
+def reduce_baseline(
+    statistic: Statistic, *, recorded: int | None = None, pruned: list[str] | None = None
+) -> BaselineSummary | None:
+    if statistic.baseline is None:
+        return None
+    today = date.today()
+    observed = set(statistic.known_failures.values())
+    known_ids = sorted(observed)
+    # Pruned entries are gone from the file, so reporting them as unobserved would describe a state that no longer exists.
+    seen = observed.union(pruned or ())
+    unobserved = [entry.id for entry in statistic.baseline.entries if entry.id not in seen]
+    return BaselineSummary(
+        known=len(statistic.known_failures),
+        new=len(statistic.unique_failures_map),
+        recorded=recorded,
+        pruned=pruned,
+        unobserved=len(unobserved),
+        known_ids=known_ids,
+        unobserved_ids=sorted(unobserved),
+        expired_ids=sorted(entry.id for entry in statistic.baseline.entries if entry.is_expired(today)),
     )
 
 

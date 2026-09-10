@@ -14,7 +14,13 @@ import click
 
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
-from schemathesis.cli.summary import ErrorGroup, FailureGroup, OperationsSummary, TestCasesSummary
+from schemathesis.cli.summary import (
+    BaselineSummary,
+    ErrorGroup,
+    FailureGroup,
+    OperationsSummary,
+    TestCasesSummary,
+)
 from schemathesis.core.errors import LoaderErrorKind
 from schemathesis.core.failures import (
     MessageBlock,
@@ -337,6 +343,25 @@ def display_failures_summary(failures: list[FailureGroup]) -> None:
     for group in failures:
         click.echo(_style(f"  ❌ {group.title}: "), nl=False)
         click.echo(_style(str(group.count), bold=True))
+    click.echo()
+
+
+def display_baseline_summary(baseline: BaselineSummary) -> None:
+    click.echo(_style("Baseline:", bold=True))
+    click.echo(_style("  Known failures: "), nl=False)
+    click.echo(_style(str(baseline.known), bold=True))
+    if baseline.recorded is not None:
+        click.echo(_style("  Recorded: "), nl=False)
+        click.echo(_style(str(baseline.recorded), bold=True))
+    if baseline.pruned is not None:
+        click.echo(_style("  Pruned: "), nl=False)
+        click.echo(_style(str(len(baseline.pruned)), bold=True))
+    if baseline.unobserved:
+        click.echo(_style("  Unobserved entries: "), nl=False)
+        click.echo(_style(str(baseline.unobserved), bold=True))
+    if baseline.expired_ids:
+        click.echo(_style(f"  Expired entries: {len(baseline.expired_ids)}", fg="yellow"))
+        click.echo(_style(f"    {', '.join(baseline.expired_ids)}", fg="yellow"))
     click.echo()
 
 

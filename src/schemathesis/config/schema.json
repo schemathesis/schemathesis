@@ -80,6 +80,9 @@
     "output": {
       "$ref": "#/$defs/OutputConfig"
     },
+    "baseline": {
+      "type": "string"
+    },
     "base-url": {
       "type": "string"
     },
@@ -935,6 +938,9 @@
       "additionalProperties": false,
       "properties": {
         "title": {
+          "type": "string"
+        },
+        "baseline": {
           "type": "string"
         },
         "base-url": {

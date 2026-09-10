@@ -5,6 +5,9 @@
 ### [Triaging Failures](triage.md)
 Work through a large number of failures systematically — from easy batch fixes to individual investigation.
 
+### [Baseline](baseline.md)
+Record the failures you are not fixing yet so CI fails only on ones that are new.
+
 ### [Replaying Failures](crash-reproduction.md)
 Re-run the exact cases that failed a previous run with `st replay` to confirm fixes, without launching a whole new campaign.
 

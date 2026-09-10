@@ -105,6 +105,32 @@ MAX_TIME = OptionSpec(
     metavar="SECONDS",
 )
 
+BASELINE = OptionSpec(
+    "--baseline",
+    "baseline",
+    help="File recording the failures you have accepted",
+    type=click.Path(dir_okay=False, path_type=str),
+    metavar="PATH",
+)
+
+BASELINE_UPDATE = OptionSpec(
+    "--baseline-update",
+    "baseline_update",
+    help="Merge the failures of this run into an existing baseline file",
+    is_flag=True,
+    default=False,
+    metavar="",
+)
+
+BASELINE_PRUNE = OptionSpec(
+    "--baseline-prune",
+    "baseline_prune",
+    help="Drop baseline entries this run tested and did not reproduce",
+    is_flag=True,
+    default=False,
+    metavar="",
+)
+
 CONTINUE_ON_FAILURE = OptionSpec(
     "--continue-on-failure",
     "continue_on_failure",

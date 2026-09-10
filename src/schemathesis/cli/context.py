@@ -25,6 +25,9 @@ class BaseExecutionContext:
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
     summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        self.statistic.baseline = self.config.load_baseline()
+
     def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
         self.initialization_lines.append(line)
 

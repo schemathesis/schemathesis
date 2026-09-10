@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING
 
 from schemathesis.checks import run_checks
 from schemathesis.core.failures import FailureGroup
+from schemathesis.engine._baseline import is_known
 
 if TYPE_CHECKING:
+    from schemathesis.baseline import Baseline
     from schemathesis.checks import CheckContext
     from schemathesis.core.failures import Failure
     from schemathesis.core.transport import Response
@@ -20,9 +22,13 @@ def validate_response(
     response: Response,
     continue_on_failure: bool,
     recorder: ScenarioRecorder,
+    baseline: Baseline | None = None,
 ) -> None:
+    checked_by: dict[Failure, str] = {}
+
     def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
         collected.add(failure)
+        checked_by.setdefault(failure, name)
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
         recorder.record_check_failure(
             name=name,
@@ -43,5 +49,6 @@ def validate_response(
         on_success=on_success,
     )
 
-    if failures and not continue_on_failure:
-        raise FailureGroup(list(failures)) from None
+    new = [failure for failure in failures if not is_known(failure, checked_by[failure], baseline)]
+    if new and not continue_on_failure:
+        raise FailureGroup(new) from None

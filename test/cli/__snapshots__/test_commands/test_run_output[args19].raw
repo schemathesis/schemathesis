@@ -64,6 +64,11 @@ API validation options:
                                 specified number of failures or errors  [x>=1]
   --continue-on-failure         Continue executing all test cases within a
                                 scenario, even after encountering failures
+  --baseline PATH               File recording the failures you have accepted
+  --baseline-update             Merge the failures of this run into an existing
+                                baseline file
+  --baseline-prune              Drop baseline entries this run tested and did
+                                not reproduce
   --max-response-time SECONDS   Maximum allowed API response time in seconds
                                 [x>0.0]
 

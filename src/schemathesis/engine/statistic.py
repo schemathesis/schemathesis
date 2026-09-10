@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.baseline import failure_identity
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import UNRESOLVABLE
@@ -14,6 +15,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 
 if TYPE_CHECKING:
+    from schemathesis.baseline import Baseline, Identity
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
 
@@ -37,6 +39,13 @@ class Statistic:
     # Track first case_id where each unique failure was found
     unique_failures_map: dict[Failure, str]
 
+    # Failures the configured baseline already accounts for, and the entries they matched.
+    baseline: Baseline | None
+    # Identity -> matched entry id.
+    known_failures: dict[Identity, str]
+    # Identity -> the failure and the check that produced it, known or not.
+    observed_failures: dict[Identity, tuple[Failure, str]]
+
     extraction_failures: set[ExtractionFailure]
 
     tested_operations: set[str]
@@ -50,6 +59,9 @@ class Statistic:
     def __init__(self) -> None:
         self.failures = {}
         self.unique_failures_map = {}
+        self.baseline = None
+        self.known_failures = {}
+        self.observed_failures = {}
         self.extraction_failures = set()
         self.tested_operations = set()
         self.operations_without_checks = set()
@@ -99,7 +111,13 @@ class Statistic:
                     failure = check.failure_info.failure
 
                     # Check if this is a new unique failure
-                    if failure not in self.unique_failures_map:
+                    identity = failure_identity(failure, check.name)
+                    if failure not in self.unique_failures_map and identity not in self.known_failures:
+                        self.observed_failures[identity] = (failure, check.name)
+                        entry = self.baseline.match(failure, check.name) if self.baseline is not None else None
+                        if entry is not None:
+                            self.known_failures[identity] = entry.id
+                            continue
                         last_failure_info = check.failure_info
                         self.unique_failures_map[failure] = case_id
                         current_case_failures.append(failure)

@@ -32,6 +32,7 @@ from schemathesis.engine.errors import (
 )
 from schemathesis.engine.run import PhaseName
 from schemathesis.engine.run.unit._case import BudgetExpired
+from schemathesis.engine._baseline import is_known
 from schemathesis.engine._rate_limit_retry import call_and_validate_with_retry
 from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -49,6 +50,7 @@ from schemathesis.generation.metrics import MetricCollector
 from schemathesis.specs.openapi.stateful.link_calibration import record_link_outcome
 
 if TYPE_CHECKING:
+    from schemathesis.baseline import Baseline
     from schemathesis.core.error_feedback.store import Observation
     from schemathesis.resources import ResourceRecorder
 
@@ -379,6 +381,7 @@ def execute_state_machine_loop(
                 control=engine.control,
                 recorder=self.recorder,
                 additional_checks=additional_checks,
+                baseline=engine.config.load_baseline(),
             )
 
         def teardown(self) -> None:
@@ -478,10 +481,13 @@ def validate_response(
     checks: list[CheckFunction],
     recorder: ScenarioRecorder,
     additional_checks: tuple[CheckFunction, ...] = (),
+    baseline: Baseline | None = None,
 ) -> None:
     """Validate the response against the provided checks."""
+    checked_by: dict[Failure, str] = {}
 
     def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+        checked_by.setdefault(failure, name)
         if stateful_ctx.is_seen_in_suite(failure) or stateful_ctx.is_seen_in_run(failure):
             return
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
@@ -503,7 +509,9 @@ def validate_response(
             code_sample="\n".join(commands),
             failure=failure,
         )
-        control.count_failure(failure)
+        # Known failures are accepted debt, so they must not spend the `--max-failures` budget.
+        if not is_known(failure, name, baseline):
+            control.count_failure(failure)
         stateful_ctx.mark_as_seen_in_suite(failure)
         collected.add(failure)
 
@@ -519,5 +527,6 @@ def validate_response(
         on_success=on_success,
     )
 
-    if failures:
-        raise FailureGroup(list(failures)) from None
+    new = [failure for failure in failures if not is_known(failure, checked_by[failure], baseline)]
+    if new:
+        raise FailureGroup(new) from None

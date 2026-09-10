@@ -68,6 +68,7 @@ def test_report_shape(ctx, cli, json_path):
             "unmatched_filter": [],
             "unresolvable_reference": [],
         },
+        "baseline": None,
         "auth": {"reauth_count": 0, "reauth_broke": False},
     }
 

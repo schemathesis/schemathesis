@@ -18,6 +18,9 @@ from schemathesis.cli.options import (
     AUTH_WFC,
     AUTH_WFC_USER,
     BASE_URL,
+    BASELINE,
+    BASELINE_PRUNE,
+    BASELINE_UPDATE,
     CHECKS_OPTION,
     CONTINUE_ON_FAILURE,
     EXCLUDE_BY,
@@ -105,6 +108,9 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 @grouped_option(*EXCLUDE_CHECKS.args, **EXCLUDE_CHECKS.kwargs)
 @grouped_option(*MAX_FAILURES.args, **MAX_FAILURES.kwargs)
 @grouped_option(*CONTINUE_ON_FAILURE.args, **CONTINUE_ON_FAILURE.kwargs)
+@grouped_option(*BASELINE.args, **BASELINE.kwargs)
+@grouped_option(*BASELINE_UPDATE.args, **BASELINE_UPDATE.kwargs)
+@grouped_option(*BASELINE_PRUNE.args, **BASELINE_PRUNE.kwargs)
 @grouped_option(*MAX_RESPONSE_TIME.args, **MAX_RESPONSE_TIME.kwargs)
 @group(
     "Filtering options",
@@ -183,6 +189,9 @@ def run(
     max_failures: int | None = None,
     max_time: int | None = None,
     continue_on_failure: bool | None = None,
+    baseline: str | None = None,
+    baseline_update: bool = False,
+    baseline_prune: bool = False,
     include_path: tuple[str, ...],
     include_path_regex: str | None,
     include_method: tuple[str, ...],
@@ -297,6 +306,7 @@ def run(
     # Other CLI options work as an override for all defined projects
     config.projects.override.update(
         base_url=base_url,
+        baseline=baseline,
         origin=origin,
         headers=headers or None,
         basic_auth=auth,
@@ -316,6 +326,12 @@ def run(
         if warnings is not None
         else None,
     )
+    if (baseline_update or baseline_prune) and config.projects.get_default().baseline is None:
+        flag = "--baseline-update" if baseline_update else "--baseline-prune"
+        raise click.UsageError(
+            f"{flag} needs a baseline file - pass `--baseline PATH` or set `baseline` in your configuration file"
+        )
+
     # These are filters for what API operations should be tested
     filter_set = {
         "include_path": include_path,
