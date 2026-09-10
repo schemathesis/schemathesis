@@ -74,6 +74,10 @@ class MissingHeaders(Failure):
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
+    @property
+    def _unique_key(self) -> str:
+        return ",".join(self.missing_headers)
+
 
 class JsonSchemaError(Failure):
     """Additional information about JSON Schema validation errors."""
@@ -237,6 +241,10 @@ class MalformedMediaType(Failure):
         self.title = title
         self.case_id = case_id
         self.severity = Severity.MEDIUM
+
+    @property
+    def _unique_key(self) -> str:
+        return self.actual
 
 
 class UndefinedContentType(Failure):
