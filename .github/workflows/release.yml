@@ -178,3 +178,47 @@ jobs:
 
       - name: Publish distribution package to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  comment_on_issues:
+    permissions:
+      # Comments on the issues the release references.
+      issues: write
+    name: Comment on referenced issues
+    needs: release_package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Comment on referenced issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Anything but a plain `vX.Y.Z` tag is a prerelease and is not announced.
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Skipped $TAG: prerelease"
+            exit 0
+          fi
+          VERSION="${TAG#v}"
+          # Hidden so that rewording the announcement does not re-announce every issue.
+          MARKER="<!-- schemathesis-release: $VERSION -->"
+          BODY="Released in Schemathesis $VERSION, available on PyPI. Release notes: https://github.com/$REPOSITORY/releases/tag/v$VERSION"$'\n\n'"$MARKER"
+          python changelog.py issues "$VERSION" > issue_numbers.txt
+          while read -r NUMBER <&3; do
+            if ! COMMENTS=$(gh issue view "$NUMBER" --repo "$REPOSITORY" --json comments --jq '.comments[].body'); then
+              echo "Skipped #$NUMBER: its comments are unreachable"
+              continue
+            fi
+            if printf '%s' "$COMMENTS" | grep -qF "$MARKER"; then
+              echo "Skipped #$NUMBER: already announced"
+              continue
+            fi
+            if ! gh issue comment "$NUMBER" --repo "$REPOSITORY" --body "$BODY"; then
+              echo "Skipped #$NUMBER: the comment was rejected"
+            fi
+          done 3< issue_numbers.txt
+        shell: bash
