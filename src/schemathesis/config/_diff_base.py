@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass, fields, is_dataclass
+from collections.abc import Iterable
+from dataclasses import fields, is_dataclass
 from itertools import starmap
-from typing import TypeVar
+from typing import ClassVar, TypeVar
 
 T = TypeVar("T", bound="DiffBase")
 
@@ -16,17 +17,36 @@ def _required_parameters(cls: type) -> set[str]:
     }
 
 
-@dataclass
+# Not a dataclass: subclasses are, and a base field would land before their own required ones.
 class DiffBase:
+    # Options that came from a config file key or an `update()` argument. Empty for configs built
+    # directly in Python, where an explicit value cannot be told apart from a default one.
+    _source_keys: frozenset[str] = frozenset()
+
+    # Config-file keys whose name differs from the option they set.
+    _key_aliases: ClassVar[dict[str, str]] = {}
+
+    def _mark_source_keys(self: T, keys: Iterable[str]) -> T:
+        normalized = (key.replace("-", "_") for key in keys)
+        self._source_keys = self._source_keys | {self._key_aliases.get(key, key) for key in normalized}
+        return self
+
+    def _apply(self, **values: object) -> None:
+        """Set every provided option and record it as coming from an explicit source."""
+        provided = [name for name, value in values.items() if value is not None]
+        for name in provided:
+            setattr(self, name, values[name])
+        self._mark_source_keys(provided)
+
     def __repr__(self) -> str:
         """Show only the fields that differ from the default."""
-        assert is_dataclass(self)
         # A section with required arguments has no argument-free default, so it is built from those values
         # and they are always shown.
         required = _required_parameters(self.__class__)
         default = self.__class__(**{name: getattr(self, name) for name in required})
         diffs = []
-        for field in fields(self):
+        # Every subclass is a dataclass; this base only carries the shared behaviour.
+        for field in fields(self):  # type: ignore[arg-type]
             name = field.name
             if name.startswith("_") and name not in ("_seed", "_filter_set"):
                 continue
@@ -99,10 +119,14 @@ class DiffBase:
                 # require merging of nested options
                 for config in configs:
                     current = getattr(config, option)
-                    if current != default:
+                    source_keys = config._source_keys
+                    # A config decides an option when its source named it. Configs built in Python
+                    # have no source, so any non-default value counts as a decision.
+                    decides = option in source_keys if source_keys else current != default
+                    if decides:
                         setattr(output, option, current)
                         # As we go from the highest priority to the lowest one,
-                        # we can just stop on the first non-default value
+                        # we can stop at the first config that sets the option
                         break
         return output  # type: ignore[return-value]
 

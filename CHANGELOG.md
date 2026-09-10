@@ -37,6 +37,7 @@
 - Server-reported numeric bounds discarded in favour of the wider `format: int32`/`int64` range.
 - `--exclude-method` and other exclusions ignored for unexpected HTTP methods in the coverage phase. [#3142](https://github.com/schemathesis/schemathesis/issues/3142)
 - False positives `positive_data_acceptance` and `negative_data_rejection` for `429` responses.
+- Config file and CLI values ignored when equal to an option's default.
 
 ## [4.26.1](https://github.com/schemathesis/schemathesis/compare/v4.26.0...v4.26.1) - 2026-09-09
 

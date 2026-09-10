@@ -25,7 +25,7 @@ class ConstantsConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ConstantsConfig:
-        return cls(enabled=data.get("enabled"))
+        return cls(enabled=data.get("enabled"))._mark_source_keys(data)
 
     @classmethod
     def from_hierarchy(cls, configs: list[ConstantsConfig]) -> ConstantsConfig:  # type: ignore[override]
@@ -47,4 +47,6 @@ class AnalysisConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AnalysisConfig:
-        return cls(constants=ConstantsConfig.from_dict(data["constants"]) if "constants" in data else None)
+        return cls(
+            constants=ConstantsConfig.from_dict(data["constants"]) if "constants" in data else None
+        )._mark_source_keys(data)

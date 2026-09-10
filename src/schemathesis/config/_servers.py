@@ -16,4 +16,4 @@ class ServersConfig(DiffBase):
     @classmethod
     def from_dict(cls, data: dict) -> ServersConfig:
         raw_variables = data.get("variables", {})
-        return cls(variables={key: resolve(value) for key, value in raw_variables.items()})
+        return cls(variables={key: resolve(value) for key, value in raw_variables.items()})._mark_source_keys(data)

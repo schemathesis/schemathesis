@@ -95,11 +95,10 @@ class SanitizationConfig(DiffBase):
             keys_to_sanitize=tuple(k.lower() for k in data.get("keys-to-sanitize", [])) or DEFAULT_KEYS_TO_SANITIZE,
             sensitive_markers=tuple(m.lower() for m in data.get("sensitive-markers", [])) or DEFAULT_SENSITIVE_MARKERS,
             replacement=data.get("replacement", DEFAULT_REPLACEMENT),
-        )
+        )._mark_source_keys(data)
 
     def update(self, *, enabled: bool | None = None) -> None:
-        if enabled is not None:
-            self.enabled = enabled
+        self._apply(enabled=enabled)
 
 
 MAX_PAYLOAD_SIZE = 512
@@ -143,11 +142,10 @@ class TruncationConfig(DiffBase):
             max_lines=data.get("max-lines", MAX_LINES),
             max_width=data.get("max-width", MAX_WIDTH),
             max_recorded_payload_size=data.get("max-recorded-payload-size", MAX_RECORDED_PAYLOAD_SIZE),
-        )
+        )._mark_source_keys(data)
 
     def update(self, *, enabled: bool | None = None) -> None:
-        if enabled is not None:
-            self.enabled = enabled
+        self._apply(enabled=enabled)
 
 
 @dataclass(repr=False, slots=True)
@@ -169,4 +167,4 @@ class OutputConfig(DiffBase):
         return cls(
             sanitization=SanitizationConfig.from_dict(data.get("sanitization", {})),
             truncation=TruncationConfig.from_dict(data.get("truncation", {})),
-        )
+        )._mark_source_keys(data)

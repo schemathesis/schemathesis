@@ -20,4 +20,4 @@ class CacheConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CacheConfig:
-        return cls(enabled=data.get("enabled", True), directory=data.get("directory"))
+        return cls(enabled=data.get("enabled", True), directory=data.get("directory"))._mark_source_keys(data)

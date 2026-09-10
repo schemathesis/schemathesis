@@ -15,4 +15,4 @@ class FuzzConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> FuzzConfig:
-        return cls(max_time=cast("int | None", data.get("max-time")))
+        return cls(max_time=cast("int | None", data.get("max-time")))._mark_source_keys(data)

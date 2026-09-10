@@ -78,7 +78,7 @@ class SimpleCheckConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SimpleCheckConfig:
-        return cls(enabled=data.get("enabled", True))
+        return cls(enabled=data.get("enabled", True))._mark_source_keys(data)
 
 
 @dataclass(repr=False, slots=True)
@@ -92,7 +92,9 @@ class ResponseSchemaConformanceConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ResponseSchemaConformanceConfig:
-        return cls(enabled=data.get("enabled", True), validate_formats=data.get("validate-formats", True))
+        return cls(
+            enabled=data.get("enabled", True), validate_formats=data.get("validate-formats", True)
+        )._mark_source_keys(data)
 
 
 @dataclass(repr=False, slots=True)
@@ -126,7 +128,7 @@ class CheckConfig(DiffBase):
         return cls(
             enabled=enabled,
             expected_statuses=data.get("expected-statuses", cls._DEFAULT_EXPECTED_STATUSES),
-        )
+        )._mark_source_keys(data)
 
 
 class NotAServerErrorConfig(CheckConfig):
