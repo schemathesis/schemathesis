@@ -357,6 +357,48 @@ def get_alphabet_format_strategies() -> dict[str, Callable[[st.SearchStrategy[st
     }
 
 
+# Shortest and longest value the built-in generator for each name can produce. A length window
+# outside the range is one no draw lands in, so the caller can answer without searching for it.
+# `test_declared_format_lengths_hold` keeps these in step with the generators above.
+FORMAT_LENGTHS: dict[str, tuple[int, int]] = {
+    "date": (10, 10),
+    "full-date": (10, 10),
+    "date-fullyear": (4, 4),
+    "date-month": (2, 2),
+    "date-mday": (2, 2),
+    "time-hour": (2, 2),
+    "time-minute": (2, 2),
+    "time-second": (2, 2),
+    "time-secfrac": (2, 7),
+    "time-numoffset": (6, 6),
+    "time-offset": (1, 6),
+    "partial-time": (8, 15),
+    "full-time": (9, 21),
+    "time": (9, 21),
+    "date-time": (20, 32),
+    "duration": (3, 26),
+    "hostname": (2, 25),
+    "idn-hostname": (2, 25),
+    "ipv4": (7, 15),
+    "ipv6": (2, 39),
+    "uri": (10, 33),
+    "uri-reference": (10, 33),
+    "iri": (10, 33),
+    "iri-reference": (10, 33),
+    "uri-template": (15, 38),
+    "email": (4, 36),
+    "idn-email": (4, 36),
+    "uuid": (36, 36),
+}
+
+
+def format_length_bounds(name: str, strategy: st.SearchStrategy | None) -> tuple[int, int] | None:
+    """Lengths `strategy` can produce, or `None` when it is not the built-in generator for `name`."""
+    if get_default_format_strategies().get(name) is not strategy:
+        return None
+    return FORMAT_LENGTHS.get(name)
+
+
 @lru_cache
 def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""

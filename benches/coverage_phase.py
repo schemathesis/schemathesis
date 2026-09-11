@@ -12,6 +12,7 @@ sys.path.append(str(CURRENT_DIR.parent))
 from schemathesis.core.parameters import ParameterLocation  # noqa: E402
 from schemathesis.generation.hypothesis import setup  # noqa: E402
 from schemathesis.specs.openapi.coverage._schema import CoverageContext, cover_schema_iter  # noqa: E402
+from schemathesis.specs.openapi.formats import get_default_format_strategies  # noqa: E402
 from schemathesis.specs.openapi.patterns import update_quantifier  # noqa: E402
 from tools.coverage.caches import clear_internal_caches  # noqa: E402
 
@@ -93,6 +94,30 @@ PATTERN_WITH_LENGTH_CONSTRAINTS = [
 @pytest.mark.parametrize("schema", PATTERN_WITH_LENGTH_CONSTRAINTS, ids=lambda x: x["pattern"][:50])
 def test_pattern_with_length_constraints(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
+
+
+# The built-in generators, so the length windows below are measured against a real format driver.
+FORMAT_CONTEXT = CoverageContext(
+    root_schema={},
+    location=ParameterLocation.BODY,
+    media_type=("application", "json"),
+    is_required=True,
+    custom_formats=get_default_format_strategies(),
+    validator_cls=Draft202012Validator,
+    update_pattern=update_quantifier,
+).with_positive()
+
+FORMAT_WITH_LENGTH_CONSTRAINTS = [
+    {"type": "string", "format": "uuid", "minLength": 1},
+    {"type": "string", "format": "email", "maxLength": 255},
+    {"type": "string", "format": "uri", "minLength": 1, "maxLength": 2083},
+]
+
+
+@pytest.mark.benchmark(group="coverage-format-with-length")
+@pytest.mark.parametrize("schema", FORMAT_WITH_LENGTH_CONSTRAINTS, ids=lambda x: x["format"])
+def test_format_with_length_constraints(benchmark, schema):
+    benchmark(lambda: list(cover_schema_iter(FORMAT_CONTEXT, schema)))
 
 
 NUMBER_CONSTRAINTS = [
