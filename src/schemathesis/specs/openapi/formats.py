@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core.validation import has_leading_whitespace
-from schemathesis.generation.jsonschema.context import Alphabet
+from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -399,10 +399,48 @@ def format_length_bounds(name: str, strategy: st.SearchStrategy | None) -> tuple
     return FORMAT_LENGTHS.get(name)
 
 
-def format_lengths_for(formats: dict[str, st.SearchStrategy]) -> dict[str, tuple[int, int]]:
-    """The known bounds among `formats`, skipping every name a caller supplied its own generator for."""
+# "YYYY-MM-DDThh:mm:ss", before the fractional second and the offset.
+_DATE_TIME_BASE_LENGTH = 19
+
+
+def date_time_values_within(min_length: int, max_length: float) -> st.SearchStrategy[str] | None:
+    """`date-time` values whose length lands inside the window, or `None` when no shape fits it."""
+    from hypothesis import strategies as st
+
+    date = rfc3339_values("full-date")
+    hour = rfc3339_values("time-hour")
+    minute = rfc3339_values("time-minute")
+    second = rfc3339_values("time-second")
+    numoffset = rfc3339_values("time-numoffset")
+    branches = []
+    for digits in range(7):
+        fraction = (
+            st.just("")
+            if digits == 0
+            else st.text(alphabet=string.digits, min_size=digits, max_size=digits).map(".".__add__)
+        )
+        fraction_length = digits + 1 if digits else 0
+        for offset, offset_length in ((st.just("Z"), 1), (numoffset, 6)):
+            if not min_length <= _DATE_TIME_BASE_LENGTH + fraction_length + offset_length <= max_length:
+                continue
+            branches.append(st.builds("{}T{}:{}:{}{}{}".format, date, hour, minute, second, fraction, offset))
+    return st.one_of(branches) if branches else None
+
+
+# Generators that can be pointed at a narrower window instead of drawn from and filtered.
+FORMAT_NARROWERS: dict[str, Callable[[int, float], st.SearchStrategy[str] | None]] = {
+    "date-time": date_time_values_within,
+}
+
+
+def format_lengths_for(formats: dict[str, st.SearchStrategy]) -> dict[str, FormatLengths]:
+    """What is known about the lengths in `formats`, skipping every name with a caller-supplied generator."""
     defaults = get_default_format_strategies()
-    return {name: bounds for name, bounds in FORMAT_LENGTHS.items() if formats.get(name) is defaults.get(name)}
+    return {
+        name: FormatLengths(shortest, longest, FORMAT_NARROWERS.get(name))
+        for name, (shortest, longest) in FORMAT_LENGTHS.items()
+        if formats.get(name) is defaults.get(name)
+    }
 
 
 @lru_cache

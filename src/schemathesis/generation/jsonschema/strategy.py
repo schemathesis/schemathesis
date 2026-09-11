@@ -1659,9 +1659,9 @@ def _formatted(
     name: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """Values from the generator registered for `name`, narrowed to the facets around it."""
-    if _length_out_of_reach(name, view, ctx):
+    strategy = _format_source(name, view, ctx)
+    if strategy is None:
         return st.nothing()
-    strategy = ctx.formats[name]
     for other in others:
         strategy = strategy.filter(_facet_check("format", other))
     for pattern in view.patterns:
@@ -1670,15 +1670,22 @@ def _formatted(
     return _within_length(strategy, view)
 
 
-def _length_out_of_reach(name: str, view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> bool:
-    """Whether the length window lies outside every length the generator for `name` reaches."""
-    bounds = ctx.format_lengths.get(name)
-    if bounds is None:
-        return False
-    shortest, longest = bounds
-    return (view.min_length is not None and view.min_length > longest) or (
-        view.max_length is not None and view.max_length < shortest
-    )
+def _format_source(
+    name: str, view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
+) -> SearchStrategy[str] | None:
+    """The generator to draw `name` from, pointed at the length window where it can be; `None` admits nothing."""
+    lengths = ctx.format_lengths.get(name)
+    if lengths is None or (view.min_length is None and view.max_length is None):
+        return ctx.formats[name]
+    low = view.min_length or 0
+    high = math.inf if view.max_length is None else view.max_length
+    if low > lengths.longest or high < lengths.shortest:
+        return None
+    # Where every value it reaches already lands inside, or it cannot be pointed anywhere,
+    # drawing and discarding is all there is.
+    if (low <= lengths.shortest and lengths.longest <= high) or lengths.within is None:
+        return ctx.formats[name]
+    return lengths.within(low, high)
 
 
 # The validator's own engine judges the facet, so `\p{L}` patterns and format assertions filter

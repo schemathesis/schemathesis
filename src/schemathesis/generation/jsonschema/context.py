@@ -5,6 +5,8 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import jsonschema_rs
     from hypothesis.strategies import SearchStrategy
 
@@ -54,6 +56,16 @@ def _characters(
     return st.characters(codec=codec, max_codepoint=max_codepoint, exclude_characters=exclude_characters)
 
 
+@dataclass(frozen=True, slots=True)
+class FormatLengths:
+    """What the caller knows about the lengths one format generator reaches."""
+
+    shortest: int
+    longest: int
+    # Values inside a narrower window, where the generator can be pointed at one.
+    within: Callable[[int, float], SearchStrategy[str] | None] | None = None
+
+
 @dataclass(slots=True)
 class StrategyContext:
     """Shared configuration threaded through `from_schema`."""
@@ -63,8 +75,8 @@ class StrategyContext:
     alphabet: Alphabet = field(default_factory=Alphabet)
     # Values for `format`, by name. Names absent here are annotations and do not constrain generation.
     formats: dict[str, SearchStrategy] = field(default_factory=dict)
-    # Shortest and longest value each generator above can produce, where the caller knows it.
-    format_lengths: dict[str, tuple[int, int]] = field(default_factory=dict)
+    # What each generator above reaches, where the caller knows it.
+    format_lengths: dict[str, FormatLengths] = field(default_factory=dict)
     cache: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
     # Placeholders for the pointer targets currently being built, by URI.
     pending: dict[str, SearchStrategy] = field(default_factory=dict)
