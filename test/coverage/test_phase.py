@@ -1888,6 +1888,38 @@ def test_array_constraints(ctx, schema, expected):
     assert_negative_coverage(build_schema(ctx, body=schema), expected)
 
 
+@pytest.mark.parametrize(
+    ("fmt", "min_length", "max_length"),
+    [("email", 200, 254), ("uri", 100, 2083), ("date-time", 26, 30)],
+)
+def test_format_value_built_for_a_length_floor_above_it(ctx, fmt, min_length, max_length):
+    # Without one, every length the window admits is out of reach and the operation gets no
+    # positive case at all.
+    operation = load_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "value",
+                "schema": {"type": "string", "format": fmt, "minLength": min_length, "maxLength": max_length},
+                "required": True,
+            },
+        ],
+    )["/foo"]["post"]
+    validator = jsonschema_rs.Draft202012Validator({"type": "string", "format": fmt}, validate_formats=True)
+    seen = []
+
+    def test(case):
+        seen.append(case.query["value"])
+
+    run_positive_test(operation, test)
+
+    assert seen
+    for value in seen:
+        assert min_length <= len(value) <= max_length, value
+        assert validator.is_valid(value), value
+
+
 def test_string_with_format(ctx):
     operation = load_schema(
         ctx,

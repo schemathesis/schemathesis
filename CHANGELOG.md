@@ -24,6 +24,7 @@
 - Coverage phase up to 6x faster on strings carrying a `format` and a length bound.
 - Strings whose length bound no `format` value can reach are ruled out without drawing.
 - `format: date-time` values are built to fit a length bound instead of drawn until one fits.
+- `format: email` and `format: uri` values are built to fit a length bound too.
 
 ### :bug: Fixed
 
@@ -36,6 +37,7 @@
 
 #### Others
 
+- No positive cases where a `format` and a length bound could not both be met. [#4592](https://github.com/schemathesis/schemathesis/issues/4592)
 - `missing_auth` warning for operations that returned 2xx responses later in the run.
 - Inferred links dropped for every consumer of a resource after the first with the same method.
 - `KeyError` from an evicted cache entry on free-threaded Python.

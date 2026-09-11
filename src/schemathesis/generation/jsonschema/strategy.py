@@ -1679,13 +1679,21 @@ def _format_source(
         return ctx.formats[name]
     low = view.min_length or 0
     high = math.inf if view.max_length is None else view.max_length
+    # Every value it reaches already lands inside, so the window has nothing left to say.
+    if low <= lengths.shortest and lengths.longest <= high:
+        return ctx.formats[name]
+    # Pointing it somewhere is what settles the window, including whether anything fits at all.
+    if lengths.within is not None:
+        narrowed = lengths.within(low, high)
+        if narrowed is None or low == high:
+            return narrowed
+        # More than one length is admitted, so the lengths it reaches on its own are worth drawing too.
+        if low <= lengths.longest and high >= lengths.shortest:
+            return st.one_of([ctx.formats[name], narrowed])
+        return narrowed
     if low > lengths.longest or high < lengths.shortest:
         return None
-    # Where every value it reaches already lands inside, or it cannot be pointed anywhere,
-    # drawing and discarding is all there is.
-    if (low <= lengths.shortest and lengths.longest <= high) or lengths.within is None:
-        return ctx.formats[name]
-    return lengths.within(low, high)
+    return ctx.formats[name]
 
 
 # The validator's own engine judges the facet, so `\p{L}` patterns and format assertions filter
