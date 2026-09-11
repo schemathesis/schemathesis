@@ -84,6 +84,7 @@ from schemathesis.specs.openapi.coverage._wire import (
     ensure_valid_path_parameter_schema,
     jsonify,
 )
+from schemathesis.specs.openapi.formats import format_length_bounds
 from schemathesis.specs.openapi.patterns import (
     matches_every_string,
     pattern_length_bounds,
@@ -117,6 +118,10 @@ VALIDATED_FORMATS = frozenset(
         "uuid",
     }
 )
+
+
+# A string where these alone surround `format`: nothing else can widen what the generator produces.
+_FORMAT_WITH_LENGTH_KEYS = frozenset({"format", "maxLength", "minLength", "type"})
 
 
 def _get_format_validator(
@@ -808,6 +813,19 @@ class CoverageContext:
         min_items = schema.get("minItems")
         if isinstance(min_items, int) and min_items > INTERNAL_BUFFER_SIZE and "array" in get_type(schema):
             raise Unsatisfiable
+        # A format generator cannot be steered to a length, so a window outside the lengths it reaches
+        # is one no draw lands in - and here the length keywords alone stand between them.
+        fmt = schema.get("format")
+        if isinstance(fmt, str) and get_type(schema) == ["string"] and set(keys) <= _FORMAT_WITH_LENGTH_KEYS:
+            bounds = format_length_bounds(fmt, self.custom_formats.get(fmt))
+            if bounds is not None:
+                shortest, longest = bounds
+                min_length = schema.get("minLength")
+                max_length = schema.get("maxLength")
+                if (isinstance(min_length, int) and min_length > longest) or (
+                    isinstance(max_length, int) and max_length < shortest
+                ):
+                    raise Unsatisfiable
         # Shortcuts read the describing keywords alone, which a combinator beside them can still narrow;
         # such a schema is built whole instead.
         if not any(key in schema for key in _FOLDED_KEYS):

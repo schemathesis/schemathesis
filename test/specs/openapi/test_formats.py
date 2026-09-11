@@ -10,7 +10,7 @@ from schemathesis.core.validation import check_header_name
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi._hypothesis import _build_custom_formats, _canonical_strategy
 from schemathesis.specs.openapi.coverage._schema import is_valid_header_value
-from schemathesis.specs.openapi.formats import register_string_format
+from schemathesis.specs.openapi.formats import FORMAT_LENGTHS, register_string_format
 from schemathesis.transport.serialization import Binary
 
 FORMATS = _build_custom_formats(GenerationConfig(), GenerationMode.POSITIVE)
@@ -63,6 +63,20 @@ def test_registered_format_generates_strings(name):
     @SETTINGS
     def test(value):
         assert isinstance(value, str), value
+
+    test()
+
+
+@pytest.mark.parametrize(("name", "bounds"), sorted(FORMAT_LENGTHS.items()))
+def test_declared_format_lengths_hold(name, bounds):
+    # A length window outside these is answered without drawing, so a generator reaching past them
+    # silently drops cases.
+    low, high = bounds
+
+    @given(_resolve(name))
+    @SETTINGS
+    def test(value):
+        assert low <= len(value) <= high, value
 
     test()
 

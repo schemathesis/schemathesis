@@ -21,6 +21,7 @@
 ### :racing_car: Performance
 
 - Coverage phase ~270x faster on strings declaring `format`, `pattern`, and a length bound together. [#4593](https://github.com/schemathesis/schemathesis/issues/4593)
+- Coverage phase up to 6x faster on strings carrying a `format` and a length bound.
 
 ### :bug: Fixed
 
