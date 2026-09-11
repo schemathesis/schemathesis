@@ -39,8 +39,24 @@ Hooks that execute during test case execution.
 | **after_call** | `(ctx, case: Case, response: Response) -> None` | After HTTP response | Inspect/modify response before checks |
 | **after_network_error** | `(ctx, case: Case, request: PreparedRequest) -> None` | When HTTP request fails at network level | Record or log failed connection attempts |
 | **after_validate** | `(ctx, case: Case, response: Response, results: list[CheckResult]) -> None` | After all checks run | Observe check outcomes for logging or reporting |
+| **filter_failure** | `(ctx, failure: Failure, case: Case, response: Response) -> bool` | Once per check failure | Drop failures that are not your API's fault |
 
-**Success flow:** `before_call` -> HTTP Request -> `after_call` -> Checks -> `after_validate`
+**Success flow:** `before_call` -> HTTP Request -> `after_call` -> Checks -> `filter_failure` -> `after_validate`
+
+Return `False` from `filter_failure` to drop a failure. A dropped failure does not fail the run, does not spend the `--max-failures` budget, does not reach deduplication, and writes no crash file; the run reports how many were dropped:
+
+```python
+@schemathesis.hook
+def filter_failure(ctx, failure, case, response):
+    # A flaky upstream is not this API's bug
+    return response.status_code != 503
+```
+
+```
+Filtered: 3 (dropped by `filter_failure`)
+```
+
+Use it for failures that depend on the response rather than on which operation was hit. For a fixed set of failures you have accepted and want reviewed, use a [baseline](../guides/baseline.md) instead. Network errors and failures raised from a check's `after_run` never reach this hook - they have no response to judge.
 
 **Network error flow:** `before_call` -> HTTP Request -> `after_network_error` -> (re-raises)
 
@@ -104,6 +120,7 @@ Not all hooks apply in every phase.
 | `after_call` | ✓ | ✓ | ✓ | ✓ |
 | `after_network_error` | ✓ | ✓ | ✓ | ✓ |
 | `after_validate` | ✓ | ✓ | ✓ | ✓ |
+| `filter_failure` | ✓ | ✓ | ✓ | ✓ |
 
 **Examples phase** runs test cases embedded directly in the schema. Cases bypass the strategy pipeline, so data generation hooks have no effect on them.
 
@@ -117,4 +134,4 @@ Schema-level hooks (`before_load_schema`, `after_load_schema`, `before_process_p
 
 ## Execution Order
 
-When multiple hooks of the same type are registered, they execute in registration order. For `filter_*` hooks, the case is discarded as soon as any hook returns `False` — subsequent hooks for that event are not called. For `map_*` hooks, each hook receives the output of the previous. For `flatmap_*` hooks, each hook receives the output of the previous, as with `map_*` hooks. Schema-level hooks run before test-level hooks of the same type.
+When multiple hooks of the same type are registered, they execute in registration order. For `filter_*` hooks, the value is discarded as soon as any hook returns `False` - subsequent hooks for that event are not called. For `map_*` hooks, each hook receives the output of the previous. For `flatmap_*` hooks, each hook receives the output of the previous, as with `map_*` hooks. Schema-level hooks run before test-level hooks of the same type.

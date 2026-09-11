@@ -21,6 +21,7 @@ from schemathesis.core.registries import Registry
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.generation.overrides import Override
+from schemathesis.hooks import should_keep_failure
 
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
@@ -447,8 +448,17 @@ def run_checks(
         try:
             skip_check = check(ctx, response, case)
         except (Failure, AssertionError, FailureGroup) as exc:
+            kept = False
             for failure in _failures_from_exception(name, case.operation.label, exc):
+                if not should_keep_failure(failure, case, response):
+                    if ctx._recorder is not None:
+                        ctx._recorder.record_filtered_failure(case_id=case.id)
+                    continue
+                kept = True
                 on_failure(name, collected, failure)
+            # Every failure was dropped, so the check ran and raised nothing the run cares about.
+            if not kept and on_success:
+                on_success(name, case)
         else:
             if not skip_check and on_success:
                 on_success(name, case)

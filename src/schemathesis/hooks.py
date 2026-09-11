@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.checks import CheckResult
+    from schemathesis.core.failures import Failure
     from schemathesis.core.parameters import ContainerName
     from schemathesis.core.spec import SchemaMetadata
     from schemathesis.generation.case import Case
@@ -402,6 +403,29 @@ def dispatch_after_network_error(
     *dispatchers: HookDispatcher, context: HookContext, case: Case, request: requests.PreparedRequest
 ) -> None:
     _dispatch_to_all("after_network_error", dispatchers, context, case, request)
+
+
+def should_keep_failure(failure: Failure, case: Case, response: Response) -> bool:
+    """Whether every `filter_failure` hook accepts this failure. One rejection is final."""
+    name = "filter_failure"
+    schema = case.operation.schema
+    dispatchers: tuple[HookDispatcher, ...] = (GLOBAL_HOOK_DISPATCHER, schema.hooks)
+    local = schema.get_local_hook_dispatcher()
+    if local is not None:
+        dispatchers = (*dispatchers, local)
+    if not any(dispatcher.defines(name) for dispatcher in dispatchers):
+        return True
+    context = HookContext(operation=case.operation)
+    for dispatcher in dispatchers:
+        for hook in dispatcher.get_all_by_name(name):
+            if _should_skip_hook(hook, context):
+                continue
+            try:
+                if not hook(context, failure, case, response):
+                    return False
+            except Exception as exc:
+                raise HookExecutionError(name, exc) from exc
+    return True
 
 
 def dispatch_after_validate(

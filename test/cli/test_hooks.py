@@ -103,3 +103,72 @@ def filter_case(context, case):
     )
     # Then it should be reported as a hook error, not a schema error
     assert cli.main("run", api.schema_url, "--max-examples=10", hooks=module) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_filter_failure_drops_a_failure(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.failure()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def filter_failure(context, failure, case, response):
+    return response.status_code != 500
+"""
+    )
+    # `--max-failures=1` would cut the run short if a dropped failure still spent the budget.
+    assert (
+        cli.main(
+            "run",
+            api.schema_url,
+            "-c",
+            "not_a_server_error",
+            "--max-examples=5",
+            "--max-failures=1",
+            "--phases=fuzzing",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
+
+
+def test_filter_failure_keeps_what_it_does_not_reject(ctx, cli):
+    api = ctx.openapi.apps.failure()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def filter_failure(context, failure, case, response):
+    return response.status_code != 503
+"""
+    )
+    result = cli.main("run", api.schema_url, "-c", "not_a_server_error", "--max-examples=1", hooks=module)
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+
+
+def test_filter_failure_hook_error_is_reported(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.failure()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def filter_failure(context, failure, case, response):
+    raise AttributeError("test hook error")
+"""
+    )
+    assert cli.main("run", api.schema_url, "-c", "not_a_server_error", "--max-examples=1", hooks=module) == snapshot_cli
+
+
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [("GET /api/failure", ExitCode.OK), ("GET /api/elsewhere", ExitCode.TESTS_FAILED)],
+    ids=["applies", "does-not-apply"],
+)
+def test_filter_failure_respects_hook_filters(ctx, cli, target, expected):
+    api = ctx.openapi.apps.failure()
+    module = ctx.write_pymodule(
+        f"""
+@schemathesis.hook.apply_to(name="{target}")
+def filter_failure(context, failure, case, response):
+    return False
+"""
+    )
+    result = cli.main("run", api.schema_url, "-c", "not_a_server_error", "--max-examples=1", hooks=module)
+    assert result.exit_code == expected, result.stdout

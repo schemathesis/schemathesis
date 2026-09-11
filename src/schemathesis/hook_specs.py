@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     from schemathesis.checks import CheckResult
     from schemathesis.core import Body
+    from schemathesis.core.failures import Failure
     from schemathesis.core.jsonschema.types import JsonSchemaObject
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
@@ -54,6 +55,19 @@ def filter_body(context: HookContext, body: Body) -> bool:
 @all_scopes
 def filter_case(context: HookContext, case: Case) -> bool:
     """Drop generated `Case` instances that fail the predicate."""
+    raise NotImplementedError
+
+
+@all_scopes
+def filter_failure(context: HookContext, failure: Failure, case: Case, response: Response) -> bool:
+    """Drop check failures that fail the predicate.
+
+    Runs once per failure, after the checks for a response. A dropped failure does not fail the
+    run, spend the `--max-failures` budget, or reach deduplication.
+
+    Use cases:
+     - Accepting failures that are not the API's fault, such as an upstream returning 503.
+    """
     raise NotImplementedError
 
 

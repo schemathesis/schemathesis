@@ -46,6 +46,9 @@ class Statistic:
     # Identity -> the failure and the check that produced it, known or not.
     observed_failures: dict[Identity, tuple[Failure, str]]
 
+    # Failures `filter_failure` hooks dropped across the run.
+    filtered_failures: int
+
     extraction_failures: set[ExtractionFailure]
 
     tested_operations: set[str]
@@ -62,6 +65,7 @@ class Statistic:
         self.baseline = None
         self.known_failures = {}
         self.observed_failures = {}
+        self.filtered_failures = 0
         self.extraction_failures = set()
         self.tested_operations = set()
         self.operations_without_checks = set()
@@ -79,6 +83,7 @@ class Statistic:
         failures_by_label: dict[str, dict[str, GroupedFailures]] = {}
 
         self.total_cases += len(recorder.cases)
+        self.filtered_failures += sum(recorder.filtered_failures.values())
 
         extraction_failures = set()
 

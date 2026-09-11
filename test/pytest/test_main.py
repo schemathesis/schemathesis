@@ -1784,3 +1784,22 @@ def test(case):
     pairs = [tuple(line.split(maxsplit=1)) for line in lines]
     unexpected_pairs = [p for p in pairs if p[0] in unexpected]
     assert sorted(unexpected_pairs) == sorted([(m, "/items") for m in unexpected]), unexpected_pairs
+
+
+def test_filter_failure_drops_a_failure(ctx, testdir):
+    api = ctx.openapi.apps.failure()
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url('{api.schema_url}')
+
+@schema.hook
+def filter_failure(context, failure, case, response):
+    return response.status_code != 500
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test(case):
+    case.call_and_validate()
+"""
+    )
+    testdir.runpytest().assert_outcomes(passed=1)

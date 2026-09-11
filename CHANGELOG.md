@@ -10,6 +10,7 @@
 - Path parameters take values seen under the same name in earlier responses.
 - Integer fields in JSON bodies draw float spellings (`2.0`) under Open API 3.1 and 3.2.
 - Baseline file so CI fails only on failures that are new.
+- `filter_failure` hook to drop check failures by a custom condition. [#1792](https://github.com/schemathesis/schemathesis/issues/1792)
 
 ### :wrench: Changed
 

@@ -38,6 +38,9 @@ class RecordedScenario(Protocol):
     def checks(self) -> Mapping[str, list[CheckNode]]: ...  # pragma: no cover
 
     @property
+    def filtered_failures(self) -> Mapping[str, int]: ...  # pragma: no cover
+
+    @property
     def interactions(self) -> Mapping[str, Interaction]: ...  # pragma: no cover
 
     def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData: ...  # pragma: no cover
@@ -69,14 +72,26 @@ class ScenarioRecorder:
     cases: dict[str, CaseNode]
     # Results of checks categorized by test case ID
     checks: dict[str, list[CheckNode]]
+    # How many failures `filter_failure` hooks dropped, by test case ID
+    filtered_failures: dict[str, int]
     # Network interactions by test case ID
     interactions: dict[str, Interaction]
-    __slots__ = ("label", "status", "roots", "cases", "checks", "interactions", "max_recorded_payload_size")
+    __slots__ = (
+        "label",
+        "status",
+        "roots",
+        "cases",
+        "checks",
+        "filtered_failures",
+        "interactions",
+        "max_recorded_payload_size",
+    )
 
     def __init__(self, *, label: str, config: OutputConfig | None = None) -> None:
         self.label = label
         self.cases = {}
         self.checks = {}
+        self.filtered_failures = {}
         self.interactions = {}
         self.max_recorded_payload_size = (
             config.truncation.max_recorded_payload_size if config is not None else MAX_RECORDED_PAYLOAD_SIZE
@@ -117,6 +132,10 @@ class ScenarioRecorder:
                 failure_info=CheckFailureInfo(code_sample=code_sample, failure=failure),
             )
         )
+
+    def record_filtered_failure(self, *, case_id: str) -> None:
+        """Record that a `filter_failure` hook dropped a failure for a given test case."""
+        self.filtered_failures[case_id] = self.filtered_failures.get(case_id, 0) + 1
 
     def record_check_success(self, *, name: str, case_id: str) -> None:
         """Record a successful pass of a check for a given test case."""

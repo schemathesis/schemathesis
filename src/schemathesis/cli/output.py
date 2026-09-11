@@ -346,6 +346,13 @@ def display_failures_summary(failures: list[FailureGroup]) -> None:
     click.echo()
 
 
+def display_filtered_summary(filtered: int) -> None:
+    click.echo(_style("Filtered: "), nl=False)
+    click.echo(_style(str(filtered), bold=True), nl=False)
+    click.echo(_style(" (dropped by `filter_failure`)"))
+    click.echo()
+
+
 def display_baseline_summary(baseline: BaselineSummary) -> None:
     click.echo(_style("Baseline:", bold=True))
     click.echo(_style("  Known failures: "), nl=False)
