@@ -18,6 +18,10 @@
 - `missing_test_data` warning tips reflect whether links reach the operation and whether stateful testing ran.
 - Reports record response bodies larger than 1 MiB as a prefix with the original size.
 
+### :racing_car: Performance
+
+- Coverage phase ~270x faster on strings declaring `format`, `pattern`, and a length bound together. [#4593](https://github.com/schemathesis/schemathesis/issues/4593)
+
 ### :bug: Fixed
 
 #### WFC authentication
