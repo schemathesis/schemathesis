@@ -76,9 +76,15 @@ def test_string_constraints(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
 
+EMAIL_PATTERN = (
+    r"^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+    r"@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$"
+)
+
 PATTERN_WITH_LENGTH_CONSTRAINTS = [
     {"type": "string", "pattern": "^[a-z]+$", "minLength": 3, "maxLength": 10},
     {"type": "string", "pattern": r"^\w{2,4}:\d{3,5}:[A-F]{1,2}$", "minLength": 10, "maxLength": 10},
+    {"type": "string", "format": "email", "pattern": EMAIL_PATTERN, "maxLength": 254},
 ]
 
 

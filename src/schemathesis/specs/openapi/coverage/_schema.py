@@ -867,6 +867,7 @@ class CoverageContext:
                     raise Unsatisfiable
                 min_length = schema.get("minLength")
                 max_length = schema.get("maxLength")
+                length_is_pinned = False
                 if min_length is not None or max_length is not None:
                     pattern_min, pattern_max = pattern_length_bounds(pattern)
                     if max_length is not None and max_length < pattern_min:
@@ -887,16 +888,25 @@ class CoverageContext:
                         pinned = pin_pattern_length(pattern, min_length, max_length)
                         if pinned != pattern:
                             updated = pinned
+                            length_is_pinned = True
                     pattern = updated
                 if min_length is not None and min_length > MAX_GENERATED_PATTERN_LENGTH:
                     return self._long_string_matching(schema, min_length)
                 fmt = schema.get("format")
+                validated = fmt if fmt in VALIDATED_FORMATS else None
+                # Spelling the length into the pattern fixes the shape of every match, so a format the
+                # first match fails is one no redraw satisfies; checking once beats searching for it.
                 strategy = _pattern_strategy(
-                    self.session, pattern, min_length, max_length, fmt if fmt in VALIDATED_FORMATS else None
+                    self.session, pattern, min_length, max_length, None if length_is_pinned else validated
                 )
                 if strategy is None:
                     raise Unsatisfiable from None
-                return cached_draw(self.session, strategy)
+                value = cached_draw(self.session, strategy)
+                if length_is_pinned and validated is not None:
+                    validator = _get_format_validator(self.session, validated, self.validator_cls)
+                    if not validator.is_valid(value):
+                        raise Unsatisfiable
+                return value
             if (
                 isinstance(min_properties, int)
                 and min_properties > MAX_DRAWN_OBJECT_PROPERTIES
