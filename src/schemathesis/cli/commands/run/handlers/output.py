@@ -23,6 +23,7 @@ from schemathesis.cli.output import (
     display_failures,
     display_failures_summary,
     display_fatal_error,
+    display_filtered_summary,
     display_final_line,
     display_header,
     display_section_name,
@@ -1499,6 +1500,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
         if summary.baseline is not None:
             display_baseline_summary(summary.baseline)
+
+        if summary.filtered:
+            display_filtered_summary(summary.filtered)
 
         if summary.errors:
             display_errors_summary(summary.errors)

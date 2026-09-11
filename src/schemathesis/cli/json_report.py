@@ -95,6 +95,7 @@ def build_document(
         }
         if summary.baseline is not None
         else None,
+        "filtered": summary.filtered,
         "warnings": summary.warnings.as_labels(),
         "auth": {
             "reauth_count": payload.reauth_count if payload is not None else 0,

@@ -193,6 +193,8 @@ class SummaryData:
     warnings: WarningData
     # `None` when no baseline is configured.
     baseline: BaselineSummary | None
+    # Failures dropped by `filter_failure` hooks.
+    filtered: int
 
     @classmethod
     def from_run(
@@ -225,6 +227,7 @@ class SummaryData:
             errors=reduce_errors(errors),
             warnings=warnings,
             baseline=reduce_baseline(statistic, recorded=baseline_recorded, pruned=baseline_pruned),
+            filtered=statistic.filtered_failures,
         )
 
 

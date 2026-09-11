@@ -39,6 +39,7 @@ class FuzzExecutionContext(BaseExecutionContext):
             errors=reduce_errors(self.errors),
             warnings=WarningData(),
             baseline=reduce_baseline(self.statistic),
+            filtered=self.statistic.filtered_failures,
         )
 
     def on_event(self, event: events.EngineEvent) -> None:
