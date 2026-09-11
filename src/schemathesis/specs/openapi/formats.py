@@ -11,6 +11,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from schemathesis.config import GenerationConfig
+from schemathesis.core import MAX_STRING_LENGTH
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.transport.serialization import Binary
@@ -393,8 +394,8 @@ FORMAT_LENGTHS: dict[str, tuple[int, int]] = {
 
 
 def format_length_bounds(name: str, strategy: st.SearchStrategy | None) -> tuple[int, int] | None:
-    """Lengths `strategy` can produce, or `None` when it is not the built-in generator for `name`."""
-    if get_default_format_strategies().get(name) is not strategy:
+    """Lengths `strategy` is held to, or `None` when it is not the built-in one or can be pointed elsewhere."""
+    if get_default_format_strategies().get(name) is not strategy or name in FORMAT_NARROWERS:
         return None
     return FORMAT_LENGTHS.get(name)
 
@@ -427,9 +428,91 @@ def date_time_values_within(min_length: int, max_length: float) -> st.SearchStra
     return st.one_of(branches) if branches else None
 
 
+# RFC 1035, Section 2.3.4 - one label of a domain name.
+_MAX_DOMAIN_LABEL_LENGTH = 63
+# The shortest and longest address the format checkers accept: "a@b" up to RFC 5321's path limit.
+_EMAIL_LENGTHS = (3, 255)
+_URI_SCHEME = "https://"
+# "https://" plus the shortest domain, up to the longest string this engine builds at all.
+_URI_LENGTHS = (len(_URI_SCHEME) + 1, MAX_STRING_LENGTH)
+
+
+def _domain_label_lengths(total: int) -> list[int]:
+    """Label lengths that render as a `total`-character domain, each inside the label cap."""
+    lengths = []
+    remaining = total
+    while remaining > _MAX_DOMAIN_LABEL_LENGTH:
+        # Leave room for one more label and the dot before it.
+        lengths.append(min(_MAX_DOMAIN_LABEL_LENGTH, remaining - 2))
+        remaining -= lengths[-1] + 1
+    lengths.append(remaining)
+    # A dotless domain is well-formed, yet the stricter checkers real services run reject it.
+    if len(lengths) == 1 and lengths[0] >= 3:
+        lengths = [lengths[0] - 2, 1]
+    return lengths
+
+
+def _domain_of_length(total: int) -> st.SearchStrategy[str]:
+    from hypothesis import strategies as st
+
+    lengths = _domain_label_lengths(total)
+    head = st.text(alphabet=_LABEL_CHARACTERS, min_size=lengths[0], max_size=lengths[0])
+    if len(lengths) == 1:
+        return head
+    # Only the first label is drawn; drawing every character of a long domain would outgrow the
+    # generation buffer, and a length boundary is what the rest of it is there for.
+    filler = ".".join("a" * length for length in lengths[1:])
+    return head.map(lambda label: f"{label}.{filler}")
+
+
+def _length_targets(name: str, min_length: int, max_length: float, renderable: tuple[int, int]) -> list[int]:
+    """The lengths to build for, at the ends of what the window and the format share."""
+    shortest, longest = renderable
+    bottom = max(min_length, shortest)
+    # Building longer than the plain generator already reaches only pays where the floor leaves no choice.
+    drawn_longest = FORMAT_LENGTHS[name][1]
+    top = min(max_length, longest if bottom > drawn_longest else drawn_longest)
+    if bottom > top:
+        return []
+    return sorted({bottom, int(top)})
+
+
+def email_values_within(min_length: int, max_length: float) -> st.SearchStrategy[str] | None:
+    """Email addresses whose length lands inside the window, or `None` when none can."""
+    from hypothesis import strategies as st
+
+    # The domain carries the length: a local part is capped at 64 characters, a domain is not.
+    branches = [
+        st.builds(
+            "{}@{}".format,
+            st.text(alphabet=_LOCAL_PART_CHARACTERS, min_size=1, max_size=1),
+            _domain_of_length(target - 2),
+        )
+        for target in _length_targets("email", min_length, max_length, _EMAIL_LENGTHS)
+    ]
+    return st.one_of(branches) if branches else None
+
+
+def uri_values_within(min_length: int, max_length: float) -> st.SearchStrategy[str] | None:
+    """URIs whose length lands inside the window, or `None` when none can."""
+    from hypothesis import strategies as st
+
+    branches = [
+        _domain_of_length(target - len(_URI_SCHEME)).map(_URI_SCHEME.__add__)
+        for target in _length_targets("uri", min_length, max_length, _URI_LENGTHS)
+    ]
+    return st.one_of(branches) if branches else None
+
+
 # Generators that can be pointed at a narrower window instead of drawn from and filtered.
 FORMAT_NARROWERS: dict[str, Callable[[int, float], st.SearchStrategy[str] | None]] = {
     "date-time": date_time_values_within,
+    "email": email_values_within,
+    "idn-email": email_values_within,
+    "uri": uri_values_within,
+    "uri-reference": uri_values_within,
+    "iri": uri_values_within,
+    "iri-reference": uri_values_within,
 }
 
 
