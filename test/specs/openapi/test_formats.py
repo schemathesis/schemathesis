@@ -125,6 +125,17 @@ def test_registering_a_format_invalidates_built_strategies():
     test()
 
 
+def test_length_window_no_format_value_reaches_admits_nothing():
+    # The generator cannot be steered to a length, so a window it never lands in has no values.
+    built = _canonical_strategy(
+        {"type": "string", "format": "uuid", "minLength": 64, "maxLength": 64},
+        GenerationConfig(),
+        jsonschema_rs.Draft4Validator,
+    )
+
+    assert built.is_empty
+
+
 def test_regex_format_respects_generation_alphabet():
     built = _canonical_strategy(
         {"type": "string", "format": "regex"},

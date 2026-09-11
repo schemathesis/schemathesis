@@ -27,7 +27,7 @@ from schemathesis.generation.jsonschema import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi.adapter.parameters import _constant_values_at_draws, _prune_modified_constants
-from schemathesis.specs.openapi.formats import HEADER_FORMAT, header_alphabet
+from schemathesis.specs.openapi.formats import HEADER_FORMAT, format_lengths_for, header_alphabet
 from schemathesis.specs.openapi.negative.mutations import (
     Mutation,
     MutationChannel,
@@ -301,10 +301,16 @@ def negative_schema(
     else:
         alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)
 
+    format_lengths = format_lengths_for(custom_formats)
+
     def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
         schema, metadata = value
         strategy = build(
-            schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
+            schema,
+            draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+            formats=custom_formats,
+            format_lengths=format_lengths,
+            alphabet=alphabet,
         )
         # Failing every format on principle only speaks for a negated `format`; elsewhere it hides
         # that the mutation left the value conforming.
@@ -330,7 +336,11 @@ def negative_schema(
     if location == ParameterLocation.BODY:
         try:
             _candidate = build(
-                schema, draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls], formats=custom_formats, alphabet=alphabet
+                schema,
+                draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+                formats=custom_formats,
+                format_lengths=format_lengths,
+                alphabet=alphabet,
             )
             _candidate.validate()
         except (InvalidArgument, InvalidSchema):

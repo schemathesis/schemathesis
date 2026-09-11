@@ -40,6 +40,7 @@ def build(
     *,
     draft: int,
     formats: dict[str, SearchStrategy],
+    format_lengths: dict[str, tuple[int, int]] | None = None,
     alphabet: Alphabet | None = None,
     whole_floats: bool = False,
 ) -> SearchStrategy[JsonValue]:
@@ -57,7 +58,13 @@ def build(
         if cached is not MISSING:
             return cached[1]
     strategy = _build(
-        schema, draft=draft, formats=formats, alphabet=alphabet, schema_key=schema_key, whole_floats=whole_floats
+        schema,
+        draft=draft,
+        formats=formats,
+        format_lengths=format_lengths or {},
+        alphabet=alphabet,
+        schema_key=schema_key,
+        whole_floats=whole_floats,
     )
     if key is not None:
         # Keeping `formats` alive next to the strategy stops its `id` from being recycled
@@ -71,6 +78,7 @@ def _build(
     *,
     draft: int,
     formats: dict[str, SearchStrategy],
+    format_lengths: dict[str, tuple[int, int]],
     alphabet: Alphabet,
     schema_key: tuple[str, ...] | None = None,
     whole_floats: bool = False,
@@ -100,7 +108,11 @@ def _build(
         return EMPTY_STRATEGY
     # Draft 4 alone reads a fractional spelling as a number rather than an integer.
     context = StrategyContext(
-        root=canonical_schema, alphabet=alphabet, formats=formats, whole_floats=whole_floats and draft >= 6
+        root=canonical_schema,
+        alphabet=alphabet,
+        formats=formats,
+        format_lengths=format_lengths,
+        whole_floats=whole_floats and draft >= 6,
     )
     # Folding an `allOf` canonicalizes again, so a rejected schema and both spellings of
     # "not modeled here" can arrive from this block too.

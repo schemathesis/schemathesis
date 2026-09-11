@@ -63,6 +63,8 @@ class StrategyContext:
     alphabet: Alphabet = field(default_factory=Alphabet)
     # Values for `format`, by name. Names absent here are annotations and do not constrain generation.
     formats: dict[str, SearchStrategy] = field(default_factory=dict)
+    # Shortest and longest value each generator above can produce, where the caller knows it.
+    format_lengths: dict[str, tuple[int, int]] = field(default_factory=dict)
     cache: dict[jsonschema_rs.CanonicalSchema, SearchStrategy] = field(default_factory=dict)
     # Placeholders for the pointer targets currently being built, by URI.
     pending: dict[str, SearchStrategy] = field(default_factory=dict)

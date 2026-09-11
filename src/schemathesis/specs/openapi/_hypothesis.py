@@ -64,6 +64,7 @@ from schemathesis.specs.openapi.formats import (
     HEADER_FORMAT,
     INVALID_HEADER_CHARS,
     STRING_FORMATS,
+    format_lengths_for,
     get_alphabet_format_strategies,
     get_default_format_strategies,
     header_alphabet,
@@ -1231,6 +1232,7 @@ def _canonical_strategy(
         schema,
         draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
         formats=formats,
+        format_lengths=format_lengths_for(formats),
         alphabet=alphabet,
         # Every other carrier renders the value as text, where `2.0` is a different string than `2`.
         whole_floats=_carries_json(media_type),
