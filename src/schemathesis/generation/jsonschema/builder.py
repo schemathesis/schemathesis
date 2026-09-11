@@ -19,7 +19,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import canonical_form_cache, canonical_strategy_cache
-from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
+from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths, StrategyContext
 from schemathesis.generation.jsonschema.strategy import _displayed, from_schema
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ def build(
     *,
     draft: int,
     formats: dict[str, SearchStrategy],
-    format_lengths: dict[str, tuple[int, int]] | None = None,
+    format_lengths: dict[str, FormatLengths] | None = None,
     alphabet: Alphabet | None = None,
     whole_floats: bool = False,
 ) -> SearchStrategy[JsonValue]:
@@ -78,7 +78,7 @@ def _build(
     *,
     draft: int,
     formats: dict[str, SearchStrategy],
-    format_lengths: dict[str, tuple[int, int]],
+    format_lengths: dict[str, FormatLengths],
     alphabet: Alphabet,
     schema_key: tuple[str, ...] | None = None,
     whole_floats: bool = False,

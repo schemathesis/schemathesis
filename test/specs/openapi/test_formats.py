@@ -136,6 +136,33 @@ def test_length_window_no_format_value_reaches_admits_nothing():
     assert built.is_empty
 
 
+def test_narrow_length_window_on_many_format_properties():
+    # Rejection sampling cannot clear twenty fields pinned to one length at once.
+    properties = {
+        f"f{index}": {"type": "string", "format": "date-time", "minLength": 25, "maxLength": 25} for index in range(20)
+    }
+    built = _canonical_strategy(
+        {"type": "object", "properties": properties, "required": list(properties)},
+        GenerationConfig(),
+        jsonschema_rs.Draft4Validator,
+    )
+    validator = jsonschema_rs.Draft202012Validator({"type": "string", "format": "date-time"}, validate_formats=True)
+    drawn = []
+
+    @given(built)
+    @SETTINGS
+    def test(value):
+        drawn.append(value)
+
+    test()
+
+    assert drawn
+    for value in drawn:
+        for name in properties:
+            assert len(value[name]) == 25, value[name]
+            assert validator.is_valid(value[name]), value[name]
+
+
 def test_regex_format_respects_generation_alphabet():
     built = _canonical_strategy(
         {"type": "string", "format": "regex"},
