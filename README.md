@@ -51,6 +51,19 @@ uvx schemathesis run https://your-api.com/openapi.json
 - 🔄 **Stateful bugs** where operations work individually but fail in realistic workflows
 
 
+## What can it do?
+
+- ⚙️ **Config file** — auth, phases, and per-operation overrides in [`schemathesis.toml`](https://schemathesis.readthedocs.io/en/stable/configuration/). No Python.
+- 🔐 **Authentication** — static headers, Basic, per-security-scheme credentials, or [custom refresh logic](https://schemathesis.readthedocs.io/en/stable/guides/auth/).
+- 🔗 **Stateful testing** — [operation links inferred from your schema](https://schemathesis.readthedocs.io/en/stable/explanations/stateful/), no manual wiring.
+- 🧠 **Adaptive testing** — [learns constraints, ids, and auth from responses](https://schemathesis.readthedocs.io/en/stable/explanations/adaptive-testing/), reusing them mid-run.
+- ✅ **Custom checks** — [assert your own business rules](https://schemathesis.readthedocs.io/en/stable/guides/extending/#custom-validation-checks) next to the built-in ones.
+- 📖 **Fuzz dictionaries** — [mix real ids, wordlists, or LLM-generated payloads](https://schemathesis.readthedocs.io/en/stable/guides/fuzz-dictionary/) into generated data.
+- 🐌 **Rate limiting** — cap the request rate, or use `auto` to follow [`Retry-After` on 429](https://schemathesis.readthedocs.io/en/stable/reference/configuration/#rate-limit).
+- 📊 **Reports** — [JUnit, VCR, HAR, NDJSON, JSON](https://schemathesis.readthedocs.io/en/stable/reference/configuration/#reporting), and [Allure](https://schemathesis.readthedocs.io/en/stable/guides/allure/).
+- 🎯 **Schema coverage** — [keyword-level coverage report](https://schemathesis.readthedocs.io/en/stable/guides/coverage/) showing which constraints your tests exercised.
+- 🔁 **Replay & baseline** — [re-run past failures](https://schemathesis.readthedocs.io/en/stable/guides/crash-reproduction/) and [fail CI only on new ones](https://schemathesis.readthedocs.io/en/stable/guides/baseline/).
+
 > ⚠️ **Upgrading from older versions?** Check our [Migration Guide](https://github.com/schemathesis/schemathesis/blob/master/MIGRATION.md) for key changes.
 
 # Installation & Usage
@@ -59,6 +72,13 @@ uvx schemathesis run https://your-api.com/openapi.json
 ```console
 uv pip install schemathesis
 schemathesis run https://your-api.com/openapi.json
+```
+
+**Config file** (`schemathesis.toml`, no Python needed):
+```toml
+headers = { Authorization = "Bearer ${API_TOKEN}" }
+generation.max-examples = 500
+rate-limit = "auto"
 ```
 
 **Python Tests:**
@@ -101,11 +121,6 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 - Code & API schema coverage achieved
 - Issues found with detailed categorization
 - Performance across different fuzzing strategies
-
-## Reporting
-
-- **[Allure](https://schemathesis.readthedocs.io/en/stable/guides/allure/)** — Rich visual reports with per-operation results, failure steps, and curl reproduction commands
-- **[JUnit XML](https://schemathesis.readthedocs.io/en/stable/guides/cicd/)** — For GitHub Actions, GitLab CI, Jenkins, and any CI tool that consumes JUnit
 
 ## Documentation
 

@@ -1181,6 +1181,12 @@ The following settings control how Schemathesis makes network requests to the AP
     rate-limit = "1000/h"
     ```
 
+    Follow the API's own limits - no throttling until a `429`, then wait for the duration in its `Retry-After` header:
+
+    ```toml
+    rate-limit = "auto"
+    ```
+
 #### `max-redirects`
 
 !!! note ""

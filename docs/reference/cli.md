@@ -388,9 +388,12 @@ The following options control how Schemathesis makes network requests to the API
 
     Specify a rate limit for test requests. Supports 's' (seconds), 'm' (minutes), and 'h' (hours) as duration units.
 
+    Pass `auto` instead of a fixed limit to send requests without throttling and wait for the duration in the `Retry-After` header whenever the API responds with `429`.
+
     ```console
     $ st run openapi.yaml --rate-limit 100/m
     $ st run openapi.yaml --rate-limit 5/s
+    $ st run openapi.yaml --rate-limit auto
     ```
 
 #### `--max-redirects INTEGER`

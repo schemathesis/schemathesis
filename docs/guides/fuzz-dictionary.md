@@ -2,6 +2,8 @@
 
 Feed any values you want Schemathesis to try: SQL injection payloads, real IDs, edge-case strings, anything. Mix them with schema-derived data at a chosen probability, or force them for a specific parameter.
 
+Entries are plain values in TOML or a text file, so a list exported from your database or produced by an LLM drops straight in - no code, no plugin.
+
 Dictionary entries are filtered by the active generation mode: positive mode samples only schema-valid entries, negative mode samples only schema-violating ones. If a binding has no eligible entries for the active mode, that parameter falls back to normal schema-derived generation.
 
 ## Probe a Wordlist Against Every String Parameter
