@@ -399,6 +399,12 @@ def format_length_bounds(name: str, strategy: st.SearchStrategy | None) -> tuple
     return FORMAT_LENGTHS.get(name)
 
 
+def format_lengths_for(formats: dict[str, st.SearchStrategy]) -> dict[str, tuple[int, int]]:
+    """The known bounds among `formats`, skipping every name a caller supplied its own generator for."""
+    defaults = get_default_format_strategies()
+    return {name: bounds for name, bounds in FORMAT_LENGTHS.items() if formats.get(name) is defaults.get(name)}
+
+
 @lru_cache
 def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""

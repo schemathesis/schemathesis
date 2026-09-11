@@ -262,6 +262,7 @@ def _not(
             root=complement,
             alphabet=ctx.alphabet,
             formats=ctx.formats,
+            format_lengths=ctx.format_lengths,
             complementing=ctx.complementing,
             whole_floats=ctx.whole_floats,
         )
@@ -1658,6 +1659,8 @@ def _formatted(
     name: str, others: list[str], view: jsonschema_rs.canonical.StringView, ctx: StrategyContext
 ) -> SearchStrategy[JsonValue]:
     """Values from the generator registered for `name`, narrowed to the facets around it."""
+    if _length_out_of_reach(name, view, ctx):
+        return st.nothing()
     strategy = ctx.formats[name]
     for other in others:
         strategy = strategy.filter(_facet_check("format", other))
@@ -1665,6 +1668,17 @@ def _formatted(
         # A format generator cannot be steered, so the pattern can only be filtered for.
         strategy = strategy.filter(_facet_check("pattern", pattern))
     return _within_length(strategy, view)
+
+
+def _length_out_of_reach(name: str, view: jsonschema_rs.canonical.StringView, ctx: StrategyContext) -> bool:
+    """Whether the length window lies outside every length the generator for `name` reaches."""
+    bounds = ctx.format_lengths.get(name)
+    if bounds is None:
+        return False
+    shortest, longest = bounds
+    return (view.min_length is not None and view.min_length > longest) or (
+        view.max_length is not None and view.max_length < shortest
+    )
 
 
 # The validator's own engine judges the facet, so `\p{L}` patterns and format assertions filter

@@ -39,6 +39,7 @@ from schemathesis.specs.openapi._hypothesis import (
     snapped_float32_clone,
 )
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
+from schemathesis.specs.openapi.formats import format_lengths_for
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -899,11 +900,13 @@ def _generate_single_example(
     validator_cls: type[jsonschema_rs.Validator],
 ) -> Any:
     # A schema with no values to draw from contributes nothing rather than a value it does not admit.
+    formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
     try:
         strategy = build(
             schema,
             draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
-            formats=_build_custom_formats(generation_config, GenerationMode.POSITIVE),
+            formats=formats,
+            format_lengths=format_lengths_for(formats),
             alphabet=Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec),
         )
     except InvalidSchema:

@@ -84,7 +84,7 @@ from schemathesis.specs.openapi.coverage._wire import (
     ensure_valid_path_parameter_schema,
     jsonify,
 )
-from schemathesis.specs.openapi.formats import format_length_bounds
+from schemathesis.specs.openapi.formats import format_length_bounds, format_lengths_for
 from schemathesis.specs.openapi.patterns import (
     matches_every_string,
     pattern_length_bounds,
@@ -648,7 +648,12 @@ class CoverageContext:
         # This phase reshapes what it is given and covers whatever parses, so a definition the draft
         # rejects - the caller's or one of these rewrites - leaves the branch uncovered, not the run failed.
         try:
-            return build(schema, draft=draft, formats=self.custom_formats)
+            return build(
+                schema,
+                draft=draft,
+                formats=self.custom_formats,
+                format_lengths=format_lengths_for(self.custom_formats),
+            )
         except InvalidSchema:
             return None
 
