@@ -955,7 +955,11 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_typ
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "files": {"type": "array", "items": {"type": "string", "format": "binary"}}
+                                        "files": {
+                                            "type": "array",
+                                            "items": {"type": "string", "format": "binary"},
+                                            "minItems": 1,
+                                        }
                                     },
                                     "required": ["files"],
                                     "additionalProperties": False,

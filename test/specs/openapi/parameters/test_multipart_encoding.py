@@ -675,6 +675,28 @@ def test_multipart_encoding_with_unknown_content_type_fails(ctx):
     test()
 
 
+def test_multipart_empty_body_sends_valid_terminator(ctx, case_factory):
+    # An empty multipart body (e.g. a required property omitted by negative generation) must
+    # still serialize to a well-formed multipart payload instead of an empty `data`/`files` pair.
+    operation = make_operation(
+        ctx,
+        {
+            "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {"file": {"type": "string", "format": "binary"}},
+            },
+        },
+    )
+    case = case_factory(operation=operation, method="POST", media_type="multipart/form-data", body={})
+
+    kwargs = case.as_transport_kwargs(base_url="http://example.com")
+
+    assert kwargs["files"] is None
+    boundary = kwargs["headers"]["Content-Type"].split("boundary=")[1]
+    assert kwargs["data"] == f"--{boundary}--\r\n".encode("latin-1")
+
+
 def test_multipart_encoding_with_negative_mode(ctx):
     operation = make_operation(
         ctx,

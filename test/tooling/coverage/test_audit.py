@@ -127,6 +127,37 @@ def test_audit_schema_records_required_invalid_for_form_urlencoded_body(ctx):
     assert form_required == [], outcome.result.uncovered_keywords
 
 
+def test_audit_schema_records_required_invalid_for_multipart_body(ctx):
+    raw = ctx.openapi.build_schema(
+        {
+            "/images": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["imageData"],
+                                    "properties": {"imageData": {"type": "string", "format": "binary"}},
+                                },
+                            },
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    multipart_required = [
+        u
+        for u in outcome.result.uncovered_keywords
+        if u.get("parameter") == "multipart/form-data" and u.get("schema_path", "").endswith("/required")
+    ]
+    assert multipart_required == [], outcome.result.uncovered_keywords
+
+
 def test_audit_schema_skips_unserializable_media_types_without_aborting_operation(ctx):
     # An unserializable body alternative (no built-in serializer for `application/x-msgpack`)
     # must not abort coverage for sibling media types that *are* serializable.
