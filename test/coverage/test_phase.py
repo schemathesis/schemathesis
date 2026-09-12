@@ -7121,6 +7121,37 @@ def test_multipart_template_body_built_from_custom_property_encodings(ctx):
     assert {"file": b"\x89PNG", "name": ""} in bodies, bodies[:5]
 
 
+def test_body_examples_mismatching_schema_do_not_suppress_positive_generation(ctx):
+    # A spec's `examples` can describe a shape unrelated to the body schema (real-world specs
+    # often disagree); they shouldn't poison generation into never producing a valid body.
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"name": "feedType", "in": "query", "required": True, "schema": {"type": "string", "enum": ["a", "b"]}}
+        ],
+        request_body={
+            "required": True,
+            "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"file": {"type": "string", "format": "binary"}},
+                        "required": ["file"],
+                    },
+                    "examples": {
+                        "json1": {"value": {"Price": [{"foo": "bar"}], "PriceHeader": {"a": 1}}},
+                        "xml1": {"value": {"Price": [{"baz": "qux"}], "PriceHeader": {"b": 2}}},
+                    },
+                }
+            },
+        },
+    )["/foo"]["post"]
+    cases = iter_cases(operation, GenerationMode.POSITIVE, GenerationMode.NEGATIVE)
+    scenarios = {c.meta.phase.data.scenario for c in cases}
+    assert CoverageScenario.VALID_OBJECT in scenarios, scenarios
+    assert CoverageScenario.INVALID_ENUM_VALUE in scenarios, scenarios
+
+
 def test_multipart_property_with_unregistered_content_type_falls_back_to_schema_generation(ctx):
     # An `encoding.contentType` with no registered strategy contributes nothing custom;
     # the property is generated from its schema like any other.

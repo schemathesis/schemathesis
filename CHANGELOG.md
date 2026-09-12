@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Generate a positive body and isolated negatives when a spec's `examples` mismatch its schema.
+
 ## [4.27.0](https://github.com/schemathesis/schemathesis/compare/v4.26.1...v4.27.0) - 2026-09-12
 
 ### :rocket: Added

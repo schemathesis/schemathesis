@@ -33,7 +33,7 @@ from schemathesis.generation.meta import (
     GenerationInfo,
     PhaseInfo,
 )
-from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet, filter_schema_valid_examples
 from schemathesis.specs.openapi.coverage._schema import CoverageContext, GeneratedValue, HashSet, cover_schema_iter
 from schemathesis.specs.openapi.error_feedback import apply_adjustments
 from schemathesis.transport.serialization import quote_all
@@ -890,14 +890,11 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
                 schema = as_object_schema(adjusted)
                 schema_is_clone = True
         examples = body.examples
-        if examples and schema_is_clone:
-            # Drop examples invalidated by inferred constraints so coverage falls back to schema generation.
-            try:
-                body_validator = make_validator(schema, validator_cls)
-            except Exception:
-                body_validator = None
-            if body_validator is not None:
-                examples = [example for example in examples if body_validator.is_valid(example)]
+        if examples:
+            # A spec's `examples` may not match its own schema (real-world specs often disagree); an
+            # unvalidated one seeds the generator with a value it can never converge on, silently
+            # collapsing positive body generation for the whole operation.
+            examples = filter_schema_valid_examples(examples, schema, validator_cls)
         if examples:
             if not schema_is_clone:
                 schema = dict(schema)
