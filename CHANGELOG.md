@@ -6,6 +6,7 @@
 
 - Generate a positive body and isolated negatives when a spec's `examples` mismatch its schema.
 - Cover a `oneOf` branch's own properties even when it can never win exclusivity over a sibling branch.
+- Send a valid multipart terminator for an empty multipart body instead of an empty request.
 
 ## [4.27.0](https://github.com/schemathesis/schemathesis/compare/v4.26.1...v4.27.0) - 2026-09-12
 

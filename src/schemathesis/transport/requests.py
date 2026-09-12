@@ -416,6 +416,15 @@ def multipart_serializer(ctx: SerializationContext, value: Body) -> dict[str, An
         return {"data": value}
     if isinstance(value, dict):
         files, data = prepare_multipart_parts(ctx, value)
+        if not files and not data:
+            boundary = choose_boundary()
+            main, sub = media_types.parse(ctx.case.media_type or "multipart/form-data")
+            content_type = f"{main}/{sub}; boundary={boundary}"
+            return {
+                "files": None,
+                "data": f"--{boundary}--\r\n".encode("latin-1"),
+                "headers": {"Content-Type": content_type},
+            }
         return {"files": files, "data": data}
     # Uncommon schema. For example - `{"type": "string"}`
     boundary = choose_boundary()
