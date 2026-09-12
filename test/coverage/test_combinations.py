@@ -4351,3 +4351,67 @@ def test_negative_one_of_ref_with_siblings_under_draft4(ctx_factory):
     validator = jsonschema_rs.Draft4Validator(schema)
     for value in cover_schema_iter(ctx, schema):
         assert not validator.is_valid(value.value), f"False negative-mode value: {value.value!r}"
+
+
+def test_positive_one_of_branch_fully_subsumed_by_sibling_covers_its_property_as_negative(ctx_factory):
+    # `TokenRequest` has no `additionalProperties: false`, so any value satisfying the `mac`
+    # branch also satisfies `TokenRequest` — that branch can never win `oneOf` exclusivity. The
+    # whole body is invalid either way, but `mac`'s own `type` keyword still deserves coverage.
+    schema = {
+        "oneOf": [
+            {"$ref": "#/x-bundled/TokenRequest"},
+            {
+                "allOf": [
+                    {"$ref": "#/x-bundled/TokenRequest"},
+                    {"type": "object", "properties": {"mac": {"type": "string"}}, "required": ["mac"]},
+                ]
+            },
+        ],
+        "x-bundled": {
+            "TokenRequest": {"type": "object", "properties": {"keyName": {"type": "string"}}, "required": ["keyName"]},
+        },
+    }
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
+        root_schema=schema,
+    )
+    validator = jsonschema_rs.Draft4Validator(schema)
+    values = list(cover_schema_iter(ctx, schema))
+    mac_string = next(
+        (value for value in values if isinstance(value.value, dict) and isinstance(value.value.get("mac"), str)), None
+    )
+    assert mac_string is not None, values
+    assert mac_string.generation_mode == GenerationMode.NEGATIVE
+    assert not validator.is_valid(mac_string.value)
+
+
+def test_subsumed_one_of_branch_negative_is_not_filtered_by_sibling_not(ctx_factory):
+    schema = {
+        "oneOf": [
+            {"$ref": "#/x-bundled/TokenRequest"},
+            {
+                "allOf": [
+                    {"$ref": "#/x-bundled/TokenRequest"},
+                    {"type": "object", "properties": {"mac": {"type": "string"}}, "required": ["mac"]},
+                ]
+            },
+        ],
+        "not": {"required": ["missing"]},
+        "x-bundled": {
+            "TokenRequest": {"type": "object", "properties": {"keyName": {"type": "string"}}, "required": ["keyName"]},
+        },
+    }
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
+        root_schema=schema,
+    )
+    validator = jsonschema_rs.Draft4Validator(schema)
+    values = list(cover_schema_iter(ctx, schema))
+    mac_string = next(
+        (value for value in values if isinstance(value.value, dict) and isinstance(value.value.get("mac"), str)), None
+    )
+    assert mac_string is not None, values
+    assert mac_string.generation_mode == GenerationMode.NEGATIVE
+    assert not validator.is_valid(mac_string.value)
