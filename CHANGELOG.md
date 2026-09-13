@@ -10,6 +10,7 @@
 - Cover `items` with a valid value when a conflicting sibling `type` would otherwise silence it.
 - Cover a `oneOf` branch's own properties even when it can never win exclusivity over a sibling branch.
 - Send a valid multipart terminator for an empty multipart body instead of an empty request.
+- Do not generate `null` as an incorrect type for nullable OpenAPI 3.0 properties.
 
 ## [4.27.0](https://github.com/schemathesis/schemathesis/compare/v4.26.1...v4.27.0) - 2026-09-12
 
