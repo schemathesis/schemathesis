@@ -4848,6 +4848,32 @@ def test_coverage_positive_object_type_with_items(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
+def test_items_with_conflicting_object_type_gets_negative_coverage(ctx):
+    # The body itself can never be POSITIVE, but `items`' own sub-schema should still see a valid draw.
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "items": {
+                "type": "object",
+                "properties": {"kind": {"type": "string", "example": "removeUserTargets"}},
+            },
+        },
+    )
+    cases = collect_cases(operation, GenerationMode.NEGATIVE)
+
+    with_valid_array = [
+        c
+        for c in cases
+        if isinstance(c.body, list)
+        and c.body
+        and all(isinstance(item, dict) and item.get("kind") == "removeUserTargets" for item in c.body)
+    ]
+    assert with_valid_array, (
+        f"Expected a NEGATIVE case with 'kind' inside an array body. Got bodies: {[c.body for c in cases]}"
+    )
+
+
 def test_object_example_with_readonly_key_ships_without_it(ctx):
     # A curated body `example` naming a server-set field must still ship once, minus that field.
     operation = body_operation(
