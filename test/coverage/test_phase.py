@@ -839,6 +839,26 @@ def test_positive_nullable_enum_omits_null(ctx, version, status):
     )
 
 
+def test_coverage_negative_nullable_property_does_not_use_null_for_incorrect_type(ctx):
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "required": ["note"],
+            "properties": {"note": {"type": "string", "nullable": True}},
+        },
+        path="/items",
+    )
+
+    cases = scenario_cases(iter_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.INCORRECT_TYPE)
+    mutated_values = [case.body["note"] for case in cases if isinstance(case.body, dict) and "note" in case.body]
+
+    assert mutated_values, "Expected incorrect_type cases for the nullable property"
+    assert None not in mutated_values
+    assert any(not isinstance(value, str) for value in mutated_values)
+    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, cases=cases)
+
+
 def test_mixed_type_keyword(ctx):
     schema = build_schema(
         ctx,

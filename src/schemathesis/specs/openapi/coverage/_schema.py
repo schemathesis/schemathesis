@@ -4002,7 +4002,12 @@ def _negative_type(
                         location=ctx.current_path,
                     )
             return
-    strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
+    nullable = schema.get("nullable") is True
+    strategies = {
+        ty: strategy
+        for ty, strategy in STRATEGIES_FOR_TYPE.items()
+        if ty not in types and not (nullable and ty == "null")
+    }
     if "string" in strategies:
         strategies["string"] = NEGATIVE_STRING_STRATEGY
     # Rules kept per type, so a probe can be held to the same ones without drawing.
