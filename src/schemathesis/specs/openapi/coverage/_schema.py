@@ -3575,7 +3575,10 @@ def _negative_array_for_conflicting_type(
 ) -> Generator[GeneratedValue, None, None]:
     # A declared `type` other than "array" paired with `items` (a schema inconsistency) makes every
     # array value invalid overall, but `items`' own sub-schema should still see a valid draw.
-    for value in _cover_positive_for_type(ctx.with_positive(), schema, "array"):
+    # Forcing `type: array` keeps an `example`/`default` describing the declared (non-array) type
+    # from validating as a positive array value and leaking through unchanged below.
+    array_schema = {**schema, "type": "array"}
+    for value in _cover_positive_for_type(ctx.with_positive(), array_schema, "array"):
         if value.generation_mode == GenerationMode.POSITIVE:
             yield NegativeValue(
                 value.value,

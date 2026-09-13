@@ -4874,6 +4874,26 @@ def test_items_with_conflicting_object_type_gets_negative_coverage(ctx):
     )
 
 
+def test_items_with_conflicting_object_type_and_example_stays_negative(ctx):
+    # An `example` describing the object must not leak through as the array `items` forces generation into.
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "items": {"type": "string"},
+            "example": {"kind": "removeUserTargets"},
+        },
+    )
+    cases = collect_cases(operation, GenerationMode.NEGATIVE)
+
+    def body_is_negative(case):
+        component = case.meta.components.get(ParameterLocation.BODY)
+        return component is not None and component.mode == GenerationMode.NEGATIVE
+
+    no_op_mutations = [c for c in cases if body_is_negative(c) and c.body == {"kind": "removeUserTargets"}]
+    assert not no_op_mutations, f"Body: {[c.body for c in no_op_mutations]}"
+
+
 def test_object_example_with_readonly_key_ships_without_it(ctx):
     # A curated body `example` naming a server-set field must still ship once, minus that field.
     operation = body_operation(
