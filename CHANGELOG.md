@@ -6,6 +6,7 @@
 
 - Decline unbuildable negated bodies instead of raising `UnsupportedSchema` during negative generation. [#4753](https://github.com/schemathesis/schemathesis/issues/4753)
 - Generate a positive body and isolated negatives when a spec's `examples` mismatch its schema.
+- Cover `items` with a valid value when a conflicting sibling `type` would otherwise silence it.
 - Cover a `oneOf` branch's own properties even when it can never win exclusivity over a sibling branch.
 - Send a valid multipart terminator for an empty multipart body instead of an empty request.
 

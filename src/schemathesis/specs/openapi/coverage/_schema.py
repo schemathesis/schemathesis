@@ -2353,6 +2353,8 @@ def cover_schema_iter(
                 handler = _NEGATIVE_HANDLERS.get(key)
                 if handler is not None:
                     yield from handler(ctx, schema, value, seen)
+                    if key == "items" and types and "array" not in types and _implies_array_type(schema):
+                        yield from _negative_array_for_conflicting_type(ctx, schema)
                 elif key == "properties":
                     template = yield from _ensure_object_template_with_baseline(ctx, schema, template)
                     yield from _negative_properties(ctx, template, value)
@@ -3566,6 +3568,21 @@ def _negative_pattern_properties(
                     description=f"Object with invalid pattern key '{key}' ('{pattern}') value: {value.description}",
                     location=nctx.current_path,
                 )
+
+
+def _negative_array_for_conflicting_type(
+    ctx: CoverageContext, schema: JsonSchemaObject
+) -> Generator[GeneratedValue, None, None]:
+    # A declared `type` other than "array" paired with `items` (a schema inconsistency) makes every
+    # array value invalid overall, but `items`' own sub-schema should still see a valid draw.
+    for value in _cover_positive_for_type(ctx.with_positive(), schema, "array"):
+        if value.generation_mode == GenerationMode.POSITIVE:
+            yield NegativeValue(
+                value.value,
+                scenario=CoverageScenario.INCORRECT_TYPE,
+                description="Array value for a schema whose declared type forbids arrays",
+                location=ctx.current_path,
+            )
 
 
 def _negative_items(
