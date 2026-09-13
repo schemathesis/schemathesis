@@ -25,6 +25,7 @@ from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.jsonschema import build
 from schemathesis.generation.jsonschema.context import Alphabet
+from schemathesis.generation.jsonschema.strategy import DECLINED
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.specs.openapi.adapter.parameters import _constant_values_at_draws, _prune_modified_constants
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, format_lengths_for, header_alphabet
@@ -305,13 +306,17 @@ def negative_schema(
 
     def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
         schema, metadata = value
-        strategy = build(
-            schema,
-            draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
-            formats=custom_formats,
-            format_lengths=format_lengths,
-            alphabet=alphabet,
-        )
+        try:
+            strategy = build(
+                schema,
+                draft=CANONICALIZE_DRAFT_BY_VALIDATOR[validator_cls],
+                formats=custom_formats,
+                format_lengths=format_lengths,
+                alphabet=alphabet,
+            )
+        except DECLINED:
+            # This mutation's negated form can't be drawn from; decline it like any other branch.
+            return st.nothing()
         # Failing every format on principle only speaks for a negated `format`; elsewhere it hides
         # that the mutation left the value conforming.
         chosen = validator if _negates_format(metadata) else get_real_validator(validator_cache_key)

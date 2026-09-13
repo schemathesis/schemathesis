@@ -6,7 +6,7 @@ import pytest
 import requests
 from _pytest.main import ExitCode
 from flask import jsonify
-from hypothesis import HealthCheck, given, seed, settings
+from hypothesis import HealthCheck, Phase, given, seed, settings
 from hypothesis import strategies as st
 from jsonschema_rs import canonical
 
@@ -1599,5 +1599,247 @@ def test_negative_body_stays_invalid_when_a_sibling_carries_a_format(ctx):
         if not isinstance(value, dict):
             return
         assert not validator.is_valid(value), f"Negative case conforms to the schema: {value!r}"
+
+    test()
+
+
+def test_negative_declines_unbuildable_negated_body(ctx):
+    # `additionalProperties: false` plus an `allOf` of `if`/`then` negates to a shape the
+    # canonical strategy builder cannot draw for; must be declined, not raised as fatal.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {"schema": {"$ref": "#/components/schemas/ExportCreateRequestRequest"}}
+                        },
+                        "required": True,
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "DateFormatEnum": {"enum": ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"], "type": "string"},
+                "EncodingEnum": {"enum": ["utf-8", "utf-8-sig", "latin-1"], "type": "string"},
+                "ExportCreateRequestRequest": {
+                    "type": "object",
+                    "properties": {
+                        "export_type": {"$ref": "#/components/schemas/ExportTypeEnum"},
+                        "fmt": {"$ref": "#/components/schemas/FmtEnum"},
+                        "filters": {"$ref": "#/components/schemas/ExportJobFiltersRequest"},
+                        "options": {"$ref": "#/components/schemas/ExportJobOptionsRequest"},
+                        "redact_pii": {"type": "boolean"},
+                        "q": {"type": "string"},
+                        "is_async": {"type": "boolean"},
+                    },
+                    "required": ["export_type"],
+                    "additionalProperties": False,
+                    "allOf": [
+                        {
+                            "if": {"properties": {"export_type": {"const": "audit_log"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv"]},
+                                    "filters": {
+                                        "type": "object",
+                                        "properties": {
+                                            "action": {"type": "string", "pattern": "\\S"},
+                                            "created_at__gte": {
+                                                "type": "string",
+                                                "pattern": "\\S",
+                                                "format": "date-time",
+                                            },
+                                            "created_at__lte": {
+                                                "type": "string",
+                                                "pattern": "\\S",
+                                                "format": "date-time",
+                                            },
+                                            "model_name": {"type": "string", "pattern": "\\S"},
+                                            "user_id": {"type": "string", "pattern": "^[0-9]+$"},
+                                        },
+                                        "additionalProperties": False,
+                                    },
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "categories"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {"type": "object", "properties": {}, "additionalProperties": False},
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "colors"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {"type": "object", "properties": {}, "additionalProperties": False},
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "materials"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {"type": "object", "properties": {}, "additionalProperties": False},
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "orders"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {
+                                        "type": "object",
+                                        "properties": {
+                                            "created_at__gte": {
+                                                "type": "string",
+                                                "pattern": "\\S",
+                                                "format": "date-time",
+                                            },
+                                            "created_at__lte": {
+                                                "type": "string",
+                                                "pattern": "\\S",
+                                                "format": "date-time",
+                                            },
+                                            "status": {"type": "string", "pattern": "\\S"},
+                                        },
+                                        "additionalProperties": False,
+                                    },
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "products"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {"type": "object", "properties": {}, "additionalProperties": False},
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "quotes"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {
+                                        "type": "object",
+                                        "properties": {
+                                            "created_at__gte": {
+                                                "type": "string",
+                                                "pattern": "\\S",
+                                                "format": "date-time",
+                                            },
+                                            "created_at__lte": {
+                                                "type": "string",
+                                                "pattern": "\\S",
+                                                "format": "date-time",
+                                            },
+                                            "status": {"type": "string", "pattern": "\\S"},
+                                        },
+                                        "additionalProperties": False,
+                                    },
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "services"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {"type": "object", "properties": {}, "additionalProperties": False},
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "suppliers"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["csv", "json"]},
+                                    "filters": {"type": "object", "properties": {}, "additionalProperties": False},
+                                }
+                            },
+                        },
+                        {
+                            "if": {"properties": {"export_type": {"const": "user_gdpr"}}, "required": ["export_type"]},
+                            "then": {
+                                "properties": {
+                                    "fmt": {"enum": ["zip"]},
+                                    "filters": {
+                                        "type": "object",
+                                        "properties": {
+                                            "client_email": {"type": "string", "pattern": "\\S", "format": "email"}
+                                        },
+                                        "additionalProperties": False,
+                                        "required": ["client_email"],
+                                    },
+                                    "q": {"type": "string", "pattern": "^\\s*$"},
+                                },
+                                "required": ["filters"],
+                            },
+                        },
+                    ],
+                },
+                "ExportJobFiltersRequest": {
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string"},
+                        "created_at__gte": {"type": "string"},
+                        "created_at__lte": {"type": "string"},
+                        "model_name": {"type": "string"},
+                        "action": {"type": "string"},
+                        "user_id": {"type": "string"},
+                        "client_email": {
+                            "anyOf": [{"type": "string", "format": "email"}, {"type": "string", "maxLength": 0}]
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+                "ExportJobOptionsRequest": {
+                    "type": "object",
+                    "properties": {
+                        "encoding": {"$ref": "#/components/schemas/EncodingEnum"},
+                        "date_format": {"$ref": "#/components/schemas/DateFormatEnum"},
+                        "include_headers": {"type": "boolean"},
+                    },
+                    "additionalProperties": False,
+                },
+                "ExportTypeEnum": {
+                    "enum": [
+                        "audit_log",
+                        "categories",
+                        "colors",
+                        "materials",
+                        "orders",
+                        "products",
+                        "quotes",
+                        "services",
+                        "suppliers",
+                        "user_gdpr",
+                    ],
+                    "type": "string",
+                },
+                "FmtEnum": {"enum": ["csv", "json", "zip"], "type": "string"},
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @seed(1)
+    @settings(max_examples=200, deadline=None, suppress_health_check=list(HealthCheck), phases=[Phase.generate])
+    def test(case):
+        pass
 
     test()
