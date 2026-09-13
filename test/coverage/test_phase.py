@@ -5603,6 +5603,37 @@ def test_coverage_negative_missing_required_with_additional_properties_schema(ct
     assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=generate_cases, validate_formats=False)
 
 
+@pytest.mark.parametrize(
+    ("annotations", "expected", "scenario"),
+    [
+        ({}, [{"a": 0}], CoverageScenario.VALID_OBJECT),
+        ({"example": 42}, [{"a": 0}], CoverageScenario.VALID_OBJECT),
+        ({"example": {"b": "oops"}}, [{"a": 0}], CoverageScenario.VALID_OBJECT),
+        ({"example": {"a": "oops"}}, [{"a": 0}], CoverageScenario.VALID_OBJECT),
+        ({"default": "oops"}, [{"a": 0}], CoverageScenario.VALID_OBJECT),
+        ({"examples": ["nope", {"b": "oops"}]}, [{"a": 0}], CoverageScenario.VALID_OBJECT),
+        ({"example": 42, "examples": ["nope"], "default": 42}, [{"a": 0}], CoverageScenario.VALID_OBJECT),
+        ({"example": {"a": 3}}, [{"a": 3}], CoverageScenario.EXAMPLE_VALUE),
+        ({"default": {"a": 3}}, [{"a": 3}, {"a": 0}], CoverageScenario.DEFAULT_VALUE),
+        ({"examples": ["nope", {"a": 3}, 42]}, [{"a": 3}], CoverageScenario.EXAMPLE_VALUE),
+        ({"example": 42, "default": {"a": 3}}, [{"a": 3}, {"a": 0}], CoverageScenario.DEFAULT_VALUE),
+        ({"example": {"a": 3}, "default": "oops"}, [{"a": 3}], CoverageScenario.EXAMPLE_VALUE),
+    ],
+)
+def test_positive_object_annotations_fall_back_to_template(ctx, annotations, expected, scenario):
+    schema = {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"], **annotations}
+    operation = body_operation(ctx, schema)
+    operation.schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
+    cases = list(iter_cases(operation, GenerationMode.POSITIVE))
+
+    assert [case.body for case in cases] == expected
+    assert cases[0].meta.phase.data.scenario == scenario
+    validator = jsonschema_rs.Draft4Validator(schema)
+    for case in cases:
+        validator.validate(case.body)
+
+
 def test_positive_object_example_with_invalid_format_not_yielded(ctx):
     # Schema-level example with a property value that violates format: date-time (missing timezone).
     # The invalid example must not appear as a POSITIVE coverage case.
