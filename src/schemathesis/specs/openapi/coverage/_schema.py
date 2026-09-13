@@ -3312,15 +3312,18 @@ def _iter_positive_object(
     # (Valid object, subset-of-optional, only-required) collapse to the same value.
     outer_seen = HashSet()
 
+    hint_accepted = False
     if example is not NOT_SET or examples or default is not NOT_SET:
         if example is not NOT_SET:
             accepted = _accept_object_hint(example, schema, ctx)
             if accepted is not NOT_SET:
+                hint_accepted = True
                 yield PositiveValue(accepted, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
                 accepted = _accept_object_hint(example, schema, ctx)
                 if accepted is not NOT_SET:
+                    hint_accepted = True
                     yield PositiveValue(accepted, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default is not NOT_SET
@@ -3329,8 +3332,10 @@ def _iter_positive_object(
         ):
             accepted = _accept_object_hint(default, schema, ctx)
             if accepted is not NOT_SET:
+                hint_accepted = True
                 yield PositiveValue(accepted, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    elif template_complete and (template or not ctx.wire.required_form_body()):
+    # Rejected annotations must not suppress the generated baseline.
+    if not hint_accepted and template_complete and (template or not ctx.wire.required_form_body()):
         outer_seen.insert(template)
         yield PositiveValue(template, scenario=CoverageScenario.VALID_OBJECT, description="Valid object")
 
