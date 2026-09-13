@@ -45,6 +45,15 @@ uvx schemathesis run http://localhost:8080/openapi.json \
 
 Schemathesis will discover an edge case that causes a 500 error.
 
+## GitHub Actions
+
+The **Test booking API** workflow ([`.github/workflows/test-booking-api.yml`](../../.github/workflows/test-booking-api.yml)) runs Schemathesis against this API in CI.
+
+- Trigger manually from **Actions → Test booking API → Run workflow**
+- Or open a pull request that changes files under `examples/booking/`
+
+The workflow exercises authenticated `GET` operations and uploads a JUnit report. `POST /bookings` is left for the [CLI tutorial](../../docs/tutorials/cli.md), which relies on the intentional validation bug.
+
 ## Example Usage
 
 Create a booking:

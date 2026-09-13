@@ -2,6 +2,14 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.0...HEAD) - TBD
 
+### :rocket: Added
+
+- GitHub Actions workflow `test-booking-api.yml` that runs Schemathesis against the booking example API with auth, schema wait, and JUnit reporting.
+
+### :wrench: Changed
+
+- Renamed the booking example workflow from `example-build.yml` to `test-booking-api.yml` and replaced the no-op path filter with real Schemathesis checks on `GET` operations.
+
 ### :bug: Fixed
 
 - Decline unbuildable negated bodies instead of raising `UnsupportedSchema` during negative generation. [#4753](https://github.com/schemathesis/schemathesis/issues/4753)

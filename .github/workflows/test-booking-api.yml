@@ -1,9 +1,9 @@
-name: Manual build API example
+name: Test booking API
 
 on:
   pull_request:
     paths:
-      - ".github/workflows/example-build.yml"
+      - ".github/workflows/test-booking-api.yml"
       - "examples/**"
   push:
     branches:
@@ -18,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  local-ci:
-    name: Example app
+  booking-api-test:
+    name: Booking API (Schemathesis)
     runs-on: ubuntu-24.04
 
     steps:
@@ -31,15 +31,21 @@ jobs:
         run: docker compose up -d --build
         working-directory: "./examples/booking"
 
-      # Runs positive Schemathesis tests
       - uses: schemathesis/action@806cace2053cbbac93188e1281ff7da415643160 # v3.0.0
-        continue-on-error: true
         with:
-          # A local API schema location
           schema: "http://127.0.0.1:8080/openapi.json"
+          authorization: "Bearer secret-token"
           max-examples: "10"
-          # To avoid failing the build
-          args: "--include-path does-not-exist"
+          wait-for-schema: "30"
+          # POST /bookings intentionally exposes a tutorial bug; CI covers read paths only.
+          args: "--report junit --include-method GET"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@4a6144826a2d195578141a2c730256f066375b90 # v4.6.0
+        if: always()
+        with:
+          name: schemathesis-results
+          path: schemathesis-report/
 
       - name: Stop containers
         if: always()

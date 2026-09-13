@@ -59,6 +59,16 @@ The JUnit report is written to `schemathesis-report/junit-<timestamp>.xml` by de
 
 Allure reports are also supported — see [Allure Integration](allure.md).
 
+### Repository example
+
+This repository ships a reference workflow for the [booking API example](../../examples/booking/README.md):
+
+- Workflow file: [`.github/workflows/test-booking-api.yml`](https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/test-booking-api.yml)
+- Starts the example API with Docker Compose, runs `schemathesis/action@v3` with bearer auth, waits for the schema, and uploads JUnit results
+- Limits CI to `GET` operations so the tutorial's intentional `POST /bookings` bug remains available for local learning
+
+Trigger it manually from **Actions → Test booking API**, or push changes under `examples/booking/`.
+
 ## GitLab CI
 
 Use the official Docker image for consistent environments.
