@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+import os
+import signal
+import subprocess
+import sys
+import time
+from contextlib import suppress
+from pathlib import Path
+
 import pytest
 
 from scripts.coverage import audit as cli_audit
@@ -92,3 +100,53 @@ def test_is_complete_still_false_when_load_failed():
     outcome = audit_schema({"not": "valid"}, api="t", corpus="external", phase=PhaseName.COVERAGE)
     assert outcome.result.errors and outcome.result.errors[0].stage == "load_failed"
     assert cli_audit._is_complete(outcome.result) is False
+
+
+def test_stopping_the_driver_leaves_no_worker_processes(tmp_path):
+    # Spawn workers outlive a killed parent forever, pinning ~1 GB each.
+    driver = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "scripts.coverage.audit",
+            "--phase=coverage",
+            "--corpus=swagger-2.0",
+            "--limit=24",
+            "--workers=2",
+            f"--out={tmp_path}",
+        ],
+        cwd=Path(__file__).resolve().parents[3],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    group = os.getpgid(driver.pid)
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline and len(_group_members(group)) < 3:
+        time.sleep(0.1)
+    assert len(_group_members(group)) >= 3, "workers never started"
+
+    driver.send_signal(signal.SIGTERM)
+    driver.wait(timeout=60)
+
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline and _group_members(group):
+        time.sleep(0.1)
+    survivors = _group_members(group)
+    for pid in survivors:
+        with suppress(ProcessLookupError):
+            os.kill(pid, signal.SIGKILL)
+    assert survivors == [], f"orphaned workers: {survivors}"
+
+
+def _group_members(group: int) -> list[int]:
+    members = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            if os.getpgid(int(entry)) == group:
+                members.append(int(entry))
+        except (ProcessLookupError, PermissionError):
+            continue
+    return members

@@ -187,6 +187,13 @@ def _record_crash(
 _KILLED_IN_ISOLATION = AuditError(stage="worker_crashed", exception=None, message="killed worker in isolation")
 
 
+def _terminate_workers() -> None:
+    """Stop live `spawn` workers so a dying driver doesn't leave them orphaned to init."""
+    for child in multiprocessing.active_children():
+        child.terminate()
+        child.join(timeout=5)
+
+
 def _run_pool(
     queue: list[_Ref],
     *,
@@ -251,6 +258,7 @@ def _run_pool(
                         in_flight[executor.submit(_process_ref, ref, **worker_kwargs)] = ref
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
+            _terminate_workers()
 
 
 def _run_parallel(
@@ -625,10 +633,13 @@ def main(argv: list[str] | None = None) -> int:
 
     def _write_summary_and_exit(signum: int, frame: object) -> None:
         print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
+        # Before writing the summary: the workers keep burning cores until they are stopped.
+        _terminate_workers()
         _finalize(results, out_dir=args.out, baseline=baseline, wall_seconds=time.monotonic() - wall_started)
         os._exit(130)
 
     signal.signal(signal.SIGINT, _write_summary_and_exit)
+    signal.signal(signal.SIGTERM, _write_summary_and_exit)
 
     worker_kwargs = _WorkerKwargs(
         out_dir=args.out,
