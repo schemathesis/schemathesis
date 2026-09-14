@@ -363,3 +363,16 @@ def test_schema_loaded_from_file_keeps_every_operation(ctx, tmp_path):
     location.write_text(json.dumps(spec))
     schema = schemathesis.openapi.from_path(location)
     assert [result.ok().label for result in schema.get_all_operations()] == [f"GET {location}"]
+
+
+def test_percent_encoded_base_path_reserved_char_survives_in_full_path(ctx):
+    # Decoding a "%3F" the schema author wrote into a static `basePath` turns it into a query delimiter.
+    schema = ctx.openapi.load_schema(
+        {"/movies.csv&imdb_id={IMDBid}": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="2.0",
+        basePath="/api-v2/%3Fsource=http:/example.com/api-v2",
+    )
+    assert (
+        schema["/movies.csv&imdb_id={IMDBid}"]["GET"].full_path
+        == "/api-v2/%3Fsource=http:/example.com/api-v2/movies.csv&imdb_id={IMDBid}"
+    )

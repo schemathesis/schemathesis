@@ -76,7 +76,9 @@ if TYPE_CHECKING:
 
 @lru_cache
 def get_full_path(base_path: str, path: str) -> str:
-    return unquote(urljoin(base_path, quote(path.lstrip("/"))))
+    # `base_path` is already in wire form; doubling its `%` keeps it whole through the `unquote`
+    # that undoes the `quote` guarding `path` from being read as an absolute URL.
+    return unquote(urljoin(base_path.replace("%", "%25"), quote(path.lstrip("/"))))
 
 
 @dataclass(eq=False)
@@ -576,7 +578,9 @@ class BaseSchema(Mapping):
         path = prepare_path(case.path, case.path_parameters).lstrip("/")
         if not base_url.endswith("/"):
             base_url += "/"
-        return unquote(urljoin(base_url, quote(path)))
+        # The base URL is already in wire form, so double its `%` to survive the `unquote` that undoes the path's
+        # `quote` — decoding it would turn an escaped reserved character such as `%3F` into a live delimiter.
+        return unquote(urljoin(base_url.replace("%", "%25"), quote(path)))
 
     def prepare_request_body(self, body: Body) -> Body:
         """Apply spec-specific transformations to a generated body before sending."""

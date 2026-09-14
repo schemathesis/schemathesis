@@ -73,11 +73,17 @@ class WireSemantics:
     media_type: tuple[str, str] | None
     is_required: bool
 
-    def representable(self, value: Any) -> bool:
-        """Whether this location can carry the value at all."""
+    def representable(self, value: Any, *, declared: bool = False) -> bool:
+        """Whether this location can carry the value at all.
+
+        `declared` marks a value the schema author wrote verbatim, where a `/` is intent to send `%2F`
+        rather than an artifact of generation, so the path filter judges its encoded form instead.
+        """
         if self.location in ("header", "cookie") and isinstance(value, str):
             return not value or (is_latin_1_encodable(value) and not has_invalid_characters("A", value))
         elif self.location == "path":
+            if declared and isinstance(value, str):
+                return not is_invalid_path_parameter(quote_path_parameter(value), allow_encoded_slash=True)
             return not is_invalid_path_parameter(value)
         return True
 

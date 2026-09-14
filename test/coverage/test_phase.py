@@ -3949,6 +3949,27 @@ def test_path_parameter_with_slash_in_custom_format(ctx):
     assert all(v == "0.0.0.0%2F0" for v in path_values), f"Unexpected values: {path_values}"
 
 
+def test_path_parameter_enum_value_with_slash_is_covered(ctx):
+    # An enum member containing "/" must still be tried, percent-encoded, not dropped.
+    operation = load_schema(
+        ctx,
+        path="/metrics/{metricId}",
+        method="get",
+        parameters=[
+            {
+                "name": "metricId",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string", "enum": ["requests/count", "users/count"]},
+            }
+        ],
+    )["/metrics/{metricId}"]["get"]
+
+    path_values = {case.path_parameters.get("metricId") for case in collect_cases(operation, GenerationMode.POSITIVE)}
+
+    assert "requests%2Fcount" in path_values, f"Unexpected values: {path_values}"
+
+
 def test_xml_string_field_no_type_mutations(ctx):
     # For {"type": "string"} XML fields, type mutations produce the same wire bytes as valid strings.
     # None -> "", False -> "False", 0 -> "0" all become valid string content in XML elements.
