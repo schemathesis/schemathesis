@@ -949,6 +949,20 @@ def test_path_parameter_space_encoded_in_url(ctx):
     assert schema.build_request_url(case, "http://127.0.0.1") == "http://127.0.0.1/forecast/2%20m%20above%20gnd"
 
 
+def test_percent_encoded_base_url_reserved_char_preserved(ctx):
+    # A base URL with a percent-encoded reserved character in its path (e.g. an Azure-style
+    # basePath that embeds a literal "?" as "%3F") must reach the wire with that encoding
+    # intact; decoding it back to "?" turns a static path segment into a query delimiter.
+    schema = ctx.openapi.load_schema(
+        {"/current-Movie-Data.csv&imdb_id={IMDBid}": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="2.0",
+    )
+    operation = schema["/current-Movie-Data.csv&imdb_id={IMDBid}"]["GET"]
+    case = operation.Case(path_parameters={"IMDBid": "0"})
+    url = schema.build_request_url(case, "http://localhost/api-v2/%3Fsource=http:/hydramovies.com/api-v2")
+    assert url == "http://localhost/api-v2/%3Fsource=http:/hydramovies.com/api-v2/current-Movie-Data.csv&imdb_id=0"
+
+
 @pytest.mark.parametrize("expected", ["null", "true", "false"])
 def test_parameters_jsonified(ctx, expected):
     # See GH-1166
