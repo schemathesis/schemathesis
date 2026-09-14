@@ -1287,8 +1287,12 @@ _TIGHTEST_LOWER = frozenset({"minLength", "minItems", "minProperties", "minimum"
 _TIGHTEST_UPPER = frozenset({"maxLength", "maxItems", "maxProperties", "maximum", "exclusiveMaximum"})
 
 
-def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
-    """`allOf` folded into the schema around it, or `None` when a branch cannot be folded."""
+def _merge_all_of(schema: JsonSchemaObject, *, judge_inherited_names: bool = False) -> JsonSchemaObject | None:
+    """`allOf` folded into the schema around it, or `None` when a branch cannot be folded.
+
+    With `judge_inherited_names`, a branch judging every name it does not declare keeps that
+    judgement on the names its siblings declare instead of stopping the fold.
+    """
     branches = schema.get("allOf")
     if not isinstance(branches, list):
         return None
@@ -1297,7 +1301,7 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     folded_branches = [outer]
     for branch in branches:
         if isinstance(branch, dict) and "allOf" in branch:
-            folded = _merge_all_of(branch)
+            folded = _merge_all_of(branch, judge_inherited_names=judge_inherited_names)
             if folded is None:
                 return None
             branch = folded
@@ -1320,13 +1324,9 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     if merged.get("not") == {}:
         # A branch rejects every value, so the keywords folded in around it cannot make one fit.
         return {"not": {}}
-    required = merged.get("required")
-    if isinstance(required, list) and isinstance(merged.get("properties"), dict):
+    if _requires_an_impossible_name(merged):
         # Requiring a name whose merged schema admits nothing leaves no object to satisfy the fold.
-        for name in required:
-            sub = merged["properties"].get(name)
-            if sub is False or sub == {"not": {}}:
-                return {"not": {}}
+        return {"not": {}}
     if "$ref" in merged and any(key != "$ref" and key not in _ANNOTATION_KEYWORDS for key in merged):
         # A reference that stays unresolved overrides everything folded in beside it, so those
         # constraints would silently vanish from the value.
@@ -1336,14 +1336,34 @@ def _merge_all_of(schema: JsonSchemaObject) -> JsonSchemaObject | None:
         extra = branch.get("additionalProperties")
         # A branch judging every name it does not declare still judges the names its siblings
         # declare; folding the property sets together would let those escape it.
-        if isinstance(extra, dict) and extra and merged_names - set(branch.get("properties", {})):
-            return None
+        if isinstance(extra, dict) and extra and (inherited := merged_names - set(branch.get("properties", {}))):
+            if not judge_inherited_names or branch.get("patternProperties"):
+                return None
+            properties = dict(merged["properties"])
+            for name in sorted(inherited):
+                judged = _merge_all_of({"allOf": [properties[name], extra]}, judge_inherited_names=True)
+                if judged is None:
+                    return None
+                properties[name] = judged
+            merged["properties"] = properties
+            merged_names = set(properties)
+            if _requires_an_impossible_name(merged):
+                return {"not": {}}
     if not _restrict_closed_properties(merged, folded_branches):
         # A branch forbidding extras leaves no room for a name another branch requires.
         return {"not": {}}
     # Keyword order drives the order coverage walks constraints in; keep it independent of
     # which branch each one came from.
     return dict(sorted(merged.items()))
+
+
+def _requires_an_impossible_name(merged: dict[str, Any]) -> bool:
+    """Whether the fold requires a name whose merged schema admits no value."""
+    required = merged.get("required")
+    properties = merged.get("properties")
+    if not isinstance(required, list) or not isinstance(properties, dict):
+        return False
+    return any(properties.get(name) is False or properties.get(name) == {"not": {}} for name in required)
 
 
 def _restrict_closed_properties(merged: dict[str, Any], branches: list[JsonSchemaObject]) -> bool:
@@ -1669,8 +1689,11 @@ def _positive_for_leaves(
         with ExitStack() as stack:
             for reference in leaf.references:
                 stack.enter_context(ctx.expand(reference))
-            if leaf.schema is not None:
-                values = cover_schema_iter(ctx, leaf.schema)
+            flat = (
+                leaf.schema if leaf.schema is not None else _merge_all_of(leaf.conjunction, judge_inherited_names=True)
+            )
+            if flat is not None and flat != {"not": {}}:
+                values = cover_schema_iter(ctx, flat)
             else:
                 # No single flat spelling (two `pattern`s, two `format`s): one conforming value rather than none.
                 values = _drawn_positive(ctx, leaf.conjunction)

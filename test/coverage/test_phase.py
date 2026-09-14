@@ -4187,6 +4187,85 @@ def test_all_of_branch_judging_outer_properties_as_additional(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
+def test_positive_body_covers_nested_enum_under_an_unfoldable_all_of(ctx):
+    operation = body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Payload"},
+        path="/x",
+        components={
+            "schemas": {
+                "Base": {"type": "object", "properties": {"id": {"type": "string"}}},
+                "Payload": {
+                    "type": "object",
+                    "additionalProperties": {"type": "object"},
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                    "properties": {
+                        "conditions": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": ["Succeeded", "Failed"]},
+                        }
+                    },
+                },
+            }
+        },
+    )
+    assert {
+        entry
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        if isinstance(case.body, dict)
+        for entry in case.body.get("conditions", [])
+    } == {"Succeeded", "Failed"}
+
+
+def test_positive_body_drawn_whole_when_an_inherited_property_cannot_be_folded(ctx):
+    # No single spelling carries both patterns, so `code` is drawn against them together.
+    operation = body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Payload"},
+        path="/x",
+        components={
+            "schemas": {
+                "Base": {
+                    "type": "object",
+                    "properties": {"code": {"type": "string", "pattern": "^a", "minLength": 2, "maxLength": 2}},
+                    "required": ["code"],
+                },
+                "Payload": {
+                    "type": "object",
+                    "maxProperties": 1,
+                    "additionalProperties": {"type": "string", "pattern": "b$", "minLength": 2, "maxLength": 2},
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                },
+            }
+        },
+    )
+
+    assert [(case.body, case.meta.phase.data.scenario) for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
+        ({"code": "ab"}, CoverageScenario.DEFAULT_POSITIVE_TEST)
+    ]
+
+
+def test_no_positive_body_when_an_inherited_required_property_admits_nothing(ctx):
+    # `code` has to be a string and an integer at once, so no object fits.
+    operation = body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Payload"},
+        path="/x",
+        components={
+            "schemas": {
+                "Base": {"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"]},
+                "Payload": {
+                    "type": "object",
+                    "additionalProperties": {"type": "integer"},
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                },
+            }
+        },
+    )
+
+    assert iter_cases(operation, GenerationMode.POSITIVE) == []
+
+
 def test_all_of_branch_that_stays_a_reference(ctx):
     # A branch left as a bare reference cannot carry its siblings' constraints - `$ref` wins over them.
     operation = body_operation(
