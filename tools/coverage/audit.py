@@ -25,6 +25,7 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
+from schemathesis.generation.drivers import without_unserializable_payload
 from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
@@ -338,12 +339,9 @@ def _coverage_cases(
         generation_config=generation_config,
         unexpected_methods_seen=None,
     ):
-        # Mirror the runner: drop cases for media types with no registered serializer
-        # so a single unsupported alternative (e.g. `application/x-msgpack`) doesn't
-        # crash the operation and forfeit coverage of its serializable siblings.
-        if case.media_type and transport.get_first_matching_media_type(case.media_type) is None:
-            continue
-        yield case
+        # Mirror the runner: an unserializable media type must not forfeit what the case tests outside the payload.
+        if without_unserializable_payload(case, transport) is not None:
+            yield case
 
 
 def _example_cases(operation: APIOperation) -> Generator[Case]:

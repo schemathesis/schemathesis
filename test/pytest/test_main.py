@@ -1155,12 +1155,8 @@ def test(case):
         schema_name="simple_openapi.yaml",
     )
     result = testdir.runpytest()
-    # We should skip checking for a server error
-    result.assert_outcomes(failed=1)
-    assert (
-        "Failed to generate test cases from examples for this API operation because of unsupported payload media types"
-        in result.stdout.str()
-    )
+    # The body is unreachable, but the query parameter is still exercised without one.
+    result.assert_outcomes(passed=1)
 
 
 def test_override(ctx, testdir):

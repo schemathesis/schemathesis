@@ -7,6 +7,7 @@
 - Keep percent-encoded reserved characters in the base path intact in request URLs.
 - Cover path parameter `enum` and `const` values containing `/` by sending them percent-encoded.
 - Wrap a top-level string body in an XML element instead of sending bare text.
+- Keep negatives that do not need the body when its media type has no serializer.
 
 ## [4.27.1](https://github.com/schemathesis/schemathesis/compare/v4.27.0...v4.27.1) - 2026-09-13
 

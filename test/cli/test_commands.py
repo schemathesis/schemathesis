@@ -2246,7 +2246,15 @@ def test_group_errors(ctx, cli, snapshot_cli):
             }
         }
     )
-    assert cli.run(str(schema_path), "--url=http://127.0.0.1:1") == snapshot_cli
+    # Unexpected-method negatives need no body, so they would reach the unreachable URL and add a network error.
+    assert (
+        cli.run(
+            str(schema_path),
+            "--url=http://127.0.0.1:1",
+            config={"phases": {"coverage": {"unexpected-methods": []}}},
+        )
+        == snapshot_cli
+    )
 
 
 @flaky(max_runs=5, min_passes=1)

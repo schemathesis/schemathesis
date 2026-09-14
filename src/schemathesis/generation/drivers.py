@@ -10,7 +10,7 @@ from jsonschema_rs import ValidationError
 
 from schemathesis import auths
 from schemathesis.config import GenerationConfig
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
     InfiniteRecursiveReference,
@@ -21,12 +21,13 @@ from schemathesis.core.errors import (
     UnresolvableReference,
     is_regex_validation_error,
 )
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
 from schemathesis.generation.hypothesis.reporting import GENERIC_UNSATISFIABLE_MESSAGE, find_unsatisfiable_parameter
+from schemathesis.generation.meta import CoveragePhaseData
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
     from schemathesis.generation.feedback import FeedbackSources
     from schemathesis.schemas import APIOperation
+    from schemathesis.transport import BaseTransport
 
 
 @dataclass(slots=True)
@@ -80,6 +82,25 @@ def _apply_filter_and_map_hooks(
             if _should_skip_hook(hook, hook_context):
                 continue
             case = hook(hook_context, case)
+    return case
+
+
+def without_unserializable_payload(case: Case, transport: BaseTransport) -> Case | None:
+    """`case` stripped of a payload nothing can serialize, or `None` when it cannot be sent without one."""
+    if not case.media_type or transport.get_first_matching_media_type(case.media_type) is not None:
+        return case
+    meta = case.meta
+    # A negative case aimed elsewhere still carries its violation bodiless, but a positive one
+    # asserts that this very payload is accepted.
+    if (
+        meta is None
+        or not isinstance(meta.phase.data, CoveragePhaseData)
+        or meta.phase.data.parameter_location == ParameterLocation.BODY
+        or meta.generation.mode != GenerationMode.NEGATIVE
+    ):
+        return None
+    case.media_type = None
+    case.body = NOT_SET
     return case
 
 
@@ -162,10 +183,7 @@ class CoverageGenerator:
                 unexpected_methods_seen=self._unexpected_methods_seen,
                 session=self._session,
             ):
-                if (
-                    case.media_type
-                    and operation.schema.transport.get_first_matching_media_type(case.media_type) is None
-                ):
+                if without_unserializable_payload(case, operation.schema.transport) is None:
                     continue
                 adjust_urlencoded_payload(case)
                 auths.set_on_case(case, auth_context, self._auth_storage)
