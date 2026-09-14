@@ -1,6 +1,10 @@
 import pytest
+from hypothesis import given, settings
+from hypothesis.database import InMemoryExampleDatabase
 
 from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
+from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.negative.mutations import MutationMetadata
 
 
@@ -12,9 +16,11 @@ def _mutation(
     new_value: object = None,
     operator: OperatorKind = OperatorKind.CHANGE_TYPE,
     parameter: str | None = None,
+    location: ParameterLocation = ParameterLocation.QUERY,
 ) -> Mutation:
     return Mutation(
         path=(),
+        parameter_location=location,
         schema_pointer=schema_pointer,
         channel=MutationChannel.SCHEMA,
         operator=operator,
@@ -150,9 +156,49 @@ def test_description_empty_mutations_returns_none():
     assert MutationMetadata(()).description is None
 
 
-def test_description_override_takes_precedence():
-    mutation = _mutation(schema_pointer="", keywords=("type",))
-    assert (
-        MutationMetadata((mutation,), description="Invalid syntax: random bytes").description
-        == "Invalid syntax: random bytes"
+def test_syntax_fuzzing_describes_the_payload():
+    # Random bytes violate no keyword, so there is nothing to render from the schema.
+    mutation = _mutation(schema_pointer="", keywords=(), operator=OperatorKind.SYNTAX_FUZZING)
+    assert MutationMetadata((mutation,)).description == "Invalid syntax: random bytes"
+
+
+def test_description_names_each_location_when_they_differ():
+    assert MutationMetadata(
+        (
+            _mutation(schema_pointer="/properties/key", keywords=("type",), location=ParameterLocation.QUERY),
+            _mutation(schema_pointer="/properties/X-Key", keywords=("minimum",), location=ParameterLocation.HEADER),
+        )
+    ).description == ("- query: violates `type` at /properties/key\n- header: violates `minimum` at /properties/X-Key")
+
+
+def test_mutations_cover_every_negated_location(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "X-Token",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "minLength": 5},
+                        },
+                        {"name": "offset", "in": "query", "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
     )
+    operation = schema["/data"]["GET"]
+
+    # A single case has to negate both containers for the omission to surface, hence the wider search.
+    @given(operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=100, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        if "X-Token" in (case.headers or {}):
+            return
+        description = case.meta.phase.data.description or ""
+        assert "X-Token" in description, description
+
+    test()

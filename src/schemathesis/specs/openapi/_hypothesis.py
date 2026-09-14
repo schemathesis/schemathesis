@@ -364,34 +364,36 @@ def openapi_cases(
 
     # Extract mutation metadata from negated values and create phase-appropriate data
     if effective_generation_mode.is_negative:
-        negated_container = None
-        for container in [query_, cookies_, headers_, path_parameters_, body_]:
-            if container.generator == GenerationMode.NEGATIVE and container.meta is not None:
-                negated_container = container
-                break
+        # Every negated container contributes; each mutation carries the location it was applied to.
+        metadata = MutationMetadata(
+            mutations=tuple(
+                mutation
+                for container in (query_, cookies_, headers_, path_parameters_, body_)
+                if container.generator == GenerationMode.NEGATIVE and container.meta is not None
+                for mutation in container.meta.mutations
+            )
+        )
 
-        if negated_container and negated_container.meta:
-            metadata = negated_container.meta
-            parameter_location = _LOCATION_NAME_TO_ENUM.get(negated_container.location)
+        if metadata.mutations:
             _phase_data = {
                 TestPhase.EXAMPLES: ExamplesPhaseData(
                     description=metadata.description,
                     parameter=metadata.parameter,
-                    parameter_location=parameter_location,
+                    parameter_location=metadata.parameter_location,
                     location=metadata.location,
                     mutations=metadata.mutations,
                 ),
                 TestPhase.FUZZING: FuzzingPhaseData(
                     description=metadata.description,
                     parameter=metadata.parameter,
-                    parameter_location=parameter_location,
+                    parameter_location=metadata.parameter_location,
                     location=metadata.location,
                     mutations=metadata.mutations,
                 ),
                 TestPhase.STATEFUL: StatefulPhaseData(
                     description=metadata.description,
                     parameter=metadata.parameter,
-                    parameter_location=parameter_location,
+                    parameter_location=metadata.parameter_location,
                     location=metadata.location,
                     mutations=metadata.mutations,
                 ),

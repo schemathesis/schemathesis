@@ -46,7 +46,7 @@ from schemathesis.specs.openapi.checks import (
     unsupported_method,
     use_after_free,
 )
-from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
+from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel, MutationMetadata
 from test.utils import check_context
 
 
@@ -130,6 +130,7 @@ def build_metadata(
             mutations = (
                 Mutation(
                     path=(parameter,),
+                    parameter_location=parameter_location or ParameterLocation.QUERY,
                     schema_pointer=f"/properties/{parameter}",
                     channel=MutationChannel.SCHEMA,
                     operator=OperatorKind.CHANGE_TYPE,
@@ -139,6 +140,9 @@ def build_metadata(
                     new_value=None,
                 ),
             )
+    elif not description:
+        # The engine derives the description from the mutations; mirror that instead of restating it.
+        description = MutationMetadata(mutations=mutations).description
     return CaseMetadata(
         generation=GenerationInfo(
             time=0.1,
@@ -245,9 +249,10 @@ def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kw
     assert has_only_additional_properties_in_non_body_parameters(case) is expected
 
 
-def _mutation(operator, keywords, parameter=None):
+def _mutation(operator, keywords, parameter=None, location=ParameterLocation.QUERY):
     return Mutation(
         path=(parameter,) if parameter else (),
+        parameter_location=location,
         schema_pointer=f"/properties/{parameter}" if parameter else "",
         channel=MutationChannel.SCHEMA if operator == OperatorKind.NEGATE_CONSTRAINTS else MutationChannel.VALUE,
         operator=operator,
@@ -591,6 +596,101 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     )
 
 
+_QUERY_TYPE_MUTATION = _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="key")
+_HEADER_KEY_MUTATION = _mutation(
+    OperatorKind.NEGATE_CONSTRAINTS, ("minimum",), parameter="X-Key", location=ParameterLocation.HEADER
+)
+
+
+def test_negative_data_rejection_ignores_extra_headers_when_query_value_is_wire_identical(
+    response_factory, sample_schema
+):
+    # `?key=7` is the same bytes a valid request sends, and unknown headers are ignored by servers.
+    operation = sample_schema["/test"]["POST"]
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            headers=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="violates `type` at /properties/key (was integer, became string)",
+            parameter="key",
+            parameter_location=ParameterLocation.QUERY,
+            mutations=(_QUERY_TYPE_MUTATION,),
+        ),
+        query={"key": "7"},
+        headers={"X-Key": 7, "X-Extra": "junk"},
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
+def _wire_identical_case(schema, other_header):
+    operation = schema["/test"]["POST"]
+    return operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            headers=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            parameter="key",
+            parameter_location=ParameterLocation.QUERY,
+            mutations=(_QUERY_TYPE_MUTATION,),
+        ),
+        query={"key": "7"},
+        headers=other_header,
+    )
+
+
+def _wire_identical_schema(ctx, header_schema):
+    return ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {"in": "query", "name": "key", "schema": {"type": "integer", "minimum": 5}},
+                        {"in": "header", "name": "X-Other", "schema": header_schema},
+                    ]
+                }
+            }
+        }
+    )
+
+
+def test_negative_data_rejection_keeps_checking_when_another_location_sends_an_array(ctx, response_factory):
+    # Repeated keys carry arrays, so what the server read back cannot be compared to the schema.
+    schema = _wire_identical_schema(ctx, {"type": "array", "items": {"type": "string"}})
+    case = _wire_identical_case(schema, {"X-Other": ["a"]})
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+def test_negative_data_rejection_keeps_checking_when_another_location_has_an_unreadable_schema(ctx, response_factory):
+    # `multipleOf: 0` builds no validator, so that location's values cannot be cleared.
+    schema = _wire_identical_schema(ctx, {"type": "integer", "multipleOf": 0})
+    case = _wire_identical_case(schema, {"X-Other": 7})
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+def test_negative_data_rejection_names_no_parameters_when_several_locations_are_negated(
+    response_factory, sample_schema
+):
+    operation = sample_schema["/test"]["POST"]
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            headers=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(_QUERY_TYPE_MUTATION, _HEADER_KEY_MUTATION),
+        ),
+        query={"key": 1},
+        headers={"X-Key": 1},
+    )
+    with pytest.raises(AcceptedNegativeData) as exc:
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+    assert "- query: violates `type` at /properties/key" in exc.value.message
+    assert "- header: violates `minimum` at /properties/X-Key" in exc.value.message
+    assert "parameters" not in exc.value.message
+
+
 _READ_ONLY_COMPONENTS = {
     "schemas": {
         "Item": {
@@ -778,6 +878,8 @@ def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_m
             headers=header_mode,
             generation_modes=[GenerationMode.NEGATIVE],
         ),
+        query={"key": "bad"} if query_mode is not None else {},
+        headers={"X-Key": "bad"} if header_mode is not None else {},
         body={},
         media_type=media_type,
     )
@@ -1344,6 +1446,7 @@ def test_negative_data_rejection_multiple_mutations_name_parameters(ctx, respons
             mutations=tuple(
                 Mutation(
                     path=(),
+                    parameter_location=ParameterLocation.QUERY,
                     schema_pointer=f"/properties/{name}",
                     channel=MutationChannel.SCHEMA,
                     operator=OperatorKind.NEGATE_CONSTRAINTS,

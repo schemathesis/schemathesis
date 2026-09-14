@@ -15,7 +15,7 @@ from schemathesis.core import NOT_SET, media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator
 from schemathesis.core.jsonschema.types import JsonSchema
-from schemathesis.core.mutations import OperatorKind
+from schemathesis.core.mutations import OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code
 from schemathesis.generation.case import Case
@@ -281,6 +281,46 @@ def _is_stringifying_media_type(media_type: str) -> bool:
     return media_types.is_plain_text(media_type) or media_type == "application/octet-stream"
 
 
+def _declared_parameters_are_valid(case: Case, location: ParameterLocation) -> bool:
+    """Whether the only difference from a valid request at `location` is undeclared extras, which servers ignore."""
+    # Every non-body container defaults to an empty mapping, and the caller never passes `BODY`.
+    value = case.get_container(location)
+    assert isinstance(value, Mapping)
+    container = getattr(case.operation, location.container_name)
+    schema = container.schema
+    if _has_serialization_sensitive_types(schema, container):
+        # Arrays and objects are rewritten on the wire, so post-serialization validity is unknowable.
+        return False
+    declared = {name: item for name, item in value.items() if name in container}
+    try:
+        return make_validator(schema, case.operation.schema.adapter.jsonschema_validator_cls).is_valid(declared)
+    except Exception:
+        # Schema the validator cannot read (e.g. a pattern valid in Python but not ECMA 262).
+        return False
+
+
+def _has_other_negated_location(case: Case, location: ParameterLocation) -> bool:
+    """Whether a location other than `location` carries a negation the server could act on."""
+    meta = case.meta
+    assert meta is not None
+    for other in (
+        ParameterLocation.PATH,
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+        ParameterLocation.BODY,
+    ):
+        if other == location:
+            continue
+        component = meta.components.get(other)
+        if component is None or not component.mode.is_negative:
+            continue
+        if other != ParameterLocation.BODY and _declared_parameters_are_valid(case, other):
+            continue
+        return True
+    return False
+
+
 def _body_negation_becomes_valid_after_serialization(case: Case) -> bool:
     """Check if body negation becomes valid after serialization.
 
@@ -307,20 +347,8 @@ def _body_negation_becomes_valid_after_serialization(case: Case) -> bool:
     if not _is_stringifying_media_type(media_type):
         return False
 
-    # Check if there are other negative components besides body
-    for location in (
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-        ParameterLocation.PATH,
-    ):
-        component = meta.components.get(location)
-        if component is not None and component.mode.is_negative:
-            # There's another negative component, don't skip the check
-            return False
-
     # Only the body is negative and it's a stringifying media type
-    return True
+    return not _has_other_negated_location(case, ParameterLocation.BODY)
 
 
 def _body_negation_is_only_forbidden_property(case: Case) -> bool:
@@ -337,15 +365,8 @@ def _body_negation_is_only_forbidden_property(case: Case) -> bool:
         return False
 
     # Another negative component carries its own expectation, so the check still applies.
-    for location in (
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-        ParameterLocation.PATH,
-    ):
-        component = meta.components.get(location)
-        if component is not None and component.mode.is_negative:
-            return False
+    if _has_other_negated_location(case, ParameterLocation.BODY):
+        return False
 
     if case.body is NOT_SET:
         return False
@@ -512,18 +533,8 @@ def _string_type_mutation_becomes_valid_after_serialization(case: Case, location
         return False
 
     # If there are other negative components, we should still validate them.
-    for other_location in (
-        ParameterLocation.PATH,
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-        ParameterLocation.BODY,
-    ):
-        if other_location == location:
-            continue
-        component = meta.components.get(other_location)
-        if component is not None and component.mode.is_negative:
-            return False
+    if _has_other_negated_location(case, location):
+        return False
 
     phase_data = meta.phase.data
     if not isinstance(phase_data, FuzzingPhaseData) or phase_data.parameter_location != location:
@@ -585,15 +596,8 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
         return False
 
     # If other locations are also negative, the acceptance can't be attributed to the path round-trip.
-    for other_location in (
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-        ParameterLocation.BODY,
-    ):
-        other = meta.components.get(other_location)
-        if other is not None and other.mode.is_negative:
-            return False
+    if _has_other_negated_location(case, ParameterLocation.PATH):
+        return False
 
     container = case.path_parameters or {}
     operation_container = case.operation.path_parameters
@@ -720,32 +724,27 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
                 # Build structured message: parameter `name` in location - description
                 # For body, don't show parameter name (it's the media type, not useful)
                 location = phase.data.parameter_location
-                if location != ParameterLocation.BODY:
-                    # A case mutating several parameters carries no single name, but each mutation knows its own.
-                    names = (
-                        [phase.data.parameter]
-                        if phase.data.parameter
-                        else list(dict.fromkeys(m.parameter for m in phase.data.mutations if m.parameter))
-                    )
-                    if names:
-                        label = "parameter" if len(names) == 1 else "parameters"
-                        parts.append(f"{label} " + ", ".join(f"`{name}`" for name in names))
+                if phase.data.parameter:
+                    names = [phase.data.parameter]
+                elif location is None:
+                    # Each rendered line names its own location, so a flat list of names would mislead.
+                    names = []
+                else:
+                    names = list(dict.fromkeys(m.parameter for m in phase.data.mutations if m.parameter))
+                if location != ParameterLocation.BODY and names:
+                    label = "parameter" if len(names) == 1 else "parameters"
+                    parts.append(f"{label} " + ", ".join(f"`{name}`" for name in names))
                 if location:
                     parts.append(f"in {location.name.lower()}")
-                # Lowercase first letter of description for consistency
-                description = phase.data.description
-                if description:
-                    description = description[0].lower() + description[1:]
                 if len(phase.data.mutations) > 1:
                     # Render each mutation on its own indented bullet under the header.
                     header = " ".join(parts)
-                    body = "\n".join(f"  {line}" for line in description.split("\n"))
+                    body = "\n".join(f"  - {line}" for line in render_mutations(phase.data.mutations))
                     extra_info = f"\nInvalid component: {header}\n{body}" if header else f"\nInvalid component:\n{body}"
                 else:
-                    if parts:
-                        parts.append(f"- {description}")
-                    else:
-                        parts.append(description)
+                    # Lowercase first letter of description for consistency
+                    description = phase.data.description[0].lower() + phase.data.description[1:]
+                    parts.append(f"- {description}" if parts else description)
                     extra_info = "\nInvalid component: " + " ".join(parts)
         raise AcceptedNegativeData(
             operation=case.operation.label,

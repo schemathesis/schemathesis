@@ -30,6 +30,7 @@ def test_negate_required_with_multiple_headers_excludes_omitted(case_factory):
     # `len(required) > 1` sets parameter=None; the original list is needed to know which header was dropped.
     mutation = Mutation(
         path=(),
+        parameter_location=ParameterLocation.HEADER,
         schema_pointer="",
         channel=MutationChannel.SCHEMA,
         operator=OperatorKind.NEGATE_CONSTRAINTS,
@@ -60,6 +61,7 @@ def test_nested_header_mutation_does_not_drop_unrelated_headers(case_factory):
     # A nested property named "Authorization" must not shadow the real top-level header.
     mutation = Mutation(
         path=("X-Token",),
+        parameter_location=ParameterLocation.HEADER,
         schema_pointer="/properties/X-Token/properties/Authorization",
         channel=MutationChannel.SCHEMA,
         operator=OperatorKind.REMOVE_REQUIRED_PROPERTY,
@@ -141,6 +143,7 @@ def test_negate_constraints_without_required_keyword_excludes_nothing(case_facto
     # Pattern negation sends a violating value — the header must not be stripped.
     mutation = Mutation(
         path=(),
+        parameter_location=ParameterLocation.HEADER,
         schema_pointer="",
         channel=MutationChannel.SCHEMA,
         operator=OperatorKind.NEGATE_CONSTRAINTS,
@@ -164,6 +167,7 @@ def test_negate_constraints_without_required_keyword_excludes_nothing(case_facto
 def test_remove_required_property_excludes_named_header(case_factory):
     mutation = Mutation(
         path=(),
+        parameter_location=ParameterLocation.HEADER,
         schema_pointer="/properties/X-Token",
         channel=MutationChannel.SCHEMA,
         operator=OperatorKind.REMOVE_REQUIRED_PROPERTY,
