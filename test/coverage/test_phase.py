@@ -6167,6 +6167,26 @@ def test_negative_coverage_emits_invalid_format_for_uuid_body_property(ctx):
         uuid.UUID(value)
 
 
+def test_negative_coverage_emits_invalid_format_for_duration_body_property(ctx):
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "required": ["retentionTime"],
+            "properties": {"retentionTime": {"type": "string", "format": "duration"}},
+        },
+        path="/tasks",
+        version="2.0",
+    )
+    cases = iter_cases(operation, GenerationMode.NEGATIVE)
+
+    assert [
+        case.body["retentionTime"]
+        for case in scenario_cases(cases, CoverageScenario.INVALID_FORMAT)
+        if isinstance(case.body, dict) and "retentionTime" in case.body
+    ], "no INVALID_FORMAT case emitted for body property with format: duration"
+
+
 def test_coverage_form_urlencoded_filters_primitives_with_bundled_ref(ctx):
     # Every NEGATIVE form-urlencoded body must remain schema-invalid after string coercion.
     operation = body_operation(

@@ -48,10 +48,26 @@ def _is_valid_uuid(value: object) -> bool:
         return False
 
 
+# RFC 3339 Appendix A `duration`, the grammar newer drafts check.
+_DURATION_RE = re.compile(
+    r"^P(?:\d+W"
+    r"|(?:\d+Y(?:\d+M(?:\d+D)?)?|\d+M(?:\d+D)?|\d+D)(?:T(?:\d+H(?:\d+M(?:\d+S)?)?|\d+M(?:\d+S)?|\d+S))?"
+    r"|T(?:\d+H(?:\d+M(?:\d+S)?)?|\d+M(?:\d+S)?|\d+S))$"
+)
+
+
+# Format checks only ever see strings - the validator skips them for every other instance type.
+def _is_valid_duration(value: str) -> bool:
+    return _DURATION_RE.match(value) is not None
+
+
 # Formats that newer JSON Schema drafts validate natively but Draft 4 (used by
 # OpenAPI 2.0 / 3.0) does not. Registered only for Draft4Validator so built-in
 # implementations in newer drafts are not overridden.
-DRAFT4_SUPPLEMENTAL_FORMATS: dict[str, Callable[[Any], bool]] = {"uuid": _is_valid_uuid}
+DRAFT4_SUPPLEMENTAL_FORMATS: dict[str, Callable[[Any], bool]] = {
+    "duration": _is_valid_duration,
+    "uuid": _is_valid_uuid,
+}
 
 
 # Format names that each `jsonschema_rs` validator class actually validates (after
@@ -60,7 +76,20 @@ DRAFT4_SUPPLEMENTAL_FORMATS: dict[str, Callable[[Any], bool]] = {"uuid": _is_val
 # cannot produce a value the validator considers wrong, so callers should skip.
 VALIDATED_FORMATS_BY_DRAFT: dict[type[jsonschema_rs.Validator], frozenset[str]] = {
     jsonschema_rs.Draft4Validator: frozenset(
-        {"date", "date-time", "email", "hostname", "idn-email", "ipv4", "ipv6", "regex", "time", "uri", "uuid"}
+        {
+            "date",
+            "date-time",
+            "duration",
+            "email",
+            "hostname",
+            "idn-email",
+            "ipv4",
+            "ipv6",
+            "regex",
+            "time",
+            "uri",
+            "uuid",
+        }
     ),
     jsonschema_rs.Draft6Validator: frozenset(
         {

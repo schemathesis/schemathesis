@@ -11,6 +11,7 @@
 - False positive `negative_data_rejection` when another location's negation only adds undeclared parameters.
 - Wrap a top-level string body in an XML element instead of sending bare text.
 - Keep negatives that do not need the body when its media type has no serializer.
+- Generate values violating `format: duration` under Swagger 2.0 and Open API 3.0.
 
 ## [4.27.1](https://github.com/schemathesis/schemathesis/compare/v4.27.0...v4.27.1) - 2026-09-13
 
