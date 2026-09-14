@@ -6381,3 +6381,47 @@ def test_second_consumer_of_a_foreign_key_gets_its_own_link(ctx):
     assert sorted(
         definition.to_openapi()["operationRef"] for entry in graph.iter_links() for definition in entry.links.values()
     ) == ["#/paths/~1customers~1{id}/get", "#/paths/~1customers~1{id}~1invoices/get"]
+
+
+def test_nested_collection_producer_links_into_top_level_id_consumer(ctx):
+    # `POST /lessons/{lessonId}/bookmarks` is the only way to make a bookmark; `/bookmarks/{id}` is where it is read.
+    bookmark = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "lessonId": {"type": "string"}},
+        "required": ["id", "lessonId"],
+    }
+    paths = {
+        **operation(
+            "post",
+            "/lessons/{lessonId}/bookmarks",
+            "201",
+            bookmark,
+            parameters=[path_param("lessonId")],
+            operation_id="createBookmark",
+        ),
+        **operation(
+            "patch",
+            "/bookmarks/{id}",
+            "200",
+            parameters=[path_param("id")],
+            operation_id="updateBookmark",
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ] == [
+        [
+            "#/paths/~1lessons~1{lessonId}~1bookmarks/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1bookmarks~1{id}/patch",
+                "parameters": {"path.id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]

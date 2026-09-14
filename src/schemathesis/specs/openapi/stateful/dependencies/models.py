@@ -119,9 +119,12 @@ class DependencyGraph:
                             if consumer_data is not None:
                                 consumer_collection, consumer_collection_prefix = consumer_data
                                 producer_collection = stripped_paths[producer_id]
-                                # Sub-paths are fine: /users/{userId}/messages -> /users/{id}
-                                if consumer_collection != producer_collection and not producer_collection.startswith(
-                                    consumer_collection_prefix
+                                # Sub-paths are fine: /users/{userId}/messages -> /users/{id}, and so is a
+                                # collection nested under a parent: /lessons/{lessonId}/bookmarks -> /bookmarks/{id}
+                                if (
+                                    consumer_collection != producer_collection
+                                    and not producer_collection.startswith(consumer_collection_prefix)
+                                    and not producer_collection.endswith(consumer_collection)
                                 ):
                                     continue
 
