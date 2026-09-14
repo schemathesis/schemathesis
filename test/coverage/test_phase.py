@@ -6758,6 +6758,26 @@ def test_negative_coverage_violates_int64_format_bounds(ctx):
     assert all(case.meta.generation.mode == GenerationMode.NEGATIVE for case in cases)
 
 
+def test_coverage_parameter_negatives_survive_unserializable_body_media_type(ctx):
+    # The declared media type has no serializer, but path-parameter negatives do not depend on the body.
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"in": "path", "name": "name", "required": True, "type": "string", "maxLength": 3},
+            {"in": "body", "name": "content", "required": True, "schema": {"type": "string"}},
+        ],
+        path="/items/{name}",
+        method="put",
+        version="2.0",
+        consumes=["text/powershell"],
+    )["/items/{name}"]["PUT"]
+    cases = generate_cases(operation, GenerationMode.NEGATIVE)
+
+    assert [
+        case.path_parameters["name"] for case in scenario_cases(cases, CoverageScenario.STRING_ABOVE_MAX_LENGTH)
+    ] == ["0000"]
+
+
 def test_coverage_recursive_body_is_generated(ctx):
     # A pointer back into the value has no unrolled form, so the value is built from the pointer
     # itself rather than from a copy of what it names.
