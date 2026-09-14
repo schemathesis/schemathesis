@@ -725,6 +725,7 @@ def test_case_metadata_round_trip_preserves_fuzzing_mutations():
     # serializing `mutations`, structured mutation records are lost in parallel runs.
     mutation = Mutation(
         path=("user", "email"),
+        parameter_location=ParameterLocation.BODY,
         schema_pointer="/properties/user/properties/email",
         channel=MutationChannel.VALUE,
         operator=OperatorKind.VALUE_VIOLATOR,

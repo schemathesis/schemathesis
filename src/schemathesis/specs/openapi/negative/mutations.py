@@ -13,13 +13,12 @@ from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureFlags, FeatureStrategy
 
-from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback.store import ParameterPath
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_xml
-from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
+from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.negative.types import Draw, Schema
@@ -39,73 +38,33 @@ MAX_WALK_DEPTH = 32
 MAX_SECONDARY_TARGETS = 2
 
 
-def _render_mutation_value(value: JsonValue, *, bare: bool) -> str:
-    """Render a mutation's before/after value for display in a failure message.
-
-    `bare=True` skips string quoting; use it for `type`-keyword mutations where the
-    value is a type name (`object`, `integer`) rather than a string literal.
-    """
-    if isinstance(value, list):
-        return ", ".join(str(v) for v in value)
-    if isinstance(value, str) and not bare:
-        return f'"{value}"'
-    return str(value)
-
-
-def _render_mutation_description(mutation: Mutation) -> str:
-    """Render a single mutation as `violates <keywords> [at <pointer>] [(was X[, became Y])]`."""
-    keywords = ", ".join(f"`{k}`" for k in mutation.keywords)
-    message = f"violates {keywords}"
-    if mutation.schema_pointer:
-        message += f" at {mutation.schema_pointer}"
-    bare = mutation.keywords == ("type",)
-    parts: list[str] = []
-    if mutation.original_value is not None:
-        parts.append(f"was {_render_mutation_value(mutation.original_value, bare=bare)}")
-    # Dict `new_value` would dump the entire mutated body into the failure message; skip it.
-    if mutation.new_value is not None and not isinstance(mutation.new_value, dict):
-        parts.append(f"became {_render_mutation_value(mutation.new_value, bare=bare)}")
-    if parts:
-        message += f" ({', '.join(parts)})"
-    return message
-
-
 class MutationMetadata:
-    """Per-case metadata: the structured Mutation records applied this case.
+    """Per-case metadata: the structured Mutation records applied this case."""
 
-    The `description` / `parameter` / `location` properties summarize the
-    single-mutation case. The `description` constructor argument lets a
-    producer supply a hand-formatted string (e.g. syntax fuzzing emits
-    "Invalid syntax: random bytes" directly); `NOT_SET` means "derive from
-    mutations", while explicit `None` means "no description for this case".
-    """
-
-    __slots__ = ("mutations", "_description")
+    __slots__ = ("mutations",)
 
     mutations: tuple[Mutation, ...]
-    _description: str | None | NotSet
 
-    def __init__(
-        self,
-        mutations: tuple[Mutation, ...],
-        description: str | None | NotSet = NOT_SET,
-    ) -> None:
+    def __init__(self, mutations: tuple[Mutation, ...]) -> None:
         self.mutations = mutations
-        self._description = description
 
     @property
     def description(self) -> str | None:
-        if not isinstance(self._description, NotSet):
-            return self._description
-        if not self.mutations:
+        lines = render_mutations(self.mutations)
+        if not lines:
             return None
-        if len(self.mutations) == 1:
-            return _render_mutation_description(self.mutations[0])
-        return "- " + "\n- ".join(_render_mutation_description(m) for m in self.mutations)
+        if len(lines) == 1:
+            return lines[0]
+        return "- " + "\n- ".join(lines)
 
     @property
     def parameter(self) -> str | None:
         return self.mutations[0].parameter if len(self.mutations) == 1 else None
+
+    @property
+    def parameter_location(self) -> ParameterLocation | None:
+        locations = {mutation.parameter_location for mutation in self.mutations}
+        return locations.pop() if len(locations) == 1 else None
 
     @property
     def location(self) -> str | None:
@@ -371,6 +330,7 @@ def _absolutize(target: MutationTarget, local: Mutation) -> Mutation:
                 break
     return Mutation(
         path=body_path_prefix + local.path,
+        parameter_location=local.parameter_location,
         schema_pointer=schema_pointer_prefix + local.schema_pointer,
         channel=local.channel,
         operator=local.operator,
@@ -407,38 +367,6 @@ def _synthesize_pattern_property_name(pattern: str) -> str | None:
         if regex.search(candidate) is not None:
             return candidate
     return None
-
-
-def metadata_with_description_override(
-    *,
-    operator: OperatorKind,
-    parameter: str | None,
-    description: str | None,
-    location: str | None,
-    keywords: tuple[str, ...] = (),
-) -> MutationMetadata:
-    """Build a MutationMetadata whose description is supplied directly.
-
-    Used by the syntax-fuzzing path: the random-bytes payload has no structured
-    keyword/path to attribute the violation to, so the producer hands in a
-    pre-formatted message ("Invalid syntax: random bytes") instead of having
-    `description` derive one from a Mutation record.
-    """
-    return MutationMetadata(
-        mutations=(
-            Mutation(
-                path=(),
-                schema_pointer=location or "",
-                channel=MutationChannel.SCHEMA,
-                operator=operator,
-                keywords=keywords,
-                parameter=parameter,
-                original_value=None,
-                new_value=None,
-            ),
-        ),
-        description=description,
-    )
 
 
 class MutationResult(int, enum.Enum):
@@ -733,6 +661,7 @@ def remove_required_property(
     # `patternProperties` can still produce this name; the output filter catches that case.
     mutation = Mutation(
         path=(),
+        parameter_location=ctx.location,
         schema_pointer=f"/properties/{property_name}",
         channel=MutationChannel.SCHEMA,
         operator=OperatorKind.REMOVE_REQUIRED_PROPERTY,
@@ -797,6 +726,7 @@ def change_type(
 
     mutation = Mutation(
         path=(),
+        parameter_location=ctx.location,
         schema_pointer="",
         channel=MutationChannel.SCHEMA,
         operator=OperatorKind.CHANGE_TYPE,
@@ -1022,6 +952,7 @@ def negate_constraints(
                 break
         mutation = Mutation(
             path=(),
+            parameter_location=ctx.location,
             schema_pointer="",
             channel=MutationChannel.SCHEMA,
             operator=OperatorKind.NEGATE_CONSTRAINTS,

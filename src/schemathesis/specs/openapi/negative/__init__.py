@@ -36,7 +36,6 @@ from schemathesis.specs.openapi.negative.mutations import (
     MutationMetadata,
     MutationTargetDescriptor,
     compute_mutation_targets,
-    metadata_with_description_override,
 )
 from schemathesis.specs.openapi.negative.value_channel import apply_value_channel, collect_value_targets
 from schemathesis.transport.serialization import Binary, contains_binary
@@ -382,6 +381,7 @@ def negative_schema(
                     return draw(inner_mutated_strategy)
                 mutation = Mutation(
                     path=target_path,
+                    parameter_location=location,
                     schema_pointer=schema_pointer,
                     channel=MutationChannel.VALUE,
                     operator=OperatorKind.VALUE_VIOLATOR,
@@ -400,11 +400,20 @@ def negative_schema(
         syntax_fuzzing_strategy = _random_non_json_bytes().map(
             lambda b: GeneratedValue(
                 b,
-                metadata_with_description_override(
-                    operator=OperatorKind.SYNTAX_FUZZING,
-                    parameter=None,
-                    description="Invalid syntax: random bytes",
-                    location=None,
+                MutationMetadata(
+                    mutations=(
+                        Mutation(
+                            path=(),
+                            parameter_location=location,
+                            schema_pointer="",
+                            channel=MutationChannel.SCHEMA,
+                            operator=OperatorKind.SYNTAX_FUZZING,
+                            keywords=(),
+                            parameter=None,
+                            original_value=None,
+                            new_value=None,
+                        ),
+                    )
                 ),
             )
         )
