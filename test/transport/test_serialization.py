@@ -1348,6 +1348,31 @@ def test_serialize_xml_hypothesis(ctx, data, schema_object, media_type):
         pass
 
 
+def test_serialize_xml_top_level_string(ctx):
+    # A bare string on the wire is not a well-formed XML document, so it cannot be mapped back to the schema.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/xml": {"schema": {"type": "string", "enum": ["hello"]}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+
+    @given(case=schema["/test"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+            assert transport.serialize_case(case)["data"] == b"<data>hello</data>"
+
+    test()
+
+
 def test_xml_with_binary(ctx):
     schema = ctx.openapi.load_schema(
         {

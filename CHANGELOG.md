@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Wrap a top-level string body in an XML element instead of sending bare text.
+
 ## [4.27.1](https://github.com/schemathesis/schemathesis/compare/v4.27.0...v4.27.1) - 2026-09-13
 
 ### :bug: Fixed
