@@ -151,13 +151,16 @@ def _serialize_xml(value: Any, schema: JsonSchema, resource_name: str | None) ->
 
     Schemas may contain additional information for fine-tuned XML serialization.
     """
-    if isinstance(value, (bytes | str)):
+    if isinstance(value, bytes):
         return {"data": value}
     # A body written as a boolean carries no XML metadata.
     definition: dict[str, Any] = schema if isinstance(schema, dict) else {}
     resolver = make_root_resolver(definition)
     if "$ref" in definition:
         resolver, definition = resolve_reference(resolver, definition["$ref"])
+    if isinstance(value, (Binary | str)) and definition.get("format") in ("binary", "file"):
+        # Opaque payloads are already the wire representation and carry no XML structure to wrap.
+        return {"data": value.data if isinstance(value, Binary) else value}
     tag = _get_xml_tag(definition, resource_name)
     buffer = StringIO()
     # Collect all namespaces to ensure that all child nodes with prefixes have proper namespaces in their parent nodes
