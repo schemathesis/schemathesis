@@ -76,7 +76,7 @@ from schemathesis.generation.jsonschema import build
 from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
-from schemathesis.specs.openapi.converter import apply_rewritten_pattern
+from schemathesis.specs.openapi.converter import DECLARED_MAXIMUM_KEY, DECLARED_MINIMUM_KEY, apply_rewritten_pattern
 from schemathesis.specs.openapi.coverage._wire import (
     HEADER_ALLOWED_CHARS,
     WireSemantics,
@@ -1916,6 +1916,8 @@ def _negative_format_for_declared_types(
 def _negative_maximum(
     ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
+    # A bound the schema declares beyond the width of its integer format is still the bound to step past.
+    value = schema.get(DECLARED_MAXIMUM_KEY, value)
     # Legacy draft-4 `exclusiveMaximum: true` makes `maximum` itself the excluded boundary.
     next = value if schema.get("exclusiveMaximum") is True else _just_past(schema, value, going_up=True)
     if next is not None and seen.insert(next):
@@ -1930,6 +1932,8 @@ def _negative_maximum(
 def _negative_minimum(
     ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
+    # A bound the schema declares beyond the width of its integer format is still the bound to step past.
+    value = schema.get(DECLARED_MINIMUM_KEY, value)
     # Legacy draft-4 `exclusiveMinimum: true` makes `minimum` itself the excluded boundary.
     next = value if schema.get("exclusiveMinimum") is True else _just_past(schema, value, going_up=False)
     if next is not None and seen.insert(next):

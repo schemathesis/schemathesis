@@ -6778,6 +6778,27 @@ def test_coverage_parameter_negatives_survive_unserializable_body_media_type(ctx
     ] == ["0000"]
 
 
+def test_negative_coverage_violates_maximum_wider_than_int64_range(ctx):
+    # `maximum` above the `format: int64` ceiling still has to be exceeded, or the bound is never tested.
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "value": {"type": "integer", "format": "int64", "maximum": 9223372036854776000, "minimum": 0}
+            },
+            "required": ["value"],
+        },
+        path="/x",
+        version="2.0",
+    )
+    cases = iter_cases(operation, GenerationMode.NEGATIVE)
+
+    assert [case.body["value"] for case in scenario_cases(cases, CoverageScenario.VALUE_ABOVE_MAXIMUM)] == [
+        9223372036854776001
+    ]
+
+
 def test_coverage_recursive_body_is_generated(ctx):
     # A pointer back into the value has no unrolled form, so the value is built from the pointer
     # itself rather than from a copy of what it names.

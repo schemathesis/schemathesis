@@ -952,12 +952,24 @@ INT64_MIN, INT64_MAX = -(2**63), 2**63 - 1
         ),
         pytest.param(
             {"type": "integer", "format": "int64", "maximum": 10**30},
-            {"type": "integer", "format": "int64", "minimum": INT64_MIN, "maximum": INT64_MAX},
+            {
+                "type": "integer",
+                "format": "int64",
+                "minimum": INT64_MIN,
+                "maximum": INT64_MAX,
+                converter.DECLARED_MAXIMUM_KEY: 10**30,
+            },
             id="explicit_looser_maximum_tightened",
         ),
         pytest.param(
             {"type": "integer", "format": "int32", "minimum": -(10**30)},
-            {"type": "integer", "format": "int32", "minimum": INT32_MIN, "maximum": INT32_MAX},
+            {
+                "type": "integer",
+                "format": "int32",
+                "minimum": INT32_MIN,
+                "maximum": INT32_MAX,
+                converter.DECLARED_MINIMUM_KEY: -(10**30),
+            },
             id="explicit_looser_minimum_tightened",
         ),
         pytest.param(

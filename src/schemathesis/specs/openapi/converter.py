@@ -5,6 +5,7 @@ from typing import Any, TypeGuard, overload
 
 from schemathesis.core.jsonschema import DRAFT_03_DIALECT, is_unsatisfiable
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
+from schemathesis.core.jsonschema.numeric import is_numeric_bound
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.patterns import (
@@ -434,6 +435,11 @@ INTEGER_FORMAT_BOUNDS = {
     "int64": (-(2**63), 2**63 - 1),
 }
 
+# Bounds the schema declares outside the width its integer `format` implies. Values are drawn inside the
+# format range, but a request has to step past the bound the schema itself declares to violate it.
+DECLARED_MINIMUM_KEY = "x-schemathesis-declared-minimum"
+DECLARED_MAXIMUM_KEY = "x-schemathesis-declared-maximum"
+
 
 def _restrict_integer_format(schema: dict[str, Any]) -> None:
     # `format` is annotation-only, so the range it implies has to become real keywords - otherwise
@@ -448,13 +454,19 @@ def _restrict_integer_format(schema: dict[str, Any]) -> None:
     minimum, maximum = bounds
     # A declared bound tighter than the format wins; one looser than the format contradicts it.
     current = schema.get("minimum")
-    schema["minimum"] = (
-        max(current, minimum) if isinstance(current, int | float) and not isinstance(current, bool) else minimum
-    )
+    if is_numeric_bound(current):
+        if current < minimum:
+            schema[DECLARED_MINIMUM_KEY] = current
+        schema["minimum"] = max(current, minimum)
+    else:
+        schema["minimum"] = minimum
     current = schema.get("maximum")
-    schema["maximum"] = (
-        min(current, maximum) if isinstance(current, int | float) and not isinstance(current, bool) else maximum
-    )
+    if is_numeric_bound(current):
+        if current > maximum:
+            schema[DECLARED_MAXIMUM_KEY] = current
+        schema["maximum"] = min(current, maximum)
+    else:
+        schema["maximum"] = maximum
 
 
 def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
