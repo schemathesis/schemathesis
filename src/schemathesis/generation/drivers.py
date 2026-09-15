@@ -49,10 +49,11 @@ class Controller:
     """Sidecar surface for a case generator.
 
     Holds `deferred_errors` for pre-iteration failures the engine surfaces after
-    iteration ends.
+    iteration ends, and `unserializable_media_types` for payloads dropped mid-iteration.
     """
 
     deferred_errors: list[Exception] = field(default_factory=list)
+    unserializable_media_types: set[str] = field(default_factory=set)
 
 
 class CaseGenerator(Protocol):
@@ -85,10 +86,14 @@ def _apply_filter_and_map_hooks(
     return case
 
 
-def without_unserializable_payload(case: Case, transport: BaseTransport) -> Case | None:
-    """`case` stripped of a payload nothing can serialize, or `None` when it cannot be sent without one."""
+def without_unserializable_payload(case: Case, transport: BaseTransport, unserializable: set[str]) -> Case | None:
+    """`case` stripped of a payload nothing can serialize, or `None` when it cannot be sent without one.
+
+    Every media type that forced the payload out is recorded in `unserializable`.
+    """
     if not case.media_type or transport.get_first_matching_media_type(case.media_type) is not None:
         return case
+    unserializable.add(case.media_type)
     meta = case.meta
     # A negative case aimed elsewhere still carries its violation bodiless, but a positive one
     # asserts that this very payload is accepted.
@@ -174,6 +179,7 @@ class CoverageGenerator:
             # Per-test hooks are a pytest-plugin feature; the engine has none.
             dispatchers = [GLOBAL_HOOK_DISPATCHER, operation.schema.hooks]
 
+            unserializable = self._controller.unserializable_media_types
             for case in operation.schema.iter_coverage_cases(
                 operation,
                 generation_modes=self._generation_modes,
@@ -183,7 +189,7 @@ class CoverageGenerator:
                 unexpected_methods_seen=self._unexpected_methods_seen,
                 session=self._session,
             ):
-                if without_unserializable_payload(case, operation.schema.transport) is None:
+                if without_unserializable_payload(case, operation.schema.transport, unserializable) is None:
                     continue
                 adjust_urlencoded_payload(case)
                 auths.set_on_case(case, auth_context, self._auth_storage)

@@ -1156,7 +1156,8 @@ def test(case):
     )
     result = testdir.runpytest()
     # The body is unreachable, but the query parameter is still exercised without one.
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=1, warnings=1)
+    assert "Skipped test cases with unsupported payload media types: image/jpeg" in result.stdout.str()
 
 
 def test_override(ctx, testdir):
