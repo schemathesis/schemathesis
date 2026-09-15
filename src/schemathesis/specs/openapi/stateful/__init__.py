@@ -7,10 +7,11 @@ from typing import TYPE_CHECKING, Any
 
 from hypothesis import strategies as st
 from hypothesis.stateful import RULE_MARKER, Bundle, Rule
+from jsonschema_rs import ValidationError
 
 from schemathesis.checks import CheckFunction
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
+from schemathesis.core.errors import InvalidSchema, InvalidStateMachine, InvalidTransition
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
@@ -35,6 +36,7 @@ from schemathesis.specs.openapi.expressions import MultiMatch
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
+    from schemathesis.config import GenerationConfig
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.python._constants.pool import ConstantsPool
@@ -183,8 +185,31 @@ def create_state_machine(
         for result in schema.get_all_operations()
         if isinstance(result, Ok) and not result.ok().has_skipped_required_body
     ]
-    bundles = {}
     transitions = collect_transitions(operations)
+    # Before anything is wired: an operation that builds no strategy leaves the machine entirely,
+    # so it is neither picked as an entry point nor left as a rule nothing can reach. Only the
+    # operations that would get a rule are worth the strategy build this costs.
+    unbuildable: dict[str, Exception] = {}
+    for operation in operations:
+        if operation.label not in transitions.operations:
+            continue
+        if not schema.config.phases_for(operation=operation).stateful.enabled:
+            continue
+        config = schema.config.generation_for(operation=operation, phase="stateful")
+        reason = find_unbuildable(
+            operation,
+            modes=config.modes,
+            generation_config=config,
+            error_feedback=error_feedback,
+            extra_data_source=extra_data_source,
+            constants_value_source=constants_value_source,
+        )
+        if reason is not None:
+            unbuildable[operation.label] = reason
+    if unbuildable:
+        operations = [operation for operation in operations if operation.label not in unbuildable]
+        transitions = collect_transitions(operations)
+    bundles = {}
     _response_matchers: dict[str, Callable[[StepOutput], str | None]] = {}
 
     # Detect warnings once for all operations tested in stateful phase
@@ -293,6 +318,7 @@ def create_state_machine(
             "bundles": bundles,
             "_response_matchers": _response_matchers,
             "_transitions": transitions,
+            "_unbuildable": unbuildable,
             **rules,
         },
     )
@@ -479,6 +505,33 @@ def is_root_allowed(label: str) -> Callable[[OpenAPIStateMachine], bool]:
         return machine.control.allow_root_transition(label, machine.bundles)
 
     return inner
+
+
+def find_unbuildable(
+    operation: APIOperation,
+    *,
+    modes: list[GenerationMode],
+    generation_config: GenerationConfig,
+    error_feedback: ErrorFeedbackStore | None,
+    extra_data_source: ExtraDataSource | None,
+    constants_value_source: ConstantsPool | None,
+) -> Exception | None:
+    """The error that stops this operation from producing requests, if there is one."""
+    for mode in modes:
+        for source in (*operation.body.items, operation.query, operation.path_parameters, operation.headers):
+            try:
+                source.get_strategy(
+                    operation,
+                    generation_config,
+                    mode,
+                    extra_data_source=extra_data_source,
+                    error_feedback=error_feedback,
+                    constants_value_source=constants_value_source,
+                )
+            # Negative generation reports a rejected definition as the raw validation error.
+            except (InvalidSchema, ValidationError) as exc:
+                return exc
+    return None
 
 
 def transition(

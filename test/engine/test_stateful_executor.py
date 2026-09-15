@@ -6,10 +6,11 @@ from queue import Queue
 from typing import Any
 
 import hypothesis
+from flask import jsonify
 
 import schemathesis
 from schemathesis.config import HealthCheck, SchemathesisConfig
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.run import Phase, PhaseName, stateful
 from schemathesis.engine.run.stateful._executor import (
@@ -75,3 +76,84 @@ def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
 
     assert status == Status.INTERRUPTED
     assert emitted
+
+
+# One operation whose schema cannot produce a strategy must not take the whole phase with it.
+def test_unbuildable_operation_does_not_abort_the_phase(ctx, app_runner):
+    def collection(item_schema):
+        return {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": item_schema}},
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "integer"}},
+                                }
+                            }
+                        },
+                    }
+                },
+            }
+        }
+
+    def item(name):
+        return {
+            "get": {
+                "parameters": [{"name": name, "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": collection({"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}),
+            "/users/{userId}": item("userId"),
+            # Swagger 2.0 parameter spelling; a Schema Object needs a list of property names here.
+            "/items": collection({"type": "array", "items": {"type": "string", "required": True}}),
+            "/items/{itemId}": item("itemId"),
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        return jsonify({"id": user_id}), 200
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({"id": item_id}), 200
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.phases.update(phases=["stateful"])
+    schema.config.generation.update(max_examples=15)
+
+    visited = set()
+    reported = set()
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished):
+            for case in event.recorder.cases.values():
+                visited.add(case.value.operation.label)
+        elif isinstance(event, events.NonFatalError):
+            reported.add(event.label)
+
+    assert any(label.endswith("/users") for label in visited), (
+        f"The broken operation took the whole phase with it; visited {sorted(visited)}"
+    )
+    assert "POST /items" in reported, f"The dropped operation was not reported; got {sorted(reported)}"
+    assert not any(label.endswith("/items") for label in visited), (
+        f"The broken operation should not have been exercised; visited {sorted(visited)}"
+    )
