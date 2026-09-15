@@ -949,12 +949,20 @@ class CoverageContext:
                 )
                 if strategy is None:
                     raise Unsatisfiable from None
-                value = cached_draw(self.session, strategy)
-                if length_is_pinned and validated is not None:
-                    validator = _get_format_validator(self.session, validated, self.validator_cls)
-                    if not validator.is_valid(value):
-                        raise Unsatisfiable
-                return value
+                try:
+                    value = cached_draw(self.session, strategy)
+                except Unsatisfiable:
+                    # Regex matches the format rejects starve the filter even where a conforming one
+                    # exists; building from the format instead reaches it, so this is not the answer yet.
+                    if validated is None or length_is_pinned:
+                        raise
+                    value = NOT_SET
+                if value is not NOT_SET:
+                    if length_is_pinned and validated is not None:
+                        validator = _get_format_validator(self.session, validated, self.validator_cls)
+                        if not validator.is_valid(value):
+                            raise Unsatisfiable
+                    return value
             if (
                 isinstance(min_properties, int)
                 and min_properties > MAX_DRAWN_OBJECT_PROPERTIES

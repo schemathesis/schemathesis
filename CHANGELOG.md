@@ -17,6 +17,7 @@
 - Wrap a top-level string body in an XML element instead of sending bare text.
 - Keep negatives that do not need the body when its media type has no serializer.
 - Generate values violating `format: duration` under Swagger 2.0 and Open API 3.0.
+- Generate string values where a `format` and a wider `pattern` both apply, instead of skipping the body.
 - Infer links from a collection nested under a parent into its top-level resource operations.
 - Cover subschemas below a `$ref` base reused across nesting levels.
 
