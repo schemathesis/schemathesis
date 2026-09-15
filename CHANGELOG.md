@@ -16,6 +16,7 @@
 - False positive `ensure_resource_availability` for a `POST` to a resource URI that does not create it.
 - Wrap a top-level string body in an XML element instead of sending bare text.
 - Complete body `example` values that omit required fields, and skip those the schema still rejects.
+- Crash when an example uses a YAML tag such as `!!binary`.
 - Keep negatives that do not need the body when its media type has no serializer.
 - Generate values violating `format: duration` under Swagger 2.0 and Open API 3.0.
 - Generate string values where a `format` and a wider `pattern` both apply, instead of skipping the body.
