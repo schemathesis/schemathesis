@@ -13,6 +13,7 @@ import schemathesis
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
+from schemathesis.generation.hypothesis.builder import generate_example_cases
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import ResourceRepository
@@ -1981,6 +1982,42 @@ def test_schema_level_body_examples_container_is_completed(ctx):
     assert len(completed) == 1
     assert completed[0]["name"] == "from-list"
     assert validator.is_valid(completed[0]), completed[0]
+
+
+SPEC_WITH_BINARY_EXAMPLE = """
+openapi: 3.0.2
+info:
+  title: t
+  version: "1"
+paths:
+  /items:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blob]
+              properties:
+                blob:
+                  type: string
+              example:
+                blob: !!binary "YWJj"
+      responses:
+        "200":
+          description: OK
+"""
+
+
+def test_yaml_example_with_binary_tag(tmp_path):
+    # `!!binary` loads as bytes, which no validator can be built over; the declared example still comes through.
+    spec = tmp_path / "api.yaml"
+    spec.write_text(SPEC_WITH_BINARY_EXAMPLE)
+    schema = schemathesis.openapi.from_path(str(spec))
+    operation = schema["/items"]["POST"]
+    cases = generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
+    assert [case.body for case in cases] == [{"blob": b"abc"}]
 
 
 def test_schema_level_body_example_dropped_when_the_rest_cannot_be_drawn(ctx):

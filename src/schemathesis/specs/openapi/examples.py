@@ -614,10 +614,7 @@ def extract_from_schemas(
             continue
         if isinstance(schema, bool):
             continue
-        try:
-            body_validator: jsonschema_rs.Validator | None = make_validator_for(schema)
-        except jsonschema_rs.ValidationError:
-            body_validator = None
+        body_validator: jsonschema_rs.Validator | None = _make_example_validator(schema, snap_float32=False)
         resolver = make_root_resolver(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
@@ -640,9 +637,13 @@ def _make_example_validator(schema: Any, *, snap_float32: bool = True) -> jsonsc
     # Float32-snap so spec examples that collapse once narrowed (e.g. `5e-324` under `exclusiveMinimum: 0`) are evicted.
     if not isinstance(schema, dict):
         return None
+    # The sample values a schema carries constrain nothing, and a YAML tag can put something in them
+    # that no validator can be built over (`!!binary` -> bytes).
+    if "example" in schema or "examples" in schema:
+        schema = {key: value for key, value in schema.items() if key not in ("example", "examples")}
     try:
         return make_validator_for(snapped_float32_clone(schema) if snap_float32 else schema)
-    except jsonschema_rs.ValidationError:
+    except ValueError:
         return None
 
 
@@ -682,7 +683,11 @@ def _completed_body_example(
     if not isinstance(value, dict) or validator is None or not isinstance(validation_schema, dict):
         return None
     # Drawing a whole body is expensive, so the cheap check for what cannot be salvaged comes first.
-    if any(error.kind.name not in _COMPLETABLE_ERROR_KINDS for error in validator.iter_errors(value)):
+    try:
+        if any(error.kind.name not in _COMPLETABLE_ERROR_KINDS for error in validator.iter_errors(value)):
+            return None
+    except ValueError:
+        # `is_valid` tolerates a value outside the JSON types, but listing its errors raises on one.
         return None
     config = operation.schema.config.generation_for(operation=operation, phase="examples")
     try:
