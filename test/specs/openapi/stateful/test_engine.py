@@ -1145,3 +1145,60 @@ def test_reproduce_chain_renders_each_step_with_its_own_headers(ctx, app_runner,
         for command in commands
         if command.startswith("curl -X POST")
     )
+
+
+# A POST to the resource's own URI need not have created it, so a later 404 is not proof of a bug.
+def test_no_false_positive_ensure_resource_availability_without_creation_evidence(ctx, app_runner, stop_event):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users/{userId}": {
+                "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "post": {
+                    "operationId": "removeUser",
+                    "responses": {
+                        "200": {
+                            "description": "Removed",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"userId": {"type": "integer"}},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                },
+                "get": {
+                    "operationId": "getUser",
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
+                },
+            },
+        }
+    )
+
+    @app.route("/users/<int:user_id>", methods=["POST"])
+    def remove_user(user_id):
+        return jsonify({"userId": user_id}), 200
+
+    @app.route("/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        return jsonify({"detail": "not found"}), 404
+
+    port = app_runner.run_flask_app(app)
+    config = schemathesis.Config.from_dict(
+        {
+            "max-failures": 1,
+            "checks": {"enabled": False, "ensure_resource_availability": {"enabled": True}},
+            "generation": {"mode": "positive", "max-examples": 40, "database": "none"},
+        }
+    )
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+    result = collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+    assert result.failures == [], [failure.failure_info.failure.title for failure in result.failures]
