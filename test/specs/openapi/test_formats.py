@@ -223,3 +223,31 @@ def test_binary_format_with_string_keywords(keywords):
         assert isinstance(value, Binary), value
 
     test()
+
+
+@pytest.mark.parametrize("name", ["email", "idn-email", "hostname", "idn-hostname", "uri", "iri", "uri-template"])
+def test_generated_domain_carries_a_dot(name):
+    # A dotless domain is well-formed, yet the stricter checkers real services run reject it.
+    @given(_resolve(name))
+    @SETTINGS
+    def test(value):
+        assert "." in value.rsplit("@", 1)[-1], value
+
+    test()
+
+
+@pytest.mark.parametrize("name", ["email", "idn-email", "uri", "iri"])
+def test_length_narrowed_domain_carries_a_dot(name):
+    # A window under the plain generator's reach is answered by building for a length instead.
+    built = _canonical_strategy(
+        {"type": "string", "format": name, "maxLength": 20},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+
+    @given(built)
+    @SETTINGS
+    def test(value):
+        assert "." in value.rsplit("@", 1)[-1], value
+
+    test()

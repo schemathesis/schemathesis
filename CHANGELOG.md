@@ -10,6 +10,7 @@
 - Cover path parameter `enum` and `const` values containing `/` by sending them percent-encoded.
 - Name every negated location in the `negative_data_rejection` failure message.
 - Send request bodies for `text/*` media types without a dedicated serializer as plain text.
+- Generate `email`, `hostname` and `uri` values with a dotted domain, which strict checkers require. [#4782](https://github.com/schemathesis/schemathesis/issues/4782)
 - Cover nested properties, items and enums under an `allOf` sharing a node with `additionalProperties`.
 - False positive `ensure_resource_availability` when a verb other than `DELETE` removed the resource.
 - False positive `negative_data_rejection` when another location's negation only adds undeclared parameters.
