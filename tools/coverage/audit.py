@@ -19,7 +19,9 @@ import schemathesis
 from schemathesis.config import SanitizationConfig
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.errors import MalformedMediaType
-from schemathesis.core.jsonschema import is_valid
+from schemathesis.core.jsonschema import bundle, is_valid
+from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver
+from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
@@ -199,7 +201,20 @@ def _is_response_gap(gap: dict[str, Any]) -> bool:
     return (gap.get("kind") or "").startswith("response_")
 
 
-def _strip_invalid_examples(node: Any) -> int:
+_DATA_KEYWORDS = ("example", "examples", "default")
+
+
+def _sibling_schema(node: dict[str, Any], resolver: Resolver) -> JsonSchema:
+    """The node's own schema with every reachable `$ref` target embedded, so pointers resolve."""
+    schema = {key: value for key, value in node.items() if key not in _DATA_KEYWORDS}
+    try:
+        return bundle(schema, resolver).schema
+    except Exception:
+        # A pointer that leads nowhere leaves the fragment untouched, and the value survives.
+        return schema
+
+
+def _strip_invalid_examples(node: Any, resolver: Resolver) -> int:
     """Drop inline `example`/`default` values that fail their sibling schema, return the count.
 
     Schemathesis silently skips these during generation; tracecov otherwise renders them as
@@ -208,19 +223,21 @@ def _strip_invalid_examples(node: Any) -> int:
     """
     if isinstance(node, dict):
         invalid = 0
-        sibling_schema = {k: v for k, v in node.items() if k not in ("example", "examples", "default")}
-        for keyword in ("example", "default"):
-            if keyword in node and not is_valid(node[keyword], sibling_schema):
-                del node[keyword]
-                invalid += 1
+        present = [keyword for keyword in ("example", "default") if keyword in node]
+        if present:
+            sibling_schema = _sibling_schema(node, resolver)
+            for keyword in present:
+                if not is_valid(node[keyword], sibling_schema):
+                    del node[keyword]
+                    invalid += 1
         for key, value in node.items():
             # Don't descend into example/default payloads themselves (data, not schema).
-            if key in ("example", "examples", "default"):
+            if key in _DATA_KEYWORDS:
                 continue
-            invalid += _strip_invalid_examples(value)
+            invalid += _strip_invalid_examples(value, resolver)
         return invalid
     if isinstance(node, list):
-        return sum(_strip_invalid_examples(item) for item in node)
+        return sum(_strip_invalid_examples(item, resolver) for item in node)
     return 0
 
 
@@ -418,7 +435,7 @@ def audit_schema(
     try:
         filtered_schema, unknown_unsupported = _strip_known_unsupported_media_types(raw_schema)
         result.unknown_unsupported_media_types = unknown_unsupported
-        result.examples_invalid = _strip_invalid_examples(filtered_schema)
+        result.examples_invalid = _strip_invalid_examples(filtered_schema, make_root_resolver(filtered_schema))
         schema = schemathesis.openapi.from_dict(filtered_schema)
         coverage_map = tracecov.CoverageMap.from_dict(filtered_schema)
     except Exception as exc:
