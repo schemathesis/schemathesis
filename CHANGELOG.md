@@ -9,6 +9,7 @@
 - Cover path parameter `enum` and `const` values containing `/` by sending them percent-encoded.
 - Name every negated location in the `negative_data_rejection` failure message.
 - Cover nested properties, items and enums under an `allOf` sharing a node with `additionalProperties`.
+- False positive `ensure_resource_availability` when a verb other than `DELETE` removed the resource.
 - False positive `negative_data_rejection` when another location's negation only adds undeclared parameters.
 - False positive `ensure_resource_availability` for a `POST` to a resource URI that does not create it.
 - Wrap a top-level string body in an XML element instead of sending bare text.

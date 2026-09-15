@@ -1490,22 +1490,30 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
     return True
 
 
-def resource_was_deleted(recorder: RecordedScenario, case: Case) -> bool:
-    """Return True if a successful DELETE in the scenario covers this case's resource path.
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
 
-    A DELETE path is considered to cover the current case when it is a prefix of the current
-    path with matching parameter values. Used to suppress false positives in checks and in
-    link-calibration observations where a prior step deleted the resource.
+
+def resource_was_deleted(recorder: RecordedScenario, case: Case) -> bool:
+    """Return True if a successful prior request in the scenario removed this case's resource.
+
+    A DELETE covers every path below the one it targets. Any other unsafe verb may be a removal
+    spelled with the wrong method, so it only counts against the resource's own URI. Used to
+    suppress false positives in checks and in link-calibration observations.
     """
     case_path = ResourcePath(case.path, case.path_parameters or {})
     for prior_case in recorder.find_all_cases():
         if prior_case.id == case.id:
             continue
-        if prior_case.operation.method.upper() != "DELETE":
+        method = prior_case.operation.method.upper()
+        if method in SAFE_METHODS:
             continue
         prior_response = recorder.find_response(case_id=prior_case.id)
         if prior_response is None or not (200 <= prior_response.status_code < 300):
             continue
-        if _is_prefix_operation(ResourcePath(prior_case.path, prior_case.path_parameters or {}), case_path):
+        prior_path = ResourcePath(prior_case.path, prior_case.path_parameters or {})
+        if method == "DELETE":
+            if _is_prefix_operation(prior_path, case_path):
+                return True
+        elif prior_case.path == case.path and _is_prefix_operation(prior_path, case_path):
             return True
     return False
