@@ -4334,6 +4334,39 @@ def test_reference_cycle_through_a_combinator_branch(ctx, combinator):
     assert iter_cases(operation, GenerationMode.POSITIVE)
 
 
+def test_positive_body_descends_past_a_second_use_of_a_shared_base(ctx):
+    # A base reused at two nesting levels must not stop the walk at a pointer it has nothing to do with.
+    operation = body_operation(
+        ctx,
+        {"$ref": "#/components/schemas/Outer"},
+        path="/x",
+        components={
+            "schemas": {
+                "Base": {"type": "object", "properties": {"id": {"type": "string"}}},
+                "Outer": {
+                    "type": "object",
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                    "properties": {"inner": {"$ref": "#/components/schemas/Middle"}},
+                },
+                "Middle": {
+                    "type": "object",
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                    "properties": {"leaf": {"$ref": "#/components/schemas/Leaf"}},
+                },
+                "Leaf": {
+                    "type": "object",
+                    "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
+                },
+            }
+        },
+    )
+    assert {
+        tuple(case.body["inner"]["leaf"]["tags"])
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        if isinstance(case.body, dict) and "tags" in case.body.get("inner", {}).get("leaf", {})
+    } == {(), ("",)}
+
+
 @pytest.mark.parametrize(
     "modes",
     [[GenerationMode.POSITIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],
