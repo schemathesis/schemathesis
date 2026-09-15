@@ -789,15 +789,23 @@ def test_examples_in_any_of_top_level(ctx, key):
         }
     )
     extracted = [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])]
+    # Under `oneOf` every string matches all three branches, so no body example conforms.
+    body_examples = (
+        []
+        if key == "oneOf"
+        else [
+            {"media_type": "application/json", "value": "body-1-1"},
+            {"media_type": "application/json", "value": "body-2-1"},
+            {"media_type": "application/json", "value": "body-1-2"},
+            {"media_type": "application/json", "value": "body-2-2"},
+        ]
+    )
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
         {"container": "query", "name": "q", "value": "foo-2-1"},
         {"container": "query", "name": "q", "value": "foo-1-2"},
         {"container": "query", "name": "q", "value": "foo-2-2"},
-        {"media_type": "application/json", "value": "body-1-1"},
-        {"media_type": "application/json", "value": "body-2-1"},
-        {"media_type": "application/json", "value": "body-1-2"},
-        {"media_type": "application/json", "value": "body-2-2"},
+        *body_examples,
     ]
 
 
@@ -1864,7 +1872,7 @@ def test_multiple_allof_items_with_parent_example(ctx):
     assert extracted[0]["value"] == {"name": "John", "age": 30, "id": 123}
 
 
-def test_allof_without_parent_example_preserves_existing_behavior(ctx):
+def test_allof_example_used_when_parent_has_none(ctx):
     # See GH-3268
     # When parent has NO example, allOf examples should still be used.
     schema = ctx.openapi.load_schema(
@@ -1891,7 +1899,7 @@ def test_allof_without_parent_example_preserves_existing_behavior(ctx):
                 "base_resource": {
                     "type": "object",
                     "properties": {"name": {"type": "string"}},
-                    "example": {"name": "example-name"},
+                    "example": {"name": "example-name", "numeric_field": 1},
                 },
             }
         },
@@ -1900,9 +1908,174 @@ def test_allof_without_parent_example_preserves_existing_behavior(ctx):
 
     extracted = [example_to_dict(example) for example in extract_top_level(operation)]
 
-    # When parent has no example, should use example from allOf item (existing behavior)
     assert len(extracted) == 1
-    assert extracted[0]["value"] == {"name": "example-name"}
+    assert extracted[0]["value"] == {"name": "example-name", "numeric_field": 1}
+
+
+def test_allof_example_missing_child_required_is_completed(ctx):
+    # A base component's example omits what the child requires; the rest is filled in rather than dropped.
+    schema = ctx.openapi.load_schema(
+        {
+            "/resource": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/resource"}}},
+                    },
+                    "responses": {"204": {"description": "Done"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "resource": {
+                    "type": "object",
+                    "allOf": [{"$ref": "#/components/schemas/base_resource"}],
+                    "required": ["numeric_field"],
+                    "properties": {"numeric_field": {"type": "integer"}},
+                },
+                "base_resource": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "example": {"name": "example-name"},
+                },
+            }
+        },
+    )
+    operation = schema["/resource"]["POST"]
+    validator = jsonschema_rs.validator_for(operation.body[0].optimized_schema)
+    completed = [example.value for example in extract_top_level(operation)]
+    assert len(completed) == 1
+    assert completed[0]["name"] == "example-name"
+    assert validator.is_valid(completed[0]), completed[0]
+
+
+def test_schema_level_body_examples_container_is_completed(ctx):
+    # The plural `examples` list inside a schema gets the same filling-in as a single `example`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/item"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "item": {
+                    "type": "object",
+                    "required": ["name", "count"],
+                    "properties": {"name": {"type": "string"}, "count": {"type": "integer"}},
+                    "examples": [{"name": "from-list"}],
+                }
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    validator = jsonschema_rs.validator_for(operation.body[0].optimized_schema)
+    completed = [example.value for example in extract_top_level(operation)]
+    assert len(completed) == 1
+    assert completed[0]["name"] == "from-list"
+    assert validator.is_valid(completed[0]), completed[0]
+
+
+def test_schema_level_body_example_dropped_when_the_rest_cannot_be_drawn(ctx):
+    # The omitted field has no value the schema admits, so there is nothing to finish the example with.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["a"],
+                                    "properties": {"a": {"type": "string", "minLength": 5, "maxLength": 1}},
+                                    "example": {},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert [example.value for example in extract_top_level(schema["/items"]["POST"])] == []
+
+
+def test_schema_level_body_example_not_completed_when_base_is_not_an_object(ctx):
+    # Nothing can be merged into a value the schema does not shape as an object, so it stays dropped.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/choice"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "choice": {
+                    "anyOf": [{"type": "string"}],
+                    "example": {"unexpected": "object"},
+                }
+            }
+        },
+    )
+    assert [example.value for example in extract_top_level(schema["/items"]["POST"])] == []
+
+
+def test_schema_level_body_example_completed_at_nested_level(ctx):
+    # The missing required field sits under a property the example does supply, so the merge has to go deep.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/envelope"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "envelope": {
+                    "type": "object",
+                    "required": ["data"],
+                    "properties": {
+                        "data": {
+                            "type": "object",
+                            "required": ["attributes", "relationships"],
+                            "properties": {
+                                "attributes": {"type": "object"},
+                                "relationships": {"type": "object"},
+                            },
+                        }
+                    },
+                    "example": {"data": {"relationships": {"user": "guid0"}}},
+                }
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    validator = jsonschema_rs.validator_for(operation.body[0].optimized_schema)
+    completed = [example.value for example in extract_top_level(operation)]
+    assert len(completed) == 1
+    assert completed[0]["data"]["relationships"] == {"user": "guid0"}
+    assert validator.is_valid(completed[0]), completed[0]
 
 
 @pytest.mark.parametrize(
@@ -3321,6 +3494,39 @@ def test_top_level_body_example_violating_schema_is_skipped(ctx):
     operation = schema["/items"]["POST"]
     body_schema = operation.body[0].optimized_schema
     validator = jsonschema_rs.validator_for(body_schema)
+    for example in extract_top_level(operation):
+        if isinstance(example, BodyExample):
+            assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+
+
+def test_schema_level_body_example_violating_schema_is_skipped(ctx):
+    # An `example` declared inside the body schema is sent as the whole body, so it must clear that schema too.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {
+                    "type": "object",
+                    "properties": {"status": {"$ref": "#/components/schemas/Status"}},
+                    "required": ["status"],
+                    "example": {"status": "nope"},
+                },
+                "Status": {"type": "string", "enum": ["draft", "published"]},
+            }
+        },
+    )
+    operation = schema["/items"]["POST"]
+    validator = jsonschema_rs.validator_for(operation.body[0].optimized_schema)
     for example in extract_top_level(operation):
         if isinstance(example, BodyExample):
             assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"

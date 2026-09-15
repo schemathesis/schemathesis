@@ -15,6 +15,7 @@
 - False positive `negative_data_rejection` when another location's negation only adds undeclared parameters.
 - False positive `ensure_resource_availability` for a `POST` to a resource URI that does not create it.
 - Wrap a top-level string body in an XML element instead of sending bare text.
+- Complete body `example` values that omit required fields, and skip those the schema still rejects.
 - Keep negatives that do not need the body when its media type has no serializer.
 - Generate values violating `format: duration` under Swagger 2.0 and Open API 3.0.
 - Infer links from a collection nested under a parent into its top-level resource operations.
