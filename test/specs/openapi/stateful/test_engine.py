@@ -1202,3 +1202,91 @@ def test_no_false_positive_ensure_resource_availability_without_creation_evidenc
     )
 
     assert result.failures == [], [failure.failure_info.failure.title for failure in result.failures]
+
+
+# A resource removed by a POST is as gone as one removed by DELETE; the follow-up 404 explains itself.
+def test_removal_by_non_delete_verb_suppresses_resource_availability(ctx, app_runner, stop_event):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"userId": {"type": "integer"}},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/users/{userId}": {
+                "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "post": {
+                    "operationId": "removeUser",
+                    "responses": {"200": {"description": "Removed"}},
+                },
+                "get": {
+                    "operationId": "getUser",
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
+                },
+            },
+        }
+    )
+
+    users = {}
+    counter = {"next": 1}
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        user_id = counter["next"]
+        counter["next"] += 1
+        users[user_id] = "u"
+        return jsonify({"userId": user_id}), 201
+
+    @app.route("/users/<int:user_id>", methods=["POST"])
+    def remove_user(user_id):
+        users.pop(user_id, None)
+        return jsonify({"removed": user_id}), 200
+
+    @app.route("/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        if user_id not in users:
+            return jsonify({"detail": "not found"}), 404
+        return jsonify({"userId": user_id}), 200
+
+    port = app_runner.run_flask_app(app)
+    config = schemathesis.Config.from_dict(
+        {
+            "max-failures": 1,
+            "checks": {"enabled": False, "ensure_resource_availability": {"enabled": True}},
+            "generation": {"mode": "positive", "max-examples": 40, "database": "none"},
+        }
+    )
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+    result = collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+    assert result.failures == [], [failure.failure_info.failure.title for failure in result.failures]
