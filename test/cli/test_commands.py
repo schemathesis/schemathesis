@@ -2228,7 +2228,7 @@ def test_group_errors(ctx, cli, snapshot_cli):
                                     "required": ["user_id"],
                                 }
                             },
-                            "text/csv": {
+                            "application/x-csv": {
                                 "schema": {
                                     "properties": {
                                         "user_id": {

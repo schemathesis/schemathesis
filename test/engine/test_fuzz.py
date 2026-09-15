@@ -35,7 +35,7 @@ def _make_flaky_repro_schema(ctx):
                     "requestBody": {
                         "required": True,
                         "content": {
-                            "text/csv": {
+                            "application/x-csv": {
                                 "schema": {
                                     "type": "array",
                                     "items": {

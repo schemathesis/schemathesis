@@ -34,7 +34,7 @@ Schemathesis dev
 __________________________________ POST /test __________________________________
 Serialization not possible
 
-No supported serializers for media types: application/x-json-smile, text/csv
+No supported serializers for media types: application/x-csv, application/x-json-smile
 Check your schema or add custom serializers: https://schemathesis.readthedocs.io/en/stable/guides/custom-serializers/
 
 Need more help?
