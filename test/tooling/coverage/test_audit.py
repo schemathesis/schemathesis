@@ -433,3 +433,63 @@ def test_audit_schema_records_unknown_unsupported(ctx):
     )
     outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
     assert outcome.result.unknown_unsupported_media_types == ["application/x-custom"]
+
+
+@pytest.mark.parametrize(
+    ("example", "expected"),
+    [({"status": "lyft"}, 1), ({"status": "pending"}, 0)],
+    ids=["violates-enum", "matches-enum"],
+)
+def test_audit_schema_counts_invalid_examples_behind_refs(ctx, example, expected):
+    raw = ctx.openapi.build_schema(
+        {
+            "/rides": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RideStatus"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "RideStatus": {
+                    "type": "object",
+                    "required": ["status"],
+                    "properties": {"status": {"$ref": "#/components/schemas/RideStatusEnum"}},
+                    "example": example,
+                },
+                "RideStatusEnum": {"type": "string", "enum": ["pending", "accepted"]},
+            }
+        },
+    )
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    assert outcome.result.errors == []
+    assert outcome.result.examples_invalid == expected
+
+
+@pytest.mark.parametrize(
+    ("definition", "expected"),
+    [
+        ({"type": "object", "properties": {"x": {"$ref": "#/components/schemas/Missing"}}, "example": {"x": 1}}, 0),
+        (
+            {
+                "type": "object",
+                "required": ["child"],
+                "properties": {"child": {"$ref": "#/components/schemas/Node"}},
+                "example": {},
+            },
+            1,
+        ),
+    ],
+    ids=["dangling-ref", "recursive-ref"],
+)
+def test_audit_schema_keeps_counting_examples_for_unresolvable_and_recursive_refs(ctx, definition, expected):
+    raw = ctx.openapi.build_schema(
+        {"/health": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        components={"schemas": {"Node": definition}},
+    )
+    outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
+    assert outcome.result.errors == []
+    assert outcome.result.examples_invalid == expected
