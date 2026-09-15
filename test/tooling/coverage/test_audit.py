@@ -218,16 +218,20 @@ def test_audit_schema_fuzzing_uses_only_requested_generation_modes(ctx):
     [
         (["application/json", "application/x-msgpack"], {"application/json"}, []),
         (["application/json", "image/png", "video/mp4"], {"application/json"}, []),
-        (["application/json", "text/html"], {"application/json", "text/html"}, ["text/html"]),
         (
-            ["application/json", "text/html", "text/csv"],
-            {"application/json", "text/html", "text/csv"},
-            ["text/csv", "text/html"],
+            ["application/json", "application/x-custom"],
+            {"application/json", "application/x-custom"},
+            ["application/x-custom"],
         ),
         (
-            ["application/json", "application/x-msgpack", "image/png", "text/html"],
-            {"application/json", "text/html"},
-            ["text/html"],
+            ["application/json", "application/x-custom", "application/x-beta"],
+            {"application/json", "application/x-custom", "application/x-beta"},
+            ["application/x-beta", "application/x-custom"],
+        ),
+        (
+            ["application/json", "application/x-msgpack", "image/png", "application/x-custom"],
+            {"application/json", "application/x-custom"},
+            ["application/x-custom"],
         ),
     ],
     ids=["explicit-deny", "prefix-deny", "unknown-surfaced", "multiple-unknowns-sorted", "mixed"],
@@ -267,9 +271,9 @@ def test_strip_known_unsupported_drops_empty_request_body(ctx):
     ("consumes", "expected_kept", "expected_unknown"),
     [
         (
-            ["application/json", "application/x-msgpack", "image/png", "text/html"],
-            ["application/json", "text/html"],
-            ["text/html"],
+            ["application/json", "application/x-msgpack", "image/png", "application/x-custom"],
+            ["application/json", "application/x-custom"],
+            ["application/x-custom"],
         ),
         (["application/json"], ["application/json"], []),
         (["application/x-msgpack", "image/png"], [], []),
@@ -339,11 +343,11 @@ def test_strip_known_unsupported_swagger2_global_consumes(ctx):
     schema = ctx.openapi.build_schema(
         {"/x": {"get": {"responses": {"200": {"description": "OK"}}}}},
         version="2.0",
-        consumes=["application/json", "application/x-msgpack", "text/csv"],
+        consumes=["application/json", "application/x-msgpack", "application/x-custom"],
     )
     filtered, unknown = _strip_known_unsupported_media_types(schema)
-    assert filtered["consumes"] == ["application/json", "text/csv"]
-    assert unknown == ["text/csv"]
+    assert filtered["consumes"] == ["application/json", "application/x-custom"]
+    assert unknown == ["application/x-custom"]
 
 
 def test_audit_schema_filters_uncovered_keywords_under_errored_operations(ctx):
@@ -418,7 +422,7 @@ def test_audit_schema_records_unknown_unsupported(ctx):
                     "requestBody": {
                         "content": {
                             "application/json": {"schema": {"type": "object", "properties": {"a": {"type": "string"}}}},
-                            "text/html": {"schema": {"type": "string"}},
+                            "application/x-custom": {"schema": {"type": "string"}},
                             "application/x-msgpack": {"schema": {"type": "object"}},
                         }
                     },
@@ -428,4 +432,4 @@ def test_audit_schema_records_unknown_unsupported(ctx):
         }
     )
     outcome = audit_schema(raw, api="t", corpus="external", phase=PhaseName.COVERAGE)
-    assert outcome.result.unknown_unsupported_media_types == ["text/html"]
+    assert outcome.result.unknown_unsupported_media_types == ["application/x-custom"]

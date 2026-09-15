@@ -99,16 +99,25 @@ class BaseTransport(Generic[S]):
                 media_types.is_plain_text,
                 media_types.is_yaml,
             ]
+            matched = False
             for registered_media_type, serializer in self._serializers.items():
                 target_main, target_sub = media_types.parse(registered_media_type)
                 # Try known variations for popular media types and fallback to comparison
                 if any(check(media_type) and check(registered_media_type) for check in checks):
                     if not is_range:
+                        matched = True
                         yield media_type, serializer
                     elif main in ("*", target_main):
+                        matched = True
                         yield registered_media_type, serializer
                 elif main in ("*", target_main) and sub in ("*", target_sub):
+                    matched = True
                     yield registered_media_type, serializer
+            if not matched and not is_range and main == "text":
+                # Any other textual subtype goes on the wire as text, under the media type the schema declares
+                plain_text = self._serializers.get("text/plain")
+                if plain_text is not None:
+                    yield media_type, plain_text
 
     def _resolve_serializer(self, input_media_type: str) -> tuple[str, Serializer]:
         """Find the concrete media type to send and the serializer that encodes the body for it."""

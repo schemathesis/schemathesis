@@ -9,6 +9,7 @@
 - Keep percent-encoded reserved characters in the base path intact in request URLs.
 - Cover path parameter `enum` and `const` values containing `/` by sending them percent-encoded.
 - Name every negated location in the `negative_data_rejection` failure message.
+- Send request bodies for `text/*` media types without a dedicated serializer as plain text.
 - Cover nested properties, items and enums under an `allOf` sharing a node with `additionalProperties`.
 - False positive `ensure_resource_availability` when a verb other than `DELETE` removed the resource.
 - False positive `negative_data_rejection` when another location's negation only adds undeclared parameters.

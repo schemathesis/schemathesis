@@ -74,14 +74,14 @@ def tsv_setup(ctx):
     api = ctx.openapi.apps.csv_payload()
     schema = schemathesis.openapi.from_url(api.schema_url)
     definition = schema.raw_schema["paths"]["/api/csv"]["post"]
-    definition["requestBody"]["content"]["text/tsv"] = definition["requestBody"]["content"].pop("text/csv")
+    definition["requestBody"]["content"]["application/x-tsv"] = definition["requestBody"]["content"].pop("text/csv")
     return api, schema
 
 
 @pytest.mark.hypothesis_nested
 def test_no_serialization_possible(tsv_setup):
     _, tsv_schema = tsv_setup
-    # When API expects `text/tsv`
+    # When API expects `application/x-tsv`
     # And there is no registered serializer for this media type
 
     @given(case=tsv_schema["/api/csv"]["POST"].as_strategy())
@@ -92,7 +92,7 @@ def test_no_serialization_possible(tsv_setup):
     # Then there should be an error indicating this
     with pytest.raises(
         SerializationNotPossible,
-        match="No supported serializers for media types: text/tsv",
+        match="No supported serializers for media types: application/x-tsv",
     ):
         test()
 
@@ -173,6 +173,31 @@ def test_media_range_sent_as_concrete_content_type(ctx, declared, expected):
     case = schema["/data"]["POST"].Case(body={"key": "value"}, media_type=declared)
     for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
         assert transport.serialize_case(case)["headers"]["Content-Type"] == expected
+
+
+@pytest.mark.parametrize("media_type", ["text/html", "text/csv", "text/markdown", "text/powershell"])
+def test_unknown_text_subtype_sent_as_plain_text(ctx, media_type):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {media_type: {"schema": {"type": "string", "enum": ["hello"]}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+
+    @given(case=schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        kwargs = case.as_transport_kwargs()
+        assert (kwargs["headers"]["Content-Type"], kwargs["data"]) == (media_type, b"hello")
+
+    test()
 
 
 def test_multipart_content_type_left_to_requests(ctx):
