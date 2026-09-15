@@ -1150,6 +1150,18 @@ def _resource_recreated_after_delete(
     return False
 
 
+def _created_a_resource(*, parent: Case, parent_response: Response, case: Case) -> bool:
+    """Whether a successful POST means the resource the follow-up reads was created.
+
+    A POST to a collection creates the item below it. A POST to the item's own URI could equally
+    be a rename, an action, or a delete spelled with the wrong verb, so it has to say that it
+    created something.
+    """
+    if len(parent.path.rstrip("/").split("/")) < len(case.path.rstrip("/").split("/")):
+        return True
+    return parent_response.status_code == 201 or "Location" in parent_response.headers
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -1244,6 +1256,7 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
             ResourcePath(parent.path, parent.path_parameters or {}),
             ResourcePath(case.path, case.path_parameters or {}),
         )
+        and _created_a_resource(parent=parent, parent_response=parent_response, case=case)
     ):
         return None
 

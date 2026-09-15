@@ -10,6 +10,7 @@
 - Name every negated location in the `negative_data_rejection` failure message.
 - Cover nested properties, items and enums under an `allOf` sharing a node with `additionalProperties`.
 - False positive `negative_data_rejection` when another location's negation only adds undeclared parameters.
+- False positive `ensure_resource_availability` for a `POST` to a resource URI that does not create it.
 - Wrap a top-level string body in an XML element instead of sending bare text.
 - Keep negatives that do not need the body when its media type has no serializer.
 - Generate values violating `format: duration` under Swagger 2.0 and Open API 3.0.
