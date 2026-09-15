@@ -4367,6 +4367,31 @@ def test_positive_body_descends_past_a_second_use_of_a_shared_base(ctx):
     } == {(), ("",)}
 
 
+def test_positive_body_descends_past_a_third_use_of_a_shared_base(ctx):
+    # A base carrying no `$ref` of its own cannot recur, so a third nesting level leaves the walk below it intact.
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "allOf": [{"$ref": "#/components/schemas/Base"}],
+            "properties": {
+                "inner": {
+                    "type": "object",
+                    "allOf": [{"$ref": "#/components/schemas/Base"}],
+                    "properties": {"pools": {"type": "array", "items": {"$ref": "#/components/schemas/Base"}}},
+                }
+            },
+        },
+        path="/x",
+        components={"schemas": {"Base": {"type": "object", "properties": {"id": {"type": "string"}}}}},
+    )
+    assert {
+        json.dumps(case.body["inner"]["pools"])
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        if isinstance(case.body, dict) and "pools" in case.body.get("inner", {})
+    } == {"[]", '[{"id": ""}]', "[{}]"}
+
+
 @pytest.mark.parametrize(
     "modes",
     [[GenerationMode.POSITIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],
