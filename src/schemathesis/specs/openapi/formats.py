@@ -171,9 +171,11 @@ def domain_values() -> st.SearchStrategy[str]:
     # One flat draw per label. Building labels out of hyphen-joined chunks nests two more list
     # draws under every domain, which costs ~2.5x across a `format`-heavy schema.
     label = st.text(alphabet=_LABEL_CHARACTERS, min_size=1, max_size=8)
+    # At least one label before the top-level one: a dotless domain is well-formed, yet the
+    # stricter checkers real services run reject it.
     return st.builds(
         lambda labels, top_level: ".".join([*labels, top_level]),
-        st.lists(label, max_size=2),
+        st.lists(label, min_size=1, max_size=2),
         st.sampled_from(_TOP_LEVEL_DOMAINS),
     )
 
@@ -378,17 +380,17 @@ FORMAT_LENGTHS: dict[str, tuple[int, int]] = {
     "time": (9, 21),
     "date-time": (20, 32),
     "duration": (3, 26),
-    "hostname": (2, 25),
-    "idn-hostname": (2, 25),
+    "hostname": (4, 25),
+    "idn-hostname": (4, 25),
     "ipv4": (7, 15),
     "ipv6": (2, 39),
-    "uri": (10, 33),
-    "uri-reference": (10, 33),
-    "iri": (10, 33),
-    "iri-reference": (10, 33),
-    "uri-template": (15, 38),
-    "email": (4, 36),
-    "idn-email": (4, 36),
+    "uri": (12, 33),
+    "uri-reference": (12, 33),
+    "iri": (12, 33),
+    "iri-reference": (12, 33),
+    "uri-template": (17, 38),
+    "email": (6, 36),
+    "idn-email": (6, 36),
     "uuid": (36, 36),
 }
 
@@ -430,11 +432,13 @@ def date_time_values_within(min_length: int, max_length: float) -> st.SearchStra
 
 # RFC 1035, Section 2.3.4 - one label of a domain name.
 _MAX_DOMAIN_LABEL_LENGTH = 63
-# The shortest and longest address the format checkers accept: "a@b" up to RFC 5321's path limit.
-_EMAIL_LENGTHS = (3, 255)
+# The shortest domain a dot fits in, as "a.b".
+_MIN_DOMAIN_LENGTH = 3
+# The shortest and longest address the format checkers accept: "a@b.c" up to RFC 5321's path limit.
+_EMAIL_LENGTHS = (_MIN_DOMAIN_LENGTH + 2, 255)
 _URI_SCHEME = "https://"
 # "https://" plus the shortest domain, up to the longest string this engine builds at all.
-_URI_LENGTHS = (len(_URI_SCHEME) + 1, MAX_STRING_LENGTH)
+_URI_LENGTHS = (len(_URI_SCHEME) + _MIN_DOMAIN_LENGTH, MAX_STRING_LENGTH)
 
 
 def _domain_label_lengths(total: int) -> list[int]:
