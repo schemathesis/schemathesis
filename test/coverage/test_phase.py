@@ -4981,6 +4981,64 @@ def test_coverage_positive_body_uuid_format_with_uppercase_pattern(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases)
 
 
+def test_coverage_positive_body_required_format_with_wider_pattern(ctx):
+    # A lowercase UUID satisfies both keywords, so this required property must not sink the whole body.
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "string", "format": "uuid", "pattern": "^[0-9a-f-]+$"}},
+        },
+        path="/docs",
+    )
+    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases)
+
+
+def test_coverage_positive_body_only_long_enough_pattern_branch_satisfies_format(ctx):
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "issued": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(2020-01-02|x)$",
+                    "minLength": 2,
+                    "maxLength": 10,
+                }
+            },
+        },
+        path="/reports",
+    )
+    assert assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases) == [
+        {"issued": "2020-01-02"},
+        {},
+    ]
+
+
+def test_coverage_positive_body_only_long_enough_pattern_branch_violates_format(ctx):
+    # No other match fits the length window, so the property goes instead of shipping a non-date.
+    operation = body_operation(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "issued": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(20200102|x)$",
+                    "minLength": 2,
+                    "maxLength": 8,
+                }
+            },
+        },
+        path="/reports",
+    )
+    assert assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases) == [{}]
+
+
 def test_coverage_positive_body_skips_properties_with_no_valid_enum_values(ctx):
     # A property schema like {enum: ["MALE", "FEMALE"], maxLength: 1} has contradictory
     # constraints — all enum values violate maxLength. The coverage phase must not pick
