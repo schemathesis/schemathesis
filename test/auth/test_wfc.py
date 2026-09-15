@@ -1074,12 +1074,12 @@ def test_a_missing_resource_does_not_settle_the_identity(cli, ctx, tmp_path):
 
 
 def test_rejected_payloads_do_not_block_escalation(cli, ctx, tmp_path):
-    # `/api/validated` answers 400 before checking the role, so 403s arrive interleaved with 400s.
+    # `/api/validated` rejects every other payload before checking the role, so denials arrive interleaved.
     api = ctx.openapi.apps.wfc_role_gated()
     auth = _write(tmp_path, ROLE_AUTH)
 
     cli.run(api.schema_url, "--max-examples=15", f"--auth-wfc={auth}", "--phases=fuzzing")
-    assert "admin" in _identities(api, "POST", "/api/validated")
+    assert _identities(api, "POST", "/api/validated") == {"viewer", "", "editor", "admin"}
 
 
 def test_pinned_user_never_escalates(cli, ctx, tmp_path):

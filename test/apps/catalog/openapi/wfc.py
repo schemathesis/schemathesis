@@ -147,6 +147,7 @@ _ROLE_GATED = {
                 "400": {"description": "Bad amount"},
                 "401": {"description": "Unauthorized"},
                 "403": {"description": "Forbidden"},
+                "409": {"description": "Rejected"},
             },
         }
     },
@@ -158,6 +159,7 @@ def wfc_role_gated(deny_status: int = 403) -> OpenAPIApp:
     app = make_flask_app_from_schema(spec)
 
     seen: list[str] = []
+    posted: list[int] = []
 
     def role() -> str:
         return (request.headers.get("Authorization") or "").removeprefix("ApiKey ").strip()
@@ -200,12 +202,16 @@ def wfc_role_gated(deny_status: int = 403) -> OpenAPIApp:
 
     @app.route("/api/validated", methods=["POST"])
     def validated() -> object:
-        # Payload is checked before the role, so a wrong identity sees 400 interleaved with the denial.
+        # Every other payload is rejected before the role is looked at, so the denials an escalation
+        # needs arrive interleaved with rejections whatever the generator happens to draw.
+        posted.append(1)
+        if len(posted) % 2:
+            return jsonify({"detail": "rejected"}), 409
+        if role() != "admin":
+            return jsonify({"detail": "denied"}), deny_status
         body = request.get_json(silent=True)
         if not isinstance(body, dict) or not isinstance(body.get("amount"), int) or body["amount"] < 100:
             return jsonify({"detail": "bad amount"}), 400
-        if role() != "admin":
-            return jsonify({"detail": "denied"}), deny_status
         return jsonify({"ok": True}), 201
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
