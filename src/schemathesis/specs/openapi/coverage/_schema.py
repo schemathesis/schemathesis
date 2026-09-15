@@ -237,6 +237,9 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
 ANNOTATION_KEYWORDS = frozenset(("description", "example", "examples", "title", "deprecated", "externalDocs", "xml"))
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
 NEGATIVE_MODE_MAX_ITEMS = 15
+# How many levels of one object graph may merge the same base before the walk stops unfolding it.
+# Keeps a base reused all the way down a deep document from turning every level into its own sweep.
+SHARED_BASE_REUSE_LIMIT = 3
 # Longest array still drawn element by element; a pattern-matched element spends budget per
 # character, so past this the draw stops being affordable.
 MAX_DRAWN_ARRAY_ITEMS = 64
@@ -448,6 +451,7 @@ class CoverageContext:
         "update_pattern",
         "_resolver",
         "_root_token_cell",
+        "_leaf_reference_cache",
         "session",
         "wire",
         "allow_extra_parameters",
@@ -470,6 +474,7 @@ class CoverageContext:
         _resolver: Resolver | None = None,
         _path_str_cache_cell: list[str | None] | None = None,
         _root_token_cell: list[object] | None = None,
+        _leaf_reference_cache: dict[str, bool] | None = None,
         allow_extra_parameters: bool = True,
         expanding: dict[str, int] | None = None,
         generating: dict[str, int] | None = None,
@@ -493,6 +498,8 @@ class CoverageContext:
         self._resolver = _resolver
         # Shared like the path cell: every context over this document answers with the same token.
         self._root_token_cell: list[object] = _root_token_cell if _root_token_cell is not None else [None]
+        # Also shared: which references name a schema that points nowhere, answered once per document.
+        self._leaf_reference_cache: dict[str, bool] = _leaf_reference_cache if _leaf_reference_cache is not None else {}
         self.allow_extra_parameters = allow_extra_parameters
         self.wire = WireSemantics(location=location, media_type=media_type, is_required=is_required)
         self.session = session if session is not None else DEFAULT_GENERATION_SESSION
@@ -552,12 +559,26 @@ class CoverageContext:
         letting a second one double as well multiplies the walks through a graph of cycles instead
         of adding to them. A pointer that is not open takes no part in that product, so a base
         shared between nesting levels does not close the pointers beneath it.
+
+        A base that names no reference of its own never comes back around, so the levels of one
+        graph that reuse it keep what sits below them covered, up to a fixed number of levels.
         """
         counters = self.expanding if counters is None else counters
         depth = counters.get(reference, 0)
-        if depth >= 2:
-            return True
-        return depth >= 1 and any(other >= 2 for other in counters.values())
+        if depth < 1 or not any(other >= 2 for other in counters.values()):
+            return False
+        return depth >= SHARED_BASE_REUSE_LIMIT or not self._points_nowhere(reference)
+
+    def _points_nowhere(self, reference: str) -> bool:
+        """Whether what this reference names carries no reference of its own."""
+        cached = self._leaf_reference_cache.get(reference)
+        if cached is None:
+            try:
+                cached = not _reads_references(self.resolve_ref(reference))
+            except RefResolutionError:
+                cached = False
+            self._leaf_reference_cache[reference] = cached
+        return cached
 
     @contextmanager
     def at(self, key: str | int) -> Generator[None, None, None]:
@@ -591,6 +612,7 @@ class CoverageContext:
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
             _root_token_cell=self._root_token_cell,
+            _leaf_reference_cache=self._leaf_reference_cache,
             allow_extra_parameters=self.allow_extra_parameters,
             expanding=self.expanding,
             generating=self.generating,
@@ -611,6 +633,7 @@ class CoverageContext:
             _resolver=self._resolver,
             _path_str_cache_cell=self._path_str_cache_cell,
             _root_token_cell=self._root_token_cell,
+            _leaf_reference_cache=self._leaf_reference_cache,
             allow_extra_parameters=self.allow_extra_parameters,
             expanding=self.expanding,
             generating=self.generating,
