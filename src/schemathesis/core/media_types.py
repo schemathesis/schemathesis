@@ -99,9 +99,16 @@ def is_json(value: str) -> bool:
     return is_json_parts(parse(value))
 
 
+_YAML_MEDIA_TYPE_PARTS: frozenset[tuple[str, str]] = frozenset(parse(media_type) for media_type in YAML_MEDIA_TYPES)
+
+
 def is_yaml(value: str) -> bool:
-    """Detect whether the content type is YAML-compatible."""
-    return value in YAML_MEDIA_TYPES
+    """Detect whether the content type is YAML-compatible.
+
+    For example - ``application/apply-patch+yaml`` matches.
+    """
+    main, sub = parse(value)
+    return (main, sub) in _YAML_MEDIA_TYPE_PARTS or (main == "application" and sub.endswith("+yaml"))
 
 
 def is_plain_text(value: str) -> bool:

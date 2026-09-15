@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Recognize `+yaml` media types (e.g. `application/apply-patch+yaml`) and YAML content types with parameters.
 - Exceed a declared `maximum`/`minimum` that lies outside the range of `format: int32`/`int64`.
 - Keep percent-encoded reserved characters in the base path intact in request URLs.
 - Cover path parameter `enum` and `const` values containing `/` by sending them percent-encoded.

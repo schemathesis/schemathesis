@@ -72,9 +72,14 @@ def test_is_plain_text_media_type(value, expected):
         ("application/x-yaml", True),
         ("text/vnd.yaml", True),
         ("application/yaml", True),
+        ("application/apply-patch+yaml", True),
+        ("application/vnd.oai.openapi+yaml", True),
+        ("application/yaml; charset=utf-8", True),
+        ("text/x-yaml;charset=utf-8", True),
         ("application/json", False),
         ("text/plain", False),
         ("application/xml", False),
+        ("text/yamlish", False),
     ],
 )
 def test_is_yaml_media_type(value, expected):
