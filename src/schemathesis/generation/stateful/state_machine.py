@@ -167,6 +167,8 @@ class APIStateMachine(RuleBasedStateMachine):
     # They don't interfere, since it is properly overridden on the Hypothesis side, but it is likely that this
     # attribute will be renamed in the future
     bundles: ClassVar[dict[str, CaseInsensitiveDict]]
+    # Operations dropped from the run because their schema builds no strategy, by label.
+    _unbuildable: ClassVar[dict[str, Exception]] = {}
     schema: BaseSchema
 
     def __init__(self) -> None:

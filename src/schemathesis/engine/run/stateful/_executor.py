@@ -470,6 +470,18 @@ def execute_state_machine_loop(
         # sequence, and holding on here would leave every later phase without a turn.
         break
 
+    # Operations left out of the machine still owe the user the reason, the way the unit phase reports them.
+    for label, reason in state_machine._unbuildable.items():
+        event_queue.put(
+            events.NonFatalError(
+                error=reason,
+                phase=PhaseName.STATEFUL_TESTING,
+                label=label,
+                related_to_operation=True,
+                code_sample=None,
+            )
+        )
+
 
 def validate_response(
     *,

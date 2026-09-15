@@ -15,6 +15,7 @@
 - Generate values violating `format: duration` under Swagger 2.0 and Open API 3.0.
 - Infer links from a collection nested under a parent into its top-level resource operations.
 - Cover subschemas below a `$ref` base reused at two nesting levels.
+- Skip operations with unbuildable schemas in the stateful phase instead of ending the whole phase.
 
 ## [4.27.1](https://github.com/schemathesis/schemathesis/compare/v4.27.0...v4.27.1) - 2026-09-13
 
