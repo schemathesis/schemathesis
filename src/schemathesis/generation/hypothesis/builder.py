@@ -349,6 +349,9 @@ def add_coverage(
     )
     for case in generator:
         test = hypothesis.example(case=case)(test)
+    unserializable = generator.controller.unserializable_media_types
+    if unserializable:
+        UnserializablePayloadMark.set(test, sorted(unserializable))
     return test
 
 
@@ -365,6 +368,7 @@ def _case_to_kwargs(case: Case) -> dict:
 
 UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")
 NonSerializableMark = Mark[SerializationNotPossible](attr_name="non_serializable")
+UnserializablePayloadMark = Mark[list[str]](attr_name="unserializable_payload")
 InvalidRegexMark = Mark[ValidationError](attr_name="invalid_regex")
 InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_header")
 MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")

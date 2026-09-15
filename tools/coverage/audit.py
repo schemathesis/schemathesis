@@ -331,6 +331,7 @@ def _coverage_cases(
     generation_modes: list[GenerationMode],
 ) -> Generator[Case]:
     transport = operation.schema.transport
+    unserializable: set[str] = set()
     for case in iter_coverage_cases(
         operation=operation,
         generation_modes=generation_modes,
@@ -340,7 +341,7 @@ def _coverage_cases(
         unexpected_methods_seen=None,
     ):
         # Mirror the runner: an unserializable media type must not forfeit what the case tests outside the payload.
-        if without_unserializable_payload(case, transport) is not None:
+        if without_unserializable_payload(case, transport, unserializable) is not None:
             yield case
 
 

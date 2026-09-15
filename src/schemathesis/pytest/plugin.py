@@ -49,7 +49,11 @@ from schemathesis.generation.hypothesis.reporting import (
 from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest.control_flow import fail_on_no_matches
-from schemathesis.pytest.warnings import emit_constants_warnings, emit_openapi_auth_warnings
+from schemathesis.pytest.warnings import (
+    emit_constants_warnings,
+    emit_openapi_auth_warnings,
+    emit_unserializable_payload_warning,
+)
 from schemathesis.python import asgi
 from schemathesis.python._constants.orchestrator import make_constants_value_source
 from schemathesis.schemas import APIOperation
@@ -438,6 +442,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
         MissingPathParameters,
         NonSerializableMark,
         UnsatisfiableExampleMark,
+        UnserializablePayloadMark,
     )
 
     __tracebackhide__ = True
@@ -481,6 +486,11 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
             raise build_unsatisfiable_error(
                 operation, with_tip=True, filter_tracker=operation.filter_case_tracker
             ) from None
+
+        # The operation ran, but part of it was left untested - a warning keeps the surviving cases passing.
+        unserializable_payload = UnserializablePayloadMark.get(pyfuncitem.obj)
+        if unserializable_payload is not None:
+            emit_unserializable_payload_warning(unserializable_payload)
 
         invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
         if invalid_headers is not None:

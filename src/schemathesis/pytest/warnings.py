@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING
 
+from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE
 from schemathesis.python._constants.orchestrator import build_constants_pool
 from schemathesis.python._constants.warnings import iter_constants_warnings
 from schemathesis.specs.openapi.warnings import UnusedOpenAPIAuthWarning
@@ -27,3 +28,13 @@ def emit_constants_warnings(schema: BaseSchema) -> None:
     """Emit Python warnings for registered constants sources that could not be scanned."""
     for warning in iter_constants_warnings(build_constants_pool(schema)):
         warnings.warn(f"Constant reuse skipped: {warning.message}", UserWarning, stacklevel=6)
+
+
+def emit_unserializable_payload_warning(media_types: list[str]) -> None:
+    """Emit a Python warning for payloads left untested because no serializer matched their media type."""
+    warnings.warn(
+        f"Skipped test cases with unsupported payload media types: {', '.join(media_types)}\n"
+        f"{SERIALIZERS_SUGGESTION_MESSAGE}",
+        UserWarning,
+        stacklevel=2,
+    )
