@@ -928,6 +928,9 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
             config = ctx.config.missing_required_header
             expected_statuses = expand_status_codes(config.expected_statuses or [])
         if response.status_code not in expected_statuses:
+            # A drawn identifier rarely exists, so the server can reject the request before reading headers.
+            if response.status_code == 404 and _targets_generated_resource(ctx, case.operation):
+                return None
             allowed = ", ".join(map(str, expected_statuses))
             raise MissingHeaderNotRejected(
                 operation=f"{case.method} {case.path}",
