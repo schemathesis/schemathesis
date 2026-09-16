@@ -47,6 +47,7 @@ from schemathesis.core.error_feedback.parsers import (  # noqa: F401, E402
     marshmallow,
     pydantic,
     rails,
+    restler,
     spring,
     symfony,
     zod,
