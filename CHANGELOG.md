@@ -10,6 +10,7 @@
 
 - Substitute only `${VAR}` in config values; `$${` escapes it, any other `$` stays literal. [#4785](https://github.com/schemathesis/schemathesis/issues/4785)
 - Accept `QUERY` in `phases.coverage.unexpected-methods`. [#4787](https://github.com/schemathesis/schemathesis/issues/4787)
+- Keep numeric bounds learned from 4xx errors on properties without a declared `type`.
 
 ## [4.27.2](https://github.com/schemathesis/schemathesis/compare/v4.27.1...v4.27.2) - 2026-09-15
 

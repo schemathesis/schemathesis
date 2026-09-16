@@ -9323,6 +9323,30 @@ def test_apply_adjustments_does_not_mutate_caller_schema(case_factory):
     assert out["required"] == ["username"]
 
 
+def test_apply_adjustments_bounds_an_untyped_property(case_factory):
+    case = case_factory()
+    store = ErrorFeedbackStore()
+    for kind, payload in (
+        (ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name="integer")),
+        (ObservationKind.NUMERIC_BOUND, NumericBoundPayload(bound=1.0, direction=BoundDirection.MIN, exclusive=False)),
+        (ObservationKind.NUMERIC_BOUND, NumericBoundPayload(bound=5.0, direction=BoundDirection.MAX, exclusive=False)),
+    ):
+        store.record(
+            Observation(
+                operation_label=case.operation.label,
+                location=ParameterLocation.BODY,
+                parameter_path=("priority",),
+                kind=kind,
+                raw_message="Invalid value specified for `priority`",
+                payload=payload,
+            )
+        )
+    schema = {"type": "object", "properties": {"priority": {}}}
+    out = apply_adjustments(operation=case.operation, location=ParameterLocation.BODY, schema=schema, store=store)
+    _assert_valid_schema_object(schema, out)
+    assert out == {"type": "object", "properties": {"priority": {"type": "integer", "minimum": 1, "maximum": 5}}}
+
+
 # Pydantic v2 error fixtures. `test_pydantic_fixture_matches_runtime` keeps
 # them aligned with the installed Pydantic version.
 _PYDANTIC_FIXTURES: tuple[tuple[dict, Observation], ...] = (
