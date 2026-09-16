@@ -10,6 +10,7 @@ from schemathesis.config import (
     SchemathesisConfig,
     SchemathesisWarning,
 )
+from schemathesis.config._phases import DEFAULT_UNEXPECTED_METHODS
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.errors import HookError
 from schemathesis.filters import FilterSet
@@ -77,6 +78,16 @@ def test_escaped_placeholder_is_resolved_once(monkeypatch):
 def test_warnings_for_without_operations():
     config = SchemathesisConfig.from_dict({"warnings": False})
     assert config.projects.default.warnings_for(operation=None).display == []
+
+
+def test_unexpected_methods_accept_every_default_method():
+    methods = sorted(method.upper() for method in DEFAULT_UNEXPECTED_METHODS)
+    assert (
+        SchemathesisConfig.from_dict(
+            {"phases": {"coverage": {"unexpected-methods": methods}}}
+        ).projects.default.phases.coverage.unexpected_methods
+        == DEFAULT_UNEXPECTED_METHODS
+    )
 
 
 def test_project_key_config_sync():
