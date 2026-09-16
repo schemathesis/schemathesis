@@ -28,6 +28,7 @@ from schemathesis.generation.overrides import Override
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     JsonSchemaError,
+    MissingHeaderNotRejected,
     RejectedPositiveData,
     UnsupportedMethodResponse,
     UseAfterFree,
@@ -2120,6 +2121,55 @@ def test_unsupported_method_404_on_pinned_templated_path(ctx, response_factory, 
             unsupported_method(context, response, case)
     else:
         assert unsupported_method(context, response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("pinned", "should_raise"),
+    [(True, True), (False, False)],
+    ids=["pinned", "generated"],
+)
+def test_missing_required_header_404_on_templated_path(ctx, response_factory, pinned, should_raise):
+    # A drawn identifier rarely exists, so the server can 404 before it ever looks at headers.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{item_id}": {
+                "delete": {
+                    "parameters": [
+                        {"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"204": {"description": "Deleted"}},
+                }
+            }
+        }
+    )
+    case = schema["/items/{item_id}"]["DELETE"].Case(
+        path_parameters={"item_id": "42"},
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=0.1, mode=GenerationMode.NEGATIVE),
+            components={},
+            phase=PhaseInfo(
+                name=TestPhase.COVERAGE,
+                data=CoveragePhaseData(
+                    scenario=CoverageScenario.MISSING_PARAMETER,
+                    description="Missing `X-Token` at header",
+                    location=None,
+                    parameter="X-Token",
+                    parameter_location=ParameterLocation.HEADER,
+                ),
+            ),
+        ),
+    )
+    override = (
+        Override(query={}, headers={}, cookies={}, path_parameters={"item_id": "42"}, body={}) if pinned else None
+    )
+    context = check_context(override=override)
+    response = response_factory.requests(status_code=404, method="DELETE")
+    if should_raise:
+        with pytest.raises(MissingHeaderNotRejected, match=re.escape("Got 404 when missing required 'X-Token' header")):
+            missing_required_header(context, response, case)
+    else:
+        assert missing_required_header(context, response, case) is None
 
 
 @pytest.mark.parametrize(
