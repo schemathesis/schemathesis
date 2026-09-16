@@ -32,7 +32,7 @@ from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
-from schemathesis.generation.jsonschema import EMPTY_STRATEGY
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool, ConstantType, ConstantValue, Origin

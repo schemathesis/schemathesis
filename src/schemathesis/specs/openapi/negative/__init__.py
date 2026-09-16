@@ -23,7 +23,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.jsonschema import build
+from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.jsonschema.strategy import DECLINED
 from schemathesis.generation.value import GeneratedValue

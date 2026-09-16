@@ -72,7 +72,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.coverage import DEFAULT_GENERATION_SESSION, GenerationSession
 from schemathesis.generation.hypothesis import UNSATISFIABLE_RESULT, examples
-from schemathesis.generation.jsonschema import build
+from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.strategy import json_identity
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter

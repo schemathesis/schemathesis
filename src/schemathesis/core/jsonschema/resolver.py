@@ -10,7 +10,6 @@ from urllib.parse import quote, urldefrag, urljoin, urlsplit, urlunsplit
 from urllib.request import urlopen
 
 import jsonschema_rs
-import requests
 
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import RefResolutionError, RemoteDocumentError, unresolvable_reference
@@ -138,6 +137,8 @@ def _looks_like_html(content_type: str | None, body: bytes) -> bool:
 @lru_cache
 def load_remote_uri(uri: str) -> Any:
     """Load the resource and parse it as YAML / JSON."""
+    import requests
+
     response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT)
     content_type = response.headers.get("Content-Type", "")
     body = response.content or b""
@@ -284,7 +285,7 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
             return resolved_uri, resolver, value
 
         resolved = resolver.lookup(reference)
-    except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError, requests.RequestException) as exc:
+    except (jsonschema_rs.ReferencingError, OSError, RemoteDocumentError) as exc:
         error = RefResolutionError(str(exc))
         if sys.version_info >= (3, 11):
             error.add_note(reference)

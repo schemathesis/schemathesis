@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from hypothesis.control import currently_in_test_context
-
 from schemathesis.core.registries import Registry
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -101,6 +99,7 @@ class MetricCollector:
 
 def maximize(metrics: Sequence[MetricFunction], case: Case, response: Response) -> None:
     import hypothesis
+    from hypothesis.control import currently_in_test_context
 
     # Coverage runs outside Hypothesis; evaluate metrics for their side effects
     # (e.g. raising on buggy metrics) but skip `target()` which is a no-op there.

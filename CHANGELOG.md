@@ -6,6 +6,10 @@
 
 - Refine generation from Luracast Restler 4xx errors.
 
+### :racing_car: Performance
+
+- `st` starts about 2.5x faster.
+
 ### :bug: Fixed
 
 - Substitute only `${VAR}` in config values; `$${` escapes it, any other `$` stays literal. [#4785](https://github.com/schemathesis/schemathesis/issues/4785)

@@ -10,8 +10,6 @@ from pathlib import Path
 from types import TracebackType
 from typing import IO, TYPE_CHECKING, Any
 
-import requests
-
 from schemathesis.core import NOT_SET
 from schemathesis.core.failures import Failure
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
@@ -112,6 +110,9 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
         if obj.is_truncated:
             data["content_size"] = obj.content_size
         return data
+    # Imported late so the CLI does not load `requests` before a command needs it.
+    import requests
+
     if isinstance(obj, requests.PreparedRequest):
         url = obj.url or ""
         if sanitization is not None:

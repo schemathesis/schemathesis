@@ -20,7 +20,7 @@ from schemathesis.hooks import (
     dispatch_after_load_schema,
     dispatch_before_load_schema,
 )
-from schemathesis.python import asgi, django, wsgi
+from schemathesis.python import django, wsgi
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -45,6 +45,8 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
         ```
 
     """
+    from schemathesis.python import asgi
+
     require_relative_url(path)
     with asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):
         response = load_from_url(client.get, url=path, **kwargs)

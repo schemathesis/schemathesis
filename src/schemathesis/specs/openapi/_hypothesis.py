@@ -38,7 +38,8 @@ from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import custom_formats_cache
 from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_schema_error
-from schemathesis.generation.jsonschema import EMPTY_STRATEGY, Alphabet, build
+from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
+from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
