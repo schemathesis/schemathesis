@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(headers={'X-Template': '${USER_ID}'}, parameters={'body.password': '$argon2id$v=19$m=65536,t=2,p=1$c29tZXNhbHQ'})))

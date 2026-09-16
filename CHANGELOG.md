@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Substitute only `${VAR}` in config values; `$${` escapes it, any other `$` stays literal. [#4785](https://github.com/schemathesis/schemathesis/issues/4785)
+
 ## [4.27.2](https://github.com/schemathesis/schemathesis/compare/v4.27.1...v4.27.2) - 2026-09-15
 
 ### :bug: Fixed
