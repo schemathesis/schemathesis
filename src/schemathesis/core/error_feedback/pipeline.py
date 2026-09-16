@@ -11,6 +11,7 @@ from schemathesis.core.deserialization import (
 )
 from schemathesis.core.error_feedback.parsers import PARSERS, ResponseParser
 from schemathesis.core.error_feedback.store import Observation
+from schemathesis.core.errors import MalformedMediaType
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import Response
@@ -45,7 +46,11 @@ class FeedbackPipeline:
     ) -> tuple[Observation, ...]:
         content_types = response.headers.get("content-type") or []
         content_type = content_types[0] if content_types else ""
-        if not content_type or not has_deserializer(content_type):
+        try:
+            if not content_type or not has_deserializer(content_type):
+                return ()
+        except MalformedMediaType:
+            # A body behind a malformed Content-Type cannot be read, so it teaches nothing.
             return ()
         try:
             body = deserialize_response(

@@ -6,7 +6,7 @@ from itertools import count
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 from pydantic import BaseModel, Field
 
 from schemathesis.core.jsonschema import is_valid
@@ -402,6 +402,33 @@ def size_bound_planted_bug() -> OpenAPIApp:
         if issues:
             return jsonify({"messages": issues}), 400
         return "", 500
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def malformed_content_type_rejection() -> OpenAPIApp:
+    spec = build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/items", methods=["POST"])
+    def create_item() -> Any:
+        return Response(b"{}", status=400, content_type="a")
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 

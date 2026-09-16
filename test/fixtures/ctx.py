@@ -306,6 +306,9 @@ class OpenAPIApps:
     def size_bound_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.size_bound_planted_bug())
 
+    def malformed_content_type_rejection(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.malformed_content_type_rejection())
+
     def format_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.format_planted_bug())
 
