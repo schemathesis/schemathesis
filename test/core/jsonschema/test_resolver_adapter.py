@@ -157,3 +157,9 @@ def test_find_unresolvable_reference_reuses_memoized_success():
 
     assert _find(schema, memo) is None
     assert len(memo) == 1
+
+
+def test_unreachable_remote_reference_is_a_resolution_error():
+    resolver = make_root_resolver({})
+    with pytest.raises(RefResolutionError):
+        resolve_reference(resolver, "http://127.0.0.1:1/schema.json#/definitions/User")

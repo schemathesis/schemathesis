@@ -21,7 +21,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, Jso
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.engine import events
-from schemathesis.generation.jsonschema import build
+from schemathesis.generation.jsonschema.builder import build
 from schemathesis.specs.openapi import definitions
 from schemathesis.specs.openapi.formats import get_default_format_strategies
 from schemathesis.specs.openapi.schemas import OpenApiSchema

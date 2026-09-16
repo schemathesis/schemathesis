@@ -17,7 +17,7 @@ from schemathesis.hooks import (
     dispatch_after_load_schema,
     dispatch_before_load_schema,
 )
-from schemathesis.python import asgi, django, wsgi
+from schemathesis.python import django, wsgi
 
 if TYPE_CHECKING:
     from graphql import DocumentNode
@@ -44,6 +44,8 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
         ```
 
     """
+    from schemathesis.python import asgi
+
     require_relative_url(path)
     kwargs.setdefault("json", {"query": get_introspection_query()})
     with asgi.get_client(app) as client, django.explain_disallowed_host(app, host=asgi.HOST):

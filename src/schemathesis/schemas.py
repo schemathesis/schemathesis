@@ -31,7 +31,6 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
-from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark
 from schemathesis.transport.prepare import prepare_path
@@ -69,6 +68,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
+    from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource, ResourcePool

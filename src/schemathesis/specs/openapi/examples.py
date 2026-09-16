@@ -27,7 +27,8 @@ from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
-from schemathesis.generation.jsonschema import Alphabet, build
+from schemathesis.generation.jsonschema.builder import build
+from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation
