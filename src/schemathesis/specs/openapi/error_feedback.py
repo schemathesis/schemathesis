@@ -302,11 +302,10 @@ def _apply_numeric_bound_to_property(
 ) -> None:
     """Write one numeric bound onto `prop`; skip when an existing constraint covers this direction."""
     types = get_type(prop)
-    if "array" in types:
+    items = prop.get("items")
+    if "array" in types and isinstance(items, dict):
         # A repeated parameter is reported under its own name while the bound constrains each element.
-        items = prop.get("items")
-        if isinstance(items, dict):
-            _apply_numeric_bound_to_property(items, payload, is_2020_12=is_2020_12)
+        _apply_numeric_bound_to_property(items, payload, is_2020_12=is_2020_12)
         return
     if "number" not in types and "integer" not in types:
         return
