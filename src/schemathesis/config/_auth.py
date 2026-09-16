@@ -135,8 +135,8 @@ class WFCAuthConfig(DiffBase):
     refresh_interval: int
 
     def __init__(self, *, path: str, user: str | None = None, refresh_interval: int = 300) -> None:
-        self.path = resolve(path)
-        self.user = resolve(user) if user is not None else None
+        self.path = path
+        self.user = user
         self.refresh_interval = refresh_interval
 
 
@@ -185,7 +185,7 @@ class AuthConfig(DiffBase):
             )
 
         if wfc is not None:
-            self.wfc = WFCAuthConfig(**wfc)
+            self.wfc = WFCAuthConfig(**{key: resolve(value) for key, value in wfc.items()})
         else:
             self.wfc = None
 
@@ -231,7 +231,7 @@ class AuthConfig(DiffBase):
             self._mark_source_keys(("basic",))
 
         if wfc_path is not None:
-            self.wfc = WFCAuthConfig(path=wfc_path, user=wfc_user)
+            self.wfc = WFCAuthConfig(path=resolve(wfc_path), user=resolve(wfc_user))
             self._mark_source_keys(("wfc",))
         elif wfc_user is not None:
             self.wfc_user = wfc_user

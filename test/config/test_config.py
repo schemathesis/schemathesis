@@ -47,6 +47,33 @@ def test_configs(monkeypatch, path, snapshot_config):
         assert str(exc) == snapshot_config
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            "$argon2id$v=19$m=65536,t=2,p=1$c29tZXNhbHQ$RdescudvJCsgt3ub",
+            "$argon2id$v=19$m=65536,t=2,p=1$c29tZXNhbHQ$RdescudvJCsgt3ub",
+        ),
+        ("$TEST_STRING_1", "$TEST_STRING_1"),
+        ("a$$b", "a$$b"),
+        ("5 $", "5 $"),
+        ("$${TEST_STRING_1}", "${TEST_STRING_1}"),
+        ("${TEST_STRING_1}:$${TEST_STRING_1}", "foo:${TEST_STRING_1}"),
+    ],
+    ids=["password-hash", "bare-name", "double-dollar", "trailing-dollar", "escaped-placeholder", "mixed"],
+)
+def test_env_substitution_only_replaces_braced_placeholders(monkeypatch, value, expected):
+    monkeypatch.setenv("TEST_STRING_1", "foo")
+    config = SchemathesisConfig.from_dict({"parameters": {"body.password": value}})
+    assert config.projects.default.parameters == {"body.password": expected}
+
+
+def test_escaped_placeholder_is_resolved_once(monkeypatch):
+    monkeypatch.delenv("TEST_STRING_1", raising=False)
+    config = SchemathesisConfig.from_str("[auth.wfc]\npath = '$${TEST_STRING_1}.yaml'")
+    assert repr(config.projects.default.auth.wfc) == "WFCAuthConfig(path='${TEST_STRING_1}.yaml')"
+
+
 def test_warnings_for_without_operations():
     config = SchemathesisConfig.from_dict({"warnings": False})
     assert config.projects.default.warnings_for(operation=None).display == []

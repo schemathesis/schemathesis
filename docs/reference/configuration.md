@@ -30,6 +30,17 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 
 This allows you to maintain a single configuration file across different environments by changing environment variables rather than the configuration itself.
 
+Only `${VAR_NAME}` is substituted. Every other `$` is kept as is, including `$VAR_NAME` and `$$`, so values like password hashes need no escaping. Write `$${` for a literal `${`:
+
+```toml
+# Sent as is
+parameters = { "body.password" = "$argon2id$v=19$m=65536,t=2,p=1$c29tZXNhbHQ" }
+# Sent as the literal `${USER_ID}`
+headers = { "X-Template" = "$${USER_ID}" }
+```
+
+A variable that is not set is an error, and so is a `${` that does not form a valid placeholder, such as `${API_TOKEN` or `${api.token}`.
+
 !!! note ""
     With `pytest`, variables are resolved when `SchemathesisConfig` is created (typically inside `schemathesis.openapi.from_url`).
 
