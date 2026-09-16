@@ -59,3 +59,9 @@ def test_parse_observations_returns_empty_for_unparsable_4xx_body(response_facto
         )
     )
     assert parse_observations(case.operation, case, response) == ()
+
+
+def test_parse_observations_returns_empty_for_malformed_content_type(response_factory, case_factory):
+    case = case_factory(_meta=_positive_meta())
+    response = Response.from_any(response_factory.requests(status_code=400, content=b"{}", content_type="a"))
+    assert parse_observations(case.operation, case, response) == ()
