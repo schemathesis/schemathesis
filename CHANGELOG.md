@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.2...HEAD) - TBD
 
+### :rocket: Added
+
+- Refine generation from Luracast Restler 4xx errors.
+
 ### :bug: Fixed
 
 - Substitute only `${VAR}` in config values; `$${` escapes it, any other `$` stays literal. [#4785](https://github.com/schemathesis/schemathesis/issues/4785)
