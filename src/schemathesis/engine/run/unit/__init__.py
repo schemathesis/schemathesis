@@ -178,6 +178,12 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
             # down. Honor the close instead of emitting the events below into a generator that is going away.
             raise exc.__context__ from None
 
+    outage = engine.server.take_report(phase.name)
+    if outage is not None:
+        is_executed = True
+        status = Status.ERROR
+        yield outage
+
     if not is_executed:
         phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
         status = Status.SKIP

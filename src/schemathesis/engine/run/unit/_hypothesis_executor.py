@@ -14,13 +14,17 @@ from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE
 from schemathesis.core.timing import Instant
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.errors import TestingState, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.run.unit._case import BudgetExpired, record_extra_data_from_recorder
+from schemathesis.engine.run.unit._case import (
+    BudgetExpired,
+    ServerWentAway,
+    record_extra_data_from_recorder,
+)
 from schemathesis.engine.run.unit._errors import classify_test_exception, iter_mark_error_events
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -119,6 +123,19 @@ def run_test(
         elif not recorder.interactions:
             status = Status.SKIP
             skip_reason = "Time limit reached"
+        else:
+            status = Status.SUCCESS
+    except ServerWentAway:
+        stored = state.unrecoverable_network_error
+        if stored is not None:
+            # A crash caught before the replay was refused is still this operation's own finding.
+            status = Status.ERROR
+            yield non_fatal_error(stored.error, code_sample=stored.code_sample)
+        elif errors:
+            status = Status.ERROR
+        elif not recorder.has_responses():
+            status = Status.SKIP
+            skip_reason = StopReason.SERVER_UNAVAILABLE.skip_explanation
         else:
             status = Status.SUCCESS
     except KeyboardInterrupt:

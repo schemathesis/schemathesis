@@ -18,6 +18,7 @@ from schemathesis.engine.errors import (
     TestingState,
     UnexpectedError,
     UnrecoverableNetworkError,
+    build_code_sample,
     is_unrecoverable_network_error,
 )
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -47,6 +48,10 @@ class BudgetExpired(KeyboardInterrupt):
     """Raised when the run's time budget is out, either for this operation's share or overall."""
 
 
+class ServerWentAway(KeyboardInterrupt):
+    """Raised once the server stopped accepting connections, so no refusal is reported per operation."""
+
+
 def run_one_case(
     *,
     case: Case,
@@ -69,6 +74,8 @@ def run_one_case(
         # operation is never selected and then left with nothing to show for it.
         if stop_reason is StopReason.MAX_TIME or (ctx.is_operation_slice_expired and recorder.interactions):
             raise BudgetExpired
+        if stop_reason is StopReason.SERVER_UNAVAILABLE:
+            raise ServerWentAway
         if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
             raise KeyboardInterrupt
         # Honor a supervisor SKIP verdict that flipped mid-scenario; without this,
@@ -118,17 +125,17 @@ def run_one_case(
             exc = InvalidSchema.from_malformed_media_type(
                 exc, case.media_type, path=case.operation.path, method=case.operation.method
             )
+        if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
+            # A check's own request may be the refused one; the case itself was answered then.
+            if recorder.find_response(case_id=case.id) is None:
+                recorder.forget_case(case_id=case.id)
+            raise ServerWentAway from None
         if isinstance(
             exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
         ) and is_unrecoverable_network_error(exc):
             # Server likely has crashed and does not accept any connections at all
             # Don't report these error - only the original crash should be reported
-            if exc.request is not None:
-                headers = dict(exc.request.headers)
-            else:
-                headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
-            verify = transport_kwargs.get("verify", True)
-            code_sample = case.as_curl_command(headers=headers, verify=verify)
+            code_sample = build_code_sample(case, exc.request, transport_kwargs)
             state.store_unrecoverable_network_error(UnrecoverableNetworkError(error=exc, code_sample=code_sample))
             raise
         errors.append(exc)
@@ -150,7 +157,7 @@ def _do_call_and_validate(
     auto_mode = ctx.config.rate_limit_for(operation=case.operation) == "auto"
 
     def _call() -> Response:
-        return case.call(**transport_kwargs)
+        return ctx.server.track(case, lambda: case.call(**transport_kwargs), transport_kwargs=transport_kwargs)
 
     def _on_delay(delay: float, retries_left: int) -> None:
         pending_events.append(

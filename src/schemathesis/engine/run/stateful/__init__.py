@@ -69,6 +69,12 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     finally:
         thread.join()
 
+    outage = engine.server.take_report(phase.name)
+    if outage is not None:
+        is_executed = True
+        status = Status.ERROR
+        yield outage
+
     if not is_executed:
         phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
         status = Status.SKIP

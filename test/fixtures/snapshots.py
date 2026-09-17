@@ -30,6 +30,9 @@ IS_WINDOWS = platform.system() == "Windows"
 EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"
 
 
+TRACEBACK_HEADER = "Traceback (most recent call last):"
+
+
 @contextmanager
 def keep_cwd():
     cwd = os.getcwd()
@@ -37,6 +40,27 @@ def keep_cwd():
         yield
     finally:
         os.chdir(cwd)
+
+
+def _collapse_tracebacks(data: str) -> str:
+    """Replace each rendered stack with a placeholder, keeping the exception line that follows it."""
+    lines = data.splitlines()
+    collapsed: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+        if stripped != TRACEBACK_HEADER:
+            collapsed.append(line)
+            index += 1
+            continue
+        indent = " " * (len(line) - len(line.lstrip()))
+        collapsed.append(f"{indent}<TRACEBACK>")
+        index += 1
+        # Frames are indented past the header; the exception line that closes the stack is not.
+        while index < len(lines) and (not lines[index].strip() or lines[index].startswith(f"{indent} ")):
+            index += 1
+    return "\n".join(collapsed)
 
 
 @dataclass
@@ -57,10 +81,7 @@ class CliSnapshotConfig:
     replace_stateful_statistic: bool = True
     remove_last_line: bool = False
     replace: bool = True
-    # Negative-fuzzing tests where the seed picks a different mutator output across
-    # CI Pythons (constraint-violation / syntax-fuzzing / format-violation). Opt-in
-    # so deterministic tests (coverage phase, hand-crafted check tests) keep the
-    # exact `Invalid component:` content for assertions.
+    replace_traceback: bool = False
     replace_invalid_component: bool = False
 
     @classmethod
@@ -159,6 +180,8 @@ class CliSnapshotConfig:
             after = re.sub(r"\d+ passed", "N passed", after)
             data = before + "Stateful" + after
 
+        if self.replace_traceback:
+            data = _collapse_tracebacks(data)
         if "Traceback (most recent call last):" in data:
             lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
             comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
@@ -175,6 +198,9 @@ class CliSnapshotConfig:
             data = (
                 data.replace("Errno 111", "Error NUM")
                 .replace("Errno 61", "Error NUM")
+                # Connection reset by peer.
+                .replace("Errno 104", "Error NUM")
+                .replace("Errno 54", "Error NUM")
                 .replace("WinError 10061", "Error NUM")
                 .replace("Cannot connect to proxy.", "Unable to connect to proxy")
             )

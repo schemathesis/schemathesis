@@ -50,6 +50,7 @@ class PhaseSkipReason(str, enum.Enum):
     # No relevant data (e.g., no transitions for stateful)
     NOT_APPLICABLE = "not_applicable"
     FAILURE_LIMIT_REACHED = "failure_limit_reached"
+    SERVER_UNAVAILABLE = "server_unavailable"
     NOTHING_TO_TEST = "nothing_to_test"
 
     @property
