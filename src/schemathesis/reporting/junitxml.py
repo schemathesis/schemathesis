@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import platform
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from io import StringIO
@@ -21,6 +22,9 @@ if TYPE_CHECKING:
 
 
 TextOutput = IO[str] | StringIO | Path
+
+# Characters XML 1.0 forbids even as character references.
+_XML_ILLEGAL_CHARACTERS = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 
 
 @dataclass
@@ -120,13 +124,17 @@ def _render(test_cases: list[_TestCase]) -> str:
     )
     for case in test_cases:
         element = ElementTree.SubElement(suite, "testcase", {"name": case.name, "time": f"{case.elapsed_sec:.6f}"})
-        for message in case.failures:
+        for message in map(_escape_illegal_characters, case.failures):
             ElementTree.SubElement(element, "failure", {"type": "failure"}).text = message
-        for message in case.errors:
+        for message in map(_escape_illegal_characters, case.errors):
             ElementTree.SubElement(element, "error", {"type": "error"}).text = message
-        for message in case.skipped:
+        for message in map(_escape_illegal_characters, case.skipped):
             ElementTree.SubElement(element, "skipped", {"type": "skipped"}).text = message
 
     ElementTree.indent(suites)
     body = ElementTree.tostring(suites, encoding="unicode")
     return f'<?xml version="1.0" encoding="utf-8"?>\n{body}'
+
+
+def _escape_illegal_characters(text: str) -> str:
+    return _XML_ILLEGAL_CHARACTERS.sub(lambda match: ascii(match.group())[1:-1], text)

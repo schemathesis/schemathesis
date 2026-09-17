@@ -17,6 +17,7 @@
 - Keep numeric bounds learned from 4xx errors on properties without a declared `type`.
 - False positive `missing_required_header` for 404 responses on generated path parameters.
 - `Schema Error` aborting operations whose 4xx responses carry a malformed `Content-Type`.
+- Escape XML-illegal control characters in JUnit XML reports. [#4794](https://github.com/schemathesis/schemathesis/issues/4794)
 
 ## [4.27.2](https://github.com/schemathesis/schemathesis/compare/v4.27.1...v4.27.2) - 2026-09-15
 

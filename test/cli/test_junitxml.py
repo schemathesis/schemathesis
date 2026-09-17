@@ -209,6 +209,28 @@ def test_bad_charset_response(ctx, cli, app_runner, tmp_path, charset):
     )
 
 
+def test_control_characters_in_failure_message(ctx, cli, app_runner, tmp_path):
+    xml_path = tmp_path / "junit.xml"
+    app, _ = ctx.openapi.make_flask_app({"/boom": {"get": {"responses": {"500": {"description": "Error"}}}}})
+
+    @app.route("/api/boom")
+    def boom():
+        return Response("bad token \x12\x00\ufffe in body", content_type="text/plain; charset=utf-8", status=500)
+
+    base_url = app_runner.openapi_url(app, path="")
+    cli.run(
+        f"{base_url}/openapi.json",
+        f"--url={base_url}/api",
+        "--checks=not_a_server_error",
+        f"--report-junit-path={xml_path}",
+    )
+    testcase = ElementTree.parse(xml_path).getroot()[0][0]
+    assert (
+        extract_message(testcase[0], base_url.removeprefix("http://"))
+        == r"1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      `bad token \x12\x00\ufffe in body`  Reproduce with:      curl -X GET http://localhost/api/boom"
+    )
+
+
 def test_timeout(ctx, cli, tmp_path, hypothesis_max_examples):
     api = ctx.openapi.apps.slow()
     xml_path = tmp_path / "junit.xml"
