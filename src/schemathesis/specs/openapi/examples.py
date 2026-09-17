@@ -775,18 +775,22 @@ def _yield_examples_from_properties(
                     bundle_storage=bundle_storage,
                 )
             )
-            values.extend(
-                extract_from_schema(
-                    operation=operation,
-                    schema=expanded_schema,
-                    example_keyword=example_keyword,
-                    examples_container_keyword=examples_container_keyword,
-                    resolver=expanded_resolver,
-                    reference_path=expanded_path,
-                    bundle_storage=bundle_storage,
-                    merge_ref_siblings=merge_ref_siblings,
-                )
-            )
+            # A composed property reaches the same nested examples through itself and through each of its alternatives
+            seen = {_combo_dedup_key(value) for value in values}
+            for value in extract_from_schema(
+                operation=operation,
+                schema=expanded_schema,
+                example_keyword=example_keyword,
+                examples_container_keyword=examples_container_keyword,
+                resolver=expanded_resolver,
+                reference_path=expanded_path,
+                bundle_storage=bundle_storage,
+                merge_ref_siblings=merge_ref_siblings,
+            ):
+                key = _combo_dedup_key(value)
+                if key not in seen:
+                    seen.add(key)
+                    values.append(value)
 
             if not values:
                 to_generate[name] = expanded_schema
@@ -885,7 +889,7 @@ def extract_from_schema(
     merge_ref_siblings: bool,
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
-    # This implementation supports only `properties` and `items`
+    # This implementation supports only `properties`, `items`, and their `allOf` / `oneOf` / `anyOf` compositions
     try:
         schema, current_path, current_resolver = _resolve_bundled(
             schema,
@@ -896,23 +900,18 @@ def extract_from_schema(
     except InfiniteRecursiveReference:
         return
 
-    # If schema has allOf, we need to get merged properties from allOf items
-    # This handles cases where parent has properties alongside allOf
     properties_to_process = schema.get("properties", {})
 
-    if "allOf" in schema and "properties" in schema:
-        # Get the merged allOf schema which includes properties from all allOf items
-        for expanded_schema, _, _ in _expand_subschemas(
+    if schema.get("allOf"):
+        # The merged allOf schema, which includes properties from all allOf items, comes after any oneOf/anyOf branches
+        *_, (merged, _, _) = _expand_subschemas(
             schema=schema,
             resolver=current_resolver,
             reference_path=current_path,
             merge_ref_siblings=merge_ref_siblings,
-        ):
-            if expanded_schema is not schema and isinstance(expanded_schema, dict):
-                # This is the merged allOf result with combined properties
-                if "properties" in expanded_schema:
-                    properties_to_process = expanded_schema["properties"]
-                break
+        )
+        if isinstance(merged, dict) and "properties" in merged:
+            properties_to_process = merged["properties"]
 
     # Required fields absent from `properties` have no annotated example; add them
     # with a non-null schema so that a value is generated for each.
@@ -990,6 +989,23 @@ def extract_from_schema(
             merge_ref_siblings=merge_ref_siblings,
         ):
             yield [value] * length
+
+    else:
+        # A purely composed schema carries its property examples inside each alternative
+        for keyword in ("oneOf", "anyOf"):
+            for branch in schema.get(keyword, []):
+                if not isinstance(branch, dict):
+                    continue
+                yield from extract_from_schema(
+                    operation=operation,
+                    schema=branch,
+                    example_keyword=example_keyword,
+                    examples_container_keyword=examples_container_keyword,
+                    resolver=current_resolver,
+                    reference_path=current_path,
+                    bundle_storage=bundle_storage,
+                    merge_ref_siblings=merge_ref_siblings,
+                )
 
 
 def _generate_single_example(
