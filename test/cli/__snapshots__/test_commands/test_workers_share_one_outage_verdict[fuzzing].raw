@@ -16,12 +16,10 @@ Schemathesis dev
 
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
- 🚫  Stateful (in 0.00s)
 
-     Scenarios:    N
-     API Links:    N covered / 1 selected / 1 total
+ 🚫  Fuzzing (in 0.00s)
 
-     🚫 1 error
+     ✅ 2 passed
 
 ==================================== ERRORS ====================================
 ____________________________________ Server ____________________________________
@@ -29,22 +27,12 @@ Server Unavailable
 
 http://127.0.0.1 stopped accepting connections. Last requests before it went away:
 
-    curl -X GET --insecure http://127.0.0.1/users/123
+    <PLACEHOLDER>
 
-    curl -X POST -H 'Content-Type: application/json' -d '{"name": "alice"}' --insecure http://127.0.0.1/users
+    <PLACEHOLDER>
 
 Tip: If the server crashed, the request that caused it may be older than these.
 Record every request sent with `--report=har`.
-________________________________ Stateful tests ________________________________
-Network Error
-
-Connection failed
-
-    Connection aborted. Remote end closed connection without response
-
-Reproduce with:
-
-    curl -X GET --insecure http://127.0.0.1/users/123
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -52,18 +40,15 @@ Need more help?
 
 API Operations:
   Selected: 2/2
-  Tested: 1
-  Skipped: 1
-    - No checks ran
+  Tested: 2
 
 Test Phases:
   ⏭  Examples (disabled)
   ⏭  Coverage (disabled)
-  ⏭  Fuzzing (disabled)
-  🚫 Stateful
+  🚫 Fuzzing
+  ⏭  Stateful (disabled)
 
 Errors:
-  🚫 Network Error: 1
   🚫 Server Unavailable: 1
 
 Test cases:
@@ -71,4 +56,4 @@ Test cases:
 
 Seed: 42
 
-============================== 2 errors in 1.00s ===============================
+=============================== 1 error in 1.00s ===============================

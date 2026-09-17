@@ -11,7 +11,7 @@ import re
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis import errors
 from schemathesis.config import ConfigError
@@ -34,6 +34,8 @@ if TYPE_CHECKING:
     import hypothesis.errors
     import requests
     from requests.exceptions import ChunkedEncodingError
+
+    from schemathesis.generation.case import Case
 
 __all__ = ["EngineErrorInfo", "DeadlineExceeded", "UnexpectedError"]
 
@@ -115,6 +117,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.AUTHENTICATION_ERROR: "Authentication Error",
             RuntimeErrorKind.CONFIG_ERROR: "Configuration Error",
             RuntimeErrorKind.HOOK_EXECUTION_ERROR: "Hook Error",
+            RuntimeErrorKind.SERVER_UNAVAILABLE: "Server Unavailable",
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK: "Hook Error",
         }.get(self._kind, "Runtime Error")
 
@@ -174,6 +177,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE,
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH,
             RuntimeErrorKind.NETWORK_OTHER,
+            RuntimeErrorKind.SERVER_UNAVAILABLE,
         )
 
     @cached_property
@@ -247,6 +251,8 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
 
     return {
         RuntimeErrorKind.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--tls-verify=false`')}.",
+        RuntimeErrorKind.SERVER_UNAVAILABLE: "If the server crashed, the request that caused it may be older than these.\n"
+        f"Record every request sent with {bold('`--report=har`')}.",
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE: "Review all parameters and request body schemas for conflicting constraints.",
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK: "Review your `filter_case` hook to ensure it accepts at least some generated cases.",
         RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Review your endpoint filters to include linked operations",
@@ -273,6 +279,7 @@ class RuntimeErrorKind(str, enum.Enum):
     CONNECTION_SSL = "connection_ssl"
     CONNECTION_OTHER = "connection_other"
     NETWORK_OTHER = "network_other"
+    SERVER_UNAVAILABLE = "server_unavailable"
 
     # Authentication issues
     AUTHENTICATION_ERROR = "authentication_error"
@@ -310,6 +317,9 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
     import hypothesis.errors
     import requests
     from hypothesis import HealthCheck
+
+    if isinstance(error, ServerUnavailable):
+        return RuntimeErrorKind.SERVER_UNAVAILABLE
 
     if isinstance(error, UnknownScalar):
         return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR
@@ -462,6 +472,41 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
 
 class UnhealthyAPIError(Exception):
     """The API is unhealthy enough that the stateful phase cannot continue."""
+
+
+def build_code_sample(
+    case: Case, request: requests.PreparedRequest | requests.Request | None, transport_kwargs: dict[str, Any]
+) -> str:
+    """Curl command for a sent request; errors raised while reading the body carry no request."""
+    if request is not None:
+        headers = dict(request.headers)
+    else:
+        headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
+    return case.as_curl_command(headers=headers, verify=transport_kwargs.get("verify", True))
+
+
+class ServerUnavailable(Exception):
+    """The server stopped accepting connections in the middle of the run."""
+
+
+def is_connection_refused(exc: requests.ConnectionError) -> bool:
+    """Whether the server refused the connection itself, not a proxy in front of it."""
+    import requests
+
+    if isinstance(exc, requests.exceptions.ProxyError):
+        return False
+    pending: list[object] = [exc]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if not isinstance(current, BaseException) or id(current) in seen:
+            continue
+        if isinstance(current, ConnectionRefusedError):
+            return True
+        seen.add(id(current))
+        # urllib3 keeps the socket error as the `reason` of its retry error, which requests wraps in `args`.
+        pending.extend((current.__cause__, current.__context__, getattr(current, "reason", None), *current.args))
+    return False
 
 
 @dataclass(slots=True)

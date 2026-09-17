@@ -21,6 +21,7 @@ class ExecutionControl:
     max_time: int | None
     _counted_failures: set[Hashable]
     has_reached_the_failure_limit: bool
+    is_server_unavailable: bool
     _start_time: float
 
     def __init__(
@@ -35,6 +36,7 @@ class ExecutionControl:
         self.max_time = max_time
         self._counted_failures = set()
         self.has_reached_the_failure_limit = False
+        self.is_server_unavailable = False
         self._start_time = time.monotonic() if start_time is None else start_time
 
     @property
@@ -61,7 +63,12 @@ class ExecutionControl:
     @property
     def is_stopped(self) -> bool:
         """Check if execution should stop."""
-        return self.is_interrupted or self.has_reached_the_failure_limit or self.has_reached_time_limit
+        return (
+            self.is_interrupted
+            or self.is_server_unavailable
+            or self.has_reached_the_failure_limit
+            or self.has_reached_time_limit
+        )
 
     @property
     def is_interrupted(self) -> bool:
@@ -85,6 +92,9 @@ class ExecutionControl:
         # A user stop wins over the clock: an interrupt that lands past the deadline is still an interrupt.
         if self.is_interrupted:
             return StopReason.INTERRUPTED
+        # Winding down after the server went away takes time; the clock must not take the credit for stopping.
+        if self.is_server_unavailable:
+            return StopReason.SERVER_UNAVAILABLE
         if self.has_reached_time_limit:
             return StopReason.MAX_TIME
         if self.has_reached_the_failure_limit:
