@@ -3364,6 +3364,82 @@ def test_oneof_branch_isolation(ctx, body_schema, expected):
     assert _extract_json_body_examples(ctx, body_schema) == expected
 
 
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        (
+            {
+                "allOf": [
+                    {"required": ["name"], "properties": {"name": {"type": "string", "example": "base"}}},
+                    {"properties": {"extra": {"type": "string", "example": "extra"}}},
+                ]
+            },
+            [{"media_type": "application/json", "value": {"name": "base", "extra": "extra"}}],
+        ),
+        (
+            {
+                "oneOf": [
+                    {"required": ["cat"], "properties": {"cat": {"type": "string", "example": "meow"}}},
+                    {"required": ["dog"], "properties": {"dog": {"type": "string", "example": "woof"}}},
+                ]
+            },
+            [
+                {"media_type": "application/json", "value": {"cat": "meow"}},
+                {"media_type": "application/json", "value": {"dog": "woof"}},
+            ],
+        ),
+        (
+            {
+                "anyOf": [
+                    {"required": ["cat"], "properties": {"cat": {"type": "string", "example": "meow"}}},
+                    {"required": ["dog"], "properties": {"dog": {"type": "string", "example": "woof"}}},
+                ]
+            },
+            [
+                {"media_type": "application/json", "value": {"cat": "meow"}},
+                {"media_type": "application/json", "value": {"dog": "woof"}},
+            ],
+        ),
+        (
+            {
+                "allOf": [{"properties": {"kind": {"type": "string", "example": "pet"}}}],
+                "oneOf": [
+                    {"required": ["cat"], "properties": {"cat": {"type": "string", "example": "meow"}}},
+                    {"required": ["dog"], "properties": {"dog": {"type": "string", "example": "woof"}}},
+                ],
+            },
+            [
+                {"media_type": "application/json", "value": {"kind": "pet", "cat": "meow"}},
+                {"media_type": "application/json", "value": {"kind": "pet", "dog": "woof"}},
+            ],
+        ),
+        (
+            {"anyOf": [True, {"required": ["cat"], "properties": {"cat": {"type": "string", "example": "meow"}}}]},
+            [{"media_type": "application/json", "value": {"cat": "meow"}}],
+        ),
+        (
+            {
+                "properties": {
+                    "pet": {
+                        "oneOf": [
+                            {"required": ["cat"], "properties": {"cat": {"type": "string", "example": "meow"}}},
+                            {"required": ["dog"], "properties": {"dog": {"type": "string", "example": "woof"}}},
+                        ]
+                    }
+                }
+            },
+            [
+                {"media_type": "application/json", "value": {"pet": {"cat": "meow"}}},
+                {"media_type": "application/json", "value": {"pet": {"dog": "woof"}}},
+            ],
+        ),
+    ],
+    ids=["allOf", "oneOf", "anyOf", "allOf-and-oneOf", "boolean-branch", "nested-oneOf"],
+)
+def test_property_examples_under_composition(ctx, body_schema, expected):
+    assert _extract_json_body_examples(ctx, body_schema) == expected
+
+
 def test_oas31_ref_sibling_example_in_body_properties(ctx):
     # In OAS 3.1, $ref siblings are valid and must be applied
     # a sibling `example` on a property should be used as the example value
