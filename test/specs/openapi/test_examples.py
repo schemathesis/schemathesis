@@ -3214,7 +3214,7 @@ def test_get_pool_combos_filters_swagger_2_path_value_violating_schemathesis_min
     assert _get_pool_combos(operation, extra_data_source) == []
 
 
-def _extract_json_body_examples(ctx, body_schema):
+def _extract_json_body_examples(ctx, body_schema, version="3.0.2"):
     schema = ctx.openapi.load_schema(
         {
             "/test": {
@@ -3226,7 +3226,8 @@ def _extract_json_body_examples(ctx, body_schema):
                     "responses": {"default": {"description": "OK"}},
                 }
             }
-        }
+        },
+        version=version,
     )
     return [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])]
 
@@ -3398,6 +3399,66 @@ def test_oas31_ref_sibling_example_in_body_properties(ctx):
     )
     extracted = [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])]
     assert extracted == [{"value": {"foo": "world", "bar": "ex"}, "media_type": "application/json"}]
+
+
+@pytest.mark.parametrize(
+    ("body_schema", "version", "expected"),
+    [
+        (
+            {"type": "array", "items": {"type": "string", "example": "item"}},
+            "3.0.2",
+            [{"value": ["item"], "media_type": "application/json"}],
+        ),
+        (
+            {"type": "array", "items": {"type": "string", "example": "item"}, "minItems": 2},
+            "3.0.2",
+            [{"value": ["item", "item"], "media_type": "application/json"}],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"tags": {"type": "array", "items": {"type": "string", "example": "tag"}}},
+            },
+            "3.0.2",
+            [{"value": {"tags": ["tag"]}, "media_type": "application/json"}],
+        ),
+        (
+            {"type": "array", "items": {"type": "string", "examples": ["item"]}},
+            "3.1.0",
+            [{"value": ["item"], "media_type": "application/json"}],
+        ),
+        (
+            {"type": "array", "items": {"type": "string", "example": 42}},
+            "3.0.2",
+            [],
+        ),
+    ],
+    ids=["body", "min-items", "body-property", "examples-3.1", "invalid-example"],
+)
+def test_array_item_examples_in_body(ctx, body_schema, version, expected):
+    assert _extract_json_body_examples(ctx, body_schema, version=version) == expected
+
+
+def test_array_item_example_in_query_parameter(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "schema": {"type": "array", "items": {"type": "integer", "example": 7}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert list(extract_from_schemas(schema["/test"]["GET"])) == [
+        ParameterExample(container="query", name="q", value=[7])
+    ]
 
 
 def test_array_body_property_with_min_items_generates_correct_length():

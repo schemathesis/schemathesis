@@ -718,6 +718,29 @@ def _example_is_valid(value: object, validator: jsonschema_rs.Validator | None) 
         return True
 
 
+def _own_examples(
+    *,
+    schema: dict[str, Any],
+    example_keyword: str,
+    examples_container_keyword: str,
+    bundle_storage: dict[str, Any] | None,
+) -> Generator[Any, None, None]:
+    if bundle_storage is not None and BUNDLE_STORAGE_KEY not in schema:
+        validation_schema = {**schema, BUNDLE_STORAGE_KEY: bundle_storage}
+    else:
+        validation_schema = schema
+
+    if example_keyword in schema:
+        candidate = schema[example_keyword]
+        if is_valid(candidate, validation_schema):
+            yield candidate
+
+    if examples_container_keyword in schema and isinstance(schema[examples_container_keyword], list):
+        for candidate in schema[examples_container_keyword]:
+            if is_valid(candidate, validation_schema):
+                yield candidate
+
+
 def _yield_examples_from_properties(
     *,
     operation: APIOperation,
@@ -744,23 +767,14 @@ def _yield_examples_from_properties(
                 to_generate[name] = expanded_schema
                 continue
 
-            if bundle_storage is not None and BUNDLE_STORAGE_KEY not in expanded_schema:
-                validation_schema = {**expanded_schema, BUNDLE_STORAGE_KEY: bundle_storage}
-            else:
-                validation_schema = expanded_schema
-
-            if example_keyword in expanded_schema:
-                candidate = expanded_schema[example_keyword]
-                if is_valid(candidate, validation_schema):
-                    values.append(candidate)
-
-            if examples_container_keyword in expanded_schema and isinstance(
-                expanded_schema[examples_container_keyword], list
-            ):
-                for candidate in expanded_schema[examples_container_keyword]:
-                    if is_valid(candidate, validation_schema):
-                        values.append(candidate)
-
+            values.extend(
+                _own_examples(
+                    schema=expanded_schema,
+                    example_keyword=example_keyword,
+                    examples_container_keyword=examples_container_keyword,
+                    bundle_storage=bundle_storage,
+                )
+            )
             values.extend(
                 extract_from_schema(
                     operation=operation,
@@ -951,6 +965,20 @@ def extract_from_schema(
         # Each inner value should be wrapped in an array, respecting minItems
         min_items = schema.get("minItems", 1)
         length = max(min_items, 1)
+        for expanded_schema, _, _ in _expand_subschemas(
+            schema=schema["items"],
+            resolver=current_resolver,
+            reference_path=current_path,
+            merge_ref_siblings=merge_ref_siblings,
+        ):
+            if isinstance(expanded_schema, dict):
+                for value in _own_examples(
+                    schema=expanded_schema,
+                    example_keyword=example_keyword,
+                    examples_container_keyword=examples_container_keyword,
+                    bundle_storage=bundle_storage,
+                ):
+                    yield [value] * length
         for value in extract_from_schema(
             operation=operation,
             schema=schema["items"],
