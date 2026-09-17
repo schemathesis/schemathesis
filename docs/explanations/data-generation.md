@@ -18,7 +18,7 @@ Schemathesis inherits Hypothesis's shrinking and example database; the feedback 
 
 ### Examples Phase
 
-Uses `example` and `examples` from your schema, filling missing parts with generated data.
+Uses `example` and `examples` from your schema, filling missing parts with `default` values or generated data.
 
 ```yaml
 # Schema

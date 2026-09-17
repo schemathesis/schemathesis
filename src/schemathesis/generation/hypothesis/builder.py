@@ -284,7 +284,7 @@ def generate_example_cases(
         result: list[Case] = [
             examples.generate_one(strategy)
             for strategy in operation.get_strategies_from_examples(
-                fill_missing_from_pool=fill_missing,
+                fill_missing=fill_missing,
                 **kwargs,
             )
         ]

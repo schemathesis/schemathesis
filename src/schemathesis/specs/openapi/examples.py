@@ -39,7 +39,7 @@ from schemathesis.specs.openapi._hypothesis import (
     openapi_cases,
     snapped_float32_clone,
 )
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.formats import format_lengths_for
 
 if TYPE_CHECKING:
@@ -172,7 +172,7 @@ _RENDERED_LOCATIONS = (
 def get_strategies_from_examples(
     operation: OpenApiOperation,
     extra_data_source: OpenApiExtraDataSource | None = None,
-    fill_missing_from_pool: bool = False,
+    fill_missing: bool = False,
     **kwargs: Any,
 ) -> list[SearchStrategy[Case]]:
     """Build strategies from schema examples, augmented with pool values where available."""
@@ -224,10 +224,12 @@ def get_strategies_from_examples(
         ]
     elif schema_combos:
         all_combos = schema_combos
-    elif pool_combos and fill_missing_from_pool:
+    elif pool_combos and fill_missing:
         all_combos = [{k: dict(v) if isinstance(v, dict) else v for k, v in combo.items()} for combo in pool_combos]
     else:
         all_combos = []
+
+    all_combos = _with_defaults(operation, all_combos, fill_missing=fill_missing)
 
     return [
         openapi_cases(operation=operation, phase=TestPhase.EXAMPLES, **merge_kwargs(combo, kwargs)).map(
@@ -235,6 +237,53 @@ def get_strategies_from_examples(
         )
         for combo in all_combos
     ]
+
+
+def _with_defaults(
+    operation: OpenApiOperation, combos: list[dict[str, Any]], *, fill_missing: bool
+) -> list[dict[str, Any]]:
+    """Fill what the combos leave unset with schema defaults; a required parameter's default counts as an example."""
+    parameter_defaults: dict[str, dict[str, Any]] = {}
+    has_required_default = False
+    for parameter, value in _iter_parameter_defaults(operation):
+        parameter_defaults.setdefault(parameter.location.container_name, {})[parameter.name] = value
+        has_required_default = has_required_default or parameter.is_required
+    if not (combos or fill_missing or has_required_default):
+        return combos
+    needs_body = not combos or any("body" not in combo for combo in combos)
+    body_default = (
+        next(_extract_body_examples_from_schemas(operation, defaults_as_examples=True), None) if needs_body else None
+    )
+    if not combos:
+        if not (has_required_default or parameter_defaults or body_default is not None):
+            return combos
+        combos = [{}]
+    filled = []
+    for combo in combos:
+        # Pool values may back the combo's containers, so defaults go into copies.
+        result = dict(combo)
+        for container, values in parameter_defaults.items():
+            result[container] = {**values, **combo.get(container, {})}
+        if "body" not in result and body_default is not None:
+            result.update(body=body_default.value, media_type=body_default.media_type)
+        filled.append(result)
+    return filled
+
+
+def _iter_parameter_defaults(operation: OpenApiOperation) -> Generator[tuple[OpenApiParameter, Any], None, None]:
+    for parameter in operation.iter_parameters():
+        try:
+            schema = parameter.validation_schema
+        except TypeError:
+            # Invalid schema (e.g., non-string pattern value)
+            continue
+        # A recursive schema stays behind a `$ref`, so its default goes unseen and a value is generated instead.
+        if (
+            isinstance(schema, dict)
+            and "default" in schema
+            and _example_is_valid(schema["default"], _make_example_validator(schema))
+        ):
+            yield parameter, schema["default"]
 
 
 def extract_top_level(
@@ -606,6 +655,13 @@ def extract_from_schemas(
             merge_ref_siblings=merge_ref_siblings,
         ):
             yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
+    yield from _extract_body_examples_from_schemas(operation, defaults_as_examples=False)
+
+
+def _extract_body_examples_from_schemas(
+    operation: OpenApiOperation, *, defaults_as_examples: bool
+) -> Generator[BodyExample, None, None]:
+    merge_ref_siblings = operation.schema.adapter.ref_siblings
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
         try:
@@ -629,6 +685,7 @@ def extract_from_schemas(
                 reference_path=reference_path,
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
+                defaults_as_examples=defaults_as_examples,
             ):
                 if _example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
@@ -718,6 +775,12 @@ def _example_is_valid(value: object, validator: jsonschema_rs.Validator | None) 
         return True
 
 
+def _with_bundle_storage(schema: dict[str, Any], bundle_storage: dict[str, Any] | None) -> dict[str, Any]:
+    if bundle_storage is not None and BUNDLE_STORAGE_KEY not in schema:
+        return {**schema, BUNDLE_STORAGE_KEY: bundle_storage}
+    return schema
+
+
 def _own_examples(
     *,
     schema: dict[str, Any],
@@ -725,10 +788,7 @@ def _own_examples(
     examples_container_keyword: str,
     bundle_storage: dict[str, Any] | None,
 ) -> Generator[Any, None, None]:
-    if bundle_storage is not None and BUNDLE_STORAGE_KEY not in schema:
-        validation_schema = {**schema, BUNDLE_STORAGE_KEY: bundle_storage}
-    else:
-        validation_schema = schema
+    validation_schema = _with_bundle_storage(schema, bundle_storage)
 
     if example_keyword in schema:
         candidate = schema[example_keyword]
@@ -752,9 +812,11 @@ def _yield_examples_from_properties(
     current_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
     merge_ref_siblings: bool,
+    defaults_as_examples: bool,
 ) -> Generator[Any, None, None]:
     variants: dict[str, list[Any]] = {}
     to_generate: dict[str, Any] = {}
+    defaults: dict[str, Any] = {}
 
     for name, subschema in properties.items():
         if isinstance(subschema, dict) and subschema.get("$ref") in current_path:
@@ -773,6 +835,13 @@ def _yield_examples_from_properties(
             if isinstance(expanded_schema, bool):
                 to_generate[name] = expanded_schema
                 continue
+
+            if (
+                "default" in expanded_schema
+                and name not in defaults
+                and is_valid(expanded_schema["default"], _with_bundle_storage(expanded_schema, bundle_storage))
+            ):
+                defaults[name] = expanded_schema["default"]
 
             values.extend(
                 _own_examples(
@@ -793,6 +862,7 @@ def _yield_examples_from_properties(
                 reference_path=expanded_path,
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
+                defaults_as_examples=defaults_as_examples,
             ):
                 key = _combo_dedup_key(value)
                 if key not in seen:
@@ -805,7 +875,10 @@ def _yield_examples_from_properties(
 
             variants[name] = values
 
-    if variants:
+    if variants or (defaults_as_examples and defaults):
+        # A documented default is often the only value a server is known to accept, so it beats a generated one.
+        for name, value in defaults.items():
+            variants.setdefault(name, [value])
         config = operation.schema.config.generation_for(operation=operation, phase="examples")
         for name, subschema in to_generate.items():
             if name in variants:
@@ -848,6 +921,7 @@ def _yield_examples_per_branch(
     current_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
     merge_ref_siblings: bool,
+    defaults_as_examples: bool,
 ) -> Generator[Any, None, None]:
     # Identify which properties are claimed by at least one branch
     branch_prop_sets: list[set[str]] = []
@@ -883,6 +957,7 @@ def _yield_examples_per_branch(
             current_path=current_path,
             bundle_storage=bundle_storage,
             merge_ref_siblings=merge_ref_siblings,
+            defaults_as_examples=defaults_as_examples,
         )
 
 
@@ -896,6 +971,7 @@ def extract_from_schema(
     reference_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
     merge_ref_siblings: bool,
+    defaults_as_examples: bool = False,
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties`, `items`, and their `allOf` / `oneOf` / `anyOf` compositions
@@ -953,6 +1029,7 @@ def extract_from_schema(
                 current_path=current_path,
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
+                defaults_as_examples=defaults_as_examples,
             ):
                 if all(f in value for f in required):
                     yield value
@@ -967,6 +1044,7 @@ def extract_from_schema(
                 current_path=current_path,
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
+                defaults_as_examples=defaults_as_examples,
             ):
                 if all(f in value for f in required):
                     yield value
@@ -998,6 +1076,7 @@ def extract_from_schema(
             reference_path=current_path,
             bundle_storage=bundle_storage,
             merge_ref_siblings=merge_ref_siblings,
+            defaults_as_examples=defaults_as_examples,
         ):
             yield [value] * length
 
@@ -1016,6 +1095,7 @@ def extract_from_schema(
                     reference_path=current_path,
                     bundle_storage=bundle_storage,
                     merge_ref_siblings=merge_ref_siblings,
+                    defaults_as_examples=defaults_as_examples,
                 )
 
 
