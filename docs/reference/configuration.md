@@ -709,7 +709,7 @@ These settings can only be applied at the project level.
     **Type**: `Boolean`  
     **Default**: `false`  
 
-    Enable example generation for API operations with no explicit schema examples. When captured response data is available (e.g., an ID returned by `POST /items`), it is used instead of random generation.
+    Enable example generation for API operations with no explicit schema examples. Schema `default` values and captured response data (e.g., an ID returned by `POST /items`) are used instead of random generation.
 
     ```toml
     [phases.examples]

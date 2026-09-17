@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.3...HEAD) - TBD
 
+### :wrench: Changed
+
+- Examples phase fills missing values with schema `default` values; required parameter defaults count as examples.
+
 ### :bug: Fixed
 
 - Use `example`/`examples` declared on array items in the examples phase.

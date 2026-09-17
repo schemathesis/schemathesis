@@ -10,6 +10,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core import NOT_SET
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
@@ -3299,6 +3300,141 @@ def test_generated_property_honors_its_format(ctx):
 def test_gate_preserved_when_no_explicit_examples(ctx, body_schema):
     # When no property has an explicit example, no examples are produced
     assert _extract_json_body_examples(ctx, body_schema) == []
+
+
+@pytest.mark.parametrize(
+    ("age", "expected"),
+    [({"type": "integer", "default": 30}, 30), ({"type": "integer", "minimum": 10, "default": 5}, 10)],
+    ids=["valid-default", "invalid-default"],
+)
+def test_property_without_example_uses_valid_default(ctx, age, expected):
+    assert _extract_json_body_examples(
+        ctx,
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string", "example": "Alice"}, "age": age},
+            "required": ["name", "age"],
+        },
+    ) == [{"media_type": "application/json", "value": {"name": "Alice", "age": expected}}]
+
+
+def _example_cases(ctx, operation_definition, *, fill_missing, version="3.0.2"):
+    schema = ctx.openapi.load_schema(
+        {"/items": {"post": {**operation_definition, "responses": {"200": {"description": "OK"}}}}}, version=version
+    )
+    operation = schema["/items"]["POST"]
+    return [
+        (case.query, case.body)
+        for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=fill_missing)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("version", "parameters"),
+    [
+        (
+            "2.0",
+            [
+                {"name": "q", "in": "query", "type": "string", "x-example": "x"},
+                {"name": "limit", "in": "query", "type": "integer", "default": 25},
+            ],
+        ),
+        (
+            "3.0.2",
+            [
+                {"name": "q", "in": "query", "schema": {"type": "string"}, "example": "x"},
+                {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 25}},
+            ],
+        ),
+        (
+            "3.1.0",
+            [
+                {"name": "q", "in": "query", "schema": {"type": "string"}, "example": "x"},
+                {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 25}},
+            ],
+        ),
+    ],
+    ids=["swagger-2.0", "openapi-3.0", "openapi-3.1"],
+)
+def test_parameter_without_example_uses_default(ctx, version, parameters):
+    assert _example_cases(ctx, {"parameters": parameters}, fill_missing=False, version=version) == [
+        ({"q": "x", "limit": 25}, NOT_SET)
+    ]
+
+
+def test_parameter_default_violating_schema_is_generated(ctx):
+    parameters = [
+        {"name": "q", "in": "query", "schema": {"type": "string"}, "example": "x"},
+        {"name": "limit", "in": "query", "required": True, "schema": {"type": "integer", "minimum": 10, "default": 5}},
+    ]
+    assert _example_cases(ctx, {"parameters": parameters}, fill_missing=False) == [({"q": "x", "limit": 10}, NOT_SET)]
+
+
+def test_body_without_examples_uses_property_defaults_next_to_parameter_examples(ctx):
+    operation_definition = {
+        "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}, "example": "x"}],
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string", "default": "dflt"}},
+                        "required": ["name"],
+                    }
+                }
+            },
+        },
+    }
+    assert _example_cases(ctx, operation_definition, fill_missing=False) == [({"q": "x"}, {"name": "dflt"})]
+
+
+REQUIRED_QUERY_DEFAULT = {
+    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string", "default": "dflt"}}]
+}
+OPTIONAL_QUERY_DEFAULT = {
+    "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "default": 25}}]
+}
+BODY_PROPERTY_DEFAULT = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string", "default": "dflt"}},
+                    "required": ["name"],
+                }
+            }
+        },
+    }
+}
+
+
+@pytest.mark.parametrize(
+    ("operation_definition", "expected"),
+    [
+        (REQUIRED_QUERY_DEFAULT, [({"q": "dflt"}, NOT_SET)]),
+        (OPTIONAL_QUERY_DEFAULT, []),
+        (BODY_PROPERTY_DEFAULT, []),
+    ],
+    ids=["required-parameter", "optional-parameter", "body-property"],
+)
+def test_only_required_parameter_default_counts_as_example(ctx, operation_definition, expected):
+    assert _example_cases(ctx, operation_definition, fill_missing=False) == expected
+
+
+@pytest.mark.parametrize(
+    ("operation_definition", "expected"),
+    [
+        (REQUIRED_QUERY_DEFAULT, [({"q": "dflt"}, NOT_SET)]),
+        (OPTIONAL_QUERY_DEFAULT, [({"limit": 25}, NOT_SET)]),
+        (BODY_PROPERTY_DEFAULT, [({}, {"name": "dflt"})]),
+    ],
+    ids=["required-parameter", "optional-parameter", "body-property"],
+)
+def test_fill_missing_uses_defaults(ctx, operation_definition, expected):
+    assert _example_cases(ctx, operation_definition, fill_missing=True) == expected
 
 
 @pytest.mark.parametrize("keyword", ["oneOf", "anyOf"])

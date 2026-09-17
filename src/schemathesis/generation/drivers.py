@@ -237,7 +237,7 @@ class ExamplesGenerator:
             return [
                 generate_one(strategy)
                 for strategy in operation.get_strategies_from_examples(
-                    fill_missing_from_pool=self._fill_missing,
+                    fill_missing=self._fill_missing,
                     extra_data_source=self._feedback.extra_data_source,
                     error_feedback=self._feedback.error_feedback,
                     **self._as_strategy_kwargs,
