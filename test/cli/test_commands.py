@@ -1695,6 +1695,47 @@ def test_explicit_example_failure_output(ctx, cli, snapshot_cli):
     )
 
 
+# The server rejects every `location` except the property example before it reads `tier`.
+def test_fuzzing_body_uses_property_example(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/records": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "location": {"type": "string", "example": "global"},
+                                        "tier": {"type": "integer"},
+                                    },
+                                    "required": ["location", "tier"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "422": {"description": "Unknown location"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/records", methods=["PUT"])
+    def put_record():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or data.get("location") != "global":
+            return jsonify({"detail": "Unknown location"}), 422
+        # Bug: `tier` indexes a three-item list without a bounds check
+        return jsonify({"tier": ["short", "medium", "long"][data["tier"]]}), 200
+
+    result = cli.run_openapi_app(
+        app, "--phases=fuzzing", "--mode=positive", "--max-examples=10", "-c not_a_server_error"
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+
+
 def test_curl_with_non_printable_characters(ctx, cli, snapshot_cli, monkeypatch):
     monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
     api = ctx.openapi.apps.failure()

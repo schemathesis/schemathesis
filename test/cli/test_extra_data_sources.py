@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from _pytest.main import ExitCode
 from flask import abort, jsonify, request
 
 
@@ -1150,3 +1151,52 @@ def test_extra_data_sources_examples_phase_disabled(cli, snapshot_cli, ctx):
         )
         == snapshot_cli
     )
+
+
+# The server rejects unknown projects before reading `ttl`, so only a pooled `project_id` lets a bad `ttl` through.
+def test_negative_body_keeps_pooled_identifier_in_unmutated_field(cli, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/projects": {
+                "post": {
+                    "operationId": "createProject",
+                    "responses": {
+                        "201": _json_response(
+                            _object_schema({"id": {"type": "string"}}, required=["id"]), description="Created"
+                        )
+                    },
+                }
+            },
+            "/records": {
+                "put": {
+                    "operationId": "putRecord",
+                    "requestBody": _json_request_body(
+                        _object_schema(
+                            {"project_id": {"type": "string"}, "ttl": {"type": "integer"}},
+                            required=["project_id", "ttl"],
+                        )
+                    ),
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Unknown project"}},
+                }
+            },
+        }
+    )
+    projects = []
+
+    @app.route("/projects", methods=["POST"])
+    def create_project():
+        project_id = uuid.uuid4().hex
+        projects.append(project_id)
+        return jsonify({"id": project_id}), 201
+
+    @app.route("/records", methods=["PUT"])
+    def put_record():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or data.get("project_id") not in projects:
+            return jsonify({"detail": "Unknown project"}), 404
+        # Bug: arithmetic on `ttl` before its type is checked
+        return jsonify({"expires_in": data["ttl"] + 1}), 200
+
+    # Negative bodies share the budget with positive ones, so fewer examples rarely mutate `ttl` at all.
+    result = cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=100", "-c not_a_server_error")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
