@@ -398,10 +398,10 @@ class UnitTestProgressManager:
     def _get_status_icon(self, default_icon: str = "🕛") -> str:
         return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default=default_icon)
 
-    def get_completion_message(self, default_icon: str = "🕛") -> str:
+    def get_completion_message(self, icon: str | None = None) -> str:
         """Complete the phase and return status message."""
         duration = format_duration(self.elapsed_ms)
-        icon = self._get_status_icon(default_icon)
+        icon = icon or self._get_status_icon()
 
         message = self._get_stats_message(live=False) or "No tests were run"
         if self.is_interrupted:
@@ -925,7 +925,8 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         from rich.padding import Padding
         from rich.text import Text
 
-        icon = "🚫" if status == Status.ERROR else "🕛"
+        # A phase errors without any operation erroring once the server stops accepting connections.
+        icon = "🚫" if status == Status.ERROR else None
         self.console.print(Padding(Text(manager.get_completion_message(icon), style="white"), BLOCK_PADDING))
         self.console.print()
 

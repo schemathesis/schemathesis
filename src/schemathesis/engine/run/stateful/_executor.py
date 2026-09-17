@@ -19,7 +19,7 @@ from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.timing import Instant
 from schemathesis.core.transport import Response
-from schemathesis.engine import Status, events
+from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.control import ExecutionControl
@@ -27,11 +27,12 @@ from schemathesis.engine.errors import (
     TestingState,
     UnhealthyAPIError,
     UnrecoverableNetworkError,
+    build_code_sample,
     clear_hypothesis_notes,
     is_unrecoverable_network_error,
 )
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.run.unit._case import BudgetExpired
+from schemathesis.engine.run.unit._case import BudgetExpired, ServerWentAway
 from schemathesis.engine._baseline import is_known
 from schemathesis.engine._rate_limit_retry import call_and_validate_with_retry
 from schemathesis.engine.run.stateful.context import StatefulContext
@@ -118,6 +119,11 @@ def _classify_suite_error(
         # The clock ended the suite. A failure found before it surfaces as its own group, so there is
         # nothing left to report here; the engine reports the limit itself.
         return Status.SUCCESS, False, []
+    if isinstance(exc, ServerWentAway):
+        stored = state.unrecoverable_network_error
+        if stored is not None:
+            return Status.ERROR, False, [_network_nonfatal_error(stored)]
+        return Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS, False, []
     if isinstance(exc, KeyboardInterrupt):
         # Raised in the state machine when the stop event is set or it is raised by the user's code
         # that is placed in the base class of the state machine.
@@ -186,15 +192,8 @@ def _unrecoverable_network_error(
         if reason is None:
             return None
     transport_kwargs = engine.get_transport_kwargs(operation=case.operation)
-    if exc.request is not None:
-        headers = dict(exc.request.headers)
-    else:
-        headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
-    verify = transport_kwargs.get("verify", True)
     return UnrecoverableNetworkError(
-        error=exc,
-        code_sample=case.as_curl_command(headers=headers, verify=verify),
-        reason=reason,
+        error=exc, code_sample=build_code_sample(case, exc.request, transport_kwargs), reason=reason
     )
 
 
@@ -259,6 +258,8 @@ def execute_state_machine_loop(
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
             if engine.has_to_stop:
+                if engine.stop_reason is StopReason.SERVER_UNAVAILABLE:
+                    raise ServerWentAway
                 # Say which one stopped it: a spent budget is a planned finish, Ctrl-C is not.
                 if engine.has_reached_time_limit and not engine.is_interrupted:
                     raise BudgetExpired
@@ -282,7 +283,9 @@ def execute_state_machine_loop(
                 auto_mode = engine.config.rate_limit_for(operation=input.case.operation) == "auto"
 
                 def call_fn() -> Response:
-                    r = self.call(input.case, **kwargs)
+                    r = engine.server.track(
+                        input.case, lambda: self.call(input.case, **kwargs), transport_kwargs=kwargs
+                    )
                     self.after_call(r, input.case)
                     return r
 
@@ -310,6 +313,8 @@ def execute_state_machine_loop(
                 ctx.step_failed()
                 raise
             except Exception as exc:
+                if isinstance(exc, requests.ConnectionError) and engine.detect_server_outage(exc, workers=1):
+                    raise ServerWentAway from None
                 # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level
                 # failures (reset, chunked-encoding break) usually mean the server crashed; surface
                 # those immediately on the first occurrence.

@@ -17,6 +17,7 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.health import HealthState
 from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.engine.observations import Observations
+from schemathesis.engine.outage import ServerMonitor
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
@@ -74,6 +75,7 @@ class EngineContext:
         "control",
         "outcome_cache",
         "health",
+        "server",
         "link_calibration",
         "start_time",
         "observations",
@@ -118,6 +120,7 @@ class EngineContext:
         )
         self.outcome_cache = {}
         self.health = HealthState()
+        self.server = ServerMonitor()
         self.link_calibration = LinkCalibrationState() if schema.config.phases.stateful.link_calibration else None
         self.observations = observations
         self._thread_local = threading.local()
@@ -216,6 +219,13 @@ class EngineContext:
 
     def stop(self) -> None:
         self.control.stop()
+
+    def detect_server_outage(self, exc: requests.ConnectionError, *, workers: int) -> bool:
+        """Stop the run when a refused connection means the server went away."""
+        if not self.server.is_down(exc, workers=workers):
+            return False
+        self.control.is_server_unavailable = True
+        return True
 
     def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
         self.outcome_cache[hash(case)] = outcome

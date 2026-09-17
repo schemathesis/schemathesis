@@ -29,6 +29,7 @@ class StopReason(str, Enum):
     INTERRUPTED = "interrupted"
     FAILURE_LIMIT = "failure_limit"
     MAX_TIME = "max_time"
+    SERVER_UNAVAILABLE = "server_unavailable"
 
     @property
     def skip_explanation(self) -> str | None:
@@ -40,6 +41,8 @@ class StopReason(str, Enum):
                 return "Failure limit reached"
             case StopReason.MAX_TIME:
                 return "Time limit reached"
+            case StopReason.SERVER_UNAVAILABLE:
+                return "Server stopped accepting connections"
             case StopReason.COMPLETED:
                 return None
 

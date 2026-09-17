@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import platform
+import re
 import sys
 import threading
 import time
@@ -2813,6 +2814,172 @@ def always_fails(ctx, response, case):
         )
 
 
+CRASHING_SERVER = """
+import json
+import os
+import socket
+import struct
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+MODE = os.environ["CRASH_MODE"]
+# Answered collections before a large one may crash the server, so the requests leading up to it are known.
+CRASH_AFTER = int(os.environ.get("CRASH_AFTER", "0"))
+ADDRESS = ("127.0.0.1", int(os.environ["PORT"]))
+SCHEMA = {
+    "openapi": "3.0.0",
+    "info": {"title": "Crashing server", "version": "1.0.0"},
+    "paths": {
+        "/collections": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"size": {"type": "integer", "minimum": 0, "maximum": 100000}},
+                                "required": ["size"],
+                                "additionalProperties": False,
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "integer"}},
+                                    "required": ["id"],
+                                }
+                            }
+                        },
+                        "links": {
+                            "GetCollection": {
+                                "operationId": "getCollection",
+                                "parameters": {"id": "$response.body#/id"},
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        "/collections/{id}": {
+            "get": {
+                "operationId": "getCollection",
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+        "/health": {"get": {"responses": {"200": {"description": "OK"}}}},
+        "/points": {"get": {"responses": {"200": {"description": "OK"}}}},
+    },
+}
+KILLED = False
+CREATED = 0
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        self.reset_after_crash()
+        if self.path == "/openapi.json":
+            self.send_json(200, SCHEMA)
+        else:
+            self.send_json(200, {"id": 1})
+
+    def do_POST(self):
+        global CREATED, KILLED
+        self.reset_after_crash()
+        try:
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+        except ValueError:
+            body = None
+        size = body.get("size") if isinstance(body, dict) else None
+        if KILLED or CREATED < CRASH_AFTER or not isinstance(size, int) or size <= 50000:
+            CREATED += 1
+            self.send_json(201, {"id": 1})
+            return
+        KILLED = True
+        if MODE != "reset":
+            # Stop listening before answering: the next request is refused, never queued.
+            self.server.socket.shutdown(socket.SHUT_RDWR)
+        self.send_json(201, {"id": 1})
+        if MODE == "refuse":
+            os._exit(1)
+        if MODE == "flap":
+            threading.Thread(target=self.server.shutdown).start()
+
+    def reset_after_crash(self):
+        # The process dies while this connection is queued: the client sees a reset, then refusals.
+        if KILLED and MODE == "reset":
+            self.server.socket.shutdown(socket.SHUT_RDWR)
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            os._exit(1)
+
+    def send_json(self, status, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        self.wfile.flush()
+
+
+server = ThreadingHTTPServer(ADDRESS, Handler)
+server.serve_forever()
+# Only a flapping server gets here: it listens again after a short outage.
+server.server_close()
+time.sleep(0.5)
+ThreadingHTTPServer(ADDRESS, Handler).serve_forever()
+"""
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.parametrize(
+    "mode", ["refuse", "reset", "flap"], ids=["refused", "reset-then-refused", "back-after-refusal"]
+)
+def test_server_stops_accepting_connections(subprocess_runner, cli, snapshot_cli, mode):
+    port = subprocess_runner.run_app(CRASHING_SERVER, env={"CRASH_MODE": mode})
+    assert (
+        cli.main(
+            "run",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage,fuzzing",
+            "--checks=not_a_server_error",
+            "--mode=positive",
+            "--max-examples=10",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+@pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
+def test_server_stops_accepting_connections_in_generated_phases(subprocess_runner, cli, snapshot_cli, phase):
+    port = subprocess_runner.run_app(CRASHING_SERVER, env={"CRASH_MODE": "refuse", "CRASH_AFTER": "5"})
+    result = cli.main(
+        "run",
+        f"http://127.0.0.1:{port}/openapi.json",
+        f"--phases={phase}",
+        "--checks=not_a_server_error",
+        "--mode=positive",
+    )
+    assert result == snapshot_cli
+    # Generated bodies differ across Python versions; the listed request must still be the one that crashed it.
+    assert int(re.findall(r"""'\{"size": (\d+)\}'""", result.stdout.split("before it went away:")[1])[0]) > 50000
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
 def test_app_crash(subprocess_runner, cli, snapshot_cli):
@@ -2912,7 +3079,7 @@ raw_schema = {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "properties": {"name": {"type": "string"}},
+                                "properties": {"name": {"type": "string", "enum": ["alice"]}},
                                 "required": ["name"]
                             }
                         }

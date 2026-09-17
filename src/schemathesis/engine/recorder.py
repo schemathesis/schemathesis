@@ -123,6 +123,11 @@ class ScenarioRecorder:
         """Record a network-level error for a given test case."""
         self.interactions[case_id] = Interaction(request=Request.from_prepared_request(request), response=None)
 
+    def forget_case(self, *, case_id: str) -> None:
+        """Drop a case whose request never reached the server."""
+        self.cases.pop(case_id, None)
+        self.interactions.pop(case_id, None)
+
     def record_check_failure(self, *, name: str, case_id: str, code_sample: str, failure: Failure) -> None:
         """Record a failure of a check for a given test case."""
         self.checks.setdefault(case_id, []).append(

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.3...HEAD) - TBD
 
+### :wrench: Changed
+
+- A server that stops accepting connections ends the run with one `Server Unavailable` error.
+
 ### :bug: Fixed
 
 - Use `example`/`examples` declared on array items in the examples phase.

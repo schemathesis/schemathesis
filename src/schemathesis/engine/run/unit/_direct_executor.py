@@ -14,7 +14,13 @@ from schemathesis.engine._baseline import has_new_failures
 from schemathesis.engine.errors import TestingState, UnexpectedError, deduplicate_errors
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.run.unit._case import BudgetExpired, record_extra_data_from_recorder, run_one_case
+from schemathesis.engine.run.unit._case import (
+    BudgetExpired,
+    ServerWentAway,
+    has_responses,
+    record_extra_data_from_recorder,
+    run_one_case,
+)
 from schemathesis.engine.run.unit._errors import (
     iter_controller_error_events,
     translate_iteration_exception,
@@ -98,6 +104,7 @@ def run_driver(
     any_case_ran = False
     any_case_errored = False
     budget_expired = False
+    server_went_away = False
     pending_events: list[events.EngineEvent] = []
     try:
         # Silence Hypothesis stderr chatter so it doesn't leak into the engine's event stream.
@@ -109,6 +116,8 @@ def run_driver(
                 stop_reason = ctx.stop_reason
                 if stop_reason is StopReason.MAX_TIME:
                     raise BudgetExpired
+                if stop_reason is StopReason.SERVER_UNAVAILABLE:
+                    raise ServerWentAway
                 if stop_reason in (StopReason.INTERRUPTED, StopReason.FAILURE_LIMIT):
                     raise KeyboardInterrupt
                 any_case_ran = True
@@ -134,6 +143,8 @@ def run_driver(
         status = Status.FAILURE
     except BudgetExpired:
         budget_expired = True
+    except ServerWentAway:
+        server_went_away = True
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
@@ -156,6 +167,9 @@ def run_driver(
             skip_reason = "Time limit reached" if budget_expired else "No examples in schema"
         elif any_case_errored:
             status = Status.ERROR
+        elif server_went_away and not has_responses(recorder):
+            status = Status.SKIP
+            skip_reason = StopReason.SERVER_UNAVAILABLE.skip_explanation
 
     if status == Status.SUCCESS and continue_on_failure and has_new_failures(recorder, ctx.config.load_baseline()):
         status = Status.FAILURE

@@ -247,6 +247,8 @@ class ExecutionPlan:
         else:
             if engine.has_reached_the_failure_limit:
                 phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
+            elif phase.is_enabled and engine.control.is_server_unavailable:
+                phase.skip_reason = PhaseSkipReason.SERVER_UNAVAILABLE
             yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
 
     def _settle_stateful(self, engine: EngineContext) -> None:
