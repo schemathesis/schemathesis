@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from base64 import b64encode
 from collections.abc import Mapping
-from http.cookies import SimpleCookie
+from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.generation.case import Case
@@ -81,7 +81,13 @@ def remove_auth(case: Case, security_parameters: list[Mapping[str, Any]]) -> Cas
             if cookies:
                 cookies.pop(name, None)
             if headers and "Cookie" in headers:
-                parsed: SimpleCookie = SimpleCookie(headers["Cookie"])
+                parsed: SimpleCookie = SimpleCookie()
+                try:
+                    parsed.load(headers["Cookie"])
+                except CookieError:
+                    # Unparsable header: drop it entirely rather than risk keeping the auth cookie.
+                    del headers["Cookie"]
+                    continue
                 parsed.pop(name, None)
                 if parsed:
                     headers["Cookie"] = "; ".join(f"{k}={v.coded_value}" for k, v in parsed.items())
