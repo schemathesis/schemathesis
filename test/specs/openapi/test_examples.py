@@ -4379,3 +4379,70 @@ def test_generated_property_with_recursive_ref(ctx):
     assert len(extracted) == 1
     assert extracted[0]["Fulfilment"] == {"Method": "Delivery"}
     assert isinstance(extracted[0]["Items"], list)
+
+
+def test_self_referencing_optional_property(ctx):
+    # A cut cycle carries no example, so the property is left out rather than filled with `null`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/nodes": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "example": "n"},
+                        "child": {"$ref": "#/components/schemas/Node"},
+                    },
+                }
+            }
+        },
+    )
+
+    assert [example.value for example in extract_from_schemas(schema["/nodes"]["POST"])] == [{"name": "n"}]
+
+
+def test_required_property_closing_a_cycle(ctx):
+    # The cut cycle is required, so it is generated from the schema it points at, not from an empty one.
+    schema = ctx.openapi.load_schema(
+        {
+            "/nodes": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "example": "n"},
+                        "link": {"$ref": "#/components/schemas/Link"},
+                    },
+                },
+                "Link": {
+                    "type": "object",
+                    "required": ["target"],
+                    "properties": {
+                        "tag": {"type": "string", "example": "t"},
+                        "target": {"$ref": "#/components/schemas/Node"},
+                    },
+                },
+            }
+        },
+    )
+
+    extracted = [example.value for example in extract_from_schemas(schema["/nodes"]["POST"])]
+
+    assert len(extracted) == 1
+    assert extracted[0]["name"] == "n"
+    assert extracted[0]["link"]["tag"] == "t"
+    assert isinstance(extracted[0]["link"]["target"], dict)
