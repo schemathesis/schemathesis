@@ -745,6 +745,7 @@ def _yield_examples_from_properties(
     *,
     operation: APIOperation,
     properties: dict[str, Any],
+    required: set[str],
     example_keyword: str,
     examples_container_keyword: str,
     resolver: Resolver,
@@ -756,6 +757,12 @@ def _yield_examples_from_properties(
     to_generate: dict[str, Any] = {}
 
     for name, subschema in properties.items():
+        if isinstance(subschema, dict) and subschema.get("$ref") in current_path:
+            # The cycle is cut here, so there is no example to take. Only a required property is filled in,
+            # and from its own schema - an empty one would draw `null` and invalidate the whole body.
+            if name in required:
+                to_generate[name] = subschema
+            continue
         values: list[Any] = []
         for expanded_schema, expanded_path, expanded_resolver in _expand_subschemas(
             schema=subschema,
@@ -833,6 +840,7 @@ def _yield_examples_per_branch(
     *,
     operation: APIOperation,
     parent_properties: dict[str, Any],
+    required: set[str],
     branches: list[dict[str, Any]],
     example_keyword: str,
     examples_container_keyword: str,
@@ -868,6 +876,7 @@ def _yield_examples_per_branch(
         yield from _yield_examples_from_properties(
             operation=operation,
             properties=active,
+            required=required | set(branch.get("required", [])),
             example_keyword=example_keyword,
             examples_container_keyword=examples_container_keyword,
             resolver=resolver,
@@ -936,6 +945,7 @@ def extract_from_schema(
             for value in _yield_examples_per_branch(
                 operation=operation,
                 parent_properties=properties_to_process,
+                required=required,
                 branches=branches,
                 example_keyword=example_keyword,
                 examples_container_keyword=examples_container_keyword,
@@ -950,6 +960,7 @@ def extract_from_schema(
             for value in _yield_examples_from_properties(
                 operation=operation,
                 properties=properties_to_process,
+                required=required,
                 example_keyword=example_keyword,
                 examples_container_keyword=examples_container_keyword,
                 resolver=current_resolver,
