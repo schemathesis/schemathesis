@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import threading
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from schemathesis.cli.commands.run.handlers.base import WRITER_WORKER_JOIN_TIMEOUT, EventHandler
+from schemathesis.cli.commands.run.handlers.base import EventHandler, WriterWorker
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.cache.io import effective_directory
 from schemathesis.engine import Status, events
@@ -45,7 +44,7 @@ class CrashHandler(EventHandler):
         self.base_url = base_url
         self.sanitization = sanitization
         self.queue: Queue[_Process | None] = Queue()
-        self.worker: threading.Thread | None = None
+        self.worker: WriterWorker | None = None
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
@@ -60,7 +59,7 @@ class CrashHandler(EventHandler):
     def _start_worker(self, project_title: str | None) -> None:
         assert self.worker is None
         directory = effective_directory(self.cache_directory, project_title) / "crashes"
-        self.worker = threading.Thread(
+        self.worker = WriterWorker(
             name="SchemathesisCrashWriter",
             target=_run,
             kwargs={
@@ -76,7 +75,7 @@ class CrashHandler(EventHandler):
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(None)
         if self.worker is not None:
-            self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+            self.worker.join()
 
 
 def _run(

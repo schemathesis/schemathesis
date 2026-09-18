@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import sys
 import uuid
 from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
@@ -110,10 +111,10 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
         if obj.is_truncated:
             data["content_size"] = obj.content_size
         return data
-    # Imported late so the CLI does not load `requests` before a command needs it.
-    import requests
-
-    if isinstance(obj, requests.PreparedRequest):
+    # Looked up rather than imported: importing here deadlocks on the writer thread, and importing at module level
+    # slows CLI startup. Nothing can be a `PreparedRequest` before `requests` is loaded, so `None` is safe.
+    prepared_request = getattr(sys.modules.get("requests"), "PreparedRequest", None)
+    if prepared_request is not None and isinstance(obj, prepared_request):
         url = obj.url or ""
         if sanitization is not None:
             url = sanitize_url(url, config=sanitization)
