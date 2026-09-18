@@ -3576,6 +3576,115 @@ def test_property_examples_under_composition(ctx, body_schema, expected):
     assert _extract_json_body_examples(ctx, body_schema) == expected
 
 
+NESTED_BRANCHES = [{"type": "string", "example": "s"}, {"type": "integer", "example": 7}]
+
+
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        (
+            {"properties": {"v": {"anyOf": [{"oneOf": NESTED_BRANCHES}, {"nullable": True}]}}},
+            [
+                {"media_type": "application/json", "value": {"v": "s"}},
+                {"media_type": "application/json", "value": {"v": 7}},
+            ],
+        ),
+        (
+            {"properties": {"v": {"allOf": [{"oneOf": NESTED_BRANCHES}]}}},
+            [
+                {"media_type": "application/json", "value": {"v": "s"}},
+                {"media_type": "application/json", "value": {"v": 7}},
+            ],
+        ),
+        (
+            {"properties": {"v": {"oneOf": [{"oneOf": NESTED_BRANCHES}]}}},
+            [
+                {"media_type": "application/json", "value": {"v": "s"}},
+                {"media_type": "application/json", "value": {"v": 7}},
+            ],
+        ),
+        (
+            {
+                "properties": {
+                    "stop": {
+                        "nullable": True,
+                        "oneOf": [
+                            {"type": "string", "example": "stop-word"},
+                            {"type": "array", "items": {"type": "string", "example": "array-word"}},
+                        ],
+                    }
+                }
+            },
+            [
+                {"media_type": "application/json", "value": {"stop": ["array-word"]}},
+                {"media_type": "application/json", "value": {"stop": "stop-word"}},
+            ],
+        ),
+    ],
+    ids=["anyOf-oneOf", "allOf-oneOf", "oneOf-oneOf", "nullable-oneOf"],
+)
+def test_property_examples_under_nested_composition(ctx, body_schema, expected):
+    assert _extract_json_body_examples(ctx, body_schema) == expected
+
+
+def test_discriminated_branches_with_all_of_inheritance(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Allow"},
+                                        {"$ref": "#/components/schemas/Deny"},
+                                    ],
+                                    "discriminator": {
+                                        "propertyName": "type",
+                                        "mapping": {
+                                            "allow": "#/components/schemas/Allow",
+                                            "deny": "#/components/schemas/Deny",
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Allow": {"allOf": [{"$ref": "#/components/schemas/PartialAllow"}]},
+                "PartialAllow": {
+                    "type": "object",
+                    "required": ["type", "host"],
+                    "properties": {
+                        "type": {"type": "string", "example": "allow"},
+                        "host": {"type": "string", "example": "allowed.com"},
+                    },
+                },
+                "Deny": {"allOf": [{"$ref": "#/components/schemas/PartialDeny"}]},
+                "PartialDeny": {
+                    "type": "object",
+                    "required": ["type", "host"],
+                    "properties": {
+                        "type": {"type": "string", "example": "deny"},
+                        "host": {"type": "string", "example": "denied.com"},
+                    },
+                },
+            }
+        },
+    )
+    assert [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"media_type": "application/json", "value": {"type": "allow", "host": "allowed.com"}},
+        {"media_type": "application/json", "value": {"type": "deny", "host": "denied.com"}},
+    ]
+
+
 def test_oas31_ref_sibling_example_in_body_properties(ctx):
     # In OAS 3.1, $ref siblings are valid and must be applied
     # a sibling `example` on a property should be used as the example value
