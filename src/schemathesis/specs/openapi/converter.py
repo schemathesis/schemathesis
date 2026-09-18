@@ -304,9 +304,12 @@ def _pin_discriminator_property(
                 original_uri = name_to_uri.get(bundled_name, "")
                 if "#" in original_uri:
                     resolved_ref = "#" + original_uri.split("#", 1)[1]
+            allowed = _branch_tag_values(ref, property_name, bundle)
             # Without an explicit mapping, prefer the branch's own const/enum so the literal
             # tag (`"function"`) wins over the schema name (`FunctionTool`).
-            disc_value = ref_to_value.get(resolved_ref) or _branch_discriminator_value(ref, property_name, bundle)
+            disc_value = ref_to_value.get(resolved_ref)
+            if disc_value is None and allowed is not None and len(allowed) == 1:
+                disc_value = next(iter(allowed))
             if disc_value is None:
                 # Fall back to schema name -- unless the target is itself polymorphic,
                 # in which case the real discriminator values live on its inner branches
@@ -314,6 +317,10 @@ def _pin_discriminator_property(
                 if _branch_is_polymorphic(ref, bundle):
                     continue
                 disc_value = resolved_ref.rstrip("/").rsplit("/", 1)[-1]
+                # The branch spells out which values it takes and this is not one of them;
+                # pinning it would leave the branch impossible to satisfy.
+                if allowed is not None and disc_value not in allowed:
+                    continue
             if not disc_value:
                 continue
             # `enum` is used instead of `const` so the pin is recognized under Draft 4
@@ -321,30 +328,65 @@ def _pin_discriminator_property(
             items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": [disc_value]}}}]}
 
 
-def _branch_discriminator_value(ref: str, property_name: str, bundle: dict[str, Any] | None) -> str | None:
+def _branch_tag_values(
+    ref: str, property_name: str, bundle: dict[str, Any] | None, seen: set[str] | None = None
+) -> set[str] | None:
+    """Literal values the branch itself allows for the discriminator property, or `None` when unconstrained."""
     if bundle is None or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
         return None
-    bundled = bundle.get(ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :])
-    properties = bundled.get("properties") if isinstance(bundled, dict) else None
-    sub = properties.get(property_name) if isinstance(properties, dict) else None
-    if not isinstance(sub, dict):
+    name = ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
+    seen = seen if seen is not None else set()
+    if name in seen:
         return None
-    # A nullable tag is spelled as a two-branch union in OpenAPI 3.1, putting its literal one level down.
-    for keyword in ("anyOf", "oneOf"):
-        variants = sub.get(keyword)
-        if isinstance(variants, list):
-            non_null = [
-                variant for variant in variants if not (isinstance(variant, dict) and variant.get("type") == "null")
-            ]
-            if len(non_null) == 1 and isinstance(non_null[0], dict):
-                sub = non_null[0]
-            break
-    const = sub.get("const")
+    seen.add(name)
+    bundled = bundle.get(name)
+    if not isinstance(bundled, dict):
+        return None
+    return _tag_values_in_schema(bundled, property_name, bundle, seen)
+
+
+def _tag_values_in_schema(
+    schema: dict[str, Any], property_name: str, bundle: dict[str, Any], seen: set[str]
+) -> set[str] | None:
+    properties = schema.get("properties")
+    values = _tag_literals(properties.get(property_name)) if isinstance(properties, dict) else None
+    # The tag is often declared in a shared base the branch pulls in through `allOf`.
+    for branch in schema.get("allOf") or []:
+        if not isinstance(branch, dict):
+            continue
+        ref = branch.get("$ref")
+        if isinstance(ref, str):
+            branch_values = _branch_tag_values(ref, property_name, bundle, seen)
+        else:
+            branch_values = _tag_values_in_schema(branch, property_name, bundle, seen)
+        if branch_values is not None:
+            values = branch_values if values is None else values & branch_values
+    return values
+
+
+def _tag_literals(schema: JsonSchema | None) -> set[str] | None:
+    if not isinstance(schema, dict):
+        return None
+    const = schema.get("const")
     if isinstance(const, str):
-        return const
-    enum = sub.get("enum")
-    if isinstance(enum, list) and len(enum) == 1 and isinstance(enum[0], str):
-        return enum[0]
+        return {const}
+    enum = schema.get("enum")
+    if isinstance(enum, list):
+        return {value for value in enum if isinstance(value, str)} or None
+    # A nullable tag is spelled as a union in OpenAPI 3.1, putting its literals one level down.
+    for keyword in ("anyOf", "oneOf"):
+        variants = schema.get(keyword)
+        if not isinstance(variants, list):
+            continue
+        collected: set[str] = set()
+        for variant in variants:
+            if isinstance(variant, dict) and variant.get("type") == "null":
+                continue
+            variant_values = _tag_literals(variant)
+            if variant_values is None:
+                return None
+            collected |= variant_values
+        return collected or None
     return None
 
 

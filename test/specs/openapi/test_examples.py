@@ -4817,3 +4817,346 @@ def test_branches_from_both_oneof_and_anyof(ctx):
         {"common": "c", "a": "A"},
         {"common": "c", "b": "B"},
     ]
+
+
+@pytest.mark.parametrize(
+    "components",
+    [
+        pytest.param(
+            {
+                "schemas": {
+                    "Base": {
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {"type": {"type": "string", "enum": ["attach", "resize"]}},
+                    },
+                    "Attach": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Base"},
+                            {
+                                "properties": {"droplet_id": {"type": "integer", "example": 11111}},
+                                "required": ["droplet_id"],
+                            },
+                        ]
+                    },
+                    "Resize": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Base"},
+                            {
+                                "properties": {"size": {"type": "string", "example": "s-1vcpu-1gb"}},
+                                "required": ["size"],
+                            },
+                        ]
+                    },
+                }
+            },
+            id="tag-through-allof",
+        ),
+        pytest.param(
+            {
+                "schemas": {
+                    "Attach": {
+                        "type": "object",
+                        "required": ["type", "droplet_id"],
+                        "properties": {
+                            "type": {"type": "string", "enum": ["attach", "resize"]},
+                            "droplet_id": {"type": "integer", "example": 11111},
+                        },
+                    },
+                    "Resize": {
+                        "type": "object",
+                        "required": ["type", "size"],
+                        "properties": {
+                            "type": {"type": "string", "enum": ["attach", "resize"]},
+                            "size": {"type": "string", "example": "s-1vcpu-1gb"},
+                        },
+                    },
+                }
+            },
+            id="tag-declared-inline",
+        ),
+        pytest.param(
+            {
+                "schemas": {
+                    "Base": {
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {"type": {"type": "string", "enum": ["attach", "resize"]}},
+                    },
+                    "Attach": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Attach"},
+                            {"$ref": "#/components/schemas/Base"},
+                            {
+                                "properties": {"droplet_id": {"type": "integer", "example": 11111}},
+                                "required": ["droplet_id"],
+                            },
+                        ]
+                    },
+                    "Resize": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Resize"},
+                            {"$ref": "#/components/schemas/Base"},
+                            {
+                                "properties": {"size": {"type": "string", "example": "s-1vcpu-1gb"}},
+                                "required": ["size"],
+                            },
+                        ]
+                    },
+                }
+            },
+            id="tag-through-recursive-allof",
+        ),
+    ],
+)
+def test_discriminated_branches_with_shared_multi_value_tag(ctx, components):
+    # The schema name is not one of the values the shared tag allows, so pinning it to the name
+    # would make both branches impossible and drop their examples.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Attach"},
+                                        {"$ref": "#/components/schemas/Resize"},
+                                    ],
+                                    "discriminator": {"propertyName": "type"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        components=components,
+    )
+    assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"type": "attach", "droplet_id": 11111},
+        {"type": "attach", "size": "s-1vcpu-1gb"},
+    ]
+
+
+@pytest.mark.parametrize(
+    "components",
+    [
+        pytest.param(
+            {
+                "schemas": {
+                    "Anything": True,
+                    "Attach": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Anything"},
+                            {
+                                "type": "object",
+                                "required": ["type", "droplet_id"],
+                                "properties": {
+                                    "type": {"type": "string", "enum": ["attach", "resize"]},
+                                    "droplet_id": {"type": "integer", "example": 11111},
+                                },
+                            },
+                        ]
+                    },
+                    "Resize": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Anything"},
+                            {
+                                "type": "object",
+                                "required": ["type", "size"],
+                                "properties": {
+                                    "type": {"type": "string", "enum": ["attach", "resize"]},
+                                    "size": {"type": "string", "example": "s-1vcpu-1gb"},
+                                },
+                            },
+                        ]
+                    },
+                }
+            },
+            id="referenced-boolean-subschema",
+        ),
+        pytest.param(
+            {
+                "schemas": {
+                    "Base": {
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {"type": {"type": "string", "enum": ["attach", "resize"]}},
+                    },
+                    "Attach": {
+                        "allOf": [
+                            True,
+                            {"$ref": "#/components/schemas/Base"},
+                            {
+                                "properties": {"droplet_id": {"type": "integer", "example": 11111}},
+                                "required": ["droplet_id"],
+                            },
+                        ]
+                    },
+                    "Resize": {
+                        "allOf": [
+                            True,
+                            {"$ref": "#/components/schemas/Base"},
+                            {
+                                "properties": {"size": {"type": "string", "example": "s-1vcpu-1gb"}},
+                                "required": ["size"],
+                            },
+                        ]
+                    },
+                }
+            },
+            id="inline-boolean-subschema",
+        ),
+    ],
+)
+def test_discriminated_branches_with_boolean_subschemas(ctx, components):
+    # A branch that composes `true` still has its tag read from the members that constrain it.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Attach"},
+                                        {"$ref": "#/components/schemas/Resize"},
+                                    ],
+                                    "discriminator": {"propertyName": "type"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components=components,
+    )
+    assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"type": "attach", "droplet_id": 11111},
+        {"type": "attach", "size": "s-1vcpu-1gb"},
+    ]
+
+
+def test_discriminated_branches_with_nullable_tag_without_enum(ctx):
+    # A nullable tag that names no literals takes any string, so the schema name still disambiguates.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Attach"},
+                                        {"$ref": "#/components/schemas/Resize"},
+                                    ],
+                                    "discriminator": {"propertyName": "type"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Base": {
+                    "type": "object",
+                    "required": ["type"],
+                    "properties": {"type": {"anyOf": [{"type": "string"}, {"type": "null"}]}},
+                },
+                "Attach": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Base"},
+                        {
+                            "properties": {"droplet_id": {"type": "integer", "example": 11111}},
+                            "required": ["droplet_id"],
+                        },
+                    ]
+                },
+                "Resize": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/Base"},
+                        {
+                            "properties": {"size": {"type": "string", "example": "s-1vcpu-1gb"}},
+                            "required": ["size"],
+                        },
+                    ]
+                },
+            }
+        },
+    )
+    assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"type": "Attach", "droplet_id": 11111},
+        {"type": "Resize", "size": "s-1vcpu-1gb"},
+    ]
+
+
+def test_discriminated_branch_with_empty_mapping_value(ctx):
+    # An empty tag carries no information, so that branch keeps the examples it declares.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Cat"},
+                                        {"$ref": "#/components/schemas/Dog"},
+                                    ],
+                                    "discriminator": {
+                                        "propertyName": "petType",
+                                        "mapping": {
+                                            "": "#/components/schemas/Cat",
+                                            "dog": "#/components/schemas/Dog",
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Cat": {
+                    "type": "object",
+                    "required": ["petType", "meows"],
+                    "properties": {
+                        "petType": {"type": "string", "example": "cat"},
+                        "meows": {"type": "boolean", "example": True},
+                    },
+                },
+                "Dog": {
+                    "type": "object",
+                    "required": ["petType", "barks"],
+                    "properties": {
+                        "petType": {"type": "string", "example": "dog"},
+                        "barks": {"type": "boolean", "example": True},
+                    },
+                },
+            }
+        },
+    )
+    assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"petType": "cat", "meows": True},
+        {"petType": "dog", "barks": True},
+    ]

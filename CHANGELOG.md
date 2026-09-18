@@ -15,6 +15,7 @@
 - `ignored_auth` crash on generated cookie values the stdlib parser rejects. [#4804](https://github.com/schemathesis/schemathesis/issues/4804)
 - Use `anyOf` branches for examples when a schema declares both `oneOf` and `anyOf`.
 - Emit `example` and `x-example` values in a stable order across runs.
+- Skip discriminator pins the branch's own `enum` rejects, which made those branches ungeneratable.
 
 ## [4.27.3](https://github.com/schemathesis/schemathesis/compare/v4.27.2...v4.27.3) - 2026-09-17
 
