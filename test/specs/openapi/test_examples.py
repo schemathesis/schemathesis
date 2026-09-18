@@ -4759,3 +4759,61 @@ def test_boolean_property_subschema_alongside_a_cycle(ctx):
     assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
         {"name": "n", "anything": None}
     ]
+
+
+def test_both_example_keywords_yield_in_a_stable_order(ctx):
+    # The spec-native keyword comes first, and the order holds across processes.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "type": "string",
+                            "x-example": "from-x-example",
+                            "example": "from-example",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    assert [example.value for example in extract_top_level(schema["/test"]["GET"])] == [
+        "from-x-example",
+        "from-example",
+    ]
+
+
+def test_branches_from_both_oneof_and_anyof(ctx):
+    # Every alternative of both keywords contributes a branch.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"common": {"type": "string", "example": "c"}},
+                                    "oneOf": [{"properties": {"a": {"type": "string", "example": "A"}}}],
+                                    "anyOf": [{"properties": {"b": {"type": "string", "example": "B"}}}],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+
+    assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"common": "c", "a": "A"},
+        {"common": "c", "b": "B"},
+    ]

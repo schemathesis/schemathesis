@@ -12,7 +12,7 @@ from schemathesis.core.jsonschema import make_validator_for
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
-from schemathesis.specs.openapi.examples import extract_from_schema
+from schemathesis.specs.openapi.examples import ExampleWalk, extract_from_schema
 from test.utils import EventStream
 
 
@@ -174,16 +174,19 @@ def test_unresolvable_reference_example_generation_error(ctx):
         schema = context.operation.definition.raw["x-unresolvable-schema"]
 
         def extract(value):
+            walk = ExampleWalk(
+                operation=context.operation,
+                example_keyword="example",
+                examples_container_keyword="examples",
+                bundle_storage=None,
+                merge_ref_siblings=context.operation.schema.adapter.ref_siblings,
+            )
             list(
                 extract_from_schema(
-                    operation=context.operation,
+                    walk,
                     schema=schema,
-                    example_keyword="example",
-                    examples_container_keyword="examples",
                     resolver=make_root_resolver(schema),
                     reference_path=(),
-                    bundle_storage=None,
-                    merge_ref_siblings=context.operation.schema.adapter.ref_siblings,
                 )
             )
             return value
