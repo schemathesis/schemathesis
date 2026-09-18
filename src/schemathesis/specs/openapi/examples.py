@@ -13,7 +13,6 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import (
-    InfiniteRecursiveReference,
     InvalidSchema,
     RefResolutionError,
     UnresolvableReference,
@@ -502,15 +501,12 @@ def _expand_subschemas(
     merge_ref_siblings: bool,
 ) -> Generator[tuple[dict[str, Any] | bool, tuple[str, ...], Resolver], None, None]:
     """Expand schema and all its subschemas."""
-    try:
-        schema, current_path, current_resolver = _resolve_bundled(
-            schema,
-            resolver,
-            reference_path,
-            merge_ref_siblings=merge_ref_siblings,
-        )
-    except InfiniteRecursiveReference:
-        return
+    schema, current_path, current_resolver = _resolve_bundled(
+        schema,
+        resolver,
+        reference_path,
+        merge_ref_siblings=merge_ref_siblings,
+    )
 
     yield schema, current_path, current_resolver
 
@@ -525,30 +521,24 @@ def _expand_subschemas(
         # For allOf, merge all alternatives
         if schema.get("allOf"):
             subschema = deepclone(schema["allOf"][0])
-            try:
-                subschema, expanded_path, expanded_resolver = _resolve_bundled(
-                    subschema,
-                    current_resolver,
-                    current_path,
-                    merge_ref_siblings=merge_ref_siblings,
-                )
-            except InfiniteRecursiveReference:
-                return
+            subschema, expanded_path, expanded_resolver = _resolve_bundled(
+                subschema,
+                current_resolver,
+                current_path,
+                merge_ref_siblings=merge_ref_siblings,
+            )
             # Clone after resolving to avoid mutating the original schema when merging
             if isinstance(subschema, dict):
                 subschema = deepclone(subschema)
 
             for sub in schema["allOf"][1:]:
                 if isinstance(sub, dict):
-                    try:
-                        sub, _, _ = _resolve_bundled(
-                            sub,
-                            current_resolver,
-                            current_path,
-                            merge_ref_siblings=merge_ref_siblings,
-                        )
-                    except InfiniteRecursiveReference:
-                        return
+                    sub, _, _ = _resolve_bundled(
+                        sub,
+                        current_resolver,
+                        current_path,
+                        merge_ref_siblings=merge_ref_siblings,
+                    )
                     for key, value in sub.items():
                         if key == "properties":
                             subschema.setdefault("properties", {}).update(value)
@@ -883,9 +873,8 @@ def _yield_examples_from_properties(
         for name, subschema in to_generate.items():
             if name in variants:
                 continue
-            if bundle_storage is not None:
-                subschema = dict(subschema)
-                subschema[BUNDLE_STORAGE_KEY] = bundle_storage
+            if isinstance(subschema, dict):
+                subschema = _with_bundle_storage(subschema, bundle_storage)
             try:
                 generated = _generate_single_example(
                     subschema, config, operation.schema.adapter.jsonschema_validator_cls
@@ -975,15 +964,12 @@ def extract_from_schema(
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties`, `items`, and their `allOf` / `oneOf` / `anyOf` compositions
-    try:
-        schema, current_path, current_resolver = _resolve_bundled(
-            schema,
-            resolver,
-            reference_path,
-            merge_ref_siblings=merge_ref_siblings,
-        )
-    except InfiniteRecursiveReference:
-        return
+    schema, current_path, current_resolver = _resolve_bundled(
+        schema,
+        resolver,
+        reference_path,
+        merge_ref_siblings=merge_ref_siblings,
+    )
 
     properties_to_process = schema.get("properties", {})
 

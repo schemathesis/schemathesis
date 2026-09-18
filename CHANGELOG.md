@@ -11,6 +11,7 @@
 - Use `example`/`examples` declared on array items in the examples phase.
 - Use property examples under top-level `allOf`, `oneOf`, and `anyOf` in the examples phase.
 - Drop self-referencing optional properties from examples instead of losing the whole body.
+- Crash in the examples phase for boolean property subschemas inside recursive schemas.
 
 ## [4.27.3](https://github.com/schemathesis/schemathesis/compare/v4.27.2...v4.27.3) - 2026-09-17
 
