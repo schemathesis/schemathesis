@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import MutableMapping, Sequence
 from functools import lru_cache
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 if TYPE_CHECKING:
     from schemathesis.config import SanitizationConfig
+
+# `MutableMapping` covers `CaseInsensitiveDict` without importing `requests`, which deadlocks on writer threads.
+MAPPING_TYPES = (dict, MutableMapping)
 
 
 def is_sensitive_key(key: str, keys_to_sanitize: Sequence[str], sensitive_markers: Sequence[str]) -> bool:
@@ -19,9 +22,7 @@ def is_sensitive_key(key: str, keys_to_sanitize: Sequence[str], sensitive_marker
 
 def sanitize_value(item: object, *, config: SanitizationConfig) -> None:
     """Replace sensitive values within `item` with `config.replacement`; recurses into nested dicts/lists."""
-    from requests.structures import CaseInsensitiveDict
-
-    if isinstance(item, dict | CaseInsensitiveDict):
+    if isinstance(item, MAPPING_TYPES):
         for key in item:
             if is_sensitive_key(
                 key,

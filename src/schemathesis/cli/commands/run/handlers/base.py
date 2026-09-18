@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from io import StringIO
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Generic, TypeVar
@@ -46,3 +48,25 @@ class BaseOutputHandler(EventHandler[T]):
 TextOutput = IO[str] | StringIO | Path
 
 WRITER_WORKER_JOIN_TIMEOUT = 10
+
+
+class WriterWorker(threading.Thread):
+    """A background thread that writes a report.
+
+    Keeps whatever ended the thread so `join` can re-raise it, instead of silently truncating the report.
+    """
+
+    def __init__(self, *, name: str, target: Callable[..., None], kwargs: dict[str, Any]) -> None:
+        super().__init__(name=name, target=target, kwargs=kwargs)
+        self.error: Exception | None = None
+
+    def run(self) -> None:
+        try:
+            super().run()
+        except Exception as exc:
+            self.error = exc
+
+    def join(self, timeout: float | None = WRITER_WORKER_JOIN_TIMEOUT) -> None:
+        super().join(timeout)
+        if self.error is not None:
+            raise self.error

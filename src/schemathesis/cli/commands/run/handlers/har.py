@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from schemathesis.cli.commands.run.handlers.base import WRITER_WORKER_JOIN_TIMEOUT, EventHandler, TextOutput
+from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput, WriterWorker
 from schemathesis.config import OutputConfig
 from schemathesis.engine import events
 from schemathesis.engine.recorder import RecordedScenario
@@ -23,7 +22,7 @@ class HarHandler(EventHandler):
     config: OutputConfig
     preserve_bytes: bool
     queue: Queue[_Initialize | _Process | _Finalize]
-    worker: threading.Thread | None
+    worker: WriterWorker | None
 
     def __init__(
         self,
@@ -39,7 +38,7 @@ class HarHandler(EventHandler):
         self.worker = None
 
     def start(self, ctx: BaseExecutionContext) -> None:
-        self.worker = threading.Thread(
+        self.worker = WriterWorker(
             name="SchemathesisHarWriter",
             target=_run,
             kwargs={
@@ -59,7 +58,7 @@ class HarHandler(EventHandler):
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Finalize())
         if self.worker is not None:
-            self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+            self.worker.join()
 
 
 def _run(

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
 from queue import Queue
 from typing import TYPE_CHECKING
 
-from schemathesis.cli.commands.run.handlers.base import WRITER_WORKER_JOIN_TIMEOUT, EventHandler, TextOutput
+from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput, WriterWorker
 from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.engine import events
 from schemathesis.reporting._command import get_command_representation
@@ -29,11 +28,11 @@ class NdjsonHandler(EventHandler):
         self.output = output
         self.config = config
         self.queue: Queue[_Initialize | _Process | _Finalize] = queue or Queue()
-        self.worker: threading.Thread | None = None
+        self.worker: WriterWorker | None = None
 
     def start(self, ctx: BaseExecutionContext) -> None:
         sanitization = self.config.output.sanitization
-        self.worker = threading.Thread(
+        self.worker = WriterWorker(
             name="SchemathesisNdjsonWriter",
             target=_run,
             kwargs={
@@ -56,7 +55,7 @@ class NdjsonHandler(EventHandler):
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Finalize())
         if self.worker is not None:
-            self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+            self.worker.join()
 
 
 def _run(

@@ -1,12 +1,17 @@
 import base64
+import builtins
 import json
 import platform
 import sys
+import threading
 from pathlib import Path
 
 import pytest
+import yaml
 from _pytest.main import ExitCode
 from flask import Response, jsonify, request
+
+from schemathesis.cli.commands.run.handlers.base import WriterWorker
 
 
 @pytest.fixture
@@ -586,3 +591,42 @@ def test_unresolvable_extraction_serialized(cli, ctx, ndjson_path):
                             assert "is_required" in param
 
     assert found_unresolvable, "Expected to find $unresolvable marker in extraction results"
+
+
+def test_report_writers_do_not_import(cli, ctx, ndjson_path, tmp_path, monkeypatch):
+    # An import on a writer thread races the main thread's own and dies, losing every later event
+    api = ctx.openapi.apps.success()
+    cassette_path = tmp_path / "output.yaml"
+    har_path = tmp_path / "output.har"
+    real_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if threading.current_thread().name in ("SchemathesisNdjsonWriter", "SchemathesisHarWriter"):
+            raise RuntimeError(f"deadlock detected by _ModuleLock({name!r})")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    cli.run(
+        api.schema_url,
+        f"--report-ndjson-path={ndjson_path}",
+        f"--report-vcr-path={cassette_path}",
+        f"--report-har-path={har_path}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+    )
+    event_types = [get_event_type(event) for event in load_ndjson(ndjson_path)]
+    assert event_types[0] == "Initialize"
+    assert event_types[-1] == "EngineFinished"
+    assert "ScenarioFinished" in event_types
+    assert yaml.safe_load(cassette_path.read_text())["http_interactions"]
+    assert json.loads(har_path.read_text())["log"]["entries"]
+
+
+def test_writer_thread_error_is_reraised():
+    def fail():
+        raise RuntimeError("Something went wrong")
+
+    worker = WriterWorker(name="SchemathesisTestWriter", target=fail, kwargs={})
+    worker.start()
+    with pytest.raises(RuntimeError, match="Something went wrong"):
+        worker.join()

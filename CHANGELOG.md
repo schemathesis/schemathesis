@@ -8,6 +8,8 @@
 
 ### :bug: Fixed
 
+- Truncated `--report ndjson` output containing only the `Initialize` event. [#4807](https://github.com/schemathesis/schemathesis/issues/4807)
+- Show an error when a report writer fails instead of truncating its output silently.
 - Use `example`/`examples` declared on array items in the examples phase.
 - Use property examples under `allOf`, `oneOf`, and `anyOf` at any depth in the examples phase.
 - Drop self-referencing optional properties from examples instead of losing the whole body.
