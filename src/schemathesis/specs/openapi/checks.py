@@ -5,7 +5,7 @@ import http.client
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import wraps
-from http.cookies import SimpleCookie
+from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -1407,7 +1407,11 @@ def _contains_auth(
     header_cookies: SimpleCookie = SimpleCookie()
     raw_cookie = request.headers.get("Cookie")
     if raw_cookie is not None:
-        header_cookies.load(raw_cookie)
+        try:
+            header_cookies.load(raw_cookie)
+        except CookieError:
+            # Generated values may render a header the stdlib parser rejects; fall back to the cookie jar.
+            header_cookies = SimpleCookie()
 
     def has_header(p: Mapping[str, Any]) -> bool:
         return p["in"] == "header" and p["name"] in request.headers

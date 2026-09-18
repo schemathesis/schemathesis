@@ -228,6 +228,15 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
             [{"name": "B", "in": "cookie"}],
             None,
         ),
+        # A generated value containing `; $` makes the outgoing `Cookie` header unparsable by the stdlib parser.
+        (
+            CheckContext(
+                override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+            ),
+            {"url": "https://example.com", "cookies": {"A": "a; $=b"}},
+            [{"name": "A", "in": "cookie"}],
+            AuthKind.GENERATED,
+        ),
     ],
 )
 def test_contains_auth(check_context, request_kwargs, parameters, expected, response_factory, case_factory):
@@ -262,8 +271,10 @@ def test_remove_auth_from_case(ctx, key, parameters):
         ("session=abc", "session", None),
         # Multiple cookies — only the security param is stripped; others remain.
         ("session=abc; other=xyz", "session", "other=xyz"),
+        # Unparsable header — dropped wholesale so the retried request carries no auth cookie.
+        ("session=a; $=b", "session", None),
     ],
-    ids=["only-param", "mixed"],
+    ids=["only-param", "mixed", "unparsable"],
 )
 def test_remove_auth_strips_cookie_from_headers(ctx, case_factory, cookie_header, param_name, expected_cookie_header):
     api = ctx.openapi.apps.success()
