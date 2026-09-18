@@ -787,8 +787,9 @@ def test_discriminator_pin_reads_nullable_anyof_tag(ctx):
     assert validator.is_valid({"type": "item_reference"})
 
 
-def test_discriminator_pin_falls_back_when_tag_has_several_candidates(ctx):
-    # Two literals under one tag are ambiguous, so neither may be picked over the schema name.
+def test_discriminator_pin_skipped_when_tag_has_several_candidates(ctx):
+    # Two literals under one tag are ambiguous, so neither may be picked - and the schema name
+    # is not one the tag accepts, so the branch is left unpinned rather than made unsatisfiable.
     schema = ctx.openapi.load_schema(
         {
             "/items": {
@@ -822,8 +823,9 @@ def test_discriminator_pin_falls_back_when_tag_has_several_candidates(ctx):
     validator = make_validator(
         schema["/items"]["POST"].body[0].optimized_schema, schema.adapter.jsonschema_validator_cls
     )
-    assert not validator.is_valid({"type": "first"})
-    assert not validator.is_valid({"type": "second"})
+    assert validator.is_valid({"type": "first"})
+    assert validator.is_valid({"type": "second"})
+    assert not validator.is_valid({"type": "Ambiguous"})
 
 
 def test_discriminator_pin_skipped_for_polymorphic_branch_target(ctx):
