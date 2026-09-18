@@ -5160,3 +5160,69 @@ def test_discriminated_branch_with_empty_mapping_value(ctx):
         {"petType": "cat", "meows": True},
         {"petType": "dog", "barks": True},
     ]
+
+
+def test_x_example_in_openapi_3_parameter_schema(ctx):
+    # `x-example` works on body properties in every version, so it must work on parameters too.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test/{id}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "x-example": "abc"},
+                        },
+                        {"name": "q", "in": "query", "schema": {"type": "string", "x-example": "qq"}},
+                        {
+                            "name": "filter",
+                            "in": "query",
+                            "schema": {"type": "object", "properties": {"name": {"type": "string", "x-example": "nn"}}},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    operation = schema["/test/{id}"]["GET"]
+
+    assert [
+        (case.path_parameters, case.query)
+        for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
+    ] == [({"id": "abc"}, {"q": "qq", "name": "nn"})]
+
+
+def test_x_examples_in_openapi_3_parameters(ctx):
+    # Real-world 3.0 specs carry `x-examples` on parameters, same as the accepted `x-example`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test/{id}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "x-examples": ["abc"]},
+                        },
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "x-examples": {"first": {"value": "qq"}},
+                            "schema": {"type": "string"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    operation = schema["/test/{id}"]["GET"]
+
+    assert [
+        (case.path_parameters, case.query)
+        for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
+    ] == [({"id": "abc"}, {"q": "qq"})]
