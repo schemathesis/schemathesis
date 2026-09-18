@@ -322,8 +322,8 @@ def extract_top_level(
                 # - A oneOf/anyOf branch example is validated against the branch (not the full
                 #   combined schema, which would reject strings valid for multiple branches).
                 validator = _make_example_validator(definition)
-            # Open API 2 also supports `example`
-            for example_keyword in dict.fromkeys((parameter.adapter.example_keyword, "example")):
+            # Both keywords are accepted in every version, like body examples
+            for example_keyword in dict.fromkeys((parameter.adapter.example_keyword, "example", "x-example")):
                 if isinstance(definition, dict) and example_keyword in definition:
                     value = definition[example_keyword]
                     if _example_is_valid(value, validator):
@@ -332,17 +332,19 @@ def extract_top_level(
                             name=parameter.name,
                             value=value,
                         )
-        if parameter.adapter.examples_container_keyword in parameter.definition:
-            for value in extract_inner_examples(
-                parameter.definition[parameter.adapter.examples_container_keyword], operation.schema
-            ):
-                if _example_is_valid(value, param_validator):
-                    yield ParameterExample(
-                        container=parameter.location.container_name, name=parameter.name, value=value
-                    )
+        container_keywords = dict.fromkeys((parameter.adapter.examples_container_keyword, "examples", "x-examples"))
+        for container_keyword in container_keywords:
+            if container_keyword in parameter.definition:
+                for value in extract_inner_examples(parameter.definition[container_keyword], operation.schema):
+                    if _example_is_valid(value, param_validator):
+                        yield ParameterExample(
+                            container=parameter.location.container_name, name=parameter.name, value=value
+                        )
         for expanded_schema in expanded:
-            if isinstance(expanded_schema, dict) and parameter.adapter.examples_container_keyword in expanded_schema:
-                for value in expanded_schema[parameter.adapter.examples_container_keyword]:
+            if not isinstance(expanded_schema, dict):
+                continue
+            for container_keyword in container_keywords:
+                for value in expanded_schema.get(container_keyword, []):
                     if _example_survives_float32(value, expanded_schema):
                         yield ParameterExample(
                             container=parameter.location.container_name, name=parameter.name, value=value
@@ -643,20 +645,23 @@ def extract_from_schemas(
             continue
         if isinstance(schema, bool):
             continue
-        walk = ExampleWalk(
-            operation=operation,
-            example_keyword=parameter.adapter.example_keyword,
-            examples_container_keyword=parameter.adapter.examples_container_keyword,
-            bundle_storage=schema.get(BUNDLE_STORAGE_KEY),
-            merge_ref_siblings=merge_ref_siblings,
-        )
-        for value in extract_from_schema(
-            walk,
-            schema=schema,
-            resolver=make_root_resolver(schema),
-            reference_path=(),
-        ):
-            yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
+        resolver = make_root_resolver(schema)
+        bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
+        for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
+            walk = ExampleWalk(
+                operation=operation,
+                example_keyword=example_keyword,
+                examples_container_keyword=examples_container_keyword,
+                bundle_storage=bundle_storage,
+                merge_ref_siblings=merge_ref_siblings,
+            )
+            for value in extract_from_schema(
+                walk,
+                schema=schema,
+                resolver=resolver,
+                reference_path=(),
+            ):
+                yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     yield from _extract_body_examples_from_schemas(operation, defaults_as_examples=False)
 
 
