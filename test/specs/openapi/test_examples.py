@@ -4618,3 +4618,35 @@ def test_mutually_recursive_allof_refs(ctx):
     assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
         {"Name": "rate-limit", "Scope": {}}
     ]
+
+
+def test_boolean_property_subschema_alongside_a_cycle(ctx):
+    # The cycle keeps the body bundled, and a boolean subschema has to survive that.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Payload"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Payload": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "example": "n"},
+                        "anything": True,
+                        "child": {"$ref": "#/components/schemas/Payload"},
+                    },
+                }
+            }
+        },
+    )
+
+    assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"name": "n", "anything": None}
+    ]
