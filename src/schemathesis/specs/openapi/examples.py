@@ -989,7 +989,7 @@ def extract_from_schema(
 
     if schema.get("allOf"):
         # The merged allOf schema, which includes properties from all allOf items, comes after any oneOf/anyOf branches
-        *_, (merged, _, _) = _expand_subschemas(
+        *_, (merged, merged_path, merged_resolver) = _expand_subschemas(
             schema=schema,
             resolver=current_resolver,
             reference_path=current_path,
@@ -997,6 +997,9 @@ def extract_from_schema(
         )
         if isinstance(merged, dict) and "properties" in merged:
             properties_to_process = merged["properties"]
+            # Keep the references consumed by the merge on the path, otherwise a cycle running only
+            # through `allOf` members is never recognized.
+            current_path, current_resolver = merged_path, merged_resolver
 
     # Required fields absent from `properties` have no annotated example; add them
     # with a non-null schema so that a value is generated for each.

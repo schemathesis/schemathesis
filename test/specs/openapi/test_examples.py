@@ -4582,3 +4582,39 @@ def test_required_property_closing_a_cycle(ctx):
     assert extracted[0]["name"] == "n"
     assert extracted[0]["link"]["tag"] == "t"
     assert isinstance(extracted[0]["link"]["target"], dict)
+
+
+def test_mutually_recursive_allof_refs(ctx):
+    # A cycle that runs through `allOf` members only, so no single schema repeats a `$ref` directly.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Statement"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Statement": {"allOf": [{"$ref": "#/components/schemas/StatementBody"}]},
+                "StatementBody": {
+                    "type": "object",
+                    "properties": {
+                        "Name": {"type": "string", "example": "rate-limit"},
+                        "Scope": {"allOf": [{"$ref": "#/components/schemas/NestedBody"}]},
+                    },
+                },
+                "NestedBody": {
+                    "type": "object",
+                    "properties": {"Inner": {"allOf": [{"$ref": "#/components/schemas/StatementBody"}]}},
+                },
+            }
+        },
+    )
+
+    assert [example.value for example in extract_from_schemas(schema["/test"]["POST"])] == [
+        {"Name": "rate-limit", "Scope": {}}
+    ]
