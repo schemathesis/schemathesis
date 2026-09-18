@@ -511,73 +511,121 @@ def _expand_subschemas(
     yield schema, current_path, current_resolver
 
     if isinstance(schema, dict):
-        # For anyOf/oneOf, yield each alternative with the same path
-        for key in ("anyOf", "oneOf"):
-            if key in schema:
-                for subschema in schema[key]:
-                    # Each alternative starts with the current path
-                    yield subschema, current_path, current_resolver
+        yield from _expand_composition(
+            schema=schema,
+            resolver=current_resolver,
+            reference_path=current_path,
+            merge_ref_siblings=merge_ref_siblings,
+        )
 
-        # For allOf, merge all alternatives
-        if schema.get("allOf"):
-            subschema = deepclone(schema["allOf"][0])
-            subschema, expanded_path, expanded_resolver = _resolve_bundled(
-                subschema,
-                current_resolver,
-                current_path,
+
+def _expand_composition(
+    *,
+    schema: dict[str, Any],
+    resolver: Resolver,
+    reference_path: tuple[str, ...],
+    merge_ref_siblings: bool,
+) -> Generator[tuple[dict[str, Any] | bool, tuple[str, ...], Resolver], None, None]:
+    """Expand the composition keywords of an already resolved schema."""
+    # An alternative may be composed itself, and its examples live at any depth
+    for key in ("anyOf", "oneOf"):
+        for subschema in schema.get(key, []):
+            yield from _expand_subschemas(
+                schema=subschema,
+                resolver=resolver,
+                reference_path=reference_path,
                 merge_ref_siblings=merge_ref_siblings,
             )
-            # Clone after resolving to avoid mutating the original schema when merging
-            if isinstance(subschema, dict):
-                subschema = deepclone(subschema)
 
-            for sub in schema["allOf"][1:]:
-                if isinstance(sub, dict):
-                    sub, _, _ = _resolve_bundled(
-                        sub,
-                        current_resolver,
-                        current_path,
-                        merge_ref_siblings=merge_ref_siblings,
-                    )
-                    for key, value in sub.items():
-                        if key == "properties":
-                            subschema.setdefault("properties", {}).update(value)
-                        elif key == "required":
-                            subschema.setdefault("required", []).extend(value)
-                        elif key == "examples":
-                            subschema.setdefault("examples", []).extend(value)
-                        elif key == "example":
-                            subschema.setdefault("examples", []).append(value)
-                        else:
-                            subschema[key] = value
+    if schema.get("allOf"):
+        merged, merged_path, merged_resolver = _merge_all_of(
+            schema=schema,
+            resolver=resolver,
+            reference_path=reference_path,
+            merge_ref_siblings=merge_ref_siblings,
+        )
+        yield merged, merged_path, merged_resolver
+        yield from _expand_composition(
+            schema=merged,
+            resolver=merged_resolver,
+            reference_path=merged_path,
+            merge_ref_siblings=merge_ref_siblings,
+        )
 
-            # Merge parent schema's fields with the merged allOf result
-            # Parent's fields take precedence as they are more specific
-            parent_has_example = "example" in schema or "examples" in schema
 
-            # If parent has examples, remove examples from merged allOf to avoid duplicates
-            # The parent's examples were already yielded from the parent schema itself
-            if parent_has_example:
-                subschema.pop("example", None)
-                subschema.pop("examples", None)
+def _merge_all_of(
+    *,
+    schema: dict[str, Any],
+    resolver: Resolver,
+    reference_path: tuple[str, ...],
+    merge_ref_siblings: bool,
+) -> tuple[dict[str, Any], tuple[str, ...], Resolver]:
+    """Merge all `allOf` members into a single schema, with the parent's own keywords on top."""
+    first, expanded_path, expanded_resolver = _resolve_bundled(
+        schema["allOf"][0],
+        resolver,
+        reference_path,
+        merge_ref_siblings=merge_ref_siblings,
+    )
+    # Clone after resolving to avoid mutating the original schema when merging
+    merged: dict[str, Any] = cast("dict[str, Any]", deepclone(first)) if isinstance(first, dict) else {}
 
-            for key, value in schema.items():
-                if key in ("allOf", "example", "examples", BUNDLE_STORAGE_KEY):
-                    # Skip the allOf itself, we already processed it
-                    # Skip parent's examples - they were already yielded
-                    # Skip bundled schemas too to avoid infinite recursion
-                    continue
-                elif key == "properties":
-                    # Merge parent properties (parent overrides allOf)
-                    subschema.setdefault("properties", {}).update(value)
+    for sub in schema["allOf"][1:]:
+        if isinstance(sub, dict):
+            sub, _, _ = _resolve_bundled(
+                sub,
+                resolver,
+                reference_path,
+                merge_ref_siblings=merge_ref_siblings,
+            )
+            for key, value in sub.items():
+                if key == "properties":
+                    merged.setdefault("properties", {}).update(value)
                 elif key == "required":
-                    # Extend required list
-                    subschema.setdefault("required", []).extend(value)
+                    merged.setdefault("required", []).extend(value)
+                elif key == "examples":
+                    merged.setdefault("examples", []).extend(value)
+                elif key == "example":
+                    merged.setdefault("examples", []).append(value)
                 else:
-                    # For other fields, parent value overrides
-                    subschema[key] = value
+                    merged[key] = value
 
-            yield subschema, expanded_path, expanded_resolver
+    # Merge parent schema's fields with the merged allOf result
+    # Parent's fields take precedence as they are more specific
+    parent_has_example = "example" in schema or "examples" in schema
+
+    # If parent has examples, remove examples from merged allOf to avoid duplicates
+    # The parent's examples were already yielded from the parent schema itself
+    if parent_has_example:
+        merged.pop("example", None)
+        merged.pop("examples", None)
+
+    for key, value in schema.items():
+        if key in ("allOf", "example", "examples", BUNDLE_STORAGE_KEY):
+            # Skip the allOf itself, we already processed it
+            # Skip parent's examples - they were already yielded
+            # Skip bundled schemas too to avoid infinite recursion
+            continue
+        elif key == "properties":
+            # Merge parent properties (parent overrides allOf)
+            merged.setdefault("properties", {}).update(value)
+        elif key == "required":
+            # Extend required list
+            merged.setdefault("required", []).extend(value)
+        else:
+            # For other fields, parent value overrides
+            merged[key] = value
+
+    if merged.get("allOf"):
+        # A member may inherit through `allOf` itself, and its properties belong in the same merge
+        return _merge_all_of(
+            schema=merged,
+            resolver=expanded_resolver,
+            reference_path=expanded_path,
+            merge_ref_siblings=merge_ref_siblings,
+        )
+
+    return merged, expanded_path, expanded_resolver
 
 
 def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Generator[Any, None, None]:
@@ -974,14 +1022,13 @@ def extract_from_schema(
     properties_to_process = schema.get("properties", {})
 
     if schema.get("allOf"):
-        # The merged allOf schema, which includes properties from all allOf items, comes after any oneOf/anyOf branches
-        *_, (merged, merged_path, merged_resolver) = _expand_subschemas(
+        merged, merged_path, merged_resolver = _merge_all_of(
             schema=schema,
             resolver=current_resolver,
             reference_path=current_path,
             merge_ref_siblings=merge_ref_siblings,
         )
-        if isinstance(merged, dict) and "properties" in merged:
+        if "properties" in merged:
             properties_to_process = merged["properties"]
             # Keep the references consumed by the merge on the path, otherwise a cycle running only
             # through `allOf` members is never recognized.
