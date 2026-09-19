@@ -15,6 +15,7 @@ nav:
       - Triaging Failures: guides/triage.md
       - Replaying Failures: guides/crash-reproduction.md
       - Optimizing for Maximum Bug Detection: guides/config-optimization.md
+      - Benchmarking Schemathesis: guides/benchmarking.md
       - guides/auth.md
       - guides/schema-conformance.md
       - guides/cicd.md

@@ -14,6 +14,9 @@ Re-run the exact cases that failed a previous run with `st replay` to confirm fi
 ### [Optimizing for Maximum Bug Detection](config-optimization.md)
 Configure Schemathesis for thorough testing when preparing for production releases or conducting security assessments.
 
+### [Benchmarking Schemathesis](benchmarking.md)
+Configure a run for measuring the tool itself — comparing it with other tools, or checking whether a change helped.
+
 ### [Authentication](auth.md)
 Set up authentication for APIs that require credentials. Covers static tokens, config-based token fetch, dynamic refresh, and endpoint-specific auth strategies.
 
