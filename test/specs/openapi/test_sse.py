@@ -948,6 +948,91 @@ def test_sse_false_itemschema_takes_precedence_over_schema():
     assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
 
 
+def test_sse_item_schema_and_schema_both_apply():
+    raw_schema = {
+        "openapi": "3.2.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/sse": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "SSE stream",
+                            "content": {
+                                "text/event-stream": {
+                                    "itemSchema": {
+                                        "type": "object",
+                                        "properties": {"data": {"type": "string"}},
+                                        "required": ["data"],
+                                    },
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"event": {"enum": ["ping"]}},
+                                    },
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+    case, response = _call_sse(raw_schema, 'data: {"value": 42}\n\n')
+
+    with pytest.raises(FailureGroup) as exc:
+        case.validate_response(response, checks=[response_schema_conformance])
+
+    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
+
+
+def test_sse_item_schema_and_schema_resolve_refs():
+    raw_schema = {
+        "openapi": "3.2.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/sse": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "SSE stream",
+                            "content": {
+                                "text/event-stream": {
+                                    "itemSchema": {"type": "object", "required": ["data"]},
+                                    "schema": {"$ref": "#/components/schemas/SSEEvent"},
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "SSEEvent": {
+                    "type": "object",
+                    "properties": {
+                        "data": {
+                            "type": "string",
+                            "contentMediaType": "application/json",
+                            "contentSchema": {
+                                "type": "object",
+                                "properties": {"value": {"type": "integer"}},
+                                "required": ["value"],
+                            },
+                        }
+                    },
+                }
+            }
+        },
+    }
+    case, response = _call_sse(raw_schema, 'data: {"value": "wrong"}\n\n')
+
+    with pytest.raises(FailureGroup) as exc:
+        case.validate_response(response, checks=[response_schema_conformance])
+
+    assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
+
+
 def test_sse_metadata_only_blocks_are_not_validated_as_events():
     case, response = _call_sse(_sse_schema(SSE_ITEM_SCHEMA), 'id: 1\nretry: 3000\n\ndata: {"value": 42}\n\n')
     case.validate_response(response, checks=[response_schema_conformance])

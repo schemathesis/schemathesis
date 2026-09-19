@@ -138,6 +138,9 @@ class JsonSchemaError(Failure):
         if exc.schema_path:
             parent_path = exc.schema_path[:-1]
             schema = resolve_path(root_schema, parent_path)
+            if not isinstance(schema, (dict, bool)):
+                # A boolean branch of `allOf` / `anyOf` has the keyword's list of schemas as its parent.
+                schema = resolve_path(root_schema, exc.schema_path)
         else:
             schema = root_schema
 

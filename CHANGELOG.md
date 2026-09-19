@@ -8,6 +8,8 @@
 - Coverage phase probing methods of operations disabled via `[[operations]]`.
 - Crash in the examples phase for `allOf` members with wrongly typed `examples` or `required`.
 - Server-Sent Events: False positives for event payloads containing U+2028 or other control characters.
+- Validate SSE events against both `itemSchema` and a sibling `schema`.
+- Report a schema error instead of a generic check failure for boolean `allOf`/`anyOf` branches.
 
 ## [4.27.4](https://github.com/schemathesis/schemathesis/compare/v4.27.3...v4.27.4) - 2026-09-19
 

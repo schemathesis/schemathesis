@@ -335,8 +335,7 @@ def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | 
     first_schema = None
     for media_type, media_type_object in content.items():
         if _is_sse_media_type(media_type):
-            item_schema = media_type_object.get("itemSchema")
-            return item_schema if item_schema is not None else media_type_object.get("schema")
+            return _media_type_schema(media_type, media_type_object)
         if first_schema is None:
             first_schema = media_type_object.get("schema")
     return first_schema
@@ -492,11 +491,17 @@ def extract_schema_for_media_type_v3(
 
 
 def _media_type_schema(media_type: str, media_type_object: Mapping[str, Any]) -> JsonSchema | None:
-    """The schema a media type entry documents, taking `itemSchema` for event streams."""
+    """The schema a media type entry documents, combining `itemSchema` with a sibling `schema` for event streams."""
+    schema = media_type_object.get("schema")
     if _is_sse_media_type(media_type):
         item_schema = media_type_object.get("itemSchema")
-        return item_schema if item_schema is not None else media_type_object.get("schema")
-    return media_type_object.get("schema")
+        if item_schema is None:
+            return schema
+        if schema is None:
+            return item_schema
+        # Both documented: every event must satisfy each of them.
+        return {"allOf": [item_schema, schema]}
+    return schema
 
 
 def _is_sse_media_type(value: str) -> bool:
