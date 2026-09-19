@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Crash on schemas where `properties` is not an object.
 - Drop parameter examples built from nested ones that violate the parameter's own schema.
 - Skip parameter schema `examples` values that violate that schema in the examples phase.
 - Coverage phase probing methods of operations disabled via `[[operations]]`.

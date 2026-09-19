@@ -260,9 +260,11 @@ def _forbidden_in_allof_branches(schema: dict[str, Any]) -> set[str]:
     for branch in schema.get("allOf") or []:
         if not isinstance(branch, dict):
             continue
-        for name, subschema in (branch.get("properties") or {}).items():
-            if is_unsatisfiable(subschema):
-                forbidden.add(name)
+        properties = branch.get("properties")
+        if isinstance(properties, dict):
+            for name, subschema in properties.items():
+                if is_unsatisfiable(subschema):
+                    forbidden.add(name)
         forbidden.update(_forbidden_in_allof_branches(branch))
     return forbidden
 
@@ -538,6 +540,8 @@ def ensure_required_properties(schema: dict[str, Any]) -> None:
         return
 
     properties = schema.setdefault("properties", {})
+    if not isinstance(properties, dict):
+        return
 
     # Add missing required properties as empty schemas
     for name in required:
@@ -606,11 +610,13 @@ def apply_rewritten_pattern(
 
 def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, Any]], bool]) -> None:
     required = schema.get("required", [])
-    for name, subschema in list(schema.get("properties", {}).items()):
-        if predicate(subschema):
-            if name in required:
-                required.remove(name)
-            schema["properties"][name] = {"not": {}}
+    properties = schema.get("properties")
+    if isinstance(properties, dict):
+        for name, subschema in list(properties.items()):
+            if predicate(subschema):
+                if name in required:
+                    required.remove(name)
+                properties[name] = {"not": {}}
     if not schema.get("required"):
         schema.pop("required", None)
     if not schema.get("properties"):
