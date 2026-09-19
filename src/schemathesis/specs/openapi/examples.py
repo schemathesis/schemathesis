@@ -519,6 +519,26 @@ def _expand_composition(
         )
 
 
+def _extend_list_keyword(merged: dict[str, Any], key: str, value: Any) -> None:
+    """Extend a list-valued keyword, ignoring wrongly typed containers on either side."""
+    if not isinstance(value, list):
+        return
+    current = merged.get(key)
+    if not isinstance(current, list):
+        current = merged[key] = []
+    current.extend(value)
+
+
+def _update_dict_keyword(merged: dict[str, Any], key: str, value: Any) -> None:
+    """Update an object-valued keyword, ignoring wrongly typed containers on either side."""
+    if not isinstance(value, dict):
+        return
+    current = merged.get(key)
+    if not isinstance(current, dict):
+        current = merged[key] = {}
+    current.update(value)
+
+
 def _merge_all_of(
     *,
     schema: dict[str, Any],
@@ -546,13 +566,13 @@ def _merge_all_of(
             )
             for key, value in sub.items():
                 if key == "properties":
-                    merged.setdefault("properties", {}).update(value)
+                    _update_dict_keyword(merged, "properties", value)
                 elif key == "required":
-                    merged.setdefault("required", []).extend(value)
+                    _extend_list_keyword(merged, "required", value)
                 elif key == "examples":
-                    merged.setdefault("examples", []).extend(value)
+                    _extend_list_keyword(merged, "examples", value)
                 elif key == "example":
-                    merged.setdefault("examples", []).append(value)
+                    _extend_list_keyword(merged, "examples", [value])
                 else:
                     merged[key] = value
 
@@ -574,10 +594,10 @@ def _merge_all_of(
             continue
         elif key == "properties":
             # Merge parent properties (parent overrides allOf)
-            merged.setdefault("properties", {}).update(value)
+            _update_dict_keyword(merged, "properties", value)
         elif key == "required":
             # Extend required list
-            merged.setdefault("required", []).extend(value)
+            _extend_list_keyword(merged, "required", value)
         else:
             # For other fields, parent value overrides
             merged[key] = value

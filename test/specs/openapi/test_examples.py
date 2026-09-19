@@ -3576,6 +3576,35 @@ def test_property_examples_under_composition(ctx, body_schema, expected):
     assert _extract_json_body_examples(ctx, body_schema) == expected
 
 
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        (
+            {
+                "allOf": [
+                    {"type": "object", "examples": {"a": 1}},
+                    {"examples": [{"x": 1}], "properties": {"y": {"example": 2}}},
+                ]
+            },
+            [{"media_type": "application/json", "value": {"y": 2}}],
+        ),
+        (
+            {
+                "allOf": [
+                    {"type": "object", "required": True},
+                    {"required": ["x"], "properties": {"x": {"example": 1}}},
+                ]
+            },
+            [{"media_type": "application/json", "value": {"x": 1}}],
+        ),
+    ],
+    ids=["examples-as-object", "required-as-boolean"],
+)
+def test_all_of_with_wrongly_typed_keywords(ctx, body_schema, expected):
+    # Real-world schemas carry `examples` / `required` with the wrong type, which must not abort the operation.
+    assert _extract_json_body_examples(ctx, body_schema) == expected
+
+
 NESTED_BRANCHES = [{"type": "string", "example": "s"}, {"type": "integer", "example": 7}]
 
 
