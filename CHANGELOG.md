@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Skip parameter schema `examples` values that violate that schema in the examples phase.
 - Coverage phase probing methods of operations disabled via `[[operations]]`.
 
 ## [4.27.4](https://github.com/schemathesis/schemathesis/compare/v4.27.3...v4.27.4) - 2026-09-19
