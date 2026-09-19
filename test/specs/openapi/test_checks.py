@@ -1761,6 +1761,29 @@ def test_response_schema_conformance_forbidden_property_message(ctx, response_fa
     assert exc_info.value.message.startswith('Property "secret" is not allowed')
 
 
+def test_response_schema_conformance_reports_boolean_branch_rejection(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"allOf": [{"type": "object"}, False]}}},
+                        }
+                    }
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    case = schema["/test"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(content=b"{}"), True)
+
+    with pytest.raises(JsonSchemaError):
+        response_schema_conformance(_CHECK_CTX, response, case)
+
+
 def test_response_schema_conformance_validate_formats_disabled(ctx, response_factory):
     config = SchemathesisConfig.from_dict({"checks": {"response_schema_conformance": {"validate-formats": False}}})
     schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(_DATE_TIME_PATHS), config=config)
