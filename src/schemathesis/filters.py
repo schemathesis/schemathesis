@@ -148,22 +148,27 @@ class FilterSet:
     _excludes: set[Filter]
     # The filters as the user wrote them, kept when matching is collapsed into a single function.
     _declared: list[DeclaredFilter] | None = field(default=None, repr=False, compare=False)
+    # Whether the operation was turned off explicitly, when matching is collapsed into a single function.
+    _deselected: MatcherFunc | None = field(default=None, repr=False, compare=False)
 
     def __init__(
         self,
         _includes: set[Filter] | None = None,
         _excludes: set[Filter] | None = None,
         _declared: list[DeclaredFilter] | None = None,
+        _deselected: MatcherFunc | None = None,
     ) -> None:
         self._includes = _includes or set()
         self._excludes = _excludes or set()
         self._declared = _declared
+        self._deselected = _deselected
 
     def clone(self) -> Self:
         return self.__class__(
             _includes=self._includes.copy(),
             _excludes=self._excludes.copy(),
             _declared=list(self._declared) if self._declared is not None else None,
+            _deselected=self._deselected,
         )
 
     def applies_to(self, operation: APIOperation) -> bool:
@@ -179,6 +184,8 @@ class FilterSet:
     def is_explicitly_excluded(self, operation: APIOperation) -> bool:
         """Whether a filter the user wrote rejects this operation."""
         ctx = SimpleNamespace(operation=operation)
+        if self._deselected is not None and self._deselected(ctx):
+            return True
         if self._declared is None:
             return any(filter_.match(ctx) for filter_ in self._excludes)
         return any(entry.filter.match(ctx) for entry in self._declared if not entry.include)

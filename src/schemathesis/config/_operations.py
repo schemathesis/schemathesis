@@ -196,11 +196,14 @@ class OperationsConfig(DiffBase):
         final = FilterSet()
         exclude = exclude or FilterSet()
 
+        def is_deselected(ctx: HasAPIOperation) -> bool:
+            """Whether an `[[operations]]` entry turns this operation off."""
+            return any(not op_config.enabled and op_config._filter_set.match(ctx) for op_config in operations)
+
         def priority_filter(ctx: HasAPIOperation) -> bool:
             """Filter operations according to CLI and config priority."""
-            for op_config in operations:
-                if op_config._filter_set.match(ctx) and not op_config.enabled:
-                    return False
+            if is_deselected(ctx):
+                return False
 
             if not include.is_empty():
                 if exclude.is_empty():
@@ -225,6 +228,8 @@ class OperationsConfig(DiffBase):
                 for filter_ in op_config._filter_set._includes
             ),
         ]
+        # Turning an operation off means "never send this request", including as an unexpected method.
+        final._deselected = is_deselected
 
         return final
 
