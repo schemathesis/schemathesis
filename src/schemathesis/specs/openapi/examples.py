@@ -982,7 +982,9 @@ def extract_from_schema(
         merge_ref_siblings=walk.merge_ref_siblings,
     )
 
-    properties_to_process = schema.get("properties", {})
+    properties_to_process = schema.get("properties")
+    if not isinstance(properties_to_process, dict):
+        properties_to_process = {}
 
     if schema.get("allOf"):
         merged, merged_path, merged_resolver = _merge_all_of(
@@ -991,7 +993,7 @@ def extract_from_schema(
             reference_path=current_path,
             merge_ref_siblings=walk.merge_ref_siblings,
         )
-        if "properties" in merged:
+        if isinstance(merged.get("properties"), dict):
             properties_to_process = merged["properties"]
             # Keep the references consumed by the merge on the path, otherwise a cycle running only
             # through `allOf` members is never recognized.

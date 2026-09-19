@@ -1011,3 +1011,46 @@ INT64_MIN, INT64_MAX = -(2**63), 2**63 - 1
 )
 def test_integer_format_bounds(schema, expected):
     assert transform(schema, converter.to_json_schema, nullable_keyword="x-nullable") == expected
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        pytest.param({"type": "object", "properties": ["x"]}, id="properties_as_list"),
+        pytest.param({"type": "object", "properties": "x"}, id="properties_as_string"),
+        pytest.param(
+            {"type": "object", "properties": ["x"], "additionalProperties": False, "required": ["y"]},
+            id="properties_as_list_with_required_and_no_additional",
+        ),
+        pytest.param(
+            {"type": "object", "required": ["a"], "allOf": [{"properties": ["x"]}]},
+            id="properties_as_list_inside_allof",
+        ),
+    ],
+)
+def test_malformed_properties_left_alone(schema):
+    assert to_json_schema(schema, nullable_keyword="nullable") == schema
+
+
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        pytest.param({"type": "object", "properties": ["x"]}, id="top_level"),
+        pytest.param({"type": "object", "allOf": [{"type": "object", "properties": ["x"]}]}, id="inside_allof"),
+    ],
+)
+def test_malformed_properties_do_not_raise_for_operation(ctx, body_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert schema["/test"]["POST"].get_strategies_from_examples() == []
