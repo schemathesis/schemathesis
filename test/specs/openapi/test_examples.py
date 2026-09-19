@@ -5226,3 +5226,50 @@ def test_x_examples_in_openapi_3_parameters(ctx):
         (case.path_parameters, case.query)
         for case in generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
     ] == [({"id": "abc"}, {"q": "qq"})]
+
+
+def test_schema_level_parameter_examples_map_yields_values(ctx):
+    # A schema-level `examples` written as an OAS-style map carries names as keys; only the values are examples.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "examples": {"a": {"value": 5}}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+
+    assert [example_to_dict(example) for example in extract_top_level(schema["/test"]["GET"])] == [
+        {"container": "query", "name": "q", "value": 5}
+    ]
+
+
+def test_schema_level_body_examples_map_yields_values(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "integer", "examples": {"a": {"value": 5}}}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+
+    assert [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])] == [
+        {"value": 5, "media_type": "application/json"}
+    ]

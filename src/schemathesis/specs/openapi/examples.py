@@ -344,7 +344,7 @@ def extract_top_level(
             if not isinstance(expanded_schema, dict):
                 continue
             for container_keyword in container_keywords:
-                for value in expanded_schema.get(container_keyword, []):
+                for value in _iter_schema_examples(expanded_schema.get(container_keyword), operation.schema):
                     if _example_survives_float32(value, expanded_schema):
                         yield ParameterExample(
                             container=parameter.location.container_name, name=parameter.name, value=value
@@ -389,7 +389,9 @@ def extract_top_level(
                     yield BodyExample(value=value, media_type=body.media_type)
         for expanded_schema in expanded:
             if isinstance(expanded_schema, dict) and body.adapter.examples_container_keyword in expanded_schema:
-                for value in expanded_schema[body.adapter.examples_container_keyword]:
+                for value in _iter_schema_examples(
+                    expanded_schema[body.adapter.examples_container_keyword], operation.schema
+                ):
                     if _example_is_valid(value, declared_validator) and _example_survives_float32(
                         value, expanded_schema
                     ):
@@ -608,6 +610,14 @@ def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Ge
             pass
     elif example:
         yield example
+
+
+def _iter_schema_examples(container: Any, schema: OpenApiSchema) -> Generator[Any, None, None]:
+    # `examples` inside a schema is a JSON Schema array, but specs also write it as a map of named Example Objects.
+    if isinstance(container, dict):
+        yield from extract_inner_examples(container, schema)
+    elif isinstance(container, list):
+        yield from container
 
 
 def extract_inner_examples(examples: dict[str, Any] | list, schema: OpenApiSchema) -> Generator[Any, None, None]:
