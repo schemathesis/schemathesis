@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Drop parameter examples built from nested ones that violate the parameter's own schema.
 - Skip parameter schema `examples` values that violate that schema in the examples phase.
 - Coverage phase probing methods of operations disabled via `[[operations]]`.
 - Crash in the examples phase for `allOf` members with wrongly typed `examples` or `required`.

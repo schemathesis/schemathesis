@@ -669,6 +669,9 @@ def extract_from_schemas(
             continue
         if isinstance(schema, bool):
             continue
+        # A value assembled from examples declared deeper in the schema still goes on the wire as the whole
+        # parameter, so it is checked against what the parameter declares.
+        parameter_validator: jsonschema_rs.Validator | None = _make_example_validator(schema, snap_float32=False)
         resolver = make_root_resolver(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
@@ -685,7 +688,10 @@ def extract_from_schemas(
                 resolver=resolver,
                 reference_path=(),
             ):
-                yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
+                if _example_is_valid(value, parameter_validator):
+                    yield ParameterExample(
+                        container=parameter.location.container_name, name=parameter.name, value=value
+                    )
     yield from _extract_body_examples_from_schemas(operation, defaults_as_examples=False)
 
 
