@@ -7,6 +7,7 @@
 - Skip parameter schema `examples` values that violate that schema in the examples phase.
 - Coverage phase probing methods of operations disabled via `[[operations]]`.
 - Crash in the examples phase for `allOf` members with wrongly typed `examples` or `required`.
+- Server-Sent Events: False positives for event payloads containing U+2028 or other control characters.
 
 ## [4.27.4](https://github.com/schemathesis/schemathesis/compare/v4.27.3...v4.27.4) - 2026-09-19
 

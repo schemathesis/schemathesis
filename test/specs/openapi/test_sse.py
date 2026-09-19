@@ -1113,6 +1113,11 @@ def test_sse_pytest_plugin(ctx):
             id="id-null-char-falls-back-to-last-event-id",
         ),
         pytest.param(
+            "data: a\x0bb\x0cc\x1cd\x1de\x1ef\x85g\u2028h\u2029i\n\n".encode(),
+            [{"event": "message", "data": "a\x0bb\x0cc\x1cd\x1de\x1ef\x85g\u2028h\u2029i"}],
+            id="non-sse-line-separators-kept-in-data",
+        ),
+        pytest.param(
             b"",
             [],
             id="empty-stream",
