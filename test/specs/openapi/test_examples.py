@@ -4055,6 +4055,31 @@ def test_top_level_body_examples_container_filters_invalid(ctx):
     assert validator.is_valid(body_examples[0].value)
 
 
+def test_top_level_parameter_schema_examples_container_filters_invalid(ctx):
+    # A parameter schema's `examples` array must not ship values the parameter's own schema rejects.
+    schema = ctx.openapi.load_schema(
+        {
+            "/search": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "examples": ["not-an-int", 42]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    assert list(extract_top_level(schema["/search"]["GET"])) == [
+        ParameterExample(container="query", name="q", value=42)
+    ]
+
+
 def test_unsatisfiable_property_schema_does_not_crash(ctx):
     # When one property has a valid example and another property has an unsatisfiable schema
     schema = ctx.openapi.load_schema(

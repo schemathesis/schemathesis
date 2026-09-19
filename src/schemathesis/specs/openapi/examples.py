@@ -343,9 +343,13 @@ def extract_top_level(
         for expanded_schema in expanded:
             if not isinstance(expanded_schema, dict):
                 continue
+            # A oneOf/anyOf branch's examples are checked against that branch, like its `example` above.
+            expanded_validator = _make_example_validator(expanded_schema)
             for container_keyword in container_keywords:
                 for value in expanded_schema.get(container_keyword, []):
-                    if _example_survives_float32(value, expanded_schema):
+                    if _example_is_valid(value, expanded_validator) and _example_survives_float32(
+                        value, expanded_schema
+                    ):
                         yield ParameterExample(
                             container=parameter.location.container_name, name=parameter.name, value=value
                         )
