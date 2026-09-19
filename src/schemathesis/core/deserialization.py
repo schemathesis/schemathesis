@@ -238,6 +238,9 @@ class ServerSentEvent(TypedDict):
 
 
 SSE_RETRY_RE = re.compile(r"^[0-9]+$")
+# Only CR, LF and CRLF end an SSE line; `str.splitlines` would also break on U+2028 and other
+# control characters, truncating payloads that legitimately contain them.
+SSE_LINE_RE = re.compile(r"\r\n|\r|\n")
 
 
 def _flush_sse_event(
@@ -272,7 +275,7 @@ def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[ServerSen
     current_data_lines: list[str] = []
     last_event_id: str | None = None
 
-    for line in text.splitlines():
+    for line in SSE_LINE_RE.split(text):
         if line == "":
             flushed = _flush_sse_event(current_event, current_data_lines, last_event_id=last_event_id)
             if flushed is not None:
