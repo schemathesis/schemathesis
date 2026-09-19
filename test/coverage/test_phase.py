@@ -2622,6 +2622,44 @@ def test_unexpected_methods_respect_exclusion_filters(ctx, cli, flags, expected)
     assert {request.method for request in app.config["captured_requests"]} == expected
 
 
+def test_unexpected_methods_respect_disabled_operations(ctx, cli):
+    # Turning an operation off must also keep its method out of the unexpected-method probes.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            },
+            "/admin": {"delete": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+
+    @app.route("/items", methods=["GET", "POST"])
+    def items():
+        return "", 200
+
+    @app.route("/admin", methods=["DELETE"])
+    def admin():
+        return "", 200
+
+    cli.run_openapi_app(
+        app,
+        "--phases=coverage",
+        "--max-examples=5",
+        config={"operations": [{"include-method-regex": "DELETE", "enabled": False}]},
+    )
+
+    assert {request.method for request in app.config["captured_requests"]} == {
+        "GET",
+        "POST",
+        "PUT",
+        "OPTIONS",
+        "PATCH",
+        "TRACE",
+        "QUERY",
+    }
+
+
 def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # Regression test for GH-3322
