@@ -1177,6 +1177,35 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self._print_items(labels)
             self._print_warning_tips([tip])
 
+    def _display_low_valid_rate_block(self, ctx: ExecutionContext) -> None:
+        """Report the share of requests each operation accepted, and what turned the rest away."""
+        self._print_warning_header(
+            "Low valid-input rate",
+            len(ctx.warnings.low_valid_rate_reported),
+            "operation",
+            " accepted few of the requests sent to it, leaving the logic behind them untested",
+        )
+        unreachable_dominates = False
+        for label in sorted(ctx.warnings.low_valid_rate_reported):
+            for phase, rate in sorted(ctx.warnings.valid_rates.get(label, {}).items()):
+                if rate.accepted and rate.rate < ctx.config.warnings.low_valid_rate.threshold:
+                    if rate.unreachable > rate.rejected:
+                        unreachable_dominates = True
+                        cause = f"{rate.unreachable} not found"
+                    else:
+                        cause = f"{rate.rejected} rejected"
+                    click.echo(
+                        _style(
+                            f"  - {label} ({phase}): {rate.rate:.0%} accepted ({rate.accepted}/{rate.total}, {cause})",
+                            fg="yellow",
+                        )
+                    )
+        if unreachable_dominates:
+            tip = "💡 Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary"
+        else:
+            tip = "💡 Most requests were refused on their data; the schema likely omits constraints the API enforces"
+        self._print_warning_tips([tip])
+
     def display_warnings(self, ctx: ExecutionContext) -> None:
         display_section_name("WARNINGS")
         click.echo()
@@ -1252,6 +1281,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 suffix_text=" contain regex patterns Schemathesis cannot use as written",
                 tips=["💡 Supply examples for these operations, or narrow the pattern"],
             )
+
+        if ctx.warnings.low_valid_rate_reported:
+            self._display_low_valid_rate_block(ctx)
 
         if ctx.warnings.unresolvable_reference:
             self._display_detailed_warning_block(
@@ -1412,6 +1444,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 "Unresolvable references",
                 "operation",
                 "had parts of the schema skipped",
+            ),
+            (
+                len(ctx.warnings.low_valid_rate_reported),
+                "Low valid-input rate",
+                "operation",
+                "accepted few of the requests sent to it",
             ),
         )
         for count, title, entity_name, suffix_text in entries:

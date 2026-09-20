@@ -15,6 +15,7 @@ class SchemathesisWarning(str, enum.Enum):
     CONSTANTS_EXTRACTION = "constants_extraction"
     UNMATCHED_FILTER = "unmatched_filter"
     UNRESOLVABLE_REFERENCE = "unresolvable_reference"
+    LOW_VALID_RATE = "low_valid_rate"
 
     @classmethod
     def from_str(cls, value: str) -> SchemathesisWarning:
@@ -30,4 +31,5 @@ class SchemathesisWarning(str, enum.Enum):
             "constants_extraction": cls.CONSTANTS_EXTRACTION,
             "unmatched_filter": cls.UNMATCHED_FILTER,
             "unresolvable_reference": cls.UNRESOLVABLE_REFERENCE,
+            "low_valid_rate": cls.LOW_VALID_RATE,
         }[value.lower()]

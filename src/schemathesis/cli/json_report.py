@@ -97,6 +97,17 @@ def build_document(
         else None,
         "filtered": summary.filtered,
         "warnings": summary.warnings.as_labels(),
+        "valid_rates": {
+            label: {
+                phase: {
+                    "accepted": rate.accepted,
+                    "unreachable": rate.unreachable,
+                    "rejected": rate.rejected,
+                }
+                for phase, rate in phases.items()
+            }
+            for label, phases in summary.warnings.valid_rates.items()
+        },
         "auth": {
             "reauth_count": payload.reauth_count if payload is not None else 0,
             "reauth_broke": payload.reauth_broke if payload is not None else False,

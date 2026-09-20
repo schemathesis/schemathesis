@@ -19,6 +19,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `constants_extraction` | A registered `@schemathesis.python.constants` source could not be scanned | Return your app or importable modules from the source |
 | `unmatched_filter` | A filter expression matched no API operation | Fix the typo, or update the filter if the operation was renamed |
 | `unresolvable_reference` | A parameter, request body, or response schema names a component that does not exist | Define the missing component, or drop the reference from the schema |
+| `low_valid_rate` (opt-in) | An operation accepted only a small share of the requests sent to it | Supply real identifiers, or align the schema with the constraints the API enforces |
 
 ## Available Warnings
 
@@ -193,6 +194,41 @@ Unresolvable references: 1 operation skipped parts of the schema
 A **required request body** with the same problem keeps the operation testable in exactly one way: the coverage phase sends the request without a body, which the schema already declares invalid. No other case can be trusted for that operation — every request would be missing the body — so the other phases skip it and no valid data is ever claimed to have been sent.
 
 Any other **required** parameter with the same problem is a hard schema error instead — a path, query, header, or cookie parameter has no meaningful absent state, so the operation cannot be tested at all and is reported under "Schema Errors".
+
+### `low_valid_rate`
+
+```
+Low valid-input rate: 1 operation accepted few of the requests sent to it, leaving the logic behind them untested
+
+  - GET /orders/{orderId} (fuzzing): 10% accepted (1/10, 9 not found)
+
+💡 Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary
+```
+
+**Trigger**: An operation received at least 10 positive requests in a phase, accepted at least one of them, and accepted fewer than 20%. The rate is reported per phase, since an operation can be reachable from a schema example and not from generated data. Below 10 requests the share accepted is noise rather than a rate, so nothing is reported.
+
+An operation where almost every request is turned away has exercised the request parser and little behind it, and nothing else in the output says so - the run still reports the same case count and passes. The two adjacent warnings cover the extreme: [`missing_test_data`](#missing_test_data) and [`validation_mismatch`](#validation_mismatch) fire when *every* request was rejected, and this one covers the middle ground they leave silent.
+
+The counts distinguish the two causes, which need different fixes:
+
+- **Not found** - the requests were well-formed but addressed resources that do not exist. Supply real identifiers through `parameters` in an `[[operations]]` section, schema examples, or a [fuzz dictionary](../guides/fuzz-dictionary.md).
+- **Rejected** - the API refused the data itself, so the schema is likely missing constraints the API enforces.
+
+Authentication failures and server errors are excluded from the rate, since neither says anything about whether the data was acceptable.
+
+This warning is **opt-in**: it is not displayed unless you enable it by name.
+
+```bash
+schemathesis run ... --warnings low_valid_rate
+```
+
+```toml
+[warnings]
+display = ["low_valid_rate"]
+
+[warnings.low_valid_rate]
+threshold = 0.5
+```
 
 ## Configuring Warnings
 

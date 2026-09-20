@@ -1072,7 +1072,8 @@
         "method_not_allowed",
         "constants_extraction",
         "unmatched_filter",
-        "unresolvable_reference"
+        "unresolvable_reference",
+        "low_valid_rate"
       ]
     },
     "WarningNameList": {
@@ -1109,6 +1110,17 @@
                   "$ref": "#/$defs/WarningNameList"
                 }
               ]
+            },
+            "low_valid_rate": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "threshold": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
             }
           }
         }
