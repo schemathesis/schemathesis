@@ -1,6 +1,7 @@
 import itertools
 
 import pytest
+import strawberry
 from _pytest.main import ExitCode
 from flask import Response, jsonify
 
@@ -577,3 +578,30 @@ threshold = 0.05
     result = cli.run_openapi_app(app, "--max-examples=10", "--phases=fuzzing", "-m", "positive")
 
     assert "Low valid-input rate" not in result.stdout
+
+
+def _erratic_books_schema():
+    calls = itertools.count()
+
+    @strawberry.type
+    class Book:
+        id: str
+        title: str
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def get_book(self, book_id: str) -> Book:
+            if next(calls) % 10 == 0:
+                return Book(id=book_id, title="Hitchhiker")
+            raise ValueError("Book not found")
+
+    return strawberry.Schema(query=Query)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_low_valid_rate_for_graphql(ctx, cli, snapshot_cli):
+    # GraphQL answers 200 whether it served the query or only returned errors.
+    api = ctx.graphql.apps.from_schema(_erratic_books_schema())
+
+    assert cli.run(api.schema_url, *LOW_VALID_RATE_ARGS, "--continue-on-failure") == snapshot_cli

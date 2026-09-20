@@ -14,7 +14,7 @@ from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transport import USER_AGENT, Response
+from schemathesis.core.transport import USER_AGENT, CallOutcome, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
@@ -624,3 +624,27 @@ def test_not_a_server_error_graphql_bad_charset(ctx, charset):
     )
 
     assert not_a_server_error(check_ctx, response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (b'{"data": {"getBooks": []}}', CallOutcome.ACCEPTED),
+        (b'{"data": null, "errors": [{"message": "Boom", "path": ["getBooks"]}]}', CallOutcome.REJECTED),
+        (b'{"data": {"getBooks": []}, "errors": [{"message": "Boom"}]}', CallOutcome.REJECTED),
+        (b'{"data": null}', CallOutcome.REJECTED),
+        (b'{"data": {"getBooks": []}, "errors": []}', CallOutcome.ACCEPTED),
+        (b"INTERNAL SERVER ERROR", CallOutcome.UNINFORMATIVE),
+    ],
+    ids=["data", "errors", "partial-data", "null-data", "empty-errors", "not-a-graphql-response"],
+)
+def test_classify_call_outcome(ctx, response_factory, content, expected):
+    schema = _books_schema(ctx)
+    assert schema.classify_call_outcome(response_factory.requests(content=content)) is expected
+
+
+@pytest.mark.parametrize("status_code", [401, 403, 500])
+def test_classify_call_outcome_ignores_uninformative_responses(ctx, response_factory, status_code):
+    schema = _books_schema(ctx)
+    response = response_factory.requests(status_code=status_code, content=b'{"errors": [{"message": "Nope"}]}')
+    assert schema.classify_call_outcome(response) is CallOutcome.UNINFORMATIVE

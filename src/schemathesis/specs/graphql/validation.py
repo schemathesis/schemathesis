@@ -1,9 +1,18 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
+from schemathesis.core.transport import Response, load_json_lossy
 from schemathesis.generation.case import Case
 from schemathesis.graphql.checks import GraphQLClientError, GraphQLServerError, UnexpectedGraphQLResponse
+
+
+def parse_payload(response: Response) -> Any:
+    """Parse a GraphQL response body, re-parsing from raw bytes if the response lies about its charset."""
+    try:
+        return response.json()
+    except (LookupError, ValueError):
+        return load_json_lossy(response.content, response.encoding)
 
 
 def is_client_error(payload: dict) -> bool:
