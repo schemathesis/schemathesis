@@ -5,6 +5,7 @@ from unittest.mock import ANY
 import pytest
 import requests
 import strawberry
+from graphql import GraphQLError
 from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
@@ -157,6 +158,109 @@ def test_client_error(ctx):
         ({"data": {"field": "value"}}, False),
         # Empty errors array
         ({"data": None, "errors": []}, False),
+        # Apollo caller-side code outweighs the resolver `path`
+        (
+            {
+                "data": None,
+                "errors": [{"message": "Bad input", "path": ["addBook"], "extensions": {"code": "BAD_USER_INPUT"}}],
+            },
+            True,
+        ),
+        # Apollo server-side code outweighs the missing `path`
+        ({"data": None, "errors": [{"message": "Boom", "extensions": {"code": "INTERNAL_SERVER_ERROR"}}]}, False),
+        # graphql-java caller-side classification outweighs the resolver `path`
+        (
+            {
+                "data": None,
+                "errors": [
+                    {"message": "Bad query", "path": ["addBook"], "extensions": {"classification": "ValidationError"}}
+                ],
+            },
+            True,
+        ),
+        # graphql-java server-side classification outweighs the missing `path`
+        (
+            {"data": None, "errors": [{"message": "Boom", "extensions": {"classification": "DataFetchingException"}}]},
+            False,
+        ),
+        # Unrecognised markers fall back to the response shape
+        ({"data": None, "errors": [{"message": "Nope", "extensions": {"code": "TEAPOT"}}]}, True),
+        (
+            {"data": None, "errors": [{"message": "Nope", "path": ["addBook"], "extensions": {"code": "TEAPOT"}}]},
+            False,
+        ),
+        (
+            {
+                "data": None,
+                "errors": [
+                    {"message": "APQ off", "path": ["addBook"], "extensions": {"code": "PERSISTED_QUERY_NOT_SUPPORTED"}}
+                ],
+            },
+            True,
+        ),
+        (
+            {
+                "data": None,
+                "errors": [
+                    {
+                        "message": "No such operation",
+                        "path": ["addBook"],
+                        "extensions": {"code": "OPERATION_RESOLUTION_FAILURE"},
+                    }
+                ],
+            },
+            True,
+        ),
+        (
+            {
+                "data": None,
+                "errors": [
+                    {
+                        "message": "Wrongly returned null",
+                        "extensions": {"classification": "NullValueInNonNullableField"},
+                    }
+                ],
+            },
+            False,
+        ),
+        (
+            {
+                "data": None,
+                "errors": [
+                    {
+                        "message": "Mutations are not supported",
+                        "path": ["addBook"],
+                        "extensions": {"classification": "OperationNotSupported"},
+                    }
+                ],
+            },
+            True,
+        ),
+        # Auth codes say nothing about the data that was sent
+        (
+            {
+                "data": None,
+                "errors": [{"message": "Nope", "path": ["addBook"], "extensions": {"code": "UNAUTHENTICATED"}}],
+            },
+            False,
+        ),
+        (
+            {"data": None, "errors": [{"message": "Nope", "extensions": {"code": "FORBIDDEN"}}]},
+            True,
+        ),
+        # A crash anywhere in the response outweighs a rejection reported beside it
+        (
+            {
+                "data": None,
+                "errors": [
+                    {"message": "Bad input", "extensions": {"code": "BAD_USER_INPUT"}},
+                    {"message": "Boom", "path": ["addBook"], "extensions": {"code": "INTERNAL_SERVER_ERROR"}},
+                ],
+            },
+            False,
+        ),
+        # Error entries that are not objects must not crash the classification
+        ({"data": None, "errors": ["Boom"]}, True),
     ],
     ids=[
         "client_error_no_data_no_path",
@@ -165,6 +269,20 @@ def test_client_error(ctx):
         "server_error_has_partial_data",
         "no_errors",
         "empty_errors_array",
+        "apollo_caller_side_code",
+        "apollo_server_side_code",
+        "graphql_java_caller_side_classification",
+        "graphql_java_server_side_classification",
+        "unknown_code_without_path",
+        "unknown_code_with_path",
+        "apollo_persisted_query_not_supported",
+        "apollo_operation_resolution_failure",
+        "graphql_java_non_null_violation",
+        "graphql_java_operation_not_supported",
+        "auth_code_with_path_falls_back_to_shape",
+        "auth_code_without_path_falls_back_to_shape",
+        "server_side_marker_outweighs_caller_side_one",
+        "non_object_error_entry",
     ],
 )
 def test_is_client_error(payload, expected):
@@ -489,8 +607,10 @@ def test_negative_mode_fallback_to_positive(ctx):
     test_()
 
 
-def _make_graphql_case_with_mode(schema, mode):
-    operation = schema["Mutation"]["addBook"]
+def _make_graphql_case_with_mode(
+    schema, mode, *, operation=None, body='{ addBook(title: "test", author: "test") { id } }'
+):
+    operation = operation if operation is not None else schema["Mutation"]["addBook"]
     meta = CaseMetadata(
         generation=GenerationInfo(time=0.0, mode=mode),
         components={ParameterLocation.BODY: ComponentInfo(mode=mode)},
@@ -508,7 +628,7 @@ def _make_graphql_case_with_mode(schema, mode):
         operation=operation,
         method="POST",
         path="/graphql",
-        body='{ addBook(title: "test", author: "test") { id } }',
+        body=body,
         media_type="application/json",
         meta=meta,
     )
@@ -571,6 +691,55 @@ def test_not_a_server_error_graphql_negative_mode_server_error_raises(ctx):
     case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Internal error in resolver", "path": ["addBook"]}]}
+    )
+    check_ctx = CheckContext(
+        override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
+    )
+
+    with pytest.raises(GraphQLServerError, match="Internal error in resolver"):
+        not_a_server_error(check_ctx, response, case)
+
+
+def test_negative_mode_resolver_rejection_marked_by_extensions(ctx):
+    # A resolver that rejects bad input reports a `path`, so only its `extensions` tell a rejection from a crash.
+    @strawberry.type
+    class Book:
+        title: str
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def bookByTitle(self, title: str) -> Book:
+            raise GraphQLError("Title must not be empty", extensions={"code": "BAD_USER_INPUT"})
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query))
+    schema = schemathesis.graphql.from_url(api.schema_url)
+    case = _make_graphql_case_with_mode(
+        schema,
+        GenerationMode.NEGATIVE,
+        operation=schema["Query"]["bookByTitle"],
+        body='{ bookByTitle(title: "") { title } }',
+    )
+
+    assert case.call_and_validate().json()["errors"][0]["path"] == ["bookByTitle"]
+
+
+def test_not_a_server_error_graphql_positive_mode_server_side_extensions_code_raises(ctx, response_factory):
+    schema = _books_schema(ctx)
+    case = _make_graphql_case_with_mode(schema, GenerationMode.POSITIVE)
+    response = response_factory.requests(
+        content=json.dumps(
+            {
+                "data": None,
+                "errors": [
+                    {
+                        "message": "Internal error in resolver",
+                        "path": ["addBook"],
+                        "extensions": {"code": "INTERNAL_SERVER_ERROR"},
+                    }
+                ],
+            }
+        ).encode()
     )
     check_ctx = CheckContext(
         override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None, response_checks=None
