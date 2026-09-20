@@ -112,6 +112,7 @@ def substitute_constants(
     pool: ConstantsPool,
     random: Random,
     probability: float = CONSTANTS_SUBSTITUTION_PROBABILITY,
+    skip: frozenset[tuple[str, ...]] = frozenset(),
 ) -> list[ConstantDraw]:
     """Replace scalar argument literals with type-compatible constants extracted from the SUT source.
 
@@ -121,7 +122,7 @@ def substitute_constants(
     root = _root_type_for(client_schema, operation_node.operation)
     assert root is not None, "query and mutation operations always have a root type"
     draws: list[ConstantDraw] = []
-    _walk_constants(operation_node.selection_set, root, pool, random, probability, draws, ())
+    _walk_constants(operation_node.selection_set, root, pool, random, probability, draws, (), skip)
     return draws
 
 
@@ -133,6 +134,7 @@ def _walk_constants(
     probability: float,
     draws: list[ConstantDraw],
     path: tuple[str, ...],
+    skip: frozenset[tuple[str, ...]],
 ) -> None:
     assert selection_set is not None, "the operation root and object-typed fields always carry a selection set"
     for selection in selection_set.selections:
@@ -156,12 +158,15 @@ def _walk_constants(
                 random,
                 probability,
                 draws,
+                skip,
             )
             if new_value is not None:
                 argument.value = new_value
         unwrapped_return = _unwrap(field_def.type)
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
-            _walk_constants(selection.selection_set, unwrapped_return, pool, random, probability, draws, field_path)
+            _walk_constants(
+                selection.selection_set, unwrapped_return, pool, random, probability, draws, field_path, skip
+            )
 
 
 def _substitute_constant_value(
@@ -173,6 +178,7 @@ def _substitute_constant_value(
     random: Random,
     probability: float,
     draws: list[ConstantDraw],
+    skip: frozenset[tuple[str, ...]],
 ) -> graphql.ValueNode | None:
     inner = value_type
     while isinstance(inner, graphql.GraphQLNonNull):
@@ -183,13 +189,16 @@ def _substitute_constant_value(
         replaced_any = False
         for list_index, element in enumerate(new_values):
             replaced = _substitute_constant_value(
-                element, inner.of_type, path, parameter_name, pool, random, probability, draws
+                element, inner.of_type, path, parameter_name, pool, random, probability, draws, skip
             )
             if replaced is not None:
                 new_values[list_index] = replaced
                 replaced_any = True
         return graphql.ListValueNode(values=tuple(new_values)) if replaced_any else None
     if isinstance(inner, graphql.GraphQLScalarType):
+        # A dictionary binding already filled this argument; a harvested constant must not undo it.
+        if path in skip:
+            return None
         return _scalar_constant_node(inner.name, path, parameter_name, pool, random, probability, draws)
     if isinstance(inner, graphql.GraphQLInputObjectType) and isinstance(value, graphql.ObjectValueNode):
         new_fields = list(value.fields)
@@ -206,6 +215,7 @@ def _substitute_constant_value(
                 random,
                 probability,
                 draws,
+                skip,
             )
             if replaced is not None:
                 new_fields[field_index] = graphql.ObjectFieldNode(name=field_node.name, value=replaced)
@@ -251,10 +261,10 @@ def _scalar_constant_node(
             body_path="/" + "/".join(path),
         )
     )
-    return _constant_value_node(scalar_name, chosen)
+    return scalar_value_node(scalar_name, chosen)
 
 
-def _constant_value_node(scalar_name: str, value: ConstantValue) -> graphql.ValueNode:
+def scalar_value_node(scalar_name: str, value: ConstantValue) -> graphql.ValueNode:
     if scalar_name == "Int":
         return graphql.IntValueNode(value=str(value))
     if scalar_name == "Float":

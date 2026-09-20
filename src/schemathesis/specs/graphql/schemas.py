@@ -49,6 +49,7 @@ from schemathesis.schemas import (
 )
 from schemathesis.transport.prepare import prepare_path
 
+from .dictionaries import resolve_bindings, substitute_dictionaries
 from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
 from .scalars import CUSTOM_SCALARS, UnknownScalar, get_extra_scalar_strategies, unsupported_scalar_name
@@ -68,6 +69,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.run import Phase
+    from schemathesis.generation.dictionaries import DictionaryDraw
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.python._constants.pool import ConstantDraw, ConstantsPool
     from schemathesis.resources import ExtraDataSource, ResourcePool
@@ -572,6 +574,7 @@ def graphql_cases(
         None,
     )
     constants_draws: tuple[ConstantDraw, ...] = ()
+    dictionary_draws: tuple[DictionaryDraw, ...] = ()
     if operation_node is not None:
         # A captured identifier would overwrite the argument the negative strategy deliberately
         # corrupted, turning the query valid and making the server's acceptance look like a bug.
@@ -585,6 +588,20 @@ def graphql_cases(
                     random=random_source,
                     schema_index=operation.schema.analysis.schema_index,
                 )
+        # A dictionary entry is explicit user intent, so it overwrites whatever the resource pool
+        # put in the same argument - and a harvested constant does not overwrite it in turn.
+        if effective_mode.is_positive:
+            dictionary_bindings = resolve_bindings(operation, generation)
+            if not dictionary_bindings.is_empty:
+                dictionary_draws = tuple(
+                    substitute_dictionaries(
+                        operation_node=operation_node,
+                        client_schema=operation.schema.client_schema,
+                        bindings=dictionary_bindings,
+                        operation_label=operation.label,
+                        random=draw(st.randoms()),
+                    )
+                )
         if constants_value_source is not None and effective_mode.is_positive:
             constants_draws = tuple(
                 substitute_constants(
@@ -592,6 +609,11 @@ def graphql_cases(
                     client_schema=operation.schema.client_schema,
                     pool=constants_value_source,
                     random=draw(st.randoms()),
+                    skip=frozenset(
+                        tuple(draw_.body_path.lstrip("/").split("/"))
+                        for draw_ in dictionary_draws
+                        if draw_.body_path is not None
+                    ),
                 )
             )
         if mutate_ast is not None:
@@ -651,6 +673,7 @@ def graphql_cases(
                 if value is not NOT_SET
             },
             constants_draws=constants_draws,
+            dictionary_draws=dictionary_draws,
         ),
         media_type=media_type or "application/json",
     )

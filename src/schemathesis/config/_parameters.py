@@ -7,7 +7,9 @@ from schemathesis.config._dictionaries import (
     SUPPORTED_LOCATION_PREFIXES,
     DictionaryDefinition,
     ParameterDictionaryBinding,
+    is_graphql_binding_key,
     parse_body_path,
+    parse_graphql_path,
     require_known_dictionary,
 )
 from schemathesis.config._env import resolve
@@ -28,6 +30,8 @@ def load_parameters(
             _validate_dictionary_location_prefix(key)
             if key.startswith(BODY_PREFIX):
                 parse_body_path(key)
+            elif is_graphql_binding_key(key):
+                parse_graphql_path(key)
             name: str = value["dictionary"]
             require_known_dictionary(f"Parameter `{key}`", name, dictionaries)
             parameters[key] = ParameterDictionaryBinding(
@@ -44,7 +48,7 @@ def _validate_dictionary_location_prefix(key: str) -> None:
     if "." not in key:
         return
     prefix, _, rest = key.partition(".")
-    if not rest or prefix in SUPPORTED_LOCATION_PREFIXES:
+    if not rest or prefix in SUPPORTED_LOCATION_PREFIXES or is_graphql_binding_key(key):
         return
     allowed = ", ".join(SUPPORTED_LOCATION_PREFIXES)
     raise ConfigError(

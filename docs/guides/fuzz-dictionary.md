@@ -80,6 +80,44 @@ values = ["sale", "featured", "archived"]
 
 For a body that's itself a top-level array, use `body.[*]`. Recursive descent (`body..x`), positional indices (`body.x[3]`), filters, and slices are not supported.
 
+## Target GraphQL Arguments
+
+Address an argument by the type that declares its field:
+
+```toml
+[dictionaries.titles]
+values = ["Dune", "Solaris"]
+
+[parameters]
+"Query.bookByTitle.title" = { dictionary = "titles" }
+```
+
+Use `*` for any type or any field - `*.*.title` covers every `title` argument in the schema, `Query.*.title` every one on `Query`:
+
+```toml
+[parameters]
+"*.*.title" = { dictionary = "titles" }
+```
+
+The same key addresses a nested field's arguments, since `<Type>` is the type that declares the field:
+
+```toml
+[parameters]
+"Author.books.genre" = { dictionary = "genres" }
+```
+
+Descend into input objects with a dotted suffix, and target list elements with `[*]` - the same vocabulary as `body.` paths:
+
+```toml
+[parameters]
+"Mutation.createOrder.input.currency" = { dictionary = "currencies" }
+"Query.search.tags[*]" = { dictionary = "tag_words" }
+```
+
+Type-wide bindings (`[generation.dictionaries] string = ...`) apply to GraphQL arguments too.
+
+Limits: only `String`, `ID`, `Int` and `Float` arguments are filled - enums, `Boolean` and custom scalars are left alone. Substitution happens in positive mode only, and only for arguments the generated query already carries, so a binding on an omitted optional argument is a no-op.
+
 ## Apply Different Dictionaries Per Operation
 
 Use `[[operations]]` with the existing filter vocabulary:
@@ -149,5 +187,9 @@ When multiple bindings could apply to the same parameter, the highest-priority o
 3. Operation-specific type-wide binding (`[[operations]] generation.dictionaries.string = ...`)
 4. Global type-wide binding (`[generation.dictionaries] string = ...`)
 5. Normal schema-derived generation
+
+For GraphQL, a binding naming both the type and the field beats one with `*` in either position, at the same scope.
+
+Dictionary entries overwrite values the runtime resource pool or source-extracted constants put in the same slot; stateful transitions still set their own linked values last.
 
 Scalar parameter overrides (`parameters.api_version = "v2"`) still force the exact value and override any dictionary binding.
