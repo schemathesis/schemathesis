@@ -9,6 +9,10 @@
 - A server that stops accepting connections ends the run with one `Server Unavailable` error.
 - `missing_test_data` warns for GraphQL operations whose responses never carry `data`.
 
+### :bug: Fixed
+
+- False positive GraphQL server errors for resolver rejections labelled in error `extensions`.
+
 ## [4.27.5](https://github.com/schemathesis/schemathesis/compare/v4.27.4...v4.27.5) - 2026-09-20
 
 ### :bug: Fixed
