@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 import hypothesis
 import pytest
 import requests
+import strawberry
 import trustme
 import urllib3.exceptions
 import yaml
@@ -1617,6 +1618,20 @@ def test_graphql_url(ctx, cli, endpoint, args, snapshot_cli):
     # When the target API is GraphQL
     api = ctx.graphql.apps.books(endpoint=endpoint)
     assert cli.run(api.schema_url, "--max-examples=5", "--mode=positive", *args) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_graphql_schema_violation(ctx, cli, snapshot_cli):
+    # Every case hits the same broken field, so the run must report one finding rather than one per case.
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def author_name(self) -> str:
+            return None
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query))
+
+    assert cli.run(api.schema_url, "--max-examples=5", "--mode=positive", "--continue-on-failure") == snapshot_cli
 
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])

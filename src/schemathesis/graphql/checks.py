@@ -92,6 +92,35 @@ class GraphQLServerError(Failure):
         return self._unique_key_cache
 
 
+class GraphQLSchemaViolation(Failure):
+    """GraphQL response contradicts the schema the server publishes."""
+
+    __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        message: str,
+        errors: list[GraphQLFormattedError],
+        title: str = "GraphQL schema violation",
+        case_id: str | None = None,
+    ) -> None:
+        self.operation = operation
+        self.errors = errors
+        self.title = title
+        self.message = message
+        self.case_id = case_id
+        self._unique_key_cache: str | None = None
+        self.severity = Severity.HIGH
+
+    @property
+    def _unique_key(self) -> str:
+        if self._unique_key_cache is None:
+            self._unique_key_cache = _group_graphql_errors(self.errors)
+        return self._unique_key_cache
+
+
 def _group_graphql_errors(errors: list[GraphQLFormattedError]) -> str:
     entries = []
     for error in errors:
