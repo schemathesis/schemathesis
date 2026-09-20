@@ -10,6 +10,7 @@ from schemathesis.engine.statistic import Statistic
 
 if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
+    from schemathesis.core import Specification
     from schemathesis.engine import events
     from schemathesis.schemas import APIOperation
 
@@ -20,6 +21,7 @@ class BaseExecutionContext:
 
     config: ProjectConfig
     find_operation_by_label: Callable[[str], APIOperation | None] | None = None
+    specification: Specification | None = None
     statistic: Statistic = field(default_factory=Statistic)
     exit_code: int = 0
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
@@ -41,3 +43,4 @@ class BaseExecutionContext:
     def on_event(self, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
             self.find_operation_by_label = event.find_operation_by_label
+            self.specification = event.specification

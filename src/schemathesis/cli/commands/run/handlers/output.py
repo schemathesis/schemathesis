@@ -35,6 +35,7 @@ from schemathesis.cli.output import (
     print_lines,
 )
 from schemathesis.config import ProjectConfig, ReportFormat
+from schemathesis.core import SpecificationKind
 from schemathesis.core.output import decode_response_text, prepare_response_payload
 from schemathesis.core.result import Ok
 from schemathesis.core.timing import Instant
@@ -1201,7 +1202,9 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                             fg="yellow",
                         )
                     )
-        if unreachable_dominates:
+        if ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRAPHQL:
+            tip = "💡 Most requests came back with errors; supply argument values via a fuzz dictionary"
+        elif unreachable_dominates:
             tip = "💡 Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary"
         else:
             tip = "💡 Most requests were refused on their data; the schema likely omits constraints the API enforces"

@@ -605,3 +605,11 @@ def test_low_valid_rate_for_graphql(ctx, cli, snapshot_cli):
     api = ctx.graphql.apps.from_schema(_erratic_books_schema())
 
     assert cli.run(api.schema_url, *LOW_VALID_RATE_ARGS, "--continue-on-failure") == snapshot_cli
+
+
+def test_low_valid_rate_tip_for_graphql(ctx, cli):
+    api = ctx.graphql.apps.from_schema(_erratic_books_schema())
+
+    result = cli.run(api.schema_url, *LOW_VALID_RATE_ARGS, "--continue-on-failure")
+
+    assert "supply argument values via a fuzz dictionary" in result.stdout
