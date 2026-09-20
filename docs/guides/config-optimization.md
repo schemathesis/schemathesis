@@ -12,7 +12,7 @@ Use these settings when:
 
 For fast development feedback, stick with defaults.
 
-To measure Schemathesis itself — comparing it with other tools, or checking whether a change helped — see [Benchmarking Schemathesis](benchmarking.md). That configuration differs from this one: it optimizes for numbers that are comparable and reproducible, not for findings a developer can act on.
+To measure Schemathesis itself - comparing it with other tools, or checking whether a change helped - see [Benchmarking Schemathesis](benchmarking.md). That configuration differs from this one: it optimizes for numbers that are comparable and reproducible, not for findings a developer can act on.
 
 ## Recommended Configuration
 

@@ -55,6 +55,20 @@ Colors indicate coverage status:
 
 For more details, see the [TraceCov documentation](https://docs.tracecov.sh).
 
+## What Coverage Supports
+
+Coverage answers one question precisely and another only loosely.
+
+**Strong evidence: this constraint was never exercised.** A red or yellow entry names a specific gap with a specific action - add an example, correct the schema, or reach the state that produces that response. This is what the report is for.
+
+**Weak evidence: this configuration is better.** A coverage delta between two runs, two configurations or two tools is not evidence that one finds more defects. Böhme, Szekeres and Metzman measured this directly on [FuzzBench](https://doi.org/10.1145/3510003.3510230): within a single program, branches covered and bugs found track each other closely (Spearman 0.88 to 0.999), yet ranking ten fuzzers by branches agrees with ranking them by bugs at only ρ = 0.38 over one-hour campaigns. The tool that covers most is often not the tool that finds most.
+
+Schema coverage sits one step further from defects than the code coverage those numbers describe - it records that a constraint was exercised, not that a code path ran.
+
+**A drop between releases is worth acting on.** Comparing a schema against itself over time is the comparative use the measurement does support: constraints that used to be exercised and no longer are point at a real change in the schema or in the tests.
+
+So treat an uncovered constraint as a task, and treat the percentage as a description of what was reached rather than a score to raise.
+
 ## Improving Coverage
 
 Schemathesis automatically targets schema constraints through its coverage phase, generating boundary values, pattern-matching strings, enum values, and more. For constraints that remain partially covered (yellow), add explicit examples to your schema. Schemathesis uses `example` (single value) and `examples` (map of example objects) as test cases:
