@@ -13,6 +13,10 @@
 
 - False positive GraphQL server errors for resolver rejections labelled in error `extensions`.
 
+### :wrench: Changed
+
+- Report GraphQL non-nullable fields resolving to `null` as a `GraphQL schema violation`, severity high.
+
 ## [4.27.5](https://github.com/schemathesis/schemathesis/compare/v4.27.4...v4.27.5) - 2026-09-20
 
 ### :bug: Fixed

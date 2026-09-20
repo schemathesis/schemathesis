@@ -26,7 +26,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
-from schemathesis.graphql.checks import GraphQLClientError, GraphQLServerError
+from schemathesis.graphql.checks import GraphQLClientError, GraphQLSchemaViolation, GraphQLServerError
 from schemathesis.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
 from schemathesis.specs.openapi.checks import (
@@ -332,6 +332,108 @@ def test_multiple_server_error(ctx):
         validate_graphql_response(case, payload)
 
     assert exc.value.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
+
+
+GRAPHQL_CORE_NON_NULL_ERROR = "Cannot return null for non-nullable field Query.getBooks."
+GRAPHQL_JAVA_NON_NULL_ERROR = (
+    "The field at path '/getBooks' was declared as a non null type, but the code involved in retrieving data has "
+    "wrongly returned a null value.  The graphql specification requires that the parent field be set to null, or if "
+    "that is non nullable that it bubble up null to its parent and so on. The non-nullable type is 'Book' within "
+    "parent type 'Query'"
+)
+
+
+@pytest.mark.parametrize(
+    "error_message",
+    [GRAPHQL_CORE_NON_NULL_ERROR, GRAPHQL_JAVA_NON_NULL_ERROR],
+    ids=["graphql-core", "graphql-java"],
+)
+def test_schema_violation(ctx, error_message):
+    case = _books_schema(ctx)["Query"]["getBooks"].Case()
+    with pytest.raises(GraphQLSchemaViolation, match="GraphQL schema violation"):
+        validate_graphql_response(case, {"data": None, "errors": [{"message": error_message, "path": ["getBooks"]}]})
+
+
+def test_schema_violation_from_classification(ctx):
+    # Servers that label the error say so in a language the message text cannot be relied on to carry.
+    case = _books_schema(ctx)["Query"]["getBooks"].Case()
+    payload = {
+        "data": None,
+        "errors": [
+            {
+                "message": "Le champ ne peut pas etre null",
+                "path": ["getBooks"],
+                "extensions": {"classification": "NullValueInNonNullableField"},
+            }
+        ],
+    }
+    with pytest.raises(GraphQLSchemaViolation, match="GraphQL schema violation"):
+        validate_graphql_response(case, payload)
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (
+            {"data": None, "errors": [{"message": "Cannot read property 'name' of null", "path": ["getBooks"]}]},
+            GraphQLServerError,
+        ),
+        (
+            {
+                "data": None,
+                "errors": [
+                    {"message": GRAPHQL_CORE_NON_NULL_ERROR, "path": ["getBooks"]},
+                    {"message": "Hidden 1 / 0 bug", "path": ["getAuthors"]},
+                ],
+            },
+            GraphQLServerError,
+        ),
+        (
+            {
+                "data": None,
+                "errors": [
+                    {
+                        "message": "Boom",
+                        "path": ["getBooks"],
+                        "extensions": {"classification": "DataFetchingException"},
+                    }
+                ],
+            },
+            GraphQLServerError,
+        ),
+        ({"errors": [{"message": "Cannot query field 'nope' on type 'Query'."}]}, GraphQLClientError),
+    ],
+    ids=[
+        "resolver_error_mentioning_null",
+        "mixed_with_resolver_error",
+        "resolver_crash_classification",
+        "unknown_field",
+    ],
+)
+def test_not_a_schema_violation(ctx, payload, expected):
+    case = _books_schema(ctx)["Query"]["getBooks"].Case()
+    with pytest.raises(expected):
+        validate_graphql_response(case, payload)
+
+
+def test_schema_violation_on_real_server(ctx):
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def author_name(self) -> str:
+            return None
+
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query))
+    schema = schemathesis.graphql.from_url(api.schema_url)
+
+    @given(case=schema["Query"]["authorName"].as_strategy())
+    @settings(max_examples=1, deadline=None, phases=[Phase.generate])
+    def test(case):
+        case.call_and_validate()
+
+    with pytest.raises(FailureGroup) as exc:
+        test()
+    assert isinstance(exc.value.exceptions[0], GraphQLSchemaViolation)
 
 
 def test_no_query(ctx):
