@@ -26,6 +26,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
+from schemathesis.core.transport import CallOutcome
 from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -427,20 +428,38 @@ class GraphQLSchema(BaseSchema):
         return None
 
     @override
+    def classify_call_outcome(self, response: Response) -> CallOutcome:
+        """Decide what the API did with a positive case, from the body rather than the status code.
+
+        A GraphQL server answers the same status whether it served the query or refused it, and an
+        `errors` entry means the operation was not carried out in full.
+        """
+        from schemathesis.specs.graphql.validation import parse_payload
+
+        if response.status_code in (401, 403) or response.status_code >= 500:
+            return CallOutcome.UNINFORMATIVE
+        try:
+            payload = parse_payload(response)
+        except ValueError:
+            # Not a GraphQL response at all; it says nothing about the data that was sent.
+            return CallOutcome.UNINFORMATIVE
+        if not isinstance(payload, dict):
+            return CallOutcome.UNINFORMATIVE
+        if payload.get("errors"):
+            return CallOutcome.REJECTED
+        # `data` is absent when the request was refused before execution, and `null` when execution
+        # began but nothing survived it.
+        return CallOutcome.ACCEPTED if payload.get("data") is not None else CallOutcome.REJECTED
+
+    @override
     def evaluate_server_error(self, case: Case, response: Response) -> None:
         from schemathesis.core.failures import AcceptedNegativeData, MalformedJson
-        from schemathesis.core.transport import load_json_lossy
         from schemathesis.graphql.checks import GraphQLClientError
-        from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
+        from schemathesis.specs.graphql.validation import is_client_error, parse_payload, validate_graphql_response
 
         is_negative_mode = case.meta is not None and case.meta.generation.mode.is_negative
         try:
-            try:
-                data = response.json()
-            except (LookupError, ValueError):
-                # A response lying about its charset must not abort the check; re-parse from raw bytes.
-                # Malformed JSON lands here too and re-raises from the lossy re-parse below.
-                data = load_json_lossy(response.content, response.encoding)
+            data = parse_payload(response)
             if is_negative_mode:
                 errors = data.get("errors")
                 if errors is None or len(errors) == 0:

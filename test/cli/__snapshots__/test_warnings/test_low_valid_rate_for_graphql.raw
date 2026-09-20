@@ -1,0 +1,73 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/graphql (in 0.00s)
+
+     Base URL:         http://127.0.0.1/graphql
+     Specification:    GraphQL
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+________________________________ Query.getBook _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- GraphQL server error
+
+    Book not found
+
+[200] OK:
+
+    `{"data": null, "errors": [{"message": "Book not found", "locations": [{"line": 2, "column": 3}], "path": ["getBook"]}]}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=================================== WARNINGS ===================================
+
+Low valid-input rate: 1 operation accepted few of the requests sent to it, leaving the logic behind them untested
+
+  - Query.getBook (fuzzing): 10% accepted (1/10, 9 rejected)
+
+💡 Most requests were refused on their data; the schema likely omits constraints the API enforces
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ GraphQL server error: 1
+
+Warnings:
+  ⚠️ Low valid-input rate: 1 operation accepted few of the requests sent to it
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================== 1 failure, 1 warning in 1.00s =========================

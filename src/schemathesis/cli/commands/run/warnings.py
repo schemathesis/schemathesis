@@ -12,6 +12,7 @@ from schemathesis.config import ProjectConfig, SchemathesisWarning
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.statistic import ApiStatistic
+from schemathesis.core.transport import CallOutcome
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import CaseNode, Interaction, RecordedScenario
 from schemathesis.engine.run import PhaseName
@@ -120,12 +121,12 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
         interaction = recorder.interactions.get(case.value.id)
         if interaction is None or interaction.response is None:
             continue
-        status = interaction.response.status_code
-        if 200 <= status < 300:
+        outcome = case.value.operation.schema.classify_call_outcome(interaction.response)
+        if outcome is CallOutcome.ACCEPTED:
             outcomes.accepted += 1
-        elif status == 404:
+        elif outcome is CallOutcome.UNREACHABLE:
             outcomes.unreachable += 1
-        elif 400 <= status < 500 and status not in (401, 403):
+        elif outcome is CallOutcome.REJECTED:
             outcomes.rejected += 1
     return outcomes
 
@@ -182,7 +183,7 @@ def _is_positive(case: CaseNode) -> bool:
 
 
 def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
-    """Whether a positive test case got a 2xx response.
+    """Whether the API served any of the positive test cases.
 
     Negative cases are excluded: an undocumented method may well be served while the operation
     itself is refused.
@@ -193,13 +194,13 @@ def any_positive_is_accepted(recorder: RecordedScenario) -> bool:
         interaction = recorder.interactions.get(case.value.id)
         if interaction is None or interaction.response is None:
             continue
-        if 200 <= interaction.response.status_code < 300:
+        if case.value.operation.schema.classify_call_outcome(interaction.response) is CallOutcome.ACCEPTED:
             return True
     return False
 
 
 def all_positive_are_rejected(recorder: RecordedScenario) -> bool:
-    """Whether the scenario generated positive test cases and none of them got a 2xx response."""
+    """Whether the scenario generated positive test cases and the API served none of them."""
     return any(_is_positive(case) for case in recorder.cases.values()) and not any_positive_is_accepted(recorder)
 
 

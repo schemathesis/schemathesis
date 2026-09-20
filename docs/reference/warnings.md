@@ -216,6 +216,8 @@ The counts distinguish the two causes, which need different fixes:
 
 Authentication failures and server errors are excluded from the rate, since neither says anything about whether the data was acceptable.
 
+For GraphQL, the status code carries no such answer, so a request counts as accepted when the response carries `data` and no `errors`.
+
 This warning is **opt-in**: it is not displayed unless you enable it by name.
 
 ```bash

@@ -26,7 +26,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
-from schemathesis.core.transport import HttpMethod, HttpMethodSchema, Response
+from schemathesis.core.transport import CallOutcome, HttpMethod, HttpMethodSchema, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
@@ -591,6 +591,21 @@ class BaseSchema(Mapping):
 
         Default no-op; specs whose errors aren't fully captured by HTTP status (e.g. GraphQL 200 + errors body) override.
         """
+
+    def classify_call_outcome(self, response: Response) -> CallOutcome:
+        """Decide what the API did with a request carrying positive test data.
+
+        Status codes carry the answer by default; specs that respond 200 regardless of the outcome
+        (e.g. GraphQL) override this and read the body instead.
+        """
+        status_code = response.status_code
+        if 200 <= status_code < 300:
+            return CallOutcome.ACCEPTED
+        if status_code == 404:
+            return CallOutcome.UNREACHABLE
+        if 400 <= status_code < 500 and status_code not in (401, 403):
+            return CallOutcome.REJECTED
+        return CallOutcome.UNINFORMATIVE
 
     def adapt_to_null_byte_in_header_failure(self) -> None:
         """React to the engine probe finding that null bytes in headers crash the app under test."""

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import enum
 import json
 import string
 from collections.abc import Mapping
@@ -74,6 +75,18 @@ def prepare_urlencoded(data: Any) -> Any:
                 output.append((item, "arbitrary-value"))
         return output
     return data
+
+
+class CallOutcome(enum.Enum):
+    """What an API did with a request carrying positive test data."""
+
+    ACCEPTED = "accepted"
+    # Well-formed, but the addressed resource does not exist.
+    UNREACHABLE = "unreachable"
+    # Refused on the data itself.
+    REJECTED = "rejected"
+    # Says nothing about whether the data was acceptable, e.g. an auth failure or a server error.
+    UNINFORMATIVE = "uninformative"
 
 
 class Response:

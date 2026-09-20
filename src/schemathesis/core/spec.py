@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from schemathesis.core.result import Result
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.statistic import ApiStatistic, StatefulInference
-    from schemathesis.core.transport import HttpMethod, Response
+    from schemathesis.core.transport import CallOutcome, HttpMethod, Response
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.run import Phase
@@ -200,6 +200,8 @@ class TransportShape(Protocol):
     def prepare_request_body(self, body: Body) -> Body: ...  # pragma: no cover
 
     def evaluate_server_error(self, case: Case, response: Response) -> None: ...  # pragma: no cover
+
+    def classify_call_outcome(self, response: Response) -> CallOutcome: ...  # pragma: no cover
 
     def prepare_multipart(
         self,
