@@ -528,6 +528,18 @@ def test_graphql_meta_field_does_not_abort_substitution():
     assert [draw.parameter_name for draw in draws] == ["code"]
 
 
+def test_graphql_constants_leave_dictionary_filled_arguments_alone():
+    draws = substitute_constants(
+        operation_node=_parse_graphql('{ lookup(code: "x") }'),
+        client_schema=_GRAPHQL_SCALAR_SCHEMA,
+        pool=_source("string", "REPLACED"),
+        random=random.Random(0),
+        probability=1.0,
+        skip=frozenset({("lookup", "code")}),
+    )
+    assert draws == []
+
+
 def test_graphql_float_scalar_rejects_overflowing_integer_constant():
     # `float(10**400)` overflows; such an integer can never be a finite `Float` literal, so it must be
     # filtered out rather than crash the draw with `OverflowError`.

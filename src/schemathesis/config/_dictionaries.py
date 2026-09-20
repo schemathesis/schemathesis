@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 import os
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, get_args
 
@@ -16,6 +18,24 @@ DictionaryLocationPrefix = Literal["path", "query", "header", "cookie", "body"]
 SUPPORTED_LOCATION_PREFIXES: tuple[DictionaryLocationPrefix, ...] = get_args(DictionaryLocationPrefix)
 BODY_PREFIX = "body."
 
+# Matches any type, field or list element in a binding key.
+WILDCARD = "*"
+_GRAPHQL_NAME = re.compile(r"[_A-Za-z][_0-9A-Za-z]*")
+
+
+@dataclass(slots=True, frozen=True)
+class GraphQLBindingPath:
+    """A `<Type>.<field>.<argument path>` binding key, with `*` standing for any name."""
+
+    type_name: str
+    field_name: str
+    argument: tuple[str, ...]
+
+
+def is_graphql_binding_key(key: str) -> bool:
+    """Tell a GraphQL argument binding from an OpenAPI location-shaped one."""
+    return key.partition(".")[0] not in SUPPORTED_LOCATION_PREFIXES and key.count(".") >= 2
+
 
 def parse_body_path(expr: str) -> str:
     """Translate a `body.<path>` binding key to a JSON Pointer with `*` wildcards."""
@@ -24,32 +44,54 @@ def parse_body_path(expr: str) -> str:
     rest = expr[len(BODY_PREFIX) :]
     if not rest:
         raise ConfigError(f"Body binding key has empty path: `{expr}`")
+    return "/" + "/".join(_parse_path_segments(rest.split("."), expr, _is_valid_body_segment))
+
+
+def parse_graphql_path(expr: str) -> GraphQLBindingPath:
+    """Translate a `<Type>.<field>.<argument path>` binding key into its parts."""
+    type_name, _, rest = expr.partition(".")
+    field_name, _, argument = rest.partition(".")
+    if not argument:
+        raise ConfigError(
+            f"GraphQL binding key must be `<Type>.<field>.<argument>` (use `*` for any type or field): `{expr}`"
+        )
+    for name in (type_name, field_name):
+        if name != WILDCARD and not _is_valid_graphql_name(name):
+            raise ConfigError(f"Invalid segment `{name}` in GraphQL binding key: `{expr}`")
+    return GraphQLBindingPath(
+        type_name=type_name,
+        field_name=field_name,
+        argument=tuple(_parse_path_segments(argument.split("."), expr, _is_valid_graphql_name)),
+    )
+
+
+def _parse_path_segments(parts: list[str], expr: str, is_valid: Callable[[str], bool]) -> list[str]:
     segments: list[str] = []
-    for part in rest.split("."):
+    for part in parts:
         if not part:
-            raise ConfigError(f"Empty segment in body path: `{expr}`")
+            raise ConfigError(f"Empty segment in path: `{expr}`")
         if part == "[*]":
-            segments.append("*")
+            segments.append(WILDCARD)
             continue
-        if "[" in part:
-            name, _, after = part.partition("[")
-            if not _is_valid_body_segment(name):
-                raise ConfigError(f"Invalid segment `{name}` in body path: `{expr}`")
+        name, bracket, after = part.partition("[")
+        if not is_valid(name):
+            raise ConfigError(f"Invalid segment `{name}` in path: `{expr}`")
+        segments.append(name)
+        if bracket:
             if after != "*]":
-                raise ConfigError(f"Only `[*]` is supported in body paths (got `[{after}` in `{expr}`)")
-            segments.append(name)
-            segments.append("*")
-        else:
-            if not _is_valid_body_segment(part):
-                raise ConfigError(f"Invalid segment `{part}` in body path: `{expr}`")
-            segments.append(part)
-    return "/" + "/".join(segments)
+                raise ConfigError(f"Only `[*]` is supported in paths (got `[{after}` in `{expr}`)")
+            segments.append(WILDCARD)
+    return segments
 
 
 def _is_valid_body_segment(name: str) -> bool:
     if not name:
         return False
     return all(c.isalnum() or c in "_-" for c in name)
+
+
+def _is_valid_graphql_name(name: str) -> bool:
+    return bool(_GRAPHQL_NAME.fullmatch(name))
 
 
 @dataclass(slots=True, frozen=True)

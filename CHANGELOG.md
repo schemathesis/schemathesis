@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.27.5...HEAD) - TBD
 
+### :rocket: Added
+
+- Fuzz dictionary bindings for GraphQL arguments via `<Type>.<field>.<argument>` keys.
+
 ## [4.27.5](https://github.com/schemathesis/schemathesis/compare/v4.27.4...v4.27.5) - 2026-09-20
 
 ### :bug: Fixed
