@@ -94,6 +94,10 @@ def bold(option: str) -> str:
     return click.style(option, bold=True)
 
 
+def _is_graphql(ctx: ExecutionContext) -> bool:
+    return ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRAPHQL
+
+
 def _missing_test_data_advice(
     label: str, *, linked: set[str], stateful_ran: bool, exercised: set[str]
 ) -> tuple[str, str]:
@@ -1152,7 +1156,17 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         self._print_warning_tips(tips)
 
     def _display_missing_test_data_block(self, ctx: ExecutionContext) -> None:
-        """Display 404-ed operations grouped by what would actually make them reachable."""
+        """Display operations nothing ever served, grouped by what would actually make them reachable."""
+        if _is_graphql(ctx):
+            self._print_warning_header(
+                "Missing test data",
+                len(ctx.warnings.missing_test_data),
+                "operation",
+                " never returned data, preventing tests from reaching your API's core logic",
+            )
+            self._print_items(ctx.warnings.missing_test_data)
+            self._print_warning_tips(["💡 Supply argument values via a fuzz dictionary so queries can return data"])
+            return
         linked = ctx.warnings.linked_operations or set()
         stateful_ran = ctx.phases[PhaseName.STATEFUL_TESTING][0] != Status.SKIP
         groups: dict[tuple[str, str], set[str]] = {}
@@ -1202,7 +1216,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                             fg="yellow",
                         )
                     )
-        if ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRAPHQL:
+        if _is_graphql(ctx):
             tip = "💡 Most requests came back with errors; supply argument values via a fuzz dictionary"
         elif unreachable_dominates:
             tip = "💡 Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary"
@@ -1404,7 +1418,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 len(ctx.warnings.missing_test_data),
                 "Missing valid test data",
                 "operation",
-                "repeatedly returned 404 responses",
+                "never returned data" if _is_graphql(ctx) else "repeatedly returned 404 responses",
             ),
             (
                 len(ctx.warnings.validation_mismatch),
