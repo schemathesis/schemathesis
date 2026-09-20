@@ -45,7 +45,7 @@ Low valid-input rate: 1 operation accepted few of the requests sent to it, leavi
 
   - Query.getBook (fuzzing): 10% accepted (1/10, 9 rejected)
 
-💡 Most requests were refused on their data; the schema likely omits constraints the API enforces
+💡 Most requests came back with errors; supply argument values via a fuzz dictionary
 
 =================================== SUMMARY ====================================
 
