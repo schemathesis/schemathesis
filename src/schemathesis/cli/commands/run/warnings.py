@@ -9,6 +9,7 @@ from schemathesis.cli.commands.run.filters import describe_filter
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.summary import WarningData
 from schemathesis.config import ProjectConfig, SchemathesisWarning
+from schemathesis.core import SpecificationKind
 from schemathesis.core.errors import RefResolutionError
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.statistic import ApiStatistic
@@ -338,6 +339,14 @@ class WarningCollector:
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
                 )
+            # GraphQL answers the same status whether it served the query or refused it, so the two
+            # checks above stay silent; the response bodies are the only evidence either way.
+            if operation is not None and operation.schema.specification.kind is SpecificationKind.GRAPHQL:
+                self._handle_warning(
+                    ctx,
+                    SchemathesisWarning.MISSING_TEST_DATA,
+                    lambda: self._record_missing_test_data(event.recorder.label, operation),
+                )
 
         # A run that did not ask for positive data has no valid-input rate worth reporting; the few
         # positive cases other phases contribute are incidental.
@@ -467,5 +476,7 @@ class WarningCollector:
             self.data.stateful_exercised.add(label)
             if label in self.data.missing_test_data and key in event.recorder.interactions:
                 response = event.recorder.interactions[key].response
-                if response is not None and response.status_code < 300:
+                if response is None:
+                    continue
+                if node.value.operation.schema.classify_call_outcome(response) is CallOutcome.ACCEPTED:
                     self.data.missing_test_data.remove(label)

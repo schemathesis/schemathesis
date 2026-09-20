@@ -3,7 +3,7 @@ import itertools
 import pytest
 import strawberry
 from _pytest.main import ExitCode
-from flask import Response, jsonify
+from flask import Flask, Response, jsonify, request
 
 import schemathesis
 from schemathesis.python._constants.registry import default_registry
@@ -613,3 +613,71 @@ def test_low_valid_rate_tip_for_graphql(ctx, cli):
     result = cli.run(api.schema_url, *LOW_VALID_RATE_ARGS, "--continue-on-failure")
 
     assert "supply argument values via a fuzz dictionary" in result.stdout
+
+
+GRAPHQL_SDL = """
+type Book {
+  id: String!
+  title: String!
+}
+
+type Query {
+  getBook(bookId: String!): Book!
+}
+"""
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_test_data_for_graphql(cli, app_runner, tmp_path, snapshot_cli):
+    # A 200 with neither `data` nor `errors` fails no check, so nothing else in the run says the query was never served.
+    sdl = tmp_path / "schema.graphql"
+    sdl.write_text(GRAPHQL_SDL)
+
+    app = Flask(__name__)
+
+    @app.route("/graphql", methods=["POST"])
+    def graphql():
+        return jsonify({"data": None})
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            str(sdl),
+            f"--url=http://127.0.0.1:{port}/graphql",
+            "--max-examples=5",
+            "--phases=fuzzing",
+            "-m",
+            "positive",
+        )
+        == snapshot_cli
+    )
+
+
+GRAPHQL_SDL_WITH_MUTATION = f"""{GRAPHQL_SDL}
+type Mutation {{
+  addBook(title: String!): Book!
+}}
+"""
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_test_data_for_graphql_survives_stateful(cli, app_runner, tmp_path, snapshot_cli):
+    # The mutation is served, so the stateful phase reaches the query - but it still returns no data.
+    sdl = tmp_path / "schema.graphql"
+    sdl.write_text(GRAPHQL_SDL_WITH_MUTATION)
+
+    app = Flask(__name__)
+
+    @app.route("/graphql", methods=["POST"])
+    def graphql():
+        if "addBook" in request.get_data(as_text=True):
+            return jsonify({"data": {"addBook": {"id": "1", "title": "Hitchhiker"}}})
+        return jsonify({"data": None})
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(str(sdl), f"--url=http://127.0.0.1:{port}/graphql", "--max-examples=5", "-m", "positive")
+        == snapshot_cli
+    )
