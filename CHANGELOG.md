@@ -8,6 +8,10 @@
 
 ## [4.27.5](https://github.com/schemathesis/schemathesis/compare/v4.27.4...v4.27.5) - 2026-09-20
 
+### :rocket: Added
+
+- Opt-in `low_valid_rate` warning for operations that accept few of the requests sent to them.
+
 ### :bug: Fixed
 
 - Crash on schemas where `properties` is not an object.

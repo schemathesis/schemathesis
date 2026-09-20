@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 from _pytest.main import ExitCode
 from flask import Response, jsonify
@@ -490,3 +492,88 @@ def test_no_missing_auth_warning_when_the_operation_later_succeeds(ctx, cli, app
     result = cli.run(schema_url, "-c not_a_server_error", "--max-examples=5", "--phases=examples,fuzzing")
 
     assert "Missing authentication" not in result.stdout
+
+
+ORDERS = {
+    "/orders/{orderId}": {
+        "get": {
+            "parameters": [{"name": "orderId", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
+        }
+    }
+}
+
+
+LOW_VALID_RATE_ARGS = ("--max-examples=10", "--phases=fuzzing", "-m", "positive", "--warnings=low_valid_rate")
+
+
+def _orders_app(ctx, *, accept_every, rejection_status=404):
+    app, _ = ctx.openapi.make_flask_app(ORDERS)
+    calls = itertools.count()
+
+    @app.route("/orders/<order_id>")
+    def orders(order_id):
+        if next(calls) % accept_every == 0:
+            return jsonify({"id": order_id})
+        return jsonify({"error": "unavailable"}), rejection_status
+
+    return app
+
+
+def test_low_valid_rate_reported(ctx, cli):
+    app = _orders_app(ctx, accept_every=10)
+
+    result = cli.run_openapi_app(app, *LOW_VALID_RATE_ARGS)
+
+    assert "Low valid-input rate" in result.stdout
+    assert "GET /orders/{orderId}" in result.stdout
+
+
+def test_low_valid_rate_is_opt_in(ctx, cli):
+    app = _orders_app(ctx, accept_every=10)
+
+    result = cli.run_openapi_app(app, "--max-examples=10", "--phases=fuzzing", "-m", "positive")
+
+    assert "Low valid-input rate" not in result.stdout
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_low_valid_rate_warning(ctx, cli, snapshot_cli):
+    # One request in ten reaches the resource; the rest are well-formed but hit nothing.
+    app = _orders_app(ctx, accept_every=10)
+
+    assert cli.run_openapi_app(app, *LOW_VALID_RATE_ARGS) == snapshot_cli
+
+
+def test_low_valid_rate_distinguishes_rejections_from_missing_resources(ctx, cli):
+    app = _orders_app(ctx, accept_every=10, rejection_status=422)
+
+    result = cli.run_openapi_app(app, *LOW_VALID_RATE_ARGS, "--checks=not_a_server_error")
+
+    assert "(1/10, 9 rejected)" in result.stdout
+    assert "refused on their data" in result.stdout
+
+
+def test_no_low_valid_rate_warning_when_most_requests_are_accepted(ctx, cli):
+    app = _orders_app(ctx, accept_every=1)
+
+    result = cli.run_openapi_app(app, *LOW_VALID_RATE_ARGS)
+
+    assert "Low valid-input rate" not in result.stdout
+
+
+def test_low_valid_rate_threshold_is_configurable(ctx, cli, tmp_path, monkeypatch):
+    config_file = tmp_path / "schemathesis.toml"
+    config_file.write_text("""
+[warnings]
+display = ["low_valid_rate"]
+
+[warnings.low_valid_rate]
+threshold = 0.05
+""")
+    monkeypatch.chdir(tmp_path)
+    app = _orders_app(ctx, accept_every=10)
+
+    result = cli.run_openapi_app(app, "--max-examples=10", "--phases=fuzzing", "-m", "positive")
+
+    assert "Low valid-input rate" not in result.stdout

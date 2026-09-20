@@ -84,6 +84,50 @@ class StatusCodeStatistic:
 
 AUTH_ERRORS_THRESHOLD = 0.9
 OTHER_CLIENT_ERRORS_THRESHOLD = 0.1
+# Fewer calls than this and the share accepted is noise rather than a rate.
+MIN_CALLS_FOR_VALID_RATE = 10
+
+
+@dataclass(slots=True)
+class ValidRate:
+    """How many positive cases an API accepted, and why the rest were turned away."""
+
+    accepted: int = 0
+    # Well-formed, but the addressed resource does not exist.
+    unreachable: int = 0
+    # Refused on the data itself.
+    rejected: int = 0
+
+    @property
+    def total(self) -> int:
+        return self.accepted + self.unreachable + self.rejected
+
+    @property
+    def rate(self) -> float:
+        return self.accepted / self.total if self.total else 0.0
+
+
+def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
+    """Classify every positive case by what the API did with it.
+
+    Auth rejections and server errors say nothing about whether the data was acceptable, so they
+    stay out of the count entirely rather than counting against the rate.
+    """
+    outcomes = ValidRate()
+    for case in recorder.cases.values():
+        if not _is_positive(case):
+            continue
+        interaction = recorder.interactions.get(case.value.id)
+        if interaction is None or interaction.response is None:
+            continue
+        status = interaction.response.status_code
+        if 200 <= status < 300:
+            outcomes.accepted += 1
+        elif status == 404:
+            outcomes.unreachable += 1
+        elif 400 <= status < 500 and status not in (401, 403):
+            outcomes.rejected += 1
+    return outcomes
 
 
 def aggregate_status_codes(interactions: Iterable[Interaction]) -> StatusCodeStatistic:
@@ -292,6 +336,30 @@ class WarningCollector:
                     ctx,
                     SchemathesisWarning.VALIDATION_MISMATCH,
                     lambda: self.data.validation_mismatch.add(event.recorder.label),
+                )
+
+        # A run that did not ask for positive data has no valid-input rate worth reporting; the few
+        # positive cases other phases contribute are incidental.
+        if (
+            GenerationMode.POSITIVE
+            not in self.config.generation_for(operation=operation, phase=event.phase.value).modes
+        ):
+            return
+
+        outcomes = positive_call_outcomes(event.recorder)
+        if outcomes.total:
+            self.data.valid_rates.setdefault(event.recorder.label, {})[event.phase.value] = outcomes
+            # An operation nothing reached at all belongs to the two warnings above, which say more
+            # about why. This one is for the middle ground they leave silent.
+            if (
+                outcomes.accepted
+                and outcomes.total >= MIN_CALLS_FOR_VALID_RATE
+                and outcomes.rate < self.config.warnings.low_valid_rate.threshold
+            ):
+                self._handle_warning(
+                    ctx,
+                    SchemathesisWarning.LOW_VALID_RATE,
+                    lambda: self.data.low_valid_rate.add(event.recorder.label),
                 )
 
     def _record_missing_test_data(self, label: str, operation: APIOperation | None) -> None:

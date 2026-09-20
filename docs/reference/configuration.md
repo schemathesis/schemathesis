@@ -267,6 +267,7 @@ Rules:
     - `constants_extraction`: A source registered with `@schemathesis.python.constants` produced nothing usable
     - `unmatched_filter`: A filter expression matched no API operation
     - `unresolvable_reference`: A parameter or response schema names a component that does not exist
+    - `low_valid_rate`: An operation accepted only a small share of the requests sent to it (opt-in; enable it by name)
 
 !!! info "CLI Only"
     This option only applies when using the `schemathesis run` command. The pytest plugin uses pytest's own warning system.
