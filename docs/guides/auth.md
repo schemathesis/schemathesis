@@ -121,6 +121,17 @@ extract_from = "header"
 extract_selector = "X-Auth-Token"
 ```
 
+For form logins that answer with `Set-Cookie`, name the cookie and Schemathesis sends it back as a cookie, without its attributes:
+
+```toml
+[auth.dynamic.openapi.SessionCookie]
+path = "/login"
+payload = { username = "${USERNAME}", password = "${PASSWORD}" }
+payload_content_type = "application/x-www-form-urlencoded"
+extract_from = "cookie"
+extract_selector = "SESSION"
+```
+
 Works the same way for `apiKey` schemes — Schemathesis reads the parameter name and location from the schema's `securitySchemes`.
 
 | Field | Default | Description |
@@ -129,8 +140,8 @@ Works the same way for `apiKey` schemes — Schemathesis reads the parameter nam
 | `method` | `"post"` | HTTP method for the fetch request |
 | `payload` | `{}` | Body sent with the fetch request; supports `${ENV_VAR}` substitution |
 | `payload_content_type` | `"application/json"` | Media type for the payload; accepts `application/json` (and any `+json` variant) or `application/x-www-form-urlencoded` |
-| `extract_from` | `"body"` | Where to find the token: `"body"` or `"header"` |
-| `extract_selector` | required | JSON Pointer (body) or header name |
+| `extract_from` | `"body"` | Where to find the token: `"body"`, `"header"` or `"cookie"` |
+| `extract_selector` | required | JSON Pointer (body), header name, or cookie name |
 
 For token refresh or scope-based caching, use a [Python auth class](#dynamic-token-authentication) instead.
 

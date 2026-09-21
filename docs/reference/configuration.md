@@ -937,6 +937,17 @@ These settings can only be applied at the project level.
     extract_selector = "X-Auth-Token"
     ```
 
+    **Session cookie - form login answering with `Set-Cookie`:**
+
+    ```toml
+    [auth.dynamic.openapi.SessionCookie]
+    path = "/login"
+    payload = { username = "${USERNAME}", password = "${PASSWORD}" }
+    payload_content_type = "application/x-www-form-urlencoded"
+    extract_from = "cookie"
+    extract_selector = "SESSION"
+    ```
+
     **API Key:**
 
     ```toml
@@ -951,8 +962,8 @@ These settings can only be applied at the project level.
     | `method` | `"post"` | HTTP method for the token fetch request |
     | `payload` | `{}` | Body sent with the fetch request; supports `${ENV_VAR}` substitution |
     | `payload_content_type` | `"application/json"` | Media type for the payload. Accepts `application/json` (and any `+json` variant, optionally with parameters such as `; charset=utf-8`) or `application/x-www-form-urlencoded` |
-    | `extract_from` | `"body"` | Source of the token: `"body"` or `"header"` |
-    | `extract_selector` | required | [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) when `extract_from = "body"`, or header name when `extract_from = "header"` |
+    | `extract_from` | `"body"` | Source of the token: `"body"`, `"header"` or `"cookie"` |
+    | `extract_selector` | required | [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) when `extract_from = "body"`, header name when `extract_from = "header"`, or cookie name when `extract_from = "cookie"` |
     | `retry_on` | `[401]` | Status codes that trigger a token refresh and a single request replay. `[]` disables reactive refresh for this scheme. |
 
     Supported for `http/bearer`, `apiKey`, and `oauth2` scheme types in OpenAPI 2.0 and 3.x. `oauth2` tokens are applied as `Authorization: Bearer <token>`.

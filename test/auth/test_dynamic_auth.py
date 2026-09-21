@@ -67,6 +67,7 @@ def _register_single_use_token(app):
         ("/api/body-auth", "body", "/access_token", "test-token"),
         ("/api/nested-auth", "body", "/data/token", "test-token"),
         ("/api/header-auth", "header", "X-Auth-Token", "test-token"),
+        ("/api/cookie-auth", "cookie", "SESSION", "s3ss10nt0k3n"),
         ("/api/bad-charset-auth/bogus-xyz", "body", "/access_token", "test-token"),
         ("/api/bad-charset-auth/undefined", "body", "/access_token", "test-token"),
         ("/api/bom-auth", "body", "/access_token", "test-token"),
@@ -93,6 +94,7 @@ def test_get_extracts_token(auth_operation, path, extract_from, extract_selector
         ("/api/fail", "body", "/access_token", "401"),
         ("/api/missing-key", "body", "/missing", "/missing"),
         ("/api/body-auth", "header", "X-Missing", "X-Missing"),
+        ("/api/cookie-auth", "cookie", "MISSING", "MISSING"),
         ("/api/non-json", "body", "/token", "non-JSON"),
         ("/api/wrong-type", "body", "/token", "Expected a string"),
     ],
@@ -506,6 +508,51 @@ def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
     )
 
 
+def test_dynamic_auth_cookie_integration(ctx, cli, app_runner, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{"SessionCookie": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "SessionCookie": {"type": "apiKey", "in": "cookie", "name": "SESSION"},
+            }
+        },
+    )
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        response = jsonify({})
+        response.set_cookie("SESSION", "s3ss10nt0k3n", path="/")
+        return response
+
+    @app.route("/protected")
+    def protected():
+        if request.cookies.get("SESSION") != "s3ss10nt0k3n":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"result": "ok"})
+
+    assert (
+        _run_cli(
+            cli,
+            app_runner,
+            app,
+            "--include-path=/protected",
+            "--phases=fuzzing",
+            "--mode=positive",
+            "-n 3",
+            config={"auth": _dynamic_auth("SessionCookie", extract_from="cookie", extract_selector="SESSION")},
+        )
+        == snapshot_cli
+    )
+
+
 def test_dynamic_auth_wsgi_e2e(testdir):
     testdir.makefile(
         ".toml",
@@ -555,6 +602,115 @@ def protected():
     return jsonify({"error": "unauthorized"}), 401
 
 schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    response = case.call()
+    assert response.status_code == 200
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_dynamic_auth_cookie_wsgi_e2e(testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.dynamic.openapi.SessionCookie]
+path = "/api/auth"
+extract_from = "cookie"
+extract_selector = "SESSION"
+""",
+    )
+    testdir.makepyfile(
+        """
+import schemathesis
+from flask import Flask, jsonify, request
+from hypothesis import Phase, settings
+
+app = Flask("test")
+
+@app.route("/openapi.json")
+def spec():
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/protected": {
+                "get": {
+                    "security": [{"SessionCookie": []}],
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "SessionCookie": {"type": "apiKey", "in": "cookie", "name": "SESSION"}
+            }
+        },
+    }
+
+@app.route("/api/auth", methods=["POST"])
+def auth():
+    response = jsonify({})
+    response.set_cookie("OTHER", "junk")
+    response.set_cookie("SESSION", "s3ss10nt0k3n", path="/")
+    return response
+
+@app.route("/protected")
+def protected():
+    if request.cookies.get("SESSION") == "s3ss10nt0k3n":
+        return jsonify({"result": "ok"})
+    return jsonify({"error": "unauthorized"}), 401
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    response = case.call()
+    assert response.status_code == 200
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_dynamic_auth_cookie_asgi_e2e(testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.dynamic.openapi.SessionCookie]
+path = "/api/auth"
+extract_from = "cookie"
+extract_selector = "SESSION"
+""",
+    )
+    testdir.makepyfile(
+        """
+import schemathesis
+from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.security import APIKeyCookie
+from hypothesis import Phase, settings
+
+app = FastAPI()
+session_cookie = APIKeyCookie(name="SESSION", scheme_name="SessionCookie", auto_error=False)
+
+@app.post("/api/auth", include_in_schema=False)
+async def auth(response: Response):
+    response.set_cookie("OTHER", "junk")
+    response.set_cookie("SESSION", "s3ss10nt0k3n", path="/")
+    return {}
+
+@app.get("/protected")
+async def protected(session: str = Depends(session_cookie)):
+    if session != "s3ss10nt0k3n":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"result": "ok"}
+
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 @schema.parametrize()
 @settings(max_examples=1, phases=[Phase.generate])

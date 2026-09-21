@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import textwrap
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
@@ -23,6 +24,13 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext
     from schemathesis.config import OutputConfig
     from schemathesis.generation.case import Case
+
+
+def _parse_set_cookie(headers: Iterable[str]) -> dict[str, str]:
+    jar = SimpleCookie()
+    for header in headers:
+        jar.load(header)
+    return {name: morsel.value for name, morsel in jar.items()}
 
 
 def _response_block(status_code: int, text: str, config: OutputConfig) -> str:
@@ -170,6 +178,7 @@ class DynamicTokenAuthProvider:
             text=decode_lossy(response.content, response.encoding),
             get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
+            cookies=response.cookies.get_dict(),
             output_config=config.output,
         )
 
@@ -196,6 +205,7 @@ class DynamicTokenAuthProvider:
             text=response.get_data(as_text=True),
             get_json=lambda: response.get_json(force=True, silent=False),
             headers=response.headers,
+            cookies=_parse_set_cookie(response.headers.getlist("Set-Cookie")),
             output_config=ctx.operation.schema.config.output,
         )
 
@@ -224,6 +234,7 @@ class DynamicTokenAuthProvider:
             text=decode_lossy(response.content, response.encoding),
             get_json=lambda: load_json_lossy(response.content, response.encoding),
             headers=response.headers,
+            cookies=response.cookies.get_dict(),
             output_config=ctx.operation.schema.config.output,
         )
 
@@ -233,6 +244,7 @@ class DynamicTokenAuthProvider:
         text: str,
         get_json: Callable[[], Any],
         headers: Mapping[str, str],
+        cookies: Mapping[str, str],
         output_config: OutputConfig,
     ) -> str:
         if status_code in (401, 403):
@@ -272,6 +284,15 @@ class DynamicTokenAuthProvider:
                     f"Expected a string at {self.extract_selector!r}, got {type(raw).__name__}: {raw!r}",
                 )
             return raw
+        if self.extract_from == "cookie":
+            value = cookies.get(self.extract_selector)
+            if value is None:
+                raise AuthenticationError(
+                    "DynamicTokenAuthProvider",
+                    "get",
+                    f"Cookie {self.extract_selector!r} not found in auth response. Present cookies: {list(cookies)!r}",
+                )
+            return value
         result = headers.get(self.extract_selector)
         if result is None:
             present = list(headers.keys())
