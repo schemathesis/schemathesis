@@ -75,7 +75,7 @@ Missing test data: 2 operations repeatedly returned 404 Not Found, preventing te
   - GET /orders
   - GET /users
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Check `--url`, and whether the schema describes everything these operations need
 
 Schema validation skipped: 2 operations cannot validate responses due to missing deserializers
 

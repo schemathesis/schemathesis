@@ -29,7 +29,7 @@ Missing test data: 2 operations repeatedly returned 404 Not Found, preventing te
   - DELETE /items/{item_id}
   - GET /items/{item_id}
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Add a link from POST /items, or supply the identifiers it returns in your config file
 
 =================================== SUMMARY ====================================
 

@@ -27,7 +27,7 @@ Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tes
 
   - GET /
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Check `--url`, and whether the schema describes everything these operations need
 
 =================================== SUMMARY ====================================
 

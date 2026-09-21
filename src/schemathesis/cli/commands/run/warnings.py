@@ -21,7 +21,7 @@ from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
-    from schemathesis.schemas import APIOperation
+    from schemathesis.schemas import APIOperation, BaseSchema
 
 
 @dataclass(slots=True)
@@ -177,6 +177,37 @@ def missing_base_path(operation: APIOperation) -> str | None:
     if not declared:
         return None
     return declared if not urlsplit(configured).path.rstrip("/").endswith(declared) else None
+
+
+def takes_input(operation: APIOperation) -> bool:
+    """Whether the operation has anything a run could have got wrong."""
+    return bool(
+        operation.path_parameters or operation.query or operation.headers or operation.cookies or operation.body
+    )
+
+
+def resource_producers(schema: BaseSchema) -> dict[str, set[str]]:
+    """For every operation that consumes a resource, the operations that appear to supply it.
+
+    From the inferred graph, so it reports what was found in the schema, not what the API can do.
+    Absent means the operation consumes nothing, or there is no graph; empty means nothing supplies it.
+    """
+    if schema.specification.kind is not SpecificationKind.OPENAPI:
+        return {}
+    operations = schema.analysis.dependency_graph.operations  # type: ignore[attr-defined]
+    by_resource: dict[str, set[str]] = {}
+    for label, node in operations.items():
+        for slot in node.outputs:
+            by_resource.setdefault(slot.resource.name, set()).add(label)
+    producers: dict[str, set[str]] = {}
+    for label, node in operations.items():
+        if not node.inputs:
+            continue
+        found: set[str] = set()
+        for slot in node.inputs:
+            found |= by_resource.get(slot.resource.name, set())
+        producers[label] = found - {label}
+    return producers
 
 
 def _is_positive(case: CaseNode) -> bool:
@@ -374,8 +405,13 @@ class WarningCollector:
 
     def _record_missing_test_data(self, label: str, operation: APIOperation | None) -> None:
         """Record the operation, capturing the link graph the first time one warns."""
-        if self.data.linked_operations is None and operation is not None:
-            self.data.linked_operations = operation.schema.operations_with_incoming_links()
+        if operation is not None:
+            if self.data.linked_operations is None:
+                self.data.linked_operations = operation.schema.operations_with_incoming_links()
+            if self.data.resource_producers is None:
+                self.data.resource_producers = resource_producers(operation.schema)
+            if not takes_input(operation):
+                self.data.parameterless.add(label)
         self.data.missing_test_data.add(label)
 
     def _mark_authenticated(self, label: str) -> None:

@@ -390,6 +390,72 @@ def test_missing_test_data_advice_for_unusable_linked_data(ctx, cli, snapshot_cl
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_test_data_advice_from_dependency_graph(ctx, cli, snapshot_cli):
+    # No links are declared, so the advice comes from the inferred dependency graph:
+    # `POST /orders` supplies what `GET /orders/{orderId}/receipt` needs, nothing in the schema
+    # supplies what `GET /invoices/{invoiceId}` needs, and `GET /status` consumes no resource at
+    # all, so it keeps the generic advice.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/orders": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/orders/{orderId}/receipt": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "orderId", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+            "/invoices/{invoiceId}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "invoiceId", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+            "/status": {"get": {"responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}}}},
+        }
+    )
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        return jsonify({"id": "order-1"}), 201
+
+    @app.route("/orders/<order_id>/receipt", methods=["GET"])
+    def get_receipt(order_id):
+        return jsonify({"message": "Not found"}), 404
+
+    @app.route("/invoices/<invoice_id>", methods=["GET"])
+    def get_invoice(invoice_id):
+        return jsonify({"message": "Not found"}), 404
+
+    @app.route("/status", methods=["GET"])
+    def get_status():
+        return jsonify({"message": "Not found"}), 404
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "-c not_a_server_error",
+            "--phases=fuzzing",
+            "--mode=positive",
+            "-n 10",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_test_data_advice_grouped_by_cause(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud()
     assert (

@@ -98,27 +98,77 @@ def _is_graphql(ctx: ExecutionContext) -> bool:
     return ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRAPHQL
 
 
+# Methods that most often create a resource, in the order they are preferred when several
+# operations could supply the same one.
+_CREATING_METHODS = ("post", "put", "patch")
+
+
+def _preferred_producer(labels: set[str]) -> str:
+    """The one producer worth naming: a creating method first, then the shortest label."""
+
+    def rank(label: str) -> tuple[int, int, str]:
+        method = label.split(" ", 1)[0].lower()
+        order = _CREATING_METHODS.index(method) if method in _CREATING_METHODS else len(_CREATING_METHODS)
+        return (order, len(label), label)
+
+    return min(labels, key=rank)
+
+
 def _missing_test_data_advice(
-    label: str, *, linked: set[str], stateful_ran: bool, exercised: set[str]
-) -> tuple[str, str]:
-    """What actually stands between this operation and real data, and the tip that addresses it."""
-    if label not in linked:
+    label: str,
+    *,
+    linked: set[str],
+    stateful_ran: bool,
+    exercised: set[str],
+    producers: dict[str, set[str]],
+    parameterless: set[str],
+) -> tuple[str, str, str]:
+    """What actually stands between this operation and real data, and the tip that addresses it.
+
+    The cause is given for one operation and for several, because the group it belongs to is only
+    known once every operation has been asked.
+    """
+    if label in parameterless:
+        # Nothing was generated for it, so no value can be the reason the path was not found.
         return (
+            "This operation declares no parameters, so an empty request was all there was to send",
+            "These operations declare no parameters, so an empty request was all there was to send",
+            "💡 Check `--url`, and whether the schema describes everything these operations need",
+        )
+    if label not in linked:
+        # The inferred graph knows more than the declared links do.
+        candidates = producers.get(label)
+        if candidates:
+            producer = _preferred_producer(candidates)
+            return (
+                f"No links point to this operation - {producer} appears to supply the data it needs",
+                f"No links point to these operations - {producer} appears to supply the data they need",
+                f"💡 Add a link from {producer}, or supply the identifiers it returns in your config file",
+            )
+        if candidates is not None:
+            return (
+                "No links point to this operation - nothing in the schema appears to supply the data it needs",
+                "No links point to these operations - nothing in the schema appears to supply the data they need",
+                "💡 Schemathesis found no operation that creates this data - create it outside the test run and supply the identifiers in your config file",
+            )
+        return (
+            "No links point to this operation",
             "No links point to these operations",
             "💡 Provide realistic parameter values in your config file so tests can access existing resources",
         )
     if not stateful_ran:
-        return (
-            "Reachable via links, but stateful testing did not run",
-            "💡 Enable the `stateful` phase so declared links can supply real identifiers",
-        )
+        cause = "Reachable via links, but stateful testing did not run"
+        return (cause, cause, "💡 Enable the `stateful` phase so declared links can supply real identifiers")
     if label not in exercised:
         return (
+            "Reachable via links, but stateful testing never reached it",
             "Reachable via links, but stateful testing never reached them",
             "💡 Raise `phases.stateful.max-steps` or run longer so stateful testing reaches these operations",
         )
+    cause = "Reached via links, but the linked data was not usable"
     return (
-        "Reached via links, but the linked data was not usable",
+        cause,
+        cause,
         "💡 Check the operations that create this data - their responses do not yield usable identifiers",
     )
 
@@ -1169,10 +1219,15 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             return
         linked = ctx.warnings.linked_operations or set()
         stateful_ran = ctx.phases[PhaseName.STATEFUL_TESTING][0] != Status.SKIP
-        groups: dict[tuple[str, str], set[str]] = {}
+        groups: dict[tuple[str, str, str], set[str]] = {}
         for label in ctx.warnings.missing_test_data:
             advice = _missing_test_data_advice(
-                label, linked=linked, stateful_ran=stateful_ran, exercised=ctx.warnings.stateful_exercised
+                label,
+                linked=linked,
+                stateful_ran=stateful_ran,
+                exercised=ctx.warnings.stateful_exercised,
+                producers=ctx.warnings.resource_producers or {},
+                parameterless=ctx.warnings.parameterless,
             )
             groups.setdefault(advice, set()).add(label)
 
@@ -1183,13 +1238,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             " repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
         )
         if len(groups) == 1:
-            (_, tip), labels = next(iter(groups.items()))
+            (_, _, tip), labels = next(iter(groups.items()))
             self._print_items(labels)
             self._print_warning_tips([tip])
             return
-        for (cause, tip), labels in sorted(groups.items()):
-            plural = "" if len(labels) == 1 else "s"
-            click.echo(_style(f"{cause} ({len(labels)} operation{plural}):", fg="yellow"))
+        for (one, many, tip), labels in sorted(groups.items()):
+            # The list that follows says how many there are when there is more than one.
+            heading = f"{one}:" if len(labels) == 1 else f"{many} ({len(labels)} operations):"
+            click.echo(_style(heading, fg="yellow"))
             self._print_items(labels)
             self._print_warning_tips([tip])
 
