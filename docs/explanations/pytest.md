@@ -117,7 +117,7 @@ test_api.py::test_api[GET /health] PASSED
 __________________________ test_api[POST /bookings] ___________________________
 + Exception Group Traceback (most recent call last):
   | # snip
-  | schemathesis.FailureGroup: Schemathesis found 2 distinct failures
+  | schemathesis.core.failures.FailureGroup: Schemathesis found 2 distinct failures
   |
   | - Server error
   |

@@ -574,6 +574,13 @@ def test_checks_errors_deduplication(ctx, response_factory, factory_type):
     assert len(exc.value.exceptions) == 1
 
 
+def test_validate_response_failure_is_catchable_from_public_errors(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    case = schema["/data"]["GET"].Case()
+    with pytest.raises(schemathesis.errors.FailureGroup):
+        case.validate_response(response_factory.requests(status_code=500))
+
+
 def test_operation_hash(openapi_30):
     # API Operations should be hashable
     _ = {i.ok() for i in openapi_30.get_all_operations()}

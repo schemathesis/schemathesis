@@ -10,6 +10,7 @@
 - `missing_test_data` warns for GraphQL operations whose responses never carry `data`.
 - `st replay` retries passing crashes up to three times and reports intermittent ones as `FLAKY`.
 - Dynamic auth `extract_from = "cookie"` takes a named cookie from a `Set-Cookie` login response.
+- `schemathesis.errors.FailureGroup` for catching failures raised by `validate_response`.
 
 ### :bug: Fixed
 

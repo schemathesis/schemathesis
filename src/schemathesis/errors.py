@@ -25,8 +25,10 @@ from schemathesis.core.errors import (
     UnsupportedRegexPattern,
     UnsupportedSchema,
 )
+from schemathesis.core.failures import FailureGroup
 
 __all__ = [
+    "FailureGroup",
     "HookError",
     "HookExecutionError",
     "IncorrectUsage",
