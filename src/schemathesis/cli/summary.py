@@ -43,6 +43,10 @@ class WarningData:
     stateful_exercised: set[str]
     # Operations some other operation links to; `None` until an operation warns.
     linked_operations: set[str] | None
+    # Operations that appear to supply what each consuming one needs; `None` until an operation warns.
+    resource_producers: dict[str, set[str]] | None
+    # Warned operations that take no parameters and no body, so no value could have been varied.
+    parameterless: set[str]
 
     def __init__(
         self,
@@ -62,6 +66,8 @@ class WarningData:
         valid_rates: dict[str, dict[str, ValidRate]] | None = None,
         stateful_exercised: set[str] | None = None,
         linked_operations: set[str] | None = None,
+        resource_producers: dict[str, set[str]] | None = None,
+        parameterless: set[str] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
@@ -79,6 +85,8 @@ class WarningData:
         self.valid_rates = valid_rates or {}
         self.stateful_exercised = stateful_exercised or set()
         self.linked_operations = linked_operations
+        self.resource_producers = resource_producers
+        self.parameterless = parameterless or set()
 
     @property
     def low_valid_rate_reported(self) -> set[str]:

@@ -25,12 +25,17 @@ Schemathesis dev
 
 Missing test data: 4 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
+No links point to these operations - nothing in the schema appears to supply the data they need (2 operations):
   - GET /api/custom_format
-  - GET /api/failure
   - GET /api/multiple_failures
+
+💡 Schemathesis found no operation that creates this data - create it outside the test run and supply the identifiers in your config file
+
+These operations declare no parameters, so an empty request was all there was to send (2 operations):
+  - GET /api/failure
   - GET /api/success
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Check `--url`, and whether the schema describes everything these operations need
 
 =================================== SUMMARY ====================================
 

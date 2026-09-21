@@ -31,7 +31,7 @@ Missing test data: 4 operations repeatedly returned 404 Not Found, preventing te
   - GET /d
   - POST /a
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Check `--url`, and whether the schema describes everything these operations need
 
 Unmatched filters: 1 filter matched no API operations
 

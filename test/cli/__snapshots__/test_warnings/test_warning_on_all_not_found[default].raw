@@ -28,7 +28,7 @@ Missing test data: 2 operations repeatedly returned 404 Not Found, preventing te
   - GET /api/failure
   - GET /api/success
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Check `--url`, and whether the schema describes everything these operations need
 
 =================================== SUMMARY ====================================
 

@@ -76,6 +76,8 @@ include-name = "GET /users/{user_id}"
 parameters = { user_id = 42 }
 ```
 
+For an operation no link points at, the warning names the operation that appears to supply its data. That comes from the inferred dependency graph, so it reports what the schema shows, not what the API can do.
+
 For GraphQL, the trigger is a response body rather than a status code: the warning fires when no positive request for an operation ever came back with `data`. Supply argument values via a [fuzz dictionary](../guides/fuzz-dictionary.md) so queries can return data.
 
 ### `validation_mismatch`

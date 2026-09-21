@@ -7,9 +7,9 @@ Schemathesis dev
 
  ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/v4
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       3 selected / 3 total
+     Operations:       4 selected / 4 total
 
 
  ✅  API capabilities:
@@ -19,41 +19,38 @@ Schemathesis dev
 
  ✅  Fuzzing (in 0.00s)
 
-     ✅ 3 passed
-
- ✅  Stateful (in 0.00s)
-
-     Scenarios:    N
-     API Links:    N covered / 4 selected / 4 total
-
-     ✅ N passed
+     ✅ 4 passed
 
 =================================== WARNINGS ===================================
 
 Missing test data: 3 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
-No links point to this operation:
-  - POST /users/
+No links point to this operation - POST /orders appears to supply the data it needs:
+  - GET /orders/{orderId}/receipt
 
-💡 Provide realistic parameter values in your config file so tests can access existing resources
+💡 Add a link from POST /orders, or supply the identifiers it returns in your config file
 
-Reachable via links, but stateful testing never reached them (2 operations):
-  - GET /users/{user_id}
-  - PATCH /users/{user_id}
+No links point to this operation - nothing in the schema appears to supply the data it needs:
+  - GET /invoices/{invoiceId}
 
-💡 Raise `phases.stateful.max-steps` or run longer so stateful testing reaches these operations
+💡 Schemathesis found no operation that creates this data - create it outside the test run and supply the identifiers in your config file
+
+This operation declares no parameters, so an empty request was all there was to send:
+  - GET /status
+
+💡 Check `--url`, and whether the schema describes everything these operations need
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 3/3
-  Tested: 3
+  Selected: 4/4
+  Tested: 4
 
 Test Phases:
   ⏭  Examples (disabled)
   ⏭  Coverage (disabled)
   ✅ Fuzzing
-  ✅ Stateful
+  ⏭  Stateful (disabled)
 
 Warnings:
   ⚠️ Missing valid test data: 3 operations repeatedly returned 404 responses
