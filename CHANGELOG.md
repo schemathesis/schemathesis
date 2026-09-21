@@ -14,6 +14,7 @@
 
 - False positive GraphQL server errors for resolver rejections labelled in error `extensions`.
 - Complete partial request body examples declared under the `examples` keyword.
+- Protocol-relative `$ref` (`//host/schema.json`) failing to resolve for schemas loaded from a file.
 
 ### :wrench: Changed
 

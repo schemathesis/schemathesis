@@ -70,6 +70,17 @@ def test_load_file_reads_yaml_document(tmp_path):
             "../defs.json#/$defs/name",
             "https://example.com/defs.json#/$defs/name",
         ),
+        (
+            "http://example.com/schemas/root.json",
+            "//other.com/defs.json#/$defs/name",
+            "http://other.com/defs.json#/$defs/name",
+        ),
+        (
+            "file:///tmp/root.json",
+            "//example.com/defs.json#/$defs/name",
+            "https://example.com/defs.json#/$defs/name",
+        ),
+        (IN_MEMORY_BASE_URI, "//example.com/defs.json#/$defs/name", "https://example.com/defs.json#/$defs/name"),
     ],
 )
 def test_resolve_reference_uri(base_uri, reference, expected):
