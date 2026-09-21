@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Generator
 from dataclasses import dataclass
 from functools import lru_cache
@@ -55,6 +56,8 @@ class ParameterExample:
     container: ContainerName
     name: str
     value: Any
+    # The name the spec gave this example, if any.
+    example_name: str | None = None
 
 
 @dataclass(slots=True)
@@ -335,10 +338,15 @@ def extract_top_level(
         container_keywords = dict.fromkeys((parameter.adapter.examples_container_keyword, "examples", "x-examples"))
         for container_keyword in container_keywords:
             if container_keyword in parameter.definition:
-                for value in extract_inner_examples(parameter.definition[container_keyword], operation.schema):
+                for example_name, value in extract_named_inner_examples(
+                    parameter.definition[container_keyword], operation.schema
+                ):
                     if _example_is_valid(value, param_validator):
                         yield ParameterExample(
-                            container=parameter.location.container_name, name=parameter.name, value=value
+                            container=parameter.location.container_name,
+                            name=parameter.name,
+                            value=value,
+                            example_name=example_name,
                         )
         for expanded_schema in expanded:
             if not isinstance(expanded_schema, dict):
@@ -640,16 +648,26 @@ def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Ge
 
 def extract_inner_examples(examples: dict[str, Any] | list, schema: OpenApiSchema) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
+    for _, value in extract_named_inner_examples(examples, schema):
+        yield value
+
+
+def extract_named_inner_examples(
+    examples: dict[str, Any] | list, schema: OpenApiSchema
+) -> Generator[tuple[str | None, Any], None, None]:
+    """Extract exact example values together with their names."""
     if isinstance(examples, dict):
-        for example in examples.values():
+        for name, example in examples.items():
             if isinstance(example, dict):
-                yield from _unpack_example_object(example, schema)
+                for value in _unpack_example_object(example, schema):
+                    yield name, value
     elif isinstance(examples, list):
         for example in examples:
             if isinstance(example, dict):
-                yield from _unpack_example_object(example, schema)
+                for value in _unpack_example_object(example, schema):
+                    yield None, value
             else:
-                yield example
+                yield None, example
 
 
 @lru_cache
@@ -1100,13 +1118,13 @@ def _generate_single_example(
 def produce_combinations(examples: list[Example]) -> Generator[dict[str, Any], None, None]:
     """Generate a minimal set of combinations for the given list of parameters."""
     # Split regular parameters & body variants first
-    parameters: dict[str, dict[str, list]] = {}
+    parameters: dict[str, dict[str, list[tuple[str | None, Any]]]] = {}
     bodies: dict[str, list] = {}
     for example in examples:
         if isinstance(example, ParameterExample):
             container_examples = parameters.setdefault(example.container, {})
             parameter_examples = container_examples.setdefault(example.name, [])
-            parameter_examples.append(example.value)
+            parameter_examples.append((example.example_name, example.value))
         else:
             values = bodies.setdefault(example.media_type, [])
             values.append(example.value)
@@ -1131,15 +1149,41 @@ def produce_combinations(examples: list[Example]) -> Generator[dict[str, Any], N
         yield from _produce_parameter_combinations(parameters)
 
 
-def _produce_parameter_combinations(parameters: dict[str, dict[str, list]]) -> Generator[dict[str, Any], None, None]:
+def _produce_parameter_combinations(
+    parameters: dict[str, dict[str, list[tuple[str | None, Any]]]],
+) -> Generator[dict[str, Any], None, None]:
+    parameters = _align_shared_example_names(parameters)
     total_combos = max(
         len(variants) for container_variants in parameters.values() for variants in container_variants.values()
     )
     for idx in range(total_combos):
         yield {
             container: {
-                name: next(islice(cycle(parameter_variants), idx, None))
+                name: next(islice(cycle(parameter_variants), idx, None))[1]
                 for name, parameter_variants in variants.items()
             }
             for container, variants in parameters.items()
         }
+
+
+def _align_shared_example_names(
+    parameters: dict[str, dict[str, list[tuple[str | None, Any]]]],
+) -> dict[str, dict[str, list[tuple[str | None, Any]]]]:
+    """Line up equally-named examples so positional pairing puts them in the same request."""
+    occurrences: Counter[str] = Counter()
+    for container_variants in parameters.values():
+        for variants in container_variants.values():
+            occurrences.update(list(dict.fromkeys(name for name, _ in variants if name is not None)))
+    shared: dict[str | None, int] = {
+        name: index for index, name in enumerate(name for name, count in occurrences.items() if count > 1)
+    }
+    if not shared:
+        return parameters
+    # Unshared examples keep their relative order behind the shared ones.
+    return {
+        container: {
+            name: sorted(variants, key=lambda variant: shared.get(variant[0], len(shared)))
+            for name, variants in container_variants.items()
+        }
+        for container, container_variants in parameters.items()
+    }

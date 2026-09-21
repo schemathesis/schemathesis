@@ -846,19 +846,47 @@ def build_example_aware_strategy(
     return with_examples()
 
 
+def split_correlated_examples(
+    parameter_examples: dict[str, list[JsonValue]],
+    named_examples: dict[str, dict[str, JsonValue]],
+) -> tuple[dict[str, list[JsonValue]], list[dict[str, JsonValue]]]:
+    """Split out examples that several parameters declare under the same name."""
+    by_example_name: dict[str, dict[str, JsonValue]] = {}
+    for parameter_name, named in named_examples.items():
+        for example_name, value in named.items():
+            by_example_name.setdefault(example_name, {})[parameter_name] = value
+    correlated = [group for group in by_example_name.values() if len(group) > 1]
+    if not correlated:
+        return parameter_examples, []
+    grouped_values: dict[str, list[JsonValue]] = {}
+    for group in correlated:
+        for parameter_name, value in group.items():
+            grouped_values.setdefault(parameter_name, []).append(value)
+    independent = {
+        parameter_name: [
+            value for value in values if not any(value is grouped for grouped in grouped_values.get(parameter_name, ()))
+        ]
+        for parameter_name, values in parameter_examples.items()
+    }
+    return independent, correlated
+
+
 def build_parameter_example_aware_strategy(
     original_strategy: st.SearchStrategy,
     parameter_examples: dict[str, list[JsonValue]],
+    correlated_examples: list[dict[str, JsonValue]] | None = None,
 ) -> st.SearchStrategy:
     """Combine original parameter strategy with per-parameter schema examples.
 
     For each parameter with examples, approximately 20% chance to replace its
     generated value with one of the examples. Parameters without examples keep
-    their generated values.
+    their generated values. Equally-named examples are applied as a whole.
 
     Uses true randomness for uniform probability distribution.
     """
     from hypothesis import strategies as st
+
+    correlated = correlated_examples or []
 
     @st.composite  # type: ignore[untyped-decorator]
     def with_parameter_examples(draw: st.DrawFn) -> dict[str, Any] | None:
@@ -869,9 +897,14 @@ def build_parameter_example_aware_strategy(
         # Use true random for uniform distribution
         random = draw(st.randoms(use_true_random=True))
 
-        # For each parameter with examples, potentially replace with example
+        chosen: dict[str, JsonValue] = {}
+        if correlated and random.random() < EXAMPLE_USAGE_PROBABILITY:
+            chosen = random.choice(correlated)
+            result.update(chosen)
+
+        # For each remaining parameter with examples, potentially replace with example
         for param_name, examples in parameter_examples.items():
-            if not examples:
+            if not examples or param_name in chosen:
                 continue
             # 20% chance to use example for this parameter
             if random.random() < EXAMPLE_USAGE_PROBABILITY:
@@ -1024,6 +1057,18 @@ class OpenApiComponent(ABC):
             self._examples = self._extract_examples()
         assert not isinstance(self._examples, NotSet)
         return self._examples
+
+    @property
+    def named_examples(self) -> dict[str, JsonValue]:
+        """Examples from the `examples` container, keyed by their names."""
+        container = self.definition.get(self.adapter.examples_container_keyword)
+        if not isinstance(container, dict):
+            return {}
+        return {
+            name: example["value"]
+            for name, example in container.items()
+            if isinstance(example, dict) and "value" in example
+        }
 
     @property
     def mutation_targets(self) -> tuple[MutationTargetDescriptor, ...]:
@@ -2234,6 +2279,7 @@ class OpenApiParameterSet(ParameterSet):
                 # validation schema so examples the API has demonstrated to be invalid get evicted.
                 adjusted_properties = schema_obj.get("properties") if isinstance(schema_obj, dict) else None
                 parameter_examples: dict[str, list[Any]] = {}
+                named_examples: dict[str, dict[str, JsonValue]] = {}
                 for param in self.items:
                     if param.name in exclude_key or not param.examples:
                         continue
@@ -2245,8 +2291,18 @@ class OpenApiParameterSet(ParameterSet):
                     valid = filter_schema_valid_examples(param.examples, validation_schema, validator_cls)
                     if valid:
                         parameter_examples[param.name] = valid
+                        named = {
+                            example_name: value
+                            for example_name, value in param.named_examples.items()
+                            if any(value is candidate for candidate in valid)
+                        }
+                        if named:
+                            named_examples[param.name] = named
                 if parameter_examples:
-                    strategy = build_parameter_example_aware_strategy(strategy, parameter_examples)
+                    parameter_examples, correlated_examples = split_correlated_examples(
+                        parameter_examples, named_examples
+                    )
+                    strategy = build_parameter_example_aware_strategy(strategy, parameter_examples, correlated_examples)
 
             # Bias path parameter integers toward positive values BEFORE the constants overlay, so a
             # substituted literal (e.g. a negative sentinel id) is the final value and is never rewritten.
