@@ -314,6 +314,11 @@ class OpenApiSchema(BaseSchema):
         )
 
     @override
+    def declared_response_values(self, operation: APIOperation) -> Mapping[str, frozenset[str]]:
+        from schemathesis.specs.openapi.declared_values import collect
+
+        return collect(operation)
+
     def get_unit_scheduler(
         self,
         operations: list[Result[APIOperation, InvalidSchema]],

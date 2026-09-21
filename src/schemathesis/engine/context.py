@@ -9,6 +9,7 @@ from schemathesis.auths import ReauthState
 from schemathesis.checks import RunChecks
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.behaviors import BehaviorCensus
 from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.core.error_feedback.collector import record_observations
 from schemathesis.core.statistic import StatefulInference
@@ -69,6 +70,8 @@ class EngineContext:
     start_time: float
     observations: Observations | None
     link_calibration: LinkCalibrationState | None
+    # Distinct behaviors seen per operation, accumulated as responses arrive.
+    behaviors: BehaviorCensus
 
     __slots__ = (
         "schema",
@@ -76,6 +79,7 @@ class EngineContext:
         "outcome_cache",
         "health",
         "server",
+        "behaviors",
         "link_calibration",
         "start_time",
         "observations",
@@ -121,6 +125,7 @@ class EngineContext:
         self.outcome_cache = {}
         self.health = HealthState()
         self.server = ServerMonitor()
+        self.behaviors = BehaviorCensus()
         self.link_calibration = LinkCalibrationState() if schema.config.phases.stateful.link_calibration else None
         self.observations = observations
         self._thread_local = threading.local()

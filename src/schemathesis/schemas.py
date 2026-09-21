@@ -549,6 +549,10 @@ class BaseSchema(Mapping):
 
         return DefaultScheduler(operations=operations)
 
+    def declared_response_values(self, operation: APIOperation) -> Mapping[str, frozenset[str]]:
+        """Response fields whose schema names the values they can hold, keyed as the alphabet keys them."""
+        return {}
+
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
         """Discover spec-specific stateful transitions; return the counts available."""
         return StatefulInference(inferred=0, total=0, selected=0)
