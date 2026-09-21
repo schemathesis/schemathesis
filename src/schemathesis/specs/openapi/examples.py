@@ -354,7 +354,7 @@ def extract_top_level(
             # A oneOf/anyOf branch's examples are checked against that branch, like its `example` above.
             expanded_validator = _make_example_validator(expanded_schema)
             for container_keyword in container_keywords:
-                for value in expanded_schema.get(container_keyword, []):
+                for value in _iter_schema_examples(expanded_schema.get(container_keyword), operation.schema):
                     if _example_is_valid(value, expanded_validator) and _example_survives_float32(
                         value, expanded_schema
                     ):
@@ -404,8 +404,9 @@ def extract_top_level(
                     if completed is not None:
                         yield BodyExample(value=completed, media_type=body.media_type)
         for expanded_schema in expanded:
-            if isinstance(expanded_schema, dict) and body.adapter.examples_container_keyword in expanded_schema:
-                for value in expanded_schema[body.adapter.examples_container_keyword]:
+            if isinstance(expanded_schema, dict):
+                container = expanded_schema.get(body.adapter.examples_container_keyword)
+                for value in _iter_schema_examples(container, operation.schema):
                     if _example_is_valid(value, declared_validator) and _example_survives_float32(
                         value, expanded_schema
                     ):
@@ -650,6 +651,16 @@ def extract_inner_examples(examples: dict[str, Any] | list, schema: OpenApiSchem
     """Extract exact examples values from the `examples` dictionary."""
     for _, value in extract_named_inner_examples(examples, schema):
         yield value
+
+
+def _iter_schema_examples(container: object, schema: OpenApiSchema) -> Generator[Any, None, None]:
+    """Example values held by an `examples` container that sits inside a schema."""
+    # A list is the JSON Schema spelling, where every item is a raw value, while a mapping can only be
+    # the Open API one, where every entry is an Example Object keyed by its name.
+    if isinstance(container, dict):
+        yield from extract_inner_examples(container, schema)
+    elif isinstance(container, list):
+        yield from container
 
 
 def extract_named_inner_examples(

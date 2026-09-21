@@ -876,6 +876,67 @@ def test_examples_in_all_of_top_level(ctx):
     ]
 
 
+@pytest.mark.parametrize("container_keyword", ["examples", "x-examples"])
+@pytest.mark.parametrize(
+    ("container", "expected"),
+    [({"first": {"value": "abc"}}, "abc"), (["abc"], "abc")],
+    ids=["map", "list"],
+)
+def test_examples_container_in_parameter_subschema(ctx, container_keyword, container, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "schema": {"allOf": [{"type": "string", container_keyword: container}]},
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])] == [
+        {"container": "query", "name": "q", "value": expected}
+    ]
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
+@pytest.mark.parametrize(
+    ("container", "expected"),
+    [
+        ({"first": {"value": {"value": "abc"}}}, {"value": "abc"}),
+        ([{"value": "abc"}], {"value": "abc"}),
+    ],
+    ids=["map", "list"],
+)
+def test_examples_container_in_body_subschema(ctx, version, container, expected):
+    container_keyword = "x-examples" if version == "2.0" else "examples"
+    body_schema = {
+        "allOf": [
+            {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                container_keyword: container,
+            }
+        ]
+    }
+    if version == "2.0":
+        operation = {"parameters": [{"name": "body", "in": "body", "schema": body_schema}]}
+    else:
+        operation = {"requestBody": {"content": {"application/json": {"schema": body_schema}}}}
+    schema = ctx.openapi.load_schema(
+        {"/test": {"post": {**operation, "responses": {"default": {"description": "OK"}}}}},
+        version=version,
+    )
+    assert [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])] == [
+        {"media_type": "application/json", "value": expected}
+    ]
+
+
 @pytest.mark.parametrize("key", ["anyOf", "oneOf"])
 def test_examples_in_any_of_in_schemas(ctx, key):
     schema = ctx.openapi.load_schema(
