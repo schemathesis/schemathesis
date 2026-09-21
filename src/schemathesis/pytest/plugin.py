@@ -11,7 +11,6 @@ import pytest
 from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
-from _pytest.subtests import SubtestReport
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from pluggy import Result as PluggyResult
 
@@ -47,7 +46,9 @@ from schemathesis.generation.hypothesis.reporting import (
     ignore_hypothesis_output,
 )
 from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
+from schemathesis.pytest import _subtests
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
+from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import (
     emit_constants_warnings,
@@ -374,7 +375,7 @@ def pytest_report_teststatus(
 ) -> Generator[None, None, None]:
     outcome = yield
     result = cast(PluggyResult[tuple[str, str, str] | None], outcome)
-    if not isinstance(report, SubtestReport):
+    if not is_subtest_report(report):
         return
     r = result.get_result()
     if r is not None:
@@ -509,6 +510,8 @@ def _is_xdist_worker(config: pytest.Config) -> bool:
 
 def pytest_configure(config: pytest.Config) -> None:
     config.stash[_CASSETTE_KEY] = {}
+    if not HAS_CORE_SUBTESTS:
+        config.pluginmanager.register(_subtests, "schemathesis-subtests")
     if config.pluginmanager.hasplugin("xdist"):
         from schemathesis.pytest.xdist import XdistReportingPlugin
 
