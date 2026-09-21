@@ -146,3 +146,39 @@ schemathesis run http://localhost:8080/openapi.json --report json
 If the API already has failures you are not fixing yet, a [baseline](baseline.md) keeps CI red only for new ones.
 
 Gate on `operations.tested` to catch a run that graded nothing, and on `failures[].type` — the failure class name — to react to specific finding kinds. The report lands in `schemathesis-report/json-<timestamp>.json`; pass `--report-json-path` for a fixed name.
+
+## Splitting a Run Across Jobs
+
+When one run does not fit the pipeline's time budget, give each job a filter that selects part of the schema. Two jobs, one API, no overlap:
+
+```bash
+# Job 1
+schemathesis run http://localhost:8080/openapi.json \
+    --include-path-regex '^/api/orders'
+
+# Job 2
+schemathesis run http://localhost:8080/openapi.json \
+    --exclude-path-regex '^/api/orders'
+```
+
+Each job reports the share it took, so you can check the groups add up:
+
+```
+Operations:       3 selected / 5 total
+```
+
+Any filter can divide the schema - by tag, name, or operation ID as well as path. See [Filtering](../reference/cli.md#filtering) for the full set.
+
+Every job writes its own report, and there is no merge step. Jobs on separate machines need no extra flags; jobs sharing one machine need a separate `--report-dir` each so they do not overwrite one another. Upload the directories as separate artifacts - CI systems that consume JUnit XML aggregate the files themselves.
+
+### Split between resources, not through them
+
+A job only knows about the operations it selected. Identifiers it never creates, it never sees - so a job that gets `GET /api/orders/{orderId}` without the operation that creates an order spends its budget on `404` responses and warns about it:
+
+```
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /api/orders/{orderId}
+```
+
+Keep create-and-read chains in the same job, and draw the split along resource boundaries.
