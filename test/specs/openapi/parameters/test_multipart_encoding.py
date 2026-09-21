@@ -2,7 +2,7 @@ import json
 
 import pytest
 import yaml
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
@@ -24,6 +24,9 @@ def custom_part_serializer():
 
     for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
         transport.unregister_serializer("application/x-part-custom")
+
+
+SUPPRESSED_HEALTH_CHECKS = list(HealthCheck)
 
 
 def make_operation(
@@ -355,6 +358,7 @@ def test_multipart_defensive_non_string_content_type(ctx):
     )
 
     @given(case=operation.as_strategy())
+    @settings(suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         # Should fall back to default strategy
         assert isinstance(case.body["data"], (bytes | Binary))
@@ -389,6 +393,7 @@ def test_nested_object_with_encoding(ctx):
     )
 
     @given(case=operation.as_strategy())
+    @settings(suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         # Should ignore the encoding since "file" is nested, not top-level
         assert "metadata" in case.body
