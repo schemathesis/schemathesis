@@ -625,6 +625,21 @@ These settings can only be applied at the project level.
 !!! info "CLI Only"
     This option only applies when using the `schemathesis run` command.
 
+#### `baseline`
+
+!!! note ""
+
+    **Type:** `String`  
+    **Default:** `null`  
+
+    Path to the file recording the failures you have accepted, so a run reports them without failing. Equivalent to [`--baseline`](cli.md#-baseline-path), which also documents the flags that rewrite the file. See the [Baseline guide](../guides/baseline.md).
+
+    ```toml
+    # Optionally under a named project
+    # [[project]]
+    baseline = "schemathesis-baseline.json"
+    ```
+
 ### Phases
 
 #### `phases.enabled`
