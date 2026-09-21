@@ -1,0 +1,27 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/GET_flaky_not_a_server_error_testtest.json
+
+  ? FLAKY  GET /flaky
+
+    ? not_a_server_error  passed 1 of 2 replays
+
+=================================== FAILURES ===================================
+__________________________________ GET /flaky __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `{"error":"intermittent"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+    st replay <PLACEHOLDER>
+
+=============================== 1 flaky in 1.00s ===============================

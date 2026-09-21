@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 GLYPH_FIXED = "+"
 GLYPH_FAILING = "x"
 GLYPH_CHANGED = "~"
+GLYPH_FLAKY = "?"
 GLYPH_ERROR = "!"
 ARROW = "->"
 
@@ -41,6 +42,7 @@ class _Badge(NamedTuple):
 BADGES: dict[ReplayStatus, _Badge] = {
     ReplayStatus.FIXED: _Badge(GLYPH_FIXED, "FIXED", "bold green"),
     ReplayStatus.FAILED: _Badge(GLYPH_FAILING, "FAILED", "bold red"),
+    ReplayStatus.FLAKY: _Badge(GLYPH_FLAKY, "FLAKY", "bold yellow"),
     ReplayStatus.ERRORED: _Badge(GLYPH_ERROR, "ERROR", "bold magenta"),
 }
 

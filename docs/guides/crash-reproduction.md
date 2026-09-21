@@ -55,13 +55,22 @@ Reproduce with:
 ========================== 1 fixed, 1 failed in 0.14s ==========================
 ```
 
-Each case carries one of three outcomes:
+Each case carries one of four outcomes:
 
 | Outcome | Meaning |
 |---------|---------|
-| `+ FIXED` | Every recorded check now passes. The crash file is deleted unless you pass `--keep`. |
+| `+ FIXED` | Every recorded check passed on three consecutive replays. The crash file is deleted unless you pass `--keep`. |
 | `x FAILED` | At least one recorded check still fails. Detailed under `FAILURES`. Kept. |
+| `? FLAKY` | A check passed on some replays and failed on others, so the failure is intermittent. The check line shows how many replays passed. Kept. |
 | `! ERROR` | The case could not be replayed - the operation is gone from the schema, or a stateful link no longer resolves. Kept. |
+
+A passing replay does not end the attempts: a case is only `FIXED` after three clean replays. One that fails right away stops after the first, so verifying a known-broken crash costs no extra requests.
+
+```
+  ? FLAKY  GET /report
+
+    ? not_a_server_error  passed 2 of 3 replays
+```
 
 A case can fail several checks at once. When only some of them are fixed, the status line keeps `x FAILED` but lists each check, and only the fixed checks' files are removed:
 

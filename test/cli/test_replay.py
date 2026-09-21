@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import itertools
 import json
 import re
 from pathlib import Path
@@ -139,6 +140,59 @@ def test_replay_still_failing(cli, app_runner, ctx, crash_factory, tmp_path, sna
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_flaky(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
+    # A crash that reproduces only on some replays must be kept, not reported as fixed.
+    app, _ = ctx.openapi.make_flask_app({"/flaky": {"get": {"responses": {"500": {"description": "Error"}}}}})
+    statuses = itertools.cycle([200, 500])
+
+    @app.route("/flaky")
+    def flaky():
+        return jsonify({"error": "intermittent"}), next(statuses)
+
+    schema_url = app_runner.openapi_url(app)
+    base = schema_url.rsplit("/", 1)[0]
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{base}/flaky",
+        schema_location=schema_url,
+        path_template="/flaky",
+        status=500,
+        body='{"error": "intermittent"}',
+    )
+
+    assert cli.main("replay", str(crash_file)) == snapshot_cli
+    assert crash_file.exists()
+
+
+@pytest.mark.parametrize(("status", "expected_attempts"), [(200, 3), (500, 1)], ids=["fixed", "failing"])
+def test_replay_attempt_count(cli, app_runner, ctx, crash_factory, tmp_path, status, expected_attempts):
+    app, _ = ctx.openapi.make_flask_app({"/probe": {"get": {"responses": {"500": {"description": "Error"}}}}})
+    calls = []
+
+    @app.route("/probe")
+    def probe():
+        calls.append(True)
+        return jsonify({"error": "boom"}), status
+
+    schema_url = app_runner.openapi_url(app)
+    base = schema_url.rsplit("/", 1)[0]
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{base}/probe",
+        schema_location=schema_url,
+        path_template="/probe",
+        status=500,
+        body='{"error": "boom"}',
+    )
+
+    cli.main("replay", str(crash_file))
+
+    assert len(calls) == expected_attempts
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_response_schema_conformance_fixed(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # An unconstrained 200 response schema always passes on replay, so the crash is reported fixed.
     app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
@@ -211,7 +265,7 @@ def test_replay_uses_recorded_base_url_without_override(cli, app_runner, ctx, cr
 
     result = cli.main("replay", "--keep")
     assert result == snapshot_cli
-    assert received == [True], result.output
+    assert received, result.output
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
