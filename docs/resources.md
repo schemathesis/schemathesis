@@ -97,7 +97,7 @@ This page collects articles, papers, videos, tutorials, and integrations about S
 
     - **Date**: 27 Feb 2023
 
-    - **Predates v4**: Uses `schemathesis.from_wsgi()`, `case.call_wsgi()`, and standalone `case.validate_response()` — replaced by `schemathesis.openapi.from_wsgi()` and `case.call_and_validate()`.
+    - **Predates v4**: Uses `schemathesis.from_wsgi()` and `case.call_wsgi()` — replaced by `schemathesis.openapi.from_wsgi()` and `case.call_and_validate()`.
 
 - [Using Hypothesis and Schemathesis to Test FastAPI](https://testdriven.io/blog/fastapi-hypothesis/) by **@amalshaji**
 
@@ -105,7 +105,7 @@ This page collects articles, papers, videos, tutorials, and integrations about S
 
     - **Date**: 06 Sep 2022
 
-    - **Predates v4**: Uses `from schemathesis.specs.openapi.loaders import from_asgi`, `schemathesis.from_uri()`, `case.call_asgi()`, and standalone `case.validate_response()`, none of which exist — plus the `--endpoint`, `--method`, `--stateful=links`, and `--hypothesis-seed` flags.
+    - **Predates v4**: Uses `from schemathesis.specs.openapi.loaders import from_asgi`, `schemathesis.from_uri()`, and `case.call_asgi()`, none of which exist — plus the `--endpoint`, `--method`, `--stateful=links`, and `--hypothesis-seed` flags.
 
 - [How to use Schemathesis to test Flask API in GitHub Actions](https://notes.lina-is-here.com/2022/08/04/schemathesis-docker-compose.html) by **@lina-is-here**
 
