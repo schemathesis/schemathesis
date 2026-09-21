@@ -236,6 +236,14 @@ def _resolve_reference_uri_with_document(base_uri: str, reference: str) -> tuple
     if reference.startswith(("http://", "https://", "file://", "urn:")):
         return reference, document_uri
 
+    if reference.startswith("//"):
+        # A protocol-relative reference inherits the scheme of the document holding it; a document
+        # loaded from disk or memory has none to give, so default to `https`.
+        scheme = urlsplit(document_uri).scheme
+        if scheme not in ("http", "https"):
+            scheme = "https"
+        return f"{scheme}:{reference}", document_uri
+
     if "://" in document_uri:
         return urljoin(document_uri, reference), document_uri
 
