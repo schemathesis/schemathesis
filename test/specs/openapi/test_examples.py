@@ -5320,3 +5320,44 @@ def test_parameter_examples_assembled_from_nested_ones_respect_the_parameter_sch
         }
     )["/r"]["GET"]
     assert [example_to_dict(example) for example in extract_from_schemas(operation)] == expected
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        {"example": {"name": "partial"}},
+        {"examples": {"partial": {"value": {"name": "partial"}}}},
+    ],
+    ids=["singular", "plural"],
+)
+def test_media_type_body_examples_container_is_completed(ctx, declaration):
+    # A partial body example gets the same filling-in whether it is declared singular or plural.
+    operation = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name", "kind"],
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "kind": {"type": "string", "enum": ["only"]},
+                                    },
+                                    "additionalProperties": False,
+                                },
+                                **declaration,
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/items"]["POST"]
+    assert [example_to_dict(example) for example in extract_top_level(operation)] == [
+        {"media_type": "application/json", "value": {"name": "partial", "kind": "only"}}
+    ]
