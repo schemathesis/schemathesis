@@ -8,6 +8,7 @@
 - Opt-in `low_valid_rate` warning for operations that accept few of the requests sent to them.
 - A server that stops accepting connections ends the run with one `Server Unavailable` error.
 - `missing_test_data` warns for GraphQL operations whose responses never carry `data`.
+- `st replay` retries passing crashes up to three times and reports intermittent ones as `FLAKY`.
 
 ### :bug: Fixed
 

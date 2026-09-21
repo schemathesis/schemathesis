@@ -190,7 +190,7 @@ def _replay_directory(
     if files_to_remove:
         CrashWriter(directory=crash_dir).remove_files(files_to_remove)
 
-    failing = any(outcome.status is ReplayStatus.FAILED for outcome in outcomes)
+    failing = any(outcome.status in (ReplayStatus.FAILED, ReplayStatus.FLAKY) for outcome in outcomes)
     error = any(outcome.status is ReplayStatus.ERRORED for outcome in outcomes)
     return failing, error, interrupted
 

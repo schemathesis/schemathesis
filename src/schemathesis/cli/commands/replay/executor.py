@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from collections import Counter
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -27,7 +28,12 @@ if TYPE_CHECKING:
 class ReplayStatus(Enum):
     FIXED = "fixed"
     FAILED = "failed"
+    FLAKY = "flaky"
     ERRORED = "errored"
+
+
+# A single passing replay does not prove a fix; an intermittent failure needs more attempts to show itself.
+MAX_REPLAY_ATTEMPTS = 3
 
 
 @dataclass(slots=True)
@@ -67,9 +73,63 @@ def replay_crash_file(
     # A fresh session per crash: applies the operation's auth/headers/TLS config and isolates cookie state.
     session = make_session(project_config, operation=operation)
     try:
-        return _replay_sequence(crash.sequence, base_url=base_url, session=session, schema=schema, operation=operation)
+        return _replay_with_retries(crash, base_url=base_url, session=session, schema=schema, operation=operation)
     finally:
         session.close()
+
+
+def _replay_with_retries(
+    crash: CrashFile,
+    *,
+    base_url: str | None,
+    session: requests.Session,
+    schema: BaseSchema,
+    operation: APIOperation | None,
+) -> ReplayOutcome:
+    """Replay until every check has failed at least once, or the attempt budget runs out."""
+    failure_counts: Counter[str] = Counter()
+    first_failing: ReplayOutcome | None = None
+    outcome: ReplayOutcome | None = None
+    attempts = 0
+
+    for _ in range(MAX_REPLAY_ATTEMPTS):
+        outcome = _replay_sequence(
+            crash.sequence, base_url=base_url, session=session, schema=schema, operation=operation
+        )
+        if not outcome.check_outcomes:
+            # The replay aborted before it could evaluate anything; further attempts would abort the same way.
+            return outcome
+        attempts += 1
+        failed = [check.name for check in outcome.check_outcomes if check.status is ReplayStatus.FAILED]
+        failure_counts.update(failed)
+        if failed and first_failing is None:
+            first_failing = outcome
+        if all(
+            failure_counts[check.name] for check in outcome.check_outcomes if check.status is not ReplayStatus.ERRORED
+        ):
+            break
+
+    assert outcome is not None
+    # Report the attempt that failed, so its response and failures are the ones shown.
+    reported = first_failing or outcome
+    check_outcomes = [
+        _final_check_outcome(check, failure_counts[check.name], attempts) for check in reported.check_outcomes
+    ]
+    return replace(reported, status=_case_status(check_outcomes), check_outcomes=check_outcomes)
+
+
+def _final_check_outcome(check: CheckOutcome, failure_count: int, attempts: int) -> CheckOutcome:
+    if check.status is ReplayStatus.ERRORED:
+        return check
+    if failure_count == 0:
+        return CheckOutcome(name=check.name, status=ReplayStatus.FIXED)
+    if failure_count == attempts:
+        return CheckOutcome(name=check.name, status=ReplayStatus.FAILED)
+    return CheckOutcome(
+        name=check.name,
+        status=ReplayStatus.FLAKY,
+        note=f"passed {attempts - failure_count} of {attempts} replays",
+    )
 
 
 def _errored_outcome(
@@ -316,6 +376,8 @@ def _build_case(operation: APIOperation, step: CrashStep) -> Case:
 def _case_status(check_outcomes: list[CheckOutcome]) -> ReplayStatus:
     if any(c.status is ReplayStatus.FAILED for c in check_outcomes):
         return ReplayStatus.FAILED
+    if any(c.status is ReplayStatus.FLAKY for c in check_outcomes):
+        return ReplayStatus.FLAKY
     if any(c.status is ReplayStatus.ERRORED for c in check_outcomes):
         return ReplayStatus.ERRORED
     return ReplayStatus.FIXED
