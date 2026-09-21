@@ -167,6 +167,7 @@ select = [
   "I",      # isort
   "FURB",   # refurb
   "PGH003", # blanket-type-ignore
+  "TID251", # banned-api
   "UP",     # pyupgrade
   "SIM"     # flake8-simplify
 ]
@@ -194,6 +195,11 @@ ignore = [
 "test/apps/__main__.py" = ["T201"]  # CLI entrypoint
 "scripts/coverage/audit.py" = ["T201", "E402"]  # CLI entrypoint; E402: sys.path setup precedes tools.* imports
 "scripts/coverage/triage.py" = ["T201"]  # CLI entrypoint
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"copy.deepcopy".msg = "Use `schemathesis.core.transforms.deepclone`, which is much faster on the JSON-shaped data this project copies."
+"unittest.mock.MagicMock".msg = "Tests build real schemas, apps and responses via the `ctx`, `case_factory` and `response_factory` fixtures."
+"unittest.mock.Mock".msg = "Tests build real schemas, apps and responses via the `ctx`, `case_factory` and `response_factory` fixtures."
 
 [tool.ruff.lint.isort]
 known-first-party = ["schemathesis", "tools"]
