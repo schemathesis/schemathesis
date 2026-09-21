@@ -228,6 +228,45 @@ $ st run [OPTIONS] SCHEMA
     $ st run openapi.yaml --continue-on-failure
     ```
 
+#### `--baseline PATH`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `null`  
+
+    File recording the failures you have accepted. Failures it lists are reported but do not fail the run, and a run pointed at a path that does not exist creates the file. An entry is keyed on the operation, the check, the failure class and a signature, so a second, genuinely different failure of the same shape on the same operation is absorbed by it. Equivalent to setting [`baseline`](configuration.md#baseline) in the config file. See the [Baseline guide](../guides/baseline.md).
+
+    ```console
+    $ st run openapi.yaml --baseline schemathesis-baseline.json
+    ```
+
+#### `--baseline-update`
+
+!!! note ""
+
+    **Type**: `Flag`  
+    **Default**: `false`  
+
+    Merges the failures of this run into an existing baseline file, preserving annotations you added by hand. Requires a baseline path from `--baseline` or the config file.
+
+    ```console
+    $ st run openapi.yaml --baseline-update
+    ```
+
+#### `--baseline-prune`
+
+!!! note ""
+
+    **Type**: `Flag`  
+    **Default**: `false`  
+
+    Drops baseline entries this run tested and did not reproduce. Entries for operations the run never reached are kept. Requires a baseline path from `--baseline` or the config file.
+
+    ```console
+    $ st run openapi.yaml --baseline-prune
+    ```
+
 #### `--max-response-time SECONDS`
 
 !!! note ""
