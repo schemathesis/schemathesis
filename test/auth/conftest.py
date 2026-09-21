@@ -36,6 +36,13 @@ def auth_operation(ctx, cli, app_runner):
     def header_auth():
         return jsonify({}), 200, {"X-Auth-Token": "test-token"}
 
+    @app.route("/api/cookie-auth", methods=["POST"])
+    def cookie_auth():
+        response = jsonify({})
+        response.set_cookie("OTHER", "junk")
+        response.set_cookie("SESSION", "s3ss10nt0k3n", path="/")
+        return response
+
     @app.route("/api/fail", methods=["POST"])
     def fail():
         return jsonify({"error": "unauthorized"}), 401

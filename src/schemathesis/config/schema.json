@@ -416,7 +416,8 @@
           "type": "string",
           "enum": [
             "body",
-            "header"
+            "header",
+            "cookie"
           ],
           "default": "body"
         },
