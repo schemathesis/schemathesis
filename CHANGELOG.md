@@ -12,6 +12,7 @@
 
 ### :bug: Fixed
 
+- Send examples that different parameters declare under the same name together.
 - False positive GraphQL server errors for resolver rejections labelled in error `extensions`.
 - Complete partial request body examples declared under the `examples` keyword.
 

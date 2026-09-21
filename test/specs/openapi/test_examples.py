@@ -5361,3 +5361,52 @@ def test_media_type_body_examples_container_is_completed(ctx, declaration):
     assert [example_to_dict(example) for example in extract_top_level(operation)] == [
         {"media_type": "application/json", "value": {"name": "partial", "kind": "only"}}
     ]
+
+
+CORRELATED_NAMED_EXAMPLES = {
+    "/search": {
+        "get": {
+            "parameters": [
+                {
+                    "name": "region",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string"},
+                    "examples": {"US": {"value": "US"}, "EU": {"value": "EU"}},
+                },
+                {
+                    "name": "currency",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string"},
+                    "examples": {"EU": {"value": "EUR"}, "US": {"value": "USD"}},
+                },
+            ],
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+}
+
+
+def test_examples_with_the_same_name_are_paired(ctx):
+    schema = ctx.openapi.load_schema(CORRELATED_NAMED_EXAMPLES)
+    assert list(produce_combinations(list(extract_top_level(schema["/search"]["GET"])))) == [
+        {"query": {"region": "US", "currency": "USD"}},
+        {"query": {"region": "EU", "currency": "EUR"}},
+    ]
+
+
+def test_examples_with_the_same_name_are_paired_in_fuzzing(ctx):
+    schema = ctx.openapi.load_schema(CORRELATED_NAMED_EXAMPLES)
+    seen = []
+
+    @given(case=schema["/search"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=200, deadline=None, phases=[Phase.generate], suppress_health_check=list(HealthCheck))
+    def test(case):
+        seen.append((case.query["region"], case.query["currency"]))
+
+    test()
+
+    from_examples = {pair for pair in seen if pair[0] in ("US", "EU") and pair[1] in ("USD", "EUR")}
+    assert from_examples
+    assert from_examples <= {("US", "USD"), ("EU", "EUR")}, f"Mismatched pairs: {from_examples}"
