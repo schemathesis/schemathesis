@@ -865,6 +865,49 @@ def test_bundled_references(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.hypothesis_nested
+def test_negative_body_never_validates_against_its_own_schema(ctx):
+    body_schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "minLength": 2, "maxLength": 20},
+            "age": {"type": "integer", "minimum": 1, "maximum": 120},
+            "tag": {"type": "string", "pattern": "^[a-z]+$"},
+        },
+        "required": ["name", "age", "tag"],
+        "additionalProperties": False,
+    }
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    validator = jsonschema_rs.validator_for(body_schema)
+    stacked = 0
+
+    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        nonlocal stacked
+        if len(case.meta.phase.data.mutations) > 1:
+            stacked += 1
+        if isinstance(case.body, bytes):
+            # Raw bytes are not JSON at all, so there is nothing for the validator to accept.
+            return
+        assert not validator.is_valid(case.body), f"Negative body still valid: {case.body!r}"
+
+    test()
+    assert stacked, "Expected some cases to stack several mutations"
+
+
+@pytest.mark.hypothesis_nested
 def test_negative_format_generates_invalid_values(ctx):
     # When a path parameter has `format: uuid`
     schema = ctx.openapi.load_schema(
@@ -937,9 +980,8 @@ def test_negative_custom_format_generates_invalid_values(ctx):
 
 
 @pytest.mark.hypothesis_nested
-def test_multiple_mutations_clear_description():
-    # GH-3367: With multiple mutations, description must be cleared so the dispatcher
-    # doesn't emit misleading single-mutation metadata. ~50 examples to reliably trigger it.
+def test_multiple_mutations_render_one_line_each():
+    # Every applied mutation is named, so a case that violates several keywords is still reportable.
     schema = {
         "type": "object",
         "properties": {
@@ -962,8 +1004,9 @@ def test_multiple_mutations_clear_description():
     def test(data):
         draw = data.draw
         _, metadata = ctx.mutate(draw)
-        if metadata is not None and len(metadata.mutations) > 1:
-            assert metadata.description is None
+        if metadata is not None and metadata.mutations:
+            assert metadata.description is not None
+            assert metadata.description.count("\n") == max(len(metadata.mutations) - 1, 0)
 
     test()
 
