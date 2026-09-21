@@ -391,6 +391,10 @@ def extract_top_level(
             ):
                 if _example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
+                else:
+                    completed = _completed_body_example(value, body.validation_schema, declared_validator, operation)
+                    if completed is not None:
+                        yield BodyExample(value=completed, media_type=body.media_type)
         for expanded_schema in expanded:
             if isinstance(expanded_schema, dict) and body.adapter.examples_container_keyword in expanded_schema:
                 for value in expanded_schema[body.adapter.examples_container_keyword]:
