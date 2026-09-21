@@ -622,22 +622,6 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
     return False
 
 
-def _has_unverifiable_mutations(case: Case) -> bool:
-    """Skip the check when the case applied multiple mutations on disjoint sites.
-
-    With multiple structured mutations, the synthesis of a single human-readable
-    description is ambiguous, so MutationMetadata.description returns None. We can't
-    pin a single-keyword expectation when the case violates several at once, so we
-    conservatively skip rather than risk false positives.
-    """
-    meta = case.meta
-    if meta is None:
-        return False
-
-    phase_data = meta.phase.data
-    return isinstance(phase_data, FuzzingPhaseData) and phase_data.description is None
-
-
 def _non_body_negative_values_match_schema(case: Case) -> bool:
     """Check if all negative non-body parameter values are still valid against their original schema."""
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -707,7 +691,6 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not _string_type_mutation_becomes_valid_after_serialization(case, ParameterLocation.PATH)
         and not _string_type_mutation_becomes_valid_after_serialization(case, ParameterLocation.QUERY)
         and not _path_array_becomes_valid_after_serialization(case)
-        and not _has_unverifiable_mutations(case)
         and not _non_body_negative_values_match_schema(case)
     ):
         extra_info = ""
