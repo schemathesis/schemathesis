@@ -11,6 +11,7 @@
 - `st replay` retries passing crashes up to three times and reports intermittent ones as `FLAKY`.
 - Dynamic auth `extract_from = "cookie"` takes a named cookie from a `Set-Cookie` login response.
 - `schemathesis.errors.FailureGroup` for catching failures raised by `validate_response`.
+- Support for `pytest` 8.4.
 
 ### :bug: Fixed
 

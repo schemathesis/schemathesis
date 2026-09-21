@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
-from contextlib import nullcontext
 from dataclasses import dataclass
 from inspect import signature
 from typing import TYPE_CHECKING, Any
@@ -29,6 +28,7 @@ from schemathesis.generation.hypothesis.given import (
     validate_given_args,
 )
 from schemathesis.pytest._keys import track_schema
+from schemathesis.pytest._subtests import make_subtests
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_constants_warnings, emit_openapi_auth_warnings
 from schemathesis.python._constants.orchestrator import make_constants_value_source
@@ -271,8 +271,7 @@ class LazySchema:
                 if not tests:
                     fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)
-                suspend_capture_ctx = _get_capturemanager(request)
-                subtests = pytest.Subtests(request.node.ihook, suspend_capture_ctx, request, _ispytest=True)
+                subtests = make_subtests(request)
                 for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
@@ -314,13 +313,6 @@ def _copy_marks(source: Callable, target: Callable) -> None:
     marks = getattr(source, "pytestmark", [])
     # Pytest adds this attribute in `usefixtures`
     target.pytestmark.extend(marks)  # type: ignore[attr-defined]
-
-
-def _get_capturemanager(request: FixtureRequest) -> Generator | type[nullcontext]:
-    capturemanager = request.node.config.pluginmanager.get_plugin("capturemanager")
-    if capturemanager is not None:
-        return capturemanager.global_and_fixture_disabled
-    return nullcontext
 
 
 def run_subtest(

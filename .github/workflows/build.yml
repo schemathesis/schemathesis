@@ -66,6 +66,46 @@ jobs:
 
       - run: uvx --with="tox" --with="tox-uv" tox -e tooling
 
+  tests-pytest8:
+    name: Tests (pytest 8)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+          cache-suffix: pytest8-3.13-v1
+
+      - run: uvx --with="tox" --with="tox-uv" tox -e pytest8
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      # Runs on failure too: a red job is exactly the sample flake detection needs.
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
+        with:
+          files: junit.xml
+          disable_search: true
+          flags: pytest8
+          token: ${{ secrets.CODECOV_TOKEN }}
+
   tests:
     strategy:
       matrix:
