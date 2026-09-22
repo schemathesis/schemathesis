@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import RefResolutionError
+from schemathesis.core.errors import InvalidSchema, OperationNotFound, RefResolutionError
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -199,7 +199,11 @@ def inject_links(schema: OpenApiSchema) -> int:
         if entry is None:
             index: dict[tuple[str, str], list[NormalizedLink]] = {}
             for link in links.values():
-                normalized = _normalize_link(link, schema, operation_cache)
+                try:
+                    normalized = _normalize_link(link, schema, operation_cache)
+                except (OperationNotFound, InvalidSchema, RefResolutionError):
+                    # Dangling links are reported when the stateful phase validates them
+                    continue
                 index.setdefault((normalized.path, normalized.method), []).append(normalized)
             normalized_cache[id(links)] = (links, index)
         else:

@@ -20,6 +20,7 @@
 - Send examples that different parameters declare under the same name together.
 - Send the value, not the name, for `examples` maps inside a parameter or body schema.
 - False positive GraphQL server errors for resolver rejections labelled in error `extensions`.
+- Report OpenAPI links to missing operations or unresolvable references as invalid links.
 - Complete partial request body examples declared under the `examples` keyword.
 - Protocol-relative `$ref` (`//host/schema.json`) failing to resolve for schemas loaded from a file.
 - XML serialization error for scalar bodies under a root element with a namespace prefix.

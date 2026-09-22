@@ -202,6 +202,61 @@ def test_missing_link(ctx, cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    "link",
+    [
+        {"operationId": "nope", "parameters": {"id": "$response.body#/id"}},
+        {"operationRef": "#/paths/~1nope/get", "parameters": {"id": "$response.body#/id"}},
+        {"operationRef": "other.json#/paths/~1u/get", "parameters": {"id": "$response.body#/id"}},
+        {"$ref": "#/components/links/nope"},
+        {},
+    ],
+    ids=["unknown-operation-id", "unknown-operation-ref", "external-operation-ref", "unknown-ref", "no-target"],
+)
+def test_dangling_link_with_inferred_links(ctx, cli, snapshot_cli, link):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/u": {
+                "post": {
+                    "operationId": "create",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"n": {"type": "string"}},
+                                    "required": ["n"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {"G": link},
+                        }
+                    },
+                }
+            },
+            "/u/{id}": {
+                "get": {
+                    "operationId": "get",
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert cli.run_openapi_app(app, "--phases=stateful", "--max-examples=2") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_not_enough_links(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_crud()
     assert cli.run(api.schema_url, "--phases=stateful", "--include-method=POST") == snapshot_cli

@@ -7,7 +7,6 @@ from flask import jsonify, request
 from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
-from schemathesis.core.errors import InvalidSchema
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies import analyze, naming
 from schemathesis.specs.openapi.stateful.dependencies.models import infer_fk_target
@@ -5819,8 +5818,7 @@ def test_inject_links_deduplication(ctx, schema, expected):
     assert dependencies.inject_links(schema) == expected
 
 
-def test_inject_links_invalid_link_missing_operation_ref_and_id(ctx):
-    # Schema with an invalid link definition (missing both operationRef and operationId)
+def test_inject_links_skips_link_missing_operation_ref_and_id(ctx):
     schema_dict = {
         "/users": {
             "post": {
@@ -5845,8 +5843,15 @@ def test_inject_links_invalid_link_missing_operation_ref_and_id(ctx):
 
     schema = ctx.openapi.load_schema(schema_dict)
 
-    with pytest.raises(InvalidSchema, match="Link definition is missing both.*operationRef.*operationId"):
-        dependencies.inject_links(schema)
+    assert dependencies.inject_links(schema) == 1
+    assert schema.raw_schema["paths"]["/users"]["post"]["responses"]["201"]["links"] == {
+        "InvalidLink": {},
+        "GetUser": {
+            "operationRef": "#/paths/~1users~1{id}/get",
+            "parameters": {"path.id": "$response.body#/id"},
+            "x-schemathesis": {"is_inferred": True},
+        },
+    }
 
 
 def test_inject_links_with_reference_to_components(ctx):
