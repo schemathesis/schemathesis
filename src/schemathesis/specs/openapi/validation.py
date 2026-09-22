@@ -40,6 +40,9 @@ class ResponseValidator:
         case: Case | None = None,
     ) -> bool | None:
         __tracebackhide__ = True
+        # HEAD responses never carry a body, whatever content the schema declares.
+        if operation.method.upper() == "HEAD":
+            return None
         schema = self.schema
         definition = operation.responses.find_by_status_code(response.status_code)
         if definition is None:
