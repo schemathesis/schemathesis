@@ -24,6 +24,7 @@
 - Complete partial request body examples declared under the `examples` keyword.
 - Protocol-relative `$ref` (`//host/schema.json`) failing to resolve for schemas loaded from a file.
 - XML serialization error for scalar bodies under a root element with a namespace prefix.
+- Generate cookie values from RFC 6265 cookie-octets only.
 
 ### :wrench: Changed
 

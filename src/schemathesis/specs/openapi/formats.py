@@ -594,3 +594,20 @@ def header_alphabet(generation_config: GenerationConfig) -> Alphabet:
         min_name_length=1,
         name_characters="!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters,
     )
+
+
+# RFC 6265: printable ASCII except space, DQUOTE, comma, semicolon and backslash; servers split or strip the rest.
+COOKIE_EXCLUDE_CHARACTERS = "".join(chr(code) for code in range(0x21)) + '",;\\'
+
+
+def cookie_alphabet(generation_config: GenerationConfig) -> Alphabet:
+    """Characters a cookie name or value may carry, under the caller's generation settings."""
+    excluded = generation_config.exclude_header_characters or ""
+    return Alphabet(
+        allow_x00=False,
+        codec="ascii",
+        max_codepoint=0x7E,
+        exclude_characters="".join(sorted(set(excluded + COOKIE_EXCLUDE_CHARACTERS))),
+        min_name_length=1,
+        name_characters="!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters,
+    )
