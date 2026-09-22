@@ -435,7 +435,7 @@ def test_unsatisfiable(engine_factory):
     result = collect_result(engine)
     assert result.errors
     assert isinstance(result.errors[0].value, hypothesis.errors.Unsatisfiable)
-    assert "Cannot generate test data for POST /users" in str(result.errors[0].value)
+    assert "Cannot generate test data for request body (application/json)" in str(result.errors[0].value)
     assert result.events[-1].status == Status.ERROR
 
 

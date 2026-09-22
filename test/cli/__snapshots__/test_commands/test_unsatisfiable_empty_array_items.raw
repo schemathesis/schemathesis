@@ -40,10 +40,7 @@ Schema:
     // Output truncated...
 }
 
-This usually means:
-  - Type mismatch (e.g., enum with strings but type: integer)
-  - Contradictory constraints (e.g., minimum > maximum)
-  - Regex that's too complex to generate values for
+`maximum: 1` at /items/oneOf/0, `maximum: 2` at /items/oneOf/1 and `maximum: 3` at /items/oneOf/2 conflict with `minimum: 10` at /items
 
 Tip: Review all parameters and request body schemas for conflicting constraints.
 

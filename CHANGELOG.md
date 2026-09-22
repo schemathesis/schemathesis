@@ -24,6 +24,7 @@
 
 ### :wrench: Changed
 
+- Name the conflicting constraints and where they sit when test data cannot be generated.
 - Report GraphQL non-nullable fields resolving to `null` as a `GraphQL schema violation`, severity high.
 - `missing_test_data` names the operation that appears to supply the data an unlinked operation needs, or reports that none does.
 
