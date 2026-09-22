@@ -34,10 +34,7 @@ Schema:
     "maximum": 10
 }
 
-This usually means:
-  - Type mismatch (e.g., enum with strings but type: integer)
-  - Contradictory constraints (e.g., minimum > maximum)
-  - Regex that's too complex to generate values for
+Nothing satisfies `minimum: 100` and `maximum: 10`
 
 Tip: Review all parameters and request body schemas for conflicting constraints.
 

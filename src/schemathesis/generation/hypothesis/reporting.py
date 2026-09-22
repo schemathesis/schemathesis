@@ -1,28 +1,33 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import jsonschema_rs
 from hypothesis import HealthCheck
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from hypothesis.reporting import with_reporter
+from jsonschema_rs import canonical
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema.bundler import unbundle
+from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, unbundle, unbundle_path
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.output import truncate_json
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import decode_pointer, encode_pointer, resolve_pointer
 from schemathesis.generation.hypothesis.examples import generate_one
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.schemas import APIOperation
-    from schemathesis.specs.openapi.adapter.parameters import OpenApiComponent
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiComponent, OpenApiParameter
 
 
 def ignore(_: str) -> None:
@@ -68,11 +73,199 @@ class FilterCaseTracker:
         return self.has_data and self.rejected == self.total
 
 
+# A keyword value longer than this says less than its name does.
+MAX_KEYWORD_VALUE_LENGTH = 30
+# A chain longer than this is a cycle the reported pointers cannot close.
+MAX_BLAME_HOPS = 10
+# Keywords whose branches are worth naming one by one when none of them survives its siblings.
+BRANCH_KEYWORDS = ("oneOf", "anyOf")
+# Past this many branches the list stops reading as a sentence.
+MAX_REPORTED_BRANCHES = 3
+# Where a branch sits inside the schema each branch is checked with.
+BRANCH_PROBE_PREFIX = "/allOf/1"
+
+
+def _display_pointer(pointer: str, name_to_uri: dict[str, str]) -> str:
+    segments = [decode_pointer(segment) for segment in pointer[1:].split("/")]
+    return "/" + "/".join(str(segment) for segment in unbundle_path(list(segments), name_to_uri))
+
+
+def _describe_keyword(schema: JsonSchema, pointer: str, keyword: str) -> str:
+    """The keyword with its value, or just its name when the value says less than the name."""
+    node = resolve_pointer(schema, pointer)
+    if not isinstance(node, dict) or keyword not in node:
+        return f"`{keyword}`"
+    value = json.dumps(node[keyword])
+    if len(value) > MAX_KEYWORD_VALUE_LENGTH:
+        return f"`{keyword}`"
+    return f"`{keyword}: {value}`"
+
+
+def _find_unsatisfiable(schema: JsonSchema, draft: int) -> dict[str, canonical.UnsatisfiableReason] | None:
+    try:
+        return canonical.find_unsatisfiable(
+            schema, draft=draft, pattern_options=FANCY_REGEX_OPTIONS, validate_formats=True
+        )
+    except Exception:
+        # Nothing is provably empty when the document cannot be read at all.
+        return None
+
+
+def _describe_branches(
+    schema: JsonSchema, cause: canonical.Cause, name_to_uri: dict[str, str], draft: int
+) -> str | None:
+    """Each branch of a `oneOf`/`anyOf` that its siblings leave empty, or `None` when one survives.
+
+    The branch itself admits values, so it is never reported on its own; it is checked here against
+    the keywords beside it.
+    """
+    node = resolve_pointer(schema, cause.pointer)
+    if not isinstance(node, dict):
+        return None  # pragma: no cover
+    keyword = next((keyword for keyword in cause.keywords if keyword in BRANCH_KEYWORDS), None)
+    branches = node.get(keyword) if keyword is not None else None
+    if not isinstance(branches, list) or not branches:
+        return None
+    siblings = {key: value for key, value in node.items() if key not in (keyword, BUNDLE_STORAGE_KEY)}
+    bundle = schema.get(BUNDLE_STORAGE_KEY) if isinstance(schema, dict) else None
+    described = []
+    for index, branch in enumerate(branches):
+        probe: dict[str, Any] = {"allOf": [siblings, branch]}
+        if bundle is not None:
+            probe[BUNDLE_STORAGE_KEY] = bundle
+        reasons = _find_unsatisfiable(probe, draft)
+        if reasons is None or "" not in reasons:
+            return None
+        at = f"{cause.pointer}/{keyword}/{index}"
+        described.append(_describe_branch(branch, reasons[""], at, name_to_uri))
+    remaining = len(described) - MAX_REPORTED_BRANCHES
+    if remaining > 0:
+        described = described[:MAX_REPORTED_BRANCHES] + [f"{remaining} more branches"]
+    return _join_prose(described)
+
+
+def _join_prose(parts: list[str]) -> str:
+    if len(parts) == 1:
+        return parts[0]
+    return f"{', '.join(parts[:-1])} and {parts[-1]}"
+
+
+def _describe_branch(
+    branch: JsonSchema, reason: canonical.UnsatisfiableReason, pointer: str, name_to_uri: dict[str, str]
+) -> str:
+    """What the branch itself brings to the conflict, named at its own pointer."""
+    if isinstance(reason, canonical.UnsatisfiableReason.Empty):
+        causes = [reason.cause]
+    elif isinstance(reason, canonical.UnsatisfiableReason.Conflict):
+        causes = list(reason.causes)
+    else:
+        causes = []  # pragma: no cover
+    # The probe puts the siblings first and the branch second, so only the second side is the branch.
+    described = " and ".join(
+        _describe_keyword(branch, cause.pointer[len(BRANCH_PROBE_PREFIX) :], keyword)
+        for cause in causes
+        if cause.pointer.startswith(BRANCH_PROBE_PREFIX)
+        for keyword in cause.keywords
+    )
+    if not described:
+        return f"the branch at {_display_pointer(pointer, name_to_uri)}"
+    return f"{described} at {_display_pointer(pointer, name_to_uri)}"
+
+
+def _describe_cause(
+    schema: JsonSchema, cause: canonical.Cause, pointer: str, name_to_uri: dict[str, str], draft: int
+) -> str:
+    branches = _describe_branches(schema, cause, name_to_uri, draft)
+    if branches is not None:
+        return branches
+    described = " and ".join(_describe_keyword(schema, cause.pointer, keyword) for keyword in cause.keywords)
+    if not described:
+        return f"the schema at {_display_pointer(cause.pointer, name_to_uri)}"
+    if cause.pointer != pointer:
+        described += f" at {_display_pointer(cause.pointer, name_to_uri)}"
+    return described
+
+
+def _blame(schema: JsonSchema, reasons: dict[str, canonical.UnsatisfiableReason], pointer: str) -> str:
+    """The pointer that carries the conflict itself, following the keywords that only pass it on."""
+    seen = {pointer}
+    for _ in range(MAX_BLAME_HOPS):
+        reason = reasons[pointer]
+        if isinstance(reason, canonical.UnsatisfiableReason.Literal):
+            return pointer
+        causes = [reason.cause] if isinstance(reason, canonical.UnsatisfiableReason.Empty) else reason.causes
+        for cause in causes:
+            for candidate in _passed_on_to(schema, cause):
+                if candidate in reasons and candidate not in seen:
+                    seen.add(candidate)
+                    pointer = candidate
+                    break
+            else:
+                continue
+            break
+        else:
+            return pointer
+    return pointer
+
+
+def _passed_on_to(schema: JsonSchema, cause: canonical.Cause) -> Generator[str, None, None]:
+    """Pointers a keyword hands the emptiness over from - a reference, a required key, an element."""
+    node = resolve_pointer(schema, cause.pointer)
+    if not isinstance(node, dict):
+        return  # pragma: no cover
+    for keyword in cause.keywords:
+        if keyword == "$ref":
+            reference = node.get("$ref")
+            if isinstance(reference, str) and reference.startswith("#"):  # pragma: no branch
+                yield reference[1:]
+        elif keyword == "required":
+            required = node.get("required")
+            if isinstance(required, list):  # pragma: no branch
+                for name in required:
+                    yield f"{cause.pointer}/properties/{encode_pointer(str(name))}"
+        elif keyword in ("items", "contains", "prefixItems"):
+            yield f"{cause.pointer}/{keyword}"
+
+
+def describe_unsatisfiable(
+    schema: JsonSchema, name_to_uri: dict[str, str], validator_cls: type[jsonschema_rs.Validator]
+) -> str | None:
+    """Why no value satisfies this schema, named at the subschema that carries the conflict.
+
+    Emptiness that does not reach the root is routine - `additionalProperties: false` is an empty
+    position and says nothing is wrong - so only a root that admits nothing is reported.
+    """
+    draft = CANONICALIZE_DRAFT_BY_VALIDATOR.get(validator_cls)
+    if draft is None:
+        return None  # pragma: no cover
+    reasons = _find_unsatisfiable(schema, draft)
+    if reasons is None or "" not in reasons:
+        return None
+    pointer = _blame(schema, reasons, "")
+    reason = reasons[pointer]
+    if isinstance(reason, canonical.UnsatisfiableReason.Literal):
+        detail = "The schema is `false`"
+        located = False
+    elif isinstance(reason, canonical.UnsatisfiableReason.Empty):
+        detail = f"Nothing satisfies {_describe_cause(schema, reason.cause, pointer, name_to_uri, draft)}"
+        located = reason.cause.pointer != pointer
+    else:
+        parts = [_describe_cause(schema, cause, pointer, name_to_uri, draft) for cause in reason.causes]
+        # The subject is plural when the first part names more than one keyword or branch.
+        detail = (" conflict with " if " and " in parts[0] else " conflicts with ").join(parts)
+        located = all(cause.pointer != pointer for cause in reason.causes)
+    # Every part already named where it sits, so the subschema holding them adds nothing.
+    if pointer and not located:
+        detail += f" at {_display_pointer(pointer, name_to_uri)}"
+    return detail
+
+
 @dataclass(slots=True)
 class UnsatisfiableParameter:
     location: ParameterLocation
     name: str
     schema: JsonSchema
+    detail: str | None
 
     def get_error_message(self, config: OutputConfig) -> str:
         formatted_schema = truncate_json(self.schema, config=config)
@@ -83,13 +276,17 @@ class UnsatisfiableParameter:
         else:
             location = f"{self.location.value} parameter '{self.name}'"
 
+        if self.detail is not None:
+            explanation = self.detail
+        else:
+            explanation = f"This usually means:\n{UNSATISFIABILITY_CAUSE}"
+
         return f"""Cannot generate test data for {location}
 Schema:
 
 {formatted_schema}
 
-This usually means:
-{UNSATISFIABILITY_CAUSE}"""
+{explanation}"""
 
 
 def is_empty_strategy_error(exc: InvalidArgument) -> bool:
@@ -118,7 +315,9 @@ def _parameter_strategy(
     )
 
 
-def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParameter | None:
+def _iter_parameters(
+    operation: APIOperation,
+) -> Generator[tuple[ParameterLocation, OpenApiParameter | OpenApiBody], None, None]:
     for location, container in (
         (ParameterLocation.QUERY, operation.query),
         (ParameterLocation.PATH, operation.path_parameters),
@@ -127,15 +326,31 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
         (ParameterLocation.BODY, operation.body),
     ):
         for parameter in container:
-            try:
-                generate_one(_parameter_strategy(operation, parameter, location))
-            except (Unsatisfiable, InvalidArgument, InvalidSchema):
-                if location == ParameterLocation.BODY:
-                    name = parameter.media_type
-                else:
-                    name = parameter.name
-                schema = unbundle(parameter.optimized_schema, parameter.name_to_uri)
-                return UnsatisfiableParameter(location=location, name=name, schema=schema)
+            yield location, parameter
+
+
+def _build_unsatisfiable_parameter(
+    operation: APIOperation, location: ParameterLocation, parameter: OpenApiParameter | OpenApiBody
+) -> UnsatisfiableParameter:
+    return UnsatisfiableParameter(
+        location=location,
+        # A body is identified by its media type, every other parameter by its name.
+        name=parameter.media_type or parameter.name,
+        schema=unbundle(parameter.optimized_schema, parameter.name_to_uri),
+        detail=describe_unsatisfiable(
+            parameter.optimized_schema,
+            parameter.name_to_uri,
+            operation.schema.adapter.jsonschema_validator_cls,
+        ),
+    )
+
+
+def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParameter | None:
+    for location, parameter in _iter_parameters(operation):
+        try:
+            generate_one(_parameter_strategy(operation, parameter, location))
+        except (Unsatisfiable, InvalidArgument, InvalidSchema):
+            return _build_unsatisfiable_parameter(operation, location, parameter)
     return None
 
 
@@ -168,6 +383,12 @@ class UnsatisfiableSchema(Unsatisfiable):
 
 
 def build_unsatisfiable_schema_error(operation: APIOperation) -> UnsatisfiableSchema:
+    # Drawing is already under way here, so the parameter is found by reading the schemas rather than
+    # by generating from each of them.
+    for location, parameter in _iter_parameters(operation):
+        unsatisfiable = _build_unsatisfiable_parameter(operation, location, parameter)
+        if unsatisfiable.detail is not None:
+            return UnsatisfiableSchema(unsatisfiable.get_error_message(operation.schema.config.output))
     return UnsatisfiableSchema(f"""Cannot generate test data for {operation.label}
 
 This usually means:

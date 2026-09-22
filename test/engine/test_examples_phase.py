@@ -220,10 +220,7 @@ Schema:
     "maximum": 4
 }
 
-This usually means:
-  - Type mismatch (e.g., enum with strings but type: integer)
-  - Contradictory constraints (e.g., minimum > maximum)
-  - Regex that's too complex to generate values for""",
+Nothing satisfies `minimum: 5` and `maximum: 4`""",
         )
     ]
 

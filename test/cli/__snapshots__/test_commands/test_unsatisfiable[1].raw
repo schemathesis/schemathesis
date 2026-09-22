@@ -47,10 +47,7 @@ Schema:
     ]
 }
 
-This usually means:
-  - Type mismatch (e.g., enum with strings but type: integer)
-  - Contradictory constraints (e.g., minimum > maximum)
-  - Regex that's too complex to generate values for
+`type: "integer"` at /allOf/0 conflicts with `type: "string"` at /allOf/1
 
 Tip: Review all parameters and request body schemas for conflicting constraints.
 
