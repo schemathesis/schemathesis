@@ -980,6 +980,40 @@ def test_negative_custom_format_generates_invalid_values(ctx):
 
 
 @pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"], ids=["openapi-30", "openapi-31"])
+@pytest.mark.parametrize(
+    "format",
+    ["regex", "uri-reference", "uri-template", "iri-reference", "json-pointer", "hostname"],
+    ids=["regex", "uri-reference", "uri-template", "iri-reference", "json-pointer", "hostname"],
+)
+def test_negative_format_values_violate_the_format(ctx, format, version):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "string", "format": format}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+    validator = jsonschema_rs.Draft202012Validator({"type": "string", "format": format}, validate_formats=True)
+
+    # Hostnames rarely come out valid by accident, so fewer examples would miss the leak.
+    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, max_examples=30, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        if isinstance(case.body, str):
+            assert not validator.is_valid(case.body), f"Negative body satisfies '{format}': {case.body!r}"
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
 def test_multiple_mutations_render_one_line_each():
     # Every applied mutation is named, so a case that violates several keywords is still reportable.
     schema = {

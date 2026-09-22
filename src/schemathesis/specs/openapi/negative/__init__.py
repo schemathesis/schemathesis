@@ -18,6 +18,7 @@ from schemathesis.core.jsonschema import (
     CANONICALIZE_DRAFT_BY_VALIDATOR,
     DRAFT4_SUPPLEMENTAL_FORMATS,
     FANCY_REGEX_OPTIONS,
+    VALIDATED_FORMATS_BY_DRAFT,
 )
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
@@ -175,13 +176,24 @@ def _is_unconstrained_binary_schema(schema: JsonSchema) -> bool:
     return schema.get("format") in _ALWAYS_INVALID_FORMATS and "type" not in schema
 
 
+# Formats with a standard definition; servers validate them that way whatever draft the schema declares.
+_STANDARD_FORMATS = VALIDATED_FORMATS_BY_DRAFT[jsonschema_rs.Draft202012Validator]
+
+
+@lru_cache
+def _standard_format_check(name: str) -> Callable[[str], bool]:
+    return jsonschema_rs.Draft202012Validator({"format": name}, validate_formats=True).is_valid
+
+
 @lru_cache
 def get_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
-    """Hook custom formats to always-fail (enables format-violating fuzzing); skip `binary`/`byte` (runtime is permissive)."""
+    """Check standard formats for real and fail the rest (enables format-violating fuzzing); skip `binary`/`byte`."""
     formats: dict[str, Any] = {}
     if cache_key.validator_cls is jsonschema_rs.Draft4Validator:
         formats.update(DRAFT4_SUPPLEMENTAL_FORMATS)
-    formats.update(dict.fromkeys(cache_key.custom_format_names - _ALWAYS_INVALID_FORMATS, _always_invalid))
+    natively_validated = VALIDATED_FORMATS_BY_DRAFT.get(cache_key.validator_cls, frozenset())
+    for name in cache_key.custom_format_names - _ALWAYS_INVALID_FORMATS - natively_validated - formats.keys():
+        formats[name] = _standard_format_check(name) if name in _STANDARD_FORMATS else _always_invalid
     return cache_key.validator_cls(
         cache_key.schema,
         formats=formats,
