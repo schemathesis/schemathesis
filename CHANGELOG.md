@@ -16,6 +16,7 @@
 
 ### :bug: Fixed
 
+- False positive `negative_data_rejection` for `regex`, `uri-reference` and similar string formats in fuzzing.
 - False positive `response_schema_conformance` for HEAD responses that declare a body.
 - Send examples that different parameters declare under the same name together.
 - Send the value, not the name, for `examples` maps inside a parameter or body schema.
