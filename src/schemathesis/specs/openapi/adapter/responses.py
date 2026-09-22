@@ -195,7 +195,11 @@ class OpenApiResponse:
         if links is None:
             return
         for name, link in links.items():
-            _, link = maybe_resolve_with_resolver(link, self.resolver)
+            try:
+                _, link = maybe_resolve_with_resolver(link, self.resolver)
+            except RefResolutionError:
+                # Kept as is, so link validation can report the dangling reference
+                pass
             yield name, link
 
 

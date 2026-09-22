@@ -99,12 +99,20 @@ class OpenApiLink:
         errors = []
 
         cache = operation_cache if operation_cache is not None else {}
-        try:
-            self.target = find_link_target(source.schema, definition, cache)
-            target = self.target.label
-        except OperationNotFound:
-            target = definition["operationId"] if "operationId" in definition else definition["operationRef"]
-            errors.append(TransitionValidationError(f"Operation '{target}' not found"))
+        reference = definition.get("$ref")
+        if reference is not None:
+            target = reference
+            errors.append(TransitionValidationError(f"Reference '{reference}' could not be resolved"))
+        else:
+            try:
+                self.target = find_link_target(source.schema, definition, cache)
+                target = self.target.label
+            except OperationNotFound:
+                target = definition["operationId"] if "operationId" in definition else definition["operationRef"]
+                errors.append(TransitionValidationError(f"Operation '{target}' not found"))
+            except InvalidSchema as exc:
+                target = "?"
+                errors.append(TransitionValidationError(str(exc)))
 
         extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
         self.parameters = self._normalize_parameters(definition.get("parameters", {}), errors)

@@ -277,7 +277,10 @@ class OperationLoader:
 
         def is_link_selected(link: dict) -> bool:
             if "$ref" in link:
-                _, link = resolve_reference(root_resolver, link["$ref"])
+                try:
+                    _, link = resolve_reference(root_resolver, link["$ref"])
+                except RefResolutionError:
+                    return False
 
             if "operationId" in link:
                 return link["operationId"] in selected_operations_by_id
