@@ -1664,6 +1664,35 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     assert failure.colno == 2
 
 
+BODY_SCHEMA = {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}
+OPENAPI_3_RESPONSES = {"200": {"description": "OK", "content": {"application/json": {"schema": BODY_SCHEMA}}}}
+SWAGGER_2_RESPONSES = {"200": {"description": "OK", "schema": BODY_SCHEMA}}
+
+
+def _operation_with_json_response(ctx, method, version):
+    if version == "2.0":
+        definition = {"produces": ["application/json"], "responses": SWAGGER_2_RESPONSES}
+    else:
+        definition = {"responses": OPENAPI_3_RESPONSES}
+    schema = ctx.openapi.load_schema({"/x": {method: definition}}, version=version)
+    return schema["/x"][method.upper()]
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "2.0"], ids=["openapi-3", "swagger-2"])
+def test_response_schema_conformance_skips_empty_head_body(ctx, response_factory, version):
+    case = _operation_with_json_response(ctx, "head", version).Case()
+    response = Response.from_requests(response_factory.requests(content=b"", method="HEAD"), True)
+    assert response_schema_conformance(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "2.0"], ids=["openapi-3", "swagger-2"])
+def test_response_schema_conformance_rejects_empty_get_body(ctx, response_factory, version):
+    case = _operation_with_json_response(ctx, "get", version).Case()
+    response = Response.from_requests(response_factory.requests(content=b"", method="GET"), True)
+    with pytest.raises(MalformedJson, match="Expecting value"):
+        response_schema_conformance(check_context(), response, case)
+
+
 @pytest.mark.parametrize(
     ("response_key", "expected_note"),
     [
