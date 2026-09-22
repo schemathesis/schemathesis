@@ -85,7 +85,8 @@ def serialize_json(value: Body) -> dict[str, Any]:
         # Possible to get via explicit examples, e.g. `externalValue`
         return {"data": value}
     if isinstance(value, Binary):
-        return {"data": value.data}
+        # Raw bytes are not JSON; send the same string a nested binary value serializes to.
+        return {"json": str(value)}
     if value is None:
         # If the body is `None`, then the app expects `null`, but `None` is also the default value for the `json`
         # argument in `requests.request` and `werkzeug.Client.open` which makes these cases indistinguishable.

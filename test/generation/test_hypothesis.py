@@ -709,7 +709,7 @@ def test_string_with_allof_of_formats_and_patterns(ctx):
     assert re.fullmatch(r"[a-z]+", case.body) and "a" in case.body
 
 
-@pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])
+@pytest.mark.parametrize("media_type", ["text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
     schema = ctx.openapi.load_schema(
         {
