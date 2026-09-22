@@ -44,6 +44,14 @@ class OperationParameter(Protocol):
         """True if required."""
         ...  # pragma: no cover
 
+    def validate(self, value: Any) -> None:
+        """Validate a value against this parameter's schema, raising if it does not conform."""
+        ...  # pragma: no cover
+
+    def is_valid(self, value: Any) -> bool:
+        """True if the value conforms to this parameter's schema."""
+        ...  # pragma: no cover
+
 
 @dataclass(slots=True)
 class ParsedParameters:
