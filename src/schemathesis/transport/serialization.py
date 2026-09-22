@@ -162,6 +162,10 @@ def _serialize_xml(value: Any, schema: JsonSchema, resource_name: str | None) ->
         # Opaque payloads are already the wire representation and carry no XML structure to wrap.
         return {"data": value.data if isinstance(value, Binary) else value}
     tag = _get_xml_tag(definition, resource_name)
+    options = definition.get("xml", {})
+    # Objects and arrays prefix their own tags, while scalars expect the caller to do it.
+    if not isinstance(value, (dict, list)) and "prefix" in options:
+        tag = f"{options['prefix']}:{tag}"
     buffer = StringIO()
     # Collect all namespaces to ensure that all child nodes with prefixes have proper namespaces in their parent nodes
     namespace_stack: list[str] = []
@@ -328,8 +332,9 @@ def _write_primitive(
 ) -> None:
     xml_options = (schema or {}).get("xml", {})
     # There is no need for modifying the namespace stack, as we know that this function is terminal - it do not recurse
-    # and this element don't have any children. Therefore, checking the prefix is enough
-    _validate_prefix(xml_options, namespace_stack)
+    # and this element don't have any children. Therefore, checking the prefix is enough, unless the element binds it
+    if "namespace" not in xml_options:
+        _validate_prefix(xml_options, namespace_stack)
     buffer.write(f"<{tag}")
     if "namespace" in xml_options:
         _write_namespace(buffer, xml_options)
