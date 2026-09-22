@@ -937,6 +937,7 @@ class OpenApiComponent(ABC):
         "_raw_schema",
         "_permissive_schema",
         "_validation_schema",
+        "_validator",
         "_examples",
         "_mutation_targets",
     )
@@ -947,6 +948,7 @@ class OpenApiComponent(ABC):
         self._raw_schema: JsonSchema | NotSet = NOT_SET
         self._permissive_schema: JsonSchema | NotSet = NOT_SET
         self._validation_schema: JsonSchema | NotSet = NOT_SET
+        self._validator: jsonschema_rs.Validator | NotSet = NOT_SET
         self._examples: list | NotSet = NOT_SET
         self._mutation_targets: tuple | NotSet = NOT_SET
 
@@ -1008,6 +1010,36 @@ class OpenApiComponent(ABC):
             )
         assert not isinstance(self._validation_schema, NotSet)
         return self._validation_schema
+
+    def _get_validator(self) -> jsonschema_rs.Validator:
+        if self._validator is NOT_SET:
+            self._validator = make_validator(self.validation_schema, self.adapter.jsonschema_validator_cls)
+        assert not isinstance(self._validator, NotSet)
+        return self._validator
+
+    def validate(self, value: Any) -> None:
+        """Validate a value against this parameter's schema.
+
+        Args:
+            value: Value to check, in its parsed form.
+
+        Raises:
+            jsonschema_rs.ValidationError: If the value does not conform to the schema.
+
+        """
+        self._get_validator().validate(value)
+
+    def is_valid(self, value: Any) -> bool:
+        """Check whether a value conforms to this parameter's schema.
+
+        Args:
+            value: Value to check, in its parsed form.
+
+        Returns:
+            `True` if the value is valid, `False` otherwise.
+
+        """
+        return self._get_validator().is_valid(value)
 
     @abstractmethod
     def _get_raw_schema(self) -> JsonSchema:
@@ -1279,6 +1311,7 @@ class OpenApiBody(OpenApiComponent):
         "_raw_schema",
         "_permissive_schema",
         "_validation_schema",
+        "_validator",
         "_examples",
         "_mutation_targets",
         "_positive_strategy_cache",

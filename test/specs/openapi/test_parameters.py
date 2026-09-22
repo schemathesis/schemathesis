@@ -1,5 +1,7 @@
 import datetime
+import re
 
+import jsonschema_rs
 import pytest
 from flask import Flask, jsonify, request
 from hypothesis import HealthCheck, assume, find, given, settings
@@ -968,3 +970,91 @@ def test_operation_parameter_override_relaxes_required(ctx, version, path_item_p
         "additionalProperties": False,
         "type": "object",
     }
+
+
+@pytest.fixture
+def schema_with_referenced_body(ctx):
+    return ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {
+                    "type": "object",
+                    "properties": {"id": {"type": "integer"}, "tag": {"type": "string", "nullable": True}},
+                    "required": ["id"],
+                }
+            }
+        },
+    )
+
+
+def test_body_validate_accepts_conforming_value(schema_with_referenced_body):
+    body = schema_with_referenced_body["/items"]["POST"].body[0]
+    assert body.validate({"id": 1, "tag": None}) is None
+    assert body.is_valid({"id": 1, "tag": None})
+
+
+@pytest.mark.parametrize(
+    ("value", "message"),
+    [
+        ({"id": "1"}, '"1" is not of type "integer"'),
+        ({"tag": "x"}, '"id" is a required property'),
+    ],
+    ids=["wrong-type", "missing-required"],
+)
+def test_body_validate_rejects_violating_value(schema_with_referenced_body, value, message):
+    body = schema_with_referenced_body["/items"]["POST"].body[0]
+    with pytest.raises(jsonschema_rs.ValidationError, match=re.escape(message)):
+        body.validate(value)
+    assert not body.is_valid(value)
+
+
+def test_query_parameter_validate(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    limit = schema["/items"]["GET"].query[0]
+    assert limit.validate(5) is None
+    with pytest.raises(jsonschema_rs.ValidationError):
+        limit.validate(0)
+
+
+# An empty array serializes to nothing, so generation raises `minItems`; the contract still admits it.
+def test_validate_ignores_serialization_bounds(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "tags",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "array", "items": {"type": "string"}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    tags = schema["/items"]["GET"].query[0]
+    assert tags.wire_bounds == {"minItems": 1}
+    assert tags.is_valid([])

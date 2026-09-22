@@ -12,6 +12,7 @@
 - Dynamic auth `extract_from = "cookie"` takes a named cookie from a `Set-Cookie` login response.
 - `schemathesis.errors.FailureGroup` for catching failures raised by `validate_response`.
 - Support for `pytest` 8.4.
+- `validate()` and `is_valid()` on request parameters for checking values against the schema.
 
 ### :bug: Fixed
 
