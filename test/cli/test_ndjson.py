@@ -160,6 +160,13 @@ def test_store_ndjson(ctx, cli, ndjson_path, hypothesis_max_examples):
     assert get_event_type(events[-1]) == "EngineFinished"
     assert "running_time" in get_event_data(events[-1])
 
+    # Behavior counts ride along for offline analysis; nothing prints them.
+    behaviors = get_event_data(events[-1])["payload"]["behaviors"]
+    assert behaviors["alphabet"] == "status+labels"
+    counts = behaviors["operations"]["GET /api/success"]
+    assert counts["responses"] >= 1
+    assert counts["singletons"] <= counts["distinct"]
+
 
 def test_store_timeout(ctx, cli, ndjson_path):
     api = ctx.openapi.apps.slow()

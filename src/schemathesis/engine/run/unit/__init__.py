@@ -85,6 +85,11 @@ def _create_scheduler(engine: EngineContext, phase: Phase, *, only: frozenset[st
         operations = [item for item in operations if not (isinstance(item, Ok) and item.ok().has_skipped_required_body)]
     if only is not None:
         operations = [item for item in operations if isinstance(item, Ok) and item.ok().label in only]
+    for item in operations:
+        if isinstance(item, Ok):
+            operation = item.ok()
+            if not engine.behaviors.knows(operation.label):
+                engine.behaviors.declare(operation.label, engine.schema.declared_response_values(operation))
     # Entries the schema could not produce never claim a share, so counting them shrinks every other one.
     engine.start_unit_phase(total_operations=sum(1 for item in operations if isinstance(item, Ok)))
     return engine.schema.get_unit_scheduler(operations, phase)
