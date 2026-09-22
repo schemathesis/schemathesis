@@ -65,6 +65,7 @@ from schemathesis.specs.openapi.formats import (
     HEADER_FORMAT,
     INVALID_HEADER_CHARS,
     STRING_FORMATS,
+    cookie_alphabet,
     format_lengths_for,
     get_alphabet_format_strategies,
     get_default_format_strategies,
@@ -1226,7 +1227,10 @@ def _canonical_strategy(
     if location is not None and location.is_in_header:
         # What a header may carry is a rule about characters, so it is spelled as one: every string
         # in the container obeys it, and the length and pattern keywords around it keep working.
-        alphabet = header_alphabet(generation_config)
+        if location == ParameterLocation.COOKIE:
+            alphabet = cookie_alphabet(generation_config)
+        else:
+            alphabet = header_alphabet(generation_config)
         formats = _build_header_formats(generation_config, GenerationMode.POSITIVE)
     else:
         alphabet = Alphabet(allow_x00=generation_config.allow_x00, codec=generation_config.codec)

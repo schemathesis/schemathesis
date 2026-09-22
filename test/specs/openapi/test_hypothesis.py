@@ -535,6 +535,63 @@ def test_header_values_never_start_with_whitespace():
         )
 
 
+COOKIE_OCTETS = frozenset(chr(code) for code in range(0x21, 0x7F)) - frozenset('",;\\')
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [{"type": "string"}, {"type": "string", "minLength": 3}],
+    ids=["plain", "min-length"],
+)
+@pytest.mark.hypothesis_nested
+def test_cookie_values_use_cookie_octets(ctx, schema):
+    operation = ctx.openapi.load_schema(
+        {
+            "/c": {
+                "get": {
+                    "parameters": [{"name": "c", "in": "cookie", "required": True, "schema": schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/c"]["GET"]
+
+    # Enough draws to reach separators, quotes and whitespace that servers strip or split on.
+    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=30, deadline=None, database=None)
+    def test(case):
+        assert set(case.cookies["c"]) <= COOKIE_OCTETS, repr(case.cookies["c"])
+
+    test()
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [({"type": "string", "enum": ["a b"]}, "a b"), ({"type": "string", "const": 'a;"b"'}, 'a;"b"')],
+    ids=["enum", "const"],
+)
+@pytest.mark.hypothesis_nested
+def test_cookie_values_keep_declared_literals(ctx, schema, expected):
+    operation = ctx.openapi.load_schema(
+        {
+            "/c": {
+                "get": {
+                    "parameters": [{"name": "c", "in": "cookie", "required": True, "schema": schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )["/c"]["GET"]
+
+    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=5, deadline=None, database=None)
+    def test(case):
+        assert case.cookies == {"c": expected}
+
+    test()
+
+
 @pytest.mark.hypothesis_nested
 def test_no_much_filtering_in_headers():
     # When headers are generated
