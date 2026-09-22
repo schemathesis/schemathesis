@@ -25,6 +25,7 @@
 - Protocol-relative `$ref` (`//host/schema.json`) failing to resolve for schemas loaded from a file.
 - XML serialization error for scalar bodies under a root element with a namespace prefix.
 - Generate cookie values from RFC 6265 cookie-octets only.
+- Send a JSON string, not raw bytes, for top-level `format: binary` JSON bodies.
 
 ### :wrench: Changed
 

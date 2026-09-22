@@ -291,6 +291,52 @@ def test_binary_data(ctx, media_type):
     assert_requests_call(case)
 
 
+@pytest.mark.parametrize(
+    ("media_type", "schema", "body", "expected"),
+    [
+        (
+            "application/json",
+            {"type": "string", "format": "binary"},
+            Binary(b"\x00\x01"),
+            {"json": "", "data": None, "Content-Type": "application/json"},
+        ),
+        (
+            "application/json",
+            {"type": "object", "properties": {"f": {"type": "string", "format": "binary"}}, "required": ["f"]},
+            {"f": Binary(b"\x00\x01")},
+            {"json": {"f": ""}, "data": None, "Content-Type": "application/json"},
+        ),
+        (
+            "application/octet-stream",
+            {"type": "string", "format": "binary"},
+            Binary(b"\x00\x01"),
+            {"json": None, "data": b"\x00\x01", "Content-Type": "application/octet-stream"},
+        ),
+    ],
+    ids=["json-top-level", "json-nested", "octet-stream"],
+)
+def test_generated_binary_body(ctx, media_type, schema, body, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {"required": True, "content": {media_type: {"schema": schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    case = schema["/test"]["POST"].Case(body=body, media_type=media_type)
+    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+        kwargs = transport.serialize_case(case)
+        assert {
+            "json": kwargs.get("json"),
+            "data": kwargs.get("data"),
+            "Content-Type": kwargs["headers"]["Content-Type"],
+        } == expected
+    assert_requests_call(case)
+
+
 @pytest.mark.parametrize(("value", "expected"), [(True, b"true"), (False, b"false"), (None, b"null")])
 def test_text_plain_boolean_and_null_use_json_spelling(ctx, value, expected):
     schema = ctx.openapi.load_schema(
