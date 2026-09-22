@@ -17,6 +17,7 @@
 ### :bug: Fixed
 
 - False positive `response_schema_conformance` for HEAD responses that declare a body.
+- False positive 'negative_data_rejection' for unknown query parameters next to boolean ones.
 - Send examples that different parameters declare under the same name together.
 - Send the value, not the name, for `examples` maps inside a parameter or body schema.
 - False positive GraphQL server errors for resolver rejections labelled in error `extensions`.

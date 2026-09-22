@@ -363,6 +363,48 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
     assert has_only_additional_properties_in_non_body_parameters(case) is True
 
 
+def _boolean_parameter_case(ctx, location, value):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {"in": location.value, "name": "flag", "required": True, "schema": {"type": "boolean"}},
+                    ]
+                }
+            }
+        }
+    )
+    return schema["/test"]["GET"].Case(
+        _meta=build_metadata(
+            generation_modes=[GenerationMode.NEGATIVE],
+            parameter_location=location,
+            mutations=(_mutation(OperatorKind.NEGATE_CONSTRAINTS, ("additionalProperties",), location=location),),
+            **{location.container_name: GenerationMode.NEGATIVE},
+        ),
+        **{location.container_name: {"flag": value, "unknown": "junk"}},
+    )
+
+
+_BOOLEAN_PARAMETER_LOCATIONS = [ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE]
+
+
+@pytest.mark.parametrize("location", _BOOLEAN_PARAMETER_LOCATIONS, ids=["query", "header", "cookie"])
+def test_negative_data_rejection_ignores_extras_next_to_boolean_wire_value(ctx, response_factory, location):
+    # Booleans reach the check already spelled as the wire sends them.
+    case = _boolean_parameter_case(ctx, location, "false")
+    assert has_only_additional_properties_in_non_body_parameters(case) is True
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
+@pytest.mark.parametrize("location", _BOOLEAN_PARAMETER_LOCATIONS, ids=["query", "header", "cookie"])
+def test_negative_data_rejection_reports_invalid_boolean_next_to_extras(ctx, response_factory, location):
+    case = _boolean_parameter_case(ctx, location, "maybe")
+    assert has_only_additional_properties_in_non_body_parameters(case) is False
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
 def _opaque_rejection(response_factory):
     # A rejection with nothing to attribute, so the hint falls back to its schema-side reasoning.
     return Response.from_requests(response_factory.requests(status_code=400), verify=True)

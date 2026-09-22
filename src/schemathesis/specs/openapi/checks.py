@@ -1058,7 +1058,10 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 # Can't reliably determine if only additional properties were added
                 continue
 
-            value_without_additional_properties = {k: v for k, v in value.items() if k in container}
+            properties = schema.get("properties", {})
+            value_without_additional_properties = {
+                k: _boolean_from_wire_spelling(v, properties.get(k, {})) for k, v in value.items() if k in container
+            }
             try:
                 is_valid = make_validator(schema, validator_cls).is_valid(value_without_additional_properties)
             except Exception:
@@ -1070,6 +1073,13 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 return False
     # Only additional properties are added
     return True
+
+
+def _boolean_from_wire_spelling(value: object, schema: JsonSchema) -> object:
+    """Booleans reach the check spelled as the wire sends them, so read `true` / `false` back."""
+    if value in ("true", "false") and "boolean" in get_type(schema):
+        return value == "true"
+    return value
 
 
 def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameterSet) -> bool:
