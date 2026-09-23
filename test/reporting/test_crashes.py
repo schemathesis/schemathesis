@@ -9,6 +9,8 @@ import requests
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core.failures import Failure, ResponseTimeExceeded
+from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -362,6 +364,27 @@ def test_crash_step_roundtrips_bytes_in_param_containers():
     assert restored.path_parameters == {"id": raw}
     assert restored.case_headers == {"X-Token": raw}
     assert restored.cookies == {"sid": raw}
+
+
+def test_crash_step_roundtrips_bytes_in_mutation_metadata():
+    # A value-channel mutation on a binary field records the injected bytes.
+    mutation = Mutation(
+        path=("payload",),
+        parameter_location=ParameterLocation.BODY,
+        schema_pointer="/properties/payload",
+        channel=MutationChannel.VALUE,
+        operator=OperatorKind.VALUE_VIOLATOR,
+        keywords=("maxLength",),
+        parameter="payload",
+        original_value=b"\x01",
+        new_value={"k": b"\x00"},
+    )
+    meta = {"phase": {"name": "fuzzing", "data": {"mutations": [mutation.to_dict()]}}}
+    step = _step(meta=meta)
+
+    restored = CrashStep.from_dict(json.loads(json.dumps(step.to_dict())))
+
+    assert restored.meta == meta
 
 
 def test_request_headers_are_sanitized(case_factory):
