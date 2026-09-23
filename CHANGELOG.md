@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.28.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Crash files lost when a negative mutation stored a `bytes` value.
+
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 
 ### :rocket: Added
