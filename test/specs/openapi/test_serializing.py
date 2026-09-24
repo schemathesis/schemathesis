@@ -976,6 +976,43 @@ def test_nullable_parameters(
     assert func("foo", **kwargs)({"foo": None}) == {"foo": ""}
 
 
+@pytest.mark.parametrize(
+    ("func", "kwargs", "value", "expected"),
+    [
+        (comma_delimited_object, {}, {"a": True, "b": None}, "a,true,b,null"),
+        (delimited_object, {}, {"a": True, "b": None}, "a=true,b=null"),
+        (delimited_nested, {"outer": "|", "inner": ","}, [[True, None], [False]], "true,null|false"),
+        (label_primitive, {}, True, ".true"),
+        (label_array, {"explode": True}, [True, None], ".true.null"),
+        (label_array, {"explode": False}, [True, None], ".true,null"),
+        (label_object, {"explode": True}, {"a": True, "b": None}, ".a=true.b=null"),
+        (label_object, {"explode": False}, {"a": True, "b": None}, ".a,true,b,null"),
+        (matrix_primitive, {}, False, ";foo=false"),
+        (matrix_array, {"explode": True}, [True, None], ";foo=true;foo=null"),
+        (matrix_array, {"explode": False}, [True, None], ";true,null"),
+        (matrix_object, {"explode": True}, {"a": True, "b": None}, ";a=true;b=null"),
+        (matrix_object, {"explode": False}, {"a": True, "b": None}, ";a,true,b,null"),
+    ],
+    ids=[
+        "comma-delimited-object",
+        "delimited-object",
+        "delimited-nested",
+        "label-primitive",
+        "label-array-explode",
+        "label-array",
+        "label-object-explode",
+        "label-object",
+        "matrix-primitive",
+        "matrix-array-explode",
+        "matrix-array",
+        "matrix-object-explode",
+        "matrix-object",
+    ],
+)
+def test_style_serializers_use_json_scalar_spelling(func, kwargs, value, expected):
+    assert func("foo", **kwargs)({"foo": value}) == {"foo": expected}
+
+
 def test_security_definition_parameter(ctx, testdir):
     # When the API contains an example for one of its parameters
     schema = ctx.openapi.build_schema(
