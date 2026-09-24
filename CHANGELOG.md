@@ -13,6 +13,7 @@
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.
 - False positive `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
+- Nested objects and `encoding` styles ignored in `application/x-www-form-urlencoded` bodies.
 - Property names holding `/` or `~` printed unescaped where conflicting constraints are named.
 - Plural `1 more branches` where conflicting constraints are named.
 - Name the `prefixItems` element that admits no value when test data cannot be generated.

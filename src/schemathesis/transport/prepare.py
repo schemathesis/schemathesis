@@ -98,7 +98,7 @@ def prepare_url(case: Case, base_url: str | None) -> str:
 
 def prepare_body(case: Case) -> Body:
     """Prepare body via the schema's spec-aware override."""
-    return case.operation.schema.prepare_request_body(case.body)
+    return case.operation.schema.prepare_request_body(case)
 
 
 @lru_cache(maxsize=128)
