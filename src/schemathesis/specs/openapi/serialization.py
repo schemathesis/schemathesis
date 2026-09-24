@@ -6,7 +6,7 @@ from functools import partial
 from typing import Any
 from urllib.parse import quote
 
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, maybe_resolve_bundled
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, maybe_resolve_bundled, schema_with_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, DelimitedValue, RawQueryString
 from schemathesis.core.transforms import to_wire_string
 from schemathesis.specs.openapi.checks import _COLLECTION_FORMAT_DELIMITERS
@@ -208,12 +208,16 @@ def _serialize_querystring_other_media_type(name: str, media_type: str) -> Calla
 
 def _build_urlencoded_serializer(media_type_object: Any) -> Callable[[Generated], Generated]:
     schema = media_type_object.get("schema", {}) if isinstance(media_type_object, Mapping) else {}
-    properties = schema.get("properties", {}) if isinstance(schema, Mapping) else {}
+    properties = maybe_resolve_bundled(schema).get("properties", {}) if isinstance(schema, dict) else {}
     encoding = media_type_object.get("encoding", {}) if isinstance(media_type_object, Mapping) else {}
     definitions = []
     if isinstance(properties, Mapping):
         for property_name, property_schema in properties.items():
-            definition: dict[str, Any] = {"name": property_name, "in": "query", "schema": property_schema}
+            definition: dict[str, Any] = {
+                "name": property_name,
+                "in": "query",
+                "schema": schema_with_bundle(property_schema, schema),
+            }
             property_encoding = encoding.get(property_name) if isinstance(encoding, Mapping) else None
             if isinstance(property_encoding, Mapping):
                 style = property_encoding.get("style", "form")

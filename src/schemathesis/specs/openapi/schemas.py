@@ -17,7 +17,7 @@ from schemathesis.config import (
     FuzzingPhaseConfig,
     OperationOrdering,
 )
-from schemathesis.core import NOT_SET, Body, Specification
+from schemathesis.core import NOT_SET, Body, Specification, media_types
 from schemathesis.core.errors import (
     InvalidSchema,
     InvalidStateMachine,
@@ -52,10 +52,11 @@ from ...hooks import (
     dispatch_before_process_path,
 )
 from ...schemas import APIOperation, APIOperationMap, BaseSchema
-from ._hypothesis import openapi_cases
+from ._hypothesis import jsonify_python_specific_types, openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
 from .operations import SCHEMA_PARSING_ERRORS, OperationLoader
+from .serialization import _build_urlencoded_serializer
 from .stateful import collect_transitions, create_state_machine
 from .utils import parse_spec_version
 from .validation import ResponseValidator
@@ -691,6 +692,18 @@ class OpenApiSchema(BaseSchema):
         self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None
     ) -> tuple[list | None, dict[str, Any] | None]:
         return self.adapter.prepare_multipart(operation, form_data, selected_content_types)
+
+    @override
+    def prepare_request_body(self, case: Case) -> Body:
+        body = case.body
+        if not isinstance(body, dict) or case.media_type is None or not media_types.is_form_urlencoded(case.media_type):
+            return body
+        for alternative in case.operation.body:
+            if alternative.media_type == case.media_type:
+                # Each property is serialized like a query parameter, following the media type's `encoding`
+                serialize = _build_urlencoded_serializer(alternative.definition)
+                return jsonify_python_specific_types(serialize(dict(body)))
+        return body
 
     @override
     def make_case(

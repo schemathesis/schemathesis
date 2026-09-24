@@ -5,6 +5,7 @@ import platform
 import re
 import string
 from io import StringIO
+from urllib.parse import parse_qsl
 from xml.etree import ElementTree
 
 import pytest
@@ -406,6 +407,71 @@ def test_wsgi_raw_multipart_body_reaches_the_app(ctx):
     operation = multipart_echo_schema(ctx)["/upload"]["POST"]
     case = operation.Case(body=b"\x92\x42", media_type="multipart/form-data")
     assert case.call().json() == {"mimetype": "", "has_boundary": False, "form": {}, "raw": "\x92B"}
+
+
+URLENCODED_NESTED_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "o": {"$ref": "#/components/schemas/Nested"},
+        "arr": {"type": "array", "items": {"type": "integer"}},
+        "s": {"type": "string"},
+    },
+}
+URLENCODED_COMPONENTS = {
+    "schemas": {
+        "Form": URLENCODED_NESTED_SCHEMA,
+        "Nested": {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "boolean"}}},
+    }
+}
+
+
+@pytest.mark.parametrize(
+    ("encoding", "expected"),
+    [
+        (None, [("a", "1"), ("b", "true"), ("arr", "1"), ("arr", "2"), ("s", "x")]),
+        (
+            {"o": {"style": "deepObject"}, "arr": {"style": "form", "explode": False}},
+            [("o[a]", "1"), ("o[b]", "true"), ("arr", "1,2"), ("s", "x")],
+        ),
+    ],
+    ids=["no-encoding", "deep-object-and-unexploded-array"],
+)
+@pytest.mark.parametrize(
+    "body_schema", [URLENCODED_NESTED_SCHEMA, {"$ref": "#/components/schemas/Form"}], ids=["inline", "referenced"]
+)
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+def test_urlencoded_body_follows_encoding(ctx, app_runner, body_schema, encoding, expected, transport):
+    media_type_object = {"schema": body_schema}
+    if encoding is not None:
+        media_type_object["encoding"] = encoding
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/form": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/x-www-form-urlencoded": media_type_object},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        components=URLENCODED_COMPONENTS,
+    )
+
+    @app.route("/form", methods=["POST"])
+    def form():
+        return request.get_data()
+
+    if transport == "wsgi":
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/form"]["POST"].Case(
+        body={"o": {"a": 1, "b": True}, "arr": [1, 2], "s": "x"},
+        media_type="application/x-www-form-urlencoded",
+    )
+    assert sorted(parse_qsl(case.call().text)) == sorted(expected)
 
 
 def test_multipart_nested_object_serializes_as_json(ctx, case_factory):

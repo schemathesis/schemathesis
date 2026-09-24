@@ -582,9 +582,9 @@ class BaseSchema(Mapping):
         # `quote` — decoding it would turn an escaped reserved character such as `%3F` into a live delimiter.
         return unquote(urljoin(base_url.replace("%", "%25"), quote(path)))
 
-    def prepare_request_body(self, body: Body) -> Body:
+    def prepare_request_body(self, case: Case) -> Body:
         """Apply spec-specific transformations to a generated body before sending."""
-        return body
+        return case.body
 
     def evaluate_server_error(self, case: Case, response: Response) -> None:
         """Raise a Failure if the schema's own conventions classify this response as a server error.

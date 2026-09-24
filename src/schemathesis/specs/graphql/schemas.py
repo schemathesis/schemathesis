@@ -216,7 +216,8 @@ class GraphQLSchema(BaseSchema):
         return urlunsplit(parts)
 
     @override
-    def prepare_request_body(self, body: Body) -> Body:
+    def prepare_request_body(self, case: Case) -> Body:
+        body = case.body
         if isinstance(body, NotSet | bytes):
             return body
         return {"query": body}

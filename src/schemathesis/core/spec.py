@@ -197,7 +197,7 @@ class TransportShape(Protocol):
 
     def build_request_url(self, case: Case, base_url: str) -> str: ...  # pragma: no cover
 
-    def prepare_request_body(self, body: Body) -> Body: ...  # pragma: no cover
+    def prepare_request_body(self, case: Case) -> Body: ...  # pragma: no cover
 
     def evaluate_server_error(self, case: Case, response: Response) -> None: ...  # pragma: no cover
 
