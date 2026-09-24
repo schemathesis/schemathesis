@@ -2358,6 +2358,53 @@ def test_optional_null_header_is_sent(ctx):
     assert [case.headers for case in iter_cases(operation, GenerationMode.POSITIVE)] == [{"X-Limit": "null"}]
 
 
+@pytest.mark.parametrize("location", ["header", "cookie", "query"])
+def test_json_content_parameter_keeps_nested_types(ctx, location):
+    schema = {
+        "type": "object",
+        "properties": {"a": {"type": "integer"}, "b": {"type": "boolean"}},
+        "required": ["a", "b"],
+        "additionalProperties": False,
+    }
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"in": location, "name": "X-F", "required": True, "content": {"application/json": {"schema": schema}}}
+        ],
+        method="get",
+    )["/foo"]["GET"]
+    container = LOCATION_TO_CONTAINER[location]
+    assert [getattr(case, container) for case in iter_cases(operation, GenerationMode.POSITIVE)] == [
+        {"X-F": '{"a": 0, "b": false}'},
+        {"X-F": '{"a": 0, "b": true}'},
+    ]
+    negatives = [
+        json.loads(getattr(case, container)["X-F"])
+        for case in iter_cases(operation, GenerationMode.NEGATIVE)
+        if getattr(case, container)
+    ]
+    assert negatives == [
+        False,
+        None,
+        "AAA",
+        [None, None],
+        {"a": AnyNumber(), "b": False},
+        {"a": False, "b": False},
+        {"a": None, "b": False},
+        {"a": "AAA", "b": False},
+        {"a": [None, None], "b": False},
+        {"a": {}, "b": False},
+        {"a": 0, "b": 0},
+        {"a": 0, "b": None},
+        {"a": 0, "b": "AAA"},
+        {"a": 0, "b": [None, None]},
+        {"a": 0, "b": {}},
+        {"b": False},
+        {"a": 0},
+        {"a": 0, "b": False, "x-schemathesis-unknown-property": 42},
+    ]
+
+
 def test_negative_data_rejection(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     raw_schema = build_schema(

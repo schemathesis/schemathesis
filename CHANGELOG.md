@@ -14,6 +14,7 @@
 - Property names holding `/` or `~` printed unescaped where conflicting constraints are named.
 - Plural `1 more branches` where conflicting constraints are named.
 - Name the `prefixItems` element that admits no value when test data cannot be generated.
+- Coverage phase stringifying nested values of JSON-encoded `content` parameters.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 

@@ -117,7 +117,8 @@ class WireSemantics:
 
     def url_part(self) -> bool:
         """Whether values travel inside the URL, where every rendering collapses to text."""
-        return self.location in (ParameterLocation.PATH, ParameterLocation.QUERY)
+        # A JSON-encoded parameter keeps its types on the wire.
+        return self.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and self.media_type is None
 
     def urlencoded_body(self) -> bool:
         return self.location == ParameterLocation.BODY and self.media_type == ("application", "x-www-form-urlencoded")
@@ -139,7 +140,7 @@ class WireSemantics:
 
     def serializes_to_string(self) -> bool:
         if self.location in ("query", "path", "header", "cookie"):
-            return True
+            return self.media_type is None
         if self.location == "body" and self.media_type is not None:
             if is_form_parts(self.media_type):
                 return True

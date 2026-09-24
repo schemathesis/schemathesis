@@ -54,6 +54,7 @@ if TYPE_CHECKING:
 class Template:
     __slots__ = (
         "_components",
+        "_json_encoded",
         "_optional_query",
         "_parameter_modes",
         "_serializers",
@@ -65,12 +66,18 @@ class Template:
         "unsatisfiable_required_parameter",
     )
 
-    def __init__(self, serializers: dict[str, Callable], optional_query: frozenset[str]) -> None:
+    def __init__(
+        self,
+        serializers: dict[str, Callable],
+        optional_query: frozenset[str],
+        json_encoded: frozenset[tuple[str, str]],
+    ) -> None:
         self._components: dict[ParameterLocation, ComponentInfo] = {}
         self._parameter_modes: dict[ParameterLocation, dict[str, GenerationMode]] = {}
         self._template: dict[str, Any] = {}
         self._serializers = serializers
         self._optional_query = optional_query
+        self._json_encoded = json_encoded
         # A required body that never produced a value, or a required parameter without a positive
         # value, leaves no valid positive request; a fallback-negative body forbids stacking a
         # second negative on top.
@@ -120,7 +127,13 @@ class Template:
         for container_name, value in kwargs.items():
             serializer = self._serializers.get(container_name)
             if container_name in ("headers", "cookies") and isinstance(value, dict):
-                value = _stringify_value(value, container_name)
+                # A JSON-encoded parameter keeps its nested types until the serializer writes it as JSON text.
+                value = {
+                    name: item
+                    if (container_name, name) in self._json_encoded
+                    else _stringify_value(item, container_name)
+                    for name, item in value.items()
+                }
             if serializer is not None:
                 # Shallow-copy dict containers before serializing to avoid mutating
                 # self._template through shared references in shallow-copy kwargs
@@ -598,6 +611,13 @@ class CoverageRun:
     correlated: dict[tuple[ParameterLocation, str], Any]
 
 
+def _json_media_type(parameter: OpenApiParameter) -> tuple[str, str] | None:
+    """The media type of a parameter that travels as JSON text rather than in its location's own style."""
+    if next(iter(parameter.definition.get("content", {})), None) == "application/json":
+        return ("application", "json")
+    return None
+
+
 def _positive_fallback(run: CoverageRun, parameter: OpenApiParameter, schema: dict[str, Any]) -> GeneratedValue | None:
     """The value a positive run would seed for this parameter, if any."""
     generator = cover_schema_iter(
@@ -697,7 +717,7 @@ def _seed_parameters(run: CoverageRun) -> None:
                 session=session,
                 root_schema=schema,
                 location=location,
-                media_type=None,
+                media_type=_json_media_type(parameter),
                 generation_modes=generation_modes,
                 is_required=parameter.is_required,
                 custom_formats=custom_formats,
@@ -1409,6 +1429,11 @@ def iter_coverage_cases(
     template = Template(
         serializers,
         optional_query=frozenset(parameter.name for parameter in operation.query if not parameter.is_required),
+        json_encoded=frozenset(
+            (parameter.location.container_name, parameter.name)
+            for parameter in (*operation.headers, *operation.cookies)
+            if _json_media_type(parameter) is not None
+        ),
     )
 
     responses = list(operation.responses.iter_examples())
