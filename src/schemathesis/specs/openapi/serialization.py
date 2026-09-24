@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Generator, Mapping
+from functools import partial
 from typing import Any
 from urllib.parse import quote
 
@@ -22,20 +23,23 @@ def make_serializer(
     """A maker function to avoid code duplication."""
 
     def _wrapper(definitions: DefinitionList) -> Callable | None:
-        functions = list(func(definitions))
-        if not functions:
-            return None
-
-        def composed(x: Any) -> Any:
-            result = x
-            for func in reversed(functions):
-                if func is not None:
-                    result = func(result)
-            return result
-
-        return composed
+        return _compose(list(func(definitions)))
 
     return _wrapper
+
+
+def _compose(functions: list[Callable | None]) -> Callable | None:
+    if not functions:
+        return None
+
+    def composed(x: Any) -> Any:
+        result = x
+        for func in reversed(functions):
+            if func is not None:
+                result = func(result)
+        return result
+
+    return composed
 
 
 def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | None, None, None]:
@@ -78,14 +82,78 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                 style = "simple" if location in ("path", "header") else "form"
             if explode is None:
                 explode = style == "form"
-            if location == "path":
-                yield from _serialize_path_openapi3(name, type_, style, explode)
-            elif location == "query":
-                yield from _serialize_query_openapi3(name, type_, style, explode, schema, schema_was_top_ref)
-            elif location == "header":
-                yield from _serialize_header_openapi3(name, type_, explode)
-            elif location == "cookie":
-                yield from _serialize_cookie_openapi3(name, type_, explode)
+            serialize = partial(
+                _serialize_location_openapi3,
+                name,
+                location,
+                style=style,
+                explode=explode,
+                schema=schema,
+                schema_was_top_ref=schema_was_top_ref,
+            )
+            container_types = [] if isinstance(type_, str) else _container_types(schema)
+            if container_types:
+                # The schema allows a container and other values, so the generated value picks the style.
+                yield _by_value_shape(
+                    name,
+                    [(_PYTHON_TYPES[kind], _compose(list(serialize(kind)))) for kind in container_types],
+                    _compose(list(serialize(None))),
+                )
+            else:
+                yield from serialize(type_)
+
+
+_PYTHON_TYPES = {"object": dict, "array": list}
+
+
+def _container_types(schema: object) -> list[str]:
+    """Return container types a schema allows through a `type` list or, without `type`, through its keywords."""
+    if not isinstance(schema, dict):
+        return []
+    type_ = schema.get("type")
+    if isinstance(type_, list):
+        return [kind for kind in ("object", "array") if kind in type_]
+    if type_ is not None:
+        return []
+    kinds = []
+    if "properties" in schema or "additionalProperties" in schema:
+        kinds.append("object")
+    if "items" in schema or "prefixItems" in schema:
+        kinds.append("array")
+    return kinds
+
+
+def _by_value_shape(
+    name: str, serializers: list[tuple[type, Callable | None]], fallback: Callable | None
+) -> Callable[[Generated], Generated]:
+    def _map(item: Generated) -> Generated:
+        value = item.get(name)
+        for python_type, serializer in serializers:
+            if isinstance(value, python_type):
+                return serializer(item) if serializer is not None else item
+        return fallback(item) if fallback is not None else item
+
+    return _map
+
+
+def _serialize_location_openapi3(
+    name: str,
+    location: str,
+    type_: str | None,
+    *,
+    style: str | None,
+    explode: bool | None,
+    schema: dict[str, Any] | None,
+    schema_was_top_ref: bool,
+) -> Generator[Callable | None, None, None]:
+    if location == "path":
+        yield from _serialize_path_openapi3(name, type_, style, explode)
+    elif location == "query":
+        yield from _serialize_query_openapi3(name, type_, style, explode, schema, schema_was_top_ref)
+    elif location == "header":
+        yield from _serialize_header_openapi3(name, type_, explode)
+    elif location == "cookie":
+        yield from _serialize_cookie_openapi3(name, type_, explode)
 
 
 def _serialize_querystring_openapi3(

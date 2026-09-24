@@ -897,6 +897,73 @@ def test_header_and_cookie_values_use_json_wire_form(ctx, location, container):
     assert coverage_rendered(operation, render) == {_WIRE_FORM_RENDERED}
 
 
+def wire_value(case, location):
+    if location == "query":
+        return prepared_query_string(case)
+    if location == "path":
+        return unquote(urlsplit(case.as_transport_kwargs(base_url="http://127.0.0.1:1")["url"]).path)
+    return case.headers["p"] if location == "header" else case.cookies["p"]
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("location", "schema", "extra", "expected"),
+    [
+        ("query", {"type": ["object", "null"], "enum": [{"a": "x"}]}, {}, "a=x"),
+        ("query", {"type": ["object", "null"], "enum": [{"a": "x"}]}, {"style": "deepObject"}, "p%5Ba%5D=x"),
+        (
+            "query",
+            {"type": ["array", "null"], "enum": [["x", "y"]]},
+            {"style": "pipeDelimited", "explode": False},
+            "p=x%7Cy",
+        ),
+        ("header", {"type": ["object", "null"], "enum": [{"a": "x"}]}, {}, "a,x"),
+        ("header", {"type": ["array", "null"], "enum": [["x", "y"]]}, {}, "x,y"),
+        ("cookie", {"type": ["object", "null"], "enum": [{"a": "x"}]}, {}, "a=x"),
+        ("cookie", {"type": ["array", "null"], "enum": [["x", "y"]]}, {}, "x,y"),
+        ("path", {"type": ["object", "null"], "enum": [{"a": "x"}]}, {}, "/teapot/a,x"),
+        ("path", {"type": ["array", "null"], "enum": [["x", "y"]]}, {}, "/teapot/x,y"),
+    ],
+    ids=[
+        "query-object",
+        "query-object-deepObject",
+        "query-array-pipeDelimited",
+        "header-object",
+        "header-array",
+        "cookie-object",
+        "cookie-array",
+        "path-object",
+        "path-array",
+    ],
+)
+def test_type_list_parameters_use_declared_style(ctx, location, schema, extra, expected):
+    path = "/teapot/{p}" if location == "path" else "/teapot"
+    parameter = {"name": "p", "in": location, "required": True, "schema": schema, **extra}
+    operation = ctx.openapi.load_schema(
+        {path: {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}},
+        version="3.1.0",
+    )[path]["GET"]
+
+    assert fuzzing_rendered(operation, partial(wire_value, location=location)) == {expected}
+
+
+@pytest.mark.parametrize(
+    ("schema", "value", "expected"),
+    [
+        pytest.param({"properties": {"a": {}}}, {"a": "x"}, "a=x", id="implicit-object"),
+        pytest.param({"properties": {"a": {}}}, "x", "x", id="implicit-object-scalar-value"),
+        pytest.param({"additionalProperties": {}}, {"a": "x"}, "a=x", id="implicit-object-additional-properties"),
+        pytest.param({"items": {}}, ["x", "y"], "x,y", id="implicit-array"),
+        pytest.param({"prefixItems": [{}]}, ["x", "y"], "x,y", id="implicit-array-prefix-items"),
+        pytest.param({"type": ["object", "null"]}, None, "null", id="type-list-null-value"),
+        pytest.param({"type": ["object", "array"]}, ["x", "y"], "x,y", id="type-list-both-array-value"),
+    ],
+)
+def test_header_serialization_follows_value_shape(schema, value, expected):
+    serializer = serialize_openapi3_parameters([{"name": "p", "in": "header", "explode": True, "schema": schema}])
+    assert serializer({"p": value}) == {"p": expected}
+
+
 def make_array_schema(location, style):
     return {
         "name": "bbox",
