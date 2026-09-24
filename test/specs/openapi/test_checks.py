@@ -1629,6 +1629,57 @@ def test_negative_data_rejection_encoded_path_value(ctx, response_factory):
     assert negative_data_rejection(check_context(), response_factory.requests(status_code=200), case) is None
 
 
+@pytest.mark.parametrize(
+    ("value", "reported"),
+    [
+        (EncodedPath("18"), False),
+        (EncodedPath("3,4"), False),
+        (EncodedPath("1.5"), True),
+        (EncodedPath("a"), True),
+    ],
+    ids=["integer", "comma-joined-integers", "float", "non-numeric-string"],
+)
+def test_negative_data_rejection_path_array_negated_to_scalar(ctx, response_factory, value, reported):
+    # `simple` style joins items with commas, so `18` is the wire form of the valid `[18]`.
+    schema = ctx.openapi.load_schema(
+        {
+            "/api/items/{ids}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "ids",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "array", "items": {"type": "integer"}, "minItems": 1},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+    case = schema["/api/items/{ids}"]["GET"].Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="violates `type` at /properties/ids (was array, became integer)",
+            parameter="ids",
+            parameter_location=ParameterLocation.PATH,
+            mutations=(
+                _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="ids", location=ParameterLocation.PATH),
+            ),
+        ),
+        path_parameters={"ids": value},
+    )
+    response = response_factory.requests(status_code=200)
+
+    if reported:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+    else:
+        assert negative_data_rejection(check_context(), response, case) is None
+
+
 def test_negative_data_rejection_path_string_numeric_serialization_with_other_negation(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {

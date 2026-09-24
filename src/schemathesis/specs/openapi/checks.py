@@ -616,7 +616,13 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
             return True
         # `unquote` keeps `str` subclasses intact, and splitting an empty string keeps the input
         # object; the validator rejects anything but a plain `str`.
-        if validator.is_valid(unquote(str(value)).split(",")):
+        items = unquote(str(value)).split(",")
+        if validator.is_valid(items):
+            return True
+        # Items arrive as text, so `18` is the wire form of `[18]` for an integer array.
+        item_types = get_type(schema.get("items", {}))
+        coerced = [_coerce_string_to_numeric(item, item_types) for item in items]
+        if None not in coerced and validator.is_valid(coerced):
             return True
 
     return False
