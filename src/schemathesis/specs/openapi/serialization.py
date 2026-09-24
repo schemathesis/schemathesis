@@ -371,7 +371,7 @@ def conversion(func: Callable[..., None]) -> Callable:
 
 
 def make_delimited(data: dict[str, Any] | None, delimiter: str = ",") -> str:
-    return delimiter.join(f"{key}={value}" for key, value in force_dict(data or {}).items())
+    return delimiter.join(f"{key}={to_wire_string(value)}" for key, value in force_dict(data or {}).items())
 
 
 def force_iterable(value: object) -> list | tuple:
@@ -424,7 +424,7 @@ def delimited_encoded(item: Generated, name: str, delimiter: str) -> None:
 @conversion
 def delimited_nested(item: Generated, name: str, *, outer: str, inner: str) -> None:
     raw = item[name] if item[name] is not None else ()
-    encoded = (inner.join(map(str, force_iterable(elem))) for elem in force_iterable(raw))
+    encoded = (inner.join(map(to_wire_string, force_iterable(elem))) for elem in force_iterable(raw))
     item[name] = outer.join(encoded)
 
 
@@ -443,7 +443,7 @@ def deep_object(item: Generated, name: str) -> None:
 
 @conversion
 def comma_delimited_object(item: Generated, name: str) -> None:
-    item[name] = ",".join(map(str, sum((force_dict(item[name] or {})).items(), ())))
+    item[name] = ",".join(map(to_wire_string, sum((force_dict(item[name] or {})).items(), ())))
 
 
 @conversion
@@ -504,7 +504,7 @@ def label_primitive(item: Generated, name: str) -> None:
     """
     new = item[name]
     if new:
-        item[name] = f".{new}"
+        item[name] = f".{to_wire_string(new)}"
     else:
         item[name] = ""
 
@@ -525,7 +525,7 @@ def label_array(item: Generated, name: str, explode: bool | None) -> None:
         delimiter = "."
     else:
         delimiter = ","
-    new = delimiter.join(map(str, force_iterable(item[name] or ())))
+    new = delimiter.join(map(to_wire_string, force_iterable(item[name] or ())))
     if new:
         item[name] = f".{new}"
     else:
@@ -547,7 +547,7 @@ def label_object(item: Generated, name: str, explode: bool | None) -> None:
     if explode:
         new = make_delimited(item[name], ".")
     else:
-        object_items = map(str, sum(force_dict(item[name] or {}).items(), ()))
+        object_items = map(to_wire_string, sum(force_dict(item[name] or {}).items(), ()))
         new = ",".join(object_items)
     if new:
         item[name] = f".{new}"
@@ -563,7 +563,7 @@ def matrix_primitive(item: Generated, name: str) -> None:
     """
     new = item[name]
     if new is not None:
-        item[name] = f";{name}={new}"
+        item[name] = f";{name}={to_wire_string(new)}"
     else:
         item[name] = ""
 
@@ -581,9 +581,9 @@ def matrix_array(item: Generated, name: str, explode: bool | None) -> None:
         id=[3, 4, 5] => ";id=3,4,5"
     """
     if explode:
-        new = ";".join(f"{name}={value}" for value in force_iterable(item[name] or ()))
+        new = ";".join(f"{name}={to_wire_string(value)}" for value in force_iterable(item[name] or ()))
     else:
-        new = ",".join(map(str, force_iterable(item[name] or ())))
+        new = ",".join(map(to_wire_string, force_iterable(item[name] or ())))
     if new:
         item[name] = f";{new}"
     else:
@@ -605,7 +605,7 @@ def matrix_object(item: Generated, name: str, explode: bool | None) -> None:
     if explode:
         new = make_delimited(item[name], ";")
     else:
-        object_items = map(str, sum(force_dict(item[name] or {}).items(), ()))
+        object_items = map(to_wire_string, sum(force_dict(item[name] or {}).items(), ()))
         new = ",".join(object_items)
     if new:
         item[name] = f";{new}"
