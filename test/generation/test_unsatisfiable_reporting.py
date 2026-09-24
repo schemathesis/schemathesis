@@ -8,6 +8,7 @@ from schemathesis.generation.hypothesis.reporting import (
 
 RESPONSES = {"responses": {"200": {"description": "OK"}}}
 DEAD_STRING = {"type": "string", "minLength": 5, "maxLength": 2}
+DEAD_INTEGER = {"type": "integer", "minimum": 10, "maximum": 5}
 
 
 def load_body(ctx, schema, components=None, version="3.0.2"):
@@ -110,6 +111,40 @@ def test_message_names_the_subschema_that_carries_the_conflict(ctx, body_schema,
 
 
 @pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("a/b", "Nothing satisfies `minimum: 10` and `maximum: 5` at /properties/a~1b"),
+        ("a~b", "Nothing satisfies `minimum: 10` and `maximum: 5` at /properties/a~0b"),
+    ],
+    ids=["a slash", "a tilde"],
+)
+def test_message_escapes_the_property_name_in_the_pointer(ctx, name, expected):
+    assert body_detail(ctx, {"type": "object", "required": [name], "properties": {name: DEAD_INTEGER}}) == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "components", "version", "expected"),
+    [
+        (
+            {"type": "array", "minItems": 1, "contains": {"type": "integer", "minimum": 10, "maximum": 1}},
+            None,
+            "3.1.0",
+            "Nothing satisfies `minimum: 10` and `maximum: 1` at /contains",
+        ),
+        (
+            {"type": "object", "required": ["id"], "properties": {"id": {"$ref": "#/components/schemas/Empty"}}},
+            {"Empty": DEAD_INTEGER},
+            "3.0.2",
+            "Nothing satisfies `minimum: 10` and `maximum: 5` at /components/schemas/Empty",
+        ),
+    ],
+    ids=["an element behind contains", "a required property behind a reference"],
+)
+def test_message_follows_the_keywords_that_pass_the_emptiness_on(ctx, schema, components, version, expected):
+    assert body_detail(ctx, schema, components, version) == expected
+
+
+@pytest.mark.parametrize(
     "body_schema",
     [
         {"type": "object", "properties": {"name": DEAD_STRING}},
@@ -158,6 +193,11 @@ def test_emptiness_that_does_not_reach_the_root_is_not_reported(ctx, body_schema
             " and 3 more branches conflict with `minimum: 10`",
         ),
         (
+            {"type": "integer", "minimum": 10, "oneOf": [{"maximum": index} for index in range(4)]},
+            "`maximum: 0` at /oneOf/0, `maximum: 1` at /oneOf/1, `maximum: 2` at /oneOf/2"
+            " and 1 more branch conflict with `minimum: 10`",
+        ),
+        (
             {
                 "type": "object",
                 "required": ["a"],
@@ -185,6 +225,7 @@ def test_emptiness_that_does_not_reach_the_root_is_not_reported(ctx, body_schema
         "oneOf",
         "anyOf",
         "more branches than fit",
+        "one more branch than fits",
         "branches whose own keywords survive the merge",
         "a single branch",
         "branches empty on their own",
@@ -256,6 +297,28 @@ def test_message_falls_back_to_naming_the_location(ctx, schema, version, expecte
     assert body_detail(ctx, schema, version=version) == expected
 
 
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"type": "array", "minItems": 1, "prefixItems": [{"type": "integer", "minimum": 10, "maximum": 1}]},
+            "Nothing satisfies `minimum: 10` and `maximum: 1` at /prefixItems/0",
+        ),
+        (
+            {
+                "type": "array",
+                "minItems": 2,
+                "prefixItems": [{"type": "string"}, {"type": "integer", "minimum": 10, "maximum": 1}],
+            },
+            "Nothing satisfies `minimum: 10` and `maximum: 1` at /prefixItems/1",
+        ),
+    ],
+    ids=["the first element", "an element after a live one"],
+)
+def test_message_follows_a_dead_element_by_its_position(ctx, schema, expected):
+    assert body_detail(ctx, schema, version="3.1.0") == expected
+
+
 def test_blame_stops_following_a_chain_that_never_ends(ctx):
     # Ten hops in, the pointer names where the search got to rather than the leaf.
     assert body_detail(ctx, required_chain(12)) == (
@@ -280,6 +343,23 @@ def test_message_keeps_the_generic_causes_when_nothing_is_proven_empty(ctx):
     # The pattern and the length bound do collide, but the canonical form does not decide it.
     assert body_message(ctx, {"type": "string", "pattern": "^[A-Z]{5,}$", "maxLength": 2}).endswith(
         """This usually means:
+  - Type mismatch (e.g., enum with strings but type: integer)
+  - Contradictory constraints (e.g., minimum > maximum)
+  - Regex that's too complex to generate values for"""
+    )
+
+
+def test_message_names_the_pattern_the_analysis_could_not_read(ctx):
+    # Schema conversion drops a `pattern` the engine rejects, but a `patternProperties` key reaches the analysis.
+    schema = {
+        "type": "object",
+        "required": ["a"],
+        "properties": {"a": DEAD_INTEGER},
+        "patternProperties": {"(": {"type": "string"}},
+    }
+
+    assert body_message(ctx, schema).endswith(
+        """A pattern could not be analyzed (invalid regular expression: "("), so the conflict is not located. This usually means:
   - Type mismatch (e.g., enum with strings but type: integer)
   - Contradictory constraints (e.g., minimum > maximum)
   - Regex that's too complex to generate values for"""
