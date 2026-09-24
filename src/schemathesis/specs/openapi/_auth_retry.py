@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from base64 import b64encode
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING, Any
 
@@ -66,6 +66,23 @@ def remove_auth_from_container(container: dict, security_parameters: list[Mappin
             container.pop(name, None)
 
 
+def remove_auth_from_cookie_header(headers: MutableMapping[str, str], name: str) -> None:
+    """Strip a cookie from the `Cookie` header in-place, whatever the header name's case."""
+    for key in [key for key in headers if key.lower() == "cookie"]:
+        parsed: SimpleCookie = SimpleCookie()
+        try:
+            parsed.load(headers[key])
+        except CookieError:
+            # Unparsable header: drop it entirely rather than risk keeping the auth cookie.
+            del headers[key]
+            continue
+        parsed.pop(name, None)
+        if parsed:
+            headers[key] = "; ".join(f"{k}={v.coded_value}" for k, v in parsed.items())
+        else:
+            del headers[key]
+
+
 def remove_auth(case: Case, security_parameters: list[Mapping[str, Any]]) -> Case:
     """Return a copy of `case` with the listed security parameters scrubbed; the new case has a fresh id."""
     headers = case.headers.copy()
@@ -80,19 +97,8 @@ def remove_auth(case: Case, security_parameters: list[Mapping[str, Any]]) -> Cas
         if parameter["in"] == "cookie":
             if cookies:
                 cookies.pop(name, None)
-            if headers and "Cookie" in headers:
-                parsed: SimpleCookie = SimpleCookie()
-                try:
-                    parsed.load(headers["Cookie"])
-                except CookieError:
-                    # Unparsable header: drop it entirely rather than risk keeping the auth cookie.
-                    del headers["Cookie"]
-                    continue
-                parsed.pop(name, None)
-                if parsed:
-                    headers["Cookie"] = "; ".join(f"{k}={v.coded_value}" for k, v in parsed.items())
-                else:
-                    del headers["Cookie"]
+            if headers:
+                remove_auth_from_cookie_header(headers, name)
     return Case(
         operation=case.operation,
         method=case.method,
@@ -132,6 +138,12 @@ def build_retry_transport_kwargs(
                 container = container.copy()
                 remove_auth_from_container(container, security_parameters, location=location)
                 kwargs[container_name] = container
+    # A configured `Cookie` header would otherwise re-add the auth cookie to every retried request.
+    headers = kwargs.get("headers")
+    if isinstance(headers, dict):
+        for parameter in security_parameters:
+            if parameter["in"] == "cookie":
+                remove_auth_from_cookie_header(headers, parameter["name"])
     kwargs.pop("session", None)
     kwargs.pop("auth", None)
     return kwargs
