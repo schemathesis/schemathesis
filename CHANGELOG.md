@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
