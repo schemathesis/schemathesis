@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.
 - False positive `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
 

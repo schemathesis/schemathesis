@@ -35,7 +35,7 @@ from schemathesis.core.output import truncate_json
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
-from schemathesis.transport.serialization import contains_binary
+from schemathesis.transport.serialization import Binary, contains_binary
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -1716,8 +1716,14 @@ def _within_length(
         return strategy
     low = view.min_length or 0
     high = math.inf if view.max_length is None else view.max_length
-    # A binary payload spells its bytes outside the string, so its length is not the one to measure.
-    return strategy.filter(lambda value: contains_binary(value) or low <= len(value) <= high)
+    # A binary payload spells its bytes outside the string, so its byte count is the length.
+    return strategy.filter(
+        lambda value: (
+            low <= len(value.data) <= high
+            if isinstance(value, Binary)
+            else contains_binary(value) or low <= len(value) <= high
+        )
+    )
 
 
 def _anything(ctx: StrategyContext) -> SearchStrategy[JsonValue]:

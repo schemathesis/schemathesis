@@ -392,6 +392,8 @@ FORMAT_LENGTHS: dict[str, tuple[int, int]] = {
     "email": (6, 36),
     "idn-email": (6, 36),
     "uuid": (36, 36),
+    # Counted in bytes, not characters.
+    "binary": (0, MAX_STRING_LENGTH),
 }
 
 
@@ -508,6 +510,14 @@ def uri_values_within(min_length: int, max_length: float) -> st.SearchStrategy[s
     return st.one_of(branches) if branches else None
 
 
+def binary_values_within(min_length: int, max_length: float) -> st.SearchStrategy[str]:
+    """Binary payloads whose byte count lands inside the window."""
+    from hypothesis import strategies as st
+
+    max_size = None if max_length == float("inf") else int(max_length)
+    return st.binary(min_size=min_length, max_size=max_size).map(Binary)
+
+
 # Generators that can be pointed at a narrower window instead of drawn from and filtered.
 FORMAT_NARROWERS: dict[str, Callable[[int, float], st.SearchStrategy[str] | None]] = {
     "date-time": date_time_values_within,
@@ -517,6 +527,7 @@ FORMAT_NARROWERS: dict[str, Callable[[int, float], st.SearchStrategy[str] | None
     "uri-reference": uri_values_within,
     "iri": uri_values_within,
     "iri-reference": uri_values_within,
+    "binary": binary_values_within,
 }
 
 
