@@ -1058,3 +1058,40 @@ def test_validate_ignores_serialization_bounds(ctx):
     tags = schema["/items"]["GET"].query[0]
     assert tags.wire_bounds == {"minItems": 1}
     assert tags.is_valid([])
+
+
+# Open API 3 requires header parameters named `Accept`, `Content-Type` or `Authorization` to be ignored.
+def test_reserved_header_parameters_are_ignored(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "parameters": [
+                    {"name": "authorization", "in": "header", "required": True, "schema": {"type": "string"}}
+                ],
+                "post": {
+                    "parameters": [
+                        {"name": "content-type", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "ACCEPT", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        }
+    )
+    operation = schema["/items"]["POST"]
+    content_types = set()
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=5, suppress_health_check=list(HealthCheck), deadline=None)
+    def test(case):
+        headers = case.as_transport_kwargs(base_url="http://127.0.0.1")["headers"]
+        content_types.add(headers["Content-Type"])
+
+    test()
+    assert [parameter.name for parameter in operation.headers] == ["X-Token"]
+    assert content_types == {"application/json"}

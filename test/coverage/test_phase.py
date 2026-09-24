@@ -1685,10 +1685,10 @@ def test_incorrect_headers_with_loose_schema(ctx):
         ctx,
         [
             {
-                "name": "authorization",
+                "name": "x-token",
                 "in": "header",
                 "required": False,
-                "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"},
+                "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "X-Token"},
             }
         ],
     )
@@ -1696,13 +1696,13 @@ def test_incorrect_headers_with_loose_schema(ctx):
         schema,
         (
             [
-                {"headers": {"authorization": ANY}},
-                {"headers": {"authorization": "null"}},
-                {"headers": {"authorization": ""}},
+                {"headers": {"x-token": ANY}},
+                {"headers": {"x-token": "null"}},
+                {"headers": {"x-token": ""}},
             ],
             [
-                {"headers": {"authorization": "null"}},
-                {"headers": {"authorization": ""}},
+                {"headers": {"x-token": "null"}},
+                {"headers": {"x-token": ""}},
             ],
         ),
     )
@@ -3967,8 +3967,9 @@ def test_missing_content_type_header(ctx):
         ctx,
         {"type": "object"},
         parameters=[
-            {"in": "header", "name": "Content-Type", "schema": {"type": "string"}, "required": True},
+            {"in": "header", "name": "Content-Type", "type": "string", "required": True},
         ],
+        version="2.0",
     )
 
     missing_content_type_case = None
@@ -6808,14 +6809,17 @@ def test_content_type_header_keeps_declared_value_when_body_media_type_conflicts
     operation = body_operation(
         ctx,
         {"type": "string", "format": "binary"},
-        media_type="application/octet-stream",
         parameters=[
             {
                 "in": "header",
                 "name": "Content-type",
-                "schema": {"type": "string", "default": "application/x-tar", "enum": ["application/x-tar"]},
+                "type": "string",
+                "default": "application/x-tar",
+                "enum": ["application/x-tar"],
             }
         ],
+        version="2.0",
+        consumes=["application/octet-stream"],
     )
     values = set()
     for case in collect_cases(operation, GenerationMode.POSITIVE):
@@ -6827,23 +6831,15 @@ def test_content_type_header_keeps_declared_value_when_body_media_type_conflicts
 
 def test_content_type_header_pins_to_a_declared_body_media_type_it_admits(ctx):
     # With several bodies declared, the pinned value names one of them rather than any string the header allows.
-    operation = load_schema(
+    operation = body_operation(
         ctx,
+        {"type": "object"},
         parameters=[
-            {
-                "in": "header",
-                "name": "Content-Type",
-                "schema": {"type": "string", "enum": ["text/plain", "application/xml"]},
-            }
+            {"in": "header", "name": "Content-Type", "type": "string", "enum": ["text/plain", "application/xml"]}
         ],
-        request_body={
-            "required": True,
-            "content": {
-                "application/json": {"schema": {"type": "object"}},
-                "application/xml": {"schema": {"type": "object"}},
-            },
-        },
-    )["/foo"]["post"]
+        version="2.0",
+        consumes=["application/json", "application/xml"],
+    )
     values = set()
     for case in collect_cases(operation, GenerationMode.POSITIVE):
         if case.body is NOT_SET:

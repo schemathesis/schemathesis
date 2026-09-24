@@ -1559,13 +1559,13 @@ def _operation_with_parameters(ctx, parameters):
 
 PLAIN_STRING_PARAMETER = {"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}
 PATTERN_HEADER = {
-    "name": "Authorization",
+    "name": "X-Token",
     "in": "header",
     "required": True,
     "schema": {"type": "string", "pattern": r"^Bearer\s[\w-]+$"},
 }
 ANNOTATED_HEADER = {
-    "name": "Accept",
+    "name": "X-Accept",
     "in": "header",
     "required": True,
     "schema": {"type": "string", "example": "application/json;version=2018-01-01"},

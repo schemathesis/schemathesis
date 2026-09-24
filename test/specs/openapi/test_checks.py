@@ -1044,13 +1044,14 @@ def test_missing_required_header(ctx, cli, snapshot_cli, path, header_name, expe
             path: {
                 "get": {
                     "parameters": [
-                        {"name": header_name, "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "X-API-Key-2", "in": "header", "schema": {"type": "string"}},
+                        {"name": header_name, "in": "header", "required": True, "type": "string"},
+                        {"name": "X-API-Key-2", "in": "header", "type": "string"},
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        version="2.0",
     )
     assert (
         cli.run(
@@ -1141,13 +1142,15 @@ def test_missing_required_accept_header(ctx, cli, tmp_path):
                             "name": "Accept",
                             "in": "header",
                             "required": True,
-                            "schema": {"type": "string", "enum": ["application/json"]},
+                            "type": "string",
+                            "enum": ["application/json"],
                         },
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        version="2.0",
     )
 
     cli.run(

@@ -1839,6 +1839,8 @@ def _skipped_parameter(definition: Mapping, error: RefResolutionError) -> Skippe
 
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
 OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
+# Open API 3 ignores header parameters with these names: media types and security schemes define them.
+OPENAPI_3_IGNORED_HEADER_NAMES = frozenset(["accept", "content-type", "authorization"])
 
 
 def _validated_parameters(parameters: object, label: str) -> Sequence[Mapping[str, Any]]:
@@ -1971,6 +1973,8 @@ def iter_parameters_v3(
             seen_query = True
         if location in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
+        if location == ParameterLocation.HEADER and parameter["name"].lower() in OPENAPI_3_IGNORED_HEADER_NAMES:
+            continue
 
         yield OpenApiParameter.from_definition(definition=parameter, name_to_uri=name_to_uri, adapter=adapter)
 
