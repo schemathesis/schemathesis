@@ -5,6 +5,7 @@ import pytest
 import requests
 from fastapi import FastAPI, HTTPException, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from flask import jsonify, request
 from hypothesis import Phase, given, settings
 
 import schemathesis
@@ -16,6 +17,7 @@ from schemathesis.engine import Status
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.run import PhaseName
 from schemathesis.python.asgi import ASGIClient
+from schemathesis.specs.openapi._auth_retry import build_retry_transport_kwargs
 from schemathesis.specs.openapi.checks import AuthKind, IgnoredAuth, _contains_auth, ignored_auth, remove_auth
 from schemathesis.transport.requests import RequestsTransport
 from test.utils import EventStream
@@ -284,6 +286,22 @@ def test_remove_auth_strips_cookie_from_headers(ctx, case_factory, cookie_header
     assert result.headers.get("Cookie") == expected_cookie_header
 
 
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        ({"Cookie": "sid=abc"}, {}),
+        ({"Cookie": "sid=abc; theme=dark", "X-Trace": "1"}, {"Cookie": "theme=dark", "X-Trace": "1"}),
+        ({"cookie": "sid=abc; theme=dark"}, {"cookie": "theme=dark"}),
+        ({"Cookie": "sid=a; $=b"}, {}),
+    ],
+    ids=["only-param", "mixed", "lowercase", "unparsable"],
+)
+def test_retry_transport_kwargs_strip_auth_cookie_from_headers(headers, expected):
+    assert build_retry_transport_kwargs({"headers": headers}, [{"name": "sid", "in": "cookie"}]) == {
+        "headers": expected
+    }
+
+
 @pytest.mark.parametrize("ignores_auth", [True, False])
 def test_proper_session(ignores_auth):
     app = FastAPI()
@@ -410,6 +428,41 @@ def test_explicit_auth_cli(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.basic()
     assert (
         cli.run(api.schema_url, "-c", "ignored_auth", "--auth=test:test", "--max-examples=1", "--mode=positive")
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize("header_name", ["Cookie", "cookie"], ids=["canonical", "lowercase"])
+def test_explicit_cookie_header_cli(ctx, cli, snapshot_cli, header_name):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/cookie": {
+                "get": {
+                    "security": [{"cookieAuth": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={"securitySchemes": {"cookieAuth": {"type": "apiKey", "in": "cookie", "name": "sid"}}},
+    )
+
+    @app.route("/cookie")
+    def cookie():
+        if request.cookies.get("sid") != "abc":
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "-H",
+            f"{header_name}: sid=abc; theme=dark",
+            "-c",
+            "ignored_auth",
+            "--phases=fuzzing",
+            "--max-examples=3",
+        )
         == snapshot_cli
     )
 
