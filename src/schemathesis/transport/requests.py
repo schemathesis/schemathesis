@@ -328,11 +328,19 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     return body.getvalue()
 
 
-def _is_structured_schema(schema: dict[str, Any]) -> bool:
-    # Arrays of binary parts (e.g. `items.format: binary`) are file uploads, not JSON payloads.
+def _resolve_property(schema: dict[str, Any], root_schema: dict[str, Any]) -> dict[str, Any]:
+    return maybe_resolve_bundled(cast("dict[str, Any]", schema_with_bundle(schema, root_schema)))
+
+
+def _is_structured_schema(schema: dict[str, Any], root_schema: dict[str, Any]) -> bool:
+    # An array part takes the default of its items: JSON for nested structures, plain text for primitives and files.
     items = schema.get("items")
-    if isinstance(items, dict) and items.get("format") in {"binary", "base64"}:
-        return False
+    if isinstance(items, dict) and items:
+        return _declares_structure(_resolve_property(items, root_schema))
+    return _declares_structure(schema)
+
+
+def _declares_structure(schema: dict[str, Any]) -> bool:
     declared = schema.get("type")
     if isinstance(declared, str):
         return declared in {"object", "array"}
@@ -364,8 +372,7 @@ def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
                         continue
                     # Resolve a property-level `$ref` against the body schema's bundle so
                     # a referent like `{type: string}` is left alone and `{type: object}` triggers JSON.
-                    spliced = cast("dict[str, Any]", schema_with_bundle(prop, schema_node))
-                    if _is_structured_schema(maybe_resolve_bundled(spliced)):
+                    if _is_structured_schema(_resolve_property(prop, schema_node), schema_node):
                         result[name] = "application/json"
         break
     return result
