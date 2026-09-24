@@ -249,10 +249,7 @@ def _serialize_path_openapi3(
 ) -> Generator[Callable | None, None, None]:
     if style == "simple":
         if type_ == "object":
-            if explode is False:
-                yield comma_delimited_object(name)
-            if explode:
-                yield delimited_object(name)
+            yield simple_object(name, explode=explode)
         if type_ == "array":
             yield delimited_encoded(name, delimiter=",")
     if style == "label":
@@ -568,6 +565,61 @@ def _flatten_nested(value: Any, prefix: str, out: dict[str, Any]) -> None:
         out[prefix] = value
 
 
+def _styled(tokens: list[tuple[str, str]]) -> DelimitedValue:
+    """Render `(delimiter, value)` pairs, keeping each style delimiter literal and percent-encoding each value."""
+    logical = "".join(delimiter + value for delimiter, value in tokens)
+    encoded = "".join(delimiter + quote(value, safe="") for delimiter, value in tokens)
+    return DelimitedValue(logical, encoded)
+
+
+def _joined(prefix: str, delimiter: str, values: list[str]) -> DelimitedValue | str:
+    """Join values after `prefix`; an empty collection renders as nothing."""
+    if not values:
+        return ""
+    return _styled([(prefix if index == 0 else delimiter, value) for index, value in enumerate(values)])
+
+
+def _array_items(value: object) -> list[str]:
+    return [to_wire_string(item) for item in force_iterable(value if value is not None else ())]
+
+
+def _object_pairs(value: object) -> list[tuple[str, str]]:
+    return [(str(key), to_wire_string(item)) for key, item in force_dict(value if value is not None else {}).items()]
+
+
+def _object_flat(value: object) -> list[str]:
+    return [part for pair in _object_pairs(value) for part in pair]
+
+
+def _object_exploded(value: object, prefix: str, delimiter: str) -> DelimitedValue | str:
+    pairs = _object_pairs(value)
+    if not pairs:
+        return ""
+    tokens: list[tuple[str, str]] = []
+    for index, (key, item) in enumerate(pairs):
+        tokens.append((prefix if index == 0 else delimiter, key))
+        tokens.append(("=", item))
+    return _styled(tokens)
+
+
+@conversion
+def simple_object(item: Generated, name: str, explode: bool | None) -> None:
+    """Serialize a path object with the `simple` style.
+
+    Explode=True
+
+        id={"role": "admin", "firstName": "Alex"} => "role=admin,firstName=Alex"
+
+    Explode=False
+
+        id={"role": "admin", "firstName": "Alex"} => "role,admin,firstName,Alex"
+    """
+    if explode:
+        item[name] = _object_exploded(item[name], "", ",")
+    else:
+        item[name] = _joined("", ",", _object_flat(item[name]))
+
+
 @conversion
 def label_primitive(item: Generated, name: str) -> None:
     """Serialize a primitive value with the `label` style.
@@ -575,8 +627,8 @@ def label_primitive(item: Generated, name: str) -> None:
     5 => ".5"
     """
     new = item[name]
-    if new:
-        item[name] = f".{to_wire_string(new)}"
+    if new is not None:
+        item[name] = _styled([(".", to_wire_string(new))])
     else:
         item[name] = ""
 
@@ -593,15 +645,7 @@ def label_array(item: Generated, name: str, explode: bool | None) -> None:
 
         id=[3, 4, 5] => ".3,4,5"
     """
-    if explode:
-        delimiter = "."
-    else:
-        delimiter = ","
-    new = delimiter.join(map(to_wire_string, force_iterable(item[name] or ())))
-    if new:
-        item[name] = f".{new}"
-    else:
-        item[name] = ""
+    item[name] = _joined(".", "." if explode else ",", _array_items(item[name]))
 
 
 @conversion
@@ -614,17 +658,12 @@ def label_object(item: Generated, name: str, explode: bool | None) -> None:
 
     Explode=False
 
-        id={"role": "admin", "firstName": "Alex"} => ".role=admin,firstName,Alex"
+        id={"role": "admin", "firstName": "Alex"} => ".role,admin,firstName,Alex"
     """
     if explode:
-        new = make_delimited(item[name], ".")
+        item[name] = _object_exploded(item[name], ".", ".")
     else:
-        object_items = map(to_wire_string, sum(force_dict(item[name] or {}).items(), ()))
-        new = ",".join(object_items)
-    if new:
-        item[name] = f".{new}"
-    else:
-        item[name] = new
+        item[name] = _joined(".", ",", _object_flat(item[name]))
 
 
 @conversion
@@ -635,7 +674,7 @@ def matrix_primitive(item: Generated, name: str) -> None:
     """
     new = item[name]
     if new is not None:
-        item[name] = f";{name}={to_wire_string(new)}"
+        item[name] = _styled([(f";{name}=", to_wire_string(new))])
     else:
         item[name] = ""
 
@@ -652,14 +691,7 @@ def matrix_array(item: Generated, name: str, explode: bool | None) -> None:
 
         id=[3, 4, 5] => ";id=3,4,5"
     """
-    if explode:
-        new = ";".join(f"{name}={to_wire_string(value)}" for value in force_iterable(item[name] or ()))
-    else:
-        new = ",".join(map(to_wire_string, force_iterable(item[name] or ())))
-    if new:
-        item[name] = f";{new}"
-    else:
-        item[name] = new
+    item[name] = _joined(f";{name}=", f";{name}=" if explode else ",", _array_items(item[name]))
 
 
 @conversion
@@ -672,17 +704,12 @@ def matrix_object(item: Generated, name: str, explode: bool | None) -> None:
 
     Explode=False
 
-        id={"role": "admin", "firstName": "Alex"} => ";role=admin,firstName,Alex"
+        id={"role": "admin", "firstName": "Alex"} => ";id=role,admin,firstName,Alex"
     """
     if explode:
-        new = make_delimited(item[name], ";")
+        item[name] = _object_exploded(item[name], ";", ";")
     else:
-        object_items = map(to_wire_string, sum(force_dict(item[name] or {}).items(), ()))
-        new = ",".join(object_items)
-    if new:
-        item[name] = f";{new}"
-    else:
-        item[name] = ""
+        item[name] = _joined(f";{name}=", ",", _object_flat(item[name]))
 
 
 @conversion

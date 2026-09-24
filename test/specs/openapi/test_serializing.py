@@ -1,7 +1,7 @@
 import json
 from email.message import EmailMessage
 from functools import partial
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import unquote, urlsplit
 
 import pytest
 import requests
@@ -30,6 +30,7 @@ from schemathesis.specs.openapi.serialization import (
     matrix_primitive,
     nested_object,
     serialize_openapi3_parameters,
+    simple_object,
 )
 from schemathesis.transport.prepare import get_default_headers
 from test.utils import assert_requests_call
@@ -78,8 +79,8 @@ def chunks(items, n):
 
 class Prefixed:
     def __init__(self, instance, prefix=""):
-        self.instance = quote(instance)
-        self.prefix = quote(prefix)
+        self.instance = instance
+        self.prefix = prefix
 
     def prepare(self, value):
         raise NotImplementedError
@@ -315,14 +316,14 @@ def test_cookie_serialization_styles_openapi3(ctx, testdir, schema, explode, exp
         (NULLABLE_OBJECT_SCHEMA, "simple", False, {"color": CommaDelimitedObject("r,100,g,200,b,150")}),
         (OBJECT_SCHEMA, "simple", True, {"color": DelimitedObject("r=100,g=200,b=150")}),
         (NULLABLE_OBJECT_SCHEMA, "simple", True, {"color": DelimitedObject("r=100,g=200,b=150")}),
-        (PRIMITIVE_SCHEMA, "label", False, {"color": quote(".1")}),
-        (NULLABLE_PRIMITIVE_SCHEMA, "label", False, {"color": quote(".1")}),
-        (PRIMITIVE_SCHEMA, "label", True, {"color": quote(".1")}),
-        (NULLABLE_PRIMITIVE_SCHEMA, "label", True, {"color": quote(".1")}),
-        (ARRAY_SCHEMA, "label", False, {"color": quote(".blue,black,brown")}),
-        (NULLABLE_ARRAY_SCHEMA, "label", False, {"color": quote(".blue,black,brown")}),
-        (ARRAY_SCHEMA, "label", True, {"color": quote(".blue.black.brown")}),
-        (NULLABLE_ARRAY_SCHEMA, "label", True, {"color": quote(".blue.black.brown")}),
+        (PRIMITIVE_SCHEMA, "label", False, {"color": ".1"}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "label", False, {"color": ".1"}),
+        (PRIMITIVE_SCHEMA, "label", True, {"color": ".1"}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "label", True, {"color": ".1"}),
+        (ARRAY_SCHEMA, "label", False, {"color": ".blue,black,brown"}),
+        (NULLABLE_ARRAY_SCHEMA, "label", False, {"color": ".blue,black,brown"}),
+        (ARRAY_SCHEMA, "label", True, {"color": ".blue.black.brown"}),
+        (NULLABLE_ARRAY_SCHEMA, "label", True, {"color": ".blue.black.brown"}),
         (OBJECT_SCHEMA, "label", False, {"color": CommaDelimitedObject(".r,100,g,200,b,150", prefix=".")}),
         (NULLABLE_OBJECT_SCHEMA, "label", False, {"color": CommaDelimitedObject(".r,100,g,200,b,150", prefix=".")}),
         (OBJECT_SCHEMA, "label", True, {"color": DelimitedObject(".r=100.g=200.b=150", prefix=".", delimiter=".")}),
@@ -332,16 +333,21 @@ def test_cookie_serialization_styles_openapi3(ctx, testdir, schema, explode, exp
             True,
             {"color": DelimitedObject(".r=100.g=200.b=150", prefix=".", delimiter=".")},
         ),
-        (PRIMITIVE_SCHEMA, "matrix", False, {"color": quote(";color=1")}),
-        (NULLABLE_PRIMITIVE_SCHEMA, "matrix", False, {"color": quote(";color=1")}),
-        (PRIMITIVE_SCHEMA, "matrix", True, {"color": quote(";color=1")}),
-        (NULLABLE_PRIMITIVE_SCHEMA, "matrix", True, {"color": quote(";color=1")}),
-        (ARRAY_SCHEMA, "matrix", False, {"color": quote(";blue,black,brown")}),
-        (NULLABLE_ARRAY_SCHEMA, "matrix", False, {"color": quote(";blue,black,brown")}),
-        (ARRAY_SCHEMA, "matrix", True, {"color": quote(";color=blue;color=black;color=brown")}),
-        (NULLABLE_ARRAY_SCHEMA, "matrix", True, {"color": quote(";color=blue;color=black;color=brown")}),
-        (OBJECT_SCHEMA, "matrix", False, {"color": CommaDelimitedObject(";r,100,g,200,b,150", prefix=";")}),
-        (NULLABLE_OBJECT_SCHEMA, "matrix", False, {"color": CommaDelimitedObject(";r,100,g,200,b,150", prefix=";")}),
+        (PRIMITIVE_SCHEMA, "matrix", False, {"color": ";color=1"}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "matrix", False, {"color": ";color=1"}),
+        (PRIMITIVE_SCHEMA, "matrix", True, {"color": ";color=1"}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "matrix", True, {"color": ";color=1"}),
+        (ARRAY_SCHEMA, "matrix", False, {"color": ";color=blue,black,brown"}),
+        (NULLABLE_ARRAY_SCHEMA, "matrix", False, {"color": ";color=blue,black,brown"}),
+        (ARRAY_SCHEMA, "matrix", True, {"color": ";color=blue;color=black;color=brown"}),
+        (NULLABLE_ARRAY_SCHEMA, "matrix", True, {"color": ";color=blue;color=black;color=brown"}),
+        (OBJECT_SCHEMA, "matrix", False, {"color": CommaDelimitedObject(";color=r,100,g,200,b,150", prefix=";color=")}),
+        (
+            NULLABLE_OBJECT_SCHEMA,
+            "matrix",
+            False,
+            {"color": CommaDelimitedObject(";color=r,100,g,200,b,150", prefix=";color=")},
+        ),
         (OBJECT_SCHEMA, "matrix", True, {"color": DelimitedObject(";r=100;g=200;b=150", prefix=";", delimiter=";")}),
         (
             NULLABLE_OBJECT_SCHEMA,
@@ -736,6 +742,78 @@ def test_array_parameter_keeps_delimiter_literal(ctx, paths, version, operation_
     test()
 
 
+STYLED_ARRAY_SCHEMA = {"type": "array", "enum": [["a,b", "c"]]}
+STYLED_OBJECT_SCHEMA = {
+    "type": "object",
+    "properties": {"k": {"type": "string", "enum": ["x,y"]}},
+    "required": ["k"],
+    "additionalProperties": False,
+}
+
+
+def prepared_path(case):
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
+    return urlsplit(requests.Request("GET", kwargs["url"]).prepare().url).path
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("style", "explode", "schema", "expected"),
+    [
+        ("matrix", False, {"type": "integer", "enum": [7]}, "/teapot/;p=7"),
+        ("matrix", False, STYLED_ARRAY_SCHEMA, "/teapot/;p=a%2Cb,c"),
+        ("matrix", True, STYLED_ARRAY_SCHEMA, "/teapot/;p=a%2Cb;p=c"),
+        ("matrix", False, STYLED_OBJECT_SCHEMA, "/teapot/;p=k,x%2Cy"),
+        ("matrix", True, STYLED_OBJECT_SCHEMA, "/teapot/;k=x%2Cy"),
+        ("label", False, {"type": "integer", "minimum": 0, "maximum": 0}, "/teapot/.0"),
+        ("label", False, {"type": "boolean", "enum": [False]}, "/teapot/.false"),
+        ("label", False, STYLED_ARRAY_SCHEMA, "/teapot/.a%2Cb,c"),
+        ("label", False, STYLED_OBJECT_SCHEMA, "/teapot/.k,x%2Cy"),
+        ("label", True, STYLED_OBJECT_SCHEMA, "/teapot/.k=x%2Cy"),
+        ("simple", False, STYLED_OBJECT_SCHEMA, "/teapot/k,x%2Cy"),
+        ("simple", True, STYLED_OBJECT_SCHEMA, "/teapot/k=x%2Cy"),
+    ],
+    ids=[
+        "matrix-primitive",
+        "matrix-array",
+        "matrix-array-explode",
+        "matrix-object",
+        "matrix-object-explode",
+        "label-zero",
+        "label-false",
+        "label-array",
+        "label-object",
+        "label-object-explode",
+        "simple-object",
+        "simple-object-explode",
+    ],
+)
+def test_path_style_delimiters_stay_literal(ctx, style, explode, schema, expected):
+    # Matrix and label parsers split the raw segment on literal delimiters; only the values are encoded.
+    operation = ctx.openapi.load_schema(
+        {
+            "/teapot/{p}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "p",
+                            "in": "path",
+                            "required": True,
+                            "style": style,
+                            "explode": explode,
+                            "schema": schema,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/teapot/{p}"]["GET"]
+
+    assert fuzzing_rendered(operation, prepared_path) == {expected}
+    assert coverage_rendered(operation, prepared_path) == {expected}
+
+
 _WIRE_FORM_ARRAY = [None, True, False, 1, 1.5, "x"]
 
 
@@ -984,11 +1062,11 @@ def make_array_schema(location, style):
         ),
         (
             make_array_schema("path", "label"),
-            ({"bbox": ".1.1%2C1.1%2C1.1%2C1.1"},),
+            ({"bbox": ".1.1,1.1,1.1,1.1"},),
         ),
         (
             make_array_schema("path", "matrix"),
-            ({"bbox": "%3B1.1%2C1.1%2C1.1%2C1.1"},),
+            ({"bbox": ";bbox=1.1,1.1,1.1,1.1"},),
         ),
         (
             {
@@ -1033,6 +1111,8 @@ def test_non_string_serialization(ctx, testdir, parameter, expected):
         (matrix_array, {"explode": False}),
         (matrix_object, {"explode": True}),
         (matrix_object, {"explode": False}),
+        (simple_object, {"explode": True}),
+        (simple_object, {"explode": False}),
     ],
 )
 def test_nullable_parameters(
@@ -1056,9 +1136,9 @@ def test_nullable_parameters(
         (label_object, {"explode": False}, {"a": True, "b": None}, ".a,true,b,null"),
         (matrix_primitive, {}, False, ";foo=false"),
         (matrix_array, {"explode": True}, [True, None], ";foo=true;foo=null"),
-        (matrix_array, {"explode": False}, [True, None], ";true,null"),
+        (matrix_array, {"explode": False}, [True, None], ";foo=true,null"),
         (matrix_object, {"explode": True}, {"a": True, "b": None}, ";a=true;b=null"),
-        (matrix_object, {"explode": False}, {"a": True, "b": None}, ";a,true,b,null"),
+        (matrix_object, {"explode": False}, {"a": True, "b": None}, ";foo=a,true,b,null"),
     ],
     ids=[
         "comma-delimited-object",
