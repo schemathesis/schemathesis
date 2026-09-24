@@ -115,7 +115,11 @@ def test_filename_only_for_binary_parts(ctx, version, property_schema, expected)
             [("file", ("file", "a")), ("file", ("file", "b"))],
         ),
         ("3.1.0", {"type": "string", "contentEncoding": "base64"}, [("file", ("file", "a")), ("file", ("file", "b"))]),
-        ("3.1.0", {"type": "string", "contentMediaType": "application/json"}, [("file", "a"), ("file", "b")]),
+        (
+            "3.1.0",
+            {"type": "string", "contentMediaType": "application/json"},
+            [("file", (None, "a")), ("file", (None, "b"))],
+        ),
     ],
     ids=["format-binary", "octet-stream", "base64-encoding", "json-string"],
 )

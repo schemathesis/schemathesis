@@ -860,6 +860,68 @@ def test_multipart_part_content_type(ctx, case_factory, load_kwargs, body, field
     assert _multipart_content_type(serialized, field) == expected
 
 
+@pytest.mark.parametrize(
+    ("items", "encoding", "tags", "expected"),
+    [
+        (
+            {"type": "string"},
+            {},
+            ["hello world", "x"],
+            [("tags", (None, "hello world")), ("tags", (None, "x")), ("n", (None, 0))],
+        ),
+        (
+            {"type": "integer"},
+            {},
+            [1, 2],
+            [("tags", (None, 1)), ("tags", (None, 2)), ("n", (None, 0))],
+        ),
+        (
+            {"type": "string"},
+            {"tags": {"contentType": "text/csv"}},
+            ["hello world"],
+            [("tags", (None, "hello world", "text/csv")), ("n", (None, 0))],
+        ),
+        (
+            {"type": "object", "properties": {"v": {"type": "string"}}},
+            {},
+            [{"v": "x"}, {"v": "y"}],
+            [("tags", (None, b'[{"v": "x"}, {"v": "y"}]', "application/json")), ("n", (None, 0))],
+        ),
+    ],
+    ids=["array-of-strings", "array-of-integers", "array-of-strings-with-encoding", "array-of-objects"],
+)
+def test_multipart_array_parts_follow_items_type(ctx, case_factory, items, encoding, tags, expected):
+    # Primitive items default to plain text parts, so a JSON label would make servers reject the raw payload.
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"tags": {"type": "array", "items": items}, "n": {"type": "integer"}},
+                                },
+                                "encoding": encoding,
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = case_factory(
+        operation=schema["/upload"]["POST"],
+        method="POST",
+        body={"tags": tags, "n": 0},
+        media_type="multipart/form-data",
+    )
+    assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == expected
+
+
 def test_unknown_multipart_fields_openapi3(ctx):
     schema = ctx.openapi.load_schema(
         {

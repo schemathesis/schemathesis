@@ -94,7 +94,7 @@ def prepare_multipart_v3(
                 elif content_type:
                     files.extend((name, (None, item, content_type)) for item in value)
                 else:
-                    files.extend((name, item) for item in value)
+                    files.extend((name, (None, item)) for item in value)
             elif _is_file_part(property_schema):
                 filename = (body_param.get_property_filename(name) if body_param else None) or name
                 if content_type:
