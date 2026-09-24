@@ -8,6 +8,8 @@
 
 ### :bug: Fixed
 
+- Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
+- Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.
 - False positive `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
