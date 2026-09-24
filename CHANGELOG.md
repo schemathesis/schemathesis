@@ -2,11 +2,18 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.28.0...HEAD) - TBD
 
+### :wrench: Changed
+
+- Name the pattern that stops the analysis when test data cannot be generated.
+
 ### :bug: Fixed
 
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.
 - False positive `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
+- Property names holding `/` or `~` printed unescaped where conflicting constraints are named.
+- Plural `1 more branches` where conflicting constraints are named.
+- Name the `prefixItems` element that admits no value when test data cannot be generated.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 
