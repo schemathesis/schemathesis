@@ -1157,6 +1157,42 @@ def test_positive_bias_keeps_path_integer_within_bounds(ctx, item_schema):
     assert not out_of_range, f"Out-of-range path integers: {sorted(set(out_of_range))}"
 
 
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    "item_schema",
+    [
+        {"type": "integer", "enum": [0, 5]},
+        {"type": "integer", "multipleOf": 5},
+        {"type": "integer", "maximum": 1, "exclusiveMaximum": True},
+        {"type": "integer", "not": {"enum": [1]}},
+    ],
+    ids=["enum", "multipleOf", "exclusiveMaximum", "not"],
+)
+def test_positive_bias_keeps_path_integer_schema_valid(ctx, item_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": item_schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/items/{item_id}"]["GET"]
+    validator = Draft4Validator(item_schema)
+    values = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    # Enough draws for the probabilistic positive-ID bias to fire on a non-positive value at least once.
+    @settings(max_examples=20, deadline=None, derandomize=True, suppress_health_check=list(HealthCheck))
+    def inner(case):
+        values.append(case.path_parameters["item_id"])
+
+    inner()
+    assert [value for value in values if not validator.is_valid(value)] == []
+
+
 def test_custom_format_with_bytes(testdir):
     # See GH-3289: custom formats returning bytes should work
     testdir.make_test(

@@ -20,6 +20,7 @@
 - Name the `prefixItems` element that admits no value when test data cannot be generated.
 - Coverage phase stringifying nested values of JSON-encoded `content` parameters.
 - Percent-encoded delimiters, missing names and dropped falsy values in `matrix`/`label`/`simple` path parameters.
+- Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 
