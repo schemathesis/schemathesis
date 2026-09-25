@@ -12,6 +12,7 @@ from test.apps.runtime import Modifier, OpenAPIApp
 @dataclass
 class UnderDeclaredSecurityConfig:
     valid_token: str = "real-token"
+    scheme: str = "Bearer"
     # Status the handler returns when the bearer token matches; the spec only documents 200/401.
     authed_status: int = 200
 
@@ -39,7 +40,7 @@ def under_declared_security(*modifiers: Modifier[UnderDeclaredSecurityStore]) ->
 
     @app.get("/protected")
     def protected():
-        if flask.request.headers.get("Authorization") == f"Bearer {store.config.valid_token}":
+        if flask.request.headers.get("Authorization") == f"{store.config.scheme} {store.config.valid_token}":
             return jsonify({"ok": True}), store.config.authed_status
         return jsonify({"error": "no auth"}), 401
 

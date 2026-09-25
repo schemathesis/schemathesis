@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Dependency inference links body fields named after a collection to its items' `code`.
+- `st replay` options `-H`/`--header`, `--auth`, `--auth-wfc` and `--auth-wfc-user` for replayed requests.
 
 ### :wrench: Changed
 
@@ -12,9 +13,13 @@
 - **BREAKING**: `st run` and `st fuzz` fail with exit code 2 when nothing is tested.
 - Linked stateful steps send negative requests as often as scenario-starting steps.
 - `st replay` step chains show each linked value as `recorded -> replayed`.
+- `st replay` removes fixed crash files with masked credentials once config or CLI supplies them.
 
 ### :bug: Fixed
 
+- `st replay` ignoring auth providers and `[auth.openapi]` credentials, resending masked values instead.
+- `st replay` reporting a crash as fixed when its credentials were missing or rejected.
+- `st replay` deleting fixed crash files that sent a masked request body value.
 - Missing `epic` label with the API title in CLI Allure reports.
 - Stateful tests with more than 6 steps running few scenarios or failing with `Unsatisfiable`.
 - Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.

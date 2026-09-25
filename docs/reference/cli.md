@@ -897,6 +897,55 @@ $ st replay [OPTIONS] [PATH]
     $ st replay --keep
     ```
 
+#### `-H, --header NAME:VALUE`
+
+!!! note ""
+
+    **Type**: `String (multiple allowed)`  
+
+    Add custom HTTP headers to every replayed request, overriding headers from the config file. Use it to supply credentials that were masked in the crash file.
+
+    ```console
+    $ st replay --header "Authorization: Bearer $TOKEN"
+    ```
+
+#### `-a, --auth USER:PASS`
+
+!!! note ""
+
+    **Type**: `String`  
+
+    Authenticate every replayed request with basic authentication.
+
+    ```console
+    $ st replay --auth username:password
+    ```
+
+#### `--auth-wfc PATH`
+
+!!! note ""
+
+    **Type**: `String`  
+
+    Authenticate every replayed request using a [Web Fuzzing Commons](https://github.com/WebFuzzing/Commons) auth file.
+
+    ```console
+    $ st replay --auth-wfc ./market-auth.yaml
+    ```
+
+#### `--auth-wfc-user NAME`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `null`  
+
+    Name of the entry to use when the auth file defines several users.
+
+    ```console
+    $ st replay --auth-wfc ./market-auth.yaml --auth-wfc-user admin
+    ```
+
 ## Exit codes
 
 Schemathesis uses predictable exit codes so automation can interpret results:

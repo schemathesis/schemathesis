@@ -5,6 +5,7 @@ from collections import Counter
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING
+from urllib.parse import parse_qs, urlsplit
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.curl import get_excluded_headers
@@ -36,6 +37,8 @@ class ReplayStatus(Enum):
 
 # A single passing replay does not prove a fix; an intermittent failure needs more attempts to show itself.
 MAX_REPLAY_ATTEMPTS = 3
+# Statuses an API answers when it does not accept the credentials a request carries.
+AUTH_REJECTION_STATUSES = frozenset({401, 403})
 
 
 @dataclass(slots=True)
@@ -62,6 +65,15 @@ class StepOutcome:
 
 
 @dataclass(slots=True)
+class RejectedStep:
+    """A replayed step the API rejected for authentication though the recorded request was accepted."""
+
+    number: int
+    status_code: int
+    recorded_status_code: int
+
+
+@dataclass(slots=True)
 class CheckOutcome:
     name: str
     status: ReplayStatus
@@ -79,6 +91,8 @@ class ReplayOutcome:
     transport_response: Response | None = None
     # Commands reproducing the requests this replay sent; empty when it stopped before the terminal step.
     code_sample: str = ""
+    unsupplied_masked: list[tuple[ParameterLocation, str]] = field(default_factory=list)
+    rejected: RejectedStep | None = None
 
 
 def replay_crash_file(
@@ -111,15 +125,21 @@ def _replay_with_retries(
     failure_counts: Counter[str] = Counter()
     first_failing: ReplayOutcome | None = None
     outcome: ReplayOutcome | None = None
+    rejected_attempt: ReplayOutcome | None = None
     attempts = 0
 
     for _ in range(MAX_REPLAY_ATTEMPTS):
-        outcome = _replay_sequence(
+        attempt = _replay_sequence(
             crash.sequence, base_url=base_url, session=session, schema=schema, operation=operation
         )
-        if not outcome.check_outcomes:
+        if not attempt.check_outcomes:
             # The replay aborted before it could evaluate anything; further attempts would abort the same way.
-            return outcome
+            return attempt
+        if attempt.rejected is not None:
+            # An unauthenticated attempt says nothing about the fix, so it never counts towards the verdict.
+            rejected_attempt = attempt
+            continue
+        outcome = attempt
         attempts += 1
         failed = [check.name for check in outcome.check_outcomes if check.status is ReplayStatus.FAILED]
         failure_counts.update(failed)
@@ -130,13 +150,42 @@ def _replay_with_retries(
         ):
             break
 
-    assert outcome is not None
-    # Report the attempt that failed, so its response and failures are the ones shown.
-    reported = first_failing or outcome
+    if outcome is None:
+        assert rejected_attempt is not None
+        # Every attempt was rejected: checks that still failed stand, passing ones cannot count as fixed.
+        reported = rejected_attempt
+        check_outcomes = rejected_attempt.check_outcomes
+    else:
+        # Report the attempt that failed, so its response and failures are the ones shown.
+        reported = first_failing or outcome
+        check_outcomes = [
+            _final_check_outcome(check, failure_counts[check.name], attempts) for check in reported.check_outcomes
+        ]
+    rejected = rejected_attempt.rejected if rejected_attempt is not None else None
+    return _unverified_without_credentials(
+        replace(reported, status=_case_status(check_outcomes), check_outcomes=check_outcomes, rejected=rejected)
+    )
+
+
+def _unverified_without_credentials(outcome: ReplayOutcome) -> ReplayOutcome:
+    """A pass without the credentials the recorded request carried proves nothing, so it never counts as fixed."""
+    if outcome.unsupplied_masked:
+        message = _missing_credentials_message(outcome.unsupplied_masked)
+        note = f"{_masked_names(outcome.unsupplied_masked)} masked in the crash file"
+    elif outcome.rejected is not None:
+        message = _rejected_credentials_message(outcome.rejected, steps=len(outcome.step_outcomes))
+        note = f"replay was not authenticated ({outcome.rejected.status_code})"
+    else:
+        return outcome
+    if outcome.status is ReplayStatus.FIXED:
+        return _errored_outcome(message, elapsed=outcome.duration_ms, step_outcomes=outcome.step_outcomes)
     check_outcomes = [
-        _final_check_outcome(check, failure_counts[check.name], attempts) for check in reported.check_outcomes
+        CheckOutcome(name=check.name, status=ReplayStatus.ERRORED, note=note)
+        if check.status is ReplayStatus.FIXED
+        else check
+        for check in outcome.check_outcomes
     ]
-    return replace(reported, status=_case_status(check_outcomes), check_outcomes=check_outcomes)
+    return replace(outcome, status=_case_status(check_outcomes), check_outcomes=check_outcomes)
 
 
 def _final_check_outcome(check: CheckOutcome, failure_count: int, attempts: int) -> CheckOutcome:
@@ -179,6 +228,7 @@ def _replay_sequence(
     schema: BaseSchema,
     operation: APIOperation | None,
 ) -> ReplayOutcome:
+    from schemathesis.auths import AuthContext, set_on_case
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.stateful.state_machine import StepOutput
 
@@ -192,6 +242,11 @@ def _replay_sequence(
     terminal_case: Case | None = None
     terminal_response: Response | None = None
     last_index = len(sequence) - 1
+    replacement = schema.config.output.sanitization.replacement
+    # Masked values no credential source replaced, so the replay sent the placeholder instead.
+    unsupplied: list[tuple[ParameterLocation, str]] = []
+    # The first step the API rejected for authentication where the recorded request was accepted.
+    rejected: RejectedStep | None = None
 
     for index, step in enumerate(sequence):
         step_operation = operation if index == last_index else _step_operation(schema, step)
@@ -211,6 +266,9 @@ def _replay_sequence(
                 elapsed=instant.elapsed_ms,
                 step_outcomes=step_outcomes,
             )
+
+        # Credentials come from the current config, CLI options and auth providers, as in a run.
+        set_on_case(case, AuthContext(operation=case.operation, app=case.operation.app), None)
 
         # A link extracts from its recorded parent step, not always the previous one (older crashes lack it).
         parent_output: StepOutput | None = None
@@ -239,6 +297,19 @@ def _replay_sequence(
             response = case.call(base_url=base_url, session=session)
         except Exception as exc:
             return _errored_outcome(str(exc), elapsed=instant.elapsed_ms, step_outcomes=step_outcomes)
+
+        if (
+            rejected is None
+            and response.status_code in AUTH_REJECTION_STATUSES
+            and step.response_status not in AUTH_REJECTION_STATUSES
+        ):
+            rejected = RejectedStep(
+                number=index + 1, status_code=response.status_code, recorded_status_code=step.response_status
+            )
+
+        for parameter in _masked_parameters(step, replacement):
+            if parameter not in unsupplied and _sent_value(response.request, *parameter) in (None, replacement):
+                unsupplied.append(parameter)
 
         parent_id = parent_output.case.id if parent_output is not None else None
         recorder.record_case(parent_id=parent_id, case=case, transition=None, is_transition_applied=False)
@@ -278,6 +349,8 @@ def _replay_sequence(
         failures=check_failures,
         transport_response=terminal_response,
         code_sample="\n".join(outcome.curl for outcome in step_outcomes),
+        unsupplied_masked=unsupplied,
+        rejected=rejected,
     )
 
 
@@ -460,6 +533,73 @@ def _build_case(operation: APIOperation, step: CrashStep) -> Case:
         case._meta = CaseMetadata.from_dict(step.meta)
     object.__setattr__(case, "_freeze_metadata", True)
     return case
+
+
+def _is_masked(value: object, replacement: str) -> bool:
+    return value == replacement or value == [replacement]
+
+
+def _masked_parameters(step: CrashStep, replacement: str) -> list[tuple[ParameterLocation, str]]:
+    """Sent parameters whose whole value was masked; the current credentials may replace them."""
+    return [
+        *(
+            (ParameterLocation.HEADER, name)
+            for name, value in step.request_headers.items()
+            if _is_masked(value, replacement)
+        ),
+        *((ParameterLocation.QUERY, name) for name, value in step.query.items() if _is_masked(value, replacement)),
+        *((ParameterLocation.COOKIE, name) for name, value in step.cookies.items() if _is_masked(value, replacement)),
+    ]
+
+
+def _sent_value(request: requests.PreparedRequest, location: ParameterLocation, name: str) -> str | None:
+    if location is ParameterLocation.HEADER:
+        return request.headers.get(name)
+    if location is ParameterLocation.QUERY:
+        values = parse_qs(urlsplit(request.url or "").query, keep_blank_values=True).get(name)
+        return values[0] if values else None
+    pairs = (pair.split("=", 1) for pair in request.headers.get("Cookie", "").split(";"))
+    return next((pair[1].strip() for pair in pairs if len(pair) == 2 and pair[0].strip() == name), None)
+
+
+_LOCATION_LABELS = {
+    ParameterLocation.HEADER: "header",
+    ParameterLocation.QUERY: "query parameter",
+    ParameterLocation.COOKIE: "cookie",
+}
+
+
+def _masked_names(masked: list[tuple[ParameterLocation, str]]) -> str:
+    return ", ".join(f"`{name}` {_LOCATION_LABELS[location]}" for location, name in masked)
+
+
+def _missing_credentials_message(missing: list[tuple[ParameterLocation, str]]) -> str:
+    names = _masked_names(missing)
+    if len(missing) == 1:
+        return f"{names} was masked in the crash file; provide it via config, -H, --auth or an auth hook"
+    return f"{names} were masked in the crash file; provide them via config, -H, --auth or an auth hook"
+
+
+def _rejected_credentials_message(rejected: RejectedStep, *, steps: int) -> str:
+    location = f" at step {rejected.number}" if steps > 1 else ""
+    return (
+        f"replay was not authenticated: the API answered {rejected.status_code}{location} "
+        f"where the recorded request got {rejected.recorded_status_code}; "
+        "check the credentials passed via config, -H, --auth or an auth hook"
+    )
+
+
+def has_unrestorable_masked_values(crash: CrashFile, replacement: str) -> bool:
+    """Whether a stored request has masked values no credential source can replace, so a replay is not faithful."""
+    for step in crash.sequence:
+        for container in (step.request_headers, step.case_headers, step.query, step.cookies):
+            if any(replacement in str(value) and not _is_masked(value, replacement) for value in container.values()):
+                return True
+        if any(replacement in str(value) for value in step.path_parameters.values()):
+            return True
+        if replacement in str(step.case_body):
+            return True
+    return False
 
 
 def _case_status(check_outcomes: list[CheckOutcome]) -> ReplayStatus:
