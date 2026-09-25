@@ -102,6 +102,19 @@ def test_custom_base_url(ctx):
     assert case.as_transport_kwargs()["url"] == "http://0.0.0.0:1234/something"
 
 
+@pytest.mark.parametrize("loader", ["from_file", "from_path"])
+def test_explicit_base_url_for_schema_loaded_from_file(ctx, tmp_path, loader):
+    sdl = "type Query { hello: String }"
+    if loader == "from_path":
+        path = tmp_path / "schema.graphql"
+        path.write_text(sdl)
+        schema = schemathesis.graphql.from_path(path)
+    else:
+        schema = ctx.graphql.load_sdl(sdl)
+    case = schema["Query"]["hello"].Case(body="{ hello }")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1:1234/graphql")["url"] == "http://127.0.0.1:1234/graphql"
+
+
 @pytest.mark.parametrize("kwargs", [{"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}])
 def test_make_case(ctx, kwargs):
     schema = _books_schema(ctx)
