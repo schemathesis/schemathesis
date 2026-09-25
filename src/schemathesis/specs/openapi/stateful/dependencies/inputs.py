@@ -57,6 +57,11 @@ def extract_inputs(
     component schema.
     """
     known_dependencies = set()
+    # Updates address the resource bound by the trailing path parameter, e.g. `PATCH /users/{userId}`.
+    updated_parameter = (
+        naming.trailing_path_parameter(operation.path) if operation.method.lower() in ("put", "patch") else None
+    )
+    updated_resource = None
     for param in operation.iter_parameters():
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
@@ -71,6 +76,8 @@ def extract_inputs(
         if input_slot is not None:
             if input_slot.resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES:
                 known_dependencies.add(input_slot.resource.name)
+            if param.location == ParameterLocation.PATH and param.name == updated_parameter:
+                updated_resource = input_slot.resource.name
             yield input_slot
 
     json_bodies = []
@@ -91,6 +98,7 @@ def extract_inputs(
             operation=operation,
             resources=resources,
             known_dependencies=known_dependencies,
+            updated_resource=updated_resource,
             deferred_nested_fks=deferred_nested_fks,
             deferred_named_scalars=deferred_named_scalars,
             candidate_resource_names=candidate_resource_names,
@@ -325,6 +333,7 @@ def _resolve_body_dependencies(
     operation: APIOperation,
     resources: ResourceMap,
     known_dependencies: set[str],
+    updated_resource: str | None = None,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
@@ -423,6 +432,9 @@ def _resolve_body_dependencies(
         resource = candidates[0]
         # Ensure the target field supports the same type
         if not resource.types[property_name] & set(get_type(subschema)):
+            continue
+        # A name labels the resource being written: only an update may keep its current one.
+        if naming.key_kind(property_name) == naming.KeyKind.NAME and resource.name != updated_resource:
             continue
 
         yield InputSlot(

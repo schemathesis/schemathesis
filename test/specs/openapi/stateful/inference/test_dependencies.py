@@ -111,6 +111,14 @@ def analyze_dependencies(ctx, paths, **kwargs):
     return schema, analyze(schema)
 
 
+def inferred_links(graph):
+    return [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ]
+
+
 ORDER_REQUEST_WITH_CUSTOMER = {
     "type": "object",
     "properties": {"customer_id": {"type": "string"}, "total": {"type": "number"}},
@@ -3208,11 +3216,7 @@ def test_path_param_named_after_collection_links_create_to_read(ctx):
         },
     }
     _, graph = analyze_dependencies(ctx, paths)
-    assert [
-        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
-        for entry in graph.iter_links()
-        for definition in entry.links.values()
-    ] == [
+    assert inferred_links(graph) == [
         [
             "#/paths/~1sessions/post",
             "201",
@@ -6349,11 +6353,7 @@ def test_scalar_body_field_named_after_collection_links_to_its_producer(ctx):
         },
     }
     _, graph = analyze_dependencies(ctx, paths)
-    assert [
-        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
-        for entry in graph.iter_links()
-        for definition in entry.links.values()
-    ] == [
+    assert inferred_links(graph) == [
         [
             "#/paths/~1countries/get",
             "200",
@@ -6410,11 +6410,7 @@ def test_form_body_field_links_to_its_producer(ctx, create_news, version):
         "/news": {"post": {"operationId": "createNews", **create_news, "responses": {"201": {"description": "OK"}}}},
     }
     _, graph = analyze_dependencies(ctx, paths, version=version)
-    assert [
-        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
-        for entry in graph.iter_links()
-        for definition in entry.links.values()
-    ] == [
+    assert inferred_links(graph) == [
         [
             "#/paths/~1countries/get",
             "200",
@@ -6489,11 +6485,7 @@ def test_scalar_body_field_named_after_object_collection(ctx, item, language, ex
         ),
     }
     _, graph = analyze_dependencies(ctx, paths)
-    assert [
-        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
-        for entry in graph.iter_links()
-        for definition in entry.links.values()
-    ] == expected
+    assert inferred_links(graph) == expected
 
 
 def test_second_consumer_of_a_foreign_key_gets_its_own_link(ctx):
@@ -6545,11 +6537,7 @@ def test_nested_collection_producer_links_into_top_level_id_consumer(ctx):
 
     _, graph = analyze_dependencies(ctx, paths)
 
-    assert [
-        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
-        for entry in graph.iter_links()
-        for definition in entry.links.values()
-    ] == [
+    assert inferred_links(graph) == [
         [
             "#/paths/~1lessons~1{lessonId}~1bookmarks/post",
             "201",
@@ -6573,11 +6561,7 @@ def test_unresolvable_response_ref_keeps_path_keyed_link(ctx):
 
     _, graph = analyze_dependencies(ctx, paths)
 
-    assert [
-        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
-        for entry in graph.iter_links()
-        for definition in entry.links.values()
-    ] == [
+    assert inferred_links(graph) == [
         [
             "#/paths/~1triggers~1{name}/post",
             "201",
@@ -6587,4 +6571,179 @@ def test_unresolvable_response_ref_keeps_path_keyed_link(ctx):
                 "x-schemathesis": {"is_inferred": True},
             },
         ]
+    ]
+
+
+PRODUCT_NAME_BODY = {"type": "object", "properties": {"productName": {"type": "string"}}, "required": ["productName"]}
+
+
+@pytest.mark.parametrize(
+    ["field", "identifier"],
+    [
+        ("productName", "product_id"),
+        ("ProductName", "ProductSid"),
+        ("product_name", "productId"),
+        ("productName", "id"),
+    ],
+)
+def test_name_keyed_producer_fills_only_name_parameters(ctx, field, identifier):
+    # `POST /products {productName}` confirms a product by its name, which is not its identifier.
+    body = {"type": "object", "properties": {field: {"type": "string"}}, "required": [field]}
+    paths = {
+        **operation_with_body("post", "/products", "201", body, operation_id="createProduct"),
+        **operation(
+            "get", "/products/{productName}", "200", parameters=[path_param("productName")], operation_id="getProduct"
+        ),
+        **operation(
+            "get",
+            f"/products/{{{identifier}}}/reviews",
+            "200",
+            parameters=[path_param(identifier)],
+            operation_id="listReviews",
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1products/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1products~1{productName}/get",
+                "parameters": {"path.productName": f"$request.body#/{field}"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_path_keyed_producer_fills_only_identifier_fields(ctx):
+    # The confirmed path parameter is the conversation identifier; it can't stand in for its participants.
+    conversation = {
+        "type": "object",
+        "properties": {"convId": {"type": "string"}, "participants": {"type": "array", "items": {"type": "string"}}},
+        "required": ["convId", "participants"],
+    }
+    participants = {
+        "type": "object",
+        "properties": {"participants": {"type": "array", "items": {"type": "string"}}},
+        "required": ["participants"],
+    }
+    paths = {
+        **operation(
+            "get",
+            "/conversations/{convId}",
+            "200",
+            conversation,
+            parameters=[path_param("convId")],
+            operation_id="getConversation",
+        ),
+        **operation(
+            "post",
+            "/conversations/moderate/{convId}",
+            "200",
+            parameters=[path_param("convId")],
+            operation_id="moderateConversation",
+        ),
+        **operation_with_body(
+            "post",
+            "/conversations/{convId}/participants",
+            "200",
+            participants,
+            parameters=[path_param("convId")],
+            operation_id="addParticipants",
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1conversations~1{convId}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1conversations~1moderate~1{convId}/post",
+                "parameters": {"path.convId": "$response.body#/convId"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1conversations~1{convId}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1conversations~1{convId}~1participants/post",
+                "parameters": {"path.convId": "$response.body#/convId"},
+                "requestBody": {"participants": "$response.body#/participants"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ],
+        [
+            "#/paths/~1conversations~1moderate~1{convId}/post",
+            "200",
+            {
+                "operationRef": "#/paths/~1conversations~1{convId}/get",
+                "parameters": {"path.convId": "$request.path.convId"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1conversations~1moderate~1{convId}/post",
+            "200",
+            {
+                "operationRef": "#/paths/~1conversations~1{convId}~1participants/post",
+                "parameters": {"path.convId": "$request.path.convId"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
+
+
+def test_name_is_copied_only_into_an_update_of_its_resource(ctx):
+    # `POST /projects/user/{user_id} {name}` names the new project, not its owner.
+    user = {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    named = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+    paths = {
+        "/users/{id}": {
+            **operation("get", "/users/{id}", "200", user, parameters=[path_param("id", "integer")])["/users/{id}"],
+            **operation_with_body("patch", "/users/{id}", "204", named, parameters=[path_param("id", "integer")])[
+                "/users/{id}"
+            ],
+        },
+        **operation_with_body(
+            "post",
+            "/projects/user/{user_id}",
+            "201",
+            named,
+            parameters=[path_param("user_id", "integer")],
+            operation_id="createUserProject",
+        ),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1users~1{id}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1users~1{id}/patch",
+                "parameters": {"path.id": "$response.body#/id"},
+                "requestBody": {"name": "$response.body#/name"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ],
+        [
+            "#/paths/~1users~1{id}/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1projects~1user~1{user_id}/post",
+                "parameters": {"path.user_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
     ]

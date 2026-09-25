@@ -88,7 +88,7 @@ def _path_keyed_outputs(
     if operation.method.lower() not in _PATH_KEYED_PRODUCER_METHODS:
         return
 
-    trailing = _trailing_path_parameter(operation.path)
+    trailing = naming.trailing_path_parameter(operation.path)
     if trailing is None:
         return
 
@@ -122,13 +122,6 @@ def _path_keyed_outputs(
     )
 
 
-def _trailing_path_parameter(path: str) -> str | None:
-    last = path.rstrip("/").rsplit("/", 1)[-1]
-    if last.startswith("{") and last.endswith("}"):
-        return last[1:-1]
-    return None
-
-
 def _body_keyed_outputs(
     *,
     operation: APIOperation,
@@ -147,7 +140,7 @@ def _body_keyed_outputs(
         return
     # Skip operations that already have a path-keyed identifier; those are
     # handled by `_path_keyed_outputs` and don't need a body-keyed echo.
-    if _trailing_path_parameter(operation.path) is not None:
+    if naming.trailing_path_parameter(operation.path) is not None:
         return
 
     path_resource = naming.from_path(operation.path)

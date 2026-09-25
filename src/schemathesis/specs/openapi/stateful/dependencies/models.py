@@ -14,7 +14,12 @@ from schemathesis.core.text import to_pascal_case
 from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
-from schemathesis.specs.openapi.stateful.dependencies.naming import from_path, strip_version_prefix
+from schemathesis.specs.openapi.stateful.dependencies.naming import (
+    KeyKind,
+    from_path,
+    key_kind,
+    strip_version_prefix,
+)
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 
@@ -97,6 +102,7 @@ class DependencyGraph:
             for output_slot in producer.outputs:
                 # Only iterate over consumers that match this resource
                 relevant_consumers = consumers_by_resource.get(id(output_slot.resource), {})
+                confirmed = _confirmed_input(producer, output_slot)
 
                 for consumer_id, (consumer, input_slots) in relevant_consumers.items():
                     # Skip self-references
@@ -107,6 +113,8 @@ class DependencyGraph:
                     links: dict[str, LinkDefinition] = {}
 
                     for input_slot in input_slots:
+                        if confirmed is not None and not _takes_confirmed_value(input_slot, confirmed):
+                            continue
                         # Scope guard: skip bare {id} links where the producer is from a
                         # different namespace. Triggered only when the resource name matches the
                         # producer's path-derived name — i.e., the collision is path-based, not
@@ -529,6 +537,37 @@ def extract_nested_fk_fields(
                     result.extend(extract_nested_fk_fields(resolved_items, resolver, items_pointer, max_depth - 1))
 
     return result
+
+
+def _confirmed_input(producer: OperationNode, output_slot: OutputSlot) -> InputSlot | None:
+    """The request input whose value a path- or body-keyed output confirms."""
+    if output_slot.path_parameter is not None:
+        location, name = ParameterLocation.PATH, output_slot.path_parameter
+    elif output_slot.body_field is not None:
+        location, name = ParameterLocation.BODY, output_slot.body_field
+    else:
+        return None
+    return next(
+        (slot for slot in producer.inputs if slot.parameter_location == location and slot.parameter_name == name),
+        None,
+    )
+
+
+def _takes_confirmed_value(input_slot: InputSlot, confirmed: InputSlot) -> bool:
+    # The confirmed request value is a single scalar key, and a name never stands in for an identifier.
+    field = input_slot.resource_field
+    if field is not None and input_slot.resource.types.get(field) == {"array"}:
+        return False
+    return {_key_kind(input_slot.parameter_name), _key_kind(confirmed.parameter_name)} != {
+        KeyKind.NAME,
+        KeyKind.IDENTIFIER,
+    }
+
+
+def _key_kind(parameter_name: str | int) -> KeyKind | None:
+    if isinstance(parameter_name, int):
+        return None
+    return key_kind(parameter_name)
 
 
 def _build_nested_body(path: str, value: str) -> dict[str, Any]:
