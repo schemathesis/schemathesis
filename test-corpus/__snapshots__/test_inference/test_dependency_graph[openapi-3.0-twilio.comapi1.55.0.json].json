@@ -3494,6 +3494,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AutoCorrectAddress",
+          "resource": "AutoCorrect",
+          "resource_field": "AutoCorrectAddress"
         }
       ],
       "outputs": [
@@ -3515,6 +3522,13 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AutoCorrectAddress",
+          "resource": "AutoCorrect",
+          "resource_field": "AutoCorrectAddress"
         }
       ],
       "outputs": [
@@ -3578,6 +3592,20 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "ApplicationSid",
+          "resource": "Application",
+          "resource_field": "ApplicationSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "CallerId",
+          "resource": "Caller",
+          "resource_field": "CallerId"
         }
       ],
       "outputs": [
@@ -3907,6 +3935,13 @@
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
           "resource_field": "ConferenceSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "CallerId",
+          "resource": "Caller",
+          "resource_field": "CallerId"
         }
       ],
       "outputs": [
@@ -4033,6 +4068,55 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AddressSid",
+          "resource": "Address",
+          "resource_field": "AddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "BundleSid",
+          "resource": "Bundle",
+          "resource_field": "BundleSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "EmergencyAddressSid",
+          "resource": "EmergencyAddress",
+          "resource_field": "EmergencyAddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IdentitySid",
+          "resource": "Identity",
+          "resource_field": "IdentitySid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "SmsApplicationSid",
+          "resource": "SmsApplication",
+          "resource_field": "SmsApplicationSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "TrunkSid",
+          "resource": "Trunk",
+          "resource_field": "TrunkSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "VoiceApplicationSid",
+          "resource": "VoiceApplication",
+          "resource_field": "VoiceApplicationSid"
         }
       ],
       "outputs": [
@@ -4054,6 +4138,55 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AddressSid",
+          "resource": "Address",
+          "resource_field": "AddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "BundleSid",
+          "resource": "Bundle",
+          "resource_field": "BundleSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "EmergencyAddressSid",
+          "resource": "EmergencyAddress",
+          "resource_field": "EmergencyAddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IdentitySid",
+          "resource": "Identity",
+          "resource_field": "IdentitySid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "SmsApplicationSid",
+          "resource": "SmsApplication",
+          "resource_field": "SmsApplicationSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "TrunkSid",
+          "resource": "Trunk",
+          "resource_field": "TrunkSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "VoiceApplicationSid",
+          "resource": "VoiceApplication",
+          "resource_field": "VoiceApplicationSid"
         }
       ],
       "outputs": [
@@ -4075,6 +4208,55 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AddressSid",
+          "resource": "Address",
+          "resource_field": "AddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "BundleSid",
+          "resource": "Bundle",
+          "resource_field": "BundleSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "EmergencyAddressSid",
+          "resource": "EmergencyAddress",
+          "resource_field": "EmergencyAddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IdentitySid",
+          "resource": "Identity",
+          "resource_field": "IdentitySid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "SmsApplicationSid",
+          "resource": "SmsApplication",
+          "resource_field": "SmsApplicationSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "TrunkSid",
+          "resource": "Trunk",
+          "resource_field": "TrunkSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "VoiceApplicationSid",
+          "resource": "VoiceApplication",
+          "resource_field": "VoiceApplicationSid"
         }
       ],
       "outputs": [
@@ -4096,6 +4278,55 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AddressSid",
+          "resource": "Address",
+          "resource_field": "AddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "BundleSid",
+          "resource": "Bundle",
+          "resource_field": "BundleSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "EmergencyAddressSid",
+          "resource": "EmergencyAddress",
+          "resource_field": "EmergencyAddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IdentitySid",
+          "resource": "Identity",
+          "resource_field": "IdentitySid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "SmsApplicationSid",
+          "resource": "SmsApplication",
+          "resource_field": "SmsApplicationSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "TrunkSid",
+          "resource": "Trunk",
+          "resource_field": "TrunkSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "VoiceApplicationSid",
+          "resource": "VoiceApplication",
+          "resource_field": "VoiceApplicationSid"
         }
       ],
       "outputs": [
@@ -4124,6 +4355,13 @@
           "parameter_name": "ResourceSid",
           "resource": "Resource",
           "resource_field": "ResourceSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "InstalledAddOnSid",
+          "resource": "InstalledAddOn",
+          "resource_field": "InstalledAddOnSid"
         }
       ],
       "outputs": [
@@ -4145,6 +4383,62 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "AddressSid",
+          "resource": "Address",
+          "resource_field": "AddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "BundleSid",
+          "resource": "Bundle",
+          "resource_field": "BundleSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "EmergencyAddressSid",
+          "resource": "EmergencyAddress",
+          "resource_field": "EmergencyAddressSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IdentitySid",
+          "resource": "Identity",
+          "resource_field": "IdentitySid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "SmsApplicationSid",
+          "resource": "SmsApplication",
+          "resource_field": "SmsApplicationSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "TrunkSid",
+          "resource": "Trunk",
+          "resource_field": "TrunkSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "VoiceApplicationSid",
+          "resource": "VoiceApplication",
+          "resource_field": "VoiceApplicationSid"
         }
       ],
       "outputs": [
@@ -4208,6 +4502,27 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "ApplicationSid",
+          "resource": "Application",
+          "resource_field": "ApplicationSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "ContentSid",
+          "resource": "Content",
+          "resource_field": "ContentSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "MessagingServiceSid",
+          "resource": "MessagingService",
+          "resource_field": "MessagingServiceSid"
         }
       ],
       "outputs": [
@@ -4495,6 +4810,20 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "ByocTrunkSid",
+          "resource": "ByocTrunk",
+          "resource_field": "ByocTrunkSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "EmergencyCallerSid",
+          "resource": "EmergencyCaller",
+          "resource_field": "EmergencyCallerSid"
         }
       ],
       "outputs": [
@@ -4523,6 +4852,13 @@
           "parameter_name": "DomainSid",
           "resource": "Domain",
           "resource_field": "DomainSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
         }
       ],
       "outputs": [
@@ -4551,6 +4887,13 @@
           "parameter_name": "DomainSid",
           "resource": "Domain",
           "resource_field": "DomainSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IpAccessControlListSid",
+          "resource": "IpAccessControlList",
+          "resource_field": "IpAccessControlListSid"
         }
       ],
       "outputs": [
@@ -4579,6 +4922,13 @@
           "parameter_name": "DomainSid",
           "resource": "Domain",
           "resource_field": "DomainSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
         }
       ],
       "outputs": [
@@ -4607,6 +4957,13 @@
           "parameter_name": "DomainSid",
           "resource": "Domain",
           "resource_field": "DomainSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
         }
       ],
       "outputs": [
@@ -4635,6 +4992,13 @@
           "parameter_name": "DomainSid",
           "resource": "Domain",
           "resource_field": "DomainSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IpAccessControlListSid",
+          "resource": "IpAccessControlList",
+          "resource_field": "IpAccessControlListSid"
         }
       ],
       "outputs": [
@@ -4656,6 +5020,27 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "ByocTrunkSid",
+          "resource": "ByocTrunk",
+          "resource_field": "ByocTrunkSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "DomainName",
+          "resource": "Domain",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "EmergencyCallerSid",
+          "resource": "EmergencyCaller",
+          "resource_field": "EmergencyCallerSid"
         }
       ],
       "outputs": [
@@ -4665,6 +5050,15 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain",
+          "status_code": "200"
+        },
+        {
+          "body_field": "DomainName",
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "",
+          "resource": "Domain",
           "status_code": "200"
         }
       ]
@@ -4705,6 +5099,13 @@
           "parameter_name": "IpAccessControlListSid",
           "resource": "IpAccessControlList",
           "resource_field": "IpAccessControlListSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IpAddress",
+          "resource": "Ip",
+          "resource_field": "IpAddress"
         }
       ],
       "outputs": [
@@ -4733,6 +5134,13 @@
           "parameter_name": "IpAccessControlListSid",
           "resource": "IpAccessControlList",
           "resource_field": "IpAccessControlListSid"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "IpAddress",
+          "resource": "Ip",
+          "resource_field": "IpAddress"
         }
       ],
       "outputs": [
@@ -5094,6 +5502,12 @@
         ]
       }
     },
+    "Application": {
+      "fields": [
+        "ApplicationSid"
+      ],
+      "types": {}
+    },
     "Applications.json": {
       "fields": [
         "applications",
@@ -5226,6 +5640,12 @@
         ]
       }
     },
+    "AutoCorrect": {
+      "fields": [
+        "AutoCorrectAddress"
+      ],
+      "types": {}
+    },
     "AvailablePhoneNumbers.json": {
       "fields": [
         "countries",
@@ -5268,9 +5688,27 @@
         ]
       }
     },
+    "Bundle": {
+      "fields": [
+        "BundleSid"
+      ],
+      "types": {}
+    },
+    "ByocTrunk": {
+      "fields": [
+        "ByocTrunkSid"
+      ],
+      "types": {}
+    },
     "Call": {
       "fields": [
         "CallSid"
+      ],
+      "types": {}
+    },
+    "Caller": {
+      "fields": [
+        "CallerId"
       ],
       "types": {}
     },
@@ -5411,6 +5849,12 @@
           "string"
         ]
       }
+    },
+    "Content": {
+      "fields": [
+        "ContentSid"
+      ],
+      "types": {}
     },
     "CredentialList": {
       "fields": [
@@ -5676,6 +6120,18 @@
         ]
       }
     },
+    "EmergencyAddress": {
+      "fields": [
+        "EmergencyAddressSid"
+      ],
+      "types": {}
+    },
+    "EmergencyCaller": {
+      "fields": [
+        "EmergencyCallerSid"
+      ],
+      "types": {}
+    },
     "Events.json": {
       "fields": [
         "end",
@@ -5770,6 +6226,12 @@
         ]
       }
     },
+    "Identity": {
+      "fields": [
+        "IdentitySid"
+      ],
+      "types": {}
+    },
     "IncomingPhoneNumbers.json": {
       "fields": [
         "end",
@@ -5811,6 +6273,18 @@
           "string"
         ]
       }
+    },
+    "InstalledAddOn": {
+      "fields": [
+        "InstalledAddOnSid"
+      ],
+      "types": {}
+    },
+    "Ip": {
+      "fields": [
+        "IpAddress"
+      ],
+      "types": {}
     },
     "IpAccessControlList": {
       "fields": [
@@ -6243,6 +6717,12 @@
           "string"
         ]
       }
+    },
+    "MessagingService": {
+      "fields": [
+        "MessagingServiceSid"
+      ],
+      "types": {}
     },
     "Mobile.json": {
       "fields": [
@@ -6828,6 +7308,12 @@
         ]
       }
     },
+    "SmsApplication": {
+      "fields": [
+        "SmsApplicationSid"
+      ],
+      "types": {}
+    },
     "ThisMonth.json": {
       "fields": [
         "end",
@@ -7037,6 +7523,18 @@
           "array"
         ]
       }
+    },
+    "Trunk": {
+      "fields": [
+        "TrunkSid"
+      ],
+      "types": {}
+    },
+    "VoiceApplication": {
+      "fields": [
+        "VoiceApplicationSid"
+      ],
+      "types": {}
     },
     "Voip.json": {
       "fields": [

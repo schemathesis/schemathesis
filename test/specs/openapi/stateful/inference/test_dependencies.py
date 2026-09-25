@@ -6366,6 +6366,136 @@ def test_scalar_body_field_named_after_collection_links_to_its_producer(ctx):
     ]
 
 
+NEWS_FORM_FIELDS = {
+    "type": "object",
+    "properties": {"country": {"type": "string"}, "text": {"type": "string"}},
+    "required": ["country"],
+}
+
+
+@pytest.mark.parametrize(
+    ["create_news", "version"],
+    [
+        pytest.param(
+            {"requestBody": {"content": {"application/x-www-form-urlencoded": {"schema": NEWS_FORM_FIELDS}}}},
+            "3.0.2",
+            id="urlencoded",
+        ),
+        pytest.param(
+            {"requestBody": {"content": {"multipart/form-data": {"schema": NEWS_FORM_FIELDS}}}},
+            "3.0.2",
+            id="multipart",
+        ),
+        pytest.param(
+            {
+                "consumes": ["application/x-www-form-urlencoded"],
+                "parameters": [
+                    {"name": "country", "in": "formData", "type": "string", "required": True},
+                    {"name": "text", "in": "formData", "type": "string"},
+                ],
+            },
+            "2.0",
+            id="swagger-form-data",
+        ),
+    ],
+)
+def test_form_body_field_links_to_its_producer(ctx, create_news, version):
+    list_countries = {"type": "array", "items": {"type": "string"}}
+    if version == "2.0":
+        countries_response = {"description": "OK", "schema": list_countries}
+    else:
+        countries_response = {"description": "OK", "content": {"application/json": {"schema": list_countries}}}
+    paths = {
+        "/countries": {"get": {"operationId": "listCountries", "responses": {"200": countries_response}}},
+        "/news": {"post": {"operationId": "createNews", **create_news, "responses": {"201": {"description": "OK"}}}},
+    }
+    _, graph = analyze_dependencies(ctx, paths, version=version)
+    assert [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ] == [
+        [
+            "#/paths/~1countries/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1news/post",
+                "requestBody": {"country": "$response.body#/*"},
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
+LANGUAGE_ITEM = {
+    "type": "object",
+    "properties": {"name": {"type": "string"}, "code": {"type": "string"}, "longCode": {"type": "string"}},
+    "required": ["name", "code", "longCode"],
+}
+LINK_FROM_LANGUAGES = [
+    [
+        "#/paths/~1languages/get",
+        "200",
+        {
+            "operationRef": "#/paths/~1check/post",
+            "requestBody": {"language": "$response.body#/*/code"},
+            "x-schemathesis": {"is_inferred": True, "merge_body": True},
+        },
+    ]
+]
+
+
+@pytest.mark.parametrize(
+    ["item", "language", "expected"],
+    [
+        pytest.param(LANGUAGE_ITEM, {"type": "string"}, LINK_FROM_LANGUAGES, id="code-keyed-items"),
+        pytest.param(
+            {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                "required": ["id", "name"],
+            },
+            {"type": "string"},
+            [],
+            id="id-keyed-items",
+        ),
+        pytest.param(
+            {
+                "type": "object",
+                "properties": {"code": {"type": "integer"}, "name": {"type": "string"}},
+                "required": ["code", "name"],
+            },
+            {"type": "string"},
+            [],
+            id="code-type-mismatch",
+        ),
+        pytest.param(LANGUAGE_ITEM, {"type": "string", "format": "uri"}, [], id="formatted-field"),
+        pytest.param(LANGUAGE_ITEM, {}, [], id="untyped-field"),
+    ],
+)
+def test_scalar_body_field_named_after_object_collection(ctx, item, language, expected):
+    paths = {
+        **operation("get", "/languages", "200", {"type": "array", "items": item}, operation_id="listLanguages"),
+        **operation_with_body(
+            "post",
+            "/check",
+            "200",
+            {
+                "type": "object",
+                "properties": {"language": language, "text": {"type": "string"}},
+                "required": ["language"],
+            },
+            operation_id="check",
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ] == expected
+
+
 def test_second_consumer_of_a_foreign_key_gets_its_own_link(ctx):
     # Two reads of the same resource are distinct destinations, not one.
     order = {

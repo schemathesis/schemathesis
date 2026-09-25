@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.28.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Dependency inference links body fields named after a collection to its items' `code`.
+
 ### :wrench: Changed
 
 - Name the pattern that stops the analysis when test data cannot be generated.
@@ -12,6 +16,8 @@
 - Missing `epic` label with the API title in CLI Allure reports.
 - Multipart parts for arrays of primitives labelled `application/json` while carrying raw text.
 - Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
+- Dependency inference ignoring `application/x-www-form-urlencoded`, `multipart/form-data` and `formData` request bodies.
+- Inferred links with `*` wildcards never filling request body fields during stateful testing.
 - Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.

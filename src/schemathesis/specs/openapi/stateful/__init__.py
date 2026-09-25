@@ -35,6 +35,8 @@ from schemathesis.specs.openapi.expressions import MultiMatch
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 
 if TYPE_CHECKING:
+    from random import Random
+
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.python._constants.pool import ConstantsPool
@@ -409,7 +411,7 @@ def into_step_input(
                 and isinstance(transition.request_body.value, Ok)
                 and transition.request_body.value.ok() is not UNRESOLVABLE
             ):
-                request_body = transition.request_body.value.ok()
+                request_body = _choose_wildcard_matches(transition.request_body.value.ok(), random)
             else:
                 request_body = NOT_SET
 
@@ -465,6 +467,17 @@ def into_step_input(
         return inner(output=_output)
 
     return builder
+
+
+def _choose_wildcard_matches(value: Any, random: Random) -> Any:
+    # Each wildcard expression in a body yields several candidates; one is picked per field.
+    if isinstance(value, MultiMatch):
+        return random.choice(value.values)
+    if isinstance(value, dict):
+        return {key: _choose_wildcard_matches(item, random) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_choose_wildcard_matches(item, random) for item in value]
+    return value
 
 
 def is_transition_allowed(bundle_name: str, source: str, target: str) -> Callable[[OpenAPIStateMachine], bool]:
