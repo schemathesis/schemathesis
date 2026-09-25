@@ -1633,6 +1633,62 @@ def test_unnegatable_path_falls_back_to_positive(ctx):
     assert all(entry["path"] == "positive" and entry["header"] == "negative" for entry in modes), modes
 
 
+@pytest.mark.parametrize(
+    "header_schema",
+    [
+        {"type": "string", "title": "Authorization"},
+        {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"},
+        {"type": ["string", "null"]},
+    ],
+    ids=["annotated", "any-of-null", "type-list-null"],
+)
+def test_optional_plain_header_falls_back_to_positive(ctx, header_schema):
+    # Every header value is a string on the wire, so an optional string header has nothing left to violate.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "Authorization", "in": "header", "required": False, "schema": header_schema},
+                        {"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    modes = []
+
+    @given(case=schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=MAX_EXAMPLES, suppress_health_check=list(HealthCheck), database=None)
+    def test(case):
+        modes.append({location.value: component.mode.value for location, component in case.meta.components.items()})
+
+    test()
+    assert modes
+    assert all(entry["header"] == "positive" and entry["query"] == "negative" for entry in modes), modes
+
+
+@pytest.mark.parametrize(
+    "header_schema",
+    [{"type": "string"}, {"type": "string", "title": "Authorization"}],
+    ids=["plain", "annotated"],
+)
+def test_required_string_header_is_negated_by_omission(ctx, header_schema):
+    header = {"name": "Authorization", "in": "header", "required": True, "schema": header_schema}
+    operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, header])
+    cases = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=MAX_EXAMPLES, suppress_health_check=list(HealthCheck), database=None)
+    def test(case):
+        cases.append((case.meta.components[ParameterLocation.HEADER].mode, "Authorization" in (case.headers or {})))
+
+    test()
+    assert set(cases) == {(GenerationMode.NEGATIVE, False)}
+
+
 def test_negative_body_stays_invalid_when_a_sibling_carries_a_format(ctx):
     # A body the schema accepts must never ship as a negative case; the leak needs a few hundred draws to surface.
     schema = ctx.openapi.load_schema(

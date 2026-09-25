@@ -4,7 +4,7 @@ from datetime import timezone
 from email.utils import format_datetime
 from typing import TYPE_CHECKING
 
-from schemathesis.specs.openapi.formats import header_values
+from schemathesis.specs.openapi.formats import HEADER_FORMAT, header_values
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -18,6 +18,8 @@ KNOWN_HEADER_FORMATS: dict[str, str] = {
     "if-unmodified-since": "_http_date_header",
     "range": "_range_header",
 }
+# Formats given to plain string headers so generated values are valid on the wire; the schema itself allows any string.
+PLAIN_HEADER_FORMATS = {HEADER_FORMAT, *KNOWN_HEADER_FORMATS.values()}
 
 # Visible ASCII for ETag content: 0x21-0x7E excluding DQUOTE (0x22)
 _ETAG_CHARS = "".join(chr(i) for i in range(0x21, 0x7F) if chr(i) != '"')

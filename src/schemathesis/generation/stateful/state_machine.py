@@ -25,6 +25,8 @@ StatefulCallbackMark = Mark[Callable | None](attr_name="stateful_callback")
 
 if TYPE_CHECKING:
     import hypothesis
+    from hypothesis.stateful import RuleStrategy
+    from hypothesis.strategies._internal.featureflags import FeatureFlags
     from requests.structures import CaseInsensitiveDict
 
     from schemathesis.checks import CheckResult
@@ -155,6 +157,30 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"\W|^(?=\d)", "_", name).replace("__", "_")
 
 
+class _ValidRuleFallbackFlags:
+    """Rule flags that enable every currently valid rule when the drawn flags disable all of them.
+
+    Swarm testing disables a random subset of rules per scenario. API state machines usually have only one or two
+    rules valid at a step, so a subset that disables all of them would reject the whole scenario.
+    """
+
+    __slots__ = ("flags", "rules", "_any_valid_enabled")
+
+    def __init__(self, flags: FeatureFlags, rules: RuleStrategy) -> None:
+        self.flags = flags
+        self.rules = rules
+        self._any_valid_enabled: bool | None = None
+
+    def is_enabled(self, name: str) -> bool:
+        if self.flags.is_enabled(name):
+            return True
+        if self._any_valid_enabled is None:
+            self._any_valid_enabled = any(
+                self.flags.is_enabled(rule.function.__name__) for rule in self.rules.rules if self.rules.is_valid(rule)
+            )
+        return not self._any_valid_enabled
+
+
 class APIStateMachine(RuleBasedStateMachine):
     """State machine for executing API operation sequences based on inferred transitions.
 
@@ -181,6 +207,10 @@ class APIStateMachine(RuleBasedStateMachine):
                 message += f"\n\nLearn how to define links: {STATEFUL_TESTING_GUIDE_URL}"
                 raise NoLinksFound(message) from None
             raise
+        rules = self._rules_strategy
+        rules.enabled_rules_strategy = rules.enabled_rules_strategy.map(
+            lambda flags: _ValidRuleFallbackFlags(flags, rules)
+        )
         self.setup()
 
     @classmethod

@@ -1,14 +1,29 @@
+import sys
+from collections import Counter
+from uuid import uuid4
+
 import pytest
-from hypothesis import HealthCheck, Phase, settings
+from fastapi import FastAPI, Header, HTTPException
+from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis.control import current_build_context
 from hypothesis.errors import InvalidDefinition
+from hypothesis.internal.conjecture.data import Status
+from pydantic import BaseModel
 
 import schemathesis
 from schemathesis.config import OperationConfig
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.transport import Response
+from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, StepOutput
-from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
+from schemathesis.specs.openapi.stateful import (
+    collect_transitions,
+    into_step_input,
+    make_response_filter,
+    match_status_code,
+)
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi.modifiers.stateful import NoMergeBody
 
@@ -510,3 +525,222 @@ def test_transitions_with_colliding_normalized_names_keep_separate_rules(ctx):
         "RANDOM__GET_users",
         "RANDOM__GET_users_",
     ]
+
+
+def test_negative_step_with_link_supplied_parameters_falls_back_to_positive(ctx):
+    # The link fills the only parameter that could be negated; the step still has to run.
+    schema = ctx.openapi.load_schema(
+        {
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    strategy = schema["/users/{userId}"]["GET"].as_strategy(
+        generation_mode=GenerationMode.NEGATIVE, phase=TestPhase.STATEFUL, path_parameters={"userId": 42}
+    )
+    modes = []
+
+    @given(case=strategy)
+    @settings(max_examples=5, suppress_health_check=list(HealthCheck), database=None)
+    def test(case):
+        modes.append(case.meta.generation.mode)
+
+    test()
+    assert set(modes) == {GenerationMode.POSITIVE}
+
+
+def _users_api_with_optional_auth_header() -> FastAPI:
+    app = FastAPI()
+    users: dict[str, dict] = {}
+
+    class NewUser(BaseModel):
+        username: str
+        email: str
+
+    class User(NewUser):
+        id: str
+
+    @app.post("/users", response_model=User, status_code=201)
+    def create_user(body: NewUser, authorization: str | None = Header(None)):
+        user_id = str(uuid4())
+        users[user_id] = {"id": user_id, **body.model_dump()}
+        return users[user_id]
+
+    @app.get("/users/{userId}", response_model=User, responses={404: {"description": "Not found"}})
+    def get_user(userId: str, authorization: str | None = Header(None)):
+        if userId not in users:
+            raise HTTPException(404)
+        return users[userId]
+
+    @app.put("/users/{userId}", response_model=User, responses={404: {"description": "Not found"}})
+    def update_user(userId: str, body: NewUser, authorization: str | None = Header(None)):
+        if userId not in users:
+            raise HTTPException(404)
+        users[userId].update(body.model_dump())
+        return users[userId]
+
+    @app.delete("/users/{userId}", status_code=204, responses={404: {"description": "Not found"}})
+    def delete_user(userId: str, authorization: str | None = Header(None)):
+        if users.pop(userId, None) is None:
+            raise HTTPException(404)
+
+    return app
+
+
+def test_long_scenarios_complete_requested_examples():
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=_users_api_with_optional_auth_header())
+    schema.config.generation.update(modes=list(GenerationMode))
+    completed = []
+
+    class Workflow(schema.as_state_machine()):
+        def validate_response(self, response, case, additional_checks=None, **kwargs):
+            pass
+
+        def teardown(self):
+            # A rejected scenario reaches teardown while its rejection is still propagating.
+            if sys.exc_info()[1] is None:
+                completed.append(True)
+
+    Workflow.run(
+        settings=settings(
+            max_examples=20,
+            stateful_step_count=20,
+            deadline=None,
+            database=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+        )
+    )
+    assert len(completed) == 20
+
+
+def test_positive_scenarios_are_never_rejected():
+    # Rule sampling may disable every rule that is valid at a step; that must not discard the scenario.
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=_users_api_with_optional_auth_header())
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    rejected = []
+
+    class Workflow(schema.as_state_machine()):
+        def validate_response(self, response, case, additional_checks=None, **kwargs):
+            pass
+
+        def teardown(self):
+            # Running out of the data budget ends a scenario too, but it is not a rejection.
+            error = sys.exc_info()[1]
+            if error is not None and current_build_context().data.status is not Status.OVERRUN:
+                rejected.append(error)
+
+    Workflow.run(
+        settings=settings(
+            max_examples=20,
+            stateful_step_count=10,
+            deadline=None,
+            database=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+        )
+    )
+    assert rejected == []
+
+
+def test_long_scenarios_follow_links_beyond_default_step_allowance():
+    # How often one scenario follows links out of an operation scales with the configured scenario length.
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=_users_api_with_optional_auth_header())
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    linked_calls = []
+
+    class Workflow(schema.as_state_machine()):
+        def setup(self):
+            linked_calls.append(Counter())
+
+        def step(self, input):
+            if input.transition is not None:
+                source = self.recorder.cases[input.transition.parent_id].value.operation.label
+                linked_calls[-1][(source, input.case.operation.label)] += 1
+            return super().step(input)
+
+        def validate_response(self, response, case, additional_checks=None, **kwargs):
+            pass
+
+    Workflow.run(
+        settings=settings(
+            max_examples=10,
+            stateful_step_count=20,
+            deadline=None,
+            database=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+        )
+    )
+    assert max(max(calls.values(), default=0) for calls in linked_calls) > 2
+
+
+def test_configured_headers_sent_on_every_step():
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=_users_api_with_optional_auth_header())
+    schema.config.update(headers={"X-Token": "secret"})
+    schema.config.generation.update(modes=list(GenerationMode))
+    headers = []
+
+    class Workflow(schema.as_state_machine()):
+        def validate_response(self, response, case, additional_checks=None, **kwargs):
+            headers.append(case.headers.get("X-Token"))
+
+    Workflow.run(
+        settings=settings(
+            max_examples=5,
+            deadline=None,
+            database=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+        )
+    )
+    assert set(headers) == {"secret"}
+
+
+def test_linked_steps_keep_negative_share_of_scenario_starts(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"itemId": "$response.body#/id"}}
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [
+                        {"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    source = schema["/items"]["POST"]
+    [link] = collect_transitions([source, schema["/items/{itemId}"]["GET"]]).operations[source.label].outgoing
+    response = Response.from_requests(response_factory.requests(content=b'{"id": 42}', status_code=201), True)
+    strategy = into_step_input(target=link.target, link=link, modes=list(GenerationMode))(
+        StepOutput(response=response, case=source.Case())
+    )
+    modes = Counter()
+
+    # Enough draws to tell the 10% negative rate, skewed upwards by Hypothesis, from an even split between modes.
+    @given(input=strategy)
+    @settings(max_examples=200, suppress_health_check=list(HealthCheck), database=None)
+    def test(input):
+        modes[input.case.meta.generation.mode] += 1
+
+    test()
+    assert 0 < modes[GenerationMode.NEGATIVE] / modes.total() < 0.45, modes
