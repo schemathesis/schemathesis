@@ -10,7 +10,7 @@ Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
 _________________________________ POST /target _________________________________
 
      1  GET   /source  200
-     2  POST  /target  500
+     2  POST  /target  500  body (unset) -> {"token": "f ...
 
 1. Test Case ID: <PLACEHOLDER>
 

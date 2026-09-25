@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, NamedTuple
 from urllib.parse import urlparse
 
 import click
 
-from schemathesis.cli.commands.replay.executor import CheckOutcome, ReplayOutcome, ReplayStatus, bodies_equal
+from schemathesis.cli.commands.replay.executor import (
+    CheckOutcome,
+    LinkedValue,
+    ReplayOutcome,
+    ReplayStatus,
+    bodies_equal,
+    link_body_pointers,
+)
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import (
     append_replay_command,
@@ -15,8 +23,10 @@ from schemathesis.cli.output import (
     format_summary_banner,
     make_console,
 )
+from schemathesis.core import NOT_SET
 from schemathesis.core.failures import format_failures
 from schemathesis.core.output import truncate_text
+from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.reporting.crashes import CrashFile, CrashStep
 
 if TYPE_CHECKING:
@@ -57,6 +67,10 @@ METHOD_STYLES = {
 }
 
 STEP_PATH_MAX = 60
+LINKED_VALUE_MAX = 16
+LINKED_VALUES_MAX = 3
+# Marks linked values the replay sent as recorded because the live response lacked them.
+UNRESOLVED_MARKER = "*"
 BADGE_WIDTH = max(len(b.glyph) + 1 + len(b.label) for b in BADGES.values())
 
 
@@ -103,7 +117,7 @@ def render_replay(
                     _print_step_chain(console, sequence=crash.sequence, outcome=outcome)
                     console.print()
                 case_id = f"{index}. Test Case ID: {crash.case_id}" if crash.case_id else None
-                reproduce = append_replay_command(crash.code_sample, crash.case_id)
+                reproduce = append_replay_command(outcome.code_sample, crash.case_id)
                 click.echo(
                     format_failures(
                         case_id=case_id,
@@ -215,7 +229,9 @@ def _print_step_chain(
     paths = [truncate_text(_step_path(step), path_limit) for step in sequence]
     method_column = max(len(step.method) for step in sequence)
     path_column = max(len(path) for path in paths)
+    masked_pointers = _link_source_pointers(sequence)
 
+    rows: list[tuple[Text, str]] = []
     for index, step in enumerate(sequence, start=1):
         actual = step_outcomes[index - 1]
 
@@ -229,6 +245,9 @@ def _print_step_chain(
             original_body=step.response_body,
             actual_body=actual.body,
             content_type=step.response_headers.get("content-type", ""),
+            masked_pointers=masked_pointers[index - 1],
+            # Values re-extracted by this step or its ancestors may be echoed back in its body.
+            linked=[value for ancestor in _lineage(sequence, index - 1) for value in step_outcomes[ancestor].links],
         )
 
         row = Text()
@@ -248,7 +267,72 @@ def _print_step_chain(
         if delta is not None:
             row.append("  ")
             row.append(GLYPH_CHANGED, style=delta)
+        rows.append((row, _format_linked_values(actual.links)))
+
+    # Line up the linked values in their own column, padding only rows that have one.
+    status_column = max(len(row) for row, _ in rows)
+    for row, links in rows:
+        if links:
+            row.pad_right(status_column - len(row))
+            row.append("  ")
+            row.append(links, style="dim")
         console.print(row)
+
+
+def _format_linked_values(links: list[LinkedValue]) -> str:
+    shown = links[:LINKED_VALUES_MAX]
+    parts = [_format_linked_value(value) for value in shown]
+    if len(links) > len(shown):
+        parts.append(f"+{len(links) - len(shown)} more")
+    text = ", ".join(parts)
+    if any(value.fresh is UNRESOLVABLE for value in shown):
+        text += f" ({UNRESOLVED_MARKER} not re-extracted)"
+    return text
+
+
+def _format_linked_value(value: LinkedValue) -> str:
+    recorded = _format_value(value.recorded)
+    if value.fresh is UNRESOLVABLE:
+        return f"{value.name} {recorded}{UNRESOLVED_MARKER}"
+    if value.fresh == value.recorded:
+        return f"{value.name} {recorded}"
+    return f"{value.name} {recorded} {ARROW} {_format_value(value.fresh)}"
+
+
+def _format_value(value: object) -> str:
+    if value is NOT_SET:
+        return "(unset)"
+    text = value if isinstance(value, str) else json.dumps(value, default=str)
+    return truncate_text(text, LINKED_VALUE_MAX)
+
+
+def _parent(sequence: list[CrashStep], index: int) -> int | None:
+    # Crash files without a recorded parent link each step to the previous one.
+    parent = sequence[index].parent_index
+    if parent is None:
+        parent = index - 1
+    return parent if 0 <= parent < index else None
+
+
+def _lineage(sequence: list[CrashStep], index: int) -> list[int]:
+    """Indices of the step at `index` and its ancestors."""
+    lineage: list[int] = []
+    current: int | None = index
+    while current is not None:
+        lineage.append(current)
+        current = _parent(sequence, current)
+    return lineage
+
+
+def _link_source_pointers(sequence: list[CrashStep]) -> list[list[str]]:
+    """For each step, the JSON Pointers into its response body that later steps' links extract from."""
+    pointers: list[list[str]] = [[] for _ in sequence]
+    for index, step in enumerate(sequence):
+        parent = _parent(sequence, index)
+        if step.link is None or parent is None:
+            continue
+        pointers[parent].extend(link_body_pointers([*step.link.parameters.values(), step.link.request_body]))
+    return pointers
 
 
 def _print_incompatible_notice(console: Console, count: int) -> None:
@@ -329,10 +413,12 @@ def _step_delta(
     original_body: str,
     actual_body: str,
     content_type: str,
+    masked_pointers: list[str],
+    linked: list[LinkedValue],
 ) -> str | None:
     """Style for the change glyph on a step row, or `None` when the step reproduced unchanged."""
     changed = original_status != actual_status or not bodies_equal(
-        original_body, actual_body, content_type=content_type
+        original_body, actual_body, content_type=content_type, masked_pointers=masked_pointers, linked=linked
     )
     if not changed:
         return None

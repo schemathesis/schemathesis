@@ -1,0 +1,32 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
+
+  x FAILED GET /items/latest
+
+=================================== FAILURES ===================================
+______________________________ GET /items/latest _______________________________
+
+     1  POST    /items            201
+     2  DELETE  /items/{item_id}  200     item_id 7 -> 100
+     3  GET     /items/latest     500  ~
+
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `{"id":100}`
+
+Reproduce with:
+
+    curl -X POST -H 'Content-Type: application/json' -d '{"name": "x"}' http://127.0.0.1/items
+    curl -X DELETE http://127.0.0.1/items/100
+    curl -X GET http://127.0.0.1/items/latest
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================
