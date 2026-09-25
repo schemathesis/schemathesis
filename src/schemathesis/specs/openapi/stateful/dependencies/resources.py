@@ -4,7 +4,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from schemathesis.core.errors import InfiniteRecursiveReference
+from schemathesis.core.errors import InfiniteRecursiveReference, RefResolutionError
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import get_type
@@ -65,16 +65,23 @@ def extract_resources_from_responses(
     Updates the global resource registry as resources are discovered.
     """
     for response in operation.responses.iter_successful_responses():
-        for extracted in iter_resources_from_response(
-            method=operation.method,
-            path=operation.path,
-            response=response,
-            resources=resources,
-            updated_resources=updated_resources,
-            resolver=resolver,
-            canonicalization_cache=canonicalization_cache,
-        ):
-            yield response, extracted
+        try:
+            extracted = list(
+                iter_resources_from_response(
+                    method=operation.method,
+                    path=operation.path,
+                    response=response,
+                    resources=resources,
+                    updated_resources=updated_resources,
+                    resolver=resolver,
+                    canonicalization_cache=canonicalization_cache,
+                )
+            )
+        except RefResolutionError:
+            # A dangling `$ref` (typo, missing component, unavailable file) hides only this response's resources
+            continue
+        for item in extracted:
+            yield response, item
 
 
 ResponseResourceCache: TypeAlias = dict[str, list[tuple["OpenApiResponse", ExtractedResource]]]

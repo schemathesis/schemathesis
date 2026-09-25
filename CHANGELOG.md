@@ -32,6 +32,7 @@
 - Apply test-scoped `filter_case` and `map_case` hooks in the pytest coverage phase.
 - Call test-scoped `after_validate` hooks.
 - Name conflicting keywords inside `$ref` branches of a `oneOf` when test data cannot be generated.
+- Keep operations in dependency inference when a response has an unresolvable `$ref`.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 
