@@ -179,16 +179,9 @@ def from_path(path: str, parameter_name: str | None = None) -> str | None:
 
     # If parameter name provided, find the resource it refers to
     if parameter_name:
-        placeholder = f"{{{parameter_name}}}"
-        try:
-            param_index = segments.index(placeholder)
-            if param_index > 0:
-                resource_segment = segments[param_index - 1]
-                if "{" not in resource_segment:
-                    singular = to_singular(resource_segment)
-                    return to_pascal_case(singular)
-        except ValueError:
-            pass  # Parameter not found in path
+        owner = _owning_segment_resource(segments, parameter_name)
+        if owner is not None:
+            return owner
 
     # Fallback to last non-parameter segment
     non_param_segments = [s for s in segments if "{" not in s]
@@ -202,6 +195,22 @@ def from_path(path: str, parameter_name: str | None = None) -> str | None:
         return to_pascal_case(singular)
 
     return None
+
+
+@lru_cache(maxsize=512)
+def owning_resource(parameter: str, path: str) -> str | None:
+    """Resource named by the static segment right before `{parameter}` (`/api/projects/{code}` -> `Project`)."""
+    return _owning_segment_resource([s for s in strip_version_prefix(path).split("/") if s], parameter)
+
+
+def _owning_segment_resource(segments: list[str], parameter: str) -> str | None:
+    placeholder = f"{{{parameter}}}"
+    if placeholder not in segments:
+        return None
+    index = segments.index(placeholder)
+    if index == 0 or "{" in segments[index - 1]:
+        return None
+    return to_pascal_case(to_singular(segments[index - 1]))
 
 
 IRREGULAR_TO_PLURAL = {
