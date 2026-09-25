@@ -82,7 +82,7 @@ class OpenAPIStateMachine(APIStateMachine):
         return matcher(result)
 
 
-# The proportion of negative tests generated for "root" transitions
+# The proportion of negative tests generated for each step
 NEGATIVE_TEST_CASES_THRESHOLD = 10
 
 
@@ -160,6 +160,39 @@ def _mixed_mode_case(draw: st.DrawFn, strategies: dict[GenerationMode, st.Search
     if draw(st.integers(min_value=0, max_value=99)) < NEGATIVE_TEST_CASES_THRESHOLD:
         return draw(strategies[GenerationMode.NEGATIVE])
     return draw(strategies[GenerationMode.POSITIVE])
+
+
+def _step_case_strategy(
+    target: APIOperation,
+    modes: list[GenerationMode],
+    *,
+    error_feedback: ErrorFeedbackStore | None,
+    extra_data_source: ExtraDataSource | None,
+    constants_value_source: ConstantsPool | None,
+    path_parameters: dict[str, object] | None = None,
+    query: dict[str, object] | None = None,
+    headers: dict[str, object] | None = None,
+    cookies: dict[str, object] | None = None,
+    body: object = NOT_SET,
+) -> st.SearchStrategy[Case]:
+    strategies = {
+        mode: target.as_strategy(
+            generation_mode=mode,
+            phase=TestPhase.STATEFUL,
+            error_feedback=error_feedback,
+            extra_data_source=extra_data_source,
+            constants_value_source=constants_value_source,
+            path_parameters=path_parameters,
+            query=query,
+            headers=headers,
+            cookies=cookies,
+            body=body,
+        )
+        for mode in modes
+    }
+    if len(modes) == 1:
+        return strategies[modes[0]]
+    return _mixed_mode_case(strategies)
 
 
 def _unique_rule_name(name: str, taken: Container[str]) -> str:
@@ -258,28 +291,13 @@ def create_state_machine(
                     )
             if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
                 name = _unique_rule_name(_normalize_name(f"RANDOM -> {target.label}"), rules)
-                if len(config.modes) == 1:
-                    case_strategy = target.as_strategy(
-                        generation_mode=config.modes[0],
-                        phase=TestPhase.STATEFUL,
-                        error_feedback=error_feedback,
-                        extra_data_source=extra_data_source,
-                        constants_value_source=constants_value_source,
-                    )
-                else:
-                    case_strategy = _mixed_mode_case(
-                        {
-                            method: target.as_strategy(
-                                generation_mode=method,
-                                phase=TestPhase.STATEFUL,
-                                error_feedback=error_feedback,
-                                extra_data_source=extra_data_source,
-                                constants_value_source=constants_value_source,
-                            )
-                            for method in config.modes
-                        }
-                    )
-
+                case_strategy = _step_case_strategy(
+                    target,
+                    config.modes,
+                    error_feedback=error_feedback,
+                    extra_data_source=extra_data_source,
+                    constants_value_source=constants_value_source,
+                )
                 rules[name] = transition(
                     name=name,
                     target=catch_all,
@@ -423,20 +441,20 @@ def into_step_input(
                 else:
                     applied_parameters.append((ParameterLocation.BODY, None))
 
-            cases = st.one_of(
-                [
-                    target.as_strategy(
-                        generation_mode=mode,
-                        phase=TestPhase.STATEFUL,
-                        error_feedback=error_feedback,
-                        extra_data_source=extra_data_source,
-                        constants_value_source=constants_value_source,
-                        **overrides,
-                    )
-                    for mode in modes
-                ]
+            case = draw(
+                _step_case_strategy(
+                    target,
+                    modes,
+                    error_feedback=error_feedback,
+                    extra_data_source=extra_data_source,
+                    constants_value_source=constants_value_source,
+                    path_parameters=overrides.get("path_parameters"),
+                    query=overrides.get("query"),
+                    headers=overrides.get("headers"),
+                    cookies=overrides.get("cookies"),
+                    body=overrides.get("body", NOT_SET),
+                )
             )
-            case = draw(cases)
             if request_body is not NOT_SET and link.merge_body:
                 if isinstance(request_body, dict):
                     selected_fields = {}

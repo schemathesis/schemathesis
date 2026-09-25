@@ -21,6 +21,7 @@ from schemathesis.core.media_types import is_xml
 from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
+from schemathesis.specs.openapi.headers import PLAIN_HEADER_FORMATS
 from schemathesis.specs.openapi.negative.types import Draw, Schema
 from schemathesis.specs.openapi.negative.utils import can_negate, is_binary_format
 
@@ -840,6 +841,9 @@ def is_negatable_keyword(key: str, value: Any, *, location: ParameterLocation, a
     if key == "required":
         return value != []
     if key in ("example", "examples", BUNDLE_STORAGE_KEY):
+        return False
+    if location.is_in_header and key == "format" and value in PLAIN_HEADER_FORMATS:
+        # Any string satisfies the header schema, so a value outside the injected format is still valid.
         return False
     if location == ParameterLocation.PATH and key == "minLength" and value == 1:
         # Negating `minLength: 1` produces empty paths that the transport drops anyway.

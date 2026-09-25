@@ -10,10 +10,13 @@
 
 - Name the pattern that stops the analysis when test data cannot be generated.
 - **BREAKING**: `st run` and `st fuzz` fail with exit code 2 when nothing is tested.
+- Linked stateful steps send negative requests as often as scenario-starting steps.
 
 ### :bug: Fixed
 
 - Missing `epic` label with the API title in CLI Allure reports.
+- Stateful tests with more than 6 steps running few scenarios or failing with `Unsatisfiable`.
+- Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
 - Multipart parts for arrays of primitives labelled `application/json` while carrying raw text.
 - Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
 - Dependency inference ignoring `application/x-www-form-urlencoded`, `multipart/form-data` and `formData` request bodies.

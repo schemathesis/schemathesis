@@ -60,6 +60,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiParameterSet,
     build_constants_overlay_strategy,
 )
+from schemathesis.specs.openapi.coverage._schema import ANNOTATION_KEYWORDS
 from schemathesis.specs.openapi.formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
     HEADER_FORMAT,
@@ -72,7 +73,7 @@ from schemathesis.specs.openapi.formats import (
     header_alphabet,
     header_values,
 )
-from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS, get_header_format_strategies
+from schemathesis.specs.openapi.headers import PLAIN_HEADER_FORMATS, get_header_format_strategies
 from schemathesis.specs.openapi.negative import (
     negative_schema,
     wrap_filter_hook_for_generated_value,
@@ -91,7 +92,6 @@ if TYPE_CHECKING:
 SLASH = "/"
 # Probability of generating valid headers in negative mode
 VALID_HEADER_PROBABILITY = 0.95
-_PLAIN_HEADER_FORMATS = {HEADER_FORMAT} | set(KNOWN_HEADER_FORMATS.values())
 # Strategies that take no varying input are deterministic and reusable; allocating
 # them once at import avoids ~300–600ns of fresh `LazyStrategy` construction per call.
 _NONE_STRATEGY: st.SearchStrategy = st.none()
@@ -337,7 +337,8 @@ def openapi_cases(
     if generation_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         if generation_config.modes == [GenerationMode.NEGATIVE]:
             raise SkipTest("Impossible to generate negative test cases")
-        else:
+        # Rejecting a stateful step discards the whole scenario, so the step is sent as a positive one instead.
+        if phase != TestPhase.STATEFUL:
             reject()
 
     # A schema-invalid dictionary draw carries negative content even when no mutator
@@ -991,8 +992,32 @@ def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> 
     headers = container.schema["properties"]
     if not headers:
         return True
-    plain = ({"type": "string"}, *({"type": "string", "format": f} for f in _PLAIN_HEADER_FORMATS))
-    return any(header not in plain for header in headers.values())
+    required = container.schema.get("required", ())
+    # Omitting a required header always violates it; an optional one is negatable only through a constraint
+    # on its value, and any string passes a plain string schema.
+    return any(name in required or not _is_plain_header(header) for name, header in headers.items())
+
+
+_PLAIN_HEADERS = ({"type": "string"}, *({"type": "string", "format": f} for f in PLAIN_HEADER_FORMATS))
+_NULL_SCHEMA = {"type": "null"}
+
+
+def _is_plain_header(schema: JsonSchema) -> bool:
+    """Whether the header accepts any string, ignoring annotations and a `null` alternative."""
+    if not isinstance(schema, dict):
+        return False
+    keywords = {
+        key: value
+        for key, value in schema.items()
+        if key not in ANNOTATION_KEYWORDS and key not in ("default", "nullable") and not key.startswith("x-")
+    }
+    if len(keywords) == 1:
+        branches = keywords.get("anyOf", keywords.get("oneOf"))
+        if isinstance(branches, list):
+            return all(branch == _NULL_SCHEMA or _is_plain_header(branch) for branch in branches)
+    if isinstance(keywords.get("type"), list) and sorted(keywords["type"]) == ["null", "string"]:
+        keywords["type"] = "string"
+    return keywords in _PLAIN_HEADERS
 
 
 def get_parameters_strategy(
@@ -1279,7 +1304,7 @@ def _can_skip_header_filter(schema: dict[str, Any]) -> bool:
     # All headers should have a known format key in order to avoid the header filter.
     # A header written as a boolean names no format, and claims either every value or none.
     return all(
-        isinstance(sub_schema, dict) and sub_schema.get("format") in _PLAIN_HEADER_FORMATS
+        isinstance(sub_schema, dict) and sub_schema.get("format") in PLAIN_HEADER_FORMATS
         for sub_schema in schema.get("properties", {}).values()
     )
 

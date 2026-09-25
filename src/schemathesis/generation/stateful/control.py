@@ -54,6 +54,17 @@ MAX_OPERATIONS_PER_SOURCE_CAP = 2
 MAX_ROOT_SOURCES = 2
 
 
+def _scenario_step_count() -> int:
+    """Steps per scenario configured for the Hypothesis run that creates the state machine."""
+    import hypothesis
+
+    # A running Hypothesis test exposes its own settings as the default ones.
+    current = hypothesis.settings.default
+    if current is None:
+        return DEFAULT_MAX_SCENARIO_STEPS
+    return current.stateful_step_count
+
+
 def _get_max_operations_per_source(transitions: Transitions) -> int:
     """Calculate global limit based on number of sources to maximize diversity of used API calls."""
     sources = len(transitions.operations)
@@ -62,7 +73,7 @@ def _get_max_operations_per_source(transitions: Transitions) -> int:
         return MAX_OPERATIONS_PER_SOURCE_CAP
 
     # Total steps divided by number of sources, but never below the cap
-    return max(MAX_OPERATIONS_PER_SOURCE_CAP, DEFAULT_MAX_SCENARIO_STEPS // sources)
+    return max(MAX_OPERATIONS_PER_SOURCE_CAP, _scenario_step_count() // sources)
 
 
 @dataclass
