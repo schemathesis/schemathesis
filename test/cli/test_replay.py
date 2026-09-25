@@ -5,6 +5,7 @@ import io
 import itertools
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -15,16 +16,19 @@ from rich.console import Console
 import schemathesis
 from schemathesis.cli.commands.replay import executor
 from schemathesis.cli.commands.replay.executor import (
+    LinkedValue,
     ReplayOutcome,
     ReplayStatus,
     StepOutcome,
     _build_case,
+    bodies_equal,
 )
-from schemathesis.cli.commands.replay.output import render_replay
+from schemathesis.cli.commands.replay.output import _format_linked_values, render_replay
 from schemathesis.cli.output import make_console
 from schemathesis.config import OutputConfig
 from schemathesis.core import transport
 from schemathesis.core.failures import ServerError
+from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.reporting.crashes import MANIFEST_FILENAME, CrashCheck, CrashFile, CrashLink, CrashStep, CrashWriter
 from test.apps.catalog.openapi.modifiers.stateful import IndependentInternalError
 from test.fixtures.crashes import FailingCheck, Link, LinkParameter, Step
@@ -943,6 +947,264 @@ def test_replay_links_resolve_against_recorded_parent_not_previous_step(cli, app
     assert "FIXED" not in result.output, result.output
 
 
+def _items_app(ctx, app_runner):
+    # Every POST mints a new id, so ids recorded in a crash file never exist on a later replay.
+    item_id = {"in": "path", "name": "item_id", "required": True, "schema": {"type": "integer"}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/items/{item_id}": {
+                "delete": {"parameters": [item_id], "responses": {"200": {"description": "OK"}}},
+                "get": {"parameters": [item_id], "responses": {"200": {"description": "OK"}}},
+            },
+            "/items/latest": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    )
+    ids = itertools.count(100)
+    items = {}
+
+    @app.route("/items", methods=["POST"])
+    def create():
+        new_id = next(ids)
+        items[new_id] = {"id": new_id, "name": request.get_json()["name"]}
+        return jsonify(items[new_id]), 201
+
+    @app.route("/items/<int:item_id>", methods=["DELETE"])
+    def delete(item_id):
+        if item_id not in items:
+            return jsonify({"error": "not found"}), 404
+        return jsonify({"id": item_id}), 200
+
+    @app.route("/items/latest")
+    def latest():
+        return jsonify({"id": max(items)}), 500
+
+    @app.route("/items/<int:item_id>")
+    def read(item_id):
+        # The bug: DELETE never removes the item, so it stays readable.
+        if item_id not in items:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(items[item_id]), 200
+
+    schema_url = app_runner.openapi_url(app)
+    return schema_url, schema_url.rsplit("/", 1)[0]
+
+
+def _items_chain(crash_factory, *, parent: int | None, request_headers: dict[str, str] | None = None) -> CrashFile:
+    extract_id = LinkParameter(location="path", name="item_id", expression="$response.body#/id")
+    crash = crash_factory.chain(
+        steps=[
+            Step(
+                method="POST",
+                path="/items",
+                status=201,
+                body=b'{"id": 7, "name": "x"}',
+                case_body={"name": "x"},
+                media_type="application/json",
+                request_headers=request_headers or {},
+            ),
+            Step(
+                method="DELETE",
+                path="/items/{item_id}",
+                status=200,
+                body=b'{"id": 7}',
+                path_parameters={"item_id": 7},
+                parent=parent,
+                link=Link(operation_id="deleteItem", parameters=[extract_id]),
+                request_headers=request_headers or {},
+            ),
+            Step(
+                method="GET",
+                path="/items/{item_id}",
+                status=200,
+                body=b'{"id": 7, "name": "x"}',
+                path_parameters={"item_id": 7},
+                parent=parent,
+                link=Link(operation_id="getItem", parameters=[extract_id]),
+                checks=[FailingCheck(name="use_after_free", related_step=1)],
+                request_headers=request_headers or {},
+            ),
+        ]
+    )
+    crash.code_sample = (
+        "curl -X POST -H 'Content-Type: application/json' -d '{\"name\": \"x\"}' http://127.0.0.1/items\n"
+        "curl -X DELETE http://127.0.0.1/items/7\n"
+        "curl -X GET http://127.0.0.1/items/7"
+    )
+    return crash
+
+
+@pytest.mark.snapshot
+def test_replay_chain_reproduces_with_fresh_ids(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
+    # The reproduce commands and step diffs must use the ids this replay minted, not the recorded ones.
+    schema_url, base = _items_app(ctx, app_runner)
+    crash_dir = _crashes_dir(tmp_path)
+    writer = CrashWriter(directory=crash_dir)
+    writer.open(schema_location=schema_url, base_url=base)
+    writer.write(_items_chain(crash_factory, parent=0))
+
+    assert cli.main("replay", "--keep") == snapshot_cli
+
+
+@pytest.mark.snapshot
+def test_replay_sibling_link_values_do_not_mask_body_changes(
+    cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
+):
+    # The last step shares only the root with the linked DELETE, so its changed id is a real difference.
+    schema_url, base = _items_app(ctx, app_runner)
+    crash_dir = _crashes_dir(tmp_path)
+    writer = CrashWriter(directory=crash_dir)
+    writer.open(schema_location=schema_url, base_url=base)
+    extract_id = LinkParameter(location="path", name="item_id", expression="$response.body#/id")
+    crash = crash_factory.chain(
+        steps=[
+            Step(
+                method="POST",
+                path="/items",
+                status=201,
+                body=b'{"id": 7, "name": "x"}',
+                case_body={"name": "x"},
+                media_type="application/json",
+            ),
+            Step(
+                method="DELETE",
+                path="/items/{item_id}",
+                status=200,
+                body=b'{"id": 7}',
+                path_parameters={"item_id": 7},
+                parent=0,
+                link=Link(operation_id="deleteItem", parameters=[extract_id]),
+            ),
+            Step(
+                method="GET",
+                path="/items/latest",
+                status=500,
+                body=b'{"id": 7}',
+                checks=[FailingCheck(name="not_a_server_error")],
+            ),
+        ]
+    )
+    crash.sequence[2] = replace(crash.sequence[2], parent_index=0)
+    writer.write(crash)
+
+    assert cli.main("replay", "--keep") == snapshot_cli
+
+
+@pytest.mark.snapshot
+def test_replay_old_crash_file_without_parent_index_or_case_headers(
+    cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
+):
+    # Without recorded parents or case headers, each step links to the previous one and resends the wire headers.
+    schema_url, base = _items_app(ctx, app_runner)
+    crash_dir = _crashes_dir(tmp_path)
+    CrashWriter(directory=crash_dir).open(schema_location=schema_url, base_url=base)
+    data = _items_chain(crash_factory, parent=None, request_headers={"X-Api-Key": "secret-key"}).to_dict()
+    for step in data["sequence"]:
+        del step["parent_index"]
+        del step["case_headers"]
+    (crash_dir / "old.json").write_text(json.dumps(data))
+
+    assert cli.main("replay", "--keep") == snapshot_cli
+
+
+@pytest.mark.snapshot
+def test_replay_resends_custom_wire_headers_but_not_generated_ones(
+    cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
+):
+    received = []
+    app, _ = ctx.openapi.make_flask_app({"/broken": {"get": {"responses": {"500": {"description": "Error"}}}}})
+
+    @app.route("/broken")
+    def broken():
+        received.append(
+            (
+                request.headers.get("X-Api-Key"),
+                request.headers.get("User-Agent"),
+                request.headers.get("X-Schemathesis-TestCaseId"),
+            )
+        )
+        return jsonify({"error": "still broken"}), 500
+
+    schema_url = app_runner.openapi_url(app)
+    base = schema_url.rsplit("/", 1)[0]
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{base}/broken",
+        schema_location=schema_url,
+        path_template="/broken",
+        status=500,
+        body='{"error": "still broken"}',
+        request_headers={
+            "User-Agent": "schemathesis/0.0.0",
+            "X-Schemathesis-TestCaseId": "Old123",
+            "X-Api-Key": "secret-key",
+        },
+    )
+
+    assert cli.main("replay", str(crash_file), "--keep") == snapshot_cli
+    [(api_key, user_agent, test_case_id)] = received
+    assert (api_key, user_agent == "schemathesis/0.0.0", test_case_id == "Old123") == ("secret-key", False, False)
+
+
+def test_build_case_keeps_wire_headers_alongside_header_parameters(ctx, crash_factory):
+    schema = ctx.openapi.load_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    operation = schema["/users"]["GET"]
+    crash = crash_factory.single(
+        path="/users",
+        status=500,
+        request_headers={"X-Tenant-Id": "t1", "x-version": "1", "User-Agent": "schemathesis/0.0.0"},
+    )
+
+    case = _build_case(operation, replace(crash.sequence[0], case_headers={"X-Version": "2"}))
+
+    assert case.headers == {"X-Tenant-Id": "t1", "X-Version": "2"}
+
+
+def test_linked_values_are_shortened_capped_and_marked_once():
+    links = [
+        LinkedValue(location="path", name="item_id", recorded=7, fresh=100),
+        LinkedValue(location="query", name="token", recorded="stale-token", fresh=UNRESOLVABLE),
+        LinkedValue(location="query", name="trace", recorded="a" * 40, fresh="b" * 40),
+        LinkedValue(location="header", name="X-Org", recorded="acme", fresh=UNRESOLVABLE),
+        LinkedValue(location="query", name="page", recorded=1, fresh=2),
+    ]
+
+    assert _format_linked_values(links) == (
+        "item_id 7 -> 100, token stale-token*, trace aaaaaaaaaaaa ... -> bbbbbbbbbbbb ..., +2 more (* not re-extracted)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("recorded", "actual", "masked_pointers", "expected"),
+    [
+        ('{"id": 7, "name": "x"}', '{"id": 100, "name": "x"}', [], True),
+        ('{"id": 7, "name": "x"}', '{"id": 100, "name": "y"}', [], False),
+        ('{"id": 7, "qty": 7}', '{"id": 100, "qty": 100}', [], False),
+        ('{"id": "7"}', '{"id": "100"}', [], False),
+        ('{"items": [{"id": 1}]}', '{"items": [{"id": 2}]}', ["/items/0/id"], True),
+        ('{"items": [{"id": 1}]}', '{"items": []}', ["/items/0/id"], False),
+        ('{"id": 1}', '{"id": null}', ["/id"], False),
+    ],
+    ids=[
+        "echoed-link-value",
+        "real-change",
+        "same-value-elsewhere",
+        "different-type",
+        "extraction-source",
+        "extraction-source-gone",
+        "extraction-source-becomes-null",
+    ],
+)
+def test_link_derived_values_are_not_body_changes(recorded, actual, masked_pointers, expected):
+    linked = [LinkedValue(location="path", name="item_id", recorded=7, fresh=100, pointers=["/id"])]
+
+    assert (
+        bodies_equal(recorded, actual, content_type="application/json", masked_pointers=masked_pointers, linked=linked)
+        is expected
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_keyboard_interrupt(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli, monkeypatch):
     app, _ = ctx.openapi.make_flask_app({"/a": {"get": {"responses": {"500": {"description": "Error"}}}}})
@@ -1128,6 +1390,7 @@ def test_render_step_chain(snapshot, crash_factory):
             duration_ms=120,
             failures=[ServerError(operation="GET /c", status_code=503)],
             transport_response=response,
+            code_sample="curl http://127.0.0.1",
             step_outcomes=[
                 StepOutcome(302, '{"ok": 1}'),
                 StepOutcome(404, '{"y": 2}'),

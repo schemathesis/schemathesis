@@ -11,6 +11,7 @@
 - Name the pattern that stops the analysis when test data cannot be generated.
 - **BREAKING**: `st run` and `st fuzz` fail with exit code 2 when nothing is tested.
 - Linked stateful steps send negative requests as often as scenario-starting steps.
+- `st replay` step chains show each linked value as `recorded -> replayed`.
 
 ### :bug: Fixed
 
@@ -46,6 +47,9 @@
 - Missing inferred stateful links for path parameters named after a resource field, e.g. `/projects/{code}`.
 - Inferred stateful links reading response fields the schema does not define.
 - Missing inferred stateful links for fields and nested foreign keys inherited through `allOf`.
+- `st replay` reproduce commands for stateful chains using stale recorded IDs.
+- `st replay` flagging stateful steps as changed when only re-extracted IDs differ.
+- `st replay` resending stale `User-Agent` and test case ID headers, or dropping `-H` headers.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 

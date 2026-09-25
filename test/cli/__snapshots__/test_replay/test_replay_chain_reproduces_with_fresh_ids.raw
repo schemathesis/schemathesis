@@ -1,0 +1,36 @@
+Exit code: 1
+---
+Stdout:
+
+Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
+
+  x FAILED GET /items/{item_id}
+
+=================================== FAILURES ===================================
+_____________________________ GET /items/{item_id} _____________________________
+
+     1  POST    /items            201
+     2  DELETE  /items/{item_id}  200  item_id 7 -> 100
+     3  GET     /items/{item_id}  200  item_id 7 -> 100
+
+1. Test Case ID: <PLACEHOLDER>
+
+- Use after free
+
+    The API did not return a `HTTP 404 Not Found` response (got `HTTP 200 OK`) for a resource that was previously deleted.
+
+    The resource was deleted with `DELETE /items/100`
+
+[200] OK:
+
+    `{"id":100,"name":"x"}`
+
+Reproduce with:
+
+    curl -X POST -H 'Content-Type: application/json' -d '{"name": "x"}' http://127.0.0.1/items
+    curl -X DELETE http://127.0.0.1/items/100
+    curl -X GET http://127.0.0.1/items/100
+
+    st replay <PLACEHOLDER>
+
+============================== 1 failed in 1.00s ===============================

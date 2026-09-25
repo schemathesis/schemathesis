@@ -2,27 +2,23 @@ Exit code: 1
 ---
 Stdout:
 
-Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
+Replaying 1 case from /tmp/GET_broken_not_a_server_error_testtest.json
 
-  x FAILED POST /target
+  x FAILED GET /broken
 
 =================================== FAILURES ===================================
-_________________________________ POST /target _________________________________
-
-     1  GET   /source  200
-     2  POST  /target  500  body {"token": "r ...* (* not re-extracted)
-
+_________________________________ GET /broken __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Server error
 
 [500] Internal Server Error:
 
-    `{"error":"boom"}`
+    `{"error":"still broken"}`
 
 Reproduce with:
 
-    <PLACEHOLDER>
+    curl -X GET -H 'X-Api-Key: [Filtered]' http://127.0.0.1/broken
 
     st replay <PLACEHOLDER>
 

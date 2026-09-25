@@ -6,10 +6,12 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from schemathesis.core import NOT_SET
+from schemathesis.core.curl import get_excluded_headers
 from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import UNRESOLVABLE
+from schemathesis.core.transforms import UNRESOLVABLE, iter_decoded_pointer_segments
 from schemathesis.reporting.crashes import CrashCheck, CrashFile, CrashLink, CrashStep
 
 if TYPE_CHECKING:
@@ -37,9 +39,26 @@ MAX_REPLAY_ATTEMPTS = 3
 
 
 @dataclass(slots=True)
+class LinkedValue:
+    """A value a step's link re-extracted from its parent's live response."""
+
+    location: str
+    name: str
+    # `NOT_SET` when the recorded request had no value there.
+    recorded: object
+    # `UNRESOLVABLE` when the live response lacks it, so the recorded value was sent instead.
+    fresh: object
+    # JSON Pointers into the parent's response body the link extracts the value from.
+    pointers: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class StepOutcome:
     status_code: int
     body: str
+    # The command reproducing the request this replay sent for the step.
+    curl: str = ""
+    links: list[LinkedValue] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -58,6 +77,8 @@ class ReplayOutcome:
     check_outcomes: list[CheckOutcome] = field(default_factory=list)
     failures: list[Failure] = field(default_factory=list)
     transport_response: Response | None = None
+    # Commands reproducing the requests this replay sent; empty when it stopped before the terminal step.
+    code_sample: str = ""
 
 
 def replay_crash_file(
@@ -199,13 +220,14 @@ def _replay_sequence(
         elif step_outputs:
             parent_output = step_outputs[-1]
 
+        links: list[LinkedValue] = []
         if (
             parent_output is not None
             and step.link is not None
             and (step.link.parameters or step.link.request_body is not None)
         ):
             try:
-                _apply_link_parameters(case, step.link, parent_output)
+                links = _apply_link_parameters(case, step.link, parent_output)
             except (KeyError, ValueError) as exc:
                 return _errored_outcome(
                     f"extraction failed at step {index + 1} - {exc}",
@@ -222,7 +244,11 @@ def _replay_sequence(
         recorder.record_case(parent_id=parent_id, case=case, transition=None, is_transition_applied=False)
         recorder.record_response(case_id=case.id, response=response)
 
-        step_outcomes.append(StepOutcome(status_code=response.status_code, body=response.text_lossy()))
+        # Built from the headers this step actually sent, the same way a run reports its failures.
+        curl = case.as_curl_command(headers=recorder.find_request_headers(case_id=case.id), verify=response.verify)
+        step_outcomes.append(
+            StepOutcome(status_code=response.status_code, body=response.text_lossy(), curl=curl, links=links)
+        )
         step_outputs.append(StepOutput(response=response, case=case))
         if index == last_index:
             terminal_case = case
@@ -251,30 +277,86 @@ def _replay_sequence(
         check_outcomes=check_outcomes,
         failures=check_failures,
         transport_response=terminal_response,
+        code_sample="\n".join(outcome.curl for outcome in step_outcomes),
     )
 
 
-def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: StepOutput) -> None:
+def _apply_link_parameters(case: Case, link: CrashLink, previous_step_output: StepOutput) -> list[LinkedValue]:
     from schemathesis.specs.openapi.expressions import evaluate
 
+    linked: list[LinkedValue] = []
     # Re-extract each link parameter from the previous response into its container.
     for key, expression in link.parameters.items():
         location, _, name = key.partition(".")
+        container = getattr(case, ParameterLocation(location).container_name)
         value = evaluate(expression, previous_step_output)
+        linked.append(
+            LinkedValue(
+                location=location,
+                name=name,
+                recorded=container.get(name, NOT_SET),
+                fresh=value,
+                pointers=link_body_pointers(expression),
+            )
+        )
         if value is UNRESOLVABLE:
             # Re-extraction failed; reuse the value captured at the original failure.
             continue
-        container = getattr(case, ParameterLocation(location).container_name)
         container[name] = value
 
     if link.request_body is not None:
         # Re-extract the body from the previous response, merging into the recorded one.
         body = evaluate(link.request_body, previous_step_output, evaluate_nested=True)
-        if body is not UNRESOLVABLE:
-            if isinstance(body, dict) and isinstance(case.body, dict):
-                case.body = {**case.body, **body}
-            else:
+        if isinstance(body, dict) and isinstance(case.body, dict) and isinstance(link.request_body, dict):
+            recorded_body = case.body
+            linked.extend(
+                LinkedValue(
+                    location="body",
+                    name=name,
+                    recorded=recorded_body.get(name, NOT_SET),
+                    fresh=value,
+                    pointers=link_body_pointers(link.request_body.get(name)),
+                )
+                for name, value in body.items()
+            )
+            case.body = {**recorded_body, **body}
+        else:
+            linked.append(
+                LinkedValue(
+                    location="body",
+                    name="body",
+                    recorded=case.body,
+                    fresh=body,
+                    pointers=link_body_pointers(link.request_body),
+                )
+            )
+            if body is not UNRESOLVABLE:
                 case.body = body
+    return linked
+
+
+def link_body_pointers(expressions: object) -> list[str]:
+    """JSON Pointers into the parent's response body that link expressions, possibly nested, extract from."""
+    from schemathesis.specs.openapi.expressions import nodes, parser
+    from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
+
+    pointers: list[str] = []
+    pending = [expressions]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, dict):
+            pending.extend(item.values())
+        elif isinstance(item, list):
+            pending.extend(item)
+        elif isinstance(item, str):
+            try:
+                parsed = parser.parse(item)
+            except RuntimeExpressionError:
+                continue
+            pointers.extend(
+                node.pointer[1:] for node in parsed if isinstance(node, nodes.BodyResponse) and node.pointer
+            )
+    return pointers
 
 
 def _evaluate_checks(
@@ -356,8 +438,15 @@ _STALE_HEADERS = frozenset({"content-length", "host", "transfer-encoding", "conn
 def _build_case(operation: APIOperation, step: CrashStep) -> Case:
     from schemathesis.generation.meta import CaseMetadata
 
-    source_headers = step.case_headers or step.request_headers
-    headers = {key: value for key, value in source_headers.items() if key.lower() not in _STALE_HEADERS}
+    # Wire headers carry user-supplied ones such as `-H`; the transport regenerates the rest.
+    excluded = get_excluded_headers()
+    case_header_names = {key.lower() for key in step.case_headers}
+    headers = {
+        key: value
+        for key, value in step.request_headers.items()
+        if key.lower() not in _STALE_HEADERS and key not in excluded and key.lower() not in case_header_names
+    }
+    headers.update(step.case_headers)
     case = operation.Case(
         method=step.method,
         path_parameters=step.path_parameters,
@@ -383,12 +472,79 @@ def _case_status(check_outcomes: list[CheckOutcome]) -> ReplayStatus:
     return ReplayStatus.FIXED
 
 
-def bodies_equal(left: str, right: str, *, content_type: str) -> bool:
-    if left == right:
+def bodies_equal(
+    recorded: str,
+    actual: str,
+    *,
+    content_type: str,
+    masked_pointers: list[str] | None = None,
+    linked: list[LinkedValue] | None = None,
+) -> bool:
+    """Whether a replayed body matches the recorded one, ignoring values links re-extracted.
+
+    `masked_pointers` locate values later steps extract from; `linked` values are ignored where their links extract them.
+    """
+    if recorded == actual:
         return True
     if content_type and is_json(content_type):
         try:
-            return json.loads(left) == json.loads(right)
+            recorded_document, actual_document = json.loads(recorded), json.loads(actual)
         except (ValueError, TypeError):
-            pass
+            return False
+        for pointer in masked_pointers or ():
+            recorded_document, actual_document = _mask(
+                recorded_document, actual_document, list(iter_decoded_pointer_segments(pointer))
+            )
+        for value in linked or ():
+            if value.fresh is UNRESOLVABLE:
+                continue
+            for pointer in value.pointers:
+                recorded_document, actual_document = _mask(
+                    recorded_document,
+                    actual_document,
+                    list(iter_decoded_pointer_segments(pointer)),
+                    expected=(value.recorded, value.fresh),
+                )
+        return recorded_document == actual_document
     return False
+
+
+class _Masked:
+    """Placeholder for a value both bodies hold but that is expected to differ between them."""
+
+
+_MASKED = _Masked()
+
+
+def _mask(
+    recorded: object, actual: object, segments: list[str], expected: tuple[object, object] | None = None
+) -> tuple[object, object]:
+    """Replace the scalars at `segments` in both documents with a placeholder.
+
+    Without `expected`, both must be of the same type; with it, they must be exactly the expected pair.
+    """
+    if not segments:
+        if expected is None:
+            matches = _is_scalar(recorded) and type(recorded) is type(actual)
+        else:
+            matches = _is_exactly(recorded, expected[0]) and _is_exactly(actual, expected[1])
+        return (_MASKED, _MASKED) if matches else (recorded, actual)
+    head, rest = segments[0], segments[1:]
+    if isinstance(recorded, dict) and isinstance(actual, dict) and head in recorded and head in actual:
+        left, right = _mask(recorded[head], actual[head], rest, expected)
+        return {**recorded, head: left}, {**actual, head: right}
+    if isinstance(recorded, list) and isinstance(actual, list) and head.isdigit():
+        index = int(head)
+        if index < len(recorded) and index < len(actual):
+            left, right = _mask(recorded[index], actual[index], rest, expected)
+            return [*recorded[:index], left, *recorded[index + 1 :]], [*actual[:index], right, *actual[index + 1 :]]
+    return recorded, actual
+
+
+def _is_scalar(value: object) -> bool:
+    return isinstance(value, (str, int, float, bool))
+
+
+def _is_exactly(value: object, expected: object) -> bool:
+    # Types must match so `1` never stands in for `True`.
+    return _is_scalar(value) and type(value) is type(expected) and value == expected
