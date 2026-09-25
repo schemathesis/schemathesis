@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema, OperationNotFound, RefResolutionError
+from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -24,11 +25,13 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
 )
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
+    Cardinality,
     DependencyGraph,
     InputSlot,
     NormalizedLink,
     OperationMap,
     OperationNode,
+    ResourceDefinition,
     ResourceMap,
 )
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
@@ -65,7 +68,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # Nested-body FK lookups whose target resource wasn't yet registered when the consumer
     # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
     deferred_nested_fks: dict[str, list[tuple[str, str, str]]] = {}
-    deferred_named_scalars: dict[str, list[tuple[str, str]]] = {}
+    deferred_named_scalars: dict[str, list[tuple[str, str, JsonSchema]]] = {}
 
     # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
     candidate_resource_names = naming.collect_candidate_resource_names(schema.raw_schema)
@@ -74,7 +77,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
         if isinstance(result, Ok):
             operation = result.ok()
             pending: list[tuple[str, str, str]] = []
-            pending_named_scalars: list[tuple[str, str]] = []
+            pending_named_scalars: list[tuple[str, str, JsonSchema]] = []
             inputs = list(
                 extract_inputs(
                     operation=operation,
@@ -127,25 +130,35 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Bind body fields named after a collection whose responses list the values they accept
     # (`country` <- `GET /countries`). Deferred to here so the producer is known.
-    primitive_producers = {
-        output.resource.name
-        for node in operations.values()
-        for output in node.outputs
-        if output.is_primitive_identifier
-    }
+    primitive_producers = set()
+    object_collection_producers = set()
+    for node in operations.values():
+        for output in node.outputs:
+            if output.is_primitive_identifier:
+                primitive_producers.add(output.resource.name)
+            elif output.cardinality == Cardinality.MANY:
+                object_collection_producers.add(output.resource.name)
     for label, named_scalars in deferred_named_scalars.items():
         node = operations[label]
         bound = {slot.parameter_name for slot in node.inputs}
-        for resource_name, property_name in named_scalars:
-            if property_name in bound or resource_name not in primitive_producers:
+        for resource_name, property_name, property_schema in named_scalars:
+            if property_name in bound or (
+                resource_name not in primitive_producers and resource_name not in object_collection_producers
+            ):
                 continue
             target = resources[resource_name]
             if any(output.resource.name == resource_name for output in node.outputs):
                 continue
+            if resource_name in primitive_producers:
+                field = target.fields[0] if target.fields else "id"
+            elif _accepts_code(property_schema, target):
+                field = "code"
+            else:
+                continue
             node.inputs.append(
                 InputSlot(
                     resource=target,
-                    resource_field=target.fields[0] if target.fields else "id",
+                    resource_field=field,
                     parameter_name=property_name,
                     parameter_location=ParameterLocation.BODY,
                 )
@@ -176,6 +189,12 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     remove_unused_resources(operations, resources)
 
     return DependencyGraph(operations=operations, resources=resources)
+
+
+def _accepts_code(schema: JsonSchema, resource: ResourceDefinition) -> bool:
+    # Listed objects are passed around by their plain `code` (`language` <- `GET /languages[*].code`). Ids, slugs
+    # and formatted strings are not: fields named after a collection often take URLs or unrelated enums instead.
+    return isinstance(schema, dict) and "format" not in schema and resource.types.get("code") == set(get_type(schema))
 
 
 def inject_links(schema: OpenApiSchema) -> int:

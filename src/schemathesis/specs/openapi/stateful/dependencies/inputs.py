@@ -40,7 +40,7 @@ def extract_inputs(
     canonicalization_cache: CanonicalizationCache,
     response_resource_cache: ResponseResourceCache,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
-    deferred_named_scalars: list[tuple[str, str]] | None = None,
+    deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
@@ -73,20 +73,28 @@ def extract_inputs(
                 known_dependencies.add(input_slot.resource.name)
             yield input_slot
 
+    json_bodies = []
+    form_bodies = []
     for body in operation.body:
         try:
-            if media_types.is_json(body.media_type):
-                yield from _resolve_body_dependencies(
-                    body=body,
-                    operation=operation,
-                    resources=resources,
-                    known_dependencies=known_dependencies,
-                    deferred_nested_fks=deferred_nested_fks,
-                    deferred_named_scalars=deferred_named_scalars,
-                    candidate_resource_names=candidate_resource_names,
-                )
+            media_type = media_types.parse(body.media_type)
         except MalformedMediaType:
             continue
+        if media_types.is_json_parts(media_type):
+            json_bodies.append(body)
+        elif media_types.is_form_parts(media_type):
+            form_bodies.append(body)
+    # Link values fill whichever body variant is sent, so form fields matter only when there is no JSON variant.
+    for body in json_bodies or form_bodies:
+        yield from _resolve_body_dependencies(
+            body=body,
+            operation=operation,
+            resources=resources,
+            known_dependencies=known_dependencies,
+            deferred_nested_fks=deferred_nested_fks,
+            deferred_named_scalars=deferred_named_scalars,
+            candidate_resource_names=candidate_resource_names,
+        )
 
 
 def _resolve_parameter_dependency(
@@ -318,7 +326,7 @@ def _resolve_body_dependencies(
     resources: ResourceMap,
     known_dependencies: set[str],
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
-    deferred_named_scalars: list[tuple[str, str]] | None = None,
+    deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
@@ -397,7 +405,7 @@ def _resolve_body_dependencies(
         if resource_name is None and deferred_named_scalars is not None and _is_scalar(subschema):
             # A field carrying no identifier suffix may still name the collection listing its
             # accepted values (`country` <- `GET /countries`). The producer is confirmed later.
-            deferred_named_scalars.append((naming.to_pascal_case(property_name), property_name))
+            deferred_named_scalars.append((naming.to_pascal_case(property_name), property_name, subschema))
 
         # Skip generic property names & optional fields (at least for now)
         if property_name in GENERIC_FIELD_NAMES or property_name not in required:

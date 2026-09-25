@@ -6,6 +6,7 @@ https://swagger.io/docs/specification/links/#runtime-expressions
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,7 +29,7 @@ class MultiMatch:
 def evaluate(expr: Any, output: StepOutput, evaluate_nested: bool = False) -> Any:
     """Evaluate runtime expression in context."""
     if isinstance(expr, (dict, list)) and evaluate_nested:
-        return _evaluate_nested(expr, output)
+        return _evaluate_nested(expr, output, _evaluate_nested_value)
     if not isinstance(expr, str):
         # Can be a non-string constant
         return expr
@@ -48,8 +49,10 @@ def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
     on zero matches or structural failure.
 
     Inference produces single-node `$response.body#/.../*/...` expressions; that's
-    the only shape this function is contracted to handle.
+    the only shape this function is contracted to handle. Request bodies are evaluated per value.
     """
+    if isinstance(expr, (dict, list)):
+        return _evaluate_nested(expr, output, evaluate_wildcard)
     if not isinstance(expr, str) or "/*" not in expr:
         return evaluate(expr, output)
     [node] = parser.parse(expr)
@@ -67,21 +70,27 @@ def evaluate_wildcard(expr: Any, output: StepOutput) -> Any:
     return UNRESOLVABLE
 
 
-def _evaluate_nested(expr: dict[str, Any] | list, output: StepOutput) -> Any:
+def _evaluate_nested_value(expr: Any, output: StepOutput) -> Any:
+    return evaluate(expr, output, evaluate_nested=True)
+
+
+def _evaluate_nested(
+    expr: dict[str, Any] | list, output: StepOutput, evaluate_value: Callable[[Any, StepOutput], Any]
+) -> Any:
     if isinstance(expr, dict):
         result_dict = {}
         for key, value in expr.items():
             new_key = _evaluate_object_key(key, output)
             if new_key is UNRESOLVABLE:
                 return new_key
-            new_value = evaluate(value, output, evaluate_nested=True)
+            new_value = evaluate_value(value, output)
             if new_value is UNRESOLVABLE:
                 return new_value
             result_dict[new_key] = new_value
         return result_dict
     result_list = []
     for item in expr:
-        new_value = evaluate(item, output, evaluate_nested=True)
+        new_value = evaluate_value(item, output)
         if new_value is UNRESOLVABLE:
             return new_value
         result_list.append(new_value)

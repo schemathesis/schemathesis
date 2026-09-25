@@ -1290,3 +1290,58 @@ def test_removal_by_non_delete_verb_suppresses_resource_availability(ctx, app_ru
     )
 
     assert result.failures == [], [failure.failure_info.failure.title for failure in result.failures]
+
+
+@pytest.mark.parametrize("media_type", ["application/json", "application/x-www-form-urlencoded"])
+def test_inferred_body_link_sends_a_listed_value(ctx, app_runner, stop_event, media_type):
+    language = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "code": {"type": "string"}},
+        "required": ["name", "code"],
+    }
+    check = {"type": "object", "properties": {"language": {"type": "string"}}, "required": ["language"]}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/languages": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "array", "items": language}}},
+                        }
+                    }
+                }
+            },
+            "/check": {
+                "post": {
+                    "requestBody": {"required": True, "content": {media_type: {"schema": check}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    sent = []
+
+    @app.route("/languages", methods=["GET"])
+    def list_languages():
+        return jsonify([{"name": "Planted", "code": "planted-code"}])
+
+    @app.route("/check", methods=["POST"])
+    def check_text():
+        payload = request.get_json(silent=True) if request.is_json else request.form
+        sent.append((payload or {}).get("language"))
+        return jsonify({}), 200
+
+    port = app_runner.run_flask_app(app)
+    config = schemathesis.Config.from_dict(
+        {"checks": {"enabled": False}, "generation": {"mode": "positive", "max-examples": 10, "database": "none"}}
+    )
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+    collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+    assert "planted-code" in sent
