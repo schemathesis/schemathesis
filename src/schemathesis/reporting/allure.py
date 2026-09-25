@@ -57,7 +57,6 @@ class AllureWriter:
     """Accumulates per-operation TestResult objects and writes Allure JSON files on close()."""
 
     __slots__ = (
-        "_api_title",
         "_attachment_bodies",
         "_config",
         "_elapsed",
@@ -67,6 +66,7 @@ class AllureWriter:
         "_results",
         "_seen_curls",
         "_skip_reasons",
+        "api_title",
     )
 
     def __init__(
@@ -74,7 +74,7 @@ class AllureWriter:
     ) -> None:
         self._output_dir = Path(output_dir)
         self._config = config
-        self._api_title = api_title
+        self.api_title = api_title
         self._results: dict[str, TestResult] = {}
         self._elapsed: dict[str, float] = {}
         self._failures: dict[str, list[GroupedFailures]] = {}
@@ -93,8 +93,8 @@ class AllureWriter:
                 Label(name="framework", value="schemathesis"),
                 Label(name="layer", value="API"),
             ]
-            if self._api_title is not None:
-                labels.append(Label(name="epic", value=self._api_title))
+            if self.api_title is not None:
+                labels.append(Label(name="epic", value=self.api_title))
             result = TestResult(
                 uuid=str(uuid4()),
                 name=label,
