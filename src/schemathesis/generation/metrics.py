@@ -60,29 +60,22 @@ def success_rate(ctx: MetricContext) -> float:
 class MetricCollector:
     """Collect multiple observations for metrics."""
 
-    __slots__ = ("metrics", "observations", "success_observations")
+    __slots__ = ("metrics", "observations")
 
     def __init__(self, metrics: list[MetricFunction] | None = None) -> None:
         self.metrics = metrics or []
         self.observations: dict[str, list[float]] = {metric.__name__: [] for metric in self.metrics}
-        self.success_observations: dict[str, list[float]] = {}
 
     def reset(self) -> None:
         """Reset all collected observations."""
         for metric in self.metrics:
             self.observations[metric.__name__].clear()
-        self.success_observations.clear()
 
     def store(self, case: Case, response: Response) -> None:
         """Calculate metrics & store them."""
         ctx = MetricContext(case=case, response=response)
         for metric in self.metrics:
             self.observations[metric.__name__].append(metric(ctx))
-        # Track success per operation
-        label = case.operation.label
-        if label not in self.success_observations:
-            self.success_observations[label] = []
-        self.success_observations[label].append(success_rate(ctx))
 
     def maximize(self) -> None:
         """Give feedback to the Hypothesis engine, so it maximizes the aggregated metrics."""
@@ -92,9 +85,6 @@ class MetricCollector:
             # Currently aggregation is just a sum
             value = sum(self.observations[metric.__name__])
             hypothesis.target(value, label=metric.__name__)
-        # Target success per operation
-        for label, values in self.success_observations.items():
-            hypothesis.target(sum(values), label=f"{label}:{success_rate.__name__}")
 
 
 def maximize(metrics: Sequence[MetricFunction], case: Case, response: Response) -> None:
@@ -105,6 +95,7 @@ def maximize(metrics: Sequence[MetricFunction], case: Case, response: Response) 
     # (e.g. raising on buggy metrics) but skip `target()` which is a no-op there.
     in_test_context = currently_in_test_context()
     ctx = MetricContext(case=case, response=response)
+    # Fuzzing leans toward inputs an operation accepts; stateful testing does not, since its steps repeat such inputs.
     if in_test_context:
         hypothesis.target(success_rate(ctx), label=f"{case.operation.label}:{success_rate.__name__}")
     for metric in metrics:
