@@ -8,6 +8,8 @@ from typing import Any
 
 import click
 
+from schemathesis.cli.constants import ExitCode
+
 GROUPS: dict[str, OptionGroup] = {}
 
 
@@ -130,6 +132,13 @@ class CommandWithGroupedOptions(click.Command):
 
 
 class StyledGroup(click.Group):
+    def invoke(self, ctx: click.Context) -> Any:
+        try:
+            return super().invoke(ctx)
+        except KeyboardInterrupt:
+            # Ctrl-C outside a test run, e.g. while loading hooks or configuration.
+            ctx.exit(ExitCode.INTERRUPTED)
+
     def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         use_color = should_use_color(ctx)
 
