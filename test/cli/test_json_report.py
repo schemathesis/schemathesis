@@ -132,3 +132,19 @@ def test_engine_never_started(cli, json_path, tmp_path):
     assert report["running_time"] is None
     assert report["complete"] is False
     assert report["operations"] is None
+
+
+def test_report_for_filters_matching_nothing(ctx, cli, json_path):
+    api = ctx.openapi.apps.success()
+    cli.run_and_assert(
+        api.schema_url,
+        f"--report-json-path={json_path}",
+        "--include-path=/does-not-exist",
+        exit_code=ExitCode.INTERRUPTED,
+    )
+    report = load_report(json_path)
+    assert (report["exit_code"], report["complete"], report["operations"]) == (
+        2,
+        True,
+        {"total": 1, "selected": 0, "tested": 0, "errored": 0, "skipped": 0, "skip_reasons": []},
+    )

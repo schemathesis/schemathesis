@@ -4,34 +4,33 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
- ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       0 selected / 4 total
+     Operations:       1 selected / 1 total
 
  ✅  API capabilities:
 
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
-     No tests were run
-
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 0/4
+  Selected: 1/1
   Tested: 0
+  Skipped: 1
 
 Test Phases:
   ⏭  Examples (disabled)
   ⏭  Coverage (disabled)
-  ⏭  Fuzzing (nothing to test)
-  ⏭  Stateful (disabled)
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (not applicable)
 
 Test cases:
   No test cases were generated
 
 Seed: 42
 
-====================== No operations matched the filters =======================
+======================== No links for stateful testing =========================

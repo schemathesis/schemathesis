@@ -5,6 +5,7 @@
 ### :wrench: Changed
 
 - Name the pattern that stops the analysis when test data cannot be generated.
+- **BREAKING**: `st run` and `st fuzz` fail with exit code 2 when nothing is tested.
 
 ### :bug: Fixed
 

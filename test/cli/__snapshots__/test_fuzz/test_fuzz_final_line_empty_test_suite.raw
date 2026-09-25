@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 2
 ---
 Stdout:
 Schemathesis dev
@@ -21,4 +21,4 @@ Test cases:
 
 Seed: 42
 
-=============================== Empty test suite ===============================
+====================== No operations matched the filters =======================
