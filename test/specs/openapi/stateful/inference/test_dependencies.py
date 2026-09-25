@@ -6430,3 +6430,31 @@ def test_nested_collection_producer_links_into_top_level_id_consumer(ctx):
             },
         ]
     ]
+
+
+def test_unresolvable_response_ref_keeps_path_keyed_link(ctx):
+    trigger = {"content": {"application/json": {"schema": component_ref("Missing")}}}
+    paths = {
+        "/triggers/{name}": {
+            "post": {"parameters": [path_param("name")], "responses": {"201": trigger}},
+            "get": {"parameters": [path_param("name")], "responses": {"200": trigger}},
+        }
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert [
+        [entry.producer_operation_ref, entry.status_code, definition.to_openapi()]
+        for entry in graph.iter_links()
+        for definition in entry.links.values()
+    ] == [
+        [
+            "#/paths/~1triggers~1{name}/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1triggers~1{name}/get",
+                "parameters": {"path.name": "$request.path.name"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]

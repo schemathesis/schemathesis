@@ -73,45 +73,40 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
-            try:
-                pending: list[tuple[str, str, str]] = []
-                pending_named_scalars: list[tuple[str, str]] = []
-                inputs = list(
-                    extract_inputs(
-                        operation=operation,
-                        resources=resources,
-                        updated_resources=updated_resources,
-                        resolver=schema.root_resolver,
-                        canonicalization_cache=canonicalization_cache,
-                        response_resource_cache=response_resource_cache,
-                        deferred_nested_fks=pending,
-                        deferred_named_scalars=pending_named_scalars,
-                        candidate_resource_names=candidate_resource_names,
-                    )
-                )
-                outputs = extract_outputs(
+            pending: list[tuple[str, str, str]] = []
+            pending_named_scalars: list[tuple[str, str]] = []
+            inputs = list(
+                extract_inputs(
                     operation=operation,
-                    inputs=inputs,
                     resources=resources,
                     updated_resources=updated_resources,
                     resolver=schema.root_resolver,
                     canonicalization_cache=canonicalization_cache,
                     response_resource_cache=response_resource_cache,
+                    deferred_nested_fks=pending,
+                    deferred_named_scalars=pending_named_scalars,
+                    candidate_resource_names=candidate_resource_names,
                 )
-                operations[operation.label] = OperationNode(
-                    method=operation.method,
-                    path=operation.path,
-                    inputs=inputs,
-                    outputs=list(outputs),
-                )
-                if pending:
-                    deferred_nested_fks[operation.label] = pending
-                if pending_named_scalars:
-                    deferred_named_scalars[operation.label] = pending_named_scalars
-            except RefResolutionError:
-                # Skip operations with unresolvable $refs (e.g., unavailable external references or references with typos)
-                # These won't participate in dependency detection
-                continue
+            )
+            outputs = extract_outputs(
+                operation=operation,
+                inputs=inputs,
+                resources=resources,
+                updated_resources=updated_resources,
+                resolver=schema.root_resolver,
+                canonicalization_cache=canonicalization_cache,
+                response_resource_cache=response_resource_cache,
+            )
+            operations[operation.label] = OperationNode(
+                method=operation.method,
+                path=operation.path,
+                inputs=inputs,
+                outputs=list(outputs),
+            )
+            if pending:
+                deferred_nested_fks[operation.label] = pending
+            if pending_named_scalars:
+                deferred_named_scalars[operation.label] = pending_named_scalars
 
     # Replay nested-FK lookups whose target resource was registered later in the scan -
     # producer paths can sort after their consumers (e.g. /departments alphabetises before

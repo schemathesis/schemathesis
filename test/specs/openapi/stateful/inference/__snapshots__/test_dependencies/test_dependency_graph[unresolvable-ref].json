@@ -11,6 +11,10 @@
         }
       ],
       "outputs": []
+    },
+    "POST /users": {
+      "inputs": [],
+      "outputs": []
     }
   },
   "resources": {
