@@ -704,3 +704,41 @@ def test_fuzz_inherits_the_root_time_limit(cli, app_runner, ctx, tmp_path):
     )
 
     assert "Server error" not in result.stdout, result.stdout
+
+
+@pytest.mark.parametrize(
+    ("args", "config", "expected"),
+    [
+        (("--max-time=10",), None, "Stop reason: Failure limit reached"),
+        (("--max-time=10", "--continue-on-failure", "--max-failures=1"), None, "Stop reason: Failure limit reached"),
+        (("--max-time=1",), {"continue-on-failure": True}, "Stop reason: Time limit reached"),
+    ],
+    ids=["first-failure", "max-failures", "continue-on-failure-from-config"],
+)
+def test_fuzz_stop_reason_after_failure(cli, ctx, args, config, expected):
+    api = ctx.openapi.apps.multiple_failures()
+
+    result = cli.main("fuzz", api.schema_url, *args, config=config)
+
+    assert expected in result.stdout, result.stdout
+
+
+def test_fuzz_first_failure_stops_every_worker(cli, ctx, restore_checks):
+    # Only the first worker fails; the others would otherwise keep fuzzing until the time limit.
+    api = ctx.openapi.apps.payload()
+    module = ctx.write_pymodule(
+        """
+import threading
+
+@schemathesis.check
+def fails_in_first_worker(ctx, response, case):
+    if threading.current_thread().name == "schemathesis_fuzz_0":
+        raise AssertionError("First worker failure")
+        """
+    )
+
+    result = cli.main(
+        "fuzz", api.schema_url, "--workers=4", "--max-time=5", "-c", "fails_in_first_worker", hooks=module
+    )
+
+    assert "Stop reason: Failure limit reached" in result.stdout, result.stdout

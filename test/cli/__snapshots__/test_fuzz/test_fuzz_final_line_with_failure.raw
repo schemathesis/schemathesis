@@ -37,7 +37,7 @@ API Operations:
   Selected: 1/1
   Tested: N
 
-Stop reason: Completed
+Stop reason: Failure limit reached
 
 Failures:
   ❌ Server error: 1

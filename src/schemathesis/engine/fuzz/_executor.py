@@ -456,8 +456,8 @@ def _run_forever_thread(
     except KeyboardInterrupt:
         ctx.stop()
     except FailureGroup:
-        # Failures are already captured
-        pass
+        # Failures are already captured; without `continue-on-failure` the first one ends the whole run.
+        ctx.control.reach_failure_limit()
     except Flaky as exc:
         if ctx.has_to_stop:
             # Deadline-induced data-tree noise; campaign already stopping, suppress.

@@ -136,7 +136,7 @@ CONTINUE_ON_FAILURE = OptionSpec(
     "continue_on_failure",
     help="Continue executing all test cases within a scenario, even after encountering failures",
     is_flag=True,
-    default=False,
+    default=None,
     metavar="",
 )
 
