@@ -183,3 +183,13 @@ def test_cli_check_selection_re_enables_check_disabled_in_config(
         "--phases=fuzzing",
         exit_code=ExitCode.TESTS_FAILED,
     )
+
+
+def test_continue_on_failure_from_config(cli, ctx):
+    api = ctx.openapi.apps.multiple_failures()
+
+    result = cli.run(
+        api.schema_url, "--phases=fuzzing", "--max-examples=20", "--seed=1", config={"continue-on-failure": True}
+    )
+
+    assert "  20 generated," in result.stdout, result.stdout

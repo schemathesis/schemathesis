@@ -46,7 +46,7 @@ API Operations:
   Selected: 2/2
   Tested: N
 
-Stop reason: Completed
+Stop reason: Failure limit reached
 
 Failures:
   ❌ Response violates schema: 1

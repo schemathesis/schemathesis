@@ -85,6 +85,10 @@ class ExecutionControl:
             if len(self._counted_failures) >= self.max_failures:
                 self.has_reached_the_failure_limit = True
 
+    def reach_failure_limit(self) -> None:
+        """Stop the run as if the failure budget were spent, e.g. on a failure without `continue-on-failure`."""
+        self.has_reached_the_failure_limit = True
+
     @property
     def stop_reason(self) -> StopReason:
         from schemathesis.engine import StopReason
