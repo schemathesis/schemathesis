@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from schemathesis.cli.commands.run.filters import describe_filter
+from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.summary import WarningData
 from schemathesis.config import ProjectConfig, SchemathesisWarning
@@ -326,7 +327,7 @@ class WarningCollector:
                 self.data.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
                 # Check if this warning should cause test failure
                 if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
-                    ctx.exit_code = 1
+                    ctx.exit_code = ExitCode.FAILURES
 
         # A wrong base URL 404s everything, and those 404s trip other checks - so this must not be
         # gated on the scenario passing, unlike the generic 404 warning below.
@@ -430,7 +431,7 @@ class WarningCollector:
             return
         record_callback()
         if self.config.warnings.should_fail(kind):
-            ctx.exit_code = 1
+            ctx.exit_code = ExitCode.FAILURES
 
     def _record_skip_warning(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         """Record a warning surfaced via a supervisor-driven scenario skip."""
@@ -444,7 +445,7 @@ class WarningCollector:
         ):
             self.data.method_not_allowed.add(event.label)
             if warnings.should_fail(SchemathesisWarning.METHOD_NOT_ALLOWED):
-                ctx.exit_code = 1
+                ctx.exit_code = ExitCode.FAILURES
 
     def _record_missing_deserializer_warning(
         self, operation_label: str, media_type: str, status_code: str

@@ -4,16 +4,16 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.summary import SummaryData
-from schemathesis.engine import StopReason
+from schemathesis.engine import StopReason, events
 from schemathesis.engine.statistic import Statistic
 
 if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
     from schemathesis.core import Specification
     from schemathesis.core.statistic import ApiStatistic
-    from schemathesis.engine import events
     from schemathesis.schemas import APIOperation
 
 
@@ -26,7 +26,7 @@ class BaseExecutionContext:
     specification: Specification | None = None
     api_statistic: ApiStatistic | None = None
     statistic: Statistic = field(default_factory=Statistic)
-    exit_code: int = 0
+    exit_code: ExitCode = ExitCode.OK
     # Why a run that completed cleanly still tested nothing.
     nothing_tested_reason: str | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
@@ -50,11 +50,22 @@ class BaseExecutionContext:
             self.find_operation_by_label = event.find_operation_by_label
             self.specification = event.specification
             self.api_statistic = event.statistic
+        elif isinstance(event, events.Interrupted) and self.api_statistic is None:
+            # Interrupted while loading the schema, so no engine run follows to settle the exit code.
+            self.exit_code = ExitCode.INTERRUPTED
+
+    def on_engine_finished(self, stop_reason: StopReason) -> None:
+        """Settle the exit code once the engine stops."""
+        if stop_reason is StopReason.INTERRUPTED:
+            # An interrupted run is incomplete, so what it found so far cannot pass or fail it.
+            self.exit_code = ExitCode.INTERRUPTED
+        else:
+            self.check_nothing_tested(stop_reason)
 
     def check_nothing_tested(self, stop_reason: StopReason) -> None:
         """Turn a clean run that generated no test cases into a configuration error."""
         if (
-            self.exit_code != 0
+            self.exit_code != ExitCode.OK
             or stop_reason is not StopReason.COMPLETED
             or self.api_statistic is None
             or self.statistic.total_cases
@@ -67,7 +78,7 @@ class BaseExecutionContext:
             self.nothing_tested_reason = "No operations matched the filters"
         else:
             self.nothing_tested_reason = self.all_skipped_reason()
-        self.exit_code = 2
+        self.exit_code = ExitCode.ERROR
 
     def all_skipped_reason(self) -> str:
         """Why every selected operation was skipped."""

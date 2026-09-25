@@ -104,7 +104,7 @@ def test_hooks_invalid(ctx, cli):
     result = cli.main("run", "http://127.0.0.1:1", hooks=module)
 
     # Then CLI run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert result.exit_code == 2, result.stdout
     # And a helpful message should be displayed in the output
     lines = result.stdout.strip().split("\n")
     assert lines[0] == "Unable to load Schemathesis extension hooks"
@@ -143,6 +143,34 @@ def test_empty_schema_file(testdir, cli, snapshot_cli):
     filename = testdir.makefile(".json", schema="")
     # Then a proper error should be reported
     assert cli.run(str(filename), "--url=http://127.0.0.1:1") == snapshot_cli
+
+
+def _malformed_schema_file(tmp_path):
+    path = tmp_path / "schema.json"
+    path.write_text("{broken")
+    return [str(path), "--url=http://127.0.0.1:1"]
+
+
+@pytest.mark.parametrize("command", ["run", "fuzz"])
+@pytest.mark.parametrize(
+    "make_args",
+    [
+        pytest.param(_malformed_schema_file, id="malformed-schema"),
+        pytest.param(lambda tmp_path: ["http://127.0.0.1:1/openapi.json"], id="unreachable-schema"),
+        pytest.param(
+            lambda tmp_path: ["http://127.0.0.1:1/openapi.json", "--wait-for-schema=1"], id="wait-for-schema-timeout"
+        ),
+    ],
+)
+def test_fatal_error_exit_code(cli, tmp_path, command, make_args):
+    result = cli.main(command, *make_args(tmp_path))
+    assert result.exit_code == 2, result.stdout
+
+
+@pytest.mark.parametrize("command", ["run", "fuzz"])
+def test_config_file_error_exit_code(cli, command):
+    result = cli.main("--config-file=unknown-file.toml", command, "http://127.0.0.1:1/openapi.json")
+    assert result.exit_code == 2, result.stdout
 
 
 def test_force_color_nocolor(ctx, cli, snapshot_cli):
@@ -263,7 +291,7 @@ def test_cli_run_changed_base_url(ctx, cli, snapshot_cli):
 @pytest.mark.parametrize("workers", [1, 2])
 def test_execute_missing_schema(ctx, cli, url, message, workers):
     api = ctx.openapi.apps.failure()
-    result = cli.run_and_assert(f"{api.base_url}{url}", f"--workers={workers}", exit_code=ExitCode.TESTS_FAILED)
+    result = cli.run_and_assert(f"{api.base_url}{url}", f"--workers={workers}", exit_code=2)
     assert message in result.stdout
 
 
@@ -739,6 +767,77 @@ def test_keyboard_interrupt_during_schema_loading(ctx, cli, mocker, snapshot_cli
     api = ctx.openapi.apps.success()
     mocker.patch("schemathesis.core.loaders.make_request", side_effect=KeyboardInterrupt)
     assert cli.run(api.schema_url) == snapshot_cli
+
+
+INTERRUPT_ON_SECOND_RESPONSE = """
+calls = 0
+
+@schemathesis.hook
+def after_call(context, case, response):
+    global calls
+    calls += 1
+    if calls > 1:
+        raise KeyboardInterrupt
+"""
+
+
+@pytest.mark.parametrize(
+    ("command", "status", "args", "failures"),
+    [
+        ("run", 200, ["--phases=fuzzing", "--max-examples=10"], 0),
+        ("run", 500, ["--phases=fuzzing", "--max-examples=10", "--continue-on-failure"], 1),
+        ("fuzz", 200, ["--max-time=10"], 0),
+    ],
+    ids=["run", "run-after-failure", "fuzz"],
+)
+def test_keyboard_interrupt_exit_code(ctx, cli, app_runner, tmp_path, command, status, args, failures):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({}), status
+
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
+    report_path = tmp_path / "report.json"
+    result = cli.main(
+        command,
+        app_runner.openapi_url(app),
+        "--checks=not_a_server_error",
+        f"--report-json-path={report_path}",
+        *args,
+        hooks=module,
+    )
+    report = json.loads(report_path.read_text())
+    assert (result.exit_code, report["exit_code"], report["stop_reason"], len(report["failures"])) == (
+        130,
+        130,
+        "interrupted",
+        failures,
+    ), result.stdout
+
+
+def test_keyboard_interrupt_exit_code_during_schema_loading(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_load_schema(context, raw_schema):
+    raise KeyboardInterrupt
+"""
+    )
+    report_path = tmp_path / "report.json"
+    result = cli.main("run", api.schema_url, f"--report-json-path={report_path}", hooks=module)
+    report = json.loads(report_path.read_text())
+    assert (result.exit_code, report["exit_code"], report["complete"]) == (130, 130, False), result.stdout
 
 
 def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
