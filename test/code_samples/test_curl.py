@@ -103,6 +103,23 @@ def test_json_payload(curl):
     curl.assert_valid(command)
 
 
+@pytest.mark.parametrize("loader", ["from_file", "from_path"])
+def test_graphql_schema_loaded_from_file(ctx, curl, tmp_path, loader):
+    sdl = "type Query { hello: String }"
+    if loader == "from_path":
+        path = tmp_path / "schema.graphql"
+        path.write_text(sdl)
+        schema = schemathesis.graphql.from_path(path)
+    else:
+        schema = ctx.graphql.load_sdl(sdl)
+    case = schema["Query"]["hello"].Case(body="{ hello }")
+    command = case.as_curl_command()
+    assert (
+        command == "curl -X POST -H 'Content-Type: application/json' -d '{\"query\": \"{ hello }\"}' http://localhost/"
+    )
+    curl.assert_valid(command)
+
+
 def test_explicit_headers(curl):
     # When the generated case contains a header from the list of headers that are ignored by default
     name = "Accept"
