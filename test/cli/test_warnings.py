@@ -747,3 +747,38 @@ def test_missing_test_data_for_graphql_survives_stateful(cli, app_runner, tmp_pa
         cli.run(str(sdl), f"--url=http://127.0.0.1:{port}/graphql", "--max-examples=5", "-m", "positive")
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_validation_mismatch_ignores_undeclared_method_probes(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/bookings/{booking_id}": {
+                "get": {
+                    "parameters": [
+                        {"name": "booking_id", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+            "/bookings": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"201": {"description": "Created"}, "422": {"description": "Invalid"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/bookings/<booking_id>", methods=["GET"], provide_automatic_options=False)
+    def get_booking(booking_id):
+        return jsonify({"detail": "Not found"}), 404
+
+    @app.route("/bookings", methods=["POST"], provide_automatic_options=False)
+    def create_booking():
+        return jsonify({"detail": "Invalid"}), 422
+
+    assert cli.run_openapi_app(app, "--phases=coverage", "-c not_a_server_error") == snapshot_cli

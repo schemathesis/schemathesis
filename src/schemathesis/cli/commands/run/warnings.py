@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
@@ -16,7 +16,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transport import CallOutcome
 from schemathesis.engine import Status, events
-from schemathesis.engine.recorder import CaseNode, Interaction, RecordedScenario
+from schemathesis.engine.recorder import CaseNode, RecordedScenario
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
@@ -133,12 +133,19 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
     return outcomes
 
 
-def aggregate_status_codes(interactions: Iterable[Interaction]) -> StatusCodeStatistic:
-    """Analyze status codes from interactions."""
+def aggregate_status_codes(recorder: RecordedScenario) -> StatusCodeStatistic:
+    """Analyze status codes the operation answered with.
+
+    Requests with a method the operation does not declare reach a different operation, or none,
+    so their responses say nothing about this one.
+    """
     counts: dict[int, int] = {}
     total = 0
 
-    for interaction in interactions:
+    for case_id, interaction in recorder.interactions.items():
+        case = recorder.cases.get(case_id)
+        if case is not None and _is_undeclared_method(case):
+            continue
         if interaction.response is not None:
             status = interaction.response.status_code
             counts[status] = counts.get(status, 0) + 1
@@ -209,6 +216,15 @@ def resource_producers(schema: BaseSchema) -> dict[str, set[str]]:
             found |= by_resource.get(slot.resource.name, set())
         producers[label] = found - {label}
     return producers
+
+
+def _is_undeclared_method(case: CaseNode) -> bool:
+    meta = case.value.meta
+    return (
+        meta is not None
+        and isinstance(meta.phase.data, CoveragePhaseData)
+        and meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
+    )
 
 
 def _is_positive(case: CaseNode) -> bool:
@@ -304,7 +320,7 @@ class WarningCollector:
             # Synthetic skip scenarios carry no interactions to inspect.
             return
 
-        statistic = aggregate_status_codes(event.recorder.interactions.values())
+        statistic = aggregate_status_codes(event.recorder)
 
         if statistic.total == 0:
             return
