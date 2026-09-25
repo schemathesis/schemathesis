@@ -23,6 +23,7 @@
 - Percent-encoded delimiters, missing names and dropped falsy values in `matrix`/`label`/`simple` path parameters.
 - Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
 - `st fuzz` workers continuing after the first failure and reporting `Stop reason: Completed`.
+- `Stop reason: Time limit reached` for runs stopped by a failure shortly before the deadline.
 - `continue-on-failure` in the config file ignored by `st run` and `st fuzz`.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23

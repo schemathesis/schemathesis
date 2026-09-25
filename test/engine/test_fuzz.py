@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 import uuid
 
 import pytest
@@ -16,6 +18,7 @@ from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, StopReason, events, from_schema
+from schemathesis.engine.control import ExecutionControl
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
 
@@ -220,6 +223,15 @@ def test_fuzz_max_failures_stop_reason(ctx):
     schema.config.max_failures = 1
     collected = _fuzz_events(schema, FuzzConfig())
     assert collected[-1].stop_reason == StopReason.FAILURE_LIMIT
+
+
+def test_failure_limit_wins_over_deadline_crossed_while_winding_down():
+    # Workers stopping after a failure can outlive the deadline; the failure is still what stopped the run.
+    control = ExecutionControl(
+        stop_event=threading.Event(), max_failures=None, max_time=5, start_time=time.monotonic() - 10
+    )
+    control.reach_failure_limit()
+    assert control.stop_reason == StopReason.FAILURE_LIMIT
 
 
 def test_fuzz_max_failures_multi_worker(ctx):

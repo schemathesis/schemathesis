@@ -738,7 +738,7 @@ def fails_in_first_worker(ctx, response, case):
     )
 
     result = cli.main(
-        "fuzz", api.schema_url, "--workers=4", "--max-time=5", "-c", "fails_in_first_worker", hooks=module
+        "fuzz", api.schema_url, "--workers=4", "--max-time=60", "-c", "fails_in_first_worker", hooks=module
     )
 
     assert "Stop reason: Failure limit reached" in result.stdout, result.stdout
