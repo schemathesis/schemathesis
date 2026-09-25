@@ -1543,6 +1543,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             warnings=ctx.warnings.kind_count,
             running_time=event.running_time,
             total_cases=ctx.statistic.total_cases,
+            nothing_tested_reason=ctx.nothing_tested_reason,
         )
 
     def display_reports(self) -> None:

@@ -196,6 +196,12 @@ def test_keyboard_interrupt(ctx, cli, mocker, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_only_without_links(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--phases=stateful") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_missing_link(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.users_create_only()
     assert cli.run(api.schema_url, "--phases=stateful") == snapshot_cli

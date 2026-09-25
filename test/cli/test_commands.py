@@ -238,12 +238,12 @@ def test_openapi_auth_skips_malformed_security_requirements(cli, ctx):
 @pytest.mark.parametrize("workers", [1, 2])
 def test_cli_run_output_empty(ctx, cli, workers):
     api = ctx.openapi.apps.no_operations()
-    result = cli.run_and_assert(api.schema_url, f"--workers={workers}")
+    result = cli.run_and_assert(api.schema_url, f"--workers={workers}", exit_code=ExitCode.INTERRUPTED)
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
-    assert "= Empty test suite =" in lines[-1]
+    assert "= The schema defines no API operations =" in lines[-1]
 
 
 def test_cli_run_changed_base_url(ctx, cli, snapshot_cli):

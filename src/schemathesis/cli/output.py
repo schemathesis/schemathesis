@@ -88,6 +88,7 @@ def display_final_line(
     warnings: int = 0,
     running_time: float,
     total_cases: int,
+    nothing_tested_reason: str | None = None,
 ) -> None:
     parts = []
     if failures:
@@ -100,7 +101,10 @@ def display_final_line(
         suffix = "s" if warnings > 1 else ""
         parts.append(f"{warnings} warning{suffix}")
 
-    if parts:
+    if nothing_tested_reason is not None:
+        message = nothing_tested_reason
+        color = "red"
+    elif parts:
         message = f"{', '.join(parts)} in {running_time:.2f}s"
         color = "red" if (failures or errors) else "yellow"
     elif total_cases == 0:

@@ -1435,7 +1435,7 @@ def test_query_param_invalid_ecma262_pattern_no_runtime_error(ctx, cli, app_runn
 
 
 def test_negative_data_rejection_array_path_param_no_false_positive(ctx, cli, app_runner):
-    # A string example like "hello,world" violates `type: array` but serializes to a valid comma-joined array.
+    # A plain string violates `type: array` but reaches the server as a valid one-item array.
     app, _ = ctx.openapi.make_flask_app(
         {
             "/get/{projects}": {
@@ -1446,8 +1446,7 @@ def test_negative_data_rejection_array_path_param_no_false_positive(ctx, cli, ap
                         "required": True,
                         "schema": {
                             "type": "array",
-                            "examples": ["hello", "world", "hello,world"],
-                            "items": {"type": "string", "enum": ["hello", "world"]},
+                            "items": {"type": "string"},
                             "minItems": 1,
                             "uniqueItems": True,
                         },
@@ -1466,8 +1465,7 @@ def test_negative_data_rejection_array_path_param_no_false_positive(ctx, cli, ap
     @app.route("/get/<projects>")
     def get_projects(projects):
         items = projects.split(",")
-        valid = {"hello", "world"}
-        if not items or any(i not in valid for i in items) or len(items) != len(set(items)):
+        if len(items) != len(set(items)):
             return jsonify({"error": "invalid"}), 422
         return jsonify({"ok": True}), 200
 
@@ -1475,7 +1473,7 @@ def test_negative_data_rejection_array_path_param_no_false_positive(ctx, cli, ap
         app_runner.openapi_url(app),
         "--checks=negative_data_rejection",
         "--mode=all",
-        "--phases=examples",
+        "--phases=coverage",
         exit_code=ExitCode.OK,
     )
 
@@ -1527,7 +1525,7 @@ def test_negative_data_rejection_array_path_param_hook_rewrite_no_false_positive
             app_runner.openapi_url(app),
             "--checks=negative_data_rejection",
             "--mode=all",
-            "--phases=examples",
+            "--phases=coverage",
             exit_code=ExitCode.OK,
         )
 

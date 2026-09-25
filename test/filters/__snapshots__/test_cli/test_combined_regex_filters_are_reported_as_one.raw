@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 2
 ---
 Stdout:
 Schemathesis dev
@@ -45,4 +45,4 @@ Test cases:
 
 Seed: 42
 
-============================== 1 warning in 1.00s ==============================
+====================== No operations matched the filters =======================

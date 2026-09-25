@@ -337,6 +337,11 @@ class CliSnapshotConfig:
         if (
             "Stop reason:" in data
             or "Empty test suite" in data
+            # Runs that tested nothing end with a banner naming the cause.
+            or "The schema defines no API operations" in data
+            or "No operations matched the filters" in data
+            or "Every selected operation was skipped" in data
+            or "No links for stateful testing" in data
             # Same no-tests path, but a warning replaced the "Empty test suite" banner.
             or ("No test cases were generated" in data and "Warnings:" in data)
         ):
