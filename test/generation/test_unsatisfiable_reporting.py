@@ -250,6 +250,23 @@ def test_branches_are_not_named_when_they_admit_values(ctx, schema, expected):
     assert body_detail(ctx, schema) == expected
 
 
+def test_branches_written_as_references_are_named_at_their_targets(ctx):
+    assert body_detail(
+        ctx,
+        {
+            "type": "string",
+            "oneOf": [{"$ref": "#/components/schemas/Address"}, {"$ref": "#/components/schemas/GeoPoint"}],
+        },
+        components={
+            "Address": {"type": "object", "properties": {"street": {"type": "string"}}},
+            "GeoPoint": {"type": "object", "properties": {"lat": {"type": "number"}}},
+        },
+    ) == (
+        '`type: "string"` conflicts with `type: "object"` at /components/schemas/Address'
+        ' and `type: "object"` at /components/schemas/GeoPoint'
+    )
+
+
 def test_branches_are_checked_against_siblings_behind_a_reference(ctx):
     detail = body_detail(
         ctx,
