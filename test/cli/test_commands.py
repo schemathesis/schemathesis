@@ -840,6 +840,12 @@ def before_load_schema(context, raw_schema):
     assert (result.exit_code, report["exit_code"], report["complete"]) == (130, 130, False), result.stdout
 
 
+def test_keyboard_interrupt_exit_code_during_hooks_loading(ctx, cli):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule("raise KeyboardInterrupt")
+    assert cli.main("run", api.schema_url, hooks=module).exit_code == 130
+
+
 def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
     api = ctx.openapi.apps.teapot()
     # When the schema contains references to other files
