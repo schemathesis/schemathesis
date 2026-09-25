@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.events import LoadingFinished
 from schemathesis.core.failures import RUN_CHECKS_LABEL
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
@@ -60,6 +61,8 @@ class AllureHandler(EventHandler):
                     skip_reason=None,
                     tags=None,
                 )
+        elif isinstance(event, LoadingFinished):
+            self.writer.api_title = event.schema.get("info", {}).get("title")
         elif isinstance(event, events.NonFatalError):
             self.writer.record_error(label=event.label, message=event.info.format())
         elif isinstance(event, events.EngineFinished):

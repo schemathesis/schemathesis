@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- Missing `epic` label with the API title in CLI Allure reports.
 - Multipart parts for arrays of primitives labelled `application/json` while carrying raw text.
 - Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
 - Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.

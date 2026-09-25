@@ -159,3 +159,26 @@ def test_allure_path_displayed(ctx, cli, tmp_path, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+def test_allure_labels_include_api_title_and_severity(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.failure()
+    allure_dir = tmp_path / "allure-results"
+    cli.run_and_assert(
+        api.schema_url,
+        f"--report-allure-path={allure_dir}",
+        "--checks=not_a_server_error",
+        "--phases=fuzzing",
+        "--max-examples=1",
+        exit_code=ExitCode.TESTS_FAILED,
+    )
+    results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
+    assert [{(lbl["name"], lbl["value"]) for lbl in result["labels"]} for result in results] == [
+        {
+            ("story", "GET /api/failure"),
+            ("framework", "schemathesis"),
+            ("layer", "API"),
+            ("epic", api.spec["info"]["title"]),
+            ("severity", "blocker"),
+        }
+    ]
