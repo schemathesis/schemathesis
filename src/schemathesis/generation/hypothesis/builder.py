@@ -200,6 +200,7 @@ def create_test(
             config.as_strategy_kwargs,
             feedback=config.feedback,
             generation_config=coverage_generation,
+            hooks=hook_dispatcher,
         )
 
     injected_path_parameter_names = [
@@ -336,6 +337,7 @@ def add_coverage(
     as_strategy_kwargs: dict[str, Any],
     feedback: FeedbackSources,
     generation_config: GenerationConfig,
+    hooks: HookDispatcher | None = None,
 ) -> Callable:
     from schemathesis.generation.drivers import CoverageGenerator
 
@@ -346,6 +348,7 @@ def add_coverage(
         auth_storage=auth_storage,
         as_strategy_kwargs=as_strategy_kwargs,
         feedback=feedback,
+        hooks=hooks,
     )
     for case in generator:
         test = hypothesis.example(case=case)(test)

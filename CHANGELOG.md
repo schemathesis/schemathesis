@@ -28,6 +28,9 @@
 - `st fuzz` workers continuing after the first failure and reporting `Stop reason: Completed`.
 - `Stop reason: Time limit reached` for runs stopped by a failure shortly before the deadline.
 - `continue-on-failure` in the config file ignored by `st run` and `st fuzz`.
+- Keep schema example values that data generation hooks change in the examples phase.
+- Apply test-scoped `filter_case` and `map_case` hooks in the pytest coverage phase.
+- Call test-scoped `after_validate` hooks.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 

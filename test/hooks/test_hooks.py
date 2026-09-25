@@ -8,6 +8,7 @@ import schemathesis
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status
+from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.hooks import (
     HookContext,
@@ -757,3 +758,166 @@ def test_after_validate_fires_for_schema_level_hook(ctx):
         ("not_a_server_error", Status.SUCCESS),
         ("not_a_server_error", Status.FAILURE),
     ]
+
+
+def register_recording_component_hooks(dispatcher, container, key, calls):
+    def before_generate(context, strategy):
+        calls.append(f"before_generate_{container}")
+        return strategy
+
+    def filter_hook(context, value):
+        calls.append(f"filter_{container}")
+        return True
+
+    def map_hook(context, value):
+        calls.append(f"map_{container}")
+        return {**(value or {}), key: 42}
+
+    def flatmap_hook(context, value):
+        calls.append(f"flatmap_{container}")
+        return st.just(value)
+
+    dispatcher.hook(f"before_generate_{container}")(before_generate)
+    dispatcher.hook(f"filter_{container}")(filter_hook)
+    dispatcher.hook(f"map_{container}")(map_hook)
+    dispatcher.hook(f"flatmap_{container}")(flatmap_hook)
+
+
+def test_component_hooks_leave_examples_untouched(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "post": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}, "example": 7},
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}, "example": "e"},
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}},
+                                "example": {"name": "example"},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    calls = []
+    test_hooks = HookDispatcher(scope=HookScope.TEST)
+    for dispatcher in (schema.hooks, test_hooks):
+        for container, key in (("path_parameters", "id"), ("query", "q"), ("body", "name")):
+            register_recording_component_hooks(dispatcher, container, key, calls)
+
+    cases = [
+        examples.generate_one(strategy)
+        for strategy in schema["/items/{id}"]["POST"].get_strategies_from_examples(hooks=test_hooks)
+    ]
+
+    assert [(case.path_parameters, case.query, case.body) for case in cases] == [
+        ({"id": 7}, {"q": "e"}, {"name": "example"})
+    ]
+    # Hooks see only the generated remainder of each location; a body taken from an example is never hooked.
+    assert set(calls) == {
+        f"{hook}_{container}"
+        for hook in ("before_generate", "filter", "map", "flatmap")
+        for container in ("path_parameters", "query")
+    }
+
+
+def test_test_scoped_case_hooks_apply_in_coverage_phase(testdir):
+    testdir.make_test(
+        """
+schema.config.phases.examples.enabled = False
+schema.config.phases.fuzzing.enabled = False
+
+filtered = []
+
+def local_filter_case(context, case):
+    filtered.append(case)
+    return True
+
+def local_map_case(context, case):
+    case.headers = {**(case.headers or {}), "X-Mapped": "yes"}
+    return case
+
+@schema.hooks.apply(local_map_case, name="map_case")
+@schema.hooks.apply(local_filter_case, name="filter_case")
+@schema.parametrize()
+def test_api(case):
+    assert case.meta.phase.name.value == "coverage"
+    assert case.headers["X-Mapped"] == "yes"
+    assert filtered
+""",
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+def test_test_scoped_after_validate_hook(testdir, ctx):
+    api = ctx.openapi.apps.success()
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+
+validated = []
+
+def local_after_validate(context, case, response, results):
+    validated.extend((result.name, result.status.name) for result in results)
+
+@schema.hooks.apply(local_after_validate, name="after_validate")
+@schema.include(path_regex="success").parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    validated.clear()
+    case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
+    assert validated == [("not_a_server_error", "SUCCESS")]
+""",
+        paths={"/success": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+def test_component_hooks_shape_generated_parts_in_examples_phase(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}, "example": "e"},
+                        {"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    filtered = []
+
+    @schema.hook
+    def filter_query(context, query):
+        filtered.append(query)
+        return True
+
+    @schema.hook
+    def map_headers(context, headers):
+        return {**(headers or {}), "X-Token": "secret"}
+
+    cases = [examples.generate_one(strategy) for strategy in schema["/items"]["GET"].get_strategies_from_examples()]
+
+    assert [(case.query["q"], case.headers) for case in cases] == [("e", {"X-Token": "secret"})]
+    assert filtered
+    assert all(set(query) == {"limit"} for query in filtered), filtered
