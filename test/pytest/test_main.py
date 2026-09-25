@@ -1800,3 +1800,40 @@ def test(case):
 """
     )
     testdir.runpytest().assert_outcomes(passed=1)
+
+
+def test_manual_target_steers_generation(testdir):
+    # Only target-guided search hits one exact value in a wide range, and it needs about 100 examples to get there.
+    testdir.make_test(
+        """
+import hypothesis
+
+schema.config.phases.coverage.enabled = False
+
+@schema.include(path_regex="items").parametrize()
+@settings(max_examples=100, derandomize=True)
+def test_api(case):
+    value = case.query["value"]
+    hypothesis.target(-abs(value - 1_000), label="distance")
+    assert value != 1_000
+""",
+        paths={
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "value",
+                            "in": "query",
+                            "required": True,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1_000_000,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        generation_modes=[GenerationMode.POSITIVE],
+    )
+    testdir.runpytest().assert_outcomes(failed=1)
