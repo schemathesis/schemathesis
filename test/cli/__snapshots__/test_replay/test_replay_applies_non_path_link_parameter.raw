@@ -10,7 +10,7 @@ Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
 ________________________________ GET /resource _________________________________
 
      1  GET  /tokens    200
-     2  GET  /resource  500  token stale-999 -> fresh-123
+     2  GET  /resource  500  token = "fresh-123" (was "stale-999", from step 1)
 
 1. Test Case ID: <PLACEHOLDER>
 

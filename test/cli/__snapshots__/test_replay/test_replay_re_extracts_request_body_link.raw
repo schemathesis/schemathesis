@@ -10,7 +10,7 @@ Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
 _________________________________ POST /target _________________________________
 
      1  GET   /source  200
-     2  POST  /target  500  token stale -> fresh
+     2  POST  /target  500  token = "fresh" (was "stale", from step 1)
 
 1. Test Case ID: <PLACEHOLDER>
 

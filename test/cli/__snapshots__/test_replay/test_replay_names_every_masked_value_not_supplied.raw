@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/GET_users_not_a_server_error_testtest.json
+
+  ! ERROR  GET /users
+
+    `Authorization` header, `api_key` query parameter, `session` cookie were masked in the crash file; provide them via config, -H, --auth or an auth hook
+
+============================== 1 errored in 1.00s ==============================

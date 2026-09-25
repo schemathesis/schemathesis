@@ -10,8 +10,8 @@ Replaying 1 case from /tmp/.schemathesis/default/cache/crashes
 _____________________________ GET /items/{item_id} _____________________________
 
      1  POST    /items            201
-     2  DELETE  /items/{item_id}  200  item_id 7 -> 100
-     3  GET     /items/{item_id}  200  item_id 7 -> 100
+     2  DELETE  /items/{item_id}  200  item_id = 100 (was 7, from step 1)
+     3  GET     /items/{item_id}  200  item_id = 100 (was 7, from step 1)
 
 1. Test Case ID: <PLACEHOLDER>
 

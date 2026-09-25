@@ -69,8 +69,6 @@ METHOD_STYLES = {
 STEP_PATH_MAX = 60
 LINKED_VALUE_MAX = 16
 LINKED_VALUES_MAX = 3
-# Marks linked values the replay sent as recorded because the live response lacked them.
-UNRESOLVED_MARKER = "*"
 BADGE_WIDTH = max(len(b.glyph) + 1 + len(b.label) for b in BADGES.values())
 
 
@@ -267,7 +265,9 @@ def _print_step_chain(
         if delta is not None:
             row.append("  ")
             row.append(GLYPH_CHANGED, style=delta)
-        rows.append((row, _format_linked_values(actual.links)))
+        parent = _parent(sequence, index - 1)
+        source = parent + 1 if parent is not None else None
+        rows.append((row, _format_linked_values(actual.links, source=source)))
 
     # Line up the linked values in their own column, padding only rows that have one.
     status_column = max(len(row) for row, _ in rows)
@@ -279,31 +279,33 @@ def _print_step_chain(
         console.print(row)
 
 
-def _format_linked_values(links: list[LinkedValue]) -> str:
+def _format_linked_values(links: list[LinkedValue], *, source: int | None) -> str:
+    """Each linked value as sent, with the recorded one when it differs and the step it was extracted from."""
     shown = links[:LINKED_VALUES_MAX]
-    parts = [_format_linked_value(value) for value in shown]
+    parts = [_format_linked_value(value, source=source) for value in shown]
     if len(links) > len(shown):
         parts.append(f"+{len(links) - len(shown)} more")
-    text = ", ".join(parts)
-    if any(value.fresh is UNRESOLVABLE for value in shown):
-        text += f" ({UNRESOLVED_MARKER} not re-extracted)"
-    return text
+    return ", ".join(parts)
 
 
-def _format_linked_value(value: LinkedValue) -> str:
-    recorded = _format_value(value.recorded)
+def _format_linked_value(value: LinkedValue, *, source: int | None) -> str:
     if value.fresh is UNRESOLVABLE:
-        return f"{value.name} {recorded}{UNRESOLVED_MARKER}"
-    if value.fresh == value.recorded:
-        return f"{value.name} {recorded}"
-    return f"{value.name} {recorded} {ARROW} {_format_value(value.fresh)}"
+        if value.recorded is NOT_SET:
+            return f"{value.name} unset (not re-extracted)"
+        return f"{value.name} = {_format_value(value.recorded)} (recorded, not re-extracted)"
+    details = []
+    if value.recorded is not NOT_SET and value.fresh != value.recorded:
+        details.append(f"was {_format_value(value.recorded)}")
+    if source is not None:
+        details.append(f"from step {source}")
+    suffix = f" ({', '.join(details)})" if details else ""
+    return f"{value.name} = {_format_value(value.fresh)}{suffix}"
 
 
 def _format_value(value: object) -> str:
-    if value is NOT_SET:
-        return "(unset)"
-    text = value if isinstance(value, str) else json.dumps(value, default=str)
-    return truncate_text(text, LINKED_VALUE_MAX)
+    if isinstance(value, str):
+        return json.dumps(truncate_text(value, LINKED_VALUE_MAX))
+    return truncate_text(json.dumps(value, default=str), LINKED_VALUE_MAX)
 
 
 def _parent(sequence: list[CrashStep], index: int) -> int | None:

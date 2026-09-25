@@ -26,11 +26,17 @@ from schemathesis.cli.commands.replay.executor import (
 from schemathesis.cli.commands.replay.output import _format_linked_values, render_replay
 from schemathesis.cli.output import make_console
 from schemathesis.config import OutputConfig
-from schemathesis.core import transport
+from schemathesis.core import NOT_SET, transport
 from schemathesis.core.failures import ServerError
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.reporting.crashes import MANIFEST_FILENAME, CrashCheck, CrashFile, CrashLink, CrashStep, CrashWriter
 from test.apps.catalog.openapi.modifiers.stateful import IndependentInternalError
+from test.apps.catalog.openapi.modifiers.under_declared_security import (
+    DeclareSecurity,
+    ExpectBasicAuth,
+    RespondWithStatus,
+    RotateTokenOnLogin,
+)
 from test.fixtures.crashes import FailingCheck, Link, LinkParameter, Step
 
 
@@ -47,6 +53,7 @@ def _write_crash(
     check: str = "not_a_server_error",
     case_id: str = "Ab1Cd2",
     request_headers: dict[str, str] | None = None,
+    **step_fields,
 ) -> Path:
     base_url = url.rsplit(path_template, 1)[0]
     crash = crash_factory.single(
@@ -56,6 +63,7 @@ def _write_crash(
         body=body.encode(),
         request_url=url,
         request_headers=request_headers,
+        **step_fields,
         checks=[FailingCheck(name=check, message=f"{status} error")],
         code_sample=f"curl -X {method} {url}",
     )
@@ -1170,9 +1178,38 @@ def test_linked_values_are_shortened_capped_and_marked_once():
         LinkedValue(location="query", name="page", recorded=1, fresh=2),
     ]
 
-    assert _format_linked_values(links) == (
-        "item_id 7 -> 100, token stale-token*, trace aaaaaaaaaaaa ... -> bbbbbbbbbbbb ..., +2 more (* not re-extracted)"
+    assert _format_linked_values(links, source=1) == (
+        'item_id = 100 (was 7, from step 1), token = "stale-token" (recorded, not re-extracted), '
+        'trace = "bbbbbbbbbbbb ..." (was "aaaaaaaaaaaa ...", from step 1), +2 more'
     )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            LinkedValue(location="query", name="token", recorded="stale", fresh="fresh"),
+            'token = "fresh" (was "stale", from step 2)',
+        ),
+        (LinkedValue(location="query", name="token", recorded="same", fresh="same"), 'token = "same" (from step 2)'),
+        (LinkedValue(location="path", name="id", recorded=7, fresh=7), "id = 7 (from step 2)"),
+        (
+            LinkedValue(location="query", name="token", recorded="stale", fresh=UNRESOLVABLE),
+            'token = "stale" (recorded, not re-extracted)',
+        ),
+        (
+            LinkedValue(location="query", name="token", recorded=NOT_SET, fresh=UNRESOLVABLE),
+            "token unset (not re-extracted)",
+        ),
+        (
+            LinkedValue(location="body", name="body", recorded=NOT_SET, fresh={"token": "fresh"}),
+            'body = {"token": "f ... (from step 2)',
+        ),
+    ],
+    ids=["changed", "unchanged", "unchanged-number", "not-re-extracted", "not-re-extracted-unset", "body-unset"],
+)
+def test_linked_value_leads_with_the_sent_value(value, expected):
+    assert _format_linked_values([value], source=2) == expected
 
 
 @pytest.mark.parametrize(
@@ -2038,9 +2075,7 @@ def test_replay_no_recorded_checks_is_errored(cli, app_runner, ctx, tmp_path, sn
     assert cli.main("replay", "--keep") == snapshot_cli
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_replay_partial_fix_shows_per_check_breakdown(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
-    # With only some checks now passing, the case stays failed, the breakdown marks fixed ones, only those removed.
+def _write_partially_fixed_crash(app_runner, ctx, crash_factory, tmp_path, **step_fields) -> Path:
     app, _ = ctx.openapi.make_flask_app(
         {
             "/data": {
@@ -2084,10 +2119,30 @@ def test_replay_partial_fix_shows_per_check_breakdown(cli, app_runner, ctx, cras
             body='{"error": "boom"}',
             check=check,
             case_id="Pf1Cd2",
+            **step_fields,
         )
+    return crash_dir
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_partial_fix_shows_per_check_breakdown(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
+    # With only some checks now passing, the case stays failed, the breakdown marks fixed ones, only those removed.
+    crash_dir = _write_partially_fixed_crash(app_runner, ctx, crash_factory, tmp_path)
 
     assert cli.main("replay") == snapshot_cli
     assert len(_list_crash_files(crash_dir)) == 1
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_partial_fix_without_masked_credentials_keeps_every_file(
+    cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
+):
+    crash_dir = _write_partially_fixed_crash(
+        app_runner, ctx, crash_factory, tmp_path, request_headers={"Authorization": "[Filtered]"}
+    )
+
+    assert cli.main("replay") == snapshot_cli
+    assert len(_list_crash_files(crash_dir)) == 2
 
 
 def test_sanitized_crash_is_never_removed(cli, app_runner, ctx, crash_factory, tmp_path):
@@ -2107,4 +2162,432 @@ def test_sanitized_crash_is_never_removed(cli, app_runner, ctx, crash_factory, t
 
     cli.main("replay", str(tmp_path))
 
+    assert crash_file.exists()
+
+
+VALID_TOKEN = "real-token"
+
+
+def _replayed_authorization(api) -> list[str | None]:
+    return [request.headers.get("Authorization") for request in api.requests if request.path == "/protected"]
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"headers": {"Authorization": f"Bearer {VALID_TOKEN}"}},
+        {"auth": {"openapi": {"BearerAuth": {"bearer": VALID_TOKEN}}}},
+    ],
+    ids=["headers", "openapi-bearer"],
+)
+def test_replay_restores_masked_credentials_from_config(cli, ctx, tmp_path, config):
+    # The server fails only for an authenticated request, so replaying the masked value would hide the failure.
+    api = ctx.openapi.apps.under_declared_security(DeclareSecurity(), RespondWithStatus(500))
+    cli.main(
+        "run",
+        api.schema_url,
+        "--phases=examples,fuzzing",
+        "--max-examples=1",
+        "-c",
+        "not_a_server_error",
+        config=config,
+    )
+    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    assert "[Filtered]" in crash_files[0].read_text()
+    api.requests.clear()
+
+    result = cli.main("replay", config=config)
+
+    assert result.exit_code == 1, result.output
+    assert _replayed_authorization(api) == [f"Bearer {VALID_TOKEN}"]
+    assert _list_crash_files(_crashes_dir(tmp_path)) == crash_files
+
+
+LOGIN_AUTH_MODULE = """
+import requests
+import schemathesis
+
+
+@schemathesis.auth(refresh_interval=None)
+class LoginAuth:
+    def get(self, case, context):
+        return requests.post(f"{case.operation.base_url}/login").json()["access_token"]
+
+    def set(self, case, data, context):
+        case.headers = {**(case.headers or {}), "Authorization": f"Bearer {data}"}
+"""
+
+
+def test_replay_applies_auth_provider_from_hooks(cli, ctx, tmp_path):
+    # Each login revokes the previous token, so only a provider that runs during replay can authenticate.
+    api = ctx.openapi.apps.under_declared_security(DeclareSecurity(), RespondWithStatus(500), RotateTokenOnLogin())
+    module = ctx.write_pymodule(LOGIN_AUTH_MODULE)
+    cli.main(
+        "run", api.schema_url, "--phases=examples,fuzzing", "--max-examples=1", "-c", "not_a_server_error", hooks=module
+    )
+    assert _list_crash_files(_crashes_dir(tmp_path))
+    api.requests.clear()
+
+    result = cli.main("replay", hooks=module)
+
+    assert result.exit_code == 1, result.output
+    assert [(request.method, request.path) for request in api.requests] == [("POST", "/login"), ("GET", "/protected")]
+
+
+@pytest.mark.parametrize(
+    ("modifiers", "args", "config", "expected"),
+    [
+        ((), ("-H", f"Authorization: Bearer {VALID_TOKEN}"), None, f"Bearer {VALID_TOKEN}"),
+        (
+            (),
+            ("--header", f"Authorization: Bearer {VALID_TOKEN}"),
+            {"headers": {"Authorization": "Bearer stale"}},
+            f"Bearer {VALID_TOKEN}",
+        ),
+        ((ExpectBasicAuth("user", "pass"),), ("--auth", "user:pass"), None, "Basic dXNlcjpwYXNz"),
+    ],
+    ids=["header", "header-over-config", "basic-auth"],
+)
+def test_replay_credentials_from_cli(cli, ctx, tmp_path, modifiers, args, config, expected):
+    api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500), *modifiers)
+    cli.main("run", api.schema_url, "--phases=examples,fuzzing", "--max-examples=1", "-c", "not_a_server_error", *args)
+    assert _list_crash_files(_crashes_dir(tmp_path))
+    api.requests.clear()
+
+    result = cli.main("replay", *args, config=config)
+
+    assert result.exit_code == 1, result.output
+    assert _replayed_authorization(api) == [expected]
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    "args",
+    [("-H", "Invalid"), ("--auth", "no-colon"), ("--auth", "user:pass", "-H", "Authorization: Bearer x")],
+    ids=["invalid-header", "invalid-auth", "auth-overlap"],
+)
+def test_replay_invalid_credentials_options(cli, tmp_path, args, snapshot_cli):
+    assert cli.main("replay", *args) == snapshot_cli
+
+
+def test_replay_credentials_from_wfc_file(cli, ctx, tmp_path):
+    api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
+    wfc_file = tmp_path / "auth.json"
+    wfc_file.write_text(
+        json.dumps(
+            {
+                "auth": [
+                    {"name": "stale", "fixedHeaders": [{"name": "Authorization", "value": "Bearer stale"}]},
+                    {"name": "valid", "fixedHeaders": [{"name": "Authorization", "value": f"Bearer {VALID_TOKEN}"}]},
+                ]
+            }
+        )
+    )
+    args = (f"--auth-wfc={wfc_file}", "--auth-wfc-user=valid")
+    cli.main("run", api.schema_url, "--phases=examples,fuzzing", "--max-examples=1", "-c", "not_a_server_error", *args)
+    assert _list_crash_files(_crashes_dir(tmp_path))
+    api.requests.clear()
+
+    result = cli.main("replay", *args)
+
+    assert result.exit_code == 1, result.output
+    assert _replayed_authorization(api) == [f"Bearer {VALID_TOKEN}"]
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_masked_credentials_not_supplied_is_errored(cli, ctx, tmp_path, snapshot_cli):
+    # Without the credential the API answers 401, which must not read as a fix.
+    api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
+    config = {"headers": {"Authorization": f"Bearer {VALID_TOKEN}"}}
+    cli.main(
+        "run",
+        api.schema_url,
+        "--phases=examples,fuzzing",
+        "--max-examples=1",
+        "-c",
+        "not_a_server_error",
+        config=config,
+    )
+    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    assert crash_files
+
+    assert cli.main("replay") == snapshot_cli
+    assert _list_crash_files(_crashes_dir(tmp_path)) == crash_files
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_names_every_masked_value_not_supplied(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
+    schema_url, base = _users_app(ctx, app_runner)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{base}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "was broken"}',
+        request_headers={"Authorization": "[Filtered]"},
+        query={"api_key": "[Filtered]"},
+        cookies={"session": "[Filtered]"},
+    )
+
+    assert cli.main("replay", str(crash_file)) == snapshot_cli
+    assert crash_file.exists()
+
+
+def test_replay_removes_fixed_crash_once_masked_credentials_are_supplied(cli, app_runner, ctx, crash_factory, tmp_path):
+    schema_url, base = _users_app(ctx, app_runner)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{base}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "was broken"}',
+        request_headers={"Authorization": "[Filtered]"},
+    )
+
+    result = cli.main("replay", str(crash_file), "-H", f"Authorization: Bearer {VALID_TOKEN}")
+
+    assert result.exit_code == 0, result.output
+    assert not crash_file.exists()
+
+
+def test_replay_keeps_fixed_crash_with_masked_body(cli, app_runner, ctx, crash_factory, tmp_path):
+    # The masked body value is sent as-is, so a passing replay proves nothing about the recorded request.
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": {"responses": {"201": {"description": "Created"}}}}})
+
+    @app.route("/users", methods=["POST"])
+    def create():
+        return jsonify({}), 201
+
+    schema_url = app_runner.openapi_url(app)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        method="POST",
+        url=f"{schema_url.rsplit('/', 1)[0]}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "was broken"}',
+        case_body={"name": "x", "password": "[Filtered]"},
+        media_type="application/json",
+    )
+
+    result = cli.main("replay", str(crash_file))
+
+    assert result.exit_code == 0, result.output
+    assert crash_file.exists()
+
+
+def test_replay_config_auth_disables_auth_providers_from_hooks(cli, app_runner, ctx, crash_factory, tmp_path):
+    # As in a run, configured auth replaces hook providers, even for operations it does not cover.
+    api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
+    module = ctx.write_pymodule(
+        f"""
+import schemathesis
+
+
+@schemathesis.auth()
+class TokenAuth:
+    def get(self, case, context):
+        return "{VALID_TOKEN}"
+
+    def set(self, case, data, context):
+        case.headers = {{**(case.headers or {{}}), "Authorization": f"Bearer {{data}}"}}
+"""
+    )
+    _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{api.base_url}/protected",
+        schema_location=api.schema_url,
+        path_template="/protected",
+        status=500,
+        body='{"error": "boom"}',
+        request_headers={"Authorization": "[Filtered]"},
+    )
+
+    cli.main("replay", str(tmp_path), hooks=module, config={"auth": {"openapi": {"BearerAuth": {"bearer": "unused"}}}})
+
+    assert set(_replayed_authorization(api)) == {"[Filtered]"}
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_with_rejected_credentials_is_errored(cli, ctx, tmp_path, snapshot_cli):
+    # A wrong token turns the recorded 500 into a 401, which must not read as a fix.
+    api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))
+    cli.main(
+        "run",
+        api.schema_url,
+        "--phases=examples,fuzzing",
+        "--max-examples=1",
+        "-c",
+        "not_a_server_error",
+        "-H",
+        f"Authorization: Bearer {VALID_TOKEN}",
+    )
+    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    assert crash_files
+
+    assert cli.main("replay", "-H", "Authorization: Bearer nope") == snapshot_cli
+    assert _list_crash_files(_crashes_dir(tmp_path)) == crash_files
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_rejected_credentials_with_failing_check_keeps_every_file(
+    cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
+):
+    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/data")
+    def data():
+        return jsonify({"error": "no auth"}), 401
+
+    schema_url = app_runner.openapi_url(app)
+    crash_dir = _crashes_dir(tmp_path)
+    crash_dir.mkdir(parents=True, exist_ok=True)
+    for check in ("not_a_server_error", "status_code_conformance"):
+        _write_crash(
+            crash_dir,
+            crash_factory,
+            url=f"{schema_url.rsplit('/', 1)[0]}/data",
+            schema_location=schema_url,
+            path_template="/data",
+            status=500,
+            body='{"error": "boom"}',
+            check=check,
+            case_id="Au1Cd2",
+        )
+
+    assert cli.main("replay") == snapshot_cli
+    assert len(_list_crash_files(crash_dir)) == 2
+
+
+@pytest.mark.parametrize(
+    ("responses", "exit_code", "kept"),
+    [
+        ({"200": {"description": "OK"}, "401": {"description": "Unauthorized"}}, 0, False),
+        ({"200": {"description": "OK"}}, 1, True),
+    ],
+    ids=["fixed", "still-failing"],
+)
+def test_replay_recorded_auth_failure_is_verified(
+    cli, app_runner, ctx, crash_factory, tmp_path, responses, exit_code, kept
+):
+    # The recorded failure was itself a 401, so a 401 on replay is a faithful reproduction.
+    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": responses}}})
+
+    @app.route("/data")
+    def data():
+        return jsonify({"error": "no auth"}), 401
+
+    schema_url = app_runner.openapi_url(app)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{schema_url.rsplit('/', 1)[0]}/data",
+        schema_location=schema_url,
+        path_template="/data",
+        status=401,
+        body='{"error": "no auth"}',
+        check="status_code_conformance",
+    )
+
+    result = cli.main("replay", str(crash_file))
+
+    assert result.exit_code == exit_code, result.output
+    assert crash_file.exists() is kept
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_replay_chain_with_rejected_credentials_at_earlier_step_is_errored(
+    cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli
+):
+    # Only the creating step needs credentials; the terminal step's 404 would otherwise read as a fix.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {"post": {"responses": {"201": {"description": "Created"}}}},
+            "/users/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create():
+        if request.headers.get("Authorization") != f"Bearer {VALID_TOKEN}":
+            return jsonify({"error": "no auth"}), 401
+        return jsonify({"id": "u1"}), 201
+
+    @app.route("/users/<id>")
+    def get_user(id):
+        return jsonify({"error": "not found"}), 404
+
+    schema_url = app_runner.openapi_url(app)
+    crash_dir = _crashes_dir(tmp_path)
+    crash_dir.mkdir(parents=True, exist_ok=True)
+    writer = CrashWriter(directory=crash_dir)
+    writer.open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
+    writer.write(
+        crash_factory.chain(
+            steps=[
+                Step(method="POST", path="/users", status=201, body=b'{"id": "u1"}'),
+                Step(
+                    method="GET",
+                    path="/users/{id}",
+                    status=500,
+                    body=b'{"error": "boom"}',
+                    path_parameters={"id": "u1"},
+                    link=Link(
+                        operation_id="getUser",
+                        parameters=[LinkParameter(location="path", name="id", expression="$response.body#/id")],
+                    ),
+                    checks=[FailingCheck(name="not_a_server_error")],
+                ),
+            ]
+        )
+    )
+    crash_files = _list_crash_files(crash_dir)
+
+    assert cli.main("replay", "-H", "Authorization: Bearer nope") == snapshot_cli
+    assert _list_crash_files(crash_dir) == crash_files
+
+
+@pytest.mark.parametrize(
+    ("statuses", "exit_code", "verdict"),
+    [([401, 500], 1, "x FAILED"), ([200, 401, 401], 2, "! ERROR")],
+    ids=["rejected-then-failing", "passing-then-rejected"],
+)
+def test_replay_attempts_rejected_for_credentials_do_not_count_as_passes(
+    cli, app_runner, ctx, crash_factory, tmp_path, statuses, exit_code, verdict
+):
+    # Each replay attempt gets the next status, as when a token is revoked or refreshed between attempts.
+    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    pending = list(statuses)
+
+    @app.route("/users")
+    def users():
+        return jsonify([]), pending.pop(0)
+
+    schema_url = app_runner.openapi_url(app)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{schema_url.rsplit('/', 1)[0]}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "was broken"}',
+    )
+
+    result = cli.main("replay", str(crash_file))
+
+    assert result.exit_code == exit_code, result.output
+    assert verdict in result.output
     assert crash_file.exists()

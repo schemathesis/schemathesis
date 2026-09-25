@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING
 import click
 
 from schemathesis.cli.core import get_terminal_width
+from schemathesis.cli.options import AUTH, AUTH_WFC, AUTH_WFC_USER, HEADER
 from schemathesis.cli.output import make_console, make_progress_bar
+from schemathesis.cli.validation import validate_auth_overlap
 from schemathesis.core import storage
 from schemathesis.core.timing import Instant
 
@@ -34,9 +36,28 @@ if TYPE_CHECKING:
 @click.option(  # type: ignore[untyped-decorator]
     "--keep", is_flag=True, default=False, help="Retain fixed crashes instead of removing them."
 )
+@click.option(*HEADER.args, **HEADER.kwargs)  # type: ignore[untyped-decorator]
+@click.option(*AUTH.args, **AUTH.kwargs)  # type: ignore[untyped-decorator]
+@click.option(*AUTH_WFC.args, **AUTH_WFC.kwargs)  # type: ignore[untyped-decorator]
+@click.option(*AUTH_WFC_USER.args, **AUTH_WFC_USER.kwargs)  # type: ignore[untyped-decorator]
 @click.pass_context  # type: ignore[untyped-decorator]
-def replay(ctx: click.Context, path: str | None, base_url: str | None, schema_location: str | None, keep: bool) -> None:
+def replay(
+    ctx: click.Context,
+    path: str | None,
+    base_url: str | None,
+    schema_location: str | None,
+    keep: bool,
+    headers: dict[str, str],
+    auth: tuple[str, str] | None,
+    auth_wfc: str | None,
+    auth_wfc_user: str | None,
+) -> None:
     """Replay stored crash files."""
+    validate_auth_overlap(auth, headers)
+    # Credentials override every project's config, as in `st run`.
+    ctx.obj.projects.override.update(
+        headers=headers or None, basic_auth=auth, wfc_auth=auth_wfc, wfc_user=auth_wfc_user
+    )
     if path is None:
         units = [
             (directory, files, str(directory))
@@ -103,7 +124,11 @@ def _replay_directory(
     source: str,
 ) -> tuple[bool, bool, bool]:
     """Replay one project's crash directory; returns (has_failing_or_changed, has_error, interrupted)."""
-    from schemathesis.cli.commands.replay.executor import ReplayStatus, replay_crash_file
+    from schemathesis.cli.commands.replay.executor import (
+        ReplayStatus,
+        has_unrestorable_masked_values,
+        replay_crash_file,
+    )
     from schemathesis.cli.commands.replay.output import render_replay
     from schemathesis.reporting.crashes import CrashFile, CrashWriter, load_manifest
 
@@ -133,6 +158,11 @@ def _replay_directory(
         return False, True, False
 
     project_config = ctx.obj.projects.get(schema.raw_schema)
+    if schema.config.auth.is_defined:
+        from schemathesis import auths
+
+        # Configured auth replaces providers from hooks, as in `st run`.
+        auths.unregister()
 
     # One case that failed several checks is stored as one file per check; replay it once and verify all checks.
     units = _merge_by_case(crashes, crash_files)
@@ -163,10 +193,11 @@ def _replay_directory(
     removal_count = 0
     files_to_remove: set[str] = set()
     if not keep and not interrupted:
+        replacement = schema.config.output.sanitization.replacement
         for unit, outcome in zip(units, outcomes, strict=True):
             # Sanitization stripped values the replay cannot restore, so a `fixed` verdict here says
             # nothing about the API. Report it, keep the file - same rule as incompatible files.
-            if unit.crash.has_sanitized_values():
+            if has_unrestorable_masked_values(unit.crash, replacement):
                 continue
             fixed = {check.name for check in outcome.check_outcomes if check.status is ReplayStatus.FIXED}
             for path, check_name in unit.sources:
