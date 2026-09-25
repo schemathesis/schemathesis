@@ -234,22 +234,12 @@
       ],
       "types": {
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "location": [
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "properties": [
@@ -259,11 +249,6 @@
           "object"
         ],
         "type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ]
       }

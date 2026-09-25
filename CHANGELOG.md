@@ -43,6 +43,9 @@
 - Call test-scoped `after_validate` hooks.
 - Name conflicting keywords inside `$ref` branches of a `oneOf` when test data cannot be generated.
 - Keep operations in dependency inference when a response has an unresolvable `$ref`.
+- Missing inferred stateful links for path parameters named after a resource field, e.g. `/projects/{code}`.
+- Inferred stateful links reading response fields the schema does not define.
+- Missing inferred stateful links for fields and nested foreign keys inherited through `allOf`.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 

@@ -3229,6 +3229,462 @@ def test_path_param_named_after_collection_links_create_to_read(ctx):
     ]
 
 
+PROJECT_WITHOUT_ID = {
+    "type": "object",
+    "properties": {"idx": {"type": "integer"}, "code": {"type": "string"}, "title": {"type": "string"}},
+}
+CREATE_PROJECT = operation("post", "/api/project", "201", PROJECT_WITHOUT_ID, operation_id="createProject")
+
+
+@pytest.mark.parametrize("consumer_first", [True, False], ids=["consumer-first", "producer-first"])
+def test_path_param_named_after_resource_field_links_create_to_read(ctx, consumer_first):
+    read = operation(
+        "get", "/api/project/{code}", "200", {"type": "object"}, [path_param("code")], operation_id="getProject"
+    )
+    paths = {**read, **CREATE_PROJECT} if consumer_first else {**CREATE_PROJECT, **read}
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1api~1project/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1api~1project~1{code}/get",
+                "parameters": {"path.code": "$response.body#/code"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_path_param_named_after_field_of_unrelated_resource_is_not_bound(ctx):
+    user = {"type": "object", "properties": {"name": {"type": "string"}}}
+    paths = {
+        **CREATE_PROJECT,
+        **operation("get", "/users/{code}", "200", user, [path_param("code")], operation_id="getUser"),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == []
+
+
+def test_path_param_without_matching_resource_field_does_not_link_to_missing_field(ctx):
+    paths = {
+        **CREATE_PROJECT,
+        **operation(
+            "get", "/api/project/{projectId}", "200", {"type": "object"}, [path_param("projectId")], "getProject"
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == []
+
+
+def test_list_items_link_through_allof_inherited_identifier(ctx):
+    paths = {
+        **operation(
+            "get", "/sites", "200", {"type": "array", "items": component_ref("Site")}, operation_id="listSites"
+        ),
+        **operation("get", "/sites/{siteId}", "200", component_ref("Site"), [path_param("siteId")], "getSite"),
+    }
+    components = {
+        "schemas": {
+            "Base": {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
+            "Site": {"allOf": [component_ref("Base")], "properties": {"kind": {"type": "string"}}},
+        }
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1sites/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1sites~1{siteId}/get",
+                "parameters": {"path.siteId": "$response.body#/*/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_list_items_link_through_allof_identifier_when_sibling_branch_reference_dangles(ctx):
+    paths = {
+        **operation(
+            "get", "/sites", "200", {"type": "array", "items": component_ref("Site")}, operation_id="listSites"
+        ),
+        **operation("get", "/sites/{siteId}", "200", component_ref("Site"), [path_param("siteId")], "getSite"),
+    }
+    components = {
+        "schemas": {
+            "Base": {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
+            "Site": {"allOf": [component_ref("Missing"), component_ref("Base")]},
+        }
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1sites/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1sites~1{siteId}/get",
+                "parameters": {"path.siteId": "$response.body#/*/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+GROUP_NAME_ONLY = {"type": "object", "properties": {"name": {"type": "string"}}}
+GROUP_WITH_ID = {"type": "object", "properties": {"groupId": {"type": "string"}, "name": {"type": "string"}}}
+LIST_MEMBERS = operation("get", "/groups/{groupId}/members", "200", {"type": "object"}, [path_param("groupId")])
+GROUP_ID_TO_MEMBERS = {
+    "operationRef": "#/paths/~1groups~1{groupId}~1members/get",
+    "parameters": {"path.groupId": "$response.body#/groupId"},
+    "x-schemathesis": {"is_inferred": True},
+}
+
+
+@pytest.mark.parametrize(
+    ["item_schema", "components"],
+    [
+        (GROUP_WITH_ID, None),
+        (component_ref("Group"), {"schemas": {"Group": GROUP_WITH_ID}}),
+        (
+            {"allOf": [component_ref("Named"), component_ref("Identified")]},
+            {
+                "schemas": {
+                    "Named": GROUP_NAME_ONLY,
+                    "Identified": {"type": "object", "properties": {"groupId": {"type": "string"}}},
+                }
+            },
+        ),
+    ],
+    ids=["inline", "reference", "all-of-references"],
+)
+def test_link_reads_field_declared_by_producer_response_when_resource_has_other_fields(ctx, item_schema, components):
+    # `Group` takes its fields from the first response naming it; the item response declares `groupId` itself
+    paths = {
+        **operation("post", "/groups", "201", GROUP_NAME_ONLY, operation_id="createGroup"),
+        **operation("get", "/groups/{groupId}", "200", item_schema, [path_param("groupId")], "getGroup"),
+        **LIST_MEMBERS,
+    }
+    kwargs = {"components": components} if components is not None else {}
+    _, graph = analyze_dependencies(ctx, paths, **kwargs)
+    assert inferred_links(graph) == [["#/paths/~1groups~1{groupId}/get", "200", GROUP_ID_TO_MEMBERS]]
+
+
+def test_list_link_reads_field_declared_by_any_of_item_alternatives(ctx):
+    items = {"anyOf": [component_ref("Team"), component_ref("Club")]}
+    paths = {
+        "/groups": {
+            **operation("post", "/groups", "201", GROUP_NAME_ONLY, operation_id="createGroup")["/groups"],
+            **operation("get", "/groups", "200", {"type": "array", "items": items}, operation_id="listGroups")[
+                "/groups"
+            ],
+        },
+        **LIST_MEMBERS,
+    }
+    components = {
+        "schemas": {
+            "Team": {"type": "object", "properties": {"name": {"type": "string"}}},
+            "Club": GROUP_WITH_ID,
+        }
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1groups/get",
+            "200",
+            {**GROUP_ID_TO_MEMBERS, "parameters": {"path.groupId": "$response.body#/*/groupId"}},
+        ]
+    ]
+
+
+@pytest.mark.parametrize(
+    ["alternative", "version"],
+    [(component_ref("Missing"), "3.0.2"), (True, "3.1.0")],
+    ids=["dangling-reference", "boolean-schema"],
+)
+def test_list_link_reads_field_declared_by_any_of_item_alternative_next_to_fieldless_one(ctx, alternative, version):
+    items = {"anyOf": [alternative, component_ref("Club")]}
+    paths = {
+        "/groups": {
+            **operation("post", "/groups", "201", GROUP_NAME_ONLY, operation_id="createGroup")["/groups"],
+            **operation("get", "/groups", "200", {"type": "array", "items": items}, operation_id="listGroups")[
+                "/groups"
+            ],
+        },
+        **LIST_MEMBERS,
+    }
+    _, graph = analyze_dependencies(ctx, paths, version=version, components={"schemas": {"Club": GROUP_WITH_ID}})
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1groups/get",
+            "200",
+            {**GROUP_ID_TO_MEMBERS, "parameters": {"path.groupId": "$response.body#/*/groupId"}},
+        ]
+    ]
+
+
+def test_no_link_to_field_the_producer_response_lacks_when_resource_declares_it(ctx):
+    paths = {
+        **operation("get", "/groups/{groupId}", "200", GROUP_WITH_ID, [path_param("groupId")], "getGroup"),
+        **operation("post", "/groups", "201", GROUP_NAME_ONLY, operation_id="createGroup"),
+        **LIST_MEMBERS,
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert inferred_links(graph) == [["#/paths/~1groups~1{groupId}/get", "200", GROUP_ID_TO_MEMBERS]]
+
+
+def test_no_link_reads_field_from_binary_response(ctx):
+    paths = {
+        **operation("post", "/groups", "201", GROUP_WITH_ID, operation_id="createGroup"),
+        "/groups/{groupId}": {
+            "get": {
+                "parameters": [path_param("groupId")],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+                    }
+                },
+            }
+        },
+        **LIST_MEMBERS,
+    }
+    _, graph = analyze_dependencies(ctx, paths)
+    assert [(producer, definition["operationRef"]) for producer, _, definition in inferred_links(graph)] == [
+        ("#/paths/~1groups/post", "#/paths/~1groups~1{groupId}/get"),
+        ("#/paths/~1groups/post", "#/paths/~1groups~1{groupId}~1members/get"),
+    ]
+
+
+def test_list_links_nested_foreign_key_declared_through_all_of(ctx):
+    paths = {
+        **operation(
+            "get",
+            "/subscriptions",
+            "200",
+            {"type": "array", "items": component_ref("Subscription")},
+            operation_id="listSubscriptions",
+        ),
+        **operation("post", "/users/{id}/unlock", "204", parameters=[path_param("id")], operation_id="unlockUser"),
+    }
+    components = {
+        "schemas": {
+            "Named": {"type": "object", "properties": {"name": {"type": "string"}}},
+            "Subscription": {
+                "allOf": [
+                    component_ref("Named"),
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "owner": {"type": "object", "properties": {"userId": {"type": "string"}}},
+                        },
+                    },
+                ]
+            },
+        }
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1subscriptions/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1users~1{id}~1unlock/post",
+                "parameters": {"path.id": "$response.body#/*/owner/userId"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+INHERITED_ID_COMPONENTS = {
+    "schemas": {
+        "Resource": {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
+        "BarrierReport": {
+            "allOf": [component_ref("Resource"), {"type": "object", "properties": {"status": {"type": "string"}}}]
+        },
+        "Barrier": {"type": "object", "properties": {"id": {"type": "string"}, "enabled": {"type": "boolean"}}},
+        "ReservationTransaction": {
+            "allOf": [component_ref("Resource"), {"type": "object", "properties": {"amount": {"type": "number"}}}]
+        },
+        "ReservationDetail": {
+            "type": "object",
+            "properties": {"reservationId": {"type": "string"}, "usedHours": {"type": "number"}},
+        },
+    }
+}
+
+
+def test_parameter_binds_to_named_resource_over_prefix_named_one_with_inherited_id(ctx):
+    # A report's id, inherited from a generic base, is not the id of the barrier it reports on
+    paths = {
+        **operation(
+            "get",
+            "/barrier_reports",
+            "200",
+            {"type": "array", "items": component_ref("BarrierReport")},
+            [{"name": "barrier_id", "in": "query", "required": True, "schema": {"type": "string"}}],
+            "listBarrierReports",
+        ),
+        **operation(
+            "get",
+            "/barrier_reports/{report_id}",
+            "200",
+            component_ref("BarrierReport"),
+            [path_param("report_id")],
+            "getBarrierReport",
+        ),
+        **operation("post", "/barriers", "201", component_ref("Barrier"), operation_id="createBarrier"),
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=INHERITED_ID_COMPONENTS)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1barrier_reports/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1barrier_reports~1{report_id}/get",
+                "parameters": {"path.report_id": "$response.body#/*/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1barriers/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1barrier_reports/get",
+                "parameters": {"query.barrier_id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
+
+
+def test_parameter_binds_to_field_named_after_it_over_prefix_named_resource_with_inherited_id(ctx):
+    # A reservation transaction's id is not a reservation id; reservation details carry one
+    paths = {
+        **operation(
+            "get",
+            "/transactions",
+            "200",
+            {"type": "array", "items": component_ref("ReservationTransaction")},
+            operation_id="listTransactions",
+        ),
+        **operation(
+            "get",
+            "/reservations/{reservationId}/summary",
+            "200",
+            {"type": "object"},
+            [path_param("reservationId")],
+            "getReservationSummary",
+        ),
+        **operation(
+            "get",
+            "/details",
+            "200",
+            {"type": "array", "items": component_ref("ReservationDetail")},
+            operation_id="listDetails",
+        ),
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=INHERITED_ID_COMPONENTS)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1details/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1reservations~1{reservationId}~1summary/get",
+                "parameters": {"path.reservationId": "$response.body#/*/reservationId"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_parameter_keeps_inherited_id_of_resource_it_names_in_other_case(ctx):
+    paths = {
+        **operation(
+            "get", "/sites", "200", {"type": "array", "items": component_ref("site")}, operation_id="listSites"
+        ),
+        **operation("get", "/sites/{siteId}/stats", "200", {"type": "object"}, [path_param("siteId")], "getSiteStats"),
+        **operation(
+            "get",
+            "/site-details",
+            "200",
+            {"type": "array", "items": component_ref("SiteDetail")},
+            operation_id="listSiteDetails",
+        ),
+    }
+    components = {
+        "schemas": {
+            "Resource": INHERITED_ID_COMPONENTS["schemas"]["Resource"],
+            "site": {
+                "allOf": [component_ref("Resource"), {"type": "object", "properties": {"kind": {"type": "string"}}}]
+            },
+            "SiteDetail": {"type": "object", "properties": {"siteId": {"type": "string"}, "note": {"type": "string"}}},
+        }
+    }
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1sites/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1sites~1{siteId}~1stats/get",
+                "parameters": {"path.siteId": "$response.body#/*/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+@pytest.mark.parametrize("parent_first", [True, False], ids=["parent-first", "parent-last"])
+def test_update_body_field_binds_to_updated_resource_when_parent_has_it_too(ctx, parent_first):
+    # Both the site and its add-on inherit `location`; the add-on update keeps the add-on's own one
+    tracked = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "location": {"type": "string"}},
+    }
+    components = {
+        "schemas": {
+            "Tracked": tracked,
+            "Site": {"allOf": [component_ref("Tracked")]},
+            "Addon": {"allOf": [component_ref("Tracked")]},
+        }
+    }
+    parameters = [path_param("siteName"), path_param("addonName")]
+    addon = {
+        "/sites/{siteName}/addons/{addonName}": {
+            **operation(
+                "get", "/sites/{siteName}/addons/{addonName}", "200", component_ref("Addon"), parameters, "getAddon"
+            )["/sites/{siteName}/addons/{addonName}"],
+            **operation_with_body(
+                "put",
+                "/sites/{siteName}/addons/{addonName}",
+                "200",
+                {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]},
+                component_ref("Addon"),
+                parameters,
+                "updateAddon",
+            )["/sites/{siteName}/addons/{addonName}"],
+        }
+    }
+    site = operation("get", "/sites/{siteName}", "200", component_ref("Site"), [path_param("siteName")], "getSite")
+    paths = {**site, **addon} if parent_first else {**addon, **site}
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+    assert sorted(
+        (producer, definition["operationRef"], definition.get("requestBody"))
+        for producer, _, definition in inferred_links(graph)
+        if definition["operationRef"].endswith("/put")
+    ) == [
+        ("#/paths/~1sites~1{siteName}/get", "#/paths/~1sites~1{siteName}~1addons~1{addonName}/put", None),
+        (
+            "#/paths/~1sites~1{siteName}~1addons~1{addonName}/get",
+            "#/paths/~1sites~1{siteName}~1addons~1{addonName}/put",
+            {"location": "$response.body#/location"},
+        ),
+    ]
+
+
 def test_nested_fk_inference_independent_of_path_order(ctx):
     # Inference must register a nested-body FK input slot regardless of whether the consumer
     # appears before or after its producer in the spec's `paths` order.

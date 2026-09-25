@@ -1,17 +1,1 @@
-[
-  [
-    "201",
-    "#/paths/~1brands/post",
-    {
-      "GetBrand": {
-        "operationRef": "#/paths/~1brands~1{id}/get",
-        "parameters": {
-          "path.id": "$response.body#/id"
-        },
-        "x-schemathesis": {
-          "is_inferred": true
-        }
-      }
-    }
-  ]
-]
+[]

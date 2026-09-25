@@ -4,10 +4,10 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from schemathesis.core.errors import InfiniteRecursiveReference, RefResolutionError
+from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.resolver import Resolver
-from schemathesis.core.jsonschema.types import get_type
+from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -48,6 +48,8 @@ class ExtractedResource:
     is_primitive_identifier: bool = False
     # True when the response is a map keyed by identifier (`{<id>: <object>, ...}`)
     extract_object_keys: bool = False
+    # Fields this response declares for the resource; `None` when it declares none
+    response_fields: frozenset[str] | None = None
 
 
 def extract_resources_from_responses(
@@ -225,13 +227,18 @@ def iter_resources_from_response(
     )
 
     if result is not None:
-        resource, cardinality = result
+        resource, cardinality, response_fields = result
+        if canonicalized is not resolved and unwrapped.pointer == ROOT_POINTER and cardinality == Cardinality.ONE:
+            # Flattening keeps one `allOf` reference only; the fields of every inherited schema belong to the response
+            response_fields = _declared_fields(resolved, current_resolver)
         if pointer:
             if unwrapped.pointer != ROOT_POINTER:
                 pointer += unwrapped.pointer
         else:
             pointer = unwrapped.pointer
-        yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=pointer)
+        yield ExtractedResource(
+            resource=resource, cardinality=cardinality, pointer=pointer, response_fields=response_fields
+        )
         parent_cardinality = cardinality
         # Look for sub-resources. When the unwrapped schema is an array (MANY producer),
         # descend into `items` so we examine the per-element object's properties.
@@ -260,10 +267,13 @@ def iter_resources_from_response(
                             parent_ref=reference,
                         )
                         if sub_result is not None:
-                            subresource, sub_cardinality = sub_result
+                            subresource, sub_cardinality, sub_fields = sub_result
                             subresource_pointer = extend_pointer(pointer, field, parent_cardinality=parent_cardinality)
                             yield ExtractedResource(
-                                resource=subresource, cardinality=sub_cardinality, pointer=subresource_pointer
+                                resource=subresource,
+                                cardinality=sub_cardinality,
+                                pointer=subresource_pointer,
+                                response_fields=sub_fields,
                             )
                             # When the sub-schema is itself a pagination/list wrapper (e.g. Spring
                             # `CustomResponse{response: {content: [...]}}`), descend one more level
@@ -283,11 +293,12 @@ def iter_resources_from_response(
                                         parent_ref=sub_unwrapped.ref or reference,
                                     )
                                     if inner_result is not None:
-                                        inner_resource, inner_cardinality = inner_result
+                                        inner_resource, inner_cardinality, inner_fields = inner_result
                                         yield ExtractedResource(
                                             resource=inner_resource,
                                             cardinality=inner_cardinality,
                                             pointer=subresource_pointer + sub_unwrapped.pointer,
+                                            response_fields=inner_fields,
                                         )
 
 
@@ -409,8 +420,8 @@ def _extract_resource_and_cardinality(
     updated_resources: set[str],
     resolver: Resolver,
     parent_ref: str | None = None,
-) -> tuple[ResourceDefinition, Cardinality] | None:
-    """Extract resource from schema and determine cardinality."""
+) -> tuple[ResourceDefinition, Cardinality, frozenset[str] | None] | None:
+    """Extract resource from schema and determine cardinality, with the fields the schema declares."""
     # Check if it's an array
     if schema.get("type") == "array" or "items" in schema:
         items = schema.get("items")
@@ -434,7 +445,7 @@ def _extract_resource_and_cardinality(
         if resource is None:
             return None
 
-        return resource, Cardinality.MANY
+        return resource, Cardinality.MANY, _declared_fields(resolved_items, resolver)
 
     # Single object
     resource = _extract_resource_from_schema(
@@ -449,7 +460,7 @@ def _extract_resource_and_cardinality(
     if resource is None:
         return None
 
-    return resource, Cardinality.ONE
+    return resource, Cardinality.ONE, _declared_fields(schema, resolver)
 
 
 def _extract_resource_from_schema(
@@ -478,30 +489,36 @@ def _extract_resource_from_schema(
     resource = resources.get(resource_name)
 
     if resource is None or resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
-        _, resolved = maybe_resolve_with_resolver(schema, resolver)
+        schema_resolver, resolved = maybe_resolve_with_resolver(schema, resolver)
 
         if "type" in resolved and resolved["type"] != "object" and "properties" not in resolved:
             # Skip strings, etc
             return None
 
-        properties = resolved.get("properties")
-        if isinstance(properties, dict) and properties:
+        properties = _collect_properties(resolved, schema_resolver)
+        if properties:
             fields = sorted(properties)
             types = {}
-            for field, subschema in properties.items():
+            for field, (field_resolver, subschema) in properties.items():
+                resolved_subschema: Mapping[str, Any] | bool = subschema
                 if isinstance(subschema, dict):
-                    _, resolved_subschema = maybe_resolve_with_resolver(subschema, resolver)
-                else:
-                    resolved_subschema = subschema
+                    _, resolved_subschema = maybe_resolve_with_resolver(subschema, field_resolver)
                 types[field] = set(get_type(cast(dict, resolved_subschema)))
+            own = resolved.get("properties")
+            inherited_fields = frozenset(properties) - frozenset(own if isinstance(own, dict) else ())
             source = DefinitionSource.SCHEMA_WITH_PROPERTIES
             # Pre-compute FK fields for efficient link generation
             fk_fields = extract_fk_fields(fields)
-            # Extract nested FK fields from the schema
-            nested_fk_fields = extract_nested_fk_fields(resolved, resolver)
+            # Extract nested FK fields from the schema, including the ones under inherited properties
+            nested_fk_fields = [
+                nested
+                for field, (field_resolver, subschema) in properties.items()
+                for nested in extract_nested_fk_fields({"properties": {field: subschema}}, field_resolver)
+            ]
         else:
             fields = []
             types = {}
+            inherited_fields = frozenset()
             source = DefinitionSource.SCHEMA_WITHOUT_PROPERTIES
             fk_fields = []
             nested_fk_fields = []
@@ -512,6 +529,7 @@ def _extract_resource_from_schema(
                 resource.types = types
                 resource.fk_fields = fk_fields
                 resource.nested_fk_fields = nested_fk_fields
+                resource.inherited_fields = inherited_fields
                 updated_resources.add(resource_name)
         else:
             resource = ResourceDefinition(
@@ -521,6 +539,7 @@ def _extract_resource_from_schema(
                 source=source,
                 fk_fields=fk_fields,
                 nested_fk_fields=nested_fk_fields,
+                inherited_fields=inherited_fields,
             )
             resources[resource_name] = resource
 
@@ -538,3 +557,56 @@ def remove_unused_resources(operations: OperationMap, resources: ResourceMap) ->
     unused = set(resources.keys()) - used_resources
     for resource_name in unused:
         del resources[resource_name]
+
+
+def _collect_properties(
+    schema: Mapping[str, Any], resolver: Resolver, seen: frozenset[str] = frozenset()
+) -> dict[str, tuple[Resolver, JsonSchema]]:
+    # Properties inherited through `allOf` belong to the resource as much as its own ones.
+    properties: dict[str, tuple[Resolver, JsonSchema]] = {}
+    own = schema.get("properties")
+    if isinstance(own, dict):
+        properties.update((name, (resolver, subschema)) for name, subschema in own.items())
+    branches = schema.get("allOf")
+    if not isinstance(branches, list):
+        return properties
+    for branch in branches:
+        if not isinstance(branch, dict):
+            continue
+        branch_resolver = resolver
+        reference = branch.get("$ref")
+        if reference is not None:
+            if not isinstance(reference, str) or reference in seen:
+                continue
+            try:
+                branch_resolver, branch = maybe_resolve_with_resolver(branch, resolver)
+            except (RefResolutionError, InvalidSchema):
+                continue
+            branch_seen = seen | {reference}
+        else:
+            branch_seen = seen
+        for name, entry in _collect_properties(branch, branch_resolver, branch_seen).items():
+            properties.setdefault(name, entry)
+    return properties
+
+
+def _declared_fields(schema: Mapping[str, Any], resolver: Resolver) -> frozenset[str] | None:
+    """Fields declared by an object schema, its `allOf` parents, and any of its `oneOf` / `anyOf` alternatives."""
+    schema_resolver, resolved = maybe_resolve_with_resolver(schema, resolver)
+    if "object" not in get_type(cast(dict, resolved)) and "properties" not in resolved:
+        # Binary or scalar bodies carry no fields at all
+        return frozenset()
+    fields = set(_collect_properties(resolved, schema_resolver))
+    for keyword in ("oneOf", "anyOf"):
+        alternatives = resolved.get(keyword)
+        if not isinstance(alternatives, list):
+            continue
+        for alternative in alternatives:
+            if not isinstance(alternative, dict):
+                continue
+            try:
+                alternative_resolver, alternative = maybe_resolve_with_resolver(alternative, schema_resolver)
+            except (RefResolutionError, InvalidSchema):
+                continue
+            fields.update(_collect_properties(alternative, alternative_resolver))
+    return frozenset(fields) or None
