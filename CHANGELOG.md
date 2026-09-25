@@ -18,6 +18,7 @@
 - Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
 - Dependency inference ignoring `application/x-www-form-urlencoded`, `multipart/form-data` and `formData` request bodies.
 - Inferred links with `*` wildcards never filling request body fields during stateful testing.
+- Inferred links passing names as identifiers, parent names to new resources, or scalars to arrays.
 - Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.

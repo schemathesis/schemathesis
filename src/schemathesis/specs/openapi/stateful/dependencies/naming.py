@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from functools import lru_cache
 
 from schemathesis.core.text import to_pascal_case
@@ -34,6 +35,40 @@ def strip_version_prefix(path: str) -> str:
         else:
             break
     return "/" + "/".join(segments[start:])
+
+
+class KeyKind(enum.Enum):
+    """How a parameter refers to a resource."""
+
+    # `name`, `DomainName`, `username`, `title`
+    NAME = enum.auto()
+    # `id`, `user_id`, `DomainSid`, `clusterArn`, `role-id`
+    IDENTIFIER = enum.auto()
+
+
+_IDENTIFIER_SUFFIXES = ("id", "ids", "uuid", "uuids", "guid", "guids", "sid", "arn", "arns")
+
+
+@lru_cache(maxsize=2048)
+def key_kind(parameter: str) -> KeyKind | None:
+    lower = parameter.lower()
+    if lower.endswith("name") or lower == "title":
+        return KeyKind.NAME
+    for suffix in _IDENTIFIER_SUFFIXES:
+        if lower == suffix:
+            return KeyKind.IDENTIFIER
+        start = len(parameter) - len(suffix)
+        # The suffix must be a separate word: `user_id`, `userId`, `UserID`, but not `paid`.
+        if start > 0 and lower.endswith(suffix) and (parameter[start - 1] in "_-" or parameter[start].isupper()):
+            return KeyKind.IDENTIFIER
+    return None
+
+
+def trailing_path_parameter(path: str) -> str | None:
+    last = path.rstrip("/").rsplit("/", 1)[-1]
+    if last.startswith("{") and last.endswith("}"):
+        return last[1:-1]
+    return None
 
 
 @lru_cache(maxsize=2048)
