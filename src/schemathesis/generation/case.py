@@ -8,7 +8,7 @@ import jsonschema_rs
 from jsonschema_rs import Validator
 from typing_extensions import assert_never
 
-from schemathesis import hooks, transport
+from schemathesis import transport
 from schemathesis.auths import reauth_and_replay
 from schemathesis.checks import (
     CheckContext,
@@ -37,6 +37,7 @@ from schemathesis.hooks import (
     dispatch_after_network_error,
     dispatch_after_validate,
     dispatch_before_call,
+    schema_hook_dispatchers,
 )
 from schemathesis.transport.prepare import prepare_path, prepare_request
 from schemathesis.transport.serialization import Binary
@@ -514,7 +515,8 @@ class Case(Generic[OperationT]):
         checks = [
             check for check in list(checks) + list(additional_checks or []) if check not in set(excluded_checks or [])
         ]
-        has_after_validate = hooks.defines("after_validate") or self.operation.schema.hooks.defines("after_validate")
+        after_validate_dispatchers = schema_hook_dispatchers(self.operation.schema)
+        has_after_validate = any(dispatcher.defines("after_validate") for dispatcher in after_validate_dispatchers)
         check_results: list[CheckResult] = []
         _on_success: Callable[[str, Case], None] | None
 
@@ -547,8 +549,7 @@ class Case(Generic[OperationT]):
         if has_after_validate:
             hook_context = HookContext(operation=self.operation)
             dispatch_after_validate(
-                GLOBAL_HOOK_DISPATCHER,
-                self.operation.schema.hooks,
+                *after_validate_dispatchers,
                 context=hook_context,
                 case=self,
                 response=response,

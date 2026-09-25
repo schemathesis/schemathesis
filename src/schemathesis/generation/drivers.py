@@ -138,6 +138,7 @@ class CoverageGenerator:
         feedback: FeedbackSources,
         session: GenerationSession | None = None,
         unexpected_methods_seen: set[tuple[str, str]] | None = None,
+        hooks: HookDispatcher | None = None,
     ) -> None:
         self._operation = operation
         self._generation_modes = generation_modes
@@ -147,6 +148,7 @@ class CoverageGenerator:
         self._feedback = feedback
         self._session = session
         self._unexpected_methods_seen = unexpected_methods_seen
+        self._hooks = hooks
         self._controller = Controller()
         _capture_missing_path_parameters(operation, self._controller)
 
@@ -176,8 +178,10 @@ class CoverageGenerator:
                 category=UserWarning,
             )
             hook_context = HookContext(operation=operation)
-            # Per-test hooks are a pytest-plugin feature; the engine has none.
             dispatchers = [GLOBAL_HOOK_DISPATCHER, operation.schema.hooks]
+            # Per-test hooks are a pytest-plugin feature; the engine has none.
+            if self._hooks is not None:
+                dispatchers.append(self._hooks)
 
             unserializable = self._controller.unserializable_media_types
             for case in operation.schema.iter_coverage_cases(

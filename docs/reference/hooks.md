@@ -108,10 +108,10 @@ Not all hooks apply in every phase.
 | Hook | Examples | Coverage | Fuzzing | Stateful |
 |------|:--------:|:--------:|:-------:|:--------:|
 | `before_add_examples` | ✓ | - | - | - |
-| `before_generate_{component}` | - | - | ✓ | ✓ |
-| `filter_{component}` | - | - | ✓ | ✓ |
-| `map_{component}` | - | - | ✓ | ✓ |
-| `flatmap_{component}` | - | - | ✓ | ✓ |
+| `before_generate_{component}` | ✓* | - | ✓ | ✓ |
+| `filter_{component}` | ✓* | - | ✓ | ✓ |
+| `map_{component}` | ✓* | - | ✓ | ✓ |
+| `flatmap_{component}` | ✓* | - | ✓ | ✓ |
 | `before_generate_case` | - | - | ✓ | ✓ |
 | `filter_case` | - | ✓ | ✓ | ✓ |
 | `map_case` | - | ✓ | ✓ | ✓ |
@@ -122,7 +122,7 @@ Not all hooks apply in every phase.
 | `after_validate` | ✓ | ✓ | ✓ | ✓ |
 | `filter_failure` | ✓ | ✓ | ✓ | ✓ |
 
-**Examples phase** runs test cases embedded directly in the schema. Cases bypass the strategy pipeline, so data generation hooks have no effect on them.
+**Examples phase** runs test cases built from examples embedded in the schema. \* Component-level hooks apply only to the parts Schemathesis generates to complete an example, such as a required parameter without an example, so `map_headers` can still add a header the example lacks. Values taken from schema examples are never changed by hooks. Case-level hooks (`before_generate_case`, `filter_case`, `map_case`, `flatmap_case`) have no effect on example cases. With [`fill-missing`](configuration.md#phasesexamplesfill-missing) enabled, the case generated for an operation without examples gets all data generation hooks.
 
 **Coverage phase** generates test cases from the schema based on coverage goals (boundary values, required/optional combinations, etc.). Cases bypass the strategy pipeline, so component-level hooks (`filter_query`, `map_headers`, etc.) have no effect.
 

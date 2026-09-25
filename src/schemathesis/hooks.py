@@ -345,12 +345,16 @@ unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
 
 
-def _dispatch_schema_cascade(schema: SchemaMetadata, name: str, context: HookContext, *args: Any) -> None:
-    dispatchers: tuple[HookDispatcher, ...] = (GLOBAL_HOOK_DISPATCHER, schema.hooks)
+def schema_hook_dispatchers(schema: SchemaMetadata) -> tuple[HookDispatcher, ...]:
+    """Global, schema-level, and test-scoped dispatchers, in the order their hooks run."""
     local = schema.get_local_hook_dispatcher()
-    if local is not None:
-        dispatchers = (*dispatchers, local)
-    _dispatch_to_all(name, dispatchers, context, *args)
+    if local is None:
+        return (GLOBAL_HOOK_DISPATCHER, schema.hooks)
+    return (GLOBAL_HOOK_DISPATCHER, schema.hooks, local)
+
+
+def _dispatch_schema_cascade(schema: SchemaMetadata, name: str, context: HookContext, *args: Any) -> None:
+    _dispatch_to_all(name, schema_hook_dispatchers(schema), context, *args)
 
 
 def dispatch_before_process_path(
@@ -408,11 +412,7 @@ def dispatch_after_network_error(
 def should_keep_failure(failure: Failure, case: Case, response: Response) -> bool:
     """Whether every `filter_failure` hook accepts this failure. One rejection is final."""
     name = "filter_failure"
-    schema = case.operation.schema
-    dispatchers: tuple[HookDispatcher, ...] = (GLOBAL_HOOK_DISPATCHER, schema.hooks)
-    local = schema.get_local_hook_dispatcher()
-    if local is not None:
-        dispatchers = (*dispatchers, local)
+    dispatchers = schema_hook_dispatchers(case.operation.schema)
     if not any(dispatcher.defines(name) for dispatcher in dispatchers):
         return True
     context = HookContext(operation=case.operation)

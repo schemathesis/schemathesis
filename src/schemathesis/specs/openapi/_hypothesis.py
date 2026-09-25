@@ -846,8 +846,9 @@ def get_parameters_value(
         dictionary_draws = ()
         constants_draws = ()
     if new is not None:
+        # Explicit values win over anything hooks put into the generated part
         copied = dict(value)
-        copied.update(new)
+        copied.update((key, item) for key, item in new.items() if key not in value)
         return GeneratedValue(
             value=copied,
             meta=meta,
