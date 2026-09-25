@@ -14,7 +14,7 @@ from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
-from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL
+from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
 from schemathesis.cli.ext.fs import open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.cli.json_report import JsonReportHandler
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class ExecutionContext(Protocol):
-    exit_code: int
+    exit_code: ExitCode
 
     def on_event(self, event: EngineEvent) -> None: ...  # pragma: no cover
 
@@ -172,8 +172,13 @@ def execute_event_loop(
                         raise click.Abort() from exc
                     raise
 
-    except (click.Abort, KeyboardInterrupt):
-        sys.exit(1)
+    except click.Abort:
+        # A fatal error means the run could not do its job, the same class as a usage error.
+        sys.exit(ExitCode.ERROR)
+    except KeyboardInterrupt:
+        if ctx is not None:
+            ctx.exit_code = ExitCode.INTERRUPTED
+        sys.exit(ExitCode.INTERRUPTED)
     finally:
         shutdown()
 

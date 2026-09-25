@@ -85,7 +85,7 @@ def test_hooks_file_path_unloadable(ctx, cli, tmp_path):
     hooks_file = tmp_path / "my_hooks.xyz"
     hooks_file.write_text("# hooks")
     result = cli.main("run", api.schema_url, env={"SCHEMATHESIS_HOOKS": str(hooks_file)})
-    assert result.exit_code == 1, result.stdout
+    assert result.exit_code == 2, result.stdout
     assert "Unable to load Schemathesis extension hooks" in result.stdout
     assert "Cannot load hooks from:" in result.stdout
 

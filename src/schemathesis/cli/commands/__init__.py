@@ -9,7 +9,7 @@ import click
 from schemathesis.cli.commands.fuzz import fuzz as fuzz_command
 from schemathesis.cli.commands.replay import replay as replay_command
 from schemathesis.cli.commands.run import run as run_command
-from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
+from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ExitCode
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.ext.groups import CommandWithGroupedOptions, GroupedOption, StyledGroup, should_use_color
 from schemathesis.cli.output import display_header
@@ -84,7 +84,7 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
             bold=True,
         )
         click.echo("\nThe configuration file does not exist")
-        ctx.exit(1)
+        ctx.exit(ExitCode.ERROR)
     except PermissionError:
         display_header(SCHEMATHESIS_VERSION)
         click.secho(
@@ -93,7 +93,7 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
             bold=True,
         )
         click.echo("\nPermission denied")
-        ctx.exit(1)
+        ctx.exit(ExitCode.ERROR)
     except (TOMLDecodeError, ConfigError) as exc:
         display_header(SCHEMATHESIS_VERSION)
         click.secho(
@@ -106,7 +106,7 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
         else:
             detail = "The loaded configuration is incorrect"
         click.echo(f"\n{detail}\n\n{exc}")
-        ctx.exit(1)
+        ctx.exit(ExitCode.ERROR)
     except HookError as exc:
         click.secho("Unable to load Schemathesis extension hooks", fg="red", bold=True)
         formatted_module_name = click.style(f"'{exc.module_path}'", bold=True)
@@ -122,7 +122,7 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
             message = format_exception(cause, with_traceback=True, skip_frames=1)
             click.secho(f"\n{message}", fg="red")
         click.echo(f"\nFor more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
-        ctx.exit(1)
+        ctx.exit(ExitCode.ERROR)
     ctx.obj = config
 
 

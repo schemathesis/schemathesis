@@ -1305,6 +1305,28 @@ def test_replay_interrupt_before_first_outcome(
     assert crash_file.exists()
 
 
+def test_replay_interrupt_exit_code(cli, app_runner, ctx, crash_factory, tmp_path):
+    schema_url, base = _users_app(ctx, app_runner)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{base}/users",
+        schema_location=schema_url,
+        path_template="/users",
+        status=500,
+        body='{"error": "boom"}',
+    )
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def after_call(context, case, response):
+    raise KeyboardInterrupt
+"""
+    )
+    result = cli.main("replay", str(crash_file), hooks=module)
+    assert (result.exit_code, crash_file.exists()) == (130, True), result.output
+
+
 def test_summary_not_green_when_no_outcomes_ran():
     console = Console(file=io.StringIO(), force_terminal=True, color_system="standard", width=100)
     render_replay(

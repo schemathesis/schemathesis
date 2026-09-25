@@ -11,6 +11,7 @@
 
 - Name the pattern that stops the analysis when test data cannot be generated.
 - **BREAKING**: `st run` and `st fuzz` fail with exit code 2 when nothing is tested.
+- **BREAKING**: `st run` and `st fuzz` exit 2 on schema, configuration and internal errors.
 - Linked stateful steps send negative requests as often as scenario-starting steps.
 - `st replay` step chains show each linked value as `recorded -> replayed`.
 - `st replay` removes fixed crash files with masked credentials once config or CLI supplies them.

@@ -952,4 +952,4 @@ Schemathesis uses predictable exit codes so automation can interpret results:
 
 - `0` — All configured checks passed
 - `1` — At least one check failed or a bug was reported
-- `2` — The run was aborted due to configuration or schema errors, or tested nothing: the schema defines no operations, no operations matched the filters, or every selected operation was skipped
+- `2` — Schemathesis could not do its job: invalid options or configuration, a schema that fails to load, an internal error, or a run that tested nothing (the schema defines no operations, no operations matched the filters, or every selected operation was skipped)

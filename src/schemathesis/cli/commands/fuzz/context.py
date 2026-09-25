@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.summary import (
     SummaryData,
@@ -41,13 +42,13 @@ class FuzzExecutionContext(BaseExecutionContext):
         if isinstance(event, FuzzScenarioFinished):
             self.statistic.on_scenario_finished(event.recorder, failure_label=lambda case: case.operation.label)
             if event.status in (Status.FAILURE, Status.ERROR):
-                self.exit_code = 1
+                self.exit_code = ExitCode.FAILURES
         elif isinstance(event, events.EngineFinished):
             # after_run failures arrive here.
             if event.failures:
                 self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
-                self.exit_code = 1
-            self.check_nothing_tested(event.stop_reason)
+                self.exit_code = ExitCode.FAILURES
+            self.on_engine_finished(event.stop_reason)
         elif isinstance(event, events.NonFatalError):
             self.errors.add(event)
-            self.exit_code = 1
+            self.exit_code = ExitCode.FAILURES

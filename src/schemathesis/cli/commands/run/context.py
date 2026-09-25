@@ -6,6 +6,7 @@ from pathlib import Path
 
 from schemathesis.baseline import Baseline, BaselineEntry
 from schemathesis.cli.commands.run.warnings import WarningCollector
+from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.summary import SummaryData, WarningData
@@ -75,8 +76,8 @@ class ExecutionContext(BaseExecutionContext):
             # after_run failures arrive here.
             if event.failures:
                 self.statistic.record_run_check_failures(event.failures, label=RUN_CHECKS_LABEL)
-                self.exit_code = 1
-            self.check_nothing_tested(event.stop_reason)
+                self.exit_code = ExitCode.FAILURES
+            self.on_engine_finished(event.stop_reason)
             self._write_baseline()
         if isinstance(event, events.NonFatalError):
             self.errors.add(event)
@@ -85,7 +86,7 @@ class ExecutionContext(BaseExecutionContext):
             and event.phase.is_enabled
             and event.status in (Status.FAILURE, Status.ERROR)
         ):
-            self.exit_code = 1
+            self.exit_code = ExitCode.FAILURES
 
     def all_skipped_reason(self) -> str:
         unit_phases_off = all(

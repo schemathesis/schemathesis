@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import click
 
+from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.options import AUTH, AUTH_WFC, AUTH_WFC_USER, HEADER
 from schemathesis.cli.output import make_console, make_progress_bar
@@ -81,11 +82,11 @@ def replay(
             found = _find_by_case_id(ctx, path)
             if found is None:
                 click.echo(f"Error: no crash file found for case ID: {path}", err=True)
-                sys.exit(2)
+                sys.exit(ExitCode.ERROR)
             units = [(found[0], found[1], str(target))]
         else:
             click.echo(f"Error: path not found: {target}", err=True)
-            sys.exit(2)
+            sys.exit(ExitCode.ERROR)
 
     console = make_console()
     has_failing_or_changed = False
@@ -104,12 +105,12 @@ def replay(
         has_failing_or_changed = has_failing_or_changed or failing
         has_error = has_error or error
         if interrupted:
-            sys.exit(1)
+            sys.exit(ExitCode.INTERRUPTED)
 
     if has_failing_or_changed:
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURES)
     if has_error:
-        sys.exit(2)
+        sys.exit(ExitCode.ERROR)
 
 
 def _replay_directory(
