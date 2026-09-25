@@ -26,7 +26,7 @@ class BaseExecutionContext:
     specification: Specification | None = None
     api_statistic: ApiStatistic | None = None
     statistic: Statistic = field(default_factory=Statistic)
-    exit_code: ExitCode = ExitCode.OK
+    exit_code: int = ExitCode.OK
     # Why a run that completed cleanly still tested nothing.
     nothing_tested_reason: str | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)

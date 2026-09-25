@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 class ExecutionContext(Protocol):
-    exit_code: ExitCode
+    exit_code: int
 
     def on_event(self, event: EngineEvent) -> None: ...  # pragma: no cover
 
@@ -145,9 +145,13 @@ def execute_event_loop(
 
     handlers = [*initialize_report_handlers(config=config, args=args, params=params), output_handler]
     ctx: ExecutionContext | None = None
+    # Set when the loop ends abnormally; the process and the reports use it instead of the run's verdict.
+    abnormal_exit_code: int | None = None
 
     def shutdown() -> None:
         if ctx is not None:
+            if abnormal_exit_code is not None:
+                ctx.exit_code = abnormal_exit_code
             for h in handlers:
                 # The exit code is the API's verdict; a reporter failing at shutdown must not mask it,
                 # unlike a mid-run handler error, which aborts.
@@ -174,12 +178,20 @@ def execute_event_loop(
 
     except click.Abort:
         # A fatal error means the run could not do its job, the same class as a usage error.
-        sys.exit(ExitCode.ERROR)
+        abnormal_exit_code = ExitCode.ERROR
     except KeyboardInterrupt:
-        if ctx is not None:
-            ctx.exit_code = ExitCode.INTERRUPTED
-        sys.exit(ExitCode.INTERRUPTED)
+        abnormal_exit_code = ExitCode.INTERRUPTED
+    except click.ClickException as exc:
+        abnormal_exit_code = exc.exit_code
+        raise
+    except Exception:
+        # The interpreter exits with 1 on an uncaught exception.
+        abnormal_exit_code = 1
+        raise
     finally:
         shutdown()
 
-    sys.exit(ctx.exit_code if ctx is not None else 1)
+    if abnormal_exit_code is not None:
+        sys.exit(abnormal_exit_code)
+    assert ctx is not None
+    sys.exit(ctx.exit_code)
