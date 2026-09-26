@@ -62,6 +62,82 @@ def _allure_result_summaries(allure_dir):
 
 
 @pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+def test_from_fixture_writes_allure_and_junit_reports(testdir, tmp_path, ctx, xdist):
+    api = ctx.openapi.apps.success_and_failure()
+    allure_dir = tmp_path / "allure-results"
+    junit_path = tmp_path / "junit.xml"
+    testdir.makepyfile(
+        f"""
+import pytest
+import schemathesis
+from hypothesis import Phase, settings
+
+@pytest.fixture
+def api_schema():
+    schema = schemathesis.openapi.from_url("{api.schema_url}")
+    schema.config.reports.update(allure_path=r"{allure_dir}", junit_path=r"{junit_path}")
+    return schema
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    case.call_and_validate()
+"""
+    )
+    args = ("-n", "2") if xdist else ()
+
+    testdir.runpytest(*args)
+
+    assert _allure_outcomes(allure_dir) == {
+        "GET /api/failure": ("failed", ""),
+        "GET /api/success": ("passed", ""),
+    }
+    assert {
+        test_case.get("name"): (test_case[0].tag if len(test_case) else "passed")
+        for test_case in ElementTree.parse(junit_path).getroot().iter("testcase")
+    } == {
+        "GET /api/failure": "failure",
+        "GET /api/success": "passed",
+    }
+
+
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        ("check_failure", ("failed", "failure")),
+        ("assertion", ("failed", "failure")),
+        ("runtime_error", ("broken", "error")),
+        ("unsatisfiable", ("broken", "error")),
+        ("network_error", ("broken", "error")),
+        ("skip", ("skipped", "skipped")),
+    ],
+)
+def test_from_fixture_reports_use_pytest_outcome(testdir, tmp_path, ctx, xdist, outcome, expected):
+    allure_dir = tmp_path / "allure-results"
+    junit_path = tmp_path / "junit.xml"
+    label = make_pytest_outcome_test(
+        testdir,
+        ctx,
+        outcome,
+        f'schema.config.reports.update(allure_path=r"{allure_dir}", junit_path=r"{junit_path}")',
+        lazy=True,
+    )
+    args = ("-n", "2") if xdist else ()
+
+    testdir.runpytest(*args)
+
+    allure_status = {name: status for name, (status, _) in _allure_outcomes(allure_dir).items()}
+    junit_kind = {
+        test_case.get("name"): (test_case[0].tag if len(test_case) else "passed")
+        for test_case in ElementTree.parse(junit_path).getroot().iter("testcase")
+    }
+    assert (allure_status, junit_kind) == ({label: expected[0]}, {label: expected[1]})
+
+
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
 @pytest.mark.parametrize(
     ("outcome", "expected"),
     [

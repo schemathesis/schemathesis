@@ -273,11 +273,14 @@ class LazySchema:
                     fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)
                 subtests = make_subtests(request)
+                from schemathesis.pytest.plugin import report_subtest
+
                 for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
                         request.node._nodeid = f"{node_id}[{operation.method.upper()} {operation.path}]"
-                        run_subtest(operation, fixtures, sub_test, subtests)
+                        with report_subtest(request.node, schema, operation.label, operation.tags):
+                            run_subtest(operation, fixtures, sub_test, subtests)
                     else:
                         _schema_error(subtests, result.err(), node_id, request.node)
                 request.node._nodeid = node_id
