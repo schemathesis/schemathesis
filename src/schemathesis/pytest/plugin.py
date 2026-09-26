@@ -32,7 +32,7 @@ from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_report
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status
-from schemathesis.generation import overrides
+from schemathesis.generation import derive_operation_seed, overrides
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
@@ -220,7 +220,7 @@ class SchemathesisCase(PyCollector):
                         given_kwargs=self.given_kwargs,
                         project=self.schema.config,
                         as_strategy_kwargs=as_strategy_kwargs,
-                        seed=self.schema.config.seed,
+                        seed=derive_operation_seed(self.schema.config.seed, operation.label),
                         feedback=feedback,
                     ),
                 )

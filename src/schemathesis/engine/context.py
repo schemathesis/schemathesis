@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import threading
 import time
 from dataclasses import dataclass
@@ -21,6 +20,7 @@ from schemathesis.engine.observations import Observations
 from schemathesis.engine.outage import ServerMonitor
 from schemathesis.engine.run.cache import Cache
 from schemathesis.engine.supervisor import Supervisor
+from schemathesis.generation import derive_operation_seed
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.python._constants.orchestrator import build_constants_pool
@@ -250,12 +250,7 @@ class EngineContext:
 
     def operation_seed(self, operation: APIOperation) -> int | None:
         """Cycle seed mixed with the operation label, so operations with identical parameters draw different inputs."""
-        seed = self.cycle_seed
-        if seed is None:
-            return None
-        # A stable hash keeps the seed identical across processes, unlike the salted built-in `hash`.
-        digest = hashlib.blake2b(f"{seed}:{operation.label}".encode(), digest_size=8).digest()
-        return int.from_bytes(digest, "big")
+        return derive_operation_seed(self.cycle_seed, operation.label)
 
     def next_stateful_seed(self) -> int | None:
         """Seed for the next stateful suite; every suite in the run gets its own, cycles included."""

@@ -14,7 +14,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import FailureGroup, as_reported_failure
 from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.generation import overrides
+from schemathesis.generation import derive_operation_seed, overrides
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
@@ -80,7 +80,7 @@ def get_all_tests(
                     settings=schema.config.get_hypothesis_settings(operation=operation, phase=phase),
                     explicit_settings=settings,
                     modes=modes,
-                    seed=seed,
+                    seed=derive_operation_seed(seed, operation.label),
                     project=schema.config,
                     as_strategy_kwargs=_as_strategy_kwargs,
                     given_kwargs=given_kwargs or {},
