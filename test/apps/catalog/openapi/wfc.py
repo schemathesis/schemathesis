@@ -319,3 +319,66 @@ def wfc_role_gated_401_when_anonymous() -> OpenAPIApp:
         return refuse()
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def wfc_accounts_seeded_later() -> OpenAPIApp:
+    """No account exists until `POST /api/seed`; like Spring, unknown credentials get 401 on every endpoint."""
+    spec = build_schema(
+        {
+            "/api/admin-only/{itemId}": {
+                "delete": {
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "204": {"description": "Deleted"},
+                        "401": {"description": "Unauthorized"},
+                        "403": {"description": "Forbidden"},
+                    },
+                }
+            },
+            "/api/ping": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/api/seed": {"post": {"responses": {"200": {"description": "Seeded"}}}},
+            "/api/whoami": {
+                "get": {"responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}}}
+            },
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+    accounts: set[str] = set()
+
+    def role() -> str | None:
+        return (request.headers.get("Authorization") or "").removeprefix("ApiKey ").strip() or None
+
+    @app.before_request
+    def reject_unknown_credentials() -> object:
+        current = role()
+        # Like a `permitAll()` route, `/api/ping` never looks at credentials.
+        if current is not None and current not in accounts and request.path != "/api/ping":
+            return jsonify({"detail": "bad credentials"}), 401
+        return None
+
+    @app.route("/api/admin-only/<item_id>", methods=["DELETE"])
+    def admin_only(item_id: str) -> object:
+        current = role()
+        if current is None:
+            return jsonify({"detail": "unauthenticated"}), 401
+        if current != "admin":
+            return jsonify({"detail": "denied"}), 403
+        return "", 204
+
+    @app.route("/api/ping", methods=["GET"])
+    def ping() -> object:
+        return jsonify({"ok": True})
+
+    @app.route("/api/seed", methods=["POST"])
+    def seed() -> object:
+        accounts.update(WFC_ROLES)
+        return jsonify({"ok": True})
+
+    @app.route("/api/whoami", methods=["GET"])
+    def whoami() -> object:
+        current = role()
+        if current is None:
+            return jsonify({"detail": "unauthenticated"}), 401
+        return jsonify({"name": current})
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

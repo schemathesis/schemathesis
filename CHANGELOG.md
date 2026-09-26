@@ -28,6 +28,7 @@
 - `Stop reason: Time limit reached` for runs stopped by a failure shortly before the deadline.
 - `continue-on-failure` in the config file ignored.
 - WFC auth skipping users in the coverage phase and settling operations on the wrong one.
+- WFC auth never retrying users rejected before the API created their accounts.
 
 #### `st replay`
 
