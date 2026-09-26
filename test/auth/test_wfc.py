@@ -1063,6 +1063,19 @@ def test_escalation_walks_the_chain_on_401(cli, ctx, tmp_path):
     assert _identities(api, "DELETE", "/api/admin-only") == {"viewer", "", "editor", "admin"}
 
 
+def test_denials_count_against_the_identity_that_was_sent(cli, ctx, tmp_path):
+    # Coverage cases carry their identity from generation, so many refusals of one user arrive at once.
+    api = ctx.openapi.apps.wfc_role_gated()
+    auth = _write(
+        tmp_path,
+        {"auth": [ROLE_AUTH["auth"][0], ROLE_AUTH["auth"][2], ROLE_AUTH["auth"][1]]},
+    )
+
+    cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=coverage,fuzzing")
+
+    assert "admin" in _identities(api, "DELETE", "/api/admin-only")
+
+
 def test_a_missing_resource_does_not_settle_the_identity(cli, ctx, tmp_path):
     # A 404 says the id was wrong, not that the identity was accepted.
     api = ctx.openapi.apps.wfc_role_gated()
