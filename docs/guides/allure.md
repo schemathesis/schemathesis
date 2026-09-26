@@ -50,6 +50,15 @@ Failures appear as one step per unique failing request, titled `Test Case: <id>`
 
 ![Allure detail view showing a failed operation with a Test Case step expanded](../img/allure-detail.png)
 
+CLI and pytest reports use the same statuses:
+
+| Status | Meaning |
+|---|---|
+| `passed` | The test completed successfully |
+| `failed` | A Schemathesis check or user assertion failed |
+| `broken` | Configuration, network, or user code raised an error |
+| `skipped` | pytest or Schemathesis skipped the test |
+
 Each result carries these labels:
 
 | Label | Value |

@@ -30,6 +30,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_reported_failure, format_failures, get_origin
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
+from schemathesis.engine import Status
 from schemathesis.generation import overrides
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.given import (
@@ -50,6 +51,7 @@ from schemathesis.pytest import _subtests
 from schemathesis.pytest._keys import _PYTEST_SCHEMAS_KEY, track_schema
 from schemathesis.pytest._subtests import HAS_CORE_SUBTESTS, is_subtest_report
 from schemathesis.pytest.control_flow import fail_on_no_matches
+from schemathesis.pytest.reporting import PytestReportOutcome
 from schemathesis.pytest.warnings import (
     emit_constants_warnings,
     emit_openapi_auth_warnings,
@@ -78,6 +80,7 @@ _CASSETTE_KEY: pytest.StashKey[
 _STATEFUL_WRITERS_KEY: pytest.StashKey[list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]] = pytest.StashKey()
 _ALLURE_FORWARDER_KEY: pytest.StashKey[_AllureHookForwarder] = pytest.StashKey()
 _ALLURE_BUFFER_KEY: pytest.StashKey[_AllureCallBuffer] = pytest.StashKey()
+_REPORT_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
 
 
 def _is_schema(value: object) -> bool:
@@ -562,6 +565,8 @@ def _write_to_writers(
     recorder: ScenarioRecorder,
     elapsed_sec: float,
     tags: list[str] | None = None,
+    outcome: PytestReportOutcome | None = None,
+    has_recorder: bool = True,
 ) -> None:
     from schemathesis.reporting.junitxml import JunitXmlWriter
 
@@ -573,10 +578,17 @@ def _write_to_writers(
 
     for writer in writers:
         if isinstance(writer, JunitXmlWriter):
-            writer.write(recorder, elapsed_sec)
+            if has_recorder:
+                writer.write(recorder, elapsed_sec)
         elif _AllureWriter is not None and isinstance(writer, _AllureWriter):
-            writer.write(recorder, elapsed_sec, tags=tags)
-        else:
+            writer.write(
+                recorder,
+                elapsed_sec,
+                tags=tags,
+                status=outcome.status if outcome is not None else None,
+                message=outcome.message if outcome is not None else None,
+            )
+        elif has_recorder:
             writer.write(recorder)
 
 
@@ -609,6 +621,8 @@ def _push_to_xdist_workeroutput(
     elapsed_sec: float,
     tags: list[str] | None = None,
     allure_calls: list[dict] | None = None,
+    outcome: PytestReportOutcome | None = None,
+    has_recorder: bool = True,
 ) -> None:
     from schemathesis.pytest.xdist import (
         SCHEMATHESIS_RECORDERS_KEY,
@@ -621,9 +635,47 @@ def _push_to_xdist_workeroutput(
     recorders = workeroutput.setdefault(SCHEMATHESIS_RECORDERS_KEY, {})
     if sid not in recorders:
         recorders[sid] = {"writer_config": _serialize_writer_config(schema), "records": []}
-    recorders[sid]["records"].append(serialize_recorder(recorder, elapsed_sec, tags=tags, allure_calls=allure_calls))
+    recorders[sid]["records"].append(
+        serialize_recorder(
+            recorder,
+            elapsed_sec,
+            tags=tags,
+            allure_calls=allure_calls,
+            status=outcome.status if outcome is not None else None,
+            message=outcome.message if outcome is not None else None,
+            has_recorder=has_recorder,
+        )
+    )
 
 
+@hookimpl(wrapper=True)  # type: ignore[untyped-decorator]
+def pytest_runtest_makereport(
+    item: pytest.Item, call: pytest.CallInfo
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
+    report = yield
+    if not isinstance(item, SchemathesisFunction) or item.operation_label is None:
+        return report
+    if call.when != "call" and (call.when != "setup" or report.passed):
+        return report
+
+    if report.passed:
+        outcome = PytestReportOutcome(Status.SUCCESS)
+    elif report.skipped:
+        message = str(call.excinfo.value) if call.excinfo is not None else None
+        outcome = PytestReportOutcome(Status.SKIP, message)
+    else:
+        assert call.excinfo is not None
+        exception = call.excinfo.value
+        if isinstance(exception, (FailureGroup, AssertionError, pytest.fail.Exception)):
+            outcome = PytestReportOutcome(Status.FAILURE, str(exception))
+        else:
+            outcome = PytestReportOutcome(Status.ERROR, f"{type(exception).__name__}: {exception}")
+    item.stash[_REPORT_OUTCOME_KEY] = outcome
+    return report
+
+
+# Report writers must be attached before a `skip` marker raises during setup, or the skip is never reported.
+@pytest.hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
 def pytest_runtest_setup(item: pytest.Item) -> None:
     item_cls = getattr(item, "cls", None)
     schema = StatefulSchemaMark.get(item_cls) if item_cls is not None else None
@@ -734,19 +786,45 @@ def _teardown_reporting(item: pytest.Item) -> None:
         return
     dispatcher, writers = entry
     result = dispatcher.pop_recorder(item.operation_label)
-    if result is not None:
+    has_recorder = result is not None
+    if result is None:
+        outcome = item.stash.get(_REPORT_OUTCOME_KEY, PytestReportOutcome(Status.SUCCESS))
+        if outcome.status == Status.SUCCESS:
+            return
+        from schemathesis.engine.recorder import ScenarioRecorder
+
+        recorder = ScenarioRecorder(label=item.operation_label, config=schema.config.output)
+        elapsed_sec = 0.0
+    else:
         recorder, elapsed_sec = result
-        if _is_xdist_worker(item.config):
-            _push_to_xdist_workeroutput(
-                item.config.workeroutput,
-                schema,
-                recorder,
-                elapsed_sec,
-                tags=item.operation_tags,
-                allure_calls=allure_buffer.to_list() if allure_buffer is not None else None,
-            )
-        else:
-            _write_to_writers(writers, recorder, elapsed_sec, tags=item.operation_tags)
+        has_check_failures = any(
+            check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks
+        )
+        outcome = (
+            PytestReportOutcome(Status.FAILURE)
+            if has_check_failures
+            else item.stash.get(_REPORT_OUTCOME_KEY, PytestReportOutcome(Status.SUCCESS))
+        )
+    if _is_xdist_worker(item.config):
+        _push_to_xdist_workeroutput(
+            item.config.workeroutput,
+            schema,
+            recorder,
+            elapsed_sec,
+            tags=item.operation_tags,
+            allure_calls=allure_buffer.to_list() if allure_buffer is not None else None,
+            outcome=outcome,
+            has_recorder=has_recorder,
+        )
+    else:
+        _write_to_writers(
+            writers,
+            recorder,
+            elapsed_sec,
+            tags=item.operation_tags,
+            outcome=outcome,
+            has_recorder=has_recorder,
+        )
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
