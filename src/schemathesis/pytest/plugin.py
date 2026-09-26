@@ -75,12 +75,13 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 _CASSETTE_KEY: pytest.StashKey[
-    dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]]]
+    dict[str, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]]]
 ] = pytest.StashKey()
 _STATEFUL_WRITERS_KEY: pytest.StashKey[list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]] = pytest.StashKey()
 _ALLURE_FORWARDER_KEY: pytest.StashKey[_AllureHookForwarder] = pytest.StashKey()
 _ALLURE_BUFFER_KEY: pytest.StashKey[_AllureCallBuffer] = pytest.StashKey()
 _REPORT_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
+_WRITERS_KEY_CACHE: pytest.StashKey[dict[int, tuple[SchemaMetadata, str]]] = pytest.StashKey()
 
 
 def _is_schema(value: object) -> bool:
@@ -515,6 +516,7 @@ def _is_xdist_worker(config: pytest.Config) -> bool:
 
 def pytest_configure(config: pytest.Config) -> None:
     config.stash[_CASSETTE_KEY] = {}
+    config.stash[_WRITERS_KEY_CACHE] = {}
     if not HAS_CORE_SUBTESTS:
         config.pluginmanager.register(_subtests, "schemathesis-subtests")
     if config.pluginmanager.hasplugin("xdist"):
@@ -592,9 +594,20 @@ def _write_to_writers(
             writer.write(recorder)
 
 
+def _writers_key(config: pytest.Config, schema: SchemaMetadata) -> str:
+    # Hashing an in-memory schema is costly, so it happens once per schema object; holding the object keeps its id unique.
+    from schemathesis.pytest.xdist import _schema_id
+
+    cache = config.stash[_WRITERS_KEY_CACHE]
+    cached = cache.get(id(schema))
+    if cached is None:
+        cached = cache[id(schema)] = (schema, _schema_id(schema))
+    return cached[1]
+
+
 def _register_allure_forwarder(item: pytest.Item, schema: SchemaMetadata) -> None:
     """Register a per-item hook forwarder for dynamic allure API calls."""
-    entry = item.config.stash[_CASSETTE_KEY].get(id(schema))
+    entry = item.config.stash[_CASSETTE_KEY].get(_writers_key(item.config, schema))
     if entry is None:
         return
     _, writers = entry
@@ -715,13 +728,14 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     if schema is None:
         return
 
-    if _is_xdist_worker(item.config):
-        reports = schema.config.reports
-        if not (reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.allure.enabled):
-            return
+    reports = schema.config.reports
+    if not (reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.allure.enabled):
+        return
+    schema_id = _writers_key(item.config, schema)
 
+    if _is_xdist_worker(item.config):
         dispatcher = PytestReportDispatcher(schema)
-        item.config.stash[_CASSETTE_KEY][id(schema)] = (dispatcher, [])
+        item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, [])
 
         if reports.allure.enabled:
             import allure_commons
@@ -735,7 +749,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             item.stash[_ALLURE_FORWARDER_KEY] = forwarder
         return
 
-    if id(schema) in item.config.stash[_CASSETTE_KEY]:
+    if schema_id in item.config.stash[_CASSETTE_KEY]:
         _register_allure_forwarder(item, schema)
         return
 
@@ -744,7 +758,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         return
 
     dispatcher = PytestReportDispatcher(schema)
-    item.config.stash[_CASSETTE_KEY][id(schema)] = (dispatcher, writers)
+    item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, writers)
     _register_allure_forwarder(item, schema)
 
 
@@ -781,7 +795,10 @@ def _teardown_reporting(item: pytest.Item) -> None:
     schema = SchemaHandleMark.get(item.test_function)
     if schema is None:
         return
-    entry = item.config.stash[_CASSETTE_KEY].get(id(schema))
+    cassettes = item.config.stash[_CASSETTE_KEY]
+    if not cassettes:
+        return
+    entry = cassettes.get(_writers_key(item.config, schema))
     if entry is None:
         return
     dispatcher, writers = entry

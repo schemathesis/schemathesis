@@ -21,6 +21,7 @@
 
 - Report Schemathesis check failures as failed instead of broken in allure-pytest.
 - Report pytest errors as broken and pytest skips as skipped in Allure.
+- Merge duplicate pytest Allure results for the same operation.
 - `st replay` ignoring auth providers and `[auth.openapi]` credentials, resending masked values instead.
 - `st replay` reporting a crash as fixed when its credentials were missing or rejected.
 - `st replay` deleting fixed crash files that sent a masked request body value.

@@ -1,5 +1,6 @@
 from pathlib import Path
 from textwrap import indent
+from xml.etree import ElementTree
 
 import pytest
 
@@ -46,6 +47,18 @@ def _allure_outcomes(allure_dir):
             message = "ConnectionError"
         outcomes[result["name"]] = (result["status"], message)
     return outcomes
+
+
+def _allure_result_summaries(allure_dir):
+    return sorted(
+        (
+            result["name"],
+            result["status"],
+            sorted(attachment["name"] for attachment in result.get("attachments", [])),
+            [step["status"] for step in result.get("steps", [])],
+        )
+        for result in _allure_results(allure_dir)
+    )
 
 
 @pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
@@ -117,6 +130,93 @@ def test_api(case):
     testdir.runpytest(*args)
 
     assert _allure_outcomes(allure_dir) == {label: expected}
+
+
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+def test_allure_merges_results_from_same_schema_source(testdir, tmp_path, ctx, xdist):
+    api = ctx.openapi.apps.failure()
+    allure_dir = tmp_path / "allure-results"
+    junit_path = tmp_path / "junit.xml"
+    testdir.makepyfile(
+        f"""
+import allure
+import schemathesis
+from hypothesis import Phase, settings
+
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.reports.update(allure_path=r"{allure_dir}", junit_path=r"{junit_path}")
+filtered_schema = schema.include(name="GET /api/failure")
+
+@filtered_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_passing(case):
+    allure.attach("passing", name="passing test", attachment_type=allure.attachment_type.TEXT)
+    case.call()
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_failing(case):
+    allure.attach("failing", name="failing test", attachment_type=allure.attachment_type.TEXT)
+    case.call_and_validate()
+"""
+    )
+    args = ("-n", "2") if xdist else ()
+
+    result = testdir.runpytest(*args)
+
+    result.assert_outcomes(passed=1, failed=1)
+    assert _allure_result_summaries(allure_dir) == [
+        ("GET /api/failure", "failed", ["failing test", "passing test"], ["failed"])
+    ]
+    testcases = ElementTree.parse(junit_path).getroot().iter("testcase")
+    assert [(case.get("name"), [child.tag for child in case]) for case in testcases] == [
+        ("GET /api/failure", ["failure"])
+    ]
+
+
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+def test_allure_keeps_results_from_different_schema_sources_separate(testdir, tmp_path, ctx, xdist):
+    api = ctx.openapi.apps.success()
+    allure_dir = tmp_path / "allure-results"
+    paths = {"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}
+    first_schema = ctx.openapi.write_schema(paths, filename="first")
+    second_schema = ctx.openapi.write_schema(paths, filename="second")
+    testdir.makepyfile(
+        f"""
+import allure
+import schemathesis
+from hypothesis import Phase, settings
+
+first_schema = schemathesis.openapi.from_path(r"{first_schema}")
+first_schema.config.update(base_url="{api.base_url}/api")
+first_schema.config.reports.update(allure_path=r"{allure_dir}")
+
+second_schema = schemathesis.openapi.from_path(r"{second_schema}")
+second_schema.config.update(base_url="{api.base_url}/api")
+second_schema.config.reports.update(allure_path=r"{allure_dir}")
+
+@first_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_first(case):
+    allure.attach("first", name="first schema", attachment_type=allure.attachment_type.TEXT)
+    case.call()
+
+@second_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_second(case):
+    allure.attach("second", name="second schema", attachment_type=allure.attachment_type.TEXT)
+    case.call()
+"""
+    )
+    args = ("-n", "2") if xdist else ()
+
+    result = testdir.runpytest(*args)
+
+    result.assert_outcomes(passed=2)
+    assert _allure_result_summaries(allure_dir) == [
+        ("GET /success", "passed", ["first schema"], []),
+        ("GET /success", "passed", ["second schema"], []),
+    ]
 
 
 def test_allure_xdist_stable_path_without_explicit_path(testdir, tmp_path, ctx):
