@@ -849,3 +849,49 @@ def verify_settings_after_collection(request):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
+
+
+def _queries_per_path(testdir, api, *, is_lazy):
+    load = f"schemathesis.openapi.from_url('{api.schema_url}', config=SchemathesisConfig(seed=42))"
+    if is_lazy:
+        setup = f"""
+@pytest.fixture
+def api_schema():
+    return {load}
+
+schema = schemathesis.pytest.from_fixture("api_schema")
+"""
+    else:
+        setup = f"schema = {load}"
+    testdir.make_test(
+        f"""
+{setup}
+
+@schema.parametrize()
+@settings(max_examples=10, phases=[Phase.generate])
+def test_(case):
+    case.call()
+"""
+    )
+    seen = len(api.requests)
+    testdir.runpytest().assert_outcomes(passed=1 if is_lazy else 2)
+    queries = {}
+    for request in api.requests[seen:]:
+        if request.path.startswith("/api/"):
+            queries.setdefault(request.path, []).append(request.query)
+    return queries
+
+
+@pytest.mark.parametrize("is_lazy", [False, True], ids=["parametrize", "from_fixture"])
+def test_seeds_operations_with_identical_parameters_differently(ctx, testdir, is_lazy):
+    api = ctx.openapi.apps.identical_query_parameters()
+    queries = _queries_per_path(testdir, api, is_lazy=is_lazy)
+    assert queries["/api/twin_a"] != queries["/api/twin_b"]
+
+
+@pytest.mark.parametrize("is_lazy", [False, True], ids=["parametrize", "from_fixture"])
+def test_seed_reproduces_per_operation_inputs(ctx, testdir, is_lazy):
+    api = ctx.openapi.apps.identical_query_parameters()
+    first = _queries_per_path(testdir, api, is_lazy=is_lazy)
+    assert first == _queries_per_path(testdir, api, is_lazy=is_lazy)
+    assert first.keys() == {"/api/twin_a", "/api/twin_b"}
