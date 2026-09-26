@@ -133,11 +133,12 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
     return outcomes
 
 
-def aggregate_status_codes(recorder: RecordedScenario) -> StatusCodeStatistic:
+def aggregate_status_codes(recorder: RecordedScenario, *, positive_only: bool = False) -> StatusCodeStatistic:
     """Analyze status codes the operation answered with.
 
     Requests with a method the operation does not declare reach a different operation, or none,
-    so their responses say nothing about this one.
+    so their responses say nothing about this one. With `positive_only`, responses to cases meant
+    to be rejected are left out too.
     """
     counts: dict[int, int] = {}
     total = 0
@@ -145,6 +146,8 @@ def aggregate_status_codes(recorder: RecordedScenario) -> StatusCodeStatistic:
     for case_id, interaction in recorder.interactions.items():
         case = recorder.cases.get(case_id)
         if case is not None and _is_undeclared_method(case):
+            continue
+        if positive_only and (case is None or not _is_positive(case)):
             continue
         if interaction.response is not None:
             status = interaction.response.status_code
@@ -325,6 +328,9 @@ class WarningCollector:
         if statistic.total == 0:
             return
 
+        # Warnings that explain why valid input was rejected look only at valid input.
+        positive = aggregate_status_codes(event.recorder, positive_only=True)
+
         assert ctx.find_operation_by_label is not None
         assert event.label is not None
         try:
@@ -352,7 +358,7 @@ class WarningCollector:
             and GenerationMode.POSITIVE
             in self.config.generation_for(operation=operation, phase=event.phase.value).modes
             and all_positive_are_rejected(event.recorder)
-            and statistic.should_warn_about_missing_test_data()
+            and positive.should_warn_about_missing_test_data()
         ):
             missing = missing_base_path(operation) if operation is not None else None
             if missing is not None:
@@ -375,13 +381,13 @@ class WarningCollector:
             in self.config.generation_for(operation=operation, phase=event.phase.value).modes
             and all_positive_are_rejected(event.recorder)
         ):
-            if statistic.should_warn_about_missing_test_data():
+            if positive.should_warn_about_missing_test_data():
                 self._handle_warning(
                     ctx,
                     SchemathesisWarning.MISSING_TEST_DATA,
                     lambda: self._record_missing_test_data(event.recorder.label, operation),
                 )
-            if statistic.should_warn_about_validation_mismatch():
+            if positive.should_warn_about_validation_mismatch():
                 self._handle_warning(
                     ctx,
                     SchemathesisWarning.VALIDATION_MISMATCH,

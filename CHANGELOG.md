@@ -60,6 +60,7 @@
 - `st replay` reproduce commands for stateful chains using stale recorded IDs.
 - `st replay` flagging stateful steps as changed when only re-extracted IDs differ.
 - `st replay` resending stale `User-Agent` and test case ID headers, or dropping `-H` headers.
+- False `validation_mismatch` and `missing_test_data` warnings from negative test cases.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 
