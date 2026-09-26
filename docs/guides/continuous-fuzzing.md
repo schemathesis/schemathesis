@@ -1,41 +1,66 @@
 # Continuous Fuzzing
 
-`st fuzz` generates and tests continuously until it finds a failure, you stop it, or a time limit is reached. Use it when you want to dedicate a time window to fuzzing rather than running a bounded test suite.
+This guide shows how to fuzz an API for a fixed time window, such as an overnight session or a scheduled fuzzing pipeline, with `st run --max-time`.
+
+With `--max-time`, `st run` first runs the examples and coverage phases once, then repeats the fuzzing and stateful phases, generating new test cases on every pass, until the time is spent. Values captured from API responses feed later passes, so the session reaches deeper into the API as it goes.
+
+## Prerequisites
+
+- Schemathesis installed or available via `uvx`
+- An API with an OpenAPI or GraphQL schema that you can send many requests to
+
+## 1. Start a session
 
 ```bash
-st fuzz https://example.schemathesis.io/openapi.json
-```
-
-Without `--max-time`, this runs until the first failure or Ctrl+C.
-
-```bash
-st fuzz https://example.schemathesis.io/openapi.json --max-time 3600
-```
-
-`--max-time` stops fuzzing after the specified number of seconds.
-
-## Finding more failures per session
-
-By default, `st fuzz` stops on the first failure. Add `--continue-on-failure` to keep testing past failures — useful for longer sessions where you want to surface as many distinct issues as possible in one run:
-
-```bash
-st fuzz https://example.schemathesis.io/openapi.json \
+uvx schemathesis run https://example.schemathesis.io/openapi.json \
   --max-time 3600 \
   --continue-on-failure
 ```
 
-## Saving results
+`--max-time` bounds the session by the clock: 3600 seconds is one hour. `--continue-on-failure` keeps testing an operation after it fails, so the session reports every distinct failure it finds instead of setting that operation aside at its first one.
+
+The session ends with a summary like this (a 20-second window against the [CLI tutorial](../tutorials/cli.md)'s booking API):
+
+```
+Failures:
+  ❌ Server error: 1
+  ❌ Undocumented HTTP status code: 1
+
+...
+
+Test cases:
+  3011 generated, 1 found 2 unique failures, 36 skipped
+```
+
+Press Ctrl+C to end a session early; the summary still covers everything tested so far.
+
+## 2. Save results
 
 ```bash
-st fuzz https://example.schemathesis.io/openapi.json \
+uvx schemathesis run https://example.schemathesis.io/openapi.json \
   --max-time 3600 \
+  --continue-on-failure \
   --report junit
 ```
 
-All report formats are supported: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`.
+All report formats are supported: `junit`, `vcr`, `har`, `ndjson`, `json`, `allure`. Report files are written to `schemathesis-report/` in the current directory. Every failing case is also saved for [`st replay`](crash-reproduction.md).
 
-## When to use `st fuzz` vs `st run`
+## 3. Put the settings in a config file
 
-Use `st run` when you want a test run that exits on completion - CI checks, PR gates, scheduled regression runs.
+```toml
+max-time = 3600
+continue-on-failure = true
 
-Use `st fuzz` when you want fuzzing to keep going: overnight sessions, dedicated fuzzing pipelines, or any context where longer execution is likely to find more bugs.
+[reports.junit]
+enabled = true
+```
+
+With this `schemathesis.toml` in place, a session is `uvx schemathesis run <schema>`. See [Optimizing for Maximum Bug Detection](config-optimization.md) for optional settings that change what the session looks for.
+
+## `st fuzz`
+
+`st fuzz` runs only multi-step scenarios across operations, without the examples and coverage phases and without feeding captured values back during the session. `st run --max-time` covers the same scenarios through its stateful phase and tests more of the API in the same time.
+
+## Troubleshooting
+
+**The session ends long before `--max-time`.** Only the fuzzing and stateful phases repeat. If every operation is skipped or errors out, nothing is left to repeat; check the errors and per-phase results in the summary.

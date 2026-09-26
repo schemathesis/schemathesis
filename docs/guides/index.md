@@ -11,14 +11,8 @@ Record the failures you are not fixing yet so CI fails only on ones that are new
 ### [Replaying Failures](crash-reproduction.md)
 Re-run the exact cases that failed a previous run with `st replay` to confirm fixes, without launching a whole new campaign.
 
-### [Optimizing for Maximum Bug Detection](config-optimization.md)
-Configure Schemathesis for thorough testing when preparing for production releases or conducting security assessments.
-
-### [Benchmarking Schemathesis](benchmarking.md)
-Configure a run for measuring the tool itself - comparing it with other tools, or checking whether a change helped.
-
 ### [Authentication](auth.md)
-Set up authentication for APIs that require credentials. Covers static tokens, config-based token fetch, dynamic refresh, and endpoint-specific auth strategies.
+Set up authentication for APIs that require credentials. Covers static tokens, config-based token fetch, Web Fuzzing Commons auth files, dynamic refresh, and endpoint-specific auth strategies.
 
 ### [Adding Schema Validation to Existing Tests](schema-conformance.md)
 Validate API responses against your schema in existing test suites without using Schemathesis for data generation.
@@ -29,7 +23,7 @@ Validate API responses against your schema in existing test suites without using
 Export test results as Allure report files with per-operation status, failure steps, and severity labels.
 
 ### [CI/CD Integration](cicd.md)
-Integrate Schemathesis into automated testing pipelines. Includes GitHub Actions, GitLab CI configurations, and reporting best practices.
+Integrate Schemathesis into automated testing pipelines. Includes GitHub Actions and GitLab CI configurations, JUnit and JSON reports for gating, and splitting a run across jobs.
 
 ### [Using Schemathesis with Docker](docker.md)
 Run Schemathesis without installing Python — covers file schemas, hooks, and reports.
@@ -65,8 +59,14 @@ Add custom command-line options and event handlers for integration with external
 
 ## Advanced Testing
 
+### [Optimizing for Maximum Bug Detection](config-optimization.md)
+Configure Schemathesis for thorough testing when preparing for production releases or conducting security assessments.
+
+### [Benchmarking Schemathesis](benchmarking.md)
+Configure a run for measuring the tool itself - comparing it with other tools, or checking whether a change helped.
+
 ### [Continuous Fuzzing](continuous-fuzzing.md)
-Run `st fuzz` for extended sessions that keep generating test cases until stopped or a time limit is reached.
+Run `st run --max-time` for overnight sessions and fuzzing pipelines that keep generating test cases until a time limit is reached.
 
 ### [Customizing Stateful Testing](stateful-testing.md)
 Schemathesis chains operations into workflows on its own — configure authentication, data initialization, and scenario setup for the cases where the defaults don't fit.

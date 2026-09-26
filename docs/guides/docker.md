@@ -1,6 +1,11 @@
 # Using Schemathesis with Docker
 
-The official Schemathesis Docker image lets you run tests without installing Python or managing dependencies.
+This guide shows how to run Schemathesis from the official Docker image, without installing Python.
+
+## Prerequisites
+
+- Docker installed and running
+- An API with an OpenAPI schema, reachable from inside the container
 
 ## Basic Usage
 
@@ -50,24 +55,28 @@ docker run \
 
 See [Extending Schemathesis](extending.md) for the full list of available hooks.
 
-tracecov is pre-installed and active by default — the built-in `hooks.py` enables schema coverage tracking automatically. See [Schema Coverage — Docker](coverage.md#docker) for details, opt-out, and custom hooks patterns.
+TraceCov is pre-installed and active by default — the built-in `hooks.py` enables schema coverage tracking automatically. See [Schema Coverage — Docker](coverage.md#docker) for details, opt-out, and custom hooks patterns.
 
 ## Reports
 
-Mount a directory to retrieve generated report files on the host:
+The container runs as a non-root user (`schemathesis`, UID 1000). If a mounted host directory does not exist, Docker creates it owned by `root` and Schemathesis cannot write to it. Create the directory before mounting it:
 
 ```bash
+mkdir -p schemathesis-report
 docker run \
   -v ./schemathesis-report:/app/schemathesis-report \
   ghcr.io/schemathesis/schemathesis:stable \
   run -w auto --report junit https://api.example.com/openapi.json
 ```
 
-`junit.xml` will appear in `./schemathesis-report/` on your host. See [CI/CD Integration](cicd.md) for how to consume this in GitHub Actions or GitLab CI.
+If your host UID (`id -u`) is not 1000, also make the directory writable for the container user with `chmod a+w schemathesis-report`.
 
-For Allure reports, Allure support is pre-installed in the image. Mount a directory and use `--report-allure-path`:
+A timestamped file such as `junit-20260925T091608Z.xml` appears in `./schemathesis-report/` on your host. See [CI/CD Integration](cicd.md) for how to consume it in GitHub Actions or GitLab CI.
+
+For Allure reports, Allure support is pre-installed in the image. Create and mount a directory the same way and use `--report-allure-path`:
 
 ```bash
+mkdir -p allure-results
 docker run \
   -v ./allure-results:/app/allure-results \
   ghcr.io/schemathesis/schemathesis:stable \
@@ -75,3 +84,11 @@ docker run \
 ```
 
 Then run the Allure CLI on your host to generate the HTML report. See [Allure Integration](allure.md) for details.
+
+## Troubleshooting
+
+**`Could not open file 'junit-....xml': Permission denied`.** The mounted report directory is not writable by the container user; prepare it as shown in [Reports](#reports). If Docker already created it as `root`, remove it (`sudo rm -r schemathesis-report`) first. Setting `--user` to another UID does not help: that user cannot write to `/app`, where Schemathesis keeps its working files.
+
+**Connection refused when the API runs on the host.** `localhost` inside the container is the container itself. Use `host.docker.internal` (Docker Desktop) or `--network host` (Linux).
+
+**The hooks file is not loaded.** Mount it at `/app/hooks.py`, or set `-e SCHEMATHESIS_HOOKS=/path/in/container.py` to the path you mounted it at.

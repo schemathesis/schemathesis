@@ -669,15 +669,13 @@ These options control how Schemathesis generates test data for API testing:
     **Type**: `Integer`  
     **Range**: `≥1`  
 
-    Maximum number of test cases generated per API operation. Must be greater than or equal to 1.
+    Caps the number of generated test cases. The effect depends on the test phase:
+
+    - In **fuzzing** phase: Caps the cases generated per API operation
+    - In **stateful** phase: Caps the number of distinct API call sequences
+    - In **examples** and **coverage** phases: Has no effect, as these use predetermined test cases
 
     Schemathesis generates diverse examples based on your API schema, distributed across enabled generation modes (e.g., positive and negative test cases). See [Data Generation](../explanations/data-generation.md) for details.
-
-    This setting has different effects depending on the test phase:
-
-    - In **fuzzing** phase: Controls the maximum number of examples generated per API operation
-    - In **stateful** phase: Determines the maximum number of distinct API call sequences
-    - In **examples** and **coverage** phases: Has no effect, as these use predetermined test cases
 
     ```console
     $ st run openapi.yaml --max-examples 100

@@ -1,73 +1,51 @@
 # Pytest Integration Tutorial
 
-**Estimated time: 15-20 minutes**
+**Estimated time: 15 minutes**
 
-This tutorial shows how to integrate Schemathesis into your `pytest` test suite using a Booking API.
+In this tutorial you add Schemathesis to a `pytest` suite, let it find a server error in a small booking API, fix the bug, and confirm the fix. By the end you will have a test module that checks every operation in the API's schema and reads its settings from `schemathesis.toml`.
 
-!!! note "CLI vs Pytest Integration"
-    The CLI offers more features (API probes, multiple phases, advanced reporting). Use pytest integration when you need direct integration with existing `pytest` test suites.
+!!! note "CLI vs pytest"
+    The CLI runs every test phase, including stateful testing, in one command. In `pytest`, `@schema.parametrize()` runs the examples, coverage, and fuzzing phases; stateful tests are a separate test class built with `schema.as_state_machine()`. Use `pytest` when you want Schemathesis inside an existing test suite, with its fixtures and plugins.
 
 ## Prerequisites
 
-- **[Git](https://git-scm.com/downloads){target=_blank}** - to clone the example API repository
-- **[Docker Compose](https://docs.docker.com/get-docker/){target=_blank}** - Install Docker Desktop which includes Docker Compose  
- - **[uv](https://docs.astral.sh/uv/getting-started/installation/){target=_blank}** - Python package manager to install pytest and Schemathesis
-- **Python 3.10+** - this tutorial uses Python 3.13
+- **[Git](https://git-scm.com/downloads){target=_blank}** - to clone the example API
+- **[Docker Compose](https://docs.docker.com/get-docker/){target=_blank}** - included in Docker Desktop
+- **[uv](https://docs.astral.sh/uv/getting-started/installation/){target=_blank}** - to install `pytest` and Schemathesis
+- **Python 3.10+**
 
-**Install dependencies:**
+--8<-- "docs/tutorials/_booking-api.md"
 
-```console
-uv venv -p 3.13
-source .venv/bin/activate.fish 
-uv pip install -U pytest schemathesis
-```
+## Setting up the test project
 
-!!! note "Shell differences"
-    This tutorial uses the Fish shell. Depending on your setup, you will need to adjust the `source` command based on the output of `uv venv`
-
-**Verify your setup:**
+Return to the directory you cloned into, create a directory for the tests next to the repository, and install the dependencies into a virtual environment:
 
 ```console
-git --version
-docker compose version
-python --version
-pytest --version
-schemathesis --version
+cd ../../..
+mkdir booking-tests
+cd booking-tests
+uv venv
+uv pip install pytest schemathesis
 ```
 
-## API under test
-
-We'll test a booking API that handles hotel reservations - creating bookings and retrieving guest information.
-
-The API lives in the [Schemathesis repository](https://github.com/schemathesis/schemathesis/tree/master/examples/booking):
+`uv run` runs commands inside that environment, whatever your shell. Verify the setup:
 
 ```console
-git clone https://github.com/schemathesis/schemathesis.git
-cd schemathesis/examples/booking
-docker compose up -d --build
+uv run pytest --version
+uv run schemathesis --version
 ```
 
-!!! success "Verify the API is running"
+If you prefer to activate the environment, run `source .venv/bin/activate` (bash, zsh) or `source .venv/bin/activate.fish` (fish), then drop the `uv run` prefix.
 
-    Open [http://localhost:8080/docs](http://localhost:8080/docs){target=_blank} - you should see the interactive API documentation.
+## First test run
 
-!!! note "Authentication token"
-
-    The API requires bearer token authentication. Use: `secret-token`
-
-## First Test Run
-
-Create your first Schemathesis pytest test:
-
-**Create `test_api.py`:**
+Create `test_api.py`:
 
 ```python
 import schemathesis
 
-schema = schemathesis.openapi.from_url(
-    "http://127.0.0.1:8080/openapi.json",
-)
-# To show the token in the cURL snippet
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+# Show the token in the curl reproduction command
 schema.config.output.sanitization.update(enabled=False)
 
 
@@ -76,38 +54,25 @@ def test_api(case):
     case.call_and_validate(headers={"Authorization": "Bearer secret-token"})
 ```
 
+`@schema.parametrize()` turns `test_api` into one test per API operation. For each operation, Schemathesis generates many requests, and `case.call_and_validate()` sends each one and runs the built-in checks on the response.
 
-**Run the test:**
+Run the tests:
 
-```bash
-pytest test_api.py -v
+```console
+uv run pytest test_api.py -v
 ```
 
-**Output shows the same bug:**
+`POST /bookings` fails:
 
 ```
-test_api.py::test_api[POST /bookings] FAILED
-test_api.py::test_api[GET /bookings/{booking_id}] PASSED
-test_api.py::test_api[GET /health] PASSED
+test_api.py::test_api[POST /bookings] FAILED                             [ 33%]
+test_api.py::test_api[GET /bookings/{booking_id}] PASSED                 [ 66%]
+test_api.py::test_api[GET /health] PASSED                                [100%]
 
-================================== FAILURES ===================================
-__________________________ test_api[POST /bookings] ___________________________
+=================================== FAILURES ===================================
+___________________________ test_api[POST /bookings] ___________________________
 + Exception Group Traceback (most recent call last):
-  |   File "/schemathesis-tutorial/test_api.py", line 11, in test_api
-  |     case.call_and_validate(headers={"Authorization": "Bearer secret-token"})
-  |     ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |   File "/../schemathesis/generation/case.py", line 493, in call_and_validate
-  |     self.validate_response(
-  |     ~~~~~~~~~~~~~~~~~~~~~~^
-  |         response,
-  |         ^^^^^^^^^
-  |     ...<4 lines>...
-  |         transport_kwargs=transport_kwargs,
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^
-  |     )
-  |     ^
-  |   File "/schemathesis/generation/case.py", line 459, in validate_response
-  |     raise FailureGroup(_failures, message) from None
+  ...
   | schemathesis.core.failures.FailureGroup: Schemathesis found 2 distinct failures
   |
   | - Server error
@@ -123,61 +88,42 @@ __________________________ test_api[POST /bookings] ___________________________
   |
   | Reproduce with:
   |
-  |     curl -X POST -H 'Authorization: Bearer secret-token' \
-  |       -H 'Content-Type: application/json' \
-  |       -d '{"guest_name": "00", "nights": 1, "room_type": ""}' \
-  |       http://127.0.0.1:8080/bookings
+  |     curl -X POST -H 'Authorization: Bearer secret-token' -H 'Content-Type: application/json' -d '{"guest_name": "00", "room_type": "", "nights": 1}' http://127.0.0.1:8080/bookings
   |
   |  (2 sub-exceptions)
-  +-+---------------- 1 ----------------
+...
+=========================== short test summary info ============================
+FAILED test_api.py::test_api[POST /bookings] - + Exception Group Traceback (m...
+========================= 1 failed, 2 passed in 1.40s ==========================
 ```
 
-Empty `room_type` causes a 500 error because the pricing logic can't handle unexpected values.
+The server answered 500, which is both a server error and a status code the schema does not document. Schemathesis has already reduced the input to the simplest case that still fails: an empty `room_type`.
 
-Run the provided `curl` command to reproduce this failure.
+Run the `curl` command to reproduce it. The response body is just `Internal Server Error`; the cause is in the server log. From `examples/booking`, run:
 
-## Fixing the bug
-
-!!! bug "Root cause"
-    The schema allows any string for `room_type`, but our pricing logic only handles specific values.
-
-**Fix: Constrain room types in the schema**
-
-=== "Before (broken)"
-    ```python
-    class BookingRequest(BaseModel):
-        room_type: str  # Any string allowed!
-    ```
-
-=== "After (fixed)"
-    ```python
-    from enum import Enum
-
-
-    class RoomType(str, Enum):
-        standard = "standard"
-        deluxe = "deluxe"
-        suite = "suite"
-
-
-    class BookingRequest(BaseModel):
-        room_type: RoomType  # Only valid values
-    ```
-
-**Don't forget to restart:**
-
-```bash
-docker compose restart
+```console
+docker compose logs booking-api
 ```
+
+```
+...
+booking-api-1  |   File "/app/app.py", line 46, in create_booking
+booking-api-1  |     price_per_night = room_prices[booking.room_type]
+booking-api-1  |                       ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+booking-api-1  | KeyError: ''
+```
+
+--8<-- "docs/tutorials/_booking-fix.md"
 
 ## Re-running the tests
 
-Now let's verify our fix by re-running the tests. Focus on the operation you just fixed:
+Back in `booking-tests`, focus on the operation you fixed. Change the decorator in `test_api.py`:
 
 ```python
 import schemathesis
 
-schema = ...  # snip
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+schema.config.output.sanitization.update(enabled=False)
 
 
 @schema.include(operation_id="create_booking_bookings_post").parametrize()
@@ -185,20 +131,28 @@ def test_api(case):
     case.call_and_validate(headers={"Authorization": "Bearer secret-token"})
 ```
 
-!!! info "Operation ID explained"
-    FastAPI generates operation IDs automatically. You can find them in the OpenAPI schema or API docs.
+```console
+uv run pytest test_api.py -v
+```
 
-The `operation_id="create_booking_bookings_post"` option targets only the specific operation we fixed, making the test run faster during development. You can also filter by HTTP method (`method="POST"`) or path patterns (`path_regex="/bookings/.*"`).
+```
+test_api.py::test_api[POST /bookings] PASSED                             [100%]
+
+============================== 1 passed in 0.72s ===============================
+```
+
+FastAPI generates operation IDs like `create_booking_bookings_post` automatically; find them in the schema at `/openapi.json`. You can also filter by HTTP method (`method="POST"`) or path (`path_regex="^/bookings"`).
 
 ## Generating more test cases
 
-Let's be more thorough:
+For a more thorough pass over the whole API, raise the number of generated cases with Hypothesis settings:
 
 ```python
 import schemathesis
 from hypothesis import settings
 
-schema = ...  # snip
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+schema.config.output.sanitization.update(enabled=False)
 
 
 @schema.parametrize()
@@ -207,41 +161,30 @@ def test_api(case):
     case.call_and_validate(headers={"Authorization": "Bearer secret-token"})
 ```
 
-**`max_examples=500`** generates more test cases per operation, increasing the chance of finding edge cases that smaller test runs might miss.
+`max_examples` caps the cases generated by the fuzzing phase per operation; the examples and coverage phases add their own cases. With the bug fixed, all three tests pass. A clean run is the result you want: up to 500 fuzzed requests per operation found no server errors or schema violations.
 
-The trade-off is longer execution time, but you'll get more chances to find bugs.
+See the [Hypothesis documentation](https://hypothesis.readthedocs.io/en/latest/reference/api.html#settings){target=_blank} for other settings.
 
-!!! tip "Hypothesis configuration"
-    See the whole list of available settings in the [Hypothesis documentation](https://hypothesis.readthedocs.io/en/latest/reference/api.html#settings).
+## Configuration file
 
-## Configuration File
-
-**Create `schemathesis.toml` in your project:**
+Move the settings out of the test module. Create `schemathesis.toml` in `booking-tests`:
 
 ```toml
-# Core settings from our previous tests
 headers = { Authorization = "Bearer ${API_TOKEN}" }
 
 [output.sanitization]
 enabled = false
 
-[generation] 
+[generation]
 max-examples = 500
 ```
 
-!!! tip "Environment variables"
-    ```bash
-    export API_TOKEN=secret-token
-    ```
-
-**Now your tests look like this**:
+`${API_TOKEN}` is read from the environment, which keeps the token out of the file. The test module shrinks to:
 
 ```python
 import schemathesis
 
-schema = schemathesis.openapi.from_url(
-    "http://127.0.0.1:8080/openapi.json",
-)
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
 
 
 @schema.parametrize()
@@ -249,20 +192,26 @@ def test_api(case):
     case.call_and_validate()
 ```
 
-Schemathesis automatically loads `schemathesis.toml` from the current directory or project root. You can specify a custom configuration file:
+```console
+export API_TOKEN=secret-token
+uv run pytest test_api.py -v
+```
+
+Schemathesis looks for `schemathesis.toml` in the current directory and its parents, up to the repository root. To load a file elsewhere:
 
 ```python
 import schemathesis
 
-config = schemathesis.Config.from_path("path-to-my/config.toml")
+config = schemathesis.Config.from_path("path/to/config.toml")
 schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json", config=config)
 ```
 
 ## What's next?
 
-**Continue learning:**
+You have a `pytest` module that tests every operation in the booking API, found and fixed a bug with it, and moved its settings into `schemathesis.toml`.
 
-- **[Python API](../reference/python.md)** - Complete Python API reference
-- **[Configuration Reference](../reference/configuration.md)** - All configuration options
-- **[How Schemathesis Integrates with Pytest
-](../explanations/pytest.md)**
+- **[Triaging Failures](../guides/triage.md)** - when your own API reports many failures at once
+- **[CI/CD Integration](../guides/cicd.md)** - run Schemathesis on every pull request
+- **[Testing multi-step workflows](../guides/stateful-testing.md)** - stateful tests with `schema.as_state_machine()`
+- **[How Schemathesis integrates with pytest](../explanations/pytest.md)** - what `parametrize` does under the hood
+- **[Python API](../reference/python.md)** - complete reference

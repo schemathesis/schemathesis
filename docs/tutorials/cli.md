@@ -1,51 +1,29 @@
 # Schemathesis CLI Tutorial
 
-**Estimated time: 15-20 minutes**
+**Estimated time: 20 minutes**
 
-This tutorial walks you through a complete API testing workflow with Schemathesis using a booking API. You'll see how property-based testing automatically finds bugs that manual testing typically misses.
+In this tutorial you run Schemathesis against a small booking API, reproduce the server error it finds, fix the bug, and confirm the fix. By the end you will have a `schemathesis.toml` that replaces the long command line, a JUnit report for your CI system, and a time-boxed fuzzing session.
 
-If you're new to Schemathesis, check the [Quick Start Guide](../quick-start.md) first.
+New to Schemathesis? The [Quick Start](../quick-start.md) takes 5 minutes.
 
 ## Prerequisites
 
- - **[Git](https://git-scm.com/downloads){target=_blank}** - to clone the example API repository
+- **[Git](https://git-scm.com/downloads){target=_blank}** - to clone the example API
+- **[Docker Compose](https://docs.docker.com/get-docker/){target=_blank}** - included in Docker Desktop
+- **[uv](https://docs.astral.sh/uv/getting-started/installation/){target=_blank}** - runs Schemathesis with `uvx`, without a permanent install
+- **[curl](https://curl.se/download.html){target=_blank}** (optional) - to reproduce failures by hand
 
- - **[Docker Compose](https://docs.docker.com/get-docker/){target=_blank}** - Install Docker Desktop which includes Docker Compose
-
- - **[uv](https://docs.astral.sh/uv/getting-started/installation/){target=_blank}** - Python package manager that allows running Schemathesis without installation using `uvx`
-
- - **[curl](https://curl.se/download.html){target=_blank}** (optional) - for reproducing API failures manually
-
-**Verify your setup:**
+Verify your setup:
 
 ```console
 git --version
 docker compose version
 uv --version
-curl --version  # optional
 ```
 
-## API under test
+--8<-- "docs/tutorials/_booking-api.md"
 
-We'll test a booking API that handles hotel reservations - creating bookings and retrieving guest information.
-
-The API lives in the [Schemathesis repository](https://github.com/schemathesis/schemathesis/tree/master/examples/booking):
-
-```console
-git clone https://github.com/schemathesis/schemathesis.git
-cd schemathesis/examples/booking
-docker compose up -d --build
-```
-
-!!! success "Verify the API is running"
-
-    Open [http://localhost:8080/docs](http://localhost:8080/docs){target=_blank} - you should see the interactive API documentation.
-
-!!! note "Authentication token"
-
-    The API requires bearer token authentication. Use: `secret-token`
-
-## First Test Run
+## First test run
 
 Run Schemathesis against the API:
 
@@ -55,25 +33,73 @@ uvx schemathesis run http://127.0.0.1:8080/openapi.json \
   --output-sanitize false
 ```
 
-**Key findings from the output:**
+`--output-sanitize false` keeps the token visible in reproduction commands; by default Schemathesis masks it.
 
-!!! failure "Bug discovered"
-    ```
-    ❌ Server error: 1
-    ❌ Undocumented HTTP status code: 1
-    
-    Reproduce with:
-    curl -X POST -H 'Authorization: Bearer secret-token' \
-      -H 'Content-Type: application/json' \
-      -d '{"guest_name": "00", "nights": 1, "room_type": ""}' \
-      http://127.0.0.1:8080/bookings
-    ```
+The run ends with the failures it found and a summary:
 
-Run the provided `curl` command to reproduce this failure. When you do, read the response body — it shows the server error in detail. Notice that Hypothesis has already reduced the input to the simplest case that still triggers the failure: `room_type: ""` is all it takes. That's your starting point for diagnosis. Look up `room_type` in the schema: it accepts any string with no constraints. Your code assumes only specific room types are submitted, but the schema never enforces that.
+```
+...
+=================================== FAILURES ===================================
+________________________________ POST /bookings ________________________________
+1. Test Case ID: Iicuq5
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200, 400, 422
+
+[500] Internal Server Error:
+
+    `Internal Server Error`
+
+Reproduce with:
+
+    curl -X POST -H 'Authorization: Bearer secret-token' -H 'Content-Type: application/json' -d '{"guest_name": "00", "room_type": "", "nights": 1}' http://127.0.0.1:8080/bookings
+
+    st replay Iicuq5
+
+...
+Failures:
+  ❌ Server error: 1
+  ❌ Undocumented HTTP status code: 1
+
+...
+Warnings:
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ...
+
+Test cases:
+  318 generated, 1 found 2 unique failures, 3 skipped
+
+Seed: 82422991785393504163937752414868088611
+...
+```
+
+The test case ID, counts, and seed differ between runs; the `POST /bookings` failure does not.
+
+The missing test data warning concerns `GET /bookings/{booking_id}`: random IDs almost never match an existing booking, so the operation answers `404` and its lookup logic is barely exercised. See [Warnings](../reference/warnings.md) for how to supply real IDs.
+
+Run the `curl` command from the failure. The response body is just `Internal Server Error`: FastAPI does not send exception details to clients. The cause is in the server log:
+
+```console
+docker compose logs booking-api
+```
+
+```
+...
+booking-api-1  |   File "/app/app.py", line 46, in create_booking
+booking-api-1  |     price_per_night = room_prices[booking.room_type]
+booking-api-1  |                       ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+booking-api-1  | KeyError: ''
+```
+
+Schemathesis has already reduced the input to the simplest case that still fails: an empty `room_type`.
 
 ## Reporting
 
-Schemathesis can export test results in multiple formats for integration with existing tools and CI/CD pipelines. Let's generate a JUnit report that can be imported into Jenkins, GitLab CI, or other test management systems:
+Export the results as a JUnit XML report that Jenkins, GitLab CI, and other test tools can import:
 
 ```bash
 uvx schemathesis run http://127.0.0.1:8080/openapi.json \
@@ -82,53 +108,31 @@ uvx schemathesis run http://127.0.0.1:8080/openapi.json \
   --report junit
 ```
 
-This creates a `junit.xml` file in the `schemathesis-report` directory containing structured test results. The JUnit format includes:
+This writes `schemathesis-report/junit-<timestamp>.xml`, for example `junit-20260925T111221Z.xml`, with one test case per API operation plus one for the stateful tests. Failed operations carry the failure message and the `curl` command to reproduce it. Pass `--report-junit-path junit.xml` for a fixed file name. See [CI/CD Integration](../guides/cicd.md) for ready-made pipeline examples.
 
-- Test case details and execution times
-- Failure descriptions with reproduction steps
+Other formats include VCR cassettes (`--report vcr`) and HAR files (`--report har`) for inspecting the HTTP traffic.
 
-Import it into any JUnit-compatible reporting tool to track failures over time — see [CI/CD Integration](../guides/cicd.md) for ready-made pipeline examples.
+--8<-- "docs/tutorials/_booking-fix.md"
 
-You can customize the output location using `--report-junit-path` or change the report directory with `--report-dir`. Other available formats include VCR cassettes (`--report vcr`) and HAR files (`--report har`) for detailed HTTP traffic analysis.
+## Confirming the fix
 
-## Fixing the bug
-
-!!! bug "Root cause"
-    The schema allows any string for `room_type`, but our pricing logic only handles specific values.
-
-
-**Fix: Constrain room types in the schema**
-
-=== "Before (broken)"
-    ```python
-    class BookingRequest(BaseModel):
-        room_type: str  # Any string allowed!
-    ```
-
-=== "After (fixed)"
-    ```python
-    from enum import Enum
-
-
-    class RoomType(str, Enum):
-        standard = "standard"
-        deluxe = "deluxe"
-        suite = "suite"
-
-
-    class BookingRequest(BaseModel):
-        room_type: RoomType  # Only valid values
-    ```
-
-**Don't forget to restart:**
+Schemathesis saves every failing case to disk. Replay the saved cases against the rebuilt API:
 
 ```bash
-docker compose restart
+uvx schemathesis replay
 ```
 
-## Re-running the tests
+```
+Replaying 1 case from .schemathesis/default/cache/crashes
 
-Now let's verify our fix by re-running the tests. Focus on the operation you just fixed:
+  + FIXED  POST /bookings
+
+Removed 2 crash files (pass --keep to retain).
+
+=============================== 2 fixed in 0.04s ===============================
+```
+
+Replay re-sends only the exact requests that failed. To test the fixed operation with fresh data, run it alone:
 
 ```bash
 uvx schemathesis run http://127.0.0.1:8080/openapi.json \
@@ -137,20 +141,20 @@ uvx schemathesis run http://127.0.0.1:8080/openapi.json \
   --include-operation-id create_booking_bookings_post
 ```
 
-!!! info "Operation ID explained"
-    FastAPI generates operation IDs automatically. You can find them in the OpenAPI schema or API docs.
+```
+...
+Test cases:
+  152 generated, 152 passed
 
-The `--include-operation-id` option targets only the specific operation we fixed, making the test run faster during development. You can also filter by HTTP method (`--include-method POST`) or path patterns (`--include-path /bookings`).
+...
+=========================== No issues found in 0.60s ===========================
+```
 
-!!! tip "Replay the exact failure instead"
-    To re-check the precise case that failed - rather than generate fresh data and hope it recurs - run `st replay`. Schemathesis records every failure to disk, and replay re-sends those exact requests. See [Replaying Failures](../guides/crash-reproduction.md).
+FastAPI generates operation IDs like `create_booking_bookings_post` automatically; find them in the schema at `/openapi.json`. You can also filter by HTTP method (`--include-method POST`) or path (`--include-path /bookings`). See [Replaying Failures](../guides/crash-reproduction.md) for more on `replay`.
 
 ## Generating more test cases
 
-!!! question "Want to find more bugs?"
-    By default, Schemathesis stops at the first failure per operation and runs a limited number of test cases.
-
-Let's be more thorough:
+The default run is quick and stops testing an operation at its first failure. For a more thorough pass over the whole API:
 
 ```bash
 uvx schemathesis run http://127.0.0.1:8080/openapi.json \
@@ -160,77 +164,78 @@ uvx schemathesis run http://127.0.0.1:8080/openapi.json \
   --continue-on-failure
 ```
 
-**`--max-examples 500`** generates more test cases per operation, increasing the chance of finding edge cases that smaller test runs might miss.
+`--max-examples` caps the cases generated by the fuzzing phase per operation and the scenarios in the stateful phase; the examples and coverage phases add their own cases. `--continue-on-failure` keeps testing an operation after its first failure, so one run can report several distinct bugs in the same operation.
 
-**`--continue-on-failure`** prevents Schemathesis from stopping at the first failure, allowing it to discover multiple issues on the same API operation in a single run.
+With the bug fixed, this run should find nothing:
 
-These options are particularly valuable when:
+```
+...
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ✅ Stateful
 
-- Preparing for production releases
-- Testing complex validation logic
+Test cases:
+  5152 generated, 5152 passed, 14 skipped
 
-The trade-off is longer execution time, but you'll get more chances to find bugs.
+...
+========================== No issues found in 18.04s ===========================
+```
 
-## Configuration File
+A clean run is the result you want: several thousand requests, including multi-step scenarios in the stateful phase, produced no server errors or schema violations. The warnings from the first run are gone as well. For longer release-testing sessions, see [Optimizing for Maximum Bug Detection](../guides/config-optimization.md).
 
-!!! question "Tired of long command lines?"
-    Instead of repeating long commands, save your settings once and reuse them across your team.
+## Configuration file
 
-**Create `schemathesis.toml` in your project:**
+Instead of repeating these options, save them in `schemathesis.toml` in the directory you run Schemathesis from:
 
 ```toml
-# Core settings from our previous commands
 headers = { Authorization = "Bearer ${API_TOKEN}" }
 continue-on-failure = true
 
 [output.sanitization]
 enabled = false
 
-[generation] 
+[generation]
 max-examples = 500
 
 [reports.junit]
 enabled = true
 ```
 
-!!! tip "Environment variables"
-    ```bash
-    export API_TOKEN=secret-token
-    ```
+`${API_TOKEN}` is read from the environment, which keeps the token out of the file:
 
-**Now run with just:**
 ```bash
+export API_TOKEN=secret-token
 uvx schemathesis run http://127.0.0.1:8080/openapi.json
 ```
 
-Schemathesis automatically loads `schemathesis.toml` from the current directory or project root. You can specify a custom configuration file:
+Schemathesis looks for `schemathesis.toml` in the current directory and its parents, up to the repository root. To use a file elsewhere:
 
 ```bash
-uvx schemathesis --config-file path/to/config.toml run http://...
+uvx schemathesis --config-file path/to/config.toml run http://127.0.0.1:8080/openapi.json
 ```
 
-!!! info "Configuration precedence"
-    CLI options override config file settings, so you can still adjust settings temporarily.
+Command-line options override the config file, so you can still adjust a setting for a single run.
 
-## Continuous Fuzzing
+## Continuous fuzzing
 
-`st run` exits when it's done. `st fuzz` is designed for the opposite: it keeps running, continuously generating test cases, until it finds a failure, a time limit is reached, or you stop it.
+By default, `run` stops once each operation has its share of test cases. With `--max-time`, it keeps generating new ones until the time limit expires or you press Ctrl+C.
 
-Run a short fuzzing session:
+Run it from the same directory and shell as the previous step: the `Authorization` header and `continue-on-failure = true` come from `schemathesis.toml`, and the token from the exported `API_TOKEN`. In a new shell, export `API_TOKEN` again first.
 
 ```bash
-uvx schemathesis fuzz http://127.0.0.1:8080/openapi.json --max-time 30
+uvx schemathesis run http://127.0.0.1:8080/openapi.json --max-time 30
 ```
-
-`st fuzz` stops on the first failure, when `--max-time` expires, or when you press Ctrl+C.
 
 For details, see [Continuous Fuzzing](../guides/continuous-fuzzing.md).
 
 ## What's next?
 
-**Continue learning:**
+You have found, diagnosed, and fixed a bug, confirmed the fix with `replay`, and moved your settings into `schemathesis.toml`.
 
-- **[Triaging Failures](../guides/triage.md)** — when your API has many failures, a systematic workflow for working through them
-- **[Using Schemathesis with Docker](../guides/docker.md)** — run without installing Python, with hooks and coverage support
-- **[CLI Reference](../reference/cli.md)** - All available CLI options
-- **[Configuration Reference](../reference/configuration.md)** - Complete configuration reference
+- **[Pytest Tutorial](pytest.md)** - run the same checks from your `pytest` suite
+- **[Triaging Failures](../guides/triage.md)** - when your own API reports many failures at once
+- **[CI/CD Integration](../guides/cicd.md)** - run Schemathesis on every pull request
+- **[Testing multi-step workflows](../guides/stateful-testing.md)** - when a bug only appears across a sequence like create -> fetch -> delete
+- **[CLI Reference](../reference/cli.md)** - all CLI options

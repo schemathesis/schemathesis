@@ -2,34 +2,7 @@
 
 ## How do I restrict the range of generated values?
 
-Schemathesis generates values across the full range permitted by the spec — including far-future dates, large integers, and unusual Unicode characters. This is intentional: servers that crash on extreme-but-valid input have real bugs. If your application already handles those cases correctly and you want to reduce noise, there are three levers:
-
-**Restrict a string format** — override the built-in strategy for any `format` keyword:
-
-```python
-from datetime import date
-from hypothesis import strategies as st
-import schemathesis
-
-today = date.today()
-schemathesis.openapi.format("date", st.dates(max_value=today).map(str))
-```
-
-See [Overriding built-in formats](guides/extending.md#overriding-built-in-formats) for more detail.
-
-**Restrict the string character set** — limit generated strings to a specific encoding, which also constrains the range of code points:
-
-```toml
-[generation]
-codec = "ascii"
-```
-
-**Disable null bytes** — some systems mishandle the `\x00` byte, causing spurious failures unrelated to your application logic:
-
-```toml
-[generation]
-allow-x00 = false
-```
+Override the strategy for a `format` such as `date` (see [Overriding built-in formats](guides/extending.md#overriding-built-in-formats)), limit the string character set with [`generation.codec`](reference/configuration.md#generationcodec), or disable null bytes with [`generation.allow-x00`](reference/configuration.md#generationallow-x00).
 
 ## What kind of data does Schemathesis generate?
 
@@ -72,7 +45,7 @@ See more details in the [Checks reference](reference/checks.md).
 ## How should I run Schemathesis?
 
 - **CLI**: Complete feature set with all test phases, and reporting. Recommended for most users.
-- **Python library**: Integrates with pytest test suites but has fewer features than the CLI.
+- **Python library**: Integrates with pytest test suites. `@schema.parametrize()` does not run the stateful phase (use [`schema.as_state_machine()`](guides/stateful-testing.md)), does not run API capability probes, and does not apply `--generation-maximize` metrics (see [Targeted Testing](guides/targeted.md#target-a-metric-in-pytest)).
 
 ## What if my application doesn't have an API schema?
 
@@ -82,20 +55,18 @@ If your API doesn't have a schema, you have several options:
 
 2. **Write a minimal schema**: Create a basic schema manually covering just the endpoints you want to test first, then expand it over time.
 
-3. **Use schema inference tools**: Some third-party tools can observe API traffic and generate a schema based on observed requests and responses.
+3. **Infer a schema from traffic**: [mitmproxy2swagger](https://github.com/alufers/mitmproxy2swagger) builds an OpenAPI schema from recorded HTTP traffic.
 
 Starting with an imperfect schema is fine - Schemathesis can help you refine it by identifying inconsistencies between your schema and implementation.
 
 ## How long does it usually take for Schemathesis to test an API?
 
-**Usually 30 seconds to 5 minutes**, depending on:
+It depends on the number of operations and parameters, the API's response time, and the configuration. Control the duration with:
 
-- API complexity (number of endpoints and parameters)
-- Test configuration (`--max-examples` setting)
-- API response time
-- Schema complexity
-
-Control duration with `--max-examples` and `--workers` options.
+- `--max-examples` - test cases the fuzzing phase generates per operation, and scenarios in the stateful phase
+- `--max-time` - a wall-clock budget for the whole run
+- `--workers` - operations tested in parallel
+- `--phases` - which test phases run
 
 ## How is Schemathesis different from other API testing tools?
 
@@ -134,40 +105,8 @@ This helps catch authentication bypass vulnerabilities where APIs accept request
 
 ## How do I authenticate when my API issues tokens from a login endpoint?
 
-Declare the login endpoint in `schemathesis.toml` and Schemathesis fetches the token for you:
-
-```toml
-[auth.dynamic.openapi.BearerAuth]
-path = "/auth/token"
-payload = { username = "${USERNAME}", password = "${PASSWORD}" }
-extract_selector = "/access_token"
-```
-
-Replace `BearerAuth` with the `securitySchemes` name from your OpenAPI spec. The token is fetched once, cached for the run, and applied to every request requiring that scheme.
-
-For tokens that expire mid-run or need per-scope caching, see [Dynamic Token Authentication](guides/auth.md#dynamic-token-authentication).
+Declare the login endpoint in `schemathesis.toml`; see [Declarative Dynamic Authentication](guides/auth.md#declarative-dynamic-authentication). For tokens that expire mid-run, see [Dynamic Token Authentication](guides/auth.md#dynamic-token-authentication).
 
 ## Can I use Schemathesis with Allure?
 
-Yes. Use `--report-allure-path` to write Allure-compatible result files directly:
-
-```bash
-schemathesis run your_schema.yaml --report-allure-path allure-results
-allure generate allure-results -o allure-report
-allure open allure-report
-```
-
-See the [Allure Integration guide](guides/allure.md) for full details including Docker usage and pytest plugin support.
-
-!!! note "Prerequisites"
-    Install `schemathesis[allure]` and the [Allure CLI](https://allurereport.org/docs/install/){target=_blank}.
-
-??? note "Alternative: JUnit XML"
-    If you cannot install the `allure` extra, export JUnit XML and copy it into an Allure results directory:
-
-    ```bash
-    schemathesis run your_schema.yaml --report junit
-    cp schemathesis-report/*.xml allure-results/
-    allure generate allure-results
-    allure open
-    ```
+Yes. Pass `--report-allure-path allure-results` and build the report with the Allure CLI; see the [Allure Integration guide](guides/allure.md). Without the `allure` extra, [export JUnit XML](guides/allure.md#without-the-allure-extra-junit-xml) instead.

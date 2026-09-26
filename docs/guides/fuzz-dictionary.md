@@ -6,6 +6,8 @@ Entries are plain values in TOML or a text file, so a list exported from your da
 
 Dictionary entries are filtered by the active generation mode: positive mode samples only schema-valid entries, negative mode samples only schema-violating ones. If a binding has no eligible entries for the active mode, that parameter falls back to normal schema-derived generation.
 
+Dictionaries apply in the **fuzzing** and **stateful** phases. The examples and coverage phases send their own values and ignore dictionary bindings; to force one value in every phase, use a [parameter override](../reference/configuration.md#parameter-overrides) (`"path.user_id" = 42`).
+
 ## Probe a Wordlist Against Every String Parameter
 
 Save a libFuzzer/AFL-style dictionary file next to your config:
@@ -13,7 +15,7 @@ Save a libFuzzer/AFL-style dictionary file next to your config:
 ```text
 # fuzz/sql_injection.dict
 "' OR 1=1--"
-"\\'\\x20OR\\x201=1--"
+"1'\x20OR\x20'1'='1"
 "admin'--"
 "'; DROP TABLE users--"
 ```
@@ -42,7 +44,7 @@ values = [42, 100, 9999]
 "path.user_id" = { dictionary = "users" }
 ```
 
-Every request to `/users/{user_id}` now uses one of `42`, `100`, `9999`. The default probability for a parameter-specific binding is `1.0` (the dictionary is always used).
+In the fuzzing and stateful phases, positive-mode requests to `/users/{user_id}` use one of `42`, `100`, `9999`. The default probability for a parameter-specific binding is `1.0` (the dictionary is always used). Negative-mode cases need schema-violating entries; these three are valid integers, so negative cases generate `user_id` as usual.
 
 Lower the probability to mix dictionary draws with random IDs:
 
@@ -102,6 +104,9 @@ Use `*` for any type or any field - `*.*.title` covers every `title` argument in
 The same key addresses a nested field's arguments, since `<Type>` is the type that declares the field:
 
 ```toml
+[dictionaries.genres]
+values = ["fantasy", "science fiction"]
+
 [parameters]
 "Author.books.genre" = { dictionary = "genres" }
 ```
@@ -109,6 +114,12 @@ The same key addresses a nested field's arguments, since `<Type>` is the type th
 Descend into input objects with a dotted suffix, and target list elements with `[*]` - the same vocabulary as `body.` paths:
 
 ```toml
+[dictionaries.currencies]
+values = ["USD", "EUR", "XXX"]
+
+[dictionaries.tag_words]
+values = ["sale", "featured", "archived"]
+
 [parameters]
 "Mutation.createOrder.input.currency" = { dictionary = "currencies" }
 "Query.search.tags[*]" = { dictionary = "tag_words" }
@@ -193,3 +204,11 @@ For GraphQL, a binding naming both the type and the field beats one with `*` in 
 Dictionary entries overwrite values the runtime resource pool or source-extracted constants put in the same slot; stateful transitions still set their own linked values last.
 
 Scalar parameter overrides (`parameters.api_version = "v2"`) still force the exact value and override any dictionary binding.
+
+## Troubleshooting
+
+**`... references unknown dictionary`.** Every `dictionary = "..."` binding needs a matching `[dictionaries.<name>]` table in the same config.
+
+**`Dictionary file ... not found`.** `from-file` paths resolve relative to the directory of `schemathesis.toml`, not the current working directory.
+
+**Entries never show up in requests.** Check the phase and mode: dictionaries apply only in the fuzzing and stateful phases, and only entries valid for the active mode are sampled. For GraphQL, the argument must be present in the generated query.

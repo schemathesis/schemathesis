@@ -12,14 +12,6 @@ Schemathesis automatically generates property-based tests from your OpenAPI or G
 [Find Bugs in Your API in 5 Minutes :octicons-rocket-24:](quick-start.md){ .md-button .md-button--primary }
 </div>
 
-## Try it now
-
-```console
-uvx schemathesis run https://example.schemathesis.io/openapi.json
-```
-
-This command will immediately find real bugs in a demo API and show you exactly how to reproduce them.
-
 ## Supported specifications
 
 | Specification | Versions |
@@ -29,7 +21,7 @@ This command will immediately find real bugs in a demo API and show you exactly 
 
 ## Why teams choose Schemathesis
 
-- 🎯 Find real bugs on the first run (commonly 5–15 in production schemas).
+- 🎯 Catches server errors, schema violations, and validation gaps that hand-written tests miss.
 - 🧠 Adapts as it runs: learns from server responses, threads real values into later requests, and shifts effort away from operations that aren't producing useful signal.
 - 🔄 Tests multi-step workflows, not single requests in isolation: follows OpenAPI `links`, infers relationships where they aren't declared, and carries real identifiers between operations.
 - ⏱️ No per-endpoint tests to maintain — point it at your schema and run.

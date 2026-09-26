@@ -1,7 +1,8 @@
 import uuid
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 app = FastAPI(title="Booking API", version="1.0.0")
 
@@ -14,10 +15,17 @@ def verify_token(authorization: str | None = Header(None)) -> bool:
     return True
 
 
+def reject_booleans(value: object) -> object:
+    # Pydantic converts `true` to `1` by default; the schema allows integers only.
+    if isinstance(value, bool):
+        raise ValueError("must be an integer")
+    return value
+
+
 class BookingRequest(BaseModel):
     guest_name: str = Field(min_length=2, max_length=100)
     room_type: str
-    nights: int = Field(gt=0, le=365)
+    nights: Annotated[int, BeforeValidator(reject_booleans)] = Field(gt=0, le=365)
 
 
 class BookingResponse(BaseModel):

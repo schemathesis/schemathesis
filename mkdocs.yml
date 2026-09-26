@@ -14,8 +14,6 @@ nav:
       - guides/index.md
       - Triaging Failures: guides/triage.md
       - Replaying Failures: guides/crash-reproduction.md
-      - Optimizing for Maximum Bug Detection: guides/config-optimization.md
-      - Benchmarking Schemathesis: guides/benchmarking.md
       - guides/auth.md
       - guides/schema-conformance.md
       - guides/cicd.md
@@ -31,6 +29,8 @@ nav:
       - guides/graphql-custom-scalars.md
       - guides/extending.md
       - guides/extending-cli.md
+      - Optimizing for Maximum Bug Detection: guides/config-optimization.md
+      - Benchmarking Schemathesis: guides/benchmarking.md
       - Continuous Fuzzing: guides/continuous-fuzzing.md
       - guides/stateful-testing.md
       - Hypothesis Strategies: guides/hypothesis-strategies.md
@@ -56,6 +56,10 @@ nav:
   - External Resources: resources.md
   - FAQ: faq.md
   - Migration from v3: migration.md
+
+# Shared fragments pulled into pages with `--8<--`; not pages of their own
+exclude_docs: |
+  _*.md
 
 theme:
   name: material
@@ -100,7 +104,8 @@ extra:
 markdown_extensions:
   - pymdownx.highlight:
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      check_paths: true
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true

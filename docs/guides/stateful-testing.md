@@ -1,66 +1,73 @@
 # Customizing Stateful Testing
 
-This guide shows how to customize Schemathesis's stateful testing to handle non-standard authentication scenarios, inject realistic test data, and adapt requests for your environment.
+This guide shows how to customize Schemathesis's stateful tests in pytest: log in before each scenario, seed realistic data, adjust every request, and tune how many scenarios run.
 
-!!! note "Need a refresher first?"
-    See [Understanding Stateful Testing](../explanations/stateful.md) for a conceptual overview before diving into customization.
+For how Schemathesis chains operations and where links come from, see [Understanding Stateful Testing](../explanations/stateful.md).
 
 ## Prerequisites
 
-Stateful testing only runs when Schemathesis can discover relationships between your operations.
+- Python with `schemathesis` and `pytest` installed (`pip install schemathesis pytest`)
+- A running API that serves its OpenAPI schema, for example at `http://localhost:8000/openapi.json`
+- Operations that Schemathesis can connect, for example `POST /users` returning an `id` and `GET /users/{userId}` taking it. Schemathesis [discovers these connections](../explanations/stateful.md#connecting-operations) from the schema; if it finds none, [define OpenAPI links](#defining-openapi-links)
 
-For **OpenAPI** schemas, this can happen in three ways:
+The examples below use an API with `POST /auth/token`, `POST /users`, `GET /users/{userId}`, and `DELETE /users/{userId}`, where user endpoints require a bearer token.
 
-- **Automatic analysis.** Schemathesis infers links from your response schemas and path parameters.
-- **`Location` headers.** When earlier phases (examples, coverage, fuzzing) encounter `Location` headers, the CLI learns new links and reuses them in the later stateful phase.
-- **Manual OpenAPI links.** You explicitly describe the relationship in your schema.
+## Write a stateful test
 
-For **GraphQL** schemas, the type graph encodes the connections directly. A mutation returning `Book!` is automatically chained to queries and mutations taking a `Book` id. Stateful testing runs automatically when the schema has at least one producer mutation.
-
-If no producers/links are discovered, the stateful phase has nothing to execute. For OpenAPI, add explicit links (see below) or adjust the schema so automatic inference becomes possible. For GraphQL, ensure at least one mutation returns an Object type with an `id` field.
-
-!!! info
-    Automatic dependency analysis runs automatically when you call `schema.as_state_machine()` in Python or pytest, respecting your configuration settings. `Location` header inference still requires the CLI, as it needs to collect headers from test runs.
-
-## Why Customize Stateful Testing?
-
-- **Data initialization:** Start scenarios with realistic data instead of random generation
-- **Authentication:** Add login flows and token management to test sequences
-- **Request customization:** Inject environment-specific headers and parameters
-- **Cleanup:** Prevent test pollution by properly resetting state between scenarios
-
-## Components of Stateful Testing
+Create `test_stateful.py`:
 
 ```python
+import requests
+from hypothesis import settings
+
 import schemathesis
 
-schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
+BASE_URL = "http://localhost:8000"
 
-APIWorkflow = schema.as_state_machine()
+schema = schemathesis.openapi.from_url(f"{BASE_URL}/openapi.json")
+
+
+class APIWorkflow(schema.as_state_machine()):
+    def setup(self):
+        # Runs at the start of each scenario
+        response = requests.post(f"{BASE_URL}/auth/token", json={"username": "demo", "password": "test"})
+        response.raise_for_status()
+        self.headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+    def before_call(self, case):
+        # Runs before every request in the scenario
+        case.headers = {**(case.headers or {}), **self.headers}
+
+
 TestAPI = APIWorkflow.TestCase
+TestAPI.settings = settings(TestAPI.settings, max_examples=200, stateful_step_count=10)
 ```
 
-Stateful testing consists of three components:
+`schema.as_state_machine()` returns a state machine class that sequences operations along the discovered links. Subclass it to hook into each scenario, and expose its `TestCase` so pytest collects it.
 
-- **Schema** - Defines available operations and their links
-- **State machine** (`APIWorkflow`) - Controls test scenario behavior and request customization  
-- **Test class** (`TestAPI`) - Integrates with pytest/unittest for fixtures and test execution
+Run it:
 
-The state machine automatically sequences API operations based on OpenAPI links. 
+```console
+$ pytest test_stateful.py
+```
 
-!!! info "How is it implemented?"
-    Schemathesis implements stateful testing on top of Hypothesis's [rule-based state machines](https://hypothesis.readthedocs.io/en/latest/stateful.html)
+You should see:
 
-## Basic Customization Pattern
+```
+collected 1 item
 
-Extend the state machine class to adjust its behavior:
+test_stateful.py .                                                       [100%]
+
+============================== 1 passed in 13.69s ==============================
+```
+
+When a check fails, pytest reports the failure with the sequence of calls that led to it and a `curl` command to reproduce the last one.
+
+## Choose where to hook in
+
+The state machine exposes four methods:
 
 ```python
-import schemathesis
-
-schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
-
-
 class APIWorkflow(schema.as_state_machine()):
     def setup(self):
         """Run once at the start of each test scenario."""
@@ -73,21 +80,119 @@ class APIWorkflow(schema.as_state_machine()):
 
     def after_call(self, response, case):
         """Process every response."""
-
-
-TestAPI = APIWorkflow.TestCase
 ```
 
-The state machine automatically handles operation sequencing based on OpenAPI links. You customize how requests are made and responses are processed.
+See the [APIStateMachine reference](../reference/python.md#stateful-testing) for all methods and their parameters.
 
-!!! note "Reference Documentation"
-    See the [APIStateMachine reference](../reference/python.md#stateful-testing) for all available customization methods and their parameters.
+## Seed data at the start of each scenario
 
-## Defining OpenAPI Links
+Create a known user in `setup` and route every request that takes a `userId` to it:
 
-When automatic inference is not enough, add links directly to your schema. Links connect a **producer** operation (e.g., `POST /users`) with a **consumer** operation (e.g., `GET /users/{userId}`).
+```python
+class APIWorkflow(schema.as_state_machine()):
+    def setup(self):
+        response = requests.post(f"{BASE_URL}/auth/token", json={"username": "demo", "password": "test"})
+        self.headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+        case = schema["/users"]["POST"].Case(
+            body={"username": "test_user", "email": "test@example.com"},
+            headers=self.headers,
+        )
+        self.user_id = case.call().json()["id"]
 
-### Basic body-to-path link
+    def before_call(self, case):
+        case.headers = {**(case.headers or {}), **self.headers}
+        if "userId" in (case.path_parameters or {}):
+            case.path_parameters["userId"] = self.user_id
+```
+
+## Run setup once per test run
+
+State machine methods (`setup`/`teardown`) run for each generated scenario. For expensive setup that should happen once, such as creating a database, use `TestCase` methods or a pytest fixture:
+
+```python
+class TestAPI(APIWorkflow.TestCase):
+    def setUp(self):
+        """Runs once before all scenarios."""
+
+    def tearDown(self):
+        """Runs once after all scenarios."""
+```
+
+```python
+import pytest
+
+
+@pytest.fixture(scope="session")
+def database():
+    # create database
+    yield
+    # drop database
+
+
+@pytest.mark.usefixtures("database")
+class TestAPI(APIWorkflow.TestCase):
+    pass
+```
+
+## Load the schema inside a fixture
+
+When the schema is only available after fixtures run (for example, the app starts inside a fixture), build the state machine in a fixture and call `run()`:
+
+```python
+import pytest
+import requests
+from hypothesis import settings
+
+import schemathesis
+
+BASE_URL = "http://localhost:8000"
+
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_url(f"{BASE_URL}/openapi.json")
+
+
+@pytest.fixture
+def state_machine(api_schema):
+    class APIWorkflow(api_schema.as_state_machine()):
+        def setup(self):
+            response = requests.post(f"{BASE_URL}/auth/token", json={"username": "demo", "password": "test"})
+            self.token = response.json()["access_token"]
+
+        def before_call(self, case):
+            case.headers["Authorization"] = f"Bearer {self.token}"
+
+    return APIWorkflow
+
+
+def test_statefully(state_machine):
+    state_machine.run(settings=settings(state_machine.TestCase.settings, max_examples=200, stateful_step_count=10))
+```
+
+## Tune the number of scenarios and steps
+
+Derive new settings from `TestCase.settings` so you keep Schemathesis's defaults for stateful tests (no deadline, health checks suppressed) and change only what you need:
+
+```python
+from hypothesis import settings
+
+TestAPI = APIWorkflow.TestCase
+TestAPI.settings = settings(TestAPI.settings, max_examples=200)
+```
+
+With a fixture-built state machine, pass the same settings to `run()`:
+
+```python
+state_machine.run(settings=settings(state_machine.TestCase.settings, max_examples=200))
+```
+
+- `max_examples` - number of scenarios (default: 100)
+- `stateful_step_count` - maximum API calls per scenario (default: 6)
+
+## Defining OpenAPI links
+
+When Schemathesis does not discover a connection you need, add a link to your schema. A link connects a **producer** operation (`POST /users`) with a **consumer** operation (`GET /users/{userId}`):
 
 ```yaml
 paths:
@@ -121,24 +226,11 @@ paths:
             type: string
 ```
 
-Read the [OpenAPI Links specification](https://spec.openapis.org/oas/v3.1.0.html#link-object) for the full syntax.
+Define the link under the status code your API actually returns. See the [OpenAPI Links specification](https://spec.openapis.org/oas/v3.1.0.html#link-object) for the full syntax.
 
-### Extracting data from a header
-
-Schemathesis extends link resolution with regex extraction. This is handy when responses return a `Location` header:
+To take part of a header value, such as the ID from a `Location: /orders/42` header, use Schemathesis's regex extension. See [Regex Extraction](../explanations/stateful.md#regex-extraction) for the matching rules:
 
 ```yaml
-paths:
-  /orders:
-    post:
-      operationId: createOrder
-      responses:
-        '201':
-          description: Order accepted
-          headers:
-            Location:
-              schema:
-                type: string
           links:
             GetOrder:
               operationId: getOrder
@@ -146,165 +238,31 @@ paths:
                 orderId: '$response.header.Location#regex:/orders/(.+)'
 ```
 
-Here the single capturing group extracts the identifier from `/orders/42` and passes it to the `getOrder` call.
+## Run stateful tests from the CLI
 
-## Per-Run Setup with pytest Fixtures
+The stateful phase runs by default after examples, coverage, and fuzzing:
 
-For expensive setup that should happen once per test execution (database creation, external services), extend the test class:
-
-```python
-class TestAPI(APIWorkflow.TestCase):
-    def setUp(self):
-        """Create database, start services - runs once per test execution."""
-
-    def tearDown(self):
-        """Cleanup resources - runs once per test execution."""
+```console
+$ uvx schemathesis run http://localhost:8000/openapi.json
 ```
 
-Or use pytest fixtures:
+To run only the stateful phase, pass `--phases stateful`. The stateful phase block reports how many links were exercised:
 
-```python
-import pytest
-
-
-@pytest.fixture(scope="session")
-def database():
-    # create database
-    yield
-    # drop database
-
-
-@pytest.mark.usefixtures("database")
-class TestAPI(APIWorkflow.TestCase):
-    pass
+```
+     Scenarios:    28
+     API Links:    0 covered / 4 selected / 4 total (4 inferred)
 ```
 
-!!! tip "Key difference"
-    State machine methods (`setup`/`teardown`) run for each generated scenario. `TestCase` methods (`setUp`/`tearDown`) run once for the entire test, regardless of how many scenarios Hypothesis generates.
-
-## Schema Loading with Fixtures
-
-When your application requires fixtures to initialize (database connections, app configuration), load the schema inside a pytest fixture:
-
-```python
-import pytest
-import schemathesis
-
-
-@pytest.fixture
-def api_schema(database, app_config):
-    # Schema loading requires initialized app
-    return schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
-
-
-@pytest.fixture
-def state_machine(api_schema):
-    return api_schema.as_state_machine()
-
-
-def test_statefully(state_machine):
-    state_machine.run()
-```
-
-You can also extend the state machine inside the fixture:
-
-```python
-@pytest.fixture
-def state_machine(api_schema, auth_service):
-    class APIWorkflow(api_schema.as_state_machine()):
-        def setup(self):
-            # Use fixture dependencies
-            self.token = auth_service.get_test_token()
-
-        def before_call(self, case):
-            case.headers["Authorization"] = f"Bearer {self.token}"
- 
-    return APIWorkflow
-```
-
-## Hypothesis Configuration
-
-Configure how many test scenarios run and how many steps each scenario contains:
-
-```python
-from hypothesis import settings
-
-# Set on TestCase class
-TestCase = schema.as_state_machine().TestCase
-TestCase.settings = settings(max_examples=200, stateful_step_count=10)
-```
-
-For fixture-based schema loading, pass settings to the `run()` method:
-
-```python
-def test_statefully(state_machine):
-    state_machine.run(
-        settings=settings(
-            max_examples=200,
-            stateful_step_count=10,
-        )
-    )
-```
-
-- `max_examples=200` - Run 200 test scenarios (default: 100)
-- `stateful_step_count=10` - Maximum 10 API calls per scenario (default: 6)
-
-## Common Customization Examples
-
-### Data Initialization
-
-Create realistic test data at the start of each scenario:
-
-```python
-class APIWorkflow(schema.as_state_machine()):
-    def setup(self):
-        # Create a test user for this scenario
-        case = schema["/users"]["POST"].Case(body={"username": "test_user", "email": "test@example.com"})
-        response = case.call()
-        self.user_id = response.json()["id"]
-
-    def before_call(self, case):
-        # Use the created user in operations that need user_id
-        if "user_id" in case.path_parameters:
-            case.path_parameters["user_id"] = self.user_id
-```
-
-### Authentication Flow
-
-Handle login and token management for protected endpoints:
-
-```python
-import requests
-
-
-class APIWorkflow(schema.as_state_machine()):
-    def setup(self):
-        # Login and get auth token
-        response = requests.post(
-            "http://localhost:8000/auth/login", json={"username": "test_user", "password": "test_password"}
-        )
-        token = response.json()["access_token"]
-        self.auth_headers = {"Authorization": f"Bearer {token}"}
-
-    def before_call(self, case):
-        # Add auth to every request
-        case.headers = {**case.headers, **self.auth_headers}
-```
-
-## Running stateful tests from the CLI
-
-Stateful testing is enabled by default - `schemathesis run http://localhost:8000/openapi.yaml` executes examples, coverage, fuzzing, and finally the stateful phase. The summary (`API Links: ...`) shows whether any links were executed.
-
-If no links are available, Schemathesis skips the stateful phase in a default run. When you run only the stateful phase (`--phases=stateful`) and no links exist, it reports `Missing Open API links`. Provide the necessary links or disable the phase explicitly.
-
-Disabling earlier phases via `--phases` keeps dependency analysis active, but Schemathesis cannot learn additional links from observed `Location` headers. Manual links remain fully supported either way.
+In the CLI, Schemathesis also learns links from `Location` headers it sees in earlier phases, so running only the stateful phase can find fewer links.
 
 ## Troubleshooting
 
-If `schemathesis run` still reports `Missing Open API links`:
+**`Schema contains no link definitions required for stateful testing`** (pytest) or **`Missing Open API links`** (CLI): Schemathesis found no connections between operations. Add [OpenAPI links](#defining-openapi-links), or check that your response schemas describe the fields that consumer operations take.
 
-1. Review the stateful phase summary (`API Links: ...`) to see how many links were discovered or filtered out.
-2. Fix any extraction errors Schemathesis reports (invalid expressions, missing parameters) and rerun.
-3. Confirm the producer response contains the referenced field or header—for regex extraction, test the pattern manually.
-4. Check endpoint filters (`--include-*`, `--exclude-*`) so both producer and consumer operations stay in scope.
-5. Check which discovery path should apply: explicit OpenAPI links must be defined under the response status code your API actually returns; automatic dependency analysis can infer links from response schemas and downstream operation inputs without any `Location` header; runtime `Location`-header inference is an additional CLI-only source of links.
+**`All link definitions required for stateful testing are excluded by filters`**: Your `--include-*` / `--exclude-*` filters or config filters remove the producer or the consumer operation. Keep both in scope.
+
+**`API Links: 0 covered`**: Schemathesis found links but no producer call succeeded, so there was nothing to pass along. In the output above, the API rejected every request without a token. Pass credentials with `--header` or a [config file](auth.md).
+
+**Every call fails with 401 in pytest**: `setup` did not obtain a token, or `before_call` does not attach it. Call `response.raise_for_status()` after the login request so a failed login stops the scenario with a clear error.
+
+**Links are defined but never followed**: Check that the link sits under the status code the producer actually returns, and that the referenced field or header is present in real responses.
