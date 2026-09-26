@@ -393,8 +393,12 @@ class XdistReportingPlugin:
                     has_recorder = record.get("has_recorder", True)
                     for writer in writers:
                         if isinstance(writer, JunitXmlWriter):
-                            if has_recorder:
-                                writer.write(recorder, elapsed_sec)
+                            writer.write(
+                                recorder,
+                                elapsed_sec,
+                                status=outcome.status if outcome is not None else None,
+                                message=outcome.message if outcome is not None else None,
+                            )
                         elif AllureWriter is not None and isinstance(writer, AllureWriter):
                             writer.write(
                                 recorder,

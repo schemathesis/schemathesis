@@ -319,3 +319,52 @@ def check_context(config=None, *, recorder=None, override=None):
         recorder=recorder,
         response_checks=None,
     )
+
+
+def make_pytest_outcome_test(testdir: Any, ctx: Any, outcome: str, report_config: str) -> str:
+    """Write a one-operation pytest test that ends with `outcome` and return its operation label."""
+    marker = ""
+    config = ""
+    if outcome == "check_failure":
+        api = ctx.openapi.apps.failure()
+        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
+        body = "case.call_and_validate()"
+        label = "GET /api/failure"
+    elif outcome == "unsatisfiable":
+        api = ctx.openapi.apps.unsatisfiable()
+        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
+        config = "schema.config.generation.update(modes=[GenerationMode.POSITIVE])"
+        body = "case.call_and_validate()"
+        label = "POST /api/unsatisfiable"
+    elif outcome == "network_error":
+        schema_dict = ctx.openapi.build_schema({"/network": {"get": {"responses": {"200": {"description": "OK"}}}}})
+        schema = f"schemathesis.openapi.from_dict({schema_dict!r})"
+        config = 'schema.config.update(base_url="http://127.0.0.1:1")'
+        body = "case.call()"
+        label = "GET /network"
+    else:
+        api = ctx.openapi.apps.success()
+        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
+        body = {
+            "assertion": 'case.call(); assert False, "boom"',
+            "runtime_error": 'case.call(); raise RuntimeError("bug")',
+            "skip": 'pytest.skip("why")',
+            "mark_skip": "case.call()",
+        }[outcome]
+        if outcome == "mark_skip":
+            marker = '@pytest.mark.skip(reason="why")'
+        label = "GET /api/success"
+    testdir.make_test(
+        f"""
+schema = {schema}
+{config}
+{report_config}
+
+{marker}
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    {body}
+"""
+    )
+    return label
