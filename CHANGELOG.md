@@ -27,6 +27,7 @@
 - Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
 - Multipart parts for arrays of primitives labelled `application/json` while carrying raw text.
 - `exit_code` of `0` in `--report json` for runs aborted by a fatal error.
+- `stop_reason` of `interrupted` and empty `errors` in `--report json` for runs aborted by an error.
 - Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
 - Dependency inference ignoring `application/x-www-form-urlencoded`, `multipart/form-data` and `formData` request bodies.
 - Inferred links with `*` wildcards never filling request body fields during stateful testing.

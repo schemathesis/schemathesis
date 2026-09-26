@@ -177,6 +177,8 @@ The full report also contains `schemathesis_version`, `command`, `seed`, `starte
 
 If the API already has failures you are not fixing yet, a [baseline](baseline.md) keeps CI red only for new ones.
 
+A run that never finished has `complete: false` and a `stop_reason` of `interrupted` after Ctrl+C or `error` otherwise; a schema loading or internal error is listed in `errors`.
+
 Gate on `operations.tested` to catch a run that graded nothing, and on `failures[].type` — the failure class name — to react to specific finding kinds. The report lands in `schemathesis-report/json-<timestamp>.json`; pass `--report-json-path` for a fixed name.
 
 ## Splitting a Run Across Jobs

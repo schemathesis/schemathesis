@@ -837,7 +837,12 @@ def before_load_schema(context, raw_schema):
     report_path = tmp_path / "report.json"
     result = cli.main("run", api.schema_url, f"--report-json-path={report_path}", hooks=module)
     report = json.loads(report_path.read_text())
-    assert (result.exit_code, report["exit_code"], report["complete"]) == (130, 130, False), result.stdout
+    assert (result.exit_code, report["exit_code"], report["complete"], report["stop_reason"]) == (
+        130,
+        130,
+        False,
+        "interrupted",
+    ), result.stdout
 
 
 def test_keyboard_interrupt_exit_code_during_hooks_loading(ctx, cli):
