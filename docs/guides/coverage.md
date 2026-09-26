@@ -4,30 +4,40 @@ Measure schema-level API coverage down to individual keywords using [TraceCov](h
 
 TraceCov tracks whether your tests exercise specific schema constraints like `minLength`, `pattern`, and `enum` values - not just whether endpoints were called.
 
+## Prerequisites
+
+- A running API and its schema URL
+- [uv](https://docs.astral.sh/uv/) for `uvx`, or a virtual environment with Schemathesis installed
+
+TraceCov runs inside the Schemathesis process, so it must be installed in the same environment as Schemathesis.
+
 ## Setup
 
-Install TraceCov:
+1. Create a hooks file that enables coverage tracking:
 
-```bash
-uv pip install tracecov
+    ```python
+    # hooks.py
+    import tracecov
+
+    tracecov.schemathesis.install()
+    ```
+
+2. Run Schemathesis with TraceCov added to its environment and the hooks loaded:
+
+    ```bash
+    export SCHEMATHESIS_HOOKS=hooks
+    uvx --with tracecov schemathesis run https://api.example.com/openapi.json
+    ```
+
+    If Schemathesis is installed in a virtual environment instead, install TraceCov there (`pip install tracecov`) and run `schemathesis run` as usual.
+
+At the end of the run you should see:
+
+```
+Schema Coverage report: ./schema-coverage.html
 ```
 
-Create a hooks file to enable coverage tracking:
-
-```python
-# hooks.py
-import tracecov
-
-tracecov.schemathesis.install()
-```
-
-Run Schemathesis with the hooks:
-
-```bash
-SCHEMATHESIS_HOOKS=hooks schemathesis run https://api.example.com/openapi.json
-```
-
-TraceCov generates an HTML report at `./schema-coverage.html` after tests complete.
+Open `schema-coverage.html` in a browser.
 
 ## Coverage Report
 
@@ -55,38 +65,32 @@ Colors indicate coverage status:
 
 For more details, see the [TraceCov documentation](https://docs.tracecov.sh).
 
-## What Coverage Supports
+## Reading the Numbers
 
-Coverage answers one question precisely and another only loosely.
+Treat an uncovered constraint as a task: add an example, correct the schema, or reach the state that produces that response. Treat the percentage as a description of what was reached rather than a score to raise; a higher percentage between two configurations or tools does not mean more defects found ([Böhme et al., ICSE 2022](https://doi.org/10.1145/3510003.3510230)).
 
-**Strong evidence: this constraint was never exercised.** A red or yellow entry names a specific gap with a specific action - add an example, correct the schema, or reach the state that produces that response. This is what the report is for.
-
-**Weak evidence: this configuration is better.** A coverage delta between two runs, two configurations or two tools is not evidence that one finds more defects. Böhme, Szekeres and Metzman measured this directly on [FuzzBench](https://doi.org/10.1145/3510003.3510230): within a single program, branches covered and bugs found track each other closely (Spearman 0.88 to 0.999), yet ranking ten fuzzers by branches agrees with ranking them by bugs at only ρ = 0.38 over one-hour campaigns. The tool that covers most is often not the tool that finds most.
-
-Schema coverage sits one step further from defects than the code coverage those numbers describe - it records that a constraint was exercised, not that a code path ran.
-
-**A drop between releases is worth acting on.** Comparing a schema against itself over time is the comparative use the measurement does support: constraints that used to be exercised and no longer are point at a real change in the schema or in the tests.
-
-So treat an uncovered constraint as a task, and treat the percentage as a description of what was reached rather than a score to raise.
+A drop between releases of the same schema is worth acting on: constraints that used to be exercised and no longer are point at a real change in the schema or in the tests.
 
 ## Improving Coverage
 
 Schemathesis automatically targets schema constraints through its coverage phase, generating boundary values, pattern-matching strings, enum values, and more. For constraints that remain partially covered (yellow), add explicit examples to your schema. Schemathesis uses `example` (single value) and `examples` (map of example objects) as test cases:
 
 ```yaml
-/users/{id}:
-  get:
-    parameters:
-      - name: id
-        in: path
-        schema:
-          type: integer
-          minimum: 1
-        examples:
-          existing:
-            value: 42
-          boundary:
-            value: 1
+paths:
+  /users/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          examples:
+            existing:
+              value: 42
+            boundary:
+              value: 1
 ```
 
 For cases where neither the coverage phase nor explicit examples are sufficient, [hooks](../reference/hooks.md) let you control generation directly - filtering values, mapping them to specific shapes, or replacing a strategy entirely.
@@ -95,15 +99,18 @@ The **Responses** dimension records status codes the API actually returned, so i
 
 ## Docker
 
-The official Schemathesis Docker image has tracecov pre-installed and enabled by default. The coverage report is written to `/app/schema-coverage.html` inside the container. Mount a host directory and override the path to retrieve it:
+The official Schemathesis Docker image has TraceCov pre-installed and enabled by default. The coverage report is written to `/app/schema-coverage.html` inside the container. Mount a host directory and override the path to retrieve it:
 
 ```bash
+mkdir -p reports
 docker run \
   -v ./reports:/app/reports \
   -e SCHEMATHESIS_COVERAGE_REPORT_HTML_PATH=/app/reports/schema-coverage.html \
   ghcr.io/schemathesis/schemathesis:stable \
   run -w auto https://api.example.com/openapi.json
 ```
+
+The container runs as a non-root user (`schemathesis`, UID 1000). Create `reports` before mounting it, because a directory Docker creates for the mount is owned by `root`. If your host UID (`id -u`) is not 1000, also run `chmod a+w reports`. Otherwise the run ends with `Could not write the coverage report: [Errno 13] Permission denied`. See [Docker](docker.md) for details.
 
 ### Opt out
 
@@ -117,7 +124,7 @@ docker run -e SCHEMATHESIS_COVERAGE=false \
 
 ### Custom hooks
 
-When you mount your own `hooks.py` at `/app/hooks.py`, it replaces the built-in stub. Add the tracecov activation lines at the top to keep coverage enabled:
+When you mount your own `hooks.py` at `/app/hooks.py`, it replaces the built-in stub. Add the TraceCov activation lines at the top to keep coverage enabled:
 
 ```python
 import tracecov
@@ -132,4 +139,10 @@ import schemathesis
 def before_generate_query(context, strategy): ...
 ```
 
-Or set `SCHEMATHESIS_COVERAGE=false` to skip tracecov without touching your hooks file.
+`SCHEMATHESIS_COVERAGE=false` applies only to the built-in hooks file. With your own hooks file, remove the TraceCov lines to disable coverage.
+
+## Troubleshooting
+
+**`ModuleNotFoundError: No module named 'tracecov'`** when loading hooks: TraceCov is not in the environment that runs Schemathesis. With `uvx`, add `--with tracecov`; a separate `uv pip install tracecov` or `pipx install tracecov` does not reach the `uvx` environment.
+
+**No `Schema Coverage report:` line at the end of the run**: The hooks file was not loaded; check `SCHEMATHESIS_HOOKS`.

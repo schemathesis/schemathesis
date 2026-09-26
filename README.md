@@ -66,11 +66,11 @@ uvx schemathesis run https://your-api.com/openapi.json
 
 > ⚠️ **Upgrading from older versions?** Check our [Migration Guide](https://github.com/schemathesis/schemathesis/blob/master/MIGRATION.md) for key changes.
 
-# Installation & Usage
+## Installation & Usage
 
 **Command Line:**
 ```console
-uv pip install schemathesis
+uv tool install schemathesis
 schemathesis run https://your-api.com/openapi.json
 ```
 
@@ -109,7 +109,7 @@ TestAPI = APIWorkflow.TestCase
 
 ## Who uses it
 
-Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordPress](https://github.com/WordPress/openverse)**, **JetBrains**, **Red Hat**, and dozens of other companies.
+Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordPress](https://github.com/WordPress/openverse)**, **JetBrains**, and **Red Hat**.
 
 
 > "_Schemathesis is the best tool for fuzz testing of REST APIs on the market. We at Red Hat use it for examining our applications in functional and integration testing levels._" - Dmitry Misharov, RedHat
@@ -124,7 +124,11 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 
 ## Documentation
 
-📚 **[Documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference.
+📚 **[Documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference. New to Schemathesis? Start here:
+
+- [Quick Start](https://schemathesis.readthedocs.io/en/stable/quick-start/) - 5 minutes
+- [CLI Tutorial](https://schemathesis.readthedocs.io/en/stable/tutorials/cli/) - 20 minutes
+- [Pytest Tutorial](https://schemathesis.readthedocs.io/en/stable/tutorials/pytest/) - 15 minutes
 
 ## Get Help
 

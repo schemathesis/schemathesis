@@ -67,8 +67,8 @@ Use it for failures that depend on the response rather than on which operation w
 | Scope | Registration Method | Available Hooks |
 |-------|-------------------|-----------------|
 | **Global** | `@schemathesis.hook` or `@schemathesis.hook("hook_name")` | All hooks |
-| **Schema** | `@schema.hooks.hook` or `@schema.hooks.hook("hook_name")` | All hooks except `before_load_schema`, `after_load_schema` |
-| **Test** | `@schema.hooks.apply(hook_func)` | All hooks except `before_load_schema`, `after_load_schema` |
+| **Schema** | `@schema.hooks.hook` or `@schema.hooks.hook("hook_name")` | All hooks except `before_load_schema`, `after_load_schema`, `before_call` |
+| **Test** | `@schema.hooks.apply(hook_func)` | All hooks except `before_load_schema`, `after_load_schema`, `before_call`, `after_call`, `after_network_error` |
 
 **Hook Name Detection:** If not specified, uses function name (must match hook name exactly).
 

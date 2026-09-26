@@ -623,7 +623,7 @@ These settings can only be applied at the project level.
     ```
 
 !!! info "CLI Only"
-    This option only applies when using the `schemathesis run` command.
+    This option applies to the `schemathesis run` and `schemathesis fuzz` commands.
 
 #### `baseline`
 
@@ -778,7 +778,7 @@ These settings can only be applied at the project level.
     **Type**: `Boolean`  
     **Default**: `true`  
 
-    Derive schema constraints from rejected requests during the **fuzzing** phase. When the API rejects a positive-mode request with a recognised 4xx validation envelope, the reported rules (required fields, formats, bounds, enums, patterns) are applied to the operation's schema so later test cases are more likely to be accepted. See [Adaptive Testing](../explanations/adaptive-testing.md).
+    Derive schema constraints from rejected requests. Despite the `fuzzing` key, this switch covers the whole run: examples, coverage, fuzzing and stateful phases. When the API rejects a positive-mode request with a recognized 4xx validation envelope, the reported rules (required fields, formats, bounds, enums, patterns) are applied to the operation's schema so later test cases are more likely to be accepted. See [Adaptive Testing](../explanations/adaptive-testing.md).
 
     ```toml
     [phases.fuzzing.error-feedback]
@@ -1347,14 +1347,14 @@ The following settings control how Schemathesis generates test data for your API
     **Type:** `Integer`  
     **Default:** `100`  
 
-    Maximum number of test cases generated per API operation. Must be greater than or equal to 1.
+    Must be greater than or equal to 1.
 
     Schemathesis generates diverse examples based on your API schema, distributed across enabled generation modes (e.g., positive and negative test cases). See [Data Generation](../explanations/data-generation.md) for details.
 
     This setting has different effects depending on the test phase:
 
-    - In **fuzzing** phase: Controls the maximum number of examples generated per API operation
-    - In **stateful** phase: Determines the maximum number of distinct API call sequences
+    - In **fuzzing** phase: Caps the cases generated per API operation
+    - In **stateful** phase: Caps the number of distinct API call sequences
     - In **examples** and **coverage** phases: Has no effect, as these use predetermined test cases
 
     ```toml

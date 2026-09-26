@@ -41,6 +41,7 @@
 - False `validation_mismatch`, `missing_test_data` and `missing_auth` warnings from undeclared-method requests.
 - Property names holding `/` or `~` printed unescaped where conflicting constraints are named.
 - Plural `1 more branches` where conflicting constraints are named.
+- `st fuzz --help` omitting that fuzzing stops at the first failure without `--continue-on-failure`.
 - Name the `prefixItems` element that admits no value when test data cannot be generated.
 - Coverage phase stringifying nested values of JSON-encoded `content` parameters.
 - Percent-encoded delimiters, missing names and dropped falsy values in `matrix`/`label`/`simple` path parameters.

@@ -2,16 +2,14 @@
 
 Customize how Schemathesis generates test data, validates responses, and handles requests through hooks, custom checks, and data generation strategies.
 
-## When to extend Schemathesis
+## Prerequisites
 
-- **Test with realistic data** - Use actual user IDs, valid timestamps, or existing database records
-- **Validate business rules** - Check application-specific response patterns
-- **Work with custom formats** - Generate valid credit cards, phone numbers, or other formats
-- **Filter problematic test cases** - Skip data combinations that aren't relevant for your API
+- Schemathesis installed or available via `uvx`
+- A Python file you can load with `SCHEMATHESIS_HOOKS` (CLI) or a `conftest.py` (pytest)
 
 ## Quick Start: Your First Hook
 
-Your API requires existing user IDs, but Schemathesis generates random values that cause 404 errors. Replace random generated data with realistic values that work with your test environment:
+Your API returns 404 for `GET /users/{user_id}` because generated IDs do not exist. Replace the generated `user_id` with one that does:
 
 ```python
 # hooks.py
@@ -19,32 +17,44 @@ import schemathesis
 
 
 @schemathesis.hook
-def map_query(ctx, query):
-    if query and "user_id" in query:
-        query["user_id"] = "test-user-123"
-    return query
+def map_path_parameters(ctx, path_parameters):
+    if path_parameters and "user_id" in path_parameters:
+        path_parameters["user_id"] = 42
+    return path_parameters
 ```
 
 ```bash
 export SCHEMATHESIS_HOOKS=hooks
-schemathesis run http://localhost:8000/openapi.json
+uvx schemathesis run http://localhost:8000/openapi.json
 ```
+
+Requests generated in the fuzzing and stateful phases use `user_id=42`. In the examples phase, component hooks apply only to generated parts and never change values taken from schema examples. The coverage phase does not run `map_*`/`filter_*` component hooks, so its requests keep their own `user_id` values; see [phase compatibility](../reference/hooks.md#phase-compatibility).
+
+To pin a value in every phase without code, use a parameter override in `schemathesis.toml`:
+
+```toml
+[parameters]
+"path.user_id" = 42
+```
+
+To mix known IDs with generated ones instead, bind a [fuzz dictionary](fuzz-dictionary.md#force-a-known-real-value-into-a-path-parameter) to the parameter. Dictionary bindings apply in the fuzzing and stateful phases.
 
 ## Hook Types and Naming
 
 Data generation hooks use a naming pattern: `<operation>_<part>` where the operation determines what the hook does and the part determines which request data it affects.
 
-**Operations:**
+Three operations are available:
 
 - **`filter_<part>`** - Skip test cases (return `True` to keep, `False` to skip)
 - **`map_<part>`** - Transform the drawn value; return the new value
 - **`flatmap_<part>`** - Transform the drawn value using additional Hypothesis strategies; return a `SearchStrategy`
 
-**Request parts:**
+Each operation targets one request part:
 
 - `query` - Query parameters
 - `headers` - HTTP headers
 - `path_parameters` - URL path parameters
+- `cookies` - Cookies
 - `body` - Request body
 - `case` - The entire test case
 
@@ -57,7 +67,7 @@ filter_* → map_* → flatmap_* → Final test case
 ```
 
 !!! note
-    Component-level hooks have no effect in the coverage phase — cases are built directly and bypass the strategy pipeline where these hooks are applied. See [phase compatibility](../reference/hooks.md#phase-compatibility) for the full breakdown.
+    Component-level hooks (`filter_query`, `map_headers`, and so on) run in the fuzzing and stateful phases. They have no effect in the coverage phase: its cases are built directly and bypass the strategy pipeline where these hooks are applied. See [phase compatibility](../reference/hooks.md#phase-compatibility) for every hook.
 
 ## Common Hook Patterns
 
@@ -198,13 +208,10 @@ class EnsureReachability:
             if 200 <= response.status_code < 300:
                 self.reached.add(label)
 
-    def after_run(self, ctx):
-        unreachable = self.tested - self.reached
-        if unreachable:
-            raise AssertionError("never returned 2xx: " + ", ".join(sorted(unreachable)))
+    # after_run is unchanged
 ```
 
-`schemathesis.toml`:
+Set the value in `schemathesis.toml`:
 
 ```toml
 [checks.EnsureReachability]
@@ -222,6 +229,8 @@ enabled = false
 
 ```python
 from hypothesis import strategies as st
+
+import schemathesis
 
 phone_strategy = st.from_regex(r"\+1-\d{3}-\d{3}-\d{4}")
 schemathesis.openapi.format("phone", phone_strategy)
@@ -271,7 +280,7 @@ def map_headers(ctx, headers):
 
 ```bash
 export SCHEMATHESIS_HOOKS=hooks
-schemathesis run http://localhost:8000/openapi.json
+uvx schemathesis run http://localhost:8000/openapi.json
 ```
 
 !!! tip
@@ -282,10 +291,25 @@ schemathesis run http://localhost:8000/openapi.json
 
 ### For pytest integration
 
-Put hooks in `conftest.py` to make them available to all tests:
+Put hooks in `conftest.py`; pytest imports it before collecting tests, so the hooks apply to every test in that directory:
+
+```python
+# conftest.py
+import schemathesis
+
+
+@schemathesis.hook
+def map_headers(ctx, headers):
+    if headers is None:
+        headers = {}
+    headers["X-Test-Mode"] = "true"
+    return headers
+```
 
 ```python
 # test_api.py
+import schemathesis
+
 schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
 
 
@@ -315,11 +339,18 @@ def map_path_parameters(ctx, path_parameters):
 
 ## Advanced: Request Modification
 
+`before_call` runs right before each request is sent, in every phase:
+
 ```python
+import uuid
+
+import schemathesis
+
+
 @schemathesis.hook
 def before_call(ctx, case, kwargs):
     case.headers["X-Correlation-ID"] = f"test-{uuid.uuid4()}"
-    case.query["mode"] = "testing"
+    case.query = {**(case.query or {}), "mode": "testing"}
 ```
 
 ## Advanced: Schema Modification Patterns
@@ -364,7 +395,9 @@ def map_body(ctx, body):
     return body
 ```
 
-### Adding query variables
+### Adding URL query parameters
+
+`map_query` sets query parameters on the request URL, not GraphQL variables:
 
 ```python
 @schemathesis.hook
@@ -372,7 +405,7 @@ def map_query(ctx, query):
     return {"q": "42"}
 ```
 
-Note that `query` is always `None` for GraphQL requests since Schemathesis doesn't generate query parameters for GraphQL.
+Schemathesis does not generate query parameters for GraphQL, so `query` is always `None` on input.
 
 ### Filtering GraphQL queries
 
@@ -385,24 +418,37 @@ def filter_body(ctx, body):
 
 ### Generating dependent data
 
+This hook adds `someDependentField` to every query that selects `someField`:
+
 ```python
+import graphql
 from hypothesis import strategies as st
+
+import schemathesis
 
 
 @schemathesis.hook
 def flatmap_body(ctx, body):
     node = body.definitions[0].selection_set.selections[0]
     if node.name.value == "someField":
-        return st.just(body).map(lambda b: modify_body(b, "someDependentField"))
+        return st.just(body).map(lambda b: add_field(b, "someDependentField"))
     return st.just(body)
 
 
-def modify_body(body, new_field_name):
-    new_field = ...  # Create a new field node
-    new_field.name.value = new_field_name
-    body.definitions[0].selection_set.selections.append(new_field)
+def add_field(body, field_name):
+    new_field = graphql.FieldNode(name=graphql.NameNode(value=field_name))
+    selections = body.definitions[0].selection_set.selections
+    body.definitions[0].selection_set.selections = (*selections, new_field)
     return body
 ```
+
+For a query `{ someField }`, the request body becomes `{ someField someDependentField }`.
+
+## Troubleshooting
+
+**The hook never runs.** Check that `SCHEMATHESIS_HOOKS` names the module or file and that it imports without errors. Under pytest, the hooks must be in a `conftest.py` that pytest collects, or imported before the schema is loaded.
+
+**A `map_*` hook has no effect on some requests.** Those requests come from the coverage phase, which does not run `map_*`/`filter_*` component hooks, or carry values taken from schema examples, which component hooks never change in the examples phase. Use `before_call` or a `[parameters]` override for values that must apply there.
 
 ## What's Next
 

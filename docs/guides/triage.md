@@ -2,11 +2,16 @@
 
 A first run surfaces everything at once: schema gaps, setup you have not supplied yet, and deliberate probes. Most findings are real, but few teams fix all of them on day one. Decide what is in scope, then work through the rest.
 
+## Prerequisites
+
+- A first `uvx schemathesis run` against your API, with its failure summary in front of you
+- A `schemathesis.toml` in the directory where you run the command, for the settings below
+
 ## Stop the Destructive Requests
 
 Do this before pointing Schemathesis at anything whose data you care about.
 
-The [coverage phase](coverage.md) probes each documented path with the methods it does *not* declare, to confirm your API answers `405 Method Not Allowed`. A path documented only with `GET` also receives `DELETE`, `PATCH`, `PUT`, `POST`, `TRACE`, `OPTIONS` and `QUERY`.
+The [coverage phase](../explanations/data-generation.md#coverage-phase) probes each documented path with the methods it does *not* declare, to confirm your API answers `405 Method Not Allowed`. A path documented only with `GET` also receives `DELETE`, `PATCH`, `PUT`, `POST`, `TRACE`, `OPTIONS` and `QUERY`.
 
 !!! danger "Disabling the check does not stop the requests"
 
@@ -81,7 +86,7 @@ Expect the remaining failures to differ from the original set, not just shrink: 
 
 ## Checks Send Their Own Requests
 
-[`ignored_auth`](../reference/checks.md#ignored_auth) verifies that an operation declaring authentication enforces it, by re-sending each successful request twice — once with credentials stripped, once with invalid ones. Your application therefore sees three distinct `Authorization` values, which reads like the tool dropping your token and is regularly reported as one ([#2779](https://github.com/schemathesis/schemathesis/issues/2779)). If the extra requests trip a rate limiter or a login lockout, exclude the check:
+[`ignored_auth`](../reference/checks.md#ignored_auth) verifies that an operation declaring authentication enforces it, by re-sending each successful request twice — once with credentials stripped, once with invalid ones. Your application therefore sees three distinct `Authorization` values; the missing or invalid ones are these extra requests, not a lost token. If the extra requests trip a rate limiter or a login lockout, exclude the check:
 
 ```bash
 uvx schemathesis run https://api.example.com/openapi.json --exclude-checks ignored_auth
@@ -108,14 +113,14 @@ These dominate most first runs. Look for patterns: if every `GET` returns an und
 The response shape does not match the declaration. Fix one area at a time rather than the whole API at once:
 
 ```bash
-uvx schemathesis run https://api.example.com/openapi.json --include-path /users
+uvx schemathesis run https://api.example.com/openapi.json --include-path-regex '^/users'
 ```
 
 Or `--include-tag users` if your schema uses tags.
 
 ## Server Errors
 
-Fewest and most severe. Run the reproduction `curl`, read the body, trace the minimal failing input back to its schema definition — there is no batch fix. After a fix, confirm with [`st replay`](crash-reproduction.md) instead of re-running the suite.
+Fewest and most severe. Run the reproduction `curl`, read the body, trace the minimal failing input back to its schema definition — there is no batch fix. After a fix, confirm with [`uvx schemathesis replay`](crash-reproduction.md) instead of re-running the suite.
 
 ## Accept What You Are Not Fixing Yet
 
@@ -126,6 +131,12 @@ uvx schemathesis run https://api.example.com/openapi.json --baseline schemathesi
 ```
 
 Every later run reports those failures and exits `0`; a new one still fails the build. Entries are yours to annotate, and an `expires` date on one makes it fail again if nobody got to it.
+
+## Troubleshooting
+
+**The settings have no effect**: Schemathesis reads `schemathesis.toml` from the current directory or the nearest parent directory. Run from there, or pass the file explicitly: `uvx schemathesis --config-file path/to/schemathesis.toml run ...`.
+
+**Every operation still fails with `401`**: `with-security-parameters = false` only stops generating credentials; it does not supply them. Configure real ones as described in [Authentication](auth.md).
 
 ## What's Next
 

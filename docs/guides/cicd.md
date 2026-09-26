@@ -2,25 +2,29 @@
 
 Run Schemathesis in CI to verify your API against its schema on every change.
 
+## Prerequisites
+
+- A CI job that can start your API, for example with `docker compose up -d` or a service container
+- The API's schema, served by the API or committed to the repository
+- Credentials stored as CI secrets, if the API requires authentication
+
 ## Schema Access
 
 === "Live Schema"
     ```bash
-    schemathesis run http://api-host:port/openapi.json --wait-for-schema 30
+    uvx schemathesis run http://api-host:port/openapi.json --wait-for-schema 30
     ```
     Test against the schema served by your running API. The `--wait-for-schema 30` waits up to 30 seconds for the API to become available.
 
 === "Static Schema"
     ```bash
-    schemathesis run ./openapi.json --url http://api-host:port
+    uvx schemathesis run ./openapi.json --url http://api-host:port
     ```
     Test using a schema file from your repository.
 
 ## GitHub Actions
 
 The [Schemathesis GitHub Action](https://github.com/schemathesis/action) provides the simplest integration path.
-
-**Basic workflow:**
 
 ```yaml
 name: API Tests
@@ -30,6 +34,7 @@ jobs:
   api-test:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
       - uses: actions/checkout@v6
@@ -55,29 +60,28 @@ jobs:
         run: docker compose down
 ```
 
+The action posts a schema coverage summary as a pull request comment, which needs `pull-requests: write`; `contents: read` keeps `actions/checkout` working, since a `permissions` block sets every permission it does not list to `none`. The action waits 2 seconds for the schema by default; raise it with the `wait-for-schema` input if the API takes longer to start. See the [action's inputs](https://github.com/schemathesis/action/blob/v3/action.yml) for the rest.
+
 The JUnit report is written to `schemathesis-report/junit-<timestamp>.xml` by default. The `upload-artifact` step above uploads the entire `schemathesis-report/` directory, which captures this file regardless of the timestamp in its name.
 
 Allure reports are also supported — see [Allure Integration](allure.md).
 
 ## GitLab CI
 
-Use the official Docker image for consistent environments.
+Use the official Docker image for consistent environments. Store the token as a masked CI/CD variable named `API_TOKEN` (**Settings > CI/CD > Variables**, with **Mask variable** checked); GitLab exposes it to the job as `$API_TOKEN`.
 
-**Complete workflow example:**
 ```yaml
 stages:
   - test
 
 api-tests:
   stage: test
-  image: 
+  image:
     name: schemathesis/schemathesis:stable
     entrypoint: [""]
   services:
     - name: your-api:latest
       alias: api
-  variables:
-    API_TOKEN: "your-secret-token"
   script:
     - >
       schemathesis run http://api:8080/openapi.json
@@ -111,37 +115,65 @@ enabled = true
 Then run with just:
 
 ```bash
-schemathesis run http://localhost:8080/openapi.json
+uvx schemathesis run http://localhost:8080/openapi.json
 ```
+
+## Exit Codes
+
+Fail the CI job on a non-zero exit code:
 
 | Exit code | Meaning |
 |-----------|---------|
 | `0` | All checks passed |
 | `1` | At least one check failed or bug reported |
-| `2` | Run aborted due to config or schema error |
+| `2` | Schemathesis could not run: config, schema or internal error, or nothing tested |
+| `130` | Run interrupted (Ctrl+C) before it finished |
 
 See the [CLI reference](../reference/cli.md#exit-codes) for the complete list of exit codes.
 
 ## Machine-Readable Results
 
-An exit code says whether something failed, not what ran — a run that selected zero operations exits `1` just like a run with real findings. `--report json` writes the run's verdict as a single JSON document so a pipeline can tell those apart:
+A run that tests nothing exits `2`: the schema has no operations, no operation matched the filters, or every selected operation was skipped. The last line of the output names the cause. `--report json` writes the run's verdict as a single JSON document so a pipeline can tell a run that tested nothing from a configuration error:
 
 ```bash
-schemathesis run http://localhost:8080/openapi.json --report json
+uvx schemathesis run http://localhost:8080/openapi.json --report json
 ```
+
+An excerpt from a run that found failures:
 
 ```json
 {
   "exit_code": 1,
   "stop_reason": "completed",
-  "operations": { "total": 42, "selected": 40, "tested": 38, "errored": 1, "skipped": 1, "skip_reasons": [] },
-  "test_cases": { "generated": 3800, "with_failures": 12, "unique_failures": 4, "without_checks": 0 },
-  "phases": { "fuzzing": { "status": "success", "skip_reason": null } },
-  "failures": [],
-  "errors": [],
-  "warnings": {}
+  "operations": {"total": 4, "selected": 4, "tested": 4, "errored": 0, "skipped": 0, "skip_reasons": []},
+  "test_cases": {"generated": 439, "with_failures": 3, "unique_failures": 5, "without_checks": 0},
+  "phases": {
+    "examples": {"status": "skip", "skip_reason": null},
+    "coverage": {"status": "failure", "skip_reason": null},
+    "fuzzing": {"status": "failure", "skip_reason": null},
+    "stateful": {"status": "failure", "skip_reason": null}
+  },
+  "failures": [
+    {
+      "type": "ServerError",
+      "title": "Server error",
+      "severity": "critical",
+      "count": 2,
+      "operations": ["GET /items/{itemId}", "POST /orders"]
+    },
+    {
+      "type": "UndefinedStatusCode",
+      "title": "Undocumented HTTP status code",
+      "severity": "medium",
+      "count": 3,
+      "operations": ["GET /items/{itemId}", "POST /items", "POST /orders"]
+    }
+  ],
+  "errors": []
 }
 ```
+
+The full report also contains `schemathesis_version`, `command`, `seed`, `started_at`, `running_time`, `complete`, `baseline`, `filtered`, `valid_rates`, `auth`, and `warnings`, which lists every warning kind (`missing_auth`, `missing_test_data`, `unmatched_filter`, and others) with an empty list when that warning did not fire.
 
 If the API already has failures you are not fixing yet, a [baseline](baseline.md) keeps CI red only for new ones.
 
@@ -153,18 +185,18 @@ When one run does not fit the pipeline's time budget, give each job a filter tha
 
 ```bash
 # Job 1
-schemathesis run http://localhost:8080/openapi.json \
+uvx schemathesis run http://localhost:8080/openapi.json \
     --include-path-regex '^/api/orders'
 
 # Job 2
-schemathesis run http://localhost:8080/openapi.json \
+uvx schemathesis run http://localhost:8080/openapi.json \
     --exclude-path-regex '^/api/orders'
 ```
 
 Each job reports the share it took, so you can check the groups add up:
 
 ```
-Operations:       3 selected / 5 total
+     Operations:       2 selected / 4 total
 ```
 
 Any filter can divide the schema - by tag, name, or operation ID as well as path. See [Filtering](../reference/cli.md#filtering) for the full set.
@@ -179,6 +211,16 @@ A job only knows about the operations it selected. Identifiers it never creates,
 Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
   - GET /api/orders/{orderId}
+
+💡 Schemathesis found no operation that creates this data - create it outside the test run and supply the identifiers in your config file
 ```
 
 Keep create-and-read chains in the same job, and draw the split along resource boundaries.
+
+## Troubleshooting
+
+**The job fails before any test runs because the schema is unreachable**: The API was not ready yet. Increase `--wait-for-schema` (the `wait-for-schema` input in the GitHub Action), or check the service's host name: inside GitLab services and Docker networks it is the service alias, not `localhost`.
+
+**Every operation fails with `401`**: The secret did not reach the job. In GitHub Actions, secrets are not passed to workflows triggered from forks; in GitLab, a protected variable is only available on protected branches.
+
+**The JUnit artifact is empty**: Pass `--report junit` or enable `[reports.junit]` in `schemathesis.toml`, and upload the whole `schemathesis-report/` directory, since the file name contains a timestamp.

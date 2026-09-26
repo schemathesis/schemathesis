@@ -1,45 +1,67 @@
 # API Authentication
 
-Configure authentication for APIs that require credentials, from simple static tokens to dynamic refresh patterns.
+Configure Schemathesis to send valid credentials, from a static token to a login flow that refreshes expiring tokens.
+
+## Prerequisites
+
+- A running API and its schema URL, for example `http://localhost:8000/openapi.json`
+- Credentials for that API: a token, an API key, a username and password, or a login endpoint that issues tokens
+- `uvx` from [uv](https://docs.astral.sh/uv/) to run Schemathesis, or Schemathesis installed with `pip`
+
+Without valid credentials, Schemathesis lists the rejected operations under `WARNINGS` at the end of the run:
+
+```
+Authentication failed: 4 operations returned authentication errors
+
+401 Unauthorized (4 operations):
+  - DELETE /users/{userId}
+  - GET /users/{userId}
+  - POST /auth/token
+  - POST /users
+
+💡 Ensure valid authentication credentials are set via --auth or -H
+```
+
+Once authentication works, the operations you authenticated disappear from that list.
 
 ## Static Authentication
 
-For simple cases use CLI options directly.
+For simple cases pass credentials on the command line:
 
 ```bash
 # Bearer token
-schemathesis run http://localhost:8000/openapi.json \
+uvx schemathesis run http://localhost:8000/openapi.json \
   --header "Authorization: Bearer your-token"
 
 # Basic authentication
-schemathesis run http://localhost:8000/openapi.json \
+uvx schemathesis run http://localhost:8000/openapi.json \
   --auth username:password
 
 # API key
-schemathesis run http://localhost:8000/openapi.json \
+uvx schemathesis run http://localhost:8000/openapi.json \
   --header "X-API-Key: your-api-key"
 ```
 
-For reusable configuration use a config file.
+For reusable configuration use a config file. `${VAR}` values are read from environment variables:
 
 ```toml
 # schemathesis.toml
 headers = { Authorization = "Bearer ${API_TOKEN}" }
 
-# Different auth for specific endpoints
+# Different auth for every operation under /admin/
 [[operations]]
-include-path = "/admin/"
+include-path-regex = "^/admin/"
 headers = { Authorization = "Bearer ${ADMIN_TOKEN}", X-Client-ID = "${CLIENT_ID}" }
 ```
 
 ```bash
 export API_TOKEN="your-secret-token"
-schemathesis run http://localhost:8000/openapi.json
+uvx schemathesis run http://localhost:8000/openapi.json
 ```
 
 ## OpenAPI-Aware Authentication
 
-Configure authentication that automatically aligns with your OpenAPI schema's security definitions. Schemathesis reads parameter names and locations directly from `securitySchemes`.
+Configure authentication that follows your OpenAPI schema's security definitions. Schemathesis reads parameter names and locations directly from `securitySchemes`.
 
 ```toml
 # schemathesis.toml
@@ -57,12 +79,10 @@ password = "${PASSWORD}"
 ```bash
 export API_KEY="your-api-key"
 export TOKEN="your-token"
-schemathesis run http://localhost:8000/openapi.json
+uvx schemathesis run http://localhost:8000/openapi.json
 ```
 
 Each config block name must match a `securityScheme` name from your OpenAPI spec. Schemathesis extracts the parameter location (`header`, `query`, or `cookie`) and name from the schema, so you only provide the value.
-
-**Supported types:**
 
 | Type | Scheme | Config Fields | OpenAPI Version |
 |------|--------|---------------|-----------------|
@@ -70,15 +90,14 @@ Each config block name must match a `securityScheme` name from your OpenAPI spec
 | `http` | `basic` | `username`, `password` | 3.x (2.0 as `basic`) |
 | `http` | `bearer` | `bearer` | 3.x |
 
-**Authentication precedence (highest to lowest):**
+When several sources provide authentication:
 
-1. **Programmatic auth** - Explicit `@schemathesis.auth()` decorators
-2. **CLI flags** - `--auth` and `--header` (always override config)
-3. **OpenAPI-aware config** - `[auth.openapi.*]` and `[auth.dynamic.openapi.*]` (target specific security schemes)
-4. **Global auth** - Fallback authentication
+- Any configured authentication - an `[auth.*]` section, `--auth` or `--auth-wfc` - disables auth classes registered with `@schemathesis.auth()` in hooks. Those classes apply only when nothing else configures authentication.
+- `--auth` and `--auth-wfc` on the command line override the matching settings in `schemathesis.toml`.
+- Headers from `-H` or `[headers]` are not authentication settings: they are sent with every request and do not disable auth classes.
 
 !!! note
-    You cannot mix `[auth.basic]` and `[auth.openapi.*]` in the same config file. Choose one authentication strategy.
+    A config file can use only one of these authentication methods: `[auth.basic]`, OpenAPI-aware authentication (`[auth.openapi.*]` and `[auth.dynamic.openapi.*]`, which can be combined), or `[auth.wfc]`. Configuring two of them is a configuration error.
 
 ## Declarative Dynamic Authentication
 
@@ -91,7 +110,7 @@ path = "/auth/token"
 extract_selector = "/access_token"
 ```
 
-Schemathesis POSTs to `/auth/token`, extracts the token using a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901), and applies it to every request requiring `BearerAuth`. The token is cached for the test run.
+Schemathesis POSTs to `/auth/token`, extracts the token using a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901), and applies it to every request requiring `BearerAuth`. The token is cached and fetched again every 300 seconds.
 
 To send credentials with the request:
 
@@ -138,16 +157,16 @@ Works the same way for `apiKey` schemes — Schemathesis reads the parameter nam
 |-------|---------|-------------|
 | `path` | required | Path on the API host (must start with `/`) |
 | `method` | `"post"` | HTTP method for the fetch request |
-| `payload` | `{}` | Body sent with the fetch request; supports `${ENV_VAR}` substitution |
+| `payload` | none (no body) | Body sent with the fetch request; supports `${ENV_VAR}` substitution |
 | `payload_content_type` | `"application/json"` | Media type for the payload; accepts `application/json` (and any `+json` variant) or `application/x-www-form-urlencoded` |
 | `extract_from` | `"body"` | Where to find the token: `"body"`, `"header"` or `"cookie"` |
 | `extract_selector` | required | JSON Pointer (body), header name, or cookie name |
 
-For token refresh or scope-based caching, use a [Python auth class](#dynamic-token-authentication) instead.
+For a different refresh schedule or scope-based caching, use a [Python auth class](#dynamic-token-authentication) instead.
 
 ## Web Fuzzing Commons
 
-Point Schemathesis at a [Web Fuzzing Commons](https://github.com/WebFuzzing/Commons) auth document to authenticate from it:
+Point Schemathesis at a [Web Fuzzing Commons](https://github.com/WebFuzzing/Commons) (WFC) auth document to authenticate from it:
 
 ```toml
 # schemathesis.toml
@@ -158,7 +177,7 @@ path = "auth.json"
 Or from the CLI:
 
 ```console
-$ st run openapi.yaml --auth-wfc auth.json
+$ uvx schemathesis run http://localhost:8000/openapi.json --auth-wfc auth.json
 ```
 
 The document lists one or more users. Static credentials use `fixedHeaders`:
@@ -166,7 +185,7 @@ The document lists one or more users. Static credentials use `fixedHeaders`:
 ```json
 {
   "auth": [
-    {"name": "admin", "fixedHeaders": [{"name": "X-Api-Key", "value": "${API_KEY}"}]}
+    {"name": "admin", "fixedHeaders": [{"name": "X-Api-Key", "value": "your-api-key"}]}
   ]
 }
 ```
@@ -183,8 +202,8 @@ A login flow uses `loginEndpointAuth` — Schemathesis calls the endpoint, extra
         "endpoint": "/auth/login",
         "contentType": "application/json",
         "payloadUserPwd": {
-          "username": "${USERNAME}",
-          "password": "${PASSWORD}",
+          "username": "demo",
+          "password": "your-password",
           "usernameField": "username",
           "passwordField": "password"
         },
@@ -201,43 +220,78 @@ A login flow uses `loginEndpointAuth` — Schemathesis calls the endpoint, extra
 }
 ```
 
-Set `"expectCookies": true` instead of `token` when the endpoint returns a session cookie. The login result is cached for the test run.
+Set `"expectCookies": true` instead of `token` when the endpoint returns a session cookie. The login result is cached and the login flow runs again every `refresh_interval` seconds (300 by default).
 
 When the login lives on a separate auth server, the document points at it with `externalEndpointURL`, and Schemathesis calls that address as written.
+
+The WFC document holds literal values: `${VAR}` inside it is sent as written. To keep secrets out of the repository, generate the file from environment variables in CI, for example with `jq`:
+
+```bash
+jq -n --arg key "$API_KEY" \
+  '{auth: [{name: "admin", fixedHeaders: [{name: "X-Api-Key", value: $key}]}]}' > auth.json
+uvx schemathesis run http://localhost:8000/openapi.json --auth-wfc auth.json
+```
+
+The `[auth.wfc]` keys in `schemathesis.toml` do support `${VAR}`, so `path = "${WFC_AUTH_FILE}"` works.
 
 | Field | CLI | Default | Description |
 |-------|-----|---------|-------------|
 | `path` | `--auth-wfc` | required | Path to the WFC auth document (JSON or YAML) |
-| `user` | `--auth-wfc-user` | first entry | `name` of the auth entry to use |
+| `user` | `--auth-wfc-user` | unset | `name` of the auth entry to use for every request |
 | `refresh_interval` | — | `300` | Seconds before re-running the login flow |
+
+When the document lists several users and `user` is unset, Schemathesis chooses an identity per operation. It starts with the first user, and each time the operation answers `401` or `403` it moves on: next to sending no credentials, then to the remaining users in document order. Once the operation answers with a `2xx` or `3xx` status, it keeps that identity for the rest of the run. Set `user` to send one identity with every request.
 
 ## Dynamic Token Authentication
 
-Static options can't handle tokens that expire, so create a custom authentication class:
+Static options can't handle tokens that expire, so write a Python auth class and load it with Schemathesis.
+
+1. Create `auth.py` next to where you run Schemathesis:
+
+    ```python
+    # auth.py
+    import requests
+
+    import schemathesis
+
+
+    @schemathesis.auth()
+    class TokenAuth:
+        def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
+            response = requests.post("http://localhost:8000/auth/token", json={"username": "demo", "password": "test"})
+            response.raise_for_status()
+            return response.json()["access_token"]
+
+        def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
+            case.headers = case.headers or {}
+            case.headers["Authorization"] = f"Bearer {data}"
+    ```
+
+    `get` fetches a token, and `set` attaches it to each request.
+
+2. Load the module through `SCHEMATHESIS_HOOKS` and run the tests:
+
+    ```bash
+    export SCHEMATHESIS_HOOKS=auth
+    uvx schemathesis run http://localhost:8000/openapi.json
+    ```
+
+    To load it without the environment variable, set `hooks = "auth"` in `schemathesis.toml`.
+
+The protected operations no longer appear under `Authentication failed` in the warnings. Schemathesis caches the token for 300 seconds by default.
+
+## Token Refresh Management
+
+To refresh tokens on a different schedule, pass `refresh_interval`:
 
 ```python
 # auth.py
 import requests
+
 import schemathesis
 
 
-@schemathesis.auth()
-class TokenAuth:
-    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
-        response = requests.post("http://localhost:8000/auth/token", json={"username": "demo", "password": "test"})
-        return response.json()["access_token"]
-
-    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
-        case.headers = case.headers or {}
-        case.headers["Authorization"] = f"Bearer {data}"
-```
-
-Schemathesis caches tokens for 300 seconds by default.
-
-## Token Refresh Management
-
-```python
-@schemathesis.auth(refresh_interval=600)  # Refresh every 10 minutes
+@schemathesis.auth(refresh_interval=600)
 class RefreshableAuth:
     def __init__(self) -> None:
         self.refresh_token = None
@@ -245,8 +299,7 @@ class RefreshableAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         if self.refresh_token:
             return self.refresh_access_token()
-        else:
-            return self.login()
+        return self.login()
 
     def login(self) -> str:
         response = requests.post("http://localhost:8000/auth/login", json={"username": "demo", "password": "test"})
@@ -263,85 +316,94 @@ class RefreshableAuth:
             self.refresh_token = data["refresh_token"]
         return data["access_token"]
 
-    # Define `set` as before ...
+    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
 ```
 
 - `refresh_interval=600` - Get new tokens every 10 minutes
 - `refresh_interval=None` - Disable caching entirely
 - Default: 300 seconds
 
-
 ## Cache Key Management
 
 Cache different tokens based on specific criteria like OAuth scopes:
 
 ```python
-@schemathesis.auth(cache_by_key=lambda case, ctx: get_required_scopes(ctx))
+# auth.py
+import requests
+
+import schemathesis
+
+
+def get_required_scopes(case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
+    """Comma-separated OAuth scopes of the operation's first security requirement."""
+    security = ctx.operation.definition.raw.get("security", [])
+    if not security or not security[0]:
+        return ""
+    scheme_name = next(iter(security[0]))
+    return ",".join(sorted(security[0][scheme_name]))
+
+
+@schemathesis.auth(cache_by_key=get_required_scopes)
 class ScopedAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
-        scopes = get_required_scopes(ctx)
+        scopes = get_required_scopes(case, ctx)
         response = requests.post(
             "http://localhost:8000/auth/token",
             json={"username": "demo", "password": "test", "scopes": scopes.split(",") if scopes else []},
         )
         return response.json()["access_token"]
 
-    # Define `set` as before ...
-
-
-def get_required_scopes(ctx: schemathesis.AuthContext) -> str:
-    """Extract required OAuth scopes from operation security requirements"""
-    security = ctx.operation.definition.raw.get("security", [])
-    if not security:
-        return ""
-
-    # Get first security requirement
-    security_req = security[0]
-    if not security_req:
-        return ""
-
-    # Get scopes for the first scheme
-    scheme_name = list(security_req.keys())[0]
-    scopes = security_req.get(scheme_name, [])
-
-    return ",".join(sorted(scopes))
+    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
 ```
 
-This ensures separate tokens for operations requiring different permissions (e.g., `read` vs `read,write` scopes).
+Operations requiring different scopes (e.g., `read` vs `read,write`) get separate tokens.
 
 ## Selective Authentication
 
 Apply authentication only to specific endpoints:
 
 ```python
-@schemathesis.auth().apply_to(path="/users/").skip_for(method="POST")
+# auth.py
+import requests
+
+import schemathesis
+
+
+def fetch_token(url: str, username: str, password: str) -> str:
+    response = requests.post(url, json={"username": username, "password": password})
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
+@schemathesis.auth().apply_to(path_regex="^/users/").skip_for(method="POST")
 class UserAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
-        response = requests.post("http://localhost:8000/auth/user-token", json={"username": "demo", "password": "test"})
-        return response.json()["access_token"]
+        return fetch_token("http://localhost:8000/auth/user-token", "demo", "test")
 
-    # Define `set` as before ...
+    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
 
 
-@schemathesis.auth().apply_to(path="/admin/")
+@schemathesis.auth().apply_to(path_regex="^/admin/")
 class AdminAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
-        response = requests.post(
-            "http://localhost:8000/auth/admin-token", json={"username": "admin", "password": "admin-pass"}
-        )
-        return response.json()["access_token"]
+        return fetch_token("http://localhost:8000/auth/admin-token", "admin", "admin-pass")
 
-    # Define `set` as before ...
+    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
 ```
 
-**Common filter patterns:**
+`path` matches the whole path exactly, so use `path_regex` to cover every path under a prefix. Other filter patterns:
 
 ```python
-# Multiple paths
-@schemathesis.auth().apply_to(path=["/users/", "/orders/"])
-
-# Regex matching
-@schemathesis.auth().apply_to(path_regex="^/admin")
+# Exact paths
+@schemathesis.auth().apply_to(path=["/users", "/orders"])
 
 # Method-specific
 @schemathesis.auth().apply_to(method=["POST", "PUT", "DELETE"])
@@ -350,7 +412,7 @@ class AdminAuth:
 @schemathesis.auth().skip_for(path="/health", method="GET")
 ```
 
-**Available filters:** `path`, `method`, `name`, `tag`, `operation_id` (add `_regex` for regex matching)
+Available filters: `path`, `method`, `name`, `tag`, `operation_id` (add `_regex` for regex matching).
 
 To apply auth only to operations that require a specific OpenAPI security scheme:
 
@@ -384,7 +446,7 @@ headers = { X-API-Key = "${ITEMS_API_KEY}" }
 export API_KEY="default-api-key"
 export ADMIN_TOKEN="admin-secret-token"
 export ITEMS_API_KEY="items-api-key"
-schemathesis run http://localhost:8000/openapi.json
+uvx schemathesis run http://localhost:8000/openapi.json
 ```
 
 Headers from a matching `[[operations]]` block are merged with the global `headers`. Matching keys override the global value, and any keys not mentioned in the operation block are still inherited.
@@ -392,26 +454,17 @@ Headers from a matching `[[operations]]` block are merged with the global `heade
 !!! note
     `auth.openapi.*` schemes are only supported at the global level, not inside `[[operations]]`. Use `headers` for per-operation credential overrides.
 
-## Advanced: Third-Party Authentication
+## Third-Party Authentication
 
-For specialized authentication protocols not covered by custom auth classes, use third-party `requests.auth` implementations:
+For protocols such as NTLM, reuse an existing `requests.auth` implementation. Install its package in the same environment as Schemathesis (`uvx --with requests-ntlm schemathesis ...`) and load this module through `SCHEMATHESIS_HOOKS` as shown [above](#dynamic-token-authentication):
 
 ```python
-# ntlm_auth.py
-import schemathesis
+# auth.py
 from requests_ntlm import HttpNtlmAuth
 
-# Use existing requests auth implementation
+import schemathesis
+
 schemathesis.auth.set_from_requests(HttpNtlmAuth("domain\\username", "password"))
-```
-
-## Setup
-
-Custom authentication classes use the same setup as other extensions:
-
-```bash
-export SCHEMATHESIS_HOOKS=auth
-schemathesis run http://localhost:8000/openapi.json
 ```
 
 ## Python Tests
@@ -444,11 +497,17 @@ def test_api(case: schemathesis.Case) -> None:
 Register auth at the schema level for all tests:
 
 ```python
+import requests
+
+import schemathesis
+
+schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
+
+
 @schema.auth()
 class APITokenAuth:
     def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
-        # Same implementation as CLI examples above
-        response = requests.post("http://localhost:8000/auth/token", ...)
+        response = requests.post("http://localhost:8000/auth/token", json={"username": "demo", "password": "test"})
         return response.json()["access_token"]
 
     def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
@@ -462,10 +521,27 @@ def test_api(case: schemathesis.Case) -> None:
     case.call_and_validate()
 ```
 
-Or register for specific tests only:
+Or register it for specific tests only, passing the class instead of decorating it:
 
 ```python
-@schema.auth(MyAuth)
+import requests
+
+import schemathesis
+
+schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
+
+
+class APITokenAuth:
+    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
+        response = requests.post("http://localhost:8000/auth/token", json={"username": "demo", "password": "test"})
+        return response.json()["access_token"]
+
+    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+
+@schema.auth(APITokenAuth)
 @schema.parametrize()
 def test_protected_endpoints(case: schemathesis.Case) -> None:
     case.call_and_validate()
@@ -478,6 +554,10 @@ For persistent sessions or custom client configuration:
 ```python
 import requests
 
+import schemathesis
+
+schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
+
 
 @schema.parametrize()
 def test_with_session(case: schemathesis.Case) -> None:
@@ -487,20 +567,23 @@ def test_with_session(case: schemathesis.Case) -> None:
 ```
 
 !!! tip ""
-    Custom auth classes support the same advanced features as CLI (refresh intervals, cache keys, selective application) with identical syntax.
+    Custom auth classes support the same features in pytest as in the CLI (refresh intervals, cache keys, selective application) with identical syntax.
 
-## Verifying That Auth Is Applied
+## Troubleshooting
 
-By default, Schemathesis sanitizes sensitive values in test output and reproduction commands. To see the actual `Authorization` or `X-API-Key` headers in output, disable sanitization:
+**Operations still listed under `Authentication failed`**: The credentials are missing or rejected. Check that the environment variables referenced in `schemathesis.toml` are exported in the same shell, and that `SCHEMATHESIS_HOOKS` names a module importable from the current directory.
+
+**`Cannot use multiple authentication methods simultaneously`**: The config file sets more than one of `[auth.basic]`, `[auth.openapi.*]`/`[auth.dynamic.openapi.*]`, and `[auth.wfc]`. Keep one.
+
+**The `Authorization` header is missing or modified on some requests**: This is intentional. Schemathesis removes or alters auth on some requests to check that your API rejects unauthenticated calls. See [Why is Schemathesis skipping my Authorization header?](../faq.md#why-is-schemathesis-skipping-my-authorization-header).
+
+**You need to see the credentials Schemathesis sent**: Output and reproduction commands hide sensitive values by default. Disable sanitization to see them:
 
 ```bash
-schemathesis run http://localhost:8000/openapi.json \
+uvx schemathesis run http://localhost:8000/openapi.json \
   --header "Authorization: Bearer your-token" \
   --output-sanitize false
 ```
-
-!!! note
-    If you see the `Authorization` header missing or modified on some requests, this is intentional. Schemathesis removes or alters auth on certain security-testing operations to check whether your API correctly rejects unauthenticated requests. See [Why is Schemathesis skipping my Authorization header?](../faq.md#why-is-schemathesis-skipping-my-authorization-header) in the FAQ.
 
 ## What's Next
 

@@ -1,13 +1,11 @@
 # Extending CLI
 
-Add custom command-line options and event handlers to integrate Schemathesis with your testing workflow.
+This guide shows how to add your own command-line options and an event handler that reacts to test progress, for example to write custom reports or send results to another system.
 
-## When to extend the CLI
+## Prerequisites
 
-Extend the CLI when you need to:
-
-- **Add reporting options** - Custom output formats or tracking metrics
-- **Integrate with external tools** - Send results to monitoring systems or databases  
+- Schemathesis installed in a Python environment you can import your own module from (`uvx` works if the module is in the current directory)
+- A module name for your extension; this guide uses `cli_extensions.py`
 
 ## Setting up CLI extensions
 
@@ -44,6 +42,8 @@ group.add_option(
 
 ### Step 3: Create the event handler
 
+The handler receives every engine event. A *scenario* is one API operation in one test phase, so an operation tested in the coverage and fuzzing phases produces two scenarios:
+
 ```python
 @cli.handler()
 class CounterHandler(cli.EventHandler):
@@ -53,7 +53,7 @@ class CounterHandler(cli.EventHandler):
         self.verbose = params["counter_verbose"]
 
         self.total_events = self.initial_value
-        self.test_cases = 0
+        self.scenarios = 0
         self.failures = 0
         self.errors = []
 
@@ -61,18 +61,13 @@ class CounterHandler(cli.EventHandler):
         self.total_events += 1
 
         if isinstance(event, events.ScenarioStarted):
-            self.test_cases += 1
-            if self.verbose:
-                ctx.add_summary_line(f"Starting test #{self.test_cases}")
+            self.scenarios += 1
 
         elif isinstance(event, events.ScenarioFinished):
-            if event.status == Status.SUCCESS:
-                if self.verbose:
-                    ctx.add_summary_line(f"✓ Test #{self.test_cases} passed")
-            elif event.status == Status.FAILURE:
+            if event.status == Status.FAILURE:
                 self.failures += 1
-                if self.verbose:
-                    ctx.add_summary_line(f"✗ Test #{self.test_cases} failed")
+            if self.verbose:
+                ctx.add_summary_line(f"{event.phase.value} {event.label}: {event.status.name}")
 
         elif isinstance(event, events.NonFatalError):
             self.errors.append(event.info.message)
@@ -80,24 +75,24 @@ class CounterHandler(cli.EventHandler):
         elif isinstance(event, events.EngineFinished):
             self._generate_summary(ctx)
 
-    def _generate_summary(self, context):
-        context.add_summary_line("")
-        context.add_summary_line("Counter Summary:")
-        context.add_summary_line(f"  Total events: {self.total_events}")
-        context.add_summary_line(f"  Test cases: {self.test_cases}")
-        context.add_summary_line(f"  Failures: {self.failures}")
-        context.add_summary_line(f"  Errors: {len(self.errors)}")
+    def _generate_summary(self, ctx):
+        ctx.add_summary_line("")
+        ctx.add_summary_line("Counter Summary:")
+        ctx.add_summary_line(f"  Total events: {self.total_events}")
+        ctx.add_summary_line(f"  Scenarios: {self.scenarios}")
+        ctx.add_summary_line(f"  Failed scenarios: {self.failures}")
+        ctx.add_summary_line(f"  Errors: {len(self.errors)}")
 
         if self.output_file:
             self._write_output_file()
-            context.add_summary_line(f"  Results written to: {self.output_file}")
+            ctx.add_summary_line(f"  Results written to: {self.output_file}")
 
     def _write_output_file(self):
         with open(self.output_file, "w") as f:
             f.write("Counter Results\n")
             f.write(f"Total events: {self.total_events}\n")
-            f.write(f"Test cases: {self.test_cases}\n")
-            f.write(f"Failures: {self.failures}\n")
+            f.write(f"Scenarios: {self.scenarios}\n")
+            f.write(f"Failed scenarios: {self.failures}\n")
             f.write(f"Errors: {len(self.errors)}\n")
 
             if self.errors:
@@ -106,7 +101,7 @@ class CounterHandler(cli.EventHandler):
                     f.write(f"- {error}\n")
 ```
 
-## Using the extension
+### Step 4: Load the extension and run
 
 !!! note "Works with `st fuzz` too"
     Handlers registered with `@cli.handler()` run for both `st run` and `st fuzz`. Events like `EngineFinished` fire in both commands.
@@ -114,25 +109,30 @@ class CounterHandler(cli.EventHandler):
 ```bash
 export SCHEMATHESIS_HOOKS=cli_extensions
 
-# Use the custom options
-schemathesis run \
+uvx schemathesis run \
   --counter-initial 100 \
   --counter-output results.txt \
   --counter-verbose \
   http://localhost:8000/openapi.json
 ```
 
-**Output:**
+Lines added with `ctx.add_summary_line` appear in the summary section. For an API with one operation:
+
 ```
-Starting test #1
-✓ Test #1 passed
-Starting test #2
-✗ Test #2 failed
+examples POST /performance: SKIP
+coverage POST /performance: SUCCESS
+fuzzing POST /performance: SUCCESS
 
 Counter Summary:
-  Total events: 125
-  Test cases: 2
-  Failures: 1
+  Total events: 128
+  Scenarios: 3
+  Failed scenarios: 0
   Errors: 0
   Results written to: results.txt
 ```
+
+## Troubleshooting
+
+**`No such option '--counter-initial'`.** The extension was not loaded. Set `SCHEMATHESIS_HOOKS` before the command and check that `cli_extensions.py` is importable from the current directory.
+
+**`KeyError` in `__init__`.** `params` keys are the option names without leading dashes, with `-` replaced by `_`: `--counter-output` becomes `counter_output`.

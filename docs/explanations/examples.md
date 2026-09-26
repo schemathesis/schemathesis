@@ -1,25 +1,10 @@
 # Examples in API Schemas
 
-Examples are sample values defined in your OpenAPI schema for request parameters and bodies.
-
-Schemathesis supports:
-
-- **Example-based testing**: Uses fixed input values from your schema to produce predictable, repeatable tests.
-- **Property-based testing**: Generates a diverse range of inputs dynamically to expose unexpected edge cases.
+Examples are sample values defined in your OpenAPI schema for request parameters and bodies. Some tools, such as [Dredd](https://dredd.org/en/latest/), test an API with those examples alone. Schemathesis uses them as one input source among several: the examples phase sends predictable, repeatable requests built from your examples, and the coverage and fuzzing phases generate a diverse range of inputs from the schema to reach edge cases your examples don't cover.
 
 ## Defining Examples in OpenAPI
 
-In OpenAPI 3.0+, use `example` for a single example and `examples` for multiple values. You can define examples at both the property and operation levels, or reference external files using `externalValue`.
-
-```yaml
-# Single example using the 'example' keyword
-schema:
-  type: object
-  properties:
-    name:
-      type: string
-      example: "John Doe"
-```
+In OpenAPI 3.0+, use `example` for a single example and `examples` for multiple values. You can define examples on properties and on the media type object, or reference external files using `externalValue`.
 
 ```yaml
 # Property-level example
@@ -33,7 +18,7 @@ properties:
 ```
 
 ```yaml
-# Operation-level example
+# Media-type-level example
 requestBody:
   content:
     application/json:
@@ -75,7 +60,7 @@ content:
 
 ## Using Examples in Tests
 
-Schemathesis automatically detects schema examples and uses them as test cases. For parameters and properties without examples, it uses their `default` when it matches the schema and generates minimal valid values otherwise. A required parameter's `default` counts as an example on its own.
+Schemathesis automatically detects schema examples and uses them as test cases. Examples that fail validation against their own schema are skipped. For parameters and properties without examples, it uses their `default` when it matches the schema and generates a value from the schema otherwise. A required parameter's `default` counts as an example on its own.
 
 ```yaml
 # Schema
@@ -97,14 +82,14 @@ This would generate test cases like:
 {"name": "John", "age": 42, "address": "abc"}
 ```
 
-Where `"John"` comes from the example, while the other values are minimal values that satisfy the schema constraints.
+Where `"John"` comes from the example, while the other values are generated from their schemas.
 
 ### Command-Line Interface
 
 Run example-based tests only using the `--phases=examples` option:
 
 ```console
-$ st run --phases=examples https://example.schemathesis.io/openapi.json
+$ uvx schemathesis run --phases=examples https://example.schemathesis.io/openapi.json
 ```
 
 This restricts testing to the examples phase, skipping other testing phases like coverage, fuzzing, and stateful testing.
@@ -131,10 +116,6 @@ Schemathesis will generate test cases using each age value:
 {"name": "John", "age": 35, ...}
 ```
 
-## Differences with Dredd
-
-Unlike [Dredd](https://dredd.org/en/latest/), which only uses schema examples, Schemathesis uses both predefined examples and generated data. Schemathesis also includes test case reduction and stateful testing.
-
-!!! tip "Feedback"
+!!! tip "Coming from Dredd?"
 
     If you rely on Dredd and find that a particular feature is missing in Schemathesis, please share your feedback via [GitHub Discussions](https://github.com/schemathesis/schemathesis/discussions).

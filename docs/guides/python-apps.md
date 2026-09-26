@@ -1,13 +1,11 @@
 # Testing Python Apps
 
-This guide shows how to test Python web applications (FastAPI, Flask, Django, etc.) directly with Schemathesis instead of making network requests. You'll learn basic setup patterns and advanced integration techniques for existing test suites.
+This guide shows how to test a Python web application (FastAPI, Flask, Django, and others) by calling it in-process with Schemathesis instead of sending requests over the network. Requests go straight to the ASGI or WSGI callable, so no server has to be running.
 
-## Why Test Python Apps Directly?
+## Prerequisites
 
-- ⚡ **Performance**: Direct function calls eliminate HTTP overhead, TCP connections, and serialization, making tests run significantly faster.
-- 🔧 **Existing Infrastructure**: Leverage your current test fixtures, database connections, and application configuration without additional network setup.
-- 🎛️ **Control**: Full access to application state, middleware behavior, and internal dependencies during test execution.
-- ✅ **Simplicity**: No server management, port conflicts, or network-related test flakiness.
+- Schemathesis and pytest installed in the same environment as your application
+- An application that serves its OpenAPI schema on a route
 
 ## Which Frameworks Work
 
@@ -75,6 +73,36 @@ import schemathesis
 
 app = Flask(__name__)
 
+OPENAPI = {
+    "openapi": "3.0.0",
+    "info": {"title": "Users API", "version": "1.0"},
+    "paths": {
+        "/users": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "List of users",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "integer"},
+                                            "name": {"type": "string"},
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    },
+}
+
 
 @app.route("/users")
 def get_users():
@@ -83,7 +111,7 @@ def get_users():
 
 @app.route("/openapi.json")
 def openapi_spec():
-    return {...}  # Your OpenAPI schema
+    return jsonify(OPENAPI)
 
 
 schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
@@ -94,7 +122,13 @@ def test_api(case):
     case.call_and_validate()
 ```
 
-Both methods expect the schema endpoint path and your application instance.
+Both loaders take the path that serves the schema and the application instance. Save either example as `test_api.py` and run `pytest test_api.py`:
+
+```
+test_api.py .                                                            [100%]
+
+============================== 1 passed in 0.23s ===============================
+```
 
 ## Django and Django REST Framework
 
@@ -138,6 +172,9 @@ Requests run Django's full request lifecycle, so they reach the database. Two er
 `FailedHealthCheck: ... uses a function-scoped fixture` - `db` runs once per test, not once per generated input, and Hypothesis refuses that until you confirm it is intended:
 
 ```python
+from hypothesis import HealthCheck, settings
+
+
 @schema.parametrize()
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_api(case, db):
@@ -177,9 +214,10 @@ The decorated function returns what to inspect: a module, an application instanc
 
 ASGI lifespan is handled for you: loading a schema with `from_asgi` starts the application's lifespan, every generated call reuses it, and shutdown runs at interpreter exit. You do not need a custom client to get startup and shutdown events.
 
-Reach for one when you need requests to share state that Schemathesis does not manage - a cookie jar carried across cases, a fixed header set, or a connection the surrounding test owns:
+Reach for one when you need requests to share state that Schemathesis does not manage - a cookie jar carried across cases, a fixed header set, or a connection the surrounding test owns. Create the client once, in a module-scoped fixture, and pass it to every call:
 
 ```python
+import pytest
 from fastapi import FastAPI
 import schemathesis
 from schemathesis.python.asgi import ASGIClient
@@ -195,11 +233,18 @@ async def get_users():
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 
-@schema.parametrize()
-def test_api_with_session(case):
+@pytest.fixture(scope="module")
+def client():
     with ASGIClient(app) as client:
-        case.call_and_validate(session=client)
+        yield client
+
+
+@schema.parametrize()
+def test_api_with_session(case, client):
+    case.call_and_validate(session=client)
 ```
+
+A function-scoped fixture would be created once per test function rather than per generated case, and Hypothesis rejects it with a `FailedHealthCheck`; a module scope avoids that.
 
 `ASGIClient` is a `requests.Session` subclass, so cookies, headers and adapters behave the way they do for any other session.
 
@@ -207,7 +252,7 @@ For WSGI applications the equivalent is a `werkzeug.Client`, passed the same way
 
 ## Integration with pytest Fixtures
 
-Combine direct app testing with existing pytest fixtures:
+Build the app, or the schema, from existing fixtures with `schemathesis.pytest.from_fixture`. Here `users` stands in for a fixture you already have, such as a database session:
 
 ```python
 import pytest
@@ -216,13 +261,17 @@ import schemathesis
 
 
 @pytest.fixture
-def configured_app(database_session):
+def users():
+    return [{"id": 1, "name": "Alice"}]
+
+
+@pytest.fixture
+def configured_app(users):
     app = FastAPI()
-    app.state.db = database_session
 
     @app.get("/users")
     async def get_users():
-        return app.state.db.query_users()
+        return users
 
     return app
 
@@ -248,15 +297,20 @@ For scenarios where you need to dynamically obtain authentication tokens (login 
 import schemathesis
 from schemathesis.python.asgi import ASGIClient
 
+from myapp import app
+
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 
 @schema.auth()
 class AppAuth:
     def get(self, case, context):
-        # Login to get a fresh token
-        client = ASGIClient(context.app)
-        response = client.post("/auth/token", json={"username": "test_user", "password": "test_password"})
+        # Log in to get a fresh token
+        with ASGIClient(context.app) as client:
+            response = client.post(
+                "/auth/token",
+                json={"username": "test_user", "password": "test_password"},
+            )
         return response.json()["access_token"]
 
     def set(self, case, data, context):
@@ -265,3 +319,11 @@ class AppAuth:
 
 !!! note ""
     This pattern is for dynamic authentication (login flows, token refresh). For static authentication (API keys, fixed tokens), simply add headers directly to your test client or case objects.
+
+## Troubleshooting
+
+**`FailedHealthCheck: ... uses a function-scoped fixture`.** A fixture passed to the test is created once per test, not once per generated case. Use a wider scope (`module`, `session`) or suppress the health check as shown in [Database access under pytest-django](#database-access-under-pytest-django).
+
+**Schema loading fails with 404.** The first argument to `from_asgi`/`from_wsgi` must be the path your application serves the schema on; see the table in [Which Frameworks Work](#which-frameworks-work).
+
+**Every request returns 400 under Django.** Add `localhost` (WSGI) or `testserver` (ASGI) to `ALLOWED_HOSTS`.

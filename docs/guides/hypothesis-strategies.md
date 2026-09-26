@@ -1,48 +1,55 @@
 # Using Hypothesis Strategies with Schemathesis
 
-Schemathesis is built on top of Hypothesis, which means every API operation becomes a Hypothesis strategy that generates `Case` objects. 
+This guide shows how to combine Schemathesis with your own [Hypothesis](https://hypothesis.readthedocs.io/) strategies: injecting custom data into Schemathesis tests, and drawing Schemathesis test cases inside your own Hypothesis tests.
 
-This foundation enables two powerful patterns: enhancing Schemathesis tests with custom data generation, and using Schemathesis strategies in custom testing workflows.
+## Prerequisites
 
-## Foundation: Schemathesis API Operations as Strategies
+- Schemathesis and pytest installed
+- Familiarity with Hypothesis strategies and `@given`
 
-Every API operation in your schema can be converted to a Hypothesis strategy:
+The examples load the schema from an ASGI app in `myapp.py` with `POST /users`, `GET`/`PUT`/`DELETE /users/{user_id}` and `POST /posts`. Any loader works the same way, for example `schemathesis.openapi.from_url(...)`.
+
+## Turn API operations into strategies
+
+Every API operation is a Hypothesis strategy that generates `Case` objects:
 
 ```python
 import schemathesis
 
-schema = schemathesis.openapi.from_url("http://api.example.com/openapi.json")
+from myapp import app
+
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 # Single operation strategy
 create_user = schema["/users"]["POST"].as_strategy()
-get_user = schema["/users/{id}"]["GET"].as_strategy()
+get_user = schema["/users/{user_id}"]["GET"].as_strategy()
 
 # Multiple operations combined
 user_operations = create_user | get_user
 
 # All operations for a path
-all_user_operations = schema["/users"].as_strategy()
+all_user_operations = schema["/users/{user_id}"].as_strategy()
 
 # All operations in the schema
 all_operations = schema.as_strategy()
 ```
 
-These strategies generate `Case` objects containing HTTP method, path, headers, query parameters, and request body - everything needed to make an API request. They behave like any other Hypothesis strategy. 
+A `Case` holds the method, path, headers, query parameters and request body needed to make a request. The strategies behave like any other Hypothesis strategy; see the [Hypothesis documentation](https://hypothesis.readthedocs.io/en/latest/data.html).
 
-!!! tip "Read More"
-    For detailed information about working with strategies, see the [Hypothesis documentation](https://hypothesis.readthedocs.io/en/latest/data.html).
-
-## Adding Custom Strategies to Schemathesis Tests
-
-### Simple Data Injection
-
-Use `@schema.given()` to inject custom data into your Schemathesis tests. This works like Hypothesis's `@given` decorator but integrates with Schemathesis's parametrization:
+The snippets below assume these imports and the `schema` defined above:
 
 ```python
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+```
 
+## Add custom data to Schemathesis tests
 
-# Generate authentication tokens
+### Inject values with `@schema.given()`
+
+`@schema.given()` works like Hypothesis's `@given` and combines with `@schema.parametrize()`:
+
+```python
 @schema.given(auth_token=st.sampled_from(["token1", "token2", "token3"]))
 @schema.parametrize()
 def test_api_with_auth(case, auth_token):
@@ -50,7 +57,6 @@ def test_api_with_auth(case, auth_token):
     case.call_and_validate()
 
 
-# Use existing data for path parameters
 existing_user_ids = [1, 42, 123, 456]
 
 
@@ -62,26 +68,26 @@ def test_user_endpoints(case, user_id):
     case.call_and_validate()
 ```
 
-Each test will run multiple Hypothesis examples, so your custom data will be sampled repeatedly across different generated test cases.
+Each test runs many Hypothesis examples, so the custom values are sampled across different generated test cases.
 
-!!! warning "Schema Examples and @schema.given()"
+!!! warning "Schema examples and `@schema.given()`"
 
-    If your schema contains examples (in parameters or request bodies), you cannot use `@schema.given()` with custom strategies on the same test function. Schema examples only provide the `case` parameter, while custom strategies require additional parameters, creating a parameter mismatch.
+    If your schema contains examples (in parameters or request bodies), a test that uses `@schema.given()` fails with `IncorrectUsage: Cannot combine @schema.given() with schema examples`. Schema examples only provide the `case` argument, and the extra arguments have no value.
 
-    **Solution**: Create separate test functions with different phases:
+    Split the test by Hypothesis phase:
 
     ```python
     from hypothesis import Phase, settings
 
 
-    # 1. One for schema examples (without @schema.given()):
+    # Schema examples, without @schema.given()
     @schema.parametrize()
     @settings(phases=[Phase.explicit])
     def test_user_endpoints_with_examples(case):
         case.call_and_validate()
 
 
-    # 2. One for property-based testing with your custom strategies:
+    # Generated cases with custom strategies
     @schema.given(user_id=st.sampled_from(existing_user_ids))
     @schema.parametrize()
     @settings(phases=[Phase.generate])
@@ -91,137 +97,160 @@ Each test will run multiple Hypothesis examples, so your custom data will be sam
         case.call_and_validate()
     ```
 
-### Database Setup with Cleanup
+### Create and clean up records per case
+
+`db` here is your own fixture that creates and deletes users. With pytest-django, override its `db` fixture in `conftest.py` so the helpers run with database access:
+
+```python
+import pytest
+
+from users.models import User
+
+
+class UserStore:
+    def create_user(self, data):
+        return User.objects.create(**data).id
+
+    def delete_user(self, user_id):
+        User.objects.filter(id=user_id).delete()
+
+
+@pytest.fixture
+def db(db):
+    return UserStore()
+```
+
+The test then uses it:
 
 ```python
 @schema.given(
     user_data=st.fixed_dictionaries(
         {
             "name": st.text(min_size=1, max_size=50),
-            "email": st.emails(),
             "role": st.sampled_from(["user", "admin"]),
         }
     )
 )
 @schema.parametrize()
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_api_with_db_setup(db, case, user_data):
-    # Create user in database for each Hypothesis example
     user_id = db.create_user(user_data)
     try:
-        # Use the created user in API tests
         if "user_id" in case.path_parameters:
             case.path_parameters["user_id"] = user_id
         case.call_and_validate()
     finally:
-        # Important: cleanup after each example
-        db.cleanup_user(user_id)
+        db.delete_user(user_id)
 ```
 
-Since Hypothesis generates multiple examples, a new user is created and cleaned up for each test case. Proper cleanup is essential to avoid test pollution.
+A function-scoped fixture such as `db` is created once per test function, not once per generated case, so Hypothesis raises `FailedHealthCheck` unless you suppress `HealthCheck.function_scoped_fixture`. The `try`/`finally` block creates and removes a user for every generated case.
 
-### Dynamic Endpoint Selection Based on Results  
+With Django, load the schema from the WSGI application, `schemathesis.openapi.from_wsgi("/openapi.json", get_wsgi_application())`. WSGI requests run in the test's thread and see the rows the fixture creates inside pytest-django's transaction. Django's ASGI application serves requests on another database connection, outside that transaction, and the test fails.
+
+### Choose the next request from a response
+
+`st.data()` lets the test draw more values while it runs. Here the response to `POST /users` decides which request follows:
 
 ```python
-# Define operation strategies for different scenarios
-admin_operations = schema["/admin"].as_strategy()
-regular_operations = schema["/posts"].as_strategy()
+get_user_operation = schema["/users/{user_id}"]["GET"].as_strategy()
+create_post_operation = schema["/posts"]["POST"].as_strategy()
 
 
 @schema.given(data=st.data())
 @schema.parametrize()
 def test_user_workflow(case, data):
-    if case.method == "POST" and case.path == "/users":
-        # Let Schemathesis generate and execute user creation
-        response = case.call_and_validate()
-        user_data = response.json()
-
-        # Choose next operations based on what was created
-        if user_data.get("role") == "admin":
-            # Test admin-specific endpoints
-            admin_case = data.draw(admin_operations)
-            admin_case.headers["User-ID"] = str(user_data["id"])
-            admin_case.call_and_validate()
+    response = case.call_and_validate()
+    if case.method == "POST" and case.path == "/users" and response.status_code == 201:
+        user = response.json()
+        if user["role"] == "admin":
+            next_case = data.draw(get_user_operation)
+            next_case.path_parameters = {"user_id": user["id"]}
         else:
-            # Test regular user endpoints
-            user_case = data.draw(regular_operations)
-            user_case.headers["User-ID"] = str(user_data["id"])
-            user_case.call_and_validate()
-    else:
-        # For other operations, test normally
-        case.call_and_validate()
+            next_case = data.draw(create_post_operation)
+            next_case.body = {**next_case.body, "author_id": user["id"]}
+        next_case.call_and_validate()
 ```
 
-The `st.data()` strategy lets you draw additional values during test execution, enabling dynamic decision-making based on API responses. This pattern lets you build workflows where Schemathesis handles initial data generation, and you make decisions about subsequent testing based on actual results.
+## Use Schemathesis strategies in your own tests
 
-## Using Schemathesis Strategies Elsewhere
+### Build a request sequence
 
-### Custom Stateful Testing with Dynamic Steps
+With plain `@given`, you control the order of requests and Schemathesis generates the data for each step:
 
 ```python
-from hypothesis import given, strategies as st
-
-# Define operation strategies
 create_user_strategy = schema["/users"]["POST"].as_strategy()
-update_user_strategy = schema["/users/{id}"]["PUT"].as_strategy()
-delete_user_strategy = schema["/users/{id}"]["DELETE"].as_strategy()
+update_user_strategy = schema["/users/{user_id}"]["PUT"].as_strategy()
+delete_user_strategy = schema["/users/{user_id}"]["DELETE"].as_strategy()
 
 
 @given(data=st.data())
 def test_user_lifecycle(data):
-    # Step 1: Always create user
+    # Step 1: always create a user
     create_case = data.draw(create_user_strategy)
     response = create_case.call_and_validate()
     user_id = response.json()["id"]
 
-    # Step 2: Probabilistic operations
-    if data.draw(st.integers(min_value=0, max_value=10)) < 7:  # 70% chance
-        # Update user
+    # Step 2: optional steps
+    if data.draw(st.booleans()):
         update_case = data.draw(update_user_strategy)
-        update_case.path_parameters = {"id": user_id}
+        update_case.path_parameters = {"user_id": user_id}
         update_case.call_and_validate()
 
-    if data.draw(st.booleans()):  # 50% chance
-        # Create a post for this user
+    if data.draw(st.booleans()):
         post_case = data.draw(schema["/posts"]["POST"].as_strategy())
-        post_case.body["author_id"] = user_id
+        post_case.body = {**post_case.body, "author_id": user_id}
         post_case.call_and_validate()
 
-    # Step 3: Always cleanup
+    # Step 3: always clean up
     delete_case = data.draw(delete_user_strategy)
-    delete_case.path_parameters = {"id": user_id}
+    delete_case.path_parameters = {"user_id": user_id}
     delete_case.call_and_validate()
 ```
 
-This approach gives you complete control over the test sequence while benefiting from Schemathesis's schema-based data generation for each step.
+### Use strategies with `unittest`
 
-### Integration with Other Frameworks
+Strategies work with `@given` in any test framework that supports Hypothesis:
 
 ```python
 from unittest import TestCase
+
 from hypothesis import given
 
-# Create strategies for specific operations
-create_pet_strategy = schema["/pet"]["POST"].as_strategy()
-get_pet_strategy = schema["/pet/{id}"]["GET"].as_strategy()
+create_user_strategy = schema["/users"]["POST"].as_strategy()
+get_user_strategy = schema["/users/{user_id}"]["GET"].as_strategy()
 
 
 class TestAPI(TestCase):
-    @given(case=create_pet_strategy)
-    def test_create_pet(self, case):
+    @given(case=create_user_strategy)
+    def test_create_user(self, case):
         response = case.call_and_validate()
         self.assertIn("id", response.json())
 
-    @given(create_case=create_pet_strategy, get_case=get_pet_strategy)
+    @given(create_case=create_user_strategy, get_case=get_user_strategy)
     def test_create_then_get(self, create_case, get_case):
-        # Create pet
         create_response = create_case.call_and_validate()
-        pet_id = create_response.json()["id"]
+        user_id = create_response.json()["id"]
 
-        # Get the same pet
-        get_case.path_parameters = {"id": pet_id}
+        get_case.path_parameters = {"user_id": user_id}
         get_response = get_case.call_and_validate()
 
-        self.assertEqual(get_response.json()["id"], pet_id)
+        self.assertEqual(get_response.json()["id"], user_id)
 ```
 
-You can use Schemathesis strategies with regular `@given` decorators in any testing framework that supports Hypothesis.
+Run these tests with `pytest` or `python -m unittest`:
+
+```
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.717s
+
+OK
+```
+
+## Troubleshooting
+
+**`FailedHealthCheck: '...' uses a function-scoped fixture '...'.`** Suppress `HealthCheck.function_scoped_fixture` as shown above, or give the fixture a wider scope.
+
+**``IncorrectUsage: Cannot combine `@schema.given()` with schema examples.``** Split the test into an explicit-examples test and a generated-data test, as shown in the warning above.
+
+**``OperationNotFound: `/users/{id}` not found. Did you mean `/users/{user_id}`?``** The path in `schema["/path"]["METHOD"]` must match the schema exactly, including path parameter names such as `{user_id}`. An unknown method raises ``LookupError: Method `POST` not found. Available methods: GET``.

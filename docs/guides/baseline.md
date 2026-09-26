@@ -2,13 +2,26 @@
 
 Point Schemathesis at an existing API and you may get hundreds of failures on day one. A baseline records the ones you are not fixing yet, so CI fails only on failures that are new.
 
+## Prerequisites
+
+- A running API and its schema URL, for example `http://localhost:8000/openapi.json`
+- A repository where you can commit the baseline file next to `schemathesis.toml`
+
 ## Capture what exists today
 
 ```bash
-schemathesis run http://localhost:8080/openapi.json --baseline schemathesis-baseline.json
+uvx schemathesis run http://localhost:8000/openapi.json --baseline schemathesis-baseline.json
 ```
 
-The file does not exist yet, so this run writes it. Put the path in `schemathesis.toml` so later runs pick it up on their own:
+The file does not exist yet, so this run writes it and reports how many failures it recorded:
+
+```
+Baseline:
+  Known failures: 0
+  Recorded: 7
+```
+
+Put the path in `schemathesis.toml` so later runs pick it up on their own:
 
 ```toml
 baseline = "schemathesis-baseline.json"
@@ -17,37 +30,33 @@ baseline = "schemathesis-baseline.json"
 Commit the file. Every later run loads it, says so in the header, reports the recorded failures and exits `0`; anything else exits `1`.
 
 ```bash
-schemathesis run http://localhost:8080/openapi.json
+uvx schemathesis run http://localhost:8000/openapi.json
 ```
 
 ```
-Baseline:    schemathesis-baseline.json / 47 entries
+     Baseline:         schemathesis-baseline.json / 7 entries
 
 ...
 
 Baseline:
-  Known failures: 47
-
-=========================== No issues found in 12.03s ==========================
+  Known failures: 7
 ```
 
-Once the file exists it changes only when you ask: a plain run reads it and nothing more. That is what keeps CI honest - a regression has to be accepted deliberately, not absorbed by the run that found it.
+Once the file exists it changes only when you ask: a plain run reads it and nothing more, so a regression has to be accepted deliberately.
 
-## One run is not enough
+## Record the failures later runs find
 
 Data is generated at random, so a single run does not meet every failure your API has. Expect the next few runs to keep finding new ones, and fold each batch in with `--baseline-update`. `--continue-on-failure` gets you there faster, because a scenario otherwise stops at the first failure on each operation:
 
 ```bash
-schemathesis run http://localhost:8080/openapi.json --continue-on-failure --baseline-update
+uvx schemathesis run http://localhost:8000/openapi.json --continue-on-failure --baseline-update
 ```
-
-Against a 33-operation demo API this recorded 37 entries in one run; without the flag it took four runs to reach the same set.
 
 `Recorded` tells you when to stop - repeat until a run adds nothing:
 
 ```
 Baseline:
-  Known failures: 37
+  Known failures: 8
   Recorded: 0
 ```
 
@@ -55,90 +64,88 @@ Then commit the file.
 
 ## Annotate entries
 
-Entries are yours to edit. Every later `--baseline-update` preserves what you wrote, including fields Schemathesis knows nothing about, and stamps `first_seen` once and refreshes `last_seen` each time it sees the failure again:
+Entries are yours to edit. Every later `--baseline-update` preserves what you wrote, including fields Schemathesis knows nothing about, stamps `first_seen` once, and refreshes `last_seen` each time it sees the failure again:
 
 ```json
 {
-  "id": "f3a91c",
-  "operation": "GET /users/{userId}",
-  "check": "positive_data_acceptance",
-  "failure": "RejectedPositiveData",
-  "signature": "409",
-  "first_seen": "2026-09-10",
-  "last_seen": "2026-09-14",
-  "reason": "Legacy conflict semantics on the v1 read path",
+  "id": "2a5e5b",
+  "operation": "POST /orders",
+  "check": "not_a_server_error",
+  "failure": "ServerError",
+  "signature": "500",
+  "first_seen": "2026-09-25",
+  "last_seen": "2026-09-25",
+  "reason": "Division by zero, fix scheduled",
   "ticket": "API-4412",
-  "expires": "2026-12-01",
-  "owner": "payments-team"
+  "expires": "2026-12-01"
 }
 ```
 
-`operation`, `check`, `failure` and `signature` are what an entry matches on; change any of them and it stops suppressing. `id` is derived from those four, and `first_seen` / `last_seen` are stamped for you.
+Do not edit `operation`, `check`, `failure` or `signature`: they identify the failure, and an entry with a changed value stops suppressing it. `id` is derived from those four.
 
-Everything else is yours. `expires` is the only annotation Schemathesis acts on; `reason`, `ticket` and anything else you invent ride along untouched.
-
-`expires` is the deadline you set on a suppression; nothing sets it for you, and an entry without one suppresses indefinitely. Past that date the entry stops suppressing, the failure resurfaces as new, and the run fails with the entry named:
+`expires` is the only annotation Schemathesis acts on; `reason`, `ticket` and anything else you add ride along untouched. An entry without `expires` suppresses indefinitely. Past that date the entry stops suppressing, the failure resurfaces as new, and the run fails with the entry named:
 
 ```
 Baseline:
+  Known failures: 4
+  Unobserved entries: 2
   Expired entries: 1
-    f3a91c
+    2a5e5b
 ```
 
 ## Drop entries you have fixed
 
 ```bash
-schemathesis run http://localhost:8080/openapi.json --baseline-prune
+uvx schemathesis run http://localhost:8000/openapi.json --baseline-prune
 ```
 
 ```
 Baseline:
-  Known failures: 41
-  Pruned: 3
+  Known failures: 6
+  Pruned: 2
 ```
 
-An entry is dropped only when the run tested its operation and did not reproduce it. Entries for operations the run never reached are kept - a filtered run, a smaller budget, or a phase subset cannot delete your baseline by accident.
+An entry is dropped only when the run tested its operation and did not reproduce it. Entries for operations the run never reached are kept, so a filtered run, a smaller budget, or a phase subset cannot delete your baseline by accident.
 
-This is also why an unobserved entry is reported rather than treated as fixed:
+An entry the run did not reproduce is reported as unobserved rather than fixed:
 
 ```
 Baseline:
-  Known failures: 41
-  Unobserved entries: 6
+  Known failures: 7
+  Recorded: 0
+  Unobserved entries: 1
 ```
 
-Six entries did not come up. Data generation is random, so that is not evidence they are gone. Other tools call these "unmatched" or "unused" suppressions and treat them as stale; here they usually mean the run simply did not reach them.
+Data generation is random, so an unobserved entry usually means the run did not reach that failure, not that it is gone.
 
 ## In CI
 
-`--report json` carries the same numbers for a pipeline to gate on:
+`--report json` writes the same numbers to the `baseline` key of the report, for a pipeline to gate on:
 
 ```json
 {
-  "baseline": {
-    "known": 41,
-    "new": 0,
-    "recorded": null,
-    "unobserved": 6,
-    "known_ids": ["f3a91c", "..."],
-    "unobserved_ids": ["9b2e04", "..."],
-    "expired_ids": [],
-    "pruned_ids": null
-  }
+  "known": 6,
+  "new": 0,
+  "recorded": null,
+  "pruned_ids": ["10eb82", "b19a23"],
+  "unobserved": 0,
+  "known_ids": ["130fa8", "2a5e5b", "4ae0f0", "4cd372", "848cfc", "9445e1"],
+  "unobserved_ids": [],
+  "expired_ids": []
 }
 ```
 
 See the [CI/CD guide](cicd.md) for the surrounding setup.
 
-## What an entry matches
+## What a baseline cannot hold
 
-A failure is identified by its operation, the check that raised it, the failure class, and one discriminating value - a status code, a JSON pointer into the schema, a header name. Generated payloads and case ids are deliberately excluded, so entries survive a change of seed.
+- Some failure classes are identified by operation, check and status code alone, so one entry covers every failure of that class on that operation at that status. A different bug with the same shape there is suppressed too.
+- Failures from custom checks are identified partly by the file and line of the failing assertion, relative to the directory you run in. Moving the assertion within its file records a new entry.
+- Response-time failures are never recorded: they vary with machine load.
+- Failures a class-based check raises from `after_run` belong to the run, not to an operation, so they always fail the run. Disable the check to silence one.
 
-Two consequences worth knowing:
+## Troubleshooting
 
-- Some failure classes key on the status code alone, so one entry covers every failure of that class on that operation at that status. A second, genuinely different bug of the same shape there would be absorbed.
-- Custom checks are keyed partly by the file and line the assertion was raised at, relative to the directory you run in. Entries travel between checkouts, but moving the assertion within its file writes a new one.
+**A recorded failure fails the run again**: Its entry expired, or one of its `operation`, `check`, `failure`, `signature` fields was edited. Check the `Expired entries` list in the summary.
 
-Response-time failures are never recorded: they flap with machine load, so an entry for one would never settle.
-
-Failures a class-based check raises from `after_run` belong to the run, not to an operation, so they cannot be recorded either. They always fail the run; disable the check to silence one.
+**The run does not load the baseline**: The header shows no `Baseline:` line. Check that `baseline` in `schemathesis.toml` points at the file relative to where you run the command, or pass `--baseline` explicitly.
