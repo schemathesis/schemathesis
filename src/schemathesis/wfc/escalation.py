@@ -70,8 +70,11 @@ class EscalatingAuthProvider:
         case._auth_identity = self.names[index]
         self.providers[index].set(case, data, context)
 
-    def record(self, label: str, status_code: int) -> None:
-        """Fold one response into the assignment for `label`."""
+    def record(self, label: str, identity: str | None, status_code: int) -> None:
+        """Fold one response, sent as `identity`, into the assignment for `label`."""
+        # Anonymous cases are never tagged, and neither are cases whose credentials were left out on purpose;
+        # both went out without credentials.
+        sent = self.names.index(identity if identity is not None else ANONYMOUS)
         with self._lock:
             if label in self._settled:
                 return
@@ -81,6 +84,9 @@ class EscalatingAuthProvider:
             if status_code not in DENIED:
                 return
             current = self._assigned.get(label, 0)
+            # Cases may carry an identity picked before earlier responses moved the assignment on.
+            if sent != current:
+                return
             rank = _DENIAL_RANK[status_code]
             best = self._best.get(label)
             # Ties go to the later rung: among identities that got equally far, it is the one with
@@ -133,4 +139,4 @@ def record_auth_outcome(case: Case, status_code: int) -> None:
     """Let an escalating provider learn from this response."""
     provider = _escalating_provider(case.operation.schema)
     if provider is not None:
-        provider.record(case.operation.label, status_code)
+        provider.record(case.operation.label, case._auth_identity, status_code)
