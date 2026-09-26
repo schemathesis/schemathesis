@@ -12,6 +12,8 @@ import pytest
 from schemathesis.config import OutputConfig, ReportConfig, ReportFormat, ReportsConfig, SanitizationConfig
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
+from schemathesis.engine import Status
+from schemathesis.pytest.reporting import PytestReportOutcome
 from schemathesis.reporting._command import get_command_representation
 
 if TYPE_CHECKING:
@@ -62,6 +64,9 @@ def serialize_recorder(
     elapsed_sec: float,
     tags: list[str] | None = None,
     allure_calls: list[dict] | None = None,
+    status: Status | None = None,
+    message: str | None = None,
+    has_recorder: bool = True,
 ) -> dict:
     """Serialize a ScenarioRecorder for cross-process transport via workeroutput."""
     interactions: dict[str, dict] = {}
@@ -140,6 +145,9 @@ def serialize_recorder(
         "cases": cases,
         "tags": tags,
         "allure_calls": serialized_calls,
+        "status": status.name if status is not None else None,
+        "message": message,
+        "has_recorder": has_recorder,
     }
 
 
@@ -376,11 +384,25 @@ class XdistReportingPlugin:
                 for record in payload["records"]:
                     recorder, elapsed_sec = deserialize_recorder(record)
                     tags: list[str] | None = record.get("tags")
+                    raw_status = record.get("status")
+                    outcome = (
+                        PytestReportOutcome(Status[raw_status], record.get("message"))
+                        if raw_status is not None
+                        else None
+                    )
+                    has_recorder = record.get("has_recorder", True)
                     for writer in writers:
                         if isinstance(writer, JunitXmlWriter):
-                            writer.write(recorder, elapsed_sec)
+                            if has_recorder:
+                                writer.write(recorder, elapsed_sec)
                         elif AllureWriter is not None and isinstance(writer, AllureWriter):
-                            writer.write(recorder, elapsed_sec, tags=tags)
+                            writer.write(
+                                recorder,
+                                elapsed_sec,
+                                tags=tags,
+                                status=outcome.status if outcome is not None else None,
+                                message=outcome.message if outcome is not None else None,
+                            )
                             for call in record.get("allure_calls", []):
                                 t = call["type"]
                                 label = call["label"]
@@ -393,7 +415,7 @@ class XdistReportingPlugin:
                                     writer.accumulate_title(label, call["title"])
                                 elif t == "description":
                                     writer.accumulate_description(label, call["description"])
-                        else:
+                        elif has_recorder:
                             writer.write(recorder)
             finally:
                 for writer in writers:

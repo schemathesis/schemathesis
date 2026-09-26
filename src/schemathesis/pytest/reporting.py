@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.engine import Status
 from schemathesis.engine.recorder import ScenarioRecorder
 
 if TYPE_CHECKING:
@@ -13,6 +15,12 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.hooks import HookContext
+
+
+@dataclass(frozen=True, slots=True)
+class PytestReportOutcome:
+    status: Status
+    message: str | None = None
 
 
 class PytestReportDispatcher:
