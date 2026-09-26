@@ -73,6 +73,9 @@ class OpenAPIApps:
     def multiple_failures(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.multiple_failures())
 
+    def crash_closes_connection(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.crash_closes_connection())
+
     def custom_format(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.custom_format())
 

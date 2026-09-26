@@ -243,6 +243,7 @@ class _OriginalResponse:
 
 class _ASGIAdapter(requests.adapters.HTTPAdapter):
     def __init__(self, app: ASGIApp) -> None:
+        super().__init__()
         self.app = app
         self.entered = False
 

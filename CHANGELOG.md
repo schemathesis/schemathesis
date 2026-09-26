@@ -47,6 +47,7 @@
 - Percent-encoded delimiters, missing names and dropped falsy values in `matrix`/`label`/`simple` path parameters.
 - Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
 - `st fuzz` workers continuing after the first failure and reporting `Stop reason: Completed`.
+- Network errors when a server closes a keep-alive connection without `Connection: close`.
 - `Stop reason: Time limit reached` for runs stopped by a failure shortly before the deadline.
 - `continue-on-failure` in the config file ignored by `st run` and `st fuzz`.
 - Keep schema example values that data generation hooks change in the examples phase.
