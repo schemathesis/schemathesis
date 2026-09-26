@@ -18,7 +18,7 @@ from schemathesis import graphql, openapi
 from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.config import ProjectConfig
-from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.errors import HookExecutionError, LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
 
@@ -60,7 +60,7 @@ def into_event_stream(
     except KeyboardInterrupt:
         yield Interrupted(phase=None)
         return
-    except LoaderError as exc:
+    except (LoaderError, HookExecutionError) as exc:
         yield FatalError(exception=exc)
         return
 

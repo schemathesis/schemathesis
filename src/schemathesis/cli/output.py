@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
-from schemathesis.cli.constants import ISSUE_TRACKER_URL
+from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.summary import (
     BaselineSummary,
@@ -37,7 +37,6 @@ if TYPE_CHECKING:
     from rich.text import Text
 
     from schemathesis.config import OutputConfig, ProjectConfig
-    from schemathesis.core.errors import LoaderError
     from schemathesis.core.failures import MessageBlock
     from schemathesis.engine import events
     from schemathesis.engine.statistic import GroupedFailures, Statistic
@@ -243,7 +242,7 @@ class LoadingProgressManager:
             (f" (in {duration})", Style(color="bright_white")),
         )
 
-    def get_error_message(self, error: LoaderError) -> Group:
+    def get_error_message(self, title: str, message: str) -> Group:
         from rich.console import Group
         from rich.style import Style
         from rich.text import Text
@@ -257,8 +256,8 @@ class LoadingProgressManager:
             (f" after {duration}", Style(color="white")),
         )
 
-        error_title = Text("Schema Loading Error", style=Style(color="red", bold=True))
-        error_message = Text(error.message)
+        error_title = Text(title, style=Style(color="red", bold=True))
+        error_message = Text(message)
 
         return Group(
             attempted,
@@ -449,11 +448,14 @@ def display_fatal_error(
     from rich.padding import Padding
     from rich.text import Text
 
-    from schemathesis.core.errors import LoaderError, format_exception, split_traceback
+    from schemathesis.core.errors import HookExecutionError, LoaderError, format_exception, split_traceback
+    from schemathesis.engine.errors import EngineErrorInfo
 
     if isinstance(event.exception, LoaderError):
         assert loading_manager is not None
-        message = Padding(loading_manager.get_error_message(event.exception), BLOCK_PADDING)
+        message = Padding(
+            loading_manager.get_error_message("Schema Loading Error", event.exception.message), BLOCK_PADDING
+        )
         console.print(message)
         console.print()
 
@@ -467,6 +469,18 @@ def display_fatal_error(
             if suggestion is not None:
                 click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
+        raise click.Abort
+
+    # Schema loading hooks are the only hooks whose errors stop the run.
+    if isinstance(event.exception, HookExecutionError):
+        assert loading_manager is not None
+        info = EngineErrorInfo(event.exception)
+        console.print(Padding(loading_manager.get_error_message(info.title, info.message), BLOCK_PADDING))
+        console.print()
+        for extra in split_traceback(info.traceback):
+            console.print(Padding(Text(extra), (0, 0, 0, 5)))
+        console.print()
+        click.echo(f"For more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
         raise click.Abort
 
     traceback = format_exception(event.exception, with_traceback=True)

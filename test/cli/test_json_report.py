@@ -5,7 +5,6 @@ from _pytest.main import ExitCode
 
 import schemathesis
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.core.errors import HookExecutionError
 
 
 @pytest.fixture
@@ -214,7 +213,11 @@ def after_load_schema(context, schema):
 """
     )
     api = ctx.openapi.apps.success()
-    # The exception escapes the command, so the interpreter exits with 1
-    with pytest.raises(HookExecutionError):
-        cli.main("run", api.schema_url, f"--report-json-path={json_path}", hooks=module)
-    assert load_report(json_path)["exit_code"] == 1
+    result = cli.main("run", api.schema_url, f"--report-json-path={json_path}", hooks=module)
+    report = load_report(json_path)
+    assert (result.exit_code, report["exit_code"], report["stop_reason"], report["errors"]) == (
+        2,
+        2,
+        "error",
+        [{"title": "Hook Error", "count": 1}],
+    ), result.stdout
