@@ -608,6 +608,15 @@ def test_remote_disconnected_error_with_empty_header(ctx, mocker, cli, snapshot_
     assert cli.run(api.schema_url) == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_server_error_closing_keep_alive_connection_is_not_a_network_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.crash_closes_connection()
+    assert (
+        cli.run(api.schema_url, "--phases=fuzzing", "--continue-on-failure", "--mode=positive", "--max-examples=5")
+        == snapshot_cli
+    )
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
 def test_proxy_error(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()

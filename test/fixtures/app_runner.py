@@ -16,8 +16,8 @@ import requests
 import uvicorn
 
 if TYPE_CHECKING:
-    from fastapi import FastAPI
     from flask import Flask
+    from starlette.types import ASGIApp
 
 
 COVERAGE_ENV_VARS = ("COVERAGE_PROCESS_START", "COVERAGE_FILE")
@@ -143,7 +143,7 @@ def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -
     return f"http://127.0.0.1:{port}{path}"
 
 
-def run_asgi_app(app: FastAPI, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int:
+def run_asgi_app(app: ASGIApp, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int:
     """Start a daemon thread running uvicorn against the given ASGI application."""
     if port is None:
         port = unused_port()

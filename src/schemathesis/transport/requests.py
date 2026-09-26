@@ -6,12 +6,15 @@ import json
 import os
 import time
 from collections.abc import Mapping, MutableMapping
+from http.client import RemoteDisconnected
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlencode, urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
 from typing_extensions import override
+from urllib3.exceptions import ProtocolError
 
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
@@ -235,12 +238,53 @@ def _request_with_retries(session: requests.Session, data: dict[str, Any], retri
     attempt = 0
     while True:
         try:
-            return session.request(**data)
+            return _request_resending_on_dropped_connection(session, data)
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             if attempt >= retries:
                 raise
             time.sleep(min(2**attempt, 10))
             attempt += 1
+
+
+def _request_resending_on_dropped_connection(session: requests.Session, data: dict[str, Any]) -> requests.Response:
+    # A server may close a keep-alive connection after a response without `Connection: close`, leaving a request
+    # already sent on it unread. Like browsers and curl, send such a request once more on a fresh connection.
+    opened = _count_opened_connections(session)
+    try:
+        return session.request(**data)
+    except requests.exceptions.ConnectionError as exc:
+        if not _is_dropped_before_response(exc) or _count_opened_connections(session) != opened:
+            raise
+        dropped = exc
+    try:
+        return session.request(**data)
+    except requests.exceptions.RequestException:
+        # The fresh connection failing too means the server itself is broken; report what the original request saw.
+        pass
+    raise dropped
+
+
+def _count_opened_connections(session: requests.Session) -> int:
+    total = 0
+    for adapter in session.adapters.values():
+        if not isinstance(adapter, HTTPAdapter):
+            continue
+        for manager in (adapter.poolmanager, *adapter.proxy_manager.values()):
+            # The pool container refuses direct iteration; its key snapshot is thread-safe.
+            for key in manager.pools.keys():  # noqa: SIM118
+                pool = manager.pools.get(key)
+                if pool is not None:
+                    total += pool.num_connections
+    return total
+
+
+def _is_dropped_before_response(exc: requests.exceptions.ConnectionError) -> bool:
+    reason = exc.args[0] if exc.args else None
+    return (
+        isinstance(reason, ProtocolError)
+        and len(reason.args) == 2
+        and isinstance(reason.args[1], RemoteDisconnected | ConnectionResetError | BrokenPipeError)
+    )
 
 
 def validate_vanilla_requests_kwargs(data: dict[str, Any], declared_base_url: str | None = None) -> None:
