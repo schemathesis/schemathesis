@@ -172,3 +172,22 @@ def filter_failure(context, failure, case, response):
     )
     result = cli.main("run", api.schema_url, "-c", "not_a_server_error", "--max-examples=1", hooks=module)
     assert result.exit_code == expected, result.stdout
+
+
+@pytest.mark.parametrize("command", ["run", "fuzz"])
+@pytest.mark.parametrize(
+    "hook",
+    ["before_load_schema(context, raw_schema)", "after_load_schema(context, schema)"],
+    ids=["before_load_schema", "after_load_schema"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_load_schema_hook_error(ctx, cli, snapshot_cli, command, hook):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        f"""
+@schemathesis.hook
+def {hook}:
+    raise ValueError("boom")
+"""
+    )
+    assert cli.main(command, api.schema_url, hooks=module) == snapshot_cli

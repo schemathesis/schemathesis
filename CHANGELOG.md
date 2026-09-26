@@ -39,6 +39,7 @@
 - Inferred links with `*` wildcards never filling request body fields during stateful testing.
 - Inferred links passing names as identifiers, parent names to new resources, or scalars to arrays.
 - Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.
+- Raw traceback and exit code 1 for errors in `before_load_schema` and `after_load_schema` hooks.
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash files lost when a negative mutation stored a `bytes` value.
 - False positive `ignored_auth` when an API-key cookie is passed via the `Cookie` header.

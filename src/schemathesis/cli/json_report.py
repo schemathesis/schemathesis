@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ExitCode
-from schemathesis.core.errors import LoaderError
+from schemathesis.core.errors import HookExecutionError, LoaderError
 from schemathesis.core.timing import format_timestamp
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import StopReason
@@ -44,6 +44,8 @@ def _fatal_error_title(event: events.FatalError) -> str:
     # Matches the title the terminal prints for the same error.
     if isinstance(event.exception, LoaderError):
         return "Schema Loading Error"
+    if isinstance(event.exception, HookExecutionError):
+        return "Hook Error"
     return "Test Execution Error"
 
 
