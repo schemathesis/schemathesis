@@ -39,6 +39,8 @@
 - Nested objects and `encoding` styles ignored in `application/x-www-form-urlencoded` bodies.
 - False positive `negative_data_rejection` for numeric array path parameters sent as a single number.
 - Wrong or crashing request URLs for GraphQL schemas loaded from files or dictionaries.
+- False positive `negative_data_rejection` for multipart bodies with `--generation-unique-inputs`.
+- `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.
 - False `validation_mismatch`, `missing_test_data` and `missing_auth` warnings from undeclared-method requests.
 - Property names holding `/` or `~` printed unescaped where conflicting constraints are named.
 - Plural `1 more branches` where conflicting constraints are named.

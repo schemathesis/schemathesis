@@ -407,6 +407,8 @@ def prepare_multipart_parts(
     ctx: SerializationContext, value: dict[str, Any]
 ) -> tuple[list | None, dict[str, Any] | None]:
     """Split a form payload into file parts and plain form fields."""
+    # Fields are replaced with their wire form; the case body must keep its generated values.
+    value = dict(value)
     encoded_fields = _collect_encoded_fields(ctx)
     for name, content_type in encoded_fields.items():
         if name in value:
