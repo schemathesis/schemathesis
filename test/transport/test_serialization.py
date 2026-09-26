@@ -1967,3 +1967,33 @@ def test_binary_not_a_dataclass():
     # asdict should not expose raw bytes
     as_dict = dataclasses.asdict(container)
     json.dumps(as_dict)
+
+
+@pytest.mark.parametrize("transport", [REQUESTS_TRANSPORT, WSGI_TRANSPORT], ids=["requests", "wsgi"])
+def test_multipart_serialization_keeps_case_body(ctx, transport):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {"type": "object"},
+                                "encoding": {"meta": {"contentType": "application/json"}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    data = Binary(b"\x92\x42")
+    case = schema["/test"]["POST"].Case(
+        body={"data": data, "price": 0.5, "empty": None, "meta": {"a": 1}, "items": [1.5, "x"]},
+        media_type="multipart/form-data",
+    )
+    transport.serialize_case(case)
+    assert case.body == {"data": data, "price": 0.5, "empty": None, "meta": {"a": 1}, "items": [1.5, "x"]}
+    assert case.body["data"] is data

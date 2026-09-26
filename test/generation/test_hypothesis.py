@@ -429,7 +429,7 @@ def test_default_strategies_binary(swagger_20):
     case = examples.generate_one(operation.as_strategy())
     assert isinstance(case.body["upfile"], Binary)
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
-    assert kwargs["files"] == [("upfile", case.body["upfile"])]
+    assert kwargs["files"] == [("upfile", case.body["upfile"].data)]
 
 
 def test_merge_length_into_pattern(ctx):

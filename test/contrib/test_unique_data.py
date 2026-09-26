@@ -1,7 +1,9 @@
 import platform
 
 import pytest
+from hypothesis import HealthCheck, given, settings
 
+from schemathesis.generation import GenerationMode
 from test.utils import flaky
 
 
@@ -100,7 +102,8 @@ def run(ctx, cli, unique_hook, schema, base_url, hypothesis_max_examples, *args)
         "--phases=examples,fuzzing",
         *args,
         hooks=unique_hook,
-        config={"warnings": False},
+        # Masked values would make distinct inputs render as the same command.
+        config={"warnings": False, "output": {"sanitization": {"enabled": False}}},
     )
 
 
@@ -194,3 +197,83 @@ def test_explicit_headers(
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_positive_multipart_not_reported_as_negative(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.upload_file()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--generation-unique-inputs",
+            "--mode=positive",
+            "--phases=fuzzing",
+            "--checks=negative_data_rejection",
+            "--max-examples=10",
+        )
+        == snapshot_cli
+    )
+
+
+def test_hash_keeps_positive_multipart_case(ctx):
+    operation = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "data": {"type": "string", "format": "binary"},
+                                        "price": {"type": "number"},
+                                    },
+                                    "required": ["data", "price"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/upload"]["POST"]
+
+    @given(operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    def check(case):
+        body = dict(case.body)
+        hash(case)
+        assert (case.body, case.meta.generation.mode) == (body, GenerationMode.POSITIVE)
+        assert [type(value) for value in case.body.values()] == [type(value) for value in body.values()]
+
+    check()
+
+
+def test_sensitive_parameter_values_are_distinct_inputs(ctx, cli):
+    api = ctx.openapi.apps.success()
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    cli.main(
+        "run",
+        str(ctx.makefile(schema)),
+        f"--url={api.base_url}/api",
+        "--generation-unique-inputs",
+        "--mode=positive",
+        "--phases=fuzzing",
+        "--checks=not_a_server_error",
+        "--max-examples=10",
+        config={"warnings": False},
+    )
+    assert len({request.raw_query for request in api.calls_to("/api/success")}) > 1
