@@ -1445,6 +1445,25 @@ def test_stateful_seed(ctx):
     assert requests[0][0] == requests[1][0] == requests[2][0]
 
 
+def _fuzzed_queries_per_path(ctx, seed):
+    api = ctx.openapi.apps.identical_query_parameters()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    EventStream(schema, phases=[PhaseName.FUZZING], seed=seed, max_examples=10).execute()
+    queries = {}
+    for request in _api_requests(api):
+        queries.setdefault(request.path, []).append(request.query)
+    return queries
+
+
+def test_fuzzing_seeds_operations_with_identical_parameters_differently(ctx):
+    queries = _fuzzed_queries_per_path(ctx, seed=42)
+    assert queries["/api/twin_a"] != queries["/api/twin_b"]
+
+
+def test_fuzzing_seed_reproduces_per_operation_inputs(ctx):
+    assert _fuzzed_queries_per_path(ctx, seed=42) == _fuzzed_queries_per_path(ctx, seed=42)
+
+
 def test_stateful_override(ctx):
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)

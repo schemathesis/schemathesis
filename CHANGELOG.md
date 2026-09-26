@@ -16,6 +16,7 @@
 - Linked stateful steps send negative requests as often as scenario-starting steps.
 - `st replay` step chains show each linked value as `recorded -> replayed`.
 - `st replay` removes fixed crash files with masked credentials once config or CLI supplies them.
+- Fuzzing seeds each operation separately, so operations with identical parameters explore different inputs.
 
 ### :bug: Fixed
 

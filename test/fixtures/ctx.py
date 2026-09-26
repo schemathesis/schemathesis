@@ -79,6 +79,9 @@ class OpenAPIApps:
     def custom_format(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.custom_format())
 
+    def identical_query_parameters(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.identical_query_parameters())
+
     def flaky(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.flaky())
 

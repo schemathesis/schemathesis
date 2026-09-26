@@ -107,6 +107,13 @@ def csv_payload() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def identical_query_parameters() -> OpenAPIApp:
+    spec = build_schema(schemas.identical_query_parameters())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_identical_query_parameters(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def flaky() -> OpenAPIApp:
     spec = build_schema(schemas.flaky())
     app = make_flask_app_from_schema(spec)

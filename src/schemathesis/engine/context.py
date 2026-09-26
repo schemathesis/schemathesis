@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 from dataclasses import dataclass
@@ -246,6 +247,15 @@ class EngineContext:
         """Run seed shifted by the cycle, so a repeat covers ground the last one did not."""
         seed = self.config.seed
         return None if seed is None else seed + self.cycle_index
+
+    def operation_seed(self, operation: APIOperation) -> int | None:
+        """Cycle seed mixed with the operation label, so operations with identical parameters draw different inputs."""
+        seed = self.cycle_seed
+        if seed is None:
+            return None
+        # A stable hash keeps the seed identical across processes, unlike the salted built-in `hash`.
+        digest = hashlib.blake2b(f"{seed}:{operation.label}".encode(), digest_size=8).digest()
+        return int.from_bytes(digest, "big")
 
     def next_stateful_seed(self) -> int | None:
         """Seed for the next stateful suite; every suite in the run gets its own, cycles included."""
