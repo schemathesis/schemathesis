@@ -13,6 +13,7 @@ from hypothesis.stateful import RuleBasedStateMachine
 from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
+from schemathesis.core.failures import FailureGroup, as_reported_failure
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Result
@@ -269,9 +270,13 @@ class APIStateMachine(RuleBasedStateMachine):
                             _callback(self.recorder, elapsed)
                             super().teardown()
 
-                    run_state_machine_as_test(_Capturing, settings=self.settings)
+                    machine: type[APIStateMachine] = _Capturing
                 else:
-                    run_state_machine_as_test(cls, settings=self.settings)
+                    machine = cls
+                try:
+                    run_state_machine_as_test(machine, settings=self.settings)
+                except FailureGroup as exc:
+                    raise as_reported_failure(exc) from None
 
             runTest.is_hypothesis_test = True  # type: ignore[attr-defined]
 

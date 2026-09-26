@@ -90,6 +90,9 @@ uvx --from 'schemathesis[allure]' schemathesis run https://api.example.com/opena
 pytest tests/ --alluredir=allure-results/pytest
 ```
 
+`allure-pytest` reports Schemathesis check failures as **failed**. Configuration, network, and user-code errors are
+reported as **broken**. For `from_fixture` tests, `allure-pytest` keeps only the first failing operation per test.
+
 ## Docker
 
 The Schemathesis Docker image has Allure support pre-installed. Create a directory, mount it and pass `--report-allure-path` to write raw result files to your host. Create the directory first: the container runs as UID 1000 and cannot write to a directory Docker creates as `root` (see [Docker troubleshooting](docker.md#troubleshooting)):

@@ -337,6 +337,19 @@ class FailureGroup(BaseExceptionGroup):
         return super().__new__(cls, message, list(failures))
 
 
+class _ReportedFailureGroup(FailureGroup, AssertionError):
+    """FailureGroup as reported to pytest so reporters classify it as a failed test."""
+
+
+_ReportedFailureGroup.__name__ = _ReportedFailureGroup.__qualname__ = "FailureGroup"
+
+
+def as_reported_failure(exc: FailureGroup) -> FailureGroup:
+    reported = _ReportedFailureGroup(list(exc.exceptions), exc.message)
+    reported.__notes__ = list(getattr(exc, "__notes__", []))
+    return reported.with_traceback(exc.__traceback__)
+
+
 class MessageBlock(str, Enum):
     CASE_ID = "case_id"
     FAILURE = "failure"
