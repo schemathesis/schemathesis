@@ -20,59 +20,88 @@
 
 ### :bug: Fixed
 
-- Report Schemathesis check failures as failed instead of broken in allure-pytest.
-- Report pytest errors as broken and pytest skips as skipped in Allure.
-- Merge duplicate pytest Allure results for the same operation.
-- Report pytest errors as errors and skips as skipped in JUnit instead of passed.
-- Include `from_fixture` tests in pytest Allure and JUnit reports.
-- `st replay` ignoring auth providers and `[auth.openapi]` credentials, resending masked values instead.
-- `st replay` reporting a crash as fixed when its credentials were missing or rejected.
-- `st replay` deleting fixed crash files that sent a masked request body value.
-- Missing `epic` label with the API title in CLI Allure reports.
-- Stateful tests with more than 6 steps running few scenarios or failing with `Unsatisfiable`.
-- Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
-- Multipart parts for arrays of primitives labelled `application/json` while carrying raw text.
-- `exit_code` of `0` in `--report json` for runs aborted by a fatal error.
-- `stop_reason` of `interrupted` and empty `errors` in `--report json` for runs aborted by an error.
-- Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
-- Dependency inference ignoring `application/x-www-form-urlencoded`, `multipart/form-data` and `formData` request bodies.
-- Inferred links with `*` wildcards never filling request body fields during stateful testing.
-- Inferred links passing names as identifiers, parent names to new resources, or scalars to arrays.
-- Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.
-- Raw traceback and exit code 1 for errors in `before_load_schema` and `after_load_schema` hooks.
-- `format: binary` strings ignoring `minLength` and `maxLength`.
-- Crash files lost when a negative mutation stored a `bytes` value.
-- False positive `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
-- Nested objects and `encoding` styles ignored in `application/x-www-form-urlencoded` bodies.
-- False positive `negative_data_rejection` for numeric array path parameters sent as a single number.
-- Wrong or crashing request URLs for GraphQL schemas loaded from files or dictionaries.
-- False positive `negative_data_rejection` for multipart bodies with `--generation-unique-inputs`.
-- `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.
-- False `validation_mismatch`, `missing_test_data` and `missing_auth` warnings from undeclared-method requests.
-- Property names holding `/` or `~` printed unescaped where conflicting constraints are named.
-- Plural `1 more branches` where conflicting constraints are named.
+#### `st run` and `st fuzz`
+
 - `st fuzz --help` omitting that fuzzing stops at the first failure without `--continue-on-failure`.
 - `st fuzz` omitting schema errors of individual operations.
-- Name the `prefixItems` element that admits no value when test data cannot be generated.
+- `st fuzz` workers continuing after the first failure and reporting `Stop reason: Completed`.
+- `Stop reason: Time limit reached` for runs stopped by a failure shortly before the deadline.
+- `continue-on-failure` in the config file ignored.
+
+#### `st replay`
+
+- Ignoring auth providers and `[auth.openapi]` credentials, resending masked values instead.
+- Reporting a crash as fixed when its credentials were missing or rejected.
+- Deleting fixed crash files that sent a masked request body value.
+- Reproduce commands for stateful chains using stale recorded IDs.
+- Flagging stateful steps as changed when only re-extracted IDs differ.
+- Resending stale `User-Agent` and test case ID headers, or dropping `-H` headers.
+
+#### Reports
+
+- Schemathesis check failures marked as broken instead of failed in allure-pytest.
+- Wrong Allure status for pytest errors (broken) and skips (skipped).
+- Duplicate pytest Allure results for the same operation.
+- pytest errors and skips marked as passed in JUnit.
+- `from_fixture` tests missing from pytest Allure and JUnit results.
+- Missing `epic` label with the API title in CLI Allure results.
+- `exit_code` of `0` in `--report json` for runs aborted by a fatal error.
+- `stop_reason` of `interrupted` and empty `errors` in `--report json` for runs aborted by an error.
+
+#### Hooks
+
+- Raw traceback and exit code 1 for errors in `before_load_schema` and `after_load_schema`.
+- Keep schema example values that data generation hooks change in the examples phase.
+- Apply test-scoped `filter_case` and `map_case` in the pytest coverage phase.
+- Call test-scoped `after_validate`.
+
+#### Stateful testing
+
+- Scenarios with more than 6 steps running rarely or failing with `Unsatisfiable`.
+- Dependency inference ignoring `application/x-www-form-urlencoded`, `multipart/form-data` and `formData` request bodies.
+- Inferred links with `*` wildcards never filling request body fields.
+- Inferred links passing names as identifiers, parent names to new resources, or scalars to arrays.
+- Keep operations in dependency inference when a response has an unresolvable `$ref`.
+- Missing inferred links for path parameters named after a resource field, e.g. `/projects/{code}`.
+- Inferred links reading response fields the schema does not define.
+- Missing inferred links for fields and nested foreign keys inherited through `allOf`.
+
+#### Data generation
+
+- Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
+- `format: binary` strings ignoring `minLength` and `maxLength`.
+- `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.
+- Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
+
+#### Request serialization
+
+- Multipart parts for arrays of primitives labelled `application/json` while carrying raw text.
+- Booleans and nulls sent as `True`/`False`/`None` in `label`, `matrix` and object-style parameters.
+- Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.
+- Nested objects and `encoding` styles ignored in `application/x-www-form-urlencoded` bodies.
 - Coverage phase stringifying nested values of JSON-encoded `content` parameters.
 - Percent-encoded delimiters, missing names and dropped falsy values in `matrix`/`label`/`simple` path parameters.
-- Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
-- `st fuzz` workers continuing after the first failure and reporting `Stop reason: Completed`.
+
+#### Unsatisfiable schema messages
+
+- Property names holding `/` or `~` printed unescaped.
+- Plural `1 more branches` for a single branch.
+- Name the `prefixItems` element that admits no value.
+- Name conflicting keywords inside `$ref` branches of a `oneOf`.
+
+#### False positives
+
+- `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
+- `negative_data_rejection` for numeric array path parameters sent as a single number.
+- `negative_data_rejection` for multipart bodies with `--generation-unique-inputs`.
+- `validation_mismatch`, `missing_test_data` and `missing_auth` warnings from undeclared-method requests.
+- `validation_mismatch` and `missing_test_data` warnings from negative test cases.
+
+#### Others
+
+- Crash files lost when a negative mutation stored a `bytes` value.
+- Wrong or crashing request URLs for GraphQL schemas loaded from files or dictionaries.
 - Network errors when a server closes a keep-alive connection without `Connection: close`.
-- `Stop reason: Time limit reached` for runs stopped by a failure shortly before the deadline.
-- `continue-on-failure` in the config file ignored by `st run` and `st fuzz`.
-- Keep schema example values that data generation hooks change in the examples phase.
-- Apply test-scoped `filter_case` and `map_case` hooks in the pytest coverage phase.
-- Call test-scoped `after_validate` hooks.
-- Name conflicting keywords inside `$ref` branches of a `oneOf` when test data cannot be generated.
-- Keep operations in dependency inference when a response has an unresolvable `$ref`.
-- Missing inferred stateful links for path parameters named after a resource field, e.g. `/projects/{code}`.
-- Inferred stateful links reading response fields the schema does not define.
-- Missing inferred stateful links for fields and nested foreign keys inherited through `allOf`.
-- `st replay` reproduce commands for stateful chains using stale recorded IDs.
-- `st replay` flagging stateful steps as changed when only re-extracted IDs differ.
-- `st replay` resending stale `User-Agent` and test case ID headers, or dropping `-H` headers.
-- False `validation_mismatch` and `missing_test_data` warnings from negative test cases.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 
