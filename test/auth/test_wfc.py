@@ -1076,6 +1076,24 @@ def test_denials_count_against_the_identity_that_was_sent(cli, ctx, tmp_path):
     assert "admin" in _identities(api, "DELETE", "/api/admin-only")
 
 
+def test_identity_refused_before_accounts_exist_is_retried(cli, ctx, tmp_path):
+    # An API may create its accounts mid-run, so a 401 from before then says nothing about the identity.
+    api = ctx.openapi.apps.wfc_accounts_seeded_later()
+    auth = _write(tmp_path, {"auth": [ROLE_AUTH["auth"][2], ROLE_AUTH["auth"][0], ROLE_AUTH["auth"][1]]})
+
+    cli.run(
+        api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=coverage,fuzzing", "--continue-on-failure"
+    )
+
+    seen = [
+        (r.headers.get("Authorization") or "").removeprefix("ApiKey ")
+        for r in api.requests
+        if r.method == "DELETE" and r.path.startswith("/api/admin-only")
+    ]
+    assert seen, "operation was never dispatched"
+    assert seen[-1] == "admin", f"never retried the identity refused before seeding: {seen}"
+
+
 def test_a_missing_resource_does_not_settle_the_identity(cli, ctx, tmp_path):
     # A 404 says the id was wrong, not that the identity was accepted.
     api = ctx.openapi.apps.wfc_role_gated()

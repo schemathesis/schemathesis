@@ -282,6 +282,9 @@ class OpenAPIApps:
     def wfc_credentials_rejected(self) -> OpenAPIServer:
         return _start(self.parent, openapi_wfc.wfc_credentials_rejected())
 
+    def wfc_accounts_seeded_later(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_accounts_seeded_later())
+
     def planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug())
 
