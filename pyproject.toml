@@ -65,6 +65,7 @@ tests = [
   "syrupy>=5.4,<5.5",
   "tomli-w>=1.2.0",
   "allure-python-commons>=2.13.0",
+  "allure-pytest>=2.13.0",
   "trustme>=0.9.0,<2.0",
   "uvicorn>=0.20,<1.0",
 ]

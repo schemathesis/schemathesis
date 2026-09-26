@@ -27,7 +27,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
     format_exception,
 )
-from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, format_failures, get_origin
+from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_reported_failure, format_failures, get_origin
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.generation import overrides
@@ -412,7 +412,7 @@ def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pyt
                 group = BaseExceptionGroup(message, deduplicated)
                 report.longrepr = "".join(format_exception(group, with_traceback=True))
 
-        if call.excinfo.type is FailureGroup:
+        if issubclass(call.excinfo.type, FailureGroup):
             tb_entries = list(call.excinfo.traceback)
             total_frames = len(tb_entries)
 
@@ -451,6 +451,8 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
         try:
             with ignore_hypothesis_output():
                 yield
+        except FailureGroup as exc:
+            raise as_reported_failure(exc) from None
         except InvalidArgument as exc:
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
                 from schemathesis.generation.hypothesis.given import GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE
