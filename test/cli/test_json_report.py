@@ -154,6 +154,9 @@ def test_report_for_filters_matching_nothing(ctx, cli, json_path):
     )
 
 
+LOADING_ERRORS = [{"title": "Schema Loading Error", "count": 1}]
+
+
 @pytest.fixture
 def schema_files(ctx, tmp_path):
     malformed = tmp_path / "broken.json"
@@ -164,18 +167,27 @@ def schema_files(ctx, tmp_path):
 
 @pytest.mark.parametrize("command", ["run", "fuzz"])
 @pytest.mark.parametrize(
-    "args",
+    ("args", "errors"),
     [
-        pytest.param(("{malformed}", "--url=http://127.0.0.1:1"), id="malformed-schema"),
-        pytest.param(("http://127.0.0.1:1/openapi.json",), id="unreachable-schema"),
-        pytest.param(("http://127.0.0.1:1/openapi.json", "--wait-for-schema=1"), id="wait-for-schema-timeout"),
-        pytest.param(("{valid}",), id="missing-base-url"),
+        pytest.param(("{malformed}", "--url=http://127.0.0.1:1"), LOADING_ERRORS, id="malformed-schema"),
+        pytest.param(("http://127.0.0.1:1/openapi.json",), LOADING_ERRORS, id="unreachable-schema"),
+        pytest.param(
+            ("http://127.0.0.1:1/openapi.json", "--wait-for-schema=1"), LOADING_ERRORS, id="wait-for-schema-timeout"
+        ),
+        # A usage error, not a run error: the terminal prints it without an error title.
+        pytest.param(("{valid}",), [], id="missing-base-url"),
     ],
 )
-def test_fatal_error_records_process_exit_code(cli, json_path, schema_files, command, args):
+def test_fatal_error_records_process_exit_code(cli, json_path, schema_files, command, args, errors):
     args = [arg.format(**schema_files) for arg in args]
     result = cli.main(command, *args, f"--report-json-path={json_path}")
-    assert (result.exit_code, load_report(json_path)["exit_code"]) == (2, 2), result.stdout
+    report = load_report(json_path)
+    assert (result.exit_code, report["exit_code"], report["stop_reason"], report["errors"]) == (
+        2,
+        2,
+        "error",
+        errors,
+    ), result.stdout
 
 
 @pytest.mark.parametrize("command", [("run", "--max-examples=1"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
@@ -189,7 +201,8 @@ def test_handler_error_records_process_exit_code(ctx, cli, json_path, command):
     api = ctx.openapi.apps.success()
     result = cli.main(command[0], api.schema_url, command[1], f"--report-json-path={json_path}")
     assert "CLI Handler Error" in result.stdout
-    assert (result.exit_code, load_report(json_path)["exit_code"]) == (2, 2)
+    report = load_report(json_path)
+    assert (result.exit_code, report["exit_code"], report["stop_reason"]) == (2, 2, "error")
 
 
 def test_hook_error_records_process_exit_code(ctx, cli, json_path):
