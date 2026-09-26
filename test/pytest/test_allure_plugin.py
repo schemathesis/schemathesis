@@ -4,7 +4,7 @@ from xml.etree import ElementTree
 
 import pytest
 
-from test.utils import load_json_or_fail
+from test.utils import load_json_or_fail, make_pytest_outcome_test
 
 
 def _make_allure_xdist_test(testdir, *, schema_dict, base_url, reports_config, body="case.call()", imports=()):
@@ -79,51 +79,8 @@ def _allure_result_summaries(allure_dir):
 )
 def test_allure_report_uses_pytest_outcome(testdir, tmp_path, ctx, xdist, outcome, expected):
     allure_dir = tmp_path / "allure-results"
-    marker = ""
-    if outcome == "check_failure":
-        api = ctx.openapi.apps.failure()
-        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
-        config = ""
-        body = "case.call_and_validate()"
-        label = "GET /api/failure"
-    elif outcome == "unsatisfiable":
-        api = ctx.openapi.apps.unsatisfiable()
-        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
-        config = "schema.config.generation.update(modes=[GenerationMode.POSITIVE])"
-        body = "case.call_and_validate()"
-        label = "POST /api/unsatisfiable"
-    elif outcome == "network_error":
-        schema_dict = ctx.openapi.build_schema({"/network": {"get": {"responses": {"200": {"description": "OK"}}}}})
-        schema = f"schemathesis.openapi.from_dict({schema_dict!r})"
-        config = 'schema.config.update(base_url="http://127.0.0.1:1")'
-        body = "case.call()"
-        label = "GET /network"
-    else:
-        api = ctx.openapi.apps.success()
-        schema = f'schemathesis.openapi.from_url("{api.schema_url}")'
-        config = ""
-        body = {
-            "assertion": 'case.call(); assert False, "boom"',
-            "runtime_error": 'case.call(); raise RuntimeError("bug")',
-            "skip": 'pytest.skip("why")',
-            "mark_skip": "case.call()",
-        }[outcome]
-        if outcome == "mark_skip":
-            marker = '@pytest.mark.skip(reason="why")'
-        label = "GET /api/success"
-
-    testdir.make_test(
-        f"""
-schema = {schema}
-{config}
-schema.config.reports.update(allure_path=r"{allure_dir}")
-
-{marker}
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.generate])
-def test_api(case):
-    {body}
-"""
+    label = make_pytest_outcome_test(
+        testdir, ctx, outcome, f'schema.config.reports.update(allure_path=r"{allure_dir}")'
     )
     args = ("-n", "2") if xdist else ()
 

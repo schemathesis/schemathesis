@@ -1,7 +1,9 @@
 import pathlib
 from xml.etree import ElementTree
 
-from test.utils import load_json_or_fail, load_yaml_or_fail
+import pytest
+
+from test.utils import load_json_or_fail, load_yaml_or_fail, make_pytest_outcome_test
 
 
 def _make_xdist_test(ctx, testdir, content, base_url, paths=None):
@@ -19,6 +21,50 @@ schema.config.update(base_url="{base_url}")
 {content}
 """
     )
+
+
+def _junit_outcomes(report_path):
+    outcomes = {}
+    for test_case in ElementTree.parse(report_path).findall(".//testcase"):
+        if len(test_case) == 0:
+            kind = "passed"
+            message = ""
+        else:
+            kind = test_case[0].tag
+            raw_message = test_case[0].attrib.get("message", "")
+            message = raw_message.splitlines()[0] if raw_message else ""
+            if message.startswith("ConnectionError: "):
+                message = "ConnectionError"
+        outcomes[test_case.attrib["name"]] = (kind, message)
+    return outcomes
+
+
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [
+        ("check_failure", ("failure", "")),
+        ("assertion", ("failure", "boom")),
+        ("runtime_error", ("error", "RuntimeError: bug")),
+        (
+            "unsatisfiable",
+            ("error", "Unsatisfiable: Cannot generate test data for request body (application/json)"),
+        ),
+        ("network_error", ("error", "ConnectionError")),
+        ("skip", ("skipped", "why")),
+        ("mark_skip", ("skipped", "why")),
+    ],
+)
+def test_junit_report_uses_pytest_outcome(testdir, tmp_path, ctx, xdist, outcome, expected):
+    report_path = tmp_path / "report.xml"
+    label = make_pytest_outcome_test(
+        testdir, ctx, outcome, f'schema.config.reports.update(junit_path=r"{report_path}")'
+    )
+    args = ("-n", "2") if xdist else ()
+
+    testdir.runpytest(*args)
+
+    assert _junit_outcomes(report_path) == {label: expected}
 
 
 def test_vcr_report_written_via_config(testdir, ctx):
