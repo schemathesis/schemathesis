@@ -321,7 +321,7 @@ def check_context(config=None, *, recorder=None, override=None):
     )
 
 
-def make_pytest_outcome_test(testdir: Any, ctx: Any, outcome: str, report_config: str) -> str:
+def make_pytest_outcome_test(testdir: Any, ctx: Any, outcome: str, report_config: str, *, lazy: bool = False) -> str:
     """Write a one-operation pytest test that ends with `outcome` and return its operation label."""
     marker = ""
     config = ""
@@ -354,8 +354,23 @@ def make_pytest_outcome_test(testdir: Any, ctx: Any, outcome: str, report_config
         if outcome == "mark_skip":
             marker = '@pytest.mark.skip(reason="why")'
         label = "GET /api/success"
-    testdir.make_test(
-        f"""
+    if lazy:
+        setup = "\n    ".join(line for line in (f"schema = {schema}", config, report_config, "return schema") if line)
+        source = f"""
+@pytest.fixture
+def api_schema():
+    {setup}
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+{marker}
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    {body}
+"""
+    else:
+        source = f"""
 schema = {schema}
 {config}
 {report_config}
@@ -366,5 +381,5 @@ schema = {schema}
 def test_api(case):
     {body}
 """
-    )
+    testdir.make_test(source)
     return label

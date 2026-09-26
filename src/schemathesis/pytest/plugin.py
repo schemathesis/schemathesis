@@ -3,7 +3,8 @@ from __future__ import annotations
 import inspect
 import sys
 import unittest
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
+from contextlib import contextmanager
 from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
@@ -82,6 +83,10 @@ _ALLURE_FORWARDER_KEY: pytest.StashKey[_AllureHookForwarder] = pytest.StashKey()
 _ALLURE_BUFFER_KEY: pytest.StashKey[_AllureCallBuffer] = pytest.StashKey()
 _REPORT_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
 _WRITERS_KEY_CACHE: pytest.StashKey[dict[int, tuple[SchemaMetadata, str]]] = pytest.StashKey()
+
+
+# Present only while a lazy-schema subtest runs; holds that subtest's outcome.
+_SUBTEST_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
 
 
 def _is_schema(value: object) -> bool:
@@ -609,26 +614,25 @@ def _writers_key(config: pytest.Config, schema: SchemaMetadata) -> str:
     return cached[1]
 
 
-def _register_allure_forwarder(item: pytest.Item, schema: SchemaMetadata) -> None:
-    """Register a per-item hook forwarder for dynamic allure API calls."""
-    entry = item.config.stash[_CASSETTE_KEY].get(_writers_key(item.config, schema))
-    if entry is None:
-        return
-    _, writers = entry
+def _register_allure_forwarder(
+    label: str, writers: Sequence[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter | _AllureCallBuffer]
+) -> _AllureHookForwarder | None:
     import allure_commons
 
-    from schemathesis.reporting.allure import AllureWriter, _AllureHookForwarder
+    from schemathesis.reporting.allure import AllureWriter, _AllureCallBuffer, _AllureHookForwarder
 
-    allure_writers = [w for w in writers if isinstance(w, AllureWriter)]
+    allure_writers = [writer for writer in writers if isinstance(writer, (AllureWriter, _AllureCallBuffer))]
     if not allure_writers:
-        return
-
-    label = item.operation_label
-    if label is None:
-        return
+        return None
     forwarder = _AllureHookForwarder(label=label, writers=allure_writers)
     allure_commons.plugin_manager.register(forwarder)
-    item.stash[_ALLURE_FORWARDER_KEY] = forwarder
+    return forwarder
+
+
+def _unregister_allure_forwarder(forwarder: _AllureHookForwarder) -> None:
+    import allure_commons
+
+    allure_commons.plugin_manager.unregister(forwarder)
 
 
 def _push_to_xdist_workeroutput(
@@ -665,30 +669,134 @@ def _push_to_xdist_workeroutput(
     )
 
 
+def _get_pytest_report_outcome(report: pytest.TestReport, call: pytest.CallInfo) -> PytestReportOutcome:
+    if report.passed:
+        return PytestReportOutcome(Status.SUCCESS)
+    if report.skipped:
+        message = str(call.excinfo.value) if call.excinfo is not None else None
+        return PytestReportOutcome(Status.SKIP, message)
+    assert call.excinfo is not None
+    exception = call.excinfo.value
+    if isinstance(exception, (FailureGroup, AssertionError, pytest.fail.Exception)):
+        return PytestReportOutcome(Status.FAILURE, str(exception))
+    return PytestReportOutcome(Status.ERROR, f"{type(exception).__name__}: {exception}")
+
+
 @hookimpl(wrapper=True)  # type: ignore[untyped-decorator]
 def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
     report = yield
+    if _SUBTEST_OUTCOME_KEY in item.stash:
+        if call.when == "call":
+            item.stash[_SUBTEST_OUTCOME_KEY] = _get_pytest_report_outcome(report, call)
+        return report
     if not isinstance(item, SchemathesisFunction) or item.operation_label is None:
         return report
     if call.when != "call" and (call.when != "setup" or report.passed):
         return report
 
-    if report.passed:
-        outcome = PytestReportOutcome(Status.SUCCESS)
-    elif report.skipped:
-        message = str(call.excinfo.value) if call.excinfo is not None else None
-        outcome = PytestReportOutcome(Status.SKIP, message)
-    else:
-        assert call.excinfo is not None
-        exception = call.excinfo.value
-        if isinstance(exception, (FailureGroup, AssertionError, pytest.fail.Exception)):
-            outcome = PytestReportOutcome(Status.FAILURE, str(exception))
-        else:
-            outcome = PytestReportOutcome(Status.ERROR, f"{type(exception).__name__}: {exception}")
-    item.stash[_REPORT_OUTCOME_KEY] = outcome
+    item.stash[_REPORT_OUTCOME_KEY] = _get_pytest_report_outcome(report, call)
     return report
+
+
+def _write_pytest_result(
+    item: pytest.Item,
+    schema: SchemaMetadata,
+    label: str,
+    tags: list[str] | None,
+    dispatcher: PytestReportDispatcher,
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter],
+    outcome: PytestReportOutcome,
+    allure_buffer: _AllureCallBuffer | None,
+) -> None:
+    result = dispatcher.pop_recorder(label)
+    has_recorder = result is not None
+    if result is None:
+        if outcome.status == Status.SUCCESS:
+            return
+        from schemathesis.engine.recorder import ScenarioRecorder
+
+        recorder = ScenarioRecorder(label=label, config=schema.config.output)
+        elapsed_sec = 0.0
+    else:
+        recorder, elapsed_sec = result
+        has_check_failures = any(
+            check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks
+        )
+        if has_check_failures:
+            outcome = PytestReportOutcome(Status.FAILURE)
+    if _is_xdist_worker(item.config):
+        _push_to_xdist_workeroutput(
+            item.config.workeroutput,
+            schema,
+            recorder,
+            elapsed_sec,
+            tags=tags,
+            allure_calls=allure_buffer.to_list() if allure_buffer is not None else None,
+            outcome=outcome,
+            has_recorder=has_recorder,
+        )
+    else:
+        _write_to_writers(
+            writers,
+            recorder,
+            elapsed_sec,
+            tags=tags,
+            outcome=outcome,
+            has_recorder=has_recorder,
+        )
+
+
+@contextmanager
+def report_subtest(
+    item: pytest.Item, schema: SchemaMetadata, label: str, tags: list[str] | None
+) -> Generator[None, None, None]:
+    reports = schema.config.reports
+    if not (reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.allure.enabled):
+        yield
+        return
+
+    from schemathesis.pytest.reporting import PytestReportDispatcher
+
+    schema_id = _writers_key(item.config, schema)
+    entry = item.config.stash[_CASSETTE_KEY].get(schema_id)
+    if entry is None:
+        writers = [] if _is_xdist_worker(item.config) else _open_writers(schema)
+        if not writers and not _is_xdist_worker(item.config):
+            yield
+            return
+        dispatcher = PytestReportDispatcher(schema)
+        item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, writers)
+    else:
+        dispatcher, writers = entry
+
+    allure_buffer = None
+    if _is_xdist_worker(item.config) and reports.allure.enabled:
+        from schemathesis.reporting.allure import _AllureCallBuffer
+
+        allure_buffer = _AllureCallBuffer()
+        forwarder = _register_allure_forwarder(label, [allure_buffer])
+    else:
+        forwarder = _register_allure_forwarder(label, writers)
+    item.stash[_SUBTEST_OUTCOME_KEY] = PytestReportOutcome(Status.SUCCESS)
+    try:
+        yield
+    finally:
+        outcome = item.stash[_SUBTEST_OUTCOME_KEY]
+        del item.stash[_SUBTEST_OUTCOME_KEY]
+        if forwarder is not None:
+            _unregister_allure_forwarder(forwarder)
+        _write_pytest_result(
+            item,
+            schema,
+            label,
+            tags,
+            dispatcher,
+            writers,
+            outcome,
+            allure_buffer,
+        )
 
 
 # Report writers must be attached before a `skip` marker raises during setup, or the skip is never reported.
@@ -742,19 +850,21 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, [])
 
         if reports.allure.enabled:
-            import allure_commons
-
-            from schemathesis.reporting.allure import _AllureCallBuffer, _AllureHookForwarder
+            from schemathesis.reporting.allure import _AllureCallBuffer
 
             buffer = _AllureCallBuffer()
-            forwarder = _AllureHookForwarder(label=item.operation_label, writers=[buffer])
-            allure_commons.plugin_manager.register(forwarder)
+            forwarder = _register_allure_forwarder(item.operation_label, [buffer])
+            assert forwarder is not None
             item.stash[_ALLURE_BUFFER_KEY] = buffer
             item.stash[_ALLURE_FORWARDER_KEY] = forwarder
         return
 
-    if schema_id in item.config.stash[_CASSETTE_KEY]:
-        _register_allure_forwarder(item, schema)
+    entry = item.config.stash[_CASSETTE_KEY].get(schema_id)
+    if entry is not None:
+        _, writers = entry
+        forwarder = _register_allure_forwarder(item.operation_label, writers)
+        if forwarder is not None:
+            item.stash[_ALLURE_FORWARDER_KEY] = forwarder
         return
 
     writers = _open_writers(schema)
@@ -763,7 +873,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
     dispatcher = PytestReportDispatcher(schema)
     item.config.stash[_CASSETTE_KEY][schema_id] = (dispatcher, writers)
-    _register_allure_forwarder(item, schema)
+    forwarder = _register_allure_forwarder(item.operation_label, writers)
+    if forwarder is not None:
+        item.stash[_ALLURE_FORWARDER_KEY] = forwarder
 
 
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
@@ -790,9 +902,7 @@ def _teardown_reporting(item: pytest.Item) -> None:
     forwarder = item.stash.get(_ALLURE_FORWARDER_KEY, None)
     if forwarder is not None:
         del item.stash[_ALLURE_FORWARDER_KEY]
-        import allure_commons
-
-        allure_commons.plugin_manager.unregister(forwarder)
+        _unregister_allure_forwarder(forwarder)
     allure_buffer = item.stash.get(_ALLURE_BUFFER_KEY, None)
     if allure_buffer is not None:
         del item.stash[_ALLURE_BUFFER_KEY]
@@ -806,46 +916,16 @@ def _teardown_reporting(item: pytest.Item) -> None:
     if entry is None:
         return
     dispatcher, writers = entry
-    result = dispatcher.pop_recorder(item.operation_label)
-    has_recorder = result is not None
-    if result is None:
-        outcome = item.stash.get(_REPORT_OUTCOME_KEY, PytestReportOutcome(Status.SUCCESS))
-        if outcome.status == Status.SUCCESS:
-            return
-        from schemathesis.engine.recorder import ScenarioRecorder
-
-        recorder = ScenarioRecorder(label=item.operation_label, config=schema.config.output)
-        elapsed_sec = 0.0
-    else:
-        recorder, elapsed_sec = result
-        has_check_failures = any(
-            check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks
-        )
-        outcome = (
-            PytestReportOutcome(Status.FAILURE)
-            if has_check_failures
-            else item.stash.get(_REPORT_OUTCOME_KEY, PytestReportOutcome(Status.SUCCESS))
-        )
-    if _is_xdist_worker(item.config):
-        _push_to_xdist_workeroutput(
-            item.config.workeroutput,
-            schema,
-            recorder,
-            elapsed_sec,
-            tags=item.operation_tags,
-            allure_calls=allure_buffer.to_list() if allure_buffer is not None else None,
-            outcome=outcome,
-            has_recorder=has_recorder,
-        )
-    else:
-        _write_to_writers(
-            writers,
-            recorder,
-            elapsed_sec,
-            tags=item.operation_tags,
-            outcome=outcome,
-            has_recorder=has_recorder,
-        )
+    _write_pytest_result(
+        item,
+        schema,
+        item.operation_label,
+        item.operation_tags,
+        dispatcher,
+        writers,
+        item.stash.get(_REPORT_OUTCOME_KEY, PytestReportOutcome(Status.SUCCESS)),
+        allure_buffer,
+    )
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
