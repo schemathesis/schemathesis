@@ -1,0 +1,48 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 N errors
+
+==================================== ERRORS ====================================
+_______________________________ GET /bad-params ________________________________
+Schema Error
+
+Invalid `parameters` definition
+
+Location:
+    paths -> /bad-params -> get -> parameters
+
+Problematic definition:
+    {
+        "name": "q"
+    }
+
+Error details:
+    {"name":"q"} is not of type "array"
+
+Ensure that the definition complies with the OpenAPI specification
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+  Errored: 1
+
+Stop reason: Completed
+
+Errors:
+  🚫 Schema Error: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================
