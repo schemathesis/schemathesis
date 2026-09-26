@@ -328,7 +328,7 @@ def worker_task(
                                 config=HypothesisTestConfig(
                                     modes=[mode],
                                     settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.value),
-                                    seed=ctx.cycle_seed,
+                                    seed=ctx.operation_seed(operation),
                                     project=ctx.config,
                                     as_strategy_kwargs=as_strategy_kwargs,
                                     feedback=feedback,

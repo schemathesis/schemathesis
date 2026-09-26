@@ -46,6 +46,18 @@ def multiple_failures() -> dict[str, Any]:
     }
 
 
+def identical_query_parameters() -> dict[str, Any]:
+    return {
+        path: {
+            "get": {
+                "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+        for path in ("/api/twin_a", "/api/twin_b")
+    }
+
+
 PAYLOAD_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {

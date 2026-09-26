@@ -93,6 +93,16 @@ def register_csv_payload(app: Flask) -> None:
         return jsonify(rows)
 
 
+def register_identical_query_parameters(app: Flask) -> None:
+    @app.route("/api/twin_a", methods=["GET"])
+    def twin_a_endpoint() -> Any:
+        return jsonify({"twin": "a"})
+
+    @app.route("/api/twin_b", methods=["GET"])
+    def twin_b_endpoint() -> Any:
+        return jsonify({"twin": "b"})
+
+
 def register_flaky(app: Flask) -> None:
     app.config["flaky_should_fail"] = True
 
