@@ -348,6 +348,30 @@ def test_fuzz_non_fatal_errors_fail_exit_code(cli, ctx, app_runner):
     assert result.exit_code == 1, result.output
 
 
+BAD_PARAMETERS_PATHS = {
+    "/bad-params": {"get": {"parameters": {"name": "q"}, "responses": {"200": {"description": "OK"}}}}
+}
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_reports_operations_with_schema_errors(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({**USERS_OK_PATHS, **BAD_PARAMETERS_PATHS})
+
+    @app.route("/users")
+    def users():
+        return jsonify([])
+
+    url = app_runner.openapi_url(app)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=3"), snapshot_cli)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_all_operations_have_schema_errors(cli, app_runner, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(BAD_PARAMETERS_PATHS)
+    url = app_runner.openapi_url(app)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=1"), snapshot_cli)
+
+
 @pytest.mark.parametrize(
     ("config", "expected"),
     [
