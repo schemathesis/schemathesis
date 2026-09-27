@@ -59,6 +59,9 @@
         "json": {
           "$ref": "#/$defs/ReportConfig"
         },
+        "wfc": {
+          "$ref": "#/$defs/ReportConfig"
+        },
         "allure": {
           "$ref": "#/$defs/ReportConfig"
         }

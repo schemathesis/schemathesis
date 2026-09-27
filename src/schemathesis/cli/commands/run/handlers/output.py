@@ -1556,6 +1556,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 (ReportFormat.HAR, reports.har),
                 (ReportFormat.NDJSON, reports.ndjson),
                 (ReportFormat.JSON, reports.json),
+                (ReportFormat.WFC, reports.wfc),
                 (ReportFormat.ALLURE, reports.allure),
             )
             if report.enabled

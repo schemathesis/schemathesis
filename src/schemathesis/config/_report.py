@@ -20,6 +20,7 @@ class ReportFormat(str, Enum):
     HAR = "har"
     NDJSON = "ndjson"
     JSON = "json"
+    WFC = "wfc"
     ALLURE = "allure"
 
     @property
@@ -31,6 +32,7 @@ class ReportFormat(str, Enum):
             self.HAR: "json",
             self.NDJSON: "ndjson",
             self.JSON: "json",
+            self.WFC: "json",
             # directory output — no file extension
             self.ALLURE: "",
         }[self]
@@ -63,6 +65,7 @@ class ReportsConfig(DiffBase):
     har: ReportConfig
     ndjson: ReportConfig
     json: ReportConfig
+    wfc: ReportConfig
     allure: ReportConfig
     _timestamp: str
 
@@ -76,6 +79,7 @@ class ReportsConfig(DiffBase):
         har: ReportConfig | None = None,
         ndjson: ReportConfig | None = None,
         json: ReportConfig | None = None,
+        wfc: ReportConfig | None = None,
         allure: ReportConfig | None = None,
     ) -> None:
         self.directory = Path(resolve(directory) or DEFAULT_REPORT_DIRECTORY)
@@ -85,6 +89,7 @@ class ReportsConfig(DiffBase):
         self.har = har or ReportConfig()
         self.ndjson = ndjson or ReportConfig()
         self.json = json or ReportConfig()
+        self.wfc = wfc or ReportConfig()
         self.allure = allure or ReportConfig()
         self._timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
@@ -98,6 +103,7 @@ class ReportsConfig(DiffBase):
             har=ReportConfig.from_dict(data.get("har", {})),
             ndjson=ReportConfig.from_dict(data.get("ndjson", {})),
             json=ReportConfig.from_dict(data.get("json", {})),
+            wfc=ReportConfig.from_dict(data.get("wfc", {})),
             allure=ReportConfig.from_dict(data.get("allure", {})),
         )._mark_source_keys(data)
 
@@ -110,6 +116,7 @@ class ReportsConfig(DiffBase):
         har_path: str | None = None,
         ndjson_path: str | None = None,
         json_path: str | None = None,
+        wfc_path: str | None = None,
         allure_path: str | None = None,
         directory: Path = DEFAULT_REPORT_DIRECTORY,
         preserve_bytes: bool | None = None,
@@ -130,6 +137,9 @@ class ReportsConfig(DiffBase):
         if json_path is not None or ReportFormat.JSON in formats:
             self.json.enabled = True
             self.json.path = Path(json_path) if json_path is not None else json_path
+        if wfc_path is not None or ReportFormat.WFC in formats:
+            self.wfc.enabled = True
+            self.wfc.path = Path(wfc_path) if wfc_path is not None else wfc_path
         if allure_path is not None or ReportFormat.ALLURE in formats:
             self.allure.enabled = True
             self.allure.path = Path(allure_path) if allure_path is not None else allure_path
