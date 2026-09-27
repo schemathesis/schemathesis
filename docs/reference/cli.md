@@ -593,6 +593,18 @@ These options control the reporting and output format of test results:
     $ st run openapi.yaml --report-json-path ./report.json
     ```
 
+#### `--report-wfc-path FILENAME`
+
+!!! note ""
+
+    **Type**: `String`
+
+    Custom path for a [Web Fuzzing Commons Report](https://github.com/WebFuzzing/Commons). It exports REST findings using WFC fault codes. Checks without an upstream WFC code use Schemathesis-specific 9xx codes: 901 valid input rejected, 902 created resource unavailable, 903 slow response, 904 invalid input accepted, and 905 unsupported-method/authentication findings without a matching WFC code.
+
+    ```console
+    $ st run openapi.yaml --report-wfc-path ./wfc-report.json
+    ```
+
 #### `--report-allure-path DIRECTORY`
 
 !!! note ""

@@ -18,6 +18,7 @@ from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACK
 from schemathesis.cli.ext.fs import open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.cli.json_report import JsonReportHandler
+from schemathesis.cli.wfc_report import WfcReportHandler
 from schemathesis.config import ReportFormat
 from schemathesis.core.errors import format_exception
 
@@ -40,11 +41,12 @@ try:
         HarHandler,
         JunitXMLHandler,
         NdjsonHandler,
+        WfcReportHandler,
         OutputHandler,
         AllureHandler,
     )
 except ImportError:
-    _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, OutputHandler)
+    _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, WfcReportHandler, OutputHandler)
 
 
 def is_built_in_handler(handler: EventHandler) -> bool:
@@ -57,7 +59,7 @@ def initialize_report_handlers(
     args: list[str],
     params: dict[str, Any],
 ) -> list[EventHandler]:
-    """Initialize report handlers (JUnit, VCR, HAR, NDJSON, Allure) and custom handlers."""
+    """Initialize built-in report handlers and custom handlers."""
     handlers: list[EventHandler] = []
 
     if config.reports.junit.enabled:
@@ -80,6 +82,10 @@ def initialize_report_handlers(
         path = config.reports.get_path(ReportFormat.JSON)
         open_file(path)
         handlers.append(JsonReportHandler(path))
+    if config.reports.wfc.enabled:
+        path = config.reports.get_path(ReportFormat.WFC)
+        open_file(path)
+        handlers.append(WfcReportHandler(path))
     if config.reports.allure.enabled:
         try:
             from schemathesis.cli.commands.run.handlers.allure import AllureHandler
