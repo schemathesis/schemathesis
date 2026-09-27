@@ -2081,3 +2081,99 @@ def test_pool_overlay_respects_max_properties(ctx):
 
     assert pool_hits > 0, "Pool's Category.categoryId values never landed in the body"
     assert not oversized, f"`maxProperties` exceeded: {oversized[0]!r}"
+
+
+def _pool_share(ctx, paths, producer, consumer, get_strategy):
+    schema = ctx.openapi.load_schema(paths)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation=producer, status_code=201, payload={"id": "known-1"})
+    method, path = consumer
+    strategy = get_strategy(schema[path][method], data_source)
+
+    results = []
+
+    @given(strategy)
+    @settings(max_examples=50, database=None, derandomize=True, suppress_health_check=list(HealthCheck))
+    def collect_samples(value):
+        results.append(value)
+
+    collect_samples()
+    return sum(isinstance(r, GeneratedValue) and bool(r.pool_draws) for r in results) / len(results)
+
+
+def _creates(link_name, operation_id, parameter):
+    return {
+        "post": {
+            "responses": {
+                "201": {
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "string"}}}}
+                    },
+                    "links": {
+                        link_name: {"operationId": operation_id, "parameters": {parameter: "$response.body#/id"}}
+                    },
+                }
+            },
+        }
+    }
+
+
+# Other inputs of the case are still generated, so reusing the only known resource does not repeat the case.
+def test_single_captured_value_reused_alongside_generated_body_fields(ctx):
+    paths = {
+        "/projects": _creates("CreateTask", "createTask", "project_id"),
+        "/tasks": {
+            "post": {
+                "operationId": "createTask",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"project_id": {"type": "string"}, "title": {"type": "string"}},
+                                "required": ["project_id", "title"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+    }
+    share = _pool_share(
+        ctx,
+        paths,
+        "POST /projects",
+        ("POST", "/tasks"),
+        lambda operation, data_source: operation.body[0].get_strategy(
+            operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=data_source
+        ),
+    )
+    assert share >= 0.5
+
+
+def test_single_captured_value_reused_alongside_generated_path_parameters(ctx):
+    paths = {
+        "/sessions": _creates("GetSession", "getSession", "id"),
+        "/sessions/{source}/{id}": {
+            "get": {
+                "operationId": "getSession",
+                "parameters": [
+                    {"name": "source", "in": "path", "required": True, "schema": {"type": "string"}},
+                    {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": {"200": {"description": "Success"}},
+            }
+        },
+    }
+    share = _pool_share(
+        ctx,
+        paths,
+        "POST /sessions",
+        ("GET", "/sessions/{source}/{id}"),
+        lambda operation, data_source: operation.path_parameters.get_strategy(
+            operation, GenerationConfig(), GenerationMode.POSITIVE, extra_data_source=data_source
+        ),
+    )
+    assert share >= 0.5

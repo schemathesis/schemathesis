@@ -58,6 +58,62 @@ def identical_query_parameters() -> dict[str, Any]:
     }
 
 
+def resource_pool(existing_ids: frozenset[int], *, secured: bool = False) -> dict[str, Any]:
+    parameter = {
+        "name": "itemId",
+        "in": "path",
+        "required": True,
+        "schema": {"type": "integer", "minimum": 1, "maximum": 3000, "example": 12},
+    }
+    if len(existing_ids) > 1:
+        parameter["examples"] = {str(item_id): {"value": item_id} for item_id in sorted(existing_ids)}
+    return {
+        "/api/items/{itemId}": {
+            "get": {
+                "parameters": [parameter],
+                "security": [{"ApiKeyAuth": []}] if secured else [],
+                "responses": {
+                    "200": {"description": "Item exists"},
+                    "404": {"description": "Item does not exist"},
+                },
+            }
+        }
+    }
+
+
+def resource_update() -> dict[str, Any]:
+    item_id = {"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer", "minimum": 1}}
+    return {
+        "/api/items/{itemId}": {
+            "get": {
+                "parameters": [{**item_id, "schema": {"type": "integer", "minimum": 1, "example": 12}}],
+                "responses": {"200": {"description": "Item exists"}, "404": {"description": "Item does not exist"}},
+            },
+            "patch": {
+                "parameters": [item_id],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"name": {"type": "string", "maxLength": 5}},
+                                "required": ["name"],
+                                "additionalProperties": False,
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {"description": "Item updated"},
+                    "404": {"description": "Item does not exist"},
+                    "422": {"description": "Invalid update"},
+                },
+            },
+        }
+    }
+
+
 PAYLOAD_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
