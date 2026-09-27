@@ -153,7 +153,7 @@ def _build_location_schema(
     location: ParameterLocation,
 ) -> dict[str, Any] | None:
     """Return the merged parameter-set schema for the given location, or None when empty."""
-    container = getattr(operation, location.container_name)
+    container = operation.get_parameter_set(location)
     if not isinstance(container, OpenApiParameterSet):
         return None
     schema = container.schema
