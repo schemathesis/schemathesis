@@ -1117,10 +1117,10 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_typ
 
     first_decoded = decode(0)
     if first_decoded:
-        assert b'Content-Disposition: form-data; name="file"; filename="file"\r\n' in first_decoded
+        assert re.search(rb'Content-Disposition: form-data; name="file"; filename="file(\.\w+)?"\r\n', first_decoded)
     last_decoded = decode(-1)
     if last_decoded:
-        assert b'Content-Disposition: form-data; name="files"; filename="files"\r\n' in last_decoded
+        assert re.search(rb'Content-Disposition: form-data; name="files"; filename="files(\.\w+)?"\r\n', last_decoded)
     # NOTE, that the actual API operation is not checked in this test
 
 

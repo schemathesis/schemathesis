@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
+from schemathesis.core.file_samples import file_extension
 from schemathesis.specs.openapi.adapter.parameters import COMBINED_FORM_DATA_MARKER
+from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -60,6 +62,13 @@ def _is_file_part(property_schema: object) -> bool:
     )
 
 
+def _filename(name: str, value: object) -> str:
+    """Field name plus the extension of the file format `value` carries, so servers can pick a decoder."""
+    data = value.data if isinstance(value, Binary) else value
+    extension = file_extension(data) if isinstance(data, bytes) else None
+    return f"{name}.{extension}" if extension else name
+
+
 def prepare_multipart_v3(
     operation: APIOperation, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
@@ -86,17 +95,19 @@ def prepare_multipart_v3(
         if isinstance(property_schema, dict):
             if isinstance(value, list):
                 if _is_file_part(property_schema.get("items")):
-                    filename = (body_param.get_property_filename(name) if body_param else None) or name
-                    if content_type:
-                        files.extend((name, (filename, item, content_type)) for item in value)
-                    else:
-                        files.extend((name, (filename, item)) for item in value)
+                    declared = body_param.get_property_filename(name) if body_param else None
+                    for item in value:
+                        filename = declared or _filename(name, item)
+                        if content_type:
+                            files.append((name, (filename, item, content_type)))
+                        else:
+                            files.append((name, (filename, item)))
                 elif content_type:
                     files.extend((name, (None, item, content_type)) for item in value)
                 else:
                     files.extend((name, (None, item)) for item in value)
             elif _is_file_part(property_schema):
-                filename = (body_param.get_property_filename(name) if body_param else None) or name
+                filename = (body_param.get_property_filename(name) if body_param else None) or _filename(name, value)
                 if content_type:
                     files.append((name, (filename, value, content_type)))
                 else:

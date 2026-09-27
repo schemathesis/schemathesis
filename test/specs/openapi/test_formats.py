@@ -2,7 +2,7 @@ from base64 import b64decode
 
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, find, given, settings
 from hypothesis import strategies as st
 
 from schemathesis.config import GenerationConfig
@@ -91,6 +91,30 @@ def test_byte_format_is_base64(data):
 @SETTINGS
 def test_binary_format_carries_bytes(data):
     assert isinstance(data.draw(FORMATS["binary"]), Binary)
+
+
+SIGNATURES = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"GIF87a", b"RIFF", b"%PDF-", b"PK\x03\x04")
+FILE_SIGNATURES = pytest.mark.parametrize("signature", SIGNATURES, ids=["png", "jpeg", "gif", "webp", "pdf", "zip"])
+
+
+@FILE_SIGNATURES
+def test_binary_format_draws_real_files(signature):
+    # Upload handlers that parse the file reject random bytes before reaching their own logic.
+    find(FORMATS["binary"], lambda value: value.data.startswith(signature), settings=SETTINGS)
+
+
+@FILE_SIGNATURES
+def test_length_bounded_binary_format_draws_real_files(signature):
+    built = _canonical_strategy(
+        {"type": "string", "format": "binary", "minLength": 1, "maxLength": 1000},
+        GenerationConfig(),
+        jsonschema_rs.Draft202012Validator,
+    )
+    find(built, lambda value: value.data.startswith(signature), settings=SETTINGS)
+
+
+def test_binary_format_still_draws_arbitrary_bytes():
+    find(FORMATS["binary"], lambda value: value.data and not value.data.startswith(SIGNATURES), settings=SETTINGS)
 
 
 @pytest.mark.parametrize("name", ["_header_value", "_basic_auth", "_bearer_auth", "_if_match_header"])
