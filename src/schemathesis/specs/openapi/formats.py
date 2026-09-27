@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import MAX_STRING_LENGTH
+from schemathesis.core.file_samples import FILE_SAMPLES
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, FormatLengths
 from schemathesis.transport.serialization import Binary
@@ -515,7 +516,11 @@ def binary_values_within(min_length: int, max_length: float) -> st.SearchStrateg
     from hypothesis import strategies as st
 
     max_size = None if max_length == float("inf") else int(max_length)
-    return st.binary(min_size=min_length, max_size=max_size).map(Binary)
+    samples = [sample for sample in FILE_SAMPLES.values() if min_length <= len(sample) <= max_length]
+    arbitrary = st.binary(min_size=min_length, max_size=max_size)
+    if samples:
+        return st.one_of(st.sampled_from(samples), arbitrary).map(Binary)
+    return arbitrary.map(Binary)
 
 
 # Generators that can be pointed at a narrower window instead of drawn from and filtered.
@@ -569,7 +574,8 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
         "uri-template": domains.map("https://{}/{{id}}".format),
         "email": email_strategy,
         "idn-email": email_strategy,
-        "binary": st.binary().map(Binary),
+        # Real files come first, so a single draw yields one that upload handlers can parse.
+        "binary": st.one_of(st.sampled_from(list(FILE_SAMPLES.values())), st.binary()).map(Binary),
         "byte": st.binary().map(lambda x: b64encode(x).decode()),
         "duration": duration_values(),
         # `st.uuids` supplies the entropy; drawing the integer directly biases hard toward zero and

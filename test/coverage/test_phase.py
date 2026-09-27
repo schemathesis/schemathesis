@@ -30,6 +30,7 @@ from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
 from schemathesis.transport.prepare import prepare_request
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from test.coverage.helpers import (
     DEFAULT_RESPONSES,
     assert_bodies,
@@ -8009,3 +8010,20 @@ def test_empty_query_value_is_negative_only_when_the_schema_forbids_it_among_oth
     ]
 
     assert bool(matching) is violates_schema, f"{empty_value!r} labelled negative: {not violates_schema}"
+
+
+def test_positive_multipart_upload_sends_a_named_real_file(ctx):
+    # Handlers that decode the upload need a parseable file with a matching extension to reach their own logic.
+    operation = body_operation(
+        ctx,
+        {"type": "object", "properties": {"image": {"type": "string", "format": "binary"}}, "required": ["image"]},
+        media_type="multipart/form-data",
+        path="/upload",
+    )
+    files = [
+        REQUESTS_TRANSPORT.serialize_case(case)["files"]
+        for case in iter_cases(operation, GenerationMode.POSITIVE)
+        if case.meta.phase.data.parameter_location == ParameterLocation.BODY
+    ]
+    assert [("image", ("image.png", ANY))] in files, files
+    assert any(part[1][1].startswith(b"\x89PNG\r\n\x1a\n") for parts in files for part in parts), files

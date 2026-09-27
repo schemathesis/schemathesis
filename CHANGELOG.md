@@ -8,6 +8,8 @@
 - Dependency inference links body fields named after a collection to its items' `code`.
 - `st replay` options `-H`/`--header`, `--auth`, `--auth-wfc` and `--auth-wfc-user` for replayed requests.
 - Coverage Content-Type probes for malformed multipart and undeclared request media types.
+- `format: binary` values include small valid PNG, JPEG, GIF, WebP, PDF and ZIP files.
+- Multipart file names carry the extension of the detected file format, e.g. `image.png`.
 
 ### :wrench: Changed
 

@@ -1111,6 +1111,37 @@ def test_multipart_binary_field_filename(ctx, encoding, expected_filename):
 
 
 @pytest.mark.parametrize(
+    "value, expected_filename",
+    [(b"\x89PNG\r\n\x1a\n\x00", "attachment.png"), (b"%PDF-1.4\n", "attachment.pdf"), (b"\x92B", "attachment")],
+    ids=["png", "pdf", "unknown"],
+)
+def test_multipart_binary_field_filename_extension(ctx, value, expected_filename):
+    # Servers pick the decoder or storage format from the extension.
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"attachment": {"type": "string", "format": "binary"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    case = schema["/test"]["POST"].Case(body={"attachment": value}, media_type="multipart/form-data")
+    assert REQUESTS_TRANSPORT.serialize_case(case)["files"] == [("attachment", (expected_filename, value))]
+
+
+@pytest.mark.parametrize(
     "encoding,expected_filename",
     [
         # No encoding: field name is used as filename for binary list items
