@@ -35,6 +35,7 @@ from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
+from schemathesis.generation.meta import content_type_probes_first
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -350,7 +351,8 @@ def add_coverage(
         feedback=feedback,
         hooks=hooks,
     )
-    for case in generator:
+    # Hypothesis runs explicit examples in reverse order of attachment.
+    for case in content_type_probes_first(generator):
         test = hypothesis.example(case=case)(test)
     unserializable = generator.controller.unserializable_media_types
     if unserializable:

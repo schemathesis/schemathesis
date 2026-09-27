@@ -26,6 +26,7 @@ from schemathesis.engine.run.unit._errors import (
 )
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.generation.meta import content_type_probes_first
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -109,7 +110,7 @@ def run_driver(
         # Silence Hypothesis stderr chatter so it doesn't leak into the engine's event stream.
         with ignore_hypothesis_output():
             # Match LIFO order from Hypothesis `Phase.explicit` so engine output matches the pytest path.
-            for case in reversed(_collect_within_budget(generator, ctx)):
+            for case in reversed(content_type_probes_first(_collect_within_budget(generator, ctx))):
                 # One snapshot: reading the clock twice lets the deadline pass in between and turn a
                 # spent budget into a phantom interrupt.
                 stop_reason = ctx.stop_reason

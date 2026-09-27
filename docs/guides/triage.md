@@ -68,6 +68,8 @@ allow-x00 = false
 
 **Undeclared methods.** `unexpected-methods = []`, above. *Trades:* the `405` check, and [`allow_header_conformance`](../reference/checks.md#allow_header_conformance) with it, since that one reads the coverage phase's `OPTIONS` response.
 
+**Content-Type probes.** Coverage also sends malformed multipart and undeclared media types. Only 5xx responses are reported, as these requests test server robustness rather than schema conformance.
+
 Together, in a `schemathesis.toml` next to where you run the command:
 
 ```toml

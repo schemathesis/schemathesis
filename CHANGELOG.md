@@ -7,6 +7,7 @@
 - WFC Report output via `--report wfc` or `--report-wfc-path`.
 - Dependency inference links body fields named after a collection to its items' `code`.
 - `st replay` options `-H`/`--header`, `--auth`, `--auth-wfc` and `--auth-wfc-user` for replayed requests.
+- Coverage Content-Type probes for malformed multipart and undeclared request media types.
 
 ### :wrench: Changed
 

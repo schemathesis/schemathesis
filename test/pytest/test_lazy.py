@@ -135,7 +135,7 @@ def test_(request, case, another):
     # Then the generated test should use these fixtures
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_fixtures.py::test_ PASSED", r".*1 passed"])
-    result.stdout.re_match_lines([r"Hypothesis calls: 9$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 10$"])
 
 
 def test_with_parametrize_filters(testdir):

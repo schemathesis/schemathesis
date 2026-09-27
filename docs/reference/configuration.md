@@ -747,6 +747,8 @@ These settings can only be applied at the project level.
     generate-duplicate-query-parameters = true
     ```
 
+The negative coverage phase also sends `Content-Type: multipart/form-data` without a boundary for every operation. For operations with a request body, it sends one additional request with an undeclared media type. Only server errors from these probes are reported.
+
 #### `phases.coverage.unexpected-methods`
 
 !!! note "" 

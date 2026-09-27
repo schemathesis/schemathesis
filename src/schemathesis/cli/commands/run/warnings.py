@@ -18,7 +18,7 @@ from schemathesis.core.transport import CallOutcome
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import CaseNode, RecordedScenario
 from schemathesis.engine.run import PhaseName
-from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
+from schemathesis.generation.meta import REQUEST_SHAPE_PROBES, CoveragePhaseData, CoverageScenario, coverage_scenario
 from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
@@ -145,7 +145,7 @@ def aggregate_status_codes(recorder: RecordedScenario, *, positive_only: bool = 
 
     for case_id, interaction in recorder.interactions.items():
         case = recorder.cases.get(case_id)
-        if case is not None and _is_undeclared_method(case):
+        if case is not None and _is_request_shape_probe(case):
             continue
         if positive_only and (case is None or not _is_positive(case)):
             continue
@@ -221,13 +221,8 @@ def resource_producers(schema: BaseSchema) -> dict[str, set[str]]:
     return producers
 
 
-def _is_undeclared_method(case: CaseNode) -> bool:
-    meta = case.value.meta
-    return (
-        meta is not None
-        and isinstance(meta.phase.data, CoveragePhaseData)
-        and meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
-    )
+def _is_request_shape_probe(case: CaseNode) -> bool:
+    return coverage_scenario(case.value) in REQUEST_SHAPE_PROBES
 
 
 def _is_positive(case: CaseNode) -> bool:

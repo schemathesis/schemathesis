@@ -11,6 +11,9 @@ from schemathesis.generation import GenerationMode
 from schemathesis.resources import PoolDraw, SemanticDraw
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from schemathesis.generation.case import Case
     from schemathesis.generation.dictionaries import DictionaryDraw
     from schemathesis.python._constants.pool import ConstantDraw
 
@@ -95,9 +98,16 @@ class CoverageScenario(str, Enum):
     MISSING_PARAMETER = "missing_parameter"
     DUPLICATE_PARAMETER = "duplicate_parameter"
 
-    # Negative scenarios - Unsupported patterns
+    # Negative scenarios - Request-shape probes
     UNSUPPORTED_PATH_PATTERN = "unsupported_path_pattern"
     UNSPECIFIED_HTTP_METHOD = "unspecified_http_method"
+    MALFORMED_CONTENT_TYPE = "malformed_content_type"
+    UNSUPPORTED_CONTENT_TYPE = "unsupported_content_type"
+
+
+CONTENT_TYPE_PROBES = frozenset({CoverageScenario.MALFORMED_CONTENT_TYPE, CoverageScenario.UNSUPPORTED_CONTENT_TYPE})
+# Requests malformed on purpose: only a server error in response to them is a finding.
+REQUEST_SHAPE_PROBES = frozenset({CoverageScenario.UNSPECIFIED_HTTP_METHOD, *CONTENT_TYPE_PROBES})
 
 
 @dataclass
@@ -465,3 +475,19 @@ def _decode_constant_value(value: str | int | float | dict[str, str]) -> str | i
     if isinstance(value, dict):
         return base64.b64decode(value[_BYTES_TAG])
     return value
+
+
+def coverage_scenario(case: Case) -> CoverageScenario | None:
+    # Reading `Case.meta` would revalidate the case, which is only settled once its request is prepared.
+    meta = case._meta
+    if meta is None or not isinstance(meta.phase.data, CoveragePhaseData):
+        return None
+    return meta.phase.data.scenario
+
+
+def content_type_probes_first(cases: Iterable[Case]) -> list[Case]:
+    """Order cases so that Content-Type probes run last under LIFO execution.
+
+    Ordinary requests then keep reporting failures that every request triggers.
+    """
+    return sorted(cases, key=lambda case: coverage_scenario(case) not in CONTENT_TYPE_PROBES)

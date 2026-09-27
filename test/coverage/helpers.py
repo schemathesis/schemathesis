@@ -15,7 +15,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.drivers import CoverageGenerator
 from schemathesis.generation.feedback import FeedbackSources
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
-from schemathesis.generation.meta import CoverageScenario, TestPhase
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._schema import cover_schema_iter
 from test.utils import assert_requests_call
@@ -138,8 +138,9 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
 
 
 def iter_cases(operation, *generation_modes, **kwargs):
-    return list(
-        iter_coverage_cases(
+    return [
+        case
+        for case in iter_coverage_cases(
             operation=operation,
             generation_modes=list(generation_modes),
             generate_duplicate_query_parameters=False,
@@ -147,7 +148,8 @@ def iter_cases(operation, *generation_modes, **kwargs):
             generation_config=operation.schema.config.generation,
             **kwargs,
         )
-    )
+        if case.meta.phase.data.scenario not in CONTENT_TYPE_PROBES
+    ]
 
 
 def generate_cases(operation, generation_mode):
@@ -223,7 +225,7 @@ def assert_coverage(schema, modes, expected, path=None):
         meta = case.meta
         if meta.phase.name != TestPhase.COVERAGE:
             return
-        if meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
+        if meta.phase.data.scenario in REQUEST_SHAPE_PROBES:
             return
         assert_requests_call(case)
         mode = meta.generation.mode

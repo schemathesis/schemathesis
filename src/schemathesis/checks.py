@@ -11,6 +11,7 @@ from typing_extensions import TypeIs
 from schemathesis.config import ChecksConfig, ConfigError
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import (
+    ContentTypeServerError,
     CustomFailure,
     Failure,
     FailureGroup,
@@ -20,6 +21,7 @@ from schemathesis.core.failures import (
 from schemathesis.core.registries import Registry
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, CoverageScenario, coverage_scenario
 from schemathesis.generation.overrides import Override
 from schemathesis.hooks import should_keep_failure
 
@@ -387,6 +389,52 @@ def check(func: CheckFunction | CheckClass) -> CheckFunction | CheckClass:
     return CHECKS.register(func)
 
 
+def _check_content_type_probe(
+    ctx: CheckContext, case: Case, scenario: CoverageScenario, status_code: int, expected_statuses: set[int]
+) -> None:
+    """Report a server error only when the probe's `Content-Type` causes it."""
+    from schemathesis.generation.case import Case
+
+    headers = case.headers.copy()
+    headers.pop("Content-Type", None)
+    # The same request with the operation's own media type. When it fails too, the header is not the cause and
+    # the operation's ordinary requests report that server error with a plain reproducer.
+    control = Case(
+        operation=case.operation,
+        method=case.method,
+        path=case.path,
+        path_parameters=case.path_parameters.copy(),
+        headers=headers,
+        cookies=case.cookies.copy(),
+        query=case.query.copy(),
+        body=case.body,
+        media_type=case.media_type,
+        multipart_content_types=case.multipart_content_types,
+        meta=case.meta,
+    )
+    kwargs = dict(ctx._transport_kwargs or {})
+    if case.operation.app is not None:
+        kwargs.setdefault("app", case.operation.app)
+    ctx._record_case(parent_id=case.id, case=control)
+    control_response = case.operation.schema.transport.send(control, **kwargs)
+    ctx._record_response(case_id=control.id, response=control_response)
+    if control_response.status_code not in expected_statuses:
+        return
+    if scenario == CoverageScenario.MALFORMED_CONTENT_TYPE:
+        message = (
+            f"`Content-Type: multipart/form-data` without a boundary returned {status_code}, "
+            "expected 400 Bad Request or 415 Unsupported Media Type\n\n"
+            "Reject a malformed `Content-Type` before parsing the request body"
+        )
+    else:
+        message = (
+            f"Undeclared `Content-Type: {case.headers['Content-Type']}` returned {status_code}, "
+            "expected 415 Unsupported Media Type\n\n"
+            "Reject media types the operation does not accept with 415"
+        )
+    raise ContentTypeServerError(operation=case.operation.label, status_code=status_code, message=message)
+
+
 @check
 def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
@@ -396,6 +444,10 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
 
     status_code = response.status_code
     if status_code not in expected_statuses:
+        scenario = coverage_scenario(case)
+        if scenario in CONTENT_TYPE_PROBES:
+            _check_content_type_probe(ctx, case, scenario, status_code, expected_statuses)
+            return None
         raise ServerError(operation=case.operation.label, status_code=status_code)
     case.operation.schema.evaluate_server_error(case, response)
     return None

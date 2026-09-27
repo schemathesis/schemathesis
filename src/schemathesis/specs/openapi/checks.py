@@ -19,7 +19,13 @@ from schemathesis.core.mutations import OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData
+from schemathesis.generation.meta import (
+    REQUEST_SHAPE_PROBES,
+    CoveragePhaseData,
+    CoverageScenario,
+    FuzzingPhaseData,
+    coverage_scenario,
+)
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
     EnsureResourceAvailability,
@@ -53,12 +59,8 @@ if TYPE_CHECKING:
 
 
 def is_unexpected_http_status_case(case: Case) -> bool:
-    # Skip checks for requests using HTTP methods not defined in the API spec
-    return bool(
-        case.meta
-        and isinstance(case.meta.phase.data, CoveragePhaseData)
-        and case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
-    )
+    # Skip checks for request-shape probes whose response conformance is irrelevant.
+    return coverage_scenario(case) in REQUEST_SHAPE_PROBES
 
 
 def requires_openapi_schema(func: CheckFunction) -> CheckFunction:
@@ -76,7 +78,7 @@ def requires_openapi_schema(func: CheckFunction) -> CheckFunction:
 
 
 def skips_on_unexpected_http_status(func: CheckFunction) -> CheckFunction:
-    """Skip the check when the scenario targets undefined HTTP methods (coverage mode)."""
+    """Skip the check when a coverage request-shape probe targets the server."""
 
     @wraps(func)
     def wrapper(ctx: CheckContext, response: Response, case: Case) -> bool | None:

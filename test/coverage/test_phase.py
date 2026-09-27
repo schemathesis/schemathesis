@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 from requests import Request
 
 import schemathesis
+from schemathesis.checks import not_a_server_error
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.error_feedback.store import (
@@ -20,11 +21,11 @@ from schemathesis.core.error_feedback.store import (
     SizeBoundPayload,
 )
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.failures import AcceptedNegativeData
+from schemathesis.core.failures import AcceptedNegativeData, ContentTypeServerError, FailureGroup
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.meta import CoverageScenario, TestPhase
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, REQUEST_SHAPE_PROBES, CoverageScenario, TestPhase
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
 from schemathesis.specs.openapi.coverage._wire import quote_path_parameter
@@ -2262,7 +2263,7 @@ def test_negative_query_parameter(ctx, schema, expected, required):
     def test(case):
         if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
+        if case.meta.phase.data.scenario in REQUEST_SHAPE_PROBES:
             return
         kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
         request = Request(**kwargs).prepare()
@@ -2572,6 +2573,137 @@ def failed(ctx, response, case):
             )
             == snapshot_cli
         )
+
+
+def test_content_type_probes(ctx):
+    bodyless_operation = load_schema(ctx, path="/bodyless", method="get")["/bodyless"]["get"]
+    assert [
+        case.headers
+        for case in scenario_cases(
+            collect_cases(bodyless_operation, GenerationMode.NEGATIVE), CoverageScenario.MALFORMED_CONTENT_TYPE
+        )
+    ] == [{"Content-Type": "multipart/form-data"}]
+
+    operation = body_operation(ctx, {"type": "object"})
+    malformed_cases = scenario_cases(
+        collect_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.MALFORMED_CONTENT_TYPE
+    )
+    unsupported_cases = scenario_cases(
+        collect_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.UNSUPPORTED_CONTENT_TYPE
+    )
+
+    assert [case.headers for case in malformed_cases] == [{"Content-Type": "multipart/form-data"}]
+    assert [case.headers for case in unsupported_cases] == [{"Content-Type": "text/plain"}]
+    assert all(case.body is not NOT_SET and case.media_type == "application/json" for case in unsupported_cases)
+
+
+def test_unsupported_content_type_uses_xml_when_text_is_declared(ctx):
+    operation = body_operation(ctx, {"type": "object"}, media_type="text/plain")
+
+    assert [
+        case.headers
+        for case in scenario_cases(
+            collect_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.UNSUPPORTED_CONTENT_TYPE
+        )
+    ] == [{"Content-Type": "application/xml"}]
+
+
+def test_malformed_multipart_probe_does_not_serialize_a_boundary(ctx):
+    operation = body_operation(ctx, {"type": "object"}, media_type="multipart/form-data")
+    (case,) = scenario_cases(collect_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.MALFORMED_CONTENT_TYPE)
+
+    assert case.body is NOT_SET
+    assert prepare_request(case, headers=None, config=SanitizationConfig(enabled=False)).headers["Content-Type"] == (
+        "multipart/form-data"
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_content_type_probe_reports_server_error(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/items")
+    def items():
+        content_type = request.headers.get("Content-Type", "")
+        if content_type.startswith("multipart/form-data") and "boundary=" not in content_type:
+            return "", 500
+        return "", 200
+
+    assert cli.run_openapi_app(app, "--phases=coverage", "--mode=negative", "--max-examples=1") == snapshot_cli
+
+
+def test_content_type_probe_does_not_hide_plain_server_error(ctx, cli):
+    # The probe's odd header must not become the only reproducer of a server error every request triggers.
+    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/items")
+    def items():
+        return "", 500
+
+    result = cli.run_openapi_app(
+        app, "--phases=coverage,fuzzing", "--max-examples=1", "--checks=not_a_server_error", "--mode=all"
+    )
+
+    findings = dict(re.findall(r"\n- (Server error[^\n]*)\n.*?\n\s+(curl [^\n]+)", result.stdout, re.DOTALL))
+    assert list(findings) == ["Server error"], result.stdout
+    assert "Content-Type" not in findings["Server error"]
+
+
+@pytest.mark.parametrize(
+    ("scenario", "message"),
+    [
+        (
+            CoverageScenario.MALFORMED_CONTENT_TYPE,
+            "`Content-Type: multipart/form-data` without a boundary returned 500, "
+            "expected 400 Bad Request or 415 Unsupported Media Type\n\n"
+            "Reject a malformed `Content-Type` before parsing the request body",
+        ),
+        (
+            CoverageScenario.UNSUPPORTED_CONTENT_TYPE,
+            "Undeclared `Content-Type: text/plain` returned 500, expected 415 Unsupported Media Type\n\n"
+            "Reject media types the operation does not accept with 415",
+        ),
+    ],
+    ids=["malformed", "unsupported"],
+)
+def test_content_type_probe_server_error_via_wsgi(ctx, scenario, message):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        if request.content_type != "application/json":
+            return "", 500
+        return "", 200
+
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/items"]["POST"]
+    (case,) = scenario_cases(collect_cases(operation, GenerationMode.NEGATIVE), scenario)
+
+    with pytest.raises(FailureGroup) as exc_info:
+        case.call_and_validate(checks=[not_a_server_error])
+
+    assert [(type(failure), failure.message) for failure in exc_info.value.exceptions] == [
+        (ContentTypeServerError, message)
+    ]
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_content_type_probe_ignores_non_server_errors(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/items")
+    def items():
+        return "", 200
+
+    assert cli.run_openapi_app(app, "--phases=coverage", "--mode=negative", "--max-examples=1") == snapshot_cli
 
 
 def test_avoid_testing_unexpected_methods(ctx):
@@ -4646,7 +4778,7 @@ def test_required_parameter_without_negative_value_kept_in_negative_cases(ctx, l
             _component_mode(case, parameter_location),
         )
         for case in _required_parameter_cases(ctx, location)
-        if case.meta.phase.data.parameter != "X-Token"
+        if case.meta.phase.data.parameter != "X-Token" and case.meta.phase.data.scenario not in CONTENT_TYPE_PROBES
     } == {((("X-Token", ""),), GenerationMode.POSITIVE)}
 
 
@@ -4783,6 +4915,7 @@ def test_resolvable_media_type_is_covered_when_sibling_reference_is_unresolvable
         (None, ParameterLocation.BODY),
         ("application/json", None),
         ("application/json", ParameterLocation.BODY),
+        ("application/json", ParameterLocation.HEADER),
         ("application/json", ParameterLocation.QUERY),
     }
 

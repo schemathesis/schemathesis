@@ -39,6 +39,7 @@ from schemathesis.specs.openapi.checks import (
     _body_negation_becomes_valid_after_serialization,
     _is_prefix_operation,
     allow_header_conformance,
+    content_type_conformance,
     has_only_additional_properties_in_non_body_parameters,
     missing_required_header,
     negative_data_rejection,
@@ -2220,6 +2221,28 @@ def test_unsupported_method_404_on_templated_path(
             unsupported_method(context, response, case)
     else:
         assert unsupported_method(context, response, case) is None
+
+
+@pytest.mark.parametrize(
+    "scenario", [CoverageScenario.MALFORMED_CONTENT_TYPE, CoverageScenario.UNSUPPORTED_CONTENT_TYPE]
+)
+def test_content_type_probes_skip_response_conformance(ctx, response_factory, scenario):
+    operation = ctx.openapi.load_schema(
+        {"/items": {"get": {"responses": {"200": {"description": "OK", "content": {"application/json": {}}}}}}}
+    )["/items"]["GET"]
+    case = operation.Case(
+        headers={"Content-Type": "multipart/form-data"},
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=0.1, mode=GenerationMode.NEGATIVE),
+            components={},
+            phase=PhaseInfo.coverage(scenario=scenario, description="Content-Type probe"),
+        ),
+    )
+
+    assert (
+        content_type_conformance(check_context(), response_factory.requests(status_code=200, content_type=None), case)
+        is True
+    )
 
 
 @pytest.mark.parametrize(

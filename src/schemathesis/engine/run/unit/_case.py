@@ -25,6 +25,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import metrics
 from schemathesis.generation.case import Case
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, coverage_scenario
 from schemathesis.wfc.escalation import record_auth_outcome
 
 if TYPE_CHECKING:
@@ -33,15 +34,14 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
-def _targets_declared_method(case: Case) -> bool:
-    """True when `case` exercises the operation's declared HTTP method.
+def _is_ordinary_request(case: Case) -> bool:
+    """True when the response to `case` says something about the operation under test.
 
-    Method-mutated cases (e.g. coverage's `METHOD` scenario sending POST to a
-    GET-only route) yield 2xx/4xx that describe the mutated method's path, not
-    the operation under test — response-driven signal must be filtered through
-    this check before being attributed to it.
+    Responses to requests malformed on purpose (an undeclared method, a malformed `Content-Type`) describe how the
+    server rejects the request, so response-driven signal must be filtered through this check before being
+    attributed to the operation.
     """
-    return case.method.lower() == case.operation.method.lower()
+    return case.method.lower() == case.operation.method.lower() and coverage_scenario(case) not in CONTENT_TYPE_PROBES
 
 
 class BudgetExpired(KeyboardInterrupt):
@@ -81,7 +81,7 @@ def run_one_case(
         # Honor a supervisor SKIP verdict that flipped mid-scenario; without this,
         # cases already drawn or queued would still hit the server.
         if (
-            _targets_declared_method(case)
+            _is_ordinary_request(case)
             and ctx.supervisor.verdict(case.operation.label).directive is SchedulingDirective.SKIP
         ):
             return
@@ -187,7 +187,7 @@ def _do_call_and_validate(
             observations=parse_observations(operation=case.operation, case=case, response=response),
             transport_kwargs=transport_kwargs,
         )
-    if _targets_declared_method(case):
+    if _is_ordinary_request(case):
         record_auth_outcome(case, response.status_code)
         is_documented_status = case.operation.responses.find_by_status_code(response.status_code) is not None
         ctx.supervisor.record_response(
@@ -236,8 +236,8 @@ def record_extra_data_from_recorder(ctx: EngineContext, operation: APIOperation,
         if response is None:
             continue
         case = recorder.cases[case_id].value
-        if extra_data_source.should_record(operation=operation.label) and _targets_declared_method(case):
+        if extra_data_source.should_record(operation=operation.label) and _is_ordinary_request(case):
             extra_data_source.record_response(operation=operation, response=response, case=case)
-        if extra_data_source.should_record_request(operation=operation.label) and _targets_declared_method(case):
+        if extra_data_source.should_record_request(operation=operation.label) and _is_ordinary_request(case):
             extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
         response.clear_cache()
