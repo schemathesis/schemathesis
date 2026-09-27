@@ -1135,6 +1135,66 @@ def _unexpected_methods(
         )
 
 
+def _content_type_probes(run: CoverageRun) -> Generator[Case, None, None]:
+    operation = run.operation
+    transport = operation.schema.transport
+    # An operation with no serializable body is reported as untestable; a probe would hide that.
+    if operation.body and all(
+        transport.get_first_matching_media_type(body.media_type) is None for body in operation.body
+    ):
+        return
+    template = run.template
+    emitter = run.emitter
+    data = template.unmodified()
+    data = TemplateValue(
+        kwargs=data.kwargs,
+        raw=data.raw,
+        components={**data.components, ParameterLocation.HEADER: ComponentInfo(mode=GenerationMode.NEGATIVE)},
+    )
+    for scenario, content_type, description in (
+        (
+            CoverageScenario.MALFORMED_CONTENT_TYPE,
+            "multipart/form-data",
+            "Malformed Content-Type: multipart/form-data without boundary",
+        ),
+        (
+            CoverageScenario.UNSUPPORTED_CONTENT_TYPE,
+            "application/xml" if any(body.media_type == "text/plain" for body in run.operation.body) else "text/plain",
+            None,
+        ),
+    ):
+        if scenario == CoverageScenario.UNSUPPORTED_CONTENT_TYPE and not run.operation.body:
+            continue
+        headers = {
+            name: value for name, value in data.kwargs.get("headers", {}).items() if name.lower() != "content-type"
+        }
+        headers["Content-Type"] = content_type
+        kwargs = {**data.kwargs, "headers": headers}
+        raw_headers = {
+            name: value for name, value in data.raw.get("headers", {}).items() if name.lower() != "content-type"
+        }
+        raw_headers["Content-Type"] = content_type
+        raw = {**data.raw, "headers": raw_headers}
+        if (
+            scenario == CoverageScenario.MALFORMED_CONTENT_TYPE
+            and data.kwargs.get("media_type") == "multipart/form-data"
+        ):
+            kwargs = {key: value for key, value in kwargs.items() if key not in ("body", "media_type")}
+            raw = {key: value for key, value in raw.items() if key not in ("body", "media_type")}
+        yield emitter.build(
+            data,
+            mode=GenerationMode.NEGATIVE,
+            elapsed=Instant().elapsed,
+            scenario=scenario,
+            description=description or f"Unsupported Content-Type: {content_type}",
+            location="/",
+            parameter="Content-Type",
+            parameter_location=ParameterLocation.HEADER,
+            kwargs=kwargs,
+            raw=raw,
+        )
+
+
 def _duplicate_query(run: CoverageRun, generate_duplicate_query_parameters: bool) -> Generator[Case, None, None]:
     operation = run.operation
     template = run.template
@@ -1499,6 +1559,7 @@ def iter_coverage_cases(
         return
     if GenerationMode.NEGATIVE in generation_modes:
         yield from _unexpected_methods(run, unexpected_methods, unexpected_methods_seen)
+        yield from _content_type_probes(run)
         yield from _duplicate_query(run, generate_duplicate_query_parameters)
         yield from _missing_required(run)
     yield from _container_combinations(run)

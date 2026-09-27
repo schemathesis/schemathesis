@@ -51,6 +51,8 @@ This check validates response times against your threshold. The actual HTTP requ
 
 Catches server-side errors (5xx status codes) and GraphQL `errors` arrays.
 
+During negative coverage, this is the only response check applied to malformed or undeclared request `Content-Type` probes.
+
 ```text
 - Server error
 

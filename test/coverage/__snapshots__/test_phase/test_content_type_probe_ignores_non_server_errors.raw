@@ -5,12 +5,11 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
-     Configuration:    /tmp/config.toml
+     Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
@@ -20,13 +19,13 @@ Schemathesis dev
 
  ✅  Coverage (in 0.00s)
 
-     ✅ 2 passed
+     ✅ 1 passed
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
-  Tested: 2
+  Selected: 1/1
+  Tested: 1
 
 Test Phases:
   ⏭  Examples (disabled)

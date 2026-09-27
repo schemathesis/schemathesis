@@ -6,7 +6,7 @@ import os
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
-from flask import Flask, jsonify, redirect
+from flask import Flask, jsonify, redirect, request
 
 import schemathesis
 from schemathesis.auths import AuthContext
@@ -1074,6 +1074,27 @@ def test_denials_count_against_the_identity_that_was_sent(cli, ctx, tmp_path):
     cli.run(api.schema_url, "--max-examples=8", f"--auth-wfc={auth}", "--phases=coverage,fuzzing")
 
     assert "admin" in _identities(api, "DELETE", "/api/admin-only")
+
+
+def test_content_type_probe_refusal_does_not_move_the_identity(cli, ctx, tmp_path):
+    # A server may refuse a malformed request before authorizing it; that says nothing about the identity.
+    app, _ = ctx.openapi.make_flask_app(
+        {"/items": {"get": {"responses": {"200": {"description": "OK"}, "403": {"description": "Forbidden"}}}}}
+    )
+    sent = []
+
+    @app.route("/items")
+    def items():
+        sent.append(request.headers.get("Authorization", ""))
+        content_type = request.headers.get("Content-Type", "")
+        if content_type.startswith("multipart/form-data") and "boundary=" not in content_type:
+            return jsonify({}), 403
+        return jsonify({}), 200
+
+    auth = _write(tmp_path, ROLE_AUTH)
+    cli.run_openapi_app(app, "--max-examples=5", f"--auth-wfc={auth}", "--phases=coverage,fuzzing")
+
+    assert set(sent) == {"ApiKey viewer"}
 
 
 def test_identity_refused_before_accounts_exist_is_retried(cli, ctx, tmp_path):

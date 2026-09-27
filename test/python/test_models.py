@@ -339,9 +339,13 @@ import pytest
 from requests import Response, Request
 from schemathesis.openapi.checks import UndefinedStatusCode
 from schemathesis.core.failures import FailureGroup
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, coverage_scenario
 
 @schema.parametrize()
 def test_(case):
+    # Content-Type probes are only checked for server errors.
+    if coverage_scenario(case) in CONTENT_TYPE_PROBES:
+        return
     response = Response()
     response.headers["Content-Type"] = "application/json"
     response.status_code = 418

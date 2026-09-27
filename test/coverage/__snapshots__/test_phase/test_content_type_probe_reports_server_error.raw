@@ -9,7 +9,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
+     Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
@@ -19,19 +19,19 @@ Schemathesis dev
 
  ❌  Coverage (in 0.00s)
 
-     ✅ 1 passed  ❌ 1 failed
+     ❌ 1 failed
 
 =================================== FAILURES ===================================
-________________________________ OPTIONS /items ________________________________
+__________________________________ GET /items __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Invalid Allow header
+- Server error on unexpected Content-Type
 
-    `Allow` header does not match the schema — missing documented methods: POST
+    `Content-Type: multipart/form-data` without a boundary returned 500, expected 400 Bad Request or 415 Unsupported Media Type
 
-    List exactly the methods this resource supports in `Allow`
+    Reject a malformed `Content-Type` before parsing the request body
 
-[200] OK:
+[500] Internal Server Error:
 
     <EMPTY>
 
@@ -44,8 +44,8 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
-  Tested: 2
+  Selected: 1/1
+  Tested: 1
 
 Test Phases:
   ⏭  Examples (disabled)
@@ -54,7 +54,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Invalid Allow header: 1
+  ❌ Server error on unexpected Content-Type: 1
 
 Test cases:
   N generated, N found N unique failures

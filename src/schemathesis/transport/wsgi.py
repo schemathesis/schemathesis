@@ -61,7 +61,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         # Set content type for payload. A raw multipart payload is sent verbatim and carries no
         # boundary, so declaring it as multipart would make it unparsable for the application.
         if media_type and not isinstance(case.body, NotSet) and not _is_raw_multipart(media_type, extra.get("data")):
-            final_headers["Content-Type"] = media_type
+            final_headers.setdefault("Content-Type", media_type)
 
         query_string: dict[str, Any] | str | None = case.query
         if isinstance(query_string, dict):

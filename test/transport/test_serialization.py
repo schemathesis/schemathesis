@@ -176,6 +176,26 @@ def test_media_range_sent_as_concrete_content_type(ctx, declared, expected):
         assert transport.serialize_case(case)["headers"]["Content-Type"] == expected
 
 
+def test_explicit_content_type_overrides_payload_media_type(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        }
+    )
+    case = schema["/data"]["POST"].Case(
+        body={"key": "value"}, headers={"Content-Type": "multipart/form-data"}, media_type="application/json"
+    )
+
+    assert {
+        transport.serialize_case(case)["headers"]["Content-Type"] for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT)
+    } == {"multipart/form-data"}
+
+
 @pytest.mark.parametrize("media_type", ["text/html", "text/csv", "text/markdown", "text/powershell"])
 def test_unknown_text_subtype_sent_as_plain_text(ctx, media_type):
     schema = ctx.openapi.load_schema(

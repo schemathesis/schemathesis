@@ -237,6 +237,21 @@ class ServerError(Failure):
         return str(self.status_code)
 
 
+class ContentTypeServerError(ServerError):
+    """Server failed on a request whose `Content-Type` is malformed or not accepted by the operation."""
+
+    __slots__ = ()
+
+    def __init__(self, *, operation: str, status_code: int, message: str, case_id: str | None = None) -> None:
+        super().__init__(
+            operation=operation,
+            status_code=status_code,
+            title="Server error on unexpected Content-Type",
+            message=message,
+            case_id=case_id,
+        )
+
+
 class MalformedJson(Failure):
     """Failed to deserialize JSON."""
 
