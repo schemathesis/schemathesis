@@ -98,6 +98,35 @@ def test_fuzzing_phase_uses_its_generation_config(ctx):
     assert [case.meta.generation.mode for case in generated] == [GenerationMode.NEGATIVE]
 
 
+def test_negative_case_can_negate_the_body_alone(ctx):
+    # A server may check the path before the body, so negating every location at once hides body handling.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{kind}": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "kind",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["a", "b"]},
+                        }
+                    ],
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "string"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    strategy = schema["/items/{kind}"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE)
+
+    find(
+        strategy,
+        lambda case: case.path_parameters["kind"] in ("a", "b") and not isinstance(case.body, str),
+        settings=settings(max_examples=100, database=None),
+    )
+
+
 def test_ref_with_sibling_anyof_against_anyof_target(ctx):
     body = {
         "type": "object",

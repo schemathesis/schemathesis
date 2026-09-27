@@ -165,6 +165,24 @@ def openapi_cases(
     # Don't mix in schema examples during EXAMPLES phase - they're handled separately there
     mix_examples = phase != TestPhase.EXAMPLES
 
+    negated = _draw_negated_locations(
+        draw,
+        operation,
+        generation_mode,
+        explicit={
+            ParameterLocation.PATH: path_parameters,
+            ParameterLocation.HEADER: headers,
+            ParameterLocation.COOKIE: cookies,
+            ParameterLocation.QUERY: query,
+        },
+        body_is_generated=body is NOT_SET,
+    )
+
+    def mode_for(location: ParameterLocation) -> GenerationMode:
+        if negated is None or location in negated:
+            return generation_mode
+        return GenerationMode.POSITIVE
+
     path_parameters_ = generate_parameter(
         ParameterLocation.PATH,
         path_parameters,
@@ -172,7 +190,7 @@ def openapi_cases(
         draw,
         ctx,
         hooks,
-        generation_mode,
+        mode_for(ParameterLocation.PATH),
         generation_config,
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
@@ -186,7 +204,7 @@ def openapi_cases(
         draw,
         ctx,
         hooks,
-        generation_mode,
+        mode_for(ParameterLocation.HEADER),
         generation_config,
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
@@ -200,7 +218,7 @@ def openapi_cases(
         draw,
         ctx,
         hooks,
-        generation_mode,
+        mode_for(ParameterLocation.COOKIE),
         generation_config,
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
@@ -214,7 +232,7 @@ def openapi_cases(
         draw,
         ctx,
         hooks,
-        generation_mode,
+        mode_for(ParameterLocation.QUERY),
         generation_config,
         extra_data_source=extra_data_source,
         error_feedback=error_feedback,
@@ -224,8 +242,8 @@ def openapi_cases(
 
     if body is NOT_SET:
         if operation.body:
-            body_generator = generation_mode
-            if generation_mode.is_negative:
+            body_generator = mode_for(ParameterLocation.BODY)
+            if body_generator.is_negative:
                 # Consider only schemas that are possible to negate
                 candidates = [item for item in operation.body.items if item.is_negatable]
                 # Not possible to negate body, fallback to positive data generation
@@ -967,6 +985,43 @@ def generate_parameter(
     )
 
 
+def _draw_negated_locations(
+    draw: st.DrawFn,
+    operation: APIOperation,
+    generation_mode: GenerationMode,
+    *,
+    explicit: dict[ParameterLocation, dict[str, Any] | None],
+    body_is_generated: bool,
+) -> set[ParameterLocation] | None:
+    """Pick which negatable locations a negative case breaks; `None` leaves every location negative."""
+    if not generation_mode.is_negative:
+        return None
+    candidates = []
+    for location in (
+        ParameterLocation.PATH,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+        ParameterLocation.QUERY,
+    ):
+        properties = cast(OpenApiParameterSet, operation.get_parameter_set(location)).schema["properties"]
+        # Explicit values are sent as given, so a location they fully cover has nothing left to negate.
+        given = {name.lower() for name in explicit[location] or ()}
+        if not properties or {name.lower() for name in properties} <= given:
+            continue
+        if location == ParameterLocation.PATH and not can_negate_path_parameters(operation):
+            continue
+        if location.is_in_header and not can_negate_headers(operation, location):
+            continue
+        candidates.append(location)
+    if body_is_generated and operation.body and any(item.is_negatable for item in operation.body.items):
+        candidates.append(ParameterLocation.BODY)
+    if not candidates:
+        return None
+    # Breaking every location at once lets the first check a server runs hide how it handles the others.
+    negated = {location for location in candidates if draw(st.booleans())}
+    return negated or {draw(st.sampled_from(candidates))}
+
+
 def can_negate_path_parameters(operation: APIOperation) -> bool:
     """Check if any path parameter can be negated."""
     # No path parameters to negate
@@ -987,7 +1042,7 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
 
 def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> bool:
     """Check if any header can be negated."""
-    container = getattr(operation, location.container_name)
+    container = cast(OpenApiParameterSet, operation.get_parameter_set(location))
     # No headers to negate
     headers = container.schema["properties"]
     if not headers:
@@ -1032,7 +1087,7 @@ def get_parameters_strategy(
     constants_value_source: ConstantsPool | None = None,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
-    container = getattr(operation, location.container_name)
+    container = cast(OpenApiParameterSet, operation.get_parameter_set(location))
     # Direct list bool check skips ParameterSet.__len__ method dispatch.
     if container.items:
         return container.get_strategy(

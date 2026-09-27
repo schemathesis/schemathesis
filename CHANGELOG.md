@@ -9,6 +9,7 @@
 
 ### :wrench: Changed
 
+- Negative test cases break a random subset of request locations instead of all of them.
 - Name the pattern that stops the analysis when test data cannot be generated.
 - **BREAKING**: `st run` and `st fuzz` fail with exit code 2 when nothing is tested.
 - **BREAKING**: `st run` and `st fuzz` exit 2 on schema, configuration and internal errors.

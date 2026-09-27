@@ -836,6 +836,18 @@ class APIOperation(Generic[P, R, S, SchemaT]):
             return self.body
         return None
 
+    def get_parameter_set(self, location: ParameterLocation) -> ParameterSet[P]:
+        match location:
+            case ParameterLocation.PATH:
+                return self.path_parameters
+            case ParameterLocation.HEADER:
+                return self.headers
+            case ParameterLocation.COOKIE:
+                return self.cookies
+            case ParameterLocation.QUERY:
+                return self.query
+        raise ValueError(f"`{location.value}` is not a parameter location")
+
     def add_parameter(self, parameter: P) -> None:
         # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
         # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
