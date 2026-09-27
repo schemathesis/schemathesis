@@ -25,7 +25,7 @@ repos:
       - id: yamllint
 
   - repo: https://github.com/Mateusz-Grzelinski/actionlint-py
-    rev: v1.7.12.24
+    rev: v1.7.12.25
     hooks:
       - id: actionlint
         # CI runners ship shellcheck, so pin it here too or the hook is stricter on CI than locally.
@@ -39,7 +39,7 @@ repos:
         args: [--no-progress, --offline]
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1
+    rev: v1.50.3
     hooks:
       - id: typos
         # Report, don't rewrite: mirrors the `spell-check` CI job
@@ -54,7 +54,7 @@ repos:
         additional_dependencies: [types-requests, types-PyYAML]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.8
+    rev: v0.16.9
     hooks:
       - id: ruff-format
       - id: ruff-check
