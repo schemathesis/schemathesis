@@ -4615,6 +4615,32 @@ def test_positive_body_descends_past_a_third_use_of_a_shared_base(ctx):
     } == {"[]", '[{"id": ""}]', "[{}]"}
 
 
+def test_negative_only_mode_emits_required_and_optional_combinations(ctx):
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"name": name, "in": "query", "required": name == "q", "schema": {"type": "integer", "minimum": 1}}
+            for name in ("q", "r", "s")
+        ],
+        path="/items",
+        method="get",
+    )["/items"]["get"]
+
+    def combination_queries(*modes):
+        # Combinations carry the required parameter and leave out at least one optional one.
+        return [
+            case.query
+            for case in iter_cases(operation, *modes)
+            if case.meta.generation.mode == GenerationMode.NEGATIVE
+            and "q" in case.query
+            and not {"r", "s"} <= case.query.keys()
+        ]
+
+    assert combination_queries(GenerationMode.NEGATIVE) == combination_queries(
+        GenerationMode.POSITIVE, GenerationMode.NEGATIVE
+    )
+
+
 @pytest.mark.parametrize(
     "modes",
     [[GenerationMode.POSITIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],

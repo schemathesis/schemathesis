@@ -85,6 +85,7 @@
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash instead of a schema error on malformed keywords like `minLength: "x"`.
 - `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.
+- Coverage phase skipping negative cases for optional parameter combinations under `--mode negative`.
 - Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
 - Coverage phase ignoring captured identifiers for request body properties defined via `$ref`.
 
