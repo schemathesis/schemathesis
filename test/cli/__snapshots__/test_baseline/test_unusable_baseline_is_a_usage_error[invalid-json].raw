@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run --help' for help.
+
+Error: Invalid value: Could not load baseline file 'schemathesis-baseline.json': Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

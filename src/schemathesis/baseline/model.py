@@ -58,7 +58,20 @@ class BaselineEntry:
         return self.expires is not None and date.fromisoformat(self.expires) < today
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> BaselineEntry:
+    def from_dict(cls, data: object) -> BaselineEntry:
+        if not isinstance(data, dict):
+            raise ValueError(f"Expected each entry to be an object, got {json.dumps(data)}")
+        missing = [
+            name for name in ("operation", "check", "failure", "signature") if not isinstance(data.get(name), str)
+        ]
+        if missing:
+            raise ValueError(f"Entry {json.dumps(data)} is missing string fields: {', '.join(missing)}")
+        expires = data.get("expires")
+        if expires is not None:
+            try:
+                date.fromisoformat(expires)
+            except (TypeError, ValueError):
+                raise ValueError(f"Entry `expires` must be a YYYY-MM-DD date, got {json.dumps(expires)}") from None
         known = {name: data[name] for name in cls.__slots__ if name in data and name != "extra"}
         extra = {key: value for key, value in data.items() if key not in cls.__slots__ and key != "id"}
         return cls(**known, extra=extra)
@@ -85,12 +98,17 @@ class Baseline:
         if not path.exists():
             return cls(entries=[])
         raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("Expected a JSON object")
         version = raw.get("format_version")
         if version != FORMAT_VERSION:
             raise ValueError(
                 f"Unsupported baseline format version {version}; this Schemathesis writes version {FORMAT_VERSION}"
             )
-        return cls(entries=[BaselineEntry.from_dict(entry) for entry in raw["entries"]])
+        entries = raw.get("entries")
+        if not isinstance(entries, list):
+            raise ValueError("Expected `entries` to be a list")
+        return cls(entries=[BaselineEntry.from_dict(entry) for entry in entries])
 
     def match(self, failure: Failure, check: str, *, today: date | None = None) -> BaselineEntry | None:
         """The entry that covers this failure, or `None` when it is new."""
@@ -107,4 +125,5 @@ class Baseline:
             "schemathesis_version": SCHEMATHESIS_VERSION,
             "entries": [entry.to_dict() for entry in sorted(self.entries, key=lambda entry: entry.identity)],
         }
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
