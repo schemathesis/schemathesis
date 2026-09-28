@@ -30,7 +30,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import RUN_CHECKS_LABEL, FailureGroup, as_reported_failure, format_failures, get_origin
 from schemathesis.core.marks import Mark
-from schemathesis.core.result import Ok, Result
+from schemathesis.core.result import Err, Ok, Result
 from schemathesis.engine import Status
 from schemathesis.generation import derive_operation_seed, overrides
 from schemathesis.generation.feedback import FeedbackSources
@@ -211,19 +211,24 @@ class SchemathesisCase(PyCollector):
 
                 # Use fuzzing phase settings if fuzzing is enabled, since only fuzzing uses max_examples
                 phase = "fuzzing" if HypothesisTestMode.FUZZING in modes else None
-                funcobj = create_test(
-                    operation=operation,
-                    test_func=self.test_function,
-                    config=HypothesisTestConfig(
-                        modes=modes,
-                        settings=self.schema.config.get_hypothesis_settings(operation=operation, phase=phase),
-                        given_kwargs=self.given_kwargs,
-                        project=self.schema.config,
-                        as_strategy_kwargs=as_strategy_kwargs,
-                        seed=derive_operation_seed(self.schema.config.seed, operation.label),
-                        feedback=feedback,
-                    ),
-                )
+                try:
+                    funcobj = create_test(
+                        operation=operation,
+                        test_func=self.test_function,
+                        config=HypothesisTestConfig(
+                            modes=modes,
+                            settings=self.schema.config.get_hypothesis_settings(operation=operation, phase=phase),
+                            given_kwargs=self.given_kwargs,
+                            project=self.schema.config,
+                            as_strategy_kwargs=as_strategy_kwargs,
+                            seed=derive_operation_seed(self.schema.config.seed, operation.label),
+                            feedback=feedback,
+                        ),
+                    )
+                except InvalidSchema as exc:
+                    # Coverage cases are built with the test, so a malformed definition surfaces here.
+                    yield from self._gen_items(Err(exc), feedback)
+                    return
                 if inspect.iscoroutinefunction(self.test_function):
                     # `pytest-trio` expects a coroutine function
                     if is_trio_test:

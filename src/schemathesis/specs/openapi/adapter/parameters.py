@@ -1161,6 +1161,15 @@ class OpenApiComponent(ABC):
         return examples
 
 
+def _admits_raising_minimum(schema: JsonSchemaObject, minimum_keyword: str, maximum_keyword: str) -> bool:
+    """Whether the declared bounds admit an empty value and one element; malformed bounds stay for validation."""
+    minimum = schema.get(minimum_keyword, 0)
+    maximum = schema.get(maximum_keyword, 1)
+    if not isinstance(minimum, (int, float)) or not isinstance(maximum, (int, float)):
+        return False
+    return minimum < 1 and maximum >= 1
+
+
 @dataclass
 class OpenApiParameter(OpenApiComponent):
     """OpenAPI operation parameter."""
@@ -1215,8 +1224,7 @@ class OpenApiParameter(OpenApiComponent):
         if (
             self.is_required
             and schema.get("type") == "array"
-            and schema.get("minItems", 0) < 1
-            and schema.get("maxItems", 1) >= 1
+            and _admits_raising_minimum(schema, "minItems", "maxItems")
         ):
             bounds["minItems"] = 1
         # An explicit `allowEmptyValue: false` forbids sending the parameter with an empty value.
@@ -1226,8 +1234,7 @@ class OpenApiParameter(OpenApiComponent):
             allow_empty_value is False
             and self.location is ParameterLocation.QUERY
             and schema.get("type") == "string"
-            and schema.get("minLength", 0) < 1
-            and schema.get("maxLength", 1) >= 1
+            and _admits_raising_minimum(schema, "minLength", "maxLength")
         ):
             bounds["minLength"] = 1
         return bounds

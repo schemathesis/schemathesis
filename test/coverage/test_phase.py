@@ -5785,6 +5785,7 @@ def test_coverage_positive_template_skips_false_schema_property(ctx):
         parameters=[{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
         path="/items/{id}",
         method="patch",
+        version="3.1.0",
     )
 
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, cases=iter_cases(operation, GenerationMode.NEGATIVE))

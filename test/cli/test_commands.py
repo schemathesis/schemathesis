@@ -1221,6 +1221,75 @@ def test_malformed_media_type_in_request_body(ctx, cli, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1") == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    "operation",
+    [
+        {
+            "parameters": [
+                {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "minLength": "x"}}
+            ]
+        },
+        {"parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer", "maximum": "x"}}]},
+        {
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "array", "items": {"type": "integer"}, "minItems": "x"},
+                }
+            ]
+        },
+        {
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "array", "items": {"type": "integer"}, "maxItems": "x"},
+                }
+            ]
+        },
+        {
+            "parameters": [
+                {
+                    "name": "q",
+                    "in": "query",
+                    "allowEmptyValue": False,
+                    "schema": {"type": "string", "minLength": "x"},
+                }
+            ]
+        },
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"type": "object", "properties": {"name": {"type": "string", "minLength": "x"}}}
+                    }
+                },
+            }
+        },
+    ],
+    ids=[
+        "query-min-length",
+        "query-maximum",
+        "query-min-items",
+        "query-max-items",
+        "query-disallowed-empty-min-length",
+        "body-min-length",
+    ],
+)
+@pytest.mark.parametrize("phase", ["coverage", "fuzzing"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_malformed_keyword(ctx, cli, snapshot_cli, operation, phase):
+    api = ctx.openapi.apps.success()
+    schema_path = ctx.openapi.write_schema(
+        {"/data": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}}
+    )
+    assert cli.run(str(schema_path), f"--url={api.base_url}/api", f"--phases={phase}") == snapshot_cli
+
+
 def test_nested_binary_in_yaml(ctx, cli, app_runner, snapshot_cli):
     paths = {
         "/property": {

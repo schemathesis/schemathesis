@@ -83,6 +83,7 @@
 - Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
 - Open API 3.1 `$ref` siblings dropped when the target defines the same keyword.
 - `format: binary` strings ignoring `minLength` and `maxLength`.
+- Crash instead of a schema error on malformed keywords like `minLength: "x"`.
 - `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.
 - Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
 - Coverage phase ignoring captured identifiers for request body properties defined via `$ref`.
