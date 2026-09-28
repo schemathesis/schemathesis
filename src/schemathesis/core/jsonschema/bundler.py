@@ -183,14 +183,15 @@ class Bundler:
 
         assert isinstance(bundled, dict)
 
-        # The root reference to a single target that never points back at itself reads the same
-        # spelled out in place. A sibling pointing at that target keeps the storage it needs.
+        # A root reference to a single non-recursive target reads the same spelled out in place, unless
+        # a sibling points at that target or shares a keyword with it (the merge would overwrite one).
         if not has_recursive_references and "$ref" in bundled and len(defs) == 1 and reference_count == 1:
-            result = {key: value for key, value in bundled.items() if key != "$ref"}
-            for value in defs.values():
-                if isinstance(value, dict):
-                    result.update(value)
-            return Bundle(schema=result, name_to_uri={})
+            (target,) = defs.values()
+            if not isinstance(target, dict) or bundled.keys().isdisjoint(target):
+                result = {key: value for key, value in bundled.items() if key != "$ref"}
+                if isinstance(target, dict):
+                    result.update(target)
+                return Bundle(schema=result, name_to_uri={})
 
         if defs:
             bundled[BUNDLE_STORAGE_KEY] = defs
