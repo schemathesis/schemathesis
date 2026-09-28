@@ -102,6 +102,7 @@
 - `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
 - `negative_data_rejection` for numeric array path parameters sent as a single number.
 - `negative_data_rejection` for multipart bodies with `--generation-unique-inputs`.
+- `negative_data_rejection` for string parameters declared as `anyOf`/`oneOf` with a `false` branch.
 - `validation_mismatch`, `missing_test_data` and `missing_auth` warnings from undeclared-method requests.
 - `validation_mismatch` and `missing_test_data` warnings from negative test cases.
 
