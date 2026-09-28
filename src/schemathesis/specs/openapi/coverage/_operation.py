@@ -1448,23 +1448,24 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
         # 2. Generate combinations with required properties and one optional property
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
-            if combo != base_container and GenerationMode.POSITIVE in generation_modes:
-                if template.can_emit(GenerationMode.POSITIVE):
-                    case = make_case(
-                        combo,
-                        CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
-                        f"All required properties and optional '{opt_param}'",
-                        location,
-                        None,
-                        GenerationMode.POSITIVE,
-                        Instant(),
-                    )
-                    if case is not None:
-                        yield case
-                if GenerationMode.NEGATIVE in generation_modes:
-                    subschema = _combination_schema(combo, required, parameter_set)
-                    declared = _container_without_wire_bounds(subschema, parameter_set)
-                    yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_REQUEST, declared)
+            if combo == base_container:
+                continue
+            if GenerationMode.POSITIVE in generation_modes and template.can_emit(GenerationMode.POSITIVE):
+                case = make_case(
+                    combo,
+                    CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
+                    f"All required properties and optional '{opt_param}'",
+                    location,
+                    None,
+                    GenerationMode.POSITIVE,
+                    Instant(),
+                )
+                if case is not None:
+                    yield case
+            if GenerationMode.NEGATIVE in generation_modes:
+                subschema = _combination_schema(combo, required, parameter_set)
+                declared = _container_without_wire_bounds(subschema, parameter_set)
+                yield from _yield_negative(subschema, location, bool(required), Dedup.WIRE_REQUEST, declared)
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
         if (
