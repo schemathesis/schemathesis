@@ -386,9 +386,7 @@ class ProjectConfig(DiffBase):
             config = self.operations.get_for_operation(operation=operation)
             if config.tls_verify is not None:
                 return config.tls_verify
-        if self.tls_verify is not None:
-            return self.tls_verify
-        return None
+        return self.tls_verify
 
     def request_cert_for(self, *, operation: APIOperation | None = None) -> str | tuple[str, str] | None:
         if operation is not None:

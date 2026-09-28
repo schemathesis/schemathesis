@@ -28,9 +28,23 @@ def test_generation_modes_accept_strings(config):
     assert [mode.is_positive for mode in config.generation.modes] == [True]
 
 
-def test_unknown_generation_mode_rejected(config):
-    with pytest.raises(ConfigError, match="Did you mean 'positive'"):
-        config.generation.update(modes=["positive-only"])
+@pytest.mark.parametrize(
+    ("mode", "rendered", "suggestion"),
+    [
+        ("positive-only", "'positive-only'", " Did you mean 'positive'?"),
+        ("xyz", "'xyz'", ""),
+        (1, "1", ""),
+    ],
+    ids=["close-match", "no-match", "not-a-string"],
+)
+def test_unknown_generation_mode_rejected(config, mode, rendered, suggestion):
+    with pytest.raises(ConfigError) as exc:
+        config.generation.update(modes=[mode])
+    assert str(exc.value) == (
+        "Error in [generation] section:\n  Invalid value:\n\n"
+        f"  - 'mode' -> {rendered} is not a valid value.{suggestion}\n\n"
+        "Valid values are: 'positive', 'negative'."
+    )
 
 
 def test_non_integer_max_examples_rejected(config):

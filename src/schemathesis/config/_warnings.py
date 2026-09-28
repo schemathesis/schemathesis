@@ -84,10 +84,8 @@ class WarningsConfig(DiffBase):
             fail_on_list = []
         elif fail_on is True:
             fail_on_list = display.copy()
-        elif isinstance(fail_on, list):
-            fail_on_list = [SchemathesisWarning.from_str(resolve(w)) for w in fail_on]
         else:
-            fail_on_list = []
+            fail_on_list = [SchemathesisWarning.from_str(resolve(w)) for w in fail_on]
 
         return cls(display=display, fail_on=fail_on_list, low_valid_rate=low_valid_rate)
 

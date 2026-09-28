@@ -57,12 +57,10 @@ FILTER_ATTRIBUTES = [
 def reraise_filter_error(attr: str) -> Generator:
     try:
         yield
-    except IncorrectUsage as exc:
-        if str(exc) == "Filter already exists":
-            raise ConfigError(
-                f"Filter for '{attr}' already exists. You can't simultaneously include and exclude the same thing."
-            ) from None
-        raise
+    except IncorrectUsage:
+        raise ConfigError(
+            f"Filter for '{attr}' already exists. You can't simultaneously include and exclude the same thing."
+        ) from None
     except re.error as exc:
         raise ConfigError(
             f"Filter for '{attr}' contains an invalid regular expression: {exc.pattern!r}\n\n  {exc}"

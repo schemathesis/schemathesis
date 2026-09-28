@@ -2,25 +2,25 @@ import hypothesis
 import pytest
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-from schemathesis.config import SchemathesisConfig
-from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
-from schemathesis.schemas import APIOperation, OperationDefinition
+from schemathesis.config import ProjectConfig, SchemathesisConfig
 
 LABEL = "PUT /users/{user_id}"
 
 
 @pytest.fixture
-def operation(openapi_30):
-    return APIOperation(
-        "/users/{user_id}",
-        "PUT",
-        OperationDefinition({"requestBody": {"content": {"application/json": {"schema": {}}}}}),
-        openapi_30,
-        label=LABEL,
-        base_url="http://127.0.0.1:8080/api",
-        responses=openapi_30._parse_responses({}, ""),
-        security=openapi_30._parse_security({}),
+def operation(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users/{user_id}": {
+                "put": {
+                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {"content": {"application/json": {"schema": {}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
     )
+    return schema["/users/{user_id}"]["PUT"]
 
 
 @pytest.mark.parametrize(
@@ -94,7 +94,7 @@ def test_headers_for_none_when_unset(operation):
     "db_value, expected_type, reuse_removed",
     [
         ("none", type(None), True),
-        (HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, InMemoryExampleDatabase, False),
+        (":memory:", InMemoryExampleDatabase, False),
         ("/tmp/db", DirectoryBasedExampleDatabase, False),
     ],
 )
@@ -159,25 +159,55 @@ def test_hypothesis_max_examples_and_no_shrink_override(operation):
     assert op_settings.derandomize is False
 
 
+@pytest.mark.parametrize("matcher", [LABEL, "Unknown"], ids=["operation-override", "project-fallback"])
 @pytest.mark.parametrize(
-    ["matcher", "expected"],
+    ("key", "project_value", "operation_value", "getter"),
     [
-        (LABEL, 5),
-        ("Unknown", 3),
+        ("max-redirects", 5, 1, ProjectConfig.max_redirects_for),
+        ("request-timeout", 10, 0.5, ProjectConfig.request_timeout_for),
+        ("request-retries", 3, 5, ProjectConfig.request_retries_for),
+        ("tls-verify", "/global/ca.pem", False, ProjectConfig.tls_verify_for),
+        ("proxy", "http://global:8080", "http://local:8080", ProjectConfig.proxy_for),
+        ("rate-limit", None, "auto", ProjectConfig.rate_limit_for),
     ],
-    ids=["operation-override", "project-fallback"],
+    ids=["max-redirects", "request-timeout", "request-retries", "tls-verify", "proxy", "rate-limit"],
 )
-def test_request_retries_for_override_and_fallback(operation, matcher, expected):
-    config = SchemathesisConfig.from_dict(
-        {
-            "request-retries": 3,
-            "operations": [
-                {
-                    "include-name": matcher,
-                    "request-retries": 5,
-                }
-            ],
-        }
+def test_transport_setting_for_operation(operation, matcher, key, project_value, operation_value, getter):
+    raw = {"operations": [{"include-name": matcher, key: operation_value}]}
+    if project_value is not None:
+        raw[key] = project_value
+    project = SchemathesisConfig.from_dict(raw).projects.get_default()
+    expected = operation_value if matcher == LABEL else project_value
+    assert (getter(project), getter(project, operation=operation)) == (project_value, expected)
+
+
+@pytest.mark.parametrize(
+    ("project_settings", "operation_settings", "expected"),
+    [
+        ({"request-cert": "global.pem", "request-cert-key": "global.key"}, None, ("global.pem", "global.key")),
+        (
+            {"request-cert": "global.pem"},
+            {"request-cert": "local.pem", "request-cert-key": "local.key"},
+            ("local.pem", "local.key"),
+        ),
+        ({"request-cert": "global.pem", "request-cert-key": "global.key"}, {"request-cert": "local.pem"}, "local.pem"),
+    ],
+    ids=["project-cert-with-key", "operation-cert-with-key", "operation-cert-without-key"],
+)
+def test_request_cert_for_operation(operation, project_settings, operation_settings, expected):
+    raw = dict(project_settings)
+    if operation_settings is not None:
+        raw["operations"] = [{"include-name": LABEL, **operation_settings}]
+    project = SchemathesisConfig.from_dict(raw).projects.get_default()
+    assert project.request_cert_for(operation=operation) == expected
+
+
+def test_warnings_disabled_for_operation(operation):
+    project = SchemathesisConfig.from_dict(
+        {"operations": [{"include-name": LABEL, "warnings": False}]}
+    ).projects.get_default()
+
+    assert (repr(project.warnings_for()), repr(project.warnings_for(operation=operation))) == (
+        "WarningsConfig()",
+        "WarningsConfig(display=[])",
     )
-    project = config.projects.get_default()
-    assert project.request_retries_for(operation=operation) == expected

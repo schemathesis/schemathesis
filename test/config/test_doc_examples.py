@@ -1,15 +1,15 @@
+import os
 import re
 from pathlib import Path
 
 import pytest
 import yaml
 
-import schemathesis.config._projects
 from schemathesis.checks import CHECKS
 from schemathesis.config import SchemathesisConfig, tomli
 from schemathesis.config._validator import CONFIG_SCHEMA
-from schemathesis.core.errors import HookError
 from schemathesis.core.transforms import resolve_pointer
+from schemathesis.errors import HookError
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 DOCS_DIR = ROOT_DIR / "docs"
@@ -57,7 +57,7 @@ def test_configs(monkeypatch, config, snapshot_config):
     monkeypatch.setenv("SESSION_ID", "secret-session-id!")
     monkeypatch.setenv("USER_ID", "42")
     monkeypatch.setenv("ENVIRONMENT", "test")
-    monkeypatch.setattr(schemathesis.config._projects, "get_workers_count", lambda: 4)
+    monkeypatch.setattr(os, "sched_getaffinity", lambda pid: {0, 1, 2, 3}, raising=False)
     try:
         config = SchemathesisConfig.from_str(config)
         assert config == snapshot_config

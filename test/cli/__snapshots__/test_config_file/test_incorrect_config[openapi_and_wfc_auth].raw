@@ -1,0 +1,17 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Cannot use multiple authentication methods simultaneously.
+
+You have configured:
+  - [auth.openapi.*] or [auth.dynamic.openapi.*] (OpenAPI-aware authentication)
+  - [auth.wfc] (Web Fuzzing Commons authentication)
+
+Please choose one authentication method.

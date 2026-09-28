@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+The provided origin is invalid. It must contain only the scheme, host and port, as the path comes from the schema. Use the base URL option if you want to set the path yourself.

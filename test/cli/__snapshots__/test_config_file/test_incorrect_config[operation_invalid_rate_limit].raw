@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Invalid rate limit value: `fast`. Should be in form `limit/interval`. Example: `10/m` for 10 requests per minute.

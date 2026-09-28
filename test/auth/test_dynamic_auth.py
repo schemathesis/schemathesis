@@ -18,8 +18,8 @@ from schemathesis.auths import (
     refresh_auth,
     set_on_case,
 )
-from schemathesis.config._auth import AuthConfig, DynamicTokenAuthConfig
-from schemathesis.config._error import ConfigError
+from schemathesis.config import ConfigError, SchemathesisConfig
+from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.core.errors import AuthenticationError
 from schemathesis.specs.openapi.adapter.security import build_auth_provider
 from schemathesis.specs.openapi.auths import (
@@ -235,22 +235,23 @@ def test_api_key_auth_unknown_location_is_noop(auth_operation):
 
 
 @pytest.mark.parametrize(
-    "kwargs,match",
+    "scheme,message",
     [
-        ({"path": "api/auth", "extract_selector": "/token"}, "must start with '/'"),
+        ({"path": "api/auth", "extract_selector": "/token"}, "Dynamic auth `path` must start with '/': 'api/auth'"),
         (
             {"path": "/api/auth", "extract_from": "body", "extract_selector": "access_token"},
-            "extract_selector.*must start with '/'",
+            "Dynamic auth `extract_selector` must start with '/' when extract_from='body': 'access_token'",
         ),
         (
             {"path": "/api/auth", "extract_selector": "/token", "payload_content_type": ""},
-            "payload_content_type.*non-empty",
+            "Dynamic auth `payload_content_type` must be a non-empty media type string.",
         ),
     ],
 )
-def test_config_rejects_invalid_fields(kwargs, match):
-    with pytest.raises(ConfigError, match=match):
-        DynamicTokenAuthConfig(**kwargs)
+def test_config_rejects_invalid_fields(scheme, message):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_dict({"auth": {"dynamic": {"openapi": {"BearerAuth": scheme}}}})
+    assert str(exc.value) == message
 
 
 @pytest.fixture
@@ -363,12 +364,12 @@ def test_unsupported_content_type_raises_at_runtime(form_auth_app, app_runner):
 
 
 @pytest.mark.parametrize(
-    "openapi_schemes,dynamic_schemes,match",
+    "openapi_schemes,dynamic_schemes,message",
     [
         (
             {"BearerAuth": {"bearer": "token"}},
             {"BearerAuth": {"path": "/api/auth", "extract_selector": "/token"}},
-            "Scheme 'BearerAuth' appears",
+            "Scheme 'BearerAuth' appears in both auth.openapi and auth.dynamic.openapi. Use one or the other.",
         ),
         (
             {"BearerAuth": {"bearer": "token"}, "ApiKeyAuth": {"api_key": "key"}},
@@ -376,16 +377,15 @@ def test_unsupported_content_type_raises_at_runtime(form_auth_app, app_runner):
                 "BearerAuth": {"path": "/api/auth", "extract_selector": "/token"},
                 "ApiKeyAuth": {"path": "/api/auth", "extract_selector": "/token"},
             },
-            "Schemes .* appear",
+            "Schemes 'ApiKeyAuth', 'BearerAuth' appear in both auth.openapi and auth.dynamic.openapi. "
+            "Use one or the other.",
         ),
     ],
 )
-def test_config_rejects_overlapping_schemes(openapi_schemes, dynamic_schemes, match):
-    with pytest.raises(ConfigError, match=match):
-        AuthConfig(
-            openapi=openapi_schemes,
-            dynamic={"openapi": dynamic_schemes},
-        )
+def test_config_rejects_overlapping_schemes(openapi_schemes, dynamic_schemes, message):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_dict({"auth": {"openapi": openapi_schemes, "dynamic": {"openapi": dynamic_schemes}}})
+    assert str(exc.value) == message
 
 
 @pytest.mark.parametrize(

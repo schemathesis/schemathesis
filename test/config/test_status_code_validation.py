@@ -1,36 +1,42 @@
 import pytest
 
-from schemathesis.config import ConfigError
-from schemathesis.config._checks import validate_status_codes
+from schemathesis.config import ConfigError, SchemathesisConfig
+
+
+def load_expected_statuses(codes):
+    config = SchemathesisConfig.from_dict({"checks": {"not_a_server_error": {"expected-statuses": codes}}})
+    return config.projects.default.checks.not_a_server_error.expected_statuses
 
 
 @pytest.mark.parametrize(
-    ("input_codes", "output", "error"),
+    "codes",
+    [["200", "404"], ["2xx", "4xx"], ["200", "2xx", "404", "4xx"], ["2X1", "21X"], [200, 404], []],
+    ids=["exact", "wildcards", "mixed", "single-wildcard-digit", "integers", "empty"],
+)
+def test_valid_expected_statuses(codes):
+    assert load_expected_statuses(codes) == [str(code) for code in codes]
+
+
+@pytest.mark.parametrize(
+    ("codes", "invalid"),
     [
-        (["200", "404"], ["200", "404"], None),
-        (["2xx", "4xx"], ["2xx", "4xx"], None),
-        (["200", "2xx", "404", "4xx"], ["200", "2xx", "404", "4xx"], None),
-        ([], [], None),
-        (["200", "600"], None, "Invalid status code(s): 600"),
-        (["2xx", "6xx"], None, "Invalid status code(s): 6xx"),
-        (["2xx", "xxx"], None, "Invalid status code(s): xxx"),
-        (["2xx", "999"], None, "Invalid status code(s): 999"),
-        (["200", "abc"], None, "Invalid status code(s): abc"),
-        (["200", "2bc"], None, "Invalid status code(s): 2bc"),
-        (["200", "2Xc"], None, "Invalid status code(s): 2Xc"),
-        (["200", "20"], None, "Invalid status code(s): 20"),
-        (["200", "2xxx"], None, "Invalid status code(s): 2xxx"),
-        (["200", "xx"], None, "Invalid status code(s): xx"),
+        (["200", "600"], "600"),
+        (["2xx", "6xx"], "6xx"),
+        (["2xx", "xxx"], "xxx"),
+        (["2xx", "999"], "999"),
+        (["200", "abc"], "abc"),
+        (["200", "2bc"], "2bc"),
+        (["200", "2Xc"], "2Xc"),
+        (["200", "20"], "20"),
+        (["200", "2xxx"], "2xxx"),
+        (["200", "xx"], "xx"),
+        (["600", "abc", "200"], "600, abc"),
     ],
 )
-def test_convert_status_codes(input_codes, output, error):
-    if error:
-        with pytest.raises(ConfigError) as excinfo:
-            validate_status_codes(input_codes)
-        assert error in str(excinfo.value)
-    else:
-        assert validate_status_codes(input_codes) == output
-
-
-def test_convert_status_codes_empty_input():
-    assert validate_status_codes(None) is None
+def test_invalid_expected_statuses(codes, invalid):
+    with pytest.raises(ConfigError) as exc:
+        load_expected_statuses(codes)
+    assert str(exc.value) == (
+        f"Invalid status code(s): {invalid}. Use valid 3-digit codes between 100 and 599, "
+        "or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit."
+    )
