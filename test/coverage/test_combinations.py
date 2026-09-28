@@ -4424,3 +4424,15 @@ def test_subsumed_one_of_branch_negative_is_not_filtered_by_sibling_not(ctx_fact
     assert mac_string is not None, values
     assert mac_string.generation_mode == GenerationMode.NEGATIVE
     assert not validator.is_valid(mac_string.value)
+
+
+def test_invalid_enum_values_do_not_run_hypothesis_per_position(nctx, mocker):
+    schema = {"type": "object", "properties": {f"key{idx}": {"enum": ["a", "b"]} for idx in range(40)}}
+    generate_one = mocker.spy(_schema.examples, "generate_one")
+    values = [
+        value.value
+        for value in cover_schema_iter(nctx, schema)
+        if value.scenario == CoverageScenario.INVALID_ENUM_VALUE
+    ]
+    assert len(values) == 40
+    assert generate_one.call_count < 5
