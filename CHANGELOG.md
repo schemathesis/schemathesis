@@ -83,6 +83,7 @@
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.
 - Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
+- Coverage phase ignoring captured identifiers for request body properties defined via `$ref`.
 
 #### Request serialization
 

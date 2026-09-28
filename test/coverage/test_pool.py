@@ -225,6 +225,53 @@ def test_coverage_consumes_body_field_keyed_pool(cli, snapshot_cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_consumes_pool_for_ref_body_property(cli, snapshot_cli, ctx):
+    paths = {
+        "/sessions": {
+            "post": {
+                "operationId": "createSession",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Session"}}},
+                    }
+                },
+            }
+        },
+        "/events": {
+            "post": {
+                "operationId": "createEvent",
+                "requestBody": _id_body("sessionId", {"$ref": "#/components/schemas/SessionId"}),
+                "responses": PLANTED_BUG_RESPONSES,
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        paths,
+        components={
+            "schemas": {
+                "SessionId": {"type": "string"},
+                "Session": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+            }
+        },
+    )
+
+    sessions: set[str] = set()
+
+    @app.route("/sessions", methods=["POST"])
+    def create_session():
+        session_id = f"session-{len(sessions)}"
+        sessions.add(session_id)
+        return jsonify({"id": session_id}), 201
+
+    @app.route("/events", methods=["POST"])
+    def create_event():
+        return _planted_bug_lookup(sessions, _json_string_field("sessionId"))
+
+    assert cli.run_openapi_app(app, "--phases=coverage", "-c response_schema_conformance") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_correlates_nested_resource_pool_picks(cli, snapshot_cli, ctx):
     # Independent picks return (U2, R1) but R1's parent is U1; only correlation matches the planted pair.
     paths = {
