@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, TypeGuard, cast
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
@@ -416,7 +416,7 @@ def _body_pool_overlays(
             value = correlated.get((ParameterLocation.BODY, prop_name))
             if value is not None:
                 try:
-                    if make_validator(prop_schema, validator_cls).is_valid(value):
+                    if make_validator(schema_with_bundle(prop_schema, body_schema), validator_cls).is_valid(value):
                         overlays[prop_name] = value
                         continue
                 except Exception:
@@ -425,7 +425,11 @@ def _body_pool_overlays(
         # an object-typed property is pool-eligible but its overlay key lives one level deeper.
         if isinstance(prop_schema, dict) and isinstance(prop_schema.get("properties"), dict):
             nested = _nested_body_pool_overlay(
-                correlated=correlated, outer_name=prop_name, inner_schema=prop_schema, validator_cls=validator_cls
+                correlated=correlated,
+                outer_name=prop_name,
+                inner_schema=prop_schema,
+                body_schema=body_schema,
+                validator_cls=validator_cls,
             )
             if nested:
                 overlays[prop_name] = _NestedOverlay(nested)
@@ -437,6 +441,7 @@ def _nested_body_pool_overlay(
     correlated: dict[tuple[ParameterLocation, str], Any],
     outer_name: str,
     inner_schema: dict[str, Any],
+    body_schema: dict[str, Any],
     validator_cls: type,
 ) -> dict[str, Any]:
     inner_props = inner_schema.get("properties")
@@ -449,7 +454,7 @@ def _nested_body_pool_overlay(
         if value is None:
             continue
         try:
-            if not make_validator(sub_schema, validator_cls).is_valid(value):
+            if not make_validator(schema_with_bundle(sub_schema, body_schema), validator_cls).is_valid(value):
                 continue
         except Exception:
             continue
