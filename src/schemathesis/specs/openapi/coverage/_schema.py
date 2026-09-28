@@ -4145,6 +4145,9 @@ def _negative_type(
             return True
 
     def _does_not_match_the_original_schema(value: Any) -> bool:
+        # A query list travels as one repeated parameter per item, and the server may read any of them.
+        if ctx.location == ParameterLocation.QUERY and isinstance(value, list):
+            return not any(is_valid(ctx.wire.observed(item)) for item in value)
         return not is_valid(ctx.wire.observed(value))
 
     if ctx.wire.url_part():

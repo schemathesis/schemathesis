@@ -106,6 +106,7 @@
 - `negative_data_rejection` for multipart bodies with `--generation-unique-inputs`.
 - `validation_mismatch`, `missing_test_data` and `missing_auth` warnings from undeclared-method requests.
 - `validation_mismatch` and `missing_test_data` warnings from negative test cases.
+- `negative_data_rejection` for repeated string query parameters whose every value is valid.
 
 #### Others
 

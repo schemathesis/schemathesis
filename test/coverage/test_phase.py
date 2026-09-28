@@ -1179,7 +1179,12 @@ def test_negative_patterns(ctx):
     )
 
 
-def test_query_parameters_always_negative():
+@pytest.mark.parametrize(
+    "modes",
+    [[GenerationMode.NEGATIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],
+    ids=["negative", "mixed"],
+)
+def test_query_parameters_always_negative(modes):
     # See GH-2900
     schema = {
         "openapi": "3.0.3",
@@ -1220,7 +1225,7 @@ def test_query_parameters_always_negative():
         },
     }
 
-    assert_negative_coverage(schema, ANY, ("/password", "get"))
+    assert_coverage(schema, modes, ANY, ("/password", "get"))
 
 
 def test_array_in_header_path_query(ctx):

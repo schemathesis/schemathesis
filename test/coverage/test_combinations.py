@@ -293,8 +293,8 @@ def test_positive_string(ctx_factory, schema, lengths):
     [
         # Too permissing - all values will be stringified anyway
         ({"type": "string"}, []),
-        ({"type": "string", "minLength": 5}, [0, 0.5, "true", "null", "0000"]),
-        ({"type": "string", "maxLength": 10}, [["null", "null"], "00000000000"]),
+        ({"type": "string", "minLength": 5}, [0, 0.5, "true", "null", ["null", "null"], "0000"]),
+        ({"type": "string", "maxLength": 10}, ["00000000000"]),
         (
             {"type": "string", "minLength": 5, "maxLength": 10},
             [0, 0.5, "true", "null", ["null", "null"], "0000", "00000000000"],
@@ -1512,11 +1512,18 @@ def test_no_type_violation_when_the_schema_accepts_every_stringified_value(nctx,
     assert scenario_values(nctx, schema, CoverageScenario.INCORRECT_TYPE) == []
 
 
+def _wire_values(location, value):
+    # A query list reaches the server as one repeated parameter per item.
+    if location == ParameterLocation.QUERY and isinstance(value, list):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
 @pytest.mark.parametrize(
     "schema",
     [
         {"type": "string", "minLength": 2},
-        {"type": "string", "maxLength": 8},
+        {"type": "string", "maxLength": 3},
         {"type": "string", "enum": ["a"]},
         {"type": "integer"},
     ],
@@ -1525,14 +1532,16 @@ def test_no_type_violation_when_the_schema_accepts_every_stringified_value(nctx,
 def test_type_violations_break_the_schema_once_stringified(nctx, schema):
     values = scenario_values(nctx, schema, CoverageScenario.INCORRECT_TYPE)
     validator = jsonschema_rs.Draft4Validator(schema)
-    assert values and not any(validator.is_valid(str(value)) for value in values)
+    assert values and not any(
+        validator.is_valid(item) for value in values for item in _wire_values(ParameterLocation.QUERY, value)
+    )
 
 
 @pytest.mark.parametrize(
     ("location", "schema", "expected"),
     [
         (ParameterLocation.QUERY, {"type": "string", "pattern": "[0-9]"}, ["true", "null", ["null", "null"]]),
-        (ParameterLocation.QUERY, {"type": "string", "minLength": 5}, [0, 0.5, "true", "null"]),
+        (ParameterLocation.QUERY, {"type": "string", "minLength": 5}, [0, 0.5, "true", "null", ["null", "null"]]),
         (ParameterLocation.QUERY, {"type": "string", "enum": ["alpha"]}, [0, 0.5, "true", "null", ["null", "null"]]),
         (ParameterLocation.QUERY, {"type": "integer", "minimum": 5}, [0.5, "true", "null", "AAA", ["null", "null"]]),
         (ParameterLocation.QUERY, {"type": "boolean"}, [2, 0.5, "null", "AAA", ["null", "null"]]),
@@ -1558,7 +1567,7 @@ def test_type_violations_cover_every_wrong_type_the_schema_turns_down(ctx_factor
     values = scenario_values(ctx, schema, CoverageScenario.INCORRECT_TYPE)
     assert values == expected
     validator = jsonschema_rs.Draft4Validator(schema)
-    assert not any(validator.is_valid(str(value)) for value in values)
+    assert not any(validator.is_valid(item) for value in values for item in _wire_values(location, value))
 
 
 def test_negative_pattern_with_incompatible_length(nctx):
