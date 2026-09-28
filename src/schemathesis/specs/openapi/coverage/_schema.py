@@ -2265,6 +2265,14 @@ def _negative_all_of(
                 yield from cover_schema_iter(nctx, folded, seen)
 
 
+def _branches_to_negate(branches: list[JsonSchema]) -> list[tuple[int, JsonSchema]]:
+    # A `false` branch matches nothing, so beside other branches it adds no negatives of its own: everything
+    # it rejects is negated through them, where wire rules (e.g. any query value is a string) still apply.
+    if all(branch is False for branch in branches):
+        return list(enumerate(branches))
+    return [(idx, branch) for idx, branch in enumerate(branches) if branch is not False]
+
+
 def _negative_any_of(
     ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
@@ -2276,7 +2284,7 @@ def _negative_any_of(
     # back to their declared type before validation, so str() doesn't make them
     # valid for explicitly string-typed branches in that case.
     stringify_body_fields = ctx.wire.form_body()
-    for idx, sub_schema in enumerate(value):
+    for idx, sub_schema in _branches_to_negate(value):
         with nctx.at(idx):
             for generated in cover_schema_iter(nctx, sub_schema, seen):
                 # Negative value for this schema could be a positive value for another one
@@ -2292,7 +2300,7 @@ def _negative_one_of(
     # Branches as written: the validator resolves `$ref` itself, so keywords beside it
     # count exactly as the operation's draft reads them.
     validators = _make_branch_validators(value, ctx)
-    for idx, sub_schema in enumerate(value):
+    for idx, sub_schema in _branches_to_negate(value):
         with nctx.at(idx):
             for generated in cover_schema_iter(nctx, sub_schema, seen):
                 if is_invalid_for_oneOf(generated.value, idx, validators):

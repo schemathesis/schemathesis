@@ -7942,6 +7942,30 @@ def test_boolean_parameter_schema(ctx, location, boolean_schema):
 
 
 @pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "string"},
+        {"anyOf": [{"type": "string"}, False]},
+        {"oneOf": [{"type": "string"}, False]},
+        {"allOf": [{"type": "string"}, True]},
+    ],
+    ids=["plain", "anyOf-false", "oneOf-false", "allOf-true"],
+)
+def test_string_query_parameter_with_boolean_subschema_has_no_wire_valid_negatives(ctx, schema):
+    # Every query value is a string on the wire, so only omitting the parameter is negative.
+    operation = load_schema(
+        ctx,
+        parameters=[{"name": "q", "in": "query", "required": True, "schema": schema}],
+        path="/items",
+        method="get",
+        version="3.1.0",
+    )["/items"]["get"]
+    assert [(case.query, case.meta.phase.data.scenario) for case in iter_cases(operation, GenerationMode.NEGATIVE)] == [
+        ({}, CoverageScenario.MISSING_PARAMETER)
+    ]
+
+
+@pytest.mark.parametrize(
     "media_type",
     [
         "application/json",
