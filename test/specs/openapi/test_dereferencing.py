@@ -1524,3 +1524,49 @@ def test_external_path_items_reparsed_after_document_eviction(ctx):
         load_file_uri.cache_clear()
         gc.collect()
     assert corrupted == []
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("version", "accepts_body_without_extra"),
+    [("3.1.0", False), ("3.0.3", True)],
+    ids=["siblings-apply", "siblings-ignored"],
+)
+def test_top_level_body_ref_siblings(ctx, version, accepts_body_without_extra):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Base",
+                                    "properties": {"extra": {"type": "integer"}},
+                                    "required": ["extra"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+        components={
+            "schemas": {"Base": {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}}
+        },
+    )
+    body = schema["/items"]["POST"].body[0]
+    bodies = []
+
+    @given(case=schema["/items"]["POST"].as_strategy())
+    @settings(max_examples=10, database=None)
+    def test(case):
+        bodies.append(case.body)
+
+    test()
+
+    assert body.is_valid({"a": "x"}) is accepts_body_without_extra
+    assert [value for value in bodies if not body.is_valid(value)] == []

@@ -77,6 +77,7 @@
 #### Data generation
 
 - Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
+- Open API 3.1 `$ref` siblings dropped when the target defines the same keyword.
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.
 - Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
