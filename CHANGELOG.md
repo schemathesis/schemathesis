@@ -121,6 +121,10 @@
 - Network errors when a server closes a keep-alive connection without `Connection: close`.
 - Raw or misleading config errors for wrong value types, duplicate list items and non-string choices.
 
+### :racing_car: Performance
+
+- Coverage phase ~1.6x faster on schemas with many `enum` or `const` positions, such as recursive request bodies.
+
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 
 ### :rocket: Added

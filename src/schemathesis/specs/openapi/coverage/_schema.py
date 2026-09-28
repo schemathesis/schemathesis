@@ -11,7 +11,7 @@ from contextlib import ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from fractions import Fraction
-from functools import partial
+from functools import cache, partial
 from hashlib import blake2b
 from itertools import combinations, count, islice
 from math import ceil, floor, inf, isinf, nextafter, ulp
@@ -3505,6 +3505,26 @@ def _negative_const(
     yield from _negative_enum(ctx, schema, [value], seen)
 
 
+INVALID_ENUM_STRATEGY: st.SearchStrategy = NEGATIVE_STRING_STRATEGY | st.none() | st.booleans() | NUMERIC_STRATEGY
+
+
+@cache
+def _invalid_enum_candidates() -> tuple[Any, ...]:
+    # A seeded run is decided by what its filter rejected so far, so the values a filter that
+    # rejects everything sees are the ones any filter sees until it first accepts one.
+    candidates: list[Any] = []
+
+    def reject(value: Any) -> bool:
+        candidates.append(value)
+        return False
+
+    try:
+        examples.generate_one(INVALID_ENUM_STRATEGY.filter(reject))
+    except Exception:
+        pass
+    return tuple(candidates)
+
+
 def _negative_enum(
     ctx: CoverageContext, schema: dict, value: list, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
@@ -3513,9 +3533,11 @@ def _negative_enum(
             return False
         return seen.insert(x)
 
-    strategy = (NEGATIVE_STRING_STRATEGY | st.none() | st.booleans() | NUMERIC_STRATEGY).filter(is_not_in_value)
+    invalid = next((x for x in _invalid_enum_candidates() if is_not_in_value(x)), NOT_SET)
+    if invalid is NOT_SET:
+        invalid = ctx.generate_from(INVALID_ENUM_STRATEGY.filter(is_not_in_value))
     yield NegativeValue(
-        ctx.generate_from(strategy),
+        invalid,
         scenario=CoverageScenario.INVALID_ENUM_VALUE,
         description="Invalid enum value",
         location=ctx.current_path,
