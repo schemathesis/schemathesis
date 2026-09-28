@@ -859,22 +859,15 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
         instant = Instant()
 
         multipart_body = _generate_multipart_body_from_custom_strategies(body)
+        first_custom_value: GeneratedValue | None
         if multipart_body is not None:
-            if body.is_required:
-                template.has_generated_required_body = True
-            if "body" not in template:
-                template.set_body(
-                    GeneratedValue.with_positive(
-                        value=multipart_body,
-                        scenario=CoverageScenario.EXAMPLE_VALUE,
-                        description="Multipart body with custom encoding",
-                    ),
-                    body.media_type,
-                )
-            continue
-
-        custom_gen = _generate_coverage_values_from_custom_strategy(body.media_type)
-        first_custom_value = next(custom_gen, None)
+            first_custom_value = GeneratedValue.with_positive(
+                value=multipart_body,
+                scenario=CoverageScenario.EXAMPLE_VALUE,
+                description="Multipart body with custom encoding",
+            )
+        else:
+            first_custom_value = next(_generate_coverage_values_from_custom_strategy(body.media_type), None)
 
         if first_custom_value is not None:
             if body.is_required:
@@ -883,7 +876,7 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
             if "body" not in template:
                 template.seed_time += elapsed
                 template.set_body(first_custom_value, body.media_type)
-            if not _is_invalid_positive(template, first_custom_value):
+            if GenerationMode.POSITIVE in generation_modes and not _is_invalid_positive(template, first_custom_value):
                 data = template.with_body(value=first_custom_value, media_type=body.media_type)
                 yield emitter.build(
                     data,
