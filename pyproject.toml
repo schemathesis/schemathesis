@@ -201,6 +201,7 @@ ignore = [
 "copy.deepcopy".msg = "Use `schemathesis.core.transforms.deepclone`, which is much faster on the JSON-shaped data this project copies."
 "unittest.mock.MagicMock".msg = "Tests build real schemas, apps and responses via the `ctx`, `case_factory` and `response_factory` fixtures."
 "unittest.mock.Mock".msg = "Tests build real schemas, apps and responses via the `ctx`, `case_factory` and `response_factory` fixtures."
+"hypothesis.strategies.randoms".msg = "Use `schemathesis.generation.hypothesis.uniform_randoms`: tracked `st.randoms()` skews `random()` far from uniform, so probability gates fire several times above their rate."
 
 [tool.ruff.lint.isort]
 known-first-party = ["schemathesis", "tools"]

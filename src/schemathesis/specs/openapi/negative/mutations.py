@@ -21,6 +21,7 @@ from schemathesis.core.media_types import is_xml
 from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
+from schemathesis.generation.hypothesis import uniform_randoms
 from schemathesis.specs.openapi.headers import PLAIN_HEADER_FORMATS
 from schemathesis.specs.openapi.negative.types import Draw, Schema
 from schemathesis.specs.openapi.negative.utils import can_negate, is_binary_format
@@ -496,7 +497,7 @@ class MutationContext:
         bundle = new_schema.get(BUNDLE_STORAGE_KEY)
         bundle_map = bundle if isinstance(bundle, dict) else {}
 
-        random_state = draw(st.randoms())
+        random_state = draw(uniform_randoms())
         # Operator-swarm mask: each case sees a random subset of operators
         # (Groce et al., "Swarm Testing", ISSTA '12, DOI 10.1145/2338965.2336763).
         enabled_operators = draw(st.shared(FeatureStrategy(), key="operators"))
@@ -811,7 +812,7 @@ def _get_type_candidates_with_weights(ctx: MutationContext, schema: Schema, draw
     candidates = _get_type_candidates(ctx, schema)
     if ctx.is_path_location:
         types = set(get_type(schema))
-        random = draw(st.randoms())
+        random = draw(uniform_randoms())
         if "null" not in types and random.random() < PATH_NULL_BOOLEAN_PROBABILITY:
             candidates.add("null")
         if "boolean" not in types and random.random() < PATH_NULL_BOOLEAN_PROBABILITY:

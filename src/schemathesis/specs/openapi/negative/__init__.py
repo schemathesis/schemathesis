@@ -24,6 +24,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_json
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.hypothesis import uniform_randoms
 from schemathesis.generation.jsonschema.builder import build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.jsonschema.strategy import DECLINED
@@ -375,7 +376,7 @@ def negative_schema(
 
         @st.composite  # type: ignore[untyped-decorator]
         def hybrid(draw: Any) -> GeneratedValue:
-            random = draw(st.randoms())
+            random = draw(uniform_randoms())
             if random.random() < VALUE_CHANNEL_PROBABILITY:
                 positive = draw(positive_strategy)
                 targets = collect_value_targets(positive, body_schema)
@@ -432,7 +433,7 @@ def negative_schema(
 
         @st.composite  # type: ignore[untyped-decorator]
         def with_syntax_fuzzing(draw: Any) -> GeneratedValue:
-            random = draw(st.randoms())
+            random = draw(uniform_randoms())
             if random.random() < SYNTAX_FUZZING_PROBABILITY:
                 return draw(syntax_fuzzing_strategy)
             return draw(mutated_strategy)

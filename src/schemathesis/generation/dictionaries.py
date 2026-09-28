@@ -23,6 +23,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, sch
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis import uniform_randoms
 from schemathesis.generation.value import GeneratedValue
 from schemathesis.resources import PoolDraw, SemanticDraw
 from schemathesis.specs.openapi.adapter.parameters import _prune_overwritten_constants
@@ -202,7 +203,7 @@ def build_dictionary_overlay_strategy(
         else:
             value = produced
 
-        random = draw(st.randoms())
+        random = draw(uniform_randoms())
 
         # Share the slot 50/50 when the semantic-pool overlay already filled the same parameter.
         semantically_substituted: set[str] = {
@@ -409,7 +410,7 @@ def build_body_dictionary_overlay_strategy(
         else:
             value = produced
 
-        random = draw(st.randoms())
+        random = draw(uniform_randoms())
         new_draws: list[DictionaryDraw] = []
         for binding, eligible in eligible_per_binding:
             value = _walk_substitute(

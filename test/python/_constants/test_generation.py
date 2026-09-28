@@ -122,8 +122,6 @@ def test_registered_constants_apply_to_direct_state_machine():
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
     class Workflow(schema.as_state_machine()):
-        constant_was_used = False
-
         # Only the generated cases matter here; skip checks so an unrelated response never aborts the run.
         def validate_response(self, *args, **kwargs):
             pass
@@ -132,20 +130,24 @@ def test_registered_constants_apply_to_direct_state_machine():
             if case._meta is not None and any(
                 draw.value == graphql_string_pool.TOKEN for draw in case._meta.constants_draws
             ):
-                type(self).constant_was_used = True
+                raise RegisteredConstantUsed
 
-    Workflow.run(
-        settings=settings(
-            max_examples=50,
-            database=None,
-            deadline=None,
-            phases=[Phase.generate],
-            stateful_step_count=1,
-            suppress_health_check=list(HealthCheck),
+    # The app's own constants share the pool, so the registered one is a rare pick; stop at the first.
+    with pytest.raises(RegisteredConstantUsed):
+        Workflow.run(
+            settings=settings(
+                max_examples=3000,
+                database=None,
+                deadline=None,
+                phases=[Phase.generate],
+                stateful_step_count=1,
+                suppress_health_check=list(HealthCheck),
+            )
         )
-    )
 
-    assert Workflow.constant_was_used
+
+class RegisteredConstantUsed(Exception):
+    pass
 
 
 def test_constant_applied_to_body_in_fuzz_mode():

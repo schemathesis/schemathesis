@@ -12,7 +12,7 @@ from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
 from schemathesis.config import GenerationConfig
-from schemathesis.core import NOT_SET, media_types
+from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.cache import MISSING
 from schemathesis.core.control import SkipTest
 from schemathesis.core.error_feedback import ErrorFeedbackStore, ObservationKind
@@ -36,7 +36,7 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone, to_wire_string
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis import custom_formats_cache
+from schemathesis.generation.hypothesis import custom_formats_cache, uniform_randoms
 from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_schema_error
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
 from schemathesis.generation.jsonschema.context import Alphabet
@@ -599,17 +599,23 @@ def _maybe_set_optional_body(
     draw: st.DrawFn,
     error_feedback: ErrorFeedbackStore | None,
 ) -> st.SearchStrategy:
-    """Add NOT_SET option to strategy for optional body parameters."""
+    """Omit optional bodies in `OPTIONAL_BODY_RATE` of cases."""
     if _body_required_per_feedback(operation, error_feedback):
         return strategy
-    if not parameter.is_required and (
-        # An optional body whose schema admits no value can only be omitted.
-        strategy is EMPTY_STRATEGY
-        or draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
-        < OPTIONAL_BODY_RATE
-    ):
-        strategy |= _JUST_NOT_SET
+    if parameter.is_required:
+        return strategy
+    # An optional body whose schema admits no value can only be omitted.
+    if strategy is EMPTY_STRATEGY:
+        return _JUST_NOT_SET
+    if draw(uniform_randoms()).random() < OPTIONAL_BODY_RATE:
+        # Draw a body and discard it: Hypothesis re-runs examples with more drawn structure, so a bare omission
+        # would be under-represented. Keep the empty branch for bodies that fail to generate.
+        return (strategy | _JUST_NOT_SET).map(_omit)
     return strategy
+
+
+def _omit(_: object) -> NotSet:
+    return NOT_SET
 
 
 def _build_form_strategy_with_encoding(
@@ -1166,7 +1172,7 @@ def _build_custom_formats_uncached(
             # Negative mode: Occasionally allow invalid characters
             @st.composite  # type: ignore[untyped-decorator]
             def header_strategy(draw: st.DrawFn) -> str:
-                random = draw(st.randoms())
+                random = draw(uniform_randoms())
                 if random.random() < VALID_HEADER_PROBABILITY:
                     return draw(header_values(codec="ascii", exclude_characters=valid_exclude))
                 return draw(header_values(**header_values_kwargs))

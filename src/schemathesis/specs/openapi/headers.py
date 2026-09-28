@@ -4,6 +4,7 @@ from datetime import timezone
 from email.utils import format_datetime
 from typing import TYPE_CHECKING
 
+from schemathesis.generation.hypothesis import uniform_randoms
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, header_values
 
 if TYPE_CHECKING:
@@ -93,21 +94,21 @@ def get_header_format_strategies(mode: GenerationMode) -> dict[str, st.SearchStr
 
     @st.composite  # type: ignore[untyped-decorator]
     def mixed_if_match(draw: st.DrawFn) -> str:
-        rng = draw(st.randoms())
+        rng = draw(uniform_randoms())
         if rng.random() < STRUCTURED_HEADER_PROBABILITY:
             return draw(if_match_values())
         return draw(header_values())
 
     @st.composite  # type: ignore[untyped-decorator]
     def mixed_http_date(draw: st.DrawFn) -> str:
-        rng = draw(st.randoms())
+        rng = draw(uniform_randoms())
         if rng.random() < STRUCTURED_HEADER_PROBABILITY:
             return draw(http_date_values())
         return draw(header_values())
 
     @st.composite  # type: ignore[untyped-decorator]
     def mixed_range(draw: st.DrawFn) -> str:
-        rng = draw(st.randoms())
+        rng = draw(uniform_randoms())
         r = rng.random()
         if r < 0.50:
             return draw(range_values())

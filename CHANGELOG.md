@@ -110,6 +110,7 @@
 - Crash files lost when a negative mutation stored a `bytes` value.
 - Wrong or crashing request URLs for GraphQL schemas loaded from files or dictionaries.
 - Network errors when a server closes a keep-alive connection without `Connection: close`.
+- Apply fuzz dictionary `probability` and internal generation rates at their configured frequency.
 
 ## [4.28.0](https://github.com/schemathesis/schemathesis/compare/v4.27.5...v4.28.0) - 2026-09-23
 

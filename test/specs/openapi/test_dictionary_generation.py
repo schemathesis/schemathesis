@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, Phase, given, seed, settings
 from hypothesis import strategies as st
 
 from schemathesis.config import ConfigError, SchemathesisConfig
@@ -1026,6 +1026,30 @@ def test_body_binding_probability_mixes_substituted_and_native(ctx):
 
     collect()
     assert substituted > 0 and native > 0, f"probability 0.3 did not mix outcomes: subst={substituted}, native={native}"
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize("probability", [0.3, 0.8])
+def test_body_binding_substitutes_at_its_configured_rate(ctx, probability):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"tokens": {"values": ["SENTINEL"]}},
+            "parameters": {"body.token": {"dictionary": "tokens", "probability": probability}},
+        },
+        _path_with_body({"type": "object", "properties": {"token": {"type": "string"}}, "required": ["token"]}),
+    )
+    substituted = []
+
+    # A rate check needs enough draws that sampling noise stays well inside the tolerance.
+    @seed(1)
+    @given(case=schema["/items"]["POST"].as_strategy())
+    @settings(max_examples=1000, database=None, deadline=None, phases=[Phase.generate])
+    def collect(case):
+        substituted.append(case.body["token"] == "SENTINEL")
+
+    collect()
+    assert probability - 0.1 < sum(substituted) / len(substituted) < probability + 0.1
 
 
 @pytest.mark.hypothesis_nested

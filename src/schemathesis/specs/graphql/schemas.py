@@ -31,6 +31,7 @@ from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
+from schemathesis.generation.hypothesis import uniform_randoms
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -606,7 +607,7 @@ def graphql_cases(
         # A captured identifier would overwrite the argument the negative strategy deliberately
         # corrupted, turning the query valid and making the server's acceptance look like a bug.
         if isinstance(extra_data_source, GraphQLResourcePool) and effective_mode.is_positive:
-            random_source = draw(st.randoms())
+            random_source = draw(uniform_randoms())
             if random_source.random() < SUBSTITUTION_PROBABILITY:
                 substitute_pool_values(
                     operation_node=operation_node,
@@ -626,7 +627,7 @@ def graphql_cases(
                         client_schema=operation.schema.client_schema,
                         bindings=dictionary_bindings,
                         operation_label=operation.label,
-                        random=draw(st.randoms()),
+                        random=draw(uniform_randoms()),
                     )
                 )
         if constants_value_source is not None and effective_mode.is_positive:
@@ -635,7 +636,7 @@ def graphql_cases(
                     operation_node=operation_node,
                     client_schema=operation.schema.client_schema,
                     pool=constants_value_source,
-                    random=draw(st.randoms()),
+                    random=draw(uniform_randoms()),
                     skip=frozenset(
                         tuple(draw_.body_path.lstrip("/").split("/"))
                         for draw_ in dictionary_draws
@@ -644,7 +645,7 @@ def graphql_cases(
                 )
             )
         if mutate_ast is not None:
-            mutate_ast(operation_node, draw(st.randoms()))
+            mutate_ast(operation_node, draw(uniform_randoms()))
     body = graphql.print_ast(ast_node)
 
     path_parameters_ = _generate_parameter(

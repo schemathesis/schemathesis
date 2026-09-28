@@ -71,7 +71,7 @@ def _build_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> di
     ):
         kwargs["extra_data_source"] = ctx.extra_data_source
     # The pool is extracted once before this run and is read-only during draws, and value
-    # selection uses Hypothesis's own `st.randoms()` -- so the strategy is reproducible with
+    # selection draws its randomness through Hypothesis -- so the strategy is reproducible with
     # no external randomness or mutable state for Hypothesis to flag as flaky.
     if not ctx.constants_extraction.is_empty():
         kwargs["constants_value_source"] = ctx.constants_extraction

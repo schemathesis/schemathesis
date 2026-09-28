@@ -1,6 +1,6 @@
 import jsonschema_rs
 import pytest
-from hypothesis import HealthCheck, find, given, settings
+from hypothesis import HealthCheck, Phase, find, given, seed, settings
 from hypothesis import strategies as st
 from hypothesis.errors import NoSuchExample
 
@@ -268,3 +268,37 @@ def test_value_channel_base_body_is_valid():
             is_invalid_before_mutation,
             settings=settings(max_examples=1000, database=None, deadline=None, suppress_health_check=_SUPPRESSED),
         )
+
+
+def test_value_channel_fires_at_its_nominal_rate():
+    # Many draws with a fixed seed: the share of value-channel bodies must track `VALUE_CHANNEL_PROBABILITY`.
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string", "maxLength": 5}},
+        "required": ["name"],
+    }
+    channels = []
+
+    @seed(1)
+    @given(data=st.data())
+    @settings(
+        deadline=None, suppress_health_check=_SUPPRESSED, max_examples=1000, database=None, phases=[Phase.generate]
+    )
+    def collect(data):
+        result = data.draw(
+            negative_schema(
+                schema,
+                operation_name="POST /users/",
+                location=ParameterLocation.BODY,
+                media_type="application/json",
+                custom_formats=get_default_format_strategies(),
+                generation_config=GenerationConfig(),
+                validator_cls=jsonschema_rs.Draft4Validator,
+            )
+        )
+        channels.append(
+            result.meta is not None and any(m.channel == MutationChannel.VALUE for m in result.meta.mutations)
+        )
+
+    collect()
+    assert 0.10 < sum(channels) / len(channels) < 0.20

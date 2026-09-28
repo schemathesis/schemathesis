@@ -19,6 +19,7 @@ from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCa
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
+from schemathesis.generation.hypothesis import uniform_randoms
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.control import TransitionController
@@ -370,7 +371,7 @@ def into_step_input(
     def builder(_output: StepOutput) -> st.SearchStrategy[StepInput]:
         @st.composite  # type: ignore[untyped-decorator]
         def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
-            random = draw(st.randoms(use_true_random=True))
+            random = draw(uniform_randoms())
 
             def biased_coin(p: float) -> bool:
                 return random.random() < p
@@ -397,7 +398,7 @@ def into_step_input(
 
                     value = extracted.value.ok()
                     # Wildcard expressions yield multiple candidates. Pick via the
-                    # `use_true_random` instance so the per-step pick stays out of
+                    # seeded generator so the per-step pick stays out of
                     # Hypothesis's data tree — the producer's response shape can vary
                     # across runs of the same byte stream when the API has mutable
                     # state, and a tracked draw would be flagged as inconsistent.

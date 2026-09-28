@@ -32,6 +32,7 @@ from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation, SkippedParameter
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
+from schemathesis.generation.hypothesis import uniform_randoms
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.value import GeneratedValue
@@ -168,8 +169,7 @@ def build_semantic_overlay(
             body = base
         if not isinstance(body, dict):
             return base
-        # `st.floats` shrinks toward 0, biasing substitution well above the configured probability.
-        random = draw(st.randoms())
+        random = draw(uniform_randoms())
         # `inner_strategy` may be `build_example_aware_strategy`, which returns a shared
         # example dict by reference. Defer the deepclone until a substitution actually fires
         # so non-substituting draws keep the zero-copy fast path.
@@ -357,7 +357,7 @@ def build_constants_overlay_strategy(
     @st.composite  # type: ignore[untyped-decorator,unused-ignore]
     def overlay(draw: st.DrawFn) -> Any:
         produced = draw(inner)
-        random = draw(st.randoms())
+        random = draw(uniform_randoms())
         value = produced.value if isinstance(produced, GeneratedValue) else produced
         if not isinstance(value, dict):
             return produced
@@ -629,7 +629,7 @@ def build_hybrid_strategy(
 
     @st.composite  # type: ignore[untyped-decorator]
     def hybrid(draw: st.DrawFn) -> Any:
-        random = draw(st.randoms())
+        random = draw(uniform_randoms())
 
         # Decide: use captured variant or generate fresh?
         if random.random() >= CAPTURED_VALUES_PROBABILITY:
@@ -773,7 +773,7 @@ def build_positive_biased_path_strategy(
         params = draw(strategy)
         if params is None:
             return params
-        return _bias_path_integers_to_positive(params, draw(st.randoms()), validators)
+        return _bias_path_integers_to_positive(params, draw(uniform_randoms()), validators)
 
     return biased()
 
@@ -802,16 +802,12 @@ def build_example_aware_strategy(
 
     Uses examples approximately 20% of the time to provide coverage of domain-specific
     values while still allowing hypothesis-generated exploration (~80%).
-
-    Uses true randomness (not Hypothesis's reproducible random) to ensure the
-    probability distribution is uniform and not affected by shrinking behavior.
     """
     from hypothesis import strategies as st
 
     @st.composite  # type: ignore[untyped-decorator]
     def with_examples(draw: st.DrawFn) -> Any:
-        # Use true random for uniform distribution (like stateful phase)
-        random = draw(st.randoms(use_true_random=True))
+        random = draw(uniform_randoms())
 
         # 20% use example, 80% generate fresh
         if random.random() >= EXAMPLE_USAGE_PROBABILITY:
@@ -857,8 +853,6 @@ def build_parameter_example_aware_strategy(
     For each parameter with examples, approximately 20% chance to replace its
     generated value with one of the examples. Parameters without examples keep
     their generated values. Equally-named examples are applied as a whole.
-
-    Uses true randomness for uniform probability distribution.
     """
     from hypothesis import strategies as st
 
@@ -870,8 +864,7 @@ def build_parameter_example_aware_strategy(
         if result is None:
             return result
 
-        # Use true random for uniform distribution
-        random = draw(st.randoms(use_true_random=True))
+        random = draw(uniform_randoms())
 
         chosen: dict[str, JsonValue] = {}
         if correlated and random.random() < EXAMPLE_USAGE_PROBABILITY:
@@ -1637,7 +1630,7 @@ class OpenApiBody(OpenApiComponent):
 
         @st.composite  # type: ignore[untyped-decorator]
         def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
-            random = draw(st.randoms())
+            random = draw(uniform_randoms())
             if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
                 return draw(negative_strategy)
             return draw(positive_strategy)
@@ -2566,7 +2559,7 @@ class OpenApiParameterSet(ParameterSet):
 
         @st.composite  # type: ignore[untyped-decorator]
         def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
-            random = draw(st.randoms())
+            random = draw(uniform_randoms())
             if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
                 return draw(negative_strategy)
             return draw(positive_strategy)

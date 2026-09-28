@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import functools
+import zlib
 from collections.abc import Callable
-from typing import Final
+from random import Random
+from typing import TYPE_CHECKING, Final
 
 from schemathesis.core.cache import MISSING, BoundedCache
+
+if TYPE_CHECKING:
+    from hypothesis.strategies import SearchStrategy
 
 # Sentinel cached when generation raised `Unsatisfiable`.
 UNSATISFIABLE_RESULT: Final = object()
@@ -54,3 +60,27 @@ def setup() -> None:
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     setup._is_patched = True  # type: ignore[attr-defined]
+
+
+def uniform_randoms() -> SearchStrategy[Random]:
+    """`Random` instances whose draws follow the distribution they name, for probability gates and weighted picks."""
+    return _uniform_randoms_strategy()
+
+
+@functools.cache
+def _uniform_randoms_strategy() -> SearchStrategy[Random]:
+    from hypothesis.internal.conjecture.data import ConjectureData
+    from hypothesis.strategies import SearchStrategy
+
+    class UniformRandoms(SearchStrategy[Random]):
+        def do_draw(self, data: ConjectureData) -> Random:
+            # Tracked `st.randoms()` makes every call a Hypothesis choice skewed toward boundary values, so a
+            # `random() < 0.05` gate fires ~20% of the time. One seeded generator per draw keeps the stated rate.
+            seed = data.draw_integer(0, 2**64 - 1)
+            if seed == 0:
+                # Hypothesis fills the tail of its early examples with zeros, which would give up to half of all
+                # cases the same generator; what they drew before this point still differs, so seed from that.
+                seed = zlib.crc32(repr(data.choices).encode())
+            return Random(seed)
+
+    return UniformRandoms()
