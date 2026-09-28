@@ -1,8 +1,14 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from schemathesis.core.fs import ensure_parent
+
+if TYPE_CHECKING:
+    from schemathesis.config import ProjectConfig
 
 
 def open_file(file: Path) -> None:
@@ -21,6 +27,16 @@ def prepare_directory(directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
     except (OSError, ValueError) as exc:
         raise click.BadParameter(f"Could not create directory {directory.name!r}: {_describe(exc)}") from exc
+
+
+def load_baseline(config: ProjectConfig) -> None:
+    # Opening a directory fails with "Permission denied" on Windows, which hides the real problem.
+    if config.baseline is not None and Path(config.baseline).is_dir():
+        raise click.BadParameter(f"Could not load baseline file {config.baseline!r}: Is a directory")
+    try:
+        config.load_baseline()
+    except (OSError, ValueError) as exc:
+        raise click.BadParameter(f"Could not load baseline file {config.baseline!r}: {_describe(exc)}") from exc
 
 
 def _describe(exc: OSError | ValueError) -> str:

@@ -1,4 +1,5 @@
 import json
+import platform
 from datetime import date
 
 import pytest
@@ -202,6 +203,75 @@ def test_missing_baseline_is_created_from_the_run(ctx, cli, tmp_path):
     run(cli, ctx.openapi.apps.failure(), f"--baseline={BASELINE}", "--phases=fuzzing")
 
     assert recorded_operations(tmp_path) == ["GET /api/failure"]
+
+
+@pytest.mark.parametrize(
+    ("flags", "config"),
+    [
+        (("--baseline=missing-dir/baseline.json",), None),
+        ((), {"baseline": "missing-dir/baseline.json"}),
+    ],
+    ids=["flag", "config"],
+)
+def test_missing_baseline_directory_is_created(ctx, cli, tmp_path, flags, config):
+    run(cli, ctx.openapi.apps.failure(), *flags, "--phases=fuzzing", config=config)
+
+    assert [
+        entry["operation"] for entry in json.loads((tmp_path / "missing-dir" / "baseline.json").read_text())["entries"]
+    ] == ["GET /api/failure"]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"{",
+        b"\xff",
+        b"[]",
+        b'{"format_version": 99, "entries": []}',
+        b'{"format_version": 1, "entries": {}}',
+        b'{"format_version": 1, "entries": ["GET /api/failure"]}',
+        b'{"format_version": 1, "entries": [{"operation": "GET /api/failure"}]}',
+        json.dumps({"format_version": 1, "entries": [{**SERVER_ERROR, "expires": "soon"}]}).encode(),
+    ],
+    ids=[
+        "invalid-json",
+        "invalid-utf8",
+        "not-an-object",
+        "unsupported-version",
+        "entries-not-a-list",
+        "entry-not-an-object",
+        "entry-missing-fields",
+        "invalid-expires",
+    ],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unusable_baseline_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli, content):
+    (tmp_path / BASELINE).write_bytes(content)
+
+    assert run(cli, ctx.openapi.apps.failure(), config=WITH_BASELINE) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_baseline_pointing_at_a_directory_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli):
+    (tmp_path / BASELINE).mkdir()
+
+    assert run(cli, ctx.openapi.apps.failure(), config=WITH_BASELINE) == snapshot_cli
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unreadable_baseline_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli):
+    write_baseline(tmp_path, SERVER_ERROR)
+    (tmp_path / BASELINE).chmod(0)
+
+    assert run(cli, ctx.openapi.apps.failure(), config=WITH_BASELINE) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unusable_baseline_is_a_usage_error_in_fuzz(ctx, cli, tmp_path, snapshot_cli):
+    (tmp_path / BASELINE).write_text("{", encoding="utf-8")
+
+    assert cli.main("fuzz", ctx.openapi.apps.failure().schema_url, "--max-time=1", config=WITH_BASELINE) == snapshot_cli
 
 
 def test_existing_baseline_is_left_alone_without_a_flag(ctx, cli, tmp_path):

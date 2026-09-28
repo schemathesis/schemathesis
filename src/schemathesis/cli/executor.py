@@ -15,7 +15,7 @@ from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL, ExitCode
-from schemathesis.cli.ext.fs import open_file, prepare_directory
+from schemathesis.cli.ext.fs import load_baseline, open_file, prepare_directory
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.cli.json_report import JsonReportHandler
 from schemathesis.cli.wfc_report import WfcReportHandler
@@ -149,6 +149,7 @@ def execute_event_loop(
     # Warm Rich's lazy emoji-codes import on the main thread; it is not concurrency-safe.
     Text.from_markup("")
 
+    load_baseline(config)
     handlers = [*initialize_report_handlers(config=config, args=args, params=params), output_handler]
     ctx: ExecutionContext | None = None
     # Set when the loop ends abnormally; the process and the reports use it instead of the run's verdict.
