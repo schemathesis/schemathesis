@@ -91,6 +91,7 @@
 - Parameter styles ignored for Open API 3.1 `type` lists and implicit object or array schemas.
 - Nested objects and `encoding` styles ignored in `application/x-www-form-urlencoded` bodies.
 - Coverage phase stringifying nested values of JSON-encoded `content` parameters.
+- Coverage phase sending a declared `Content-Type` header that names another body media type.
 - Percent-encoded delimiters, missing names and dropped falsy values in `matrix`/`label`/`simple` path parameters.
 
 #### Unsatisfiable schema messages
