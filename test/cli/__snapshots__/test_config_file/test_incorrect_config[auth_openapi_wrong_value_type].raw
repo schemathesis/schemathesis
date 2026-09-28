@@ -1,0 +1,14 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Error in [auth.openapi.ApiKeyAuth] section:
+  Type error:
+
+  - 'api_key' -> Must be a string, but got int: 42

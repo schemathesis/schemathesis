@@ -76,6 +76,26 @@ from flask import jsonify
             ),
             id="null_byte",
         ),
+        pytest.param(
+            textwrap.dedent(
+                """
+                [generation]
+                mode = true
+                """
+            ),
+            id="enum_non_string_value",
+        ),
+        pytest.param("warnings = 42", id="warnings_wrong_type"),
+        pytest.param(
+            textwrap.dedent(
+                """
+                [auth.openapi.ApiKeyAuth]
+                api_key = 42
+                """
+            ),
+            id="auth_openapi_wrong_value_type",
+        ),
+        pytest.param('suppress-health-check = ["all", "all"]', id="duplicate_health_checks"),
     ],
 )
 def test_incorrect_config(cli, snapshot_cli, tmp_path, config_content):

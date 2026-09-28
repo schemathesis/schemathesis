@@ -1,0 +1,14 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Error in root section:
+  Duplicate values:
+
+  - 'suppress-health-check' -> 'all' is listed more than once.
