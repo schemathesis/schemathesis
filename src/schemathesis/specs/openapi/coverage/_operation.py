@@ -12,6 +12,8 @@ from enum import Enum, auto
 from itertools import combinations
 from typing import TYPE_CHECKING, Any, TypeGuard, cast
 
+import jsonschema_rs
+
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
@@ -39,7 +41,6 @@ from schemathesis.specs.openapi.error_feedback import apply_adjustments
 from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
-    import jsonschema_rs
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.config import GenerationConfig
@@ -665,6 +666,21 @@ def _positive_fallback(run: CoverageRun, parameter: OpenApiParameter, schema: di
     return next(generator, None)
 
 
+def _reject_malformed_definition(
+    operation: APIOperation, schema: JsonSchemaObject, validator_cls: type[jsonschema_rs.Validator]
+) -> None:
+    """Report a definition its own draft rejects as fuzzing does, instead of walking keywords of the wrong type."""
+    try:
+        make_validator(schema, validator_cls)
+    except jsonschema_rs.ValidationError as exc:
+        raise InvalidSchema.from_jsonschema_error(
+            exc, path=operation.path, method=operation.method, config=operation.schema.config.output
+        ) from None
+    except ValueError:
+        # Not a draft violation: e.g. YAML boolean property names, which the walk handles itself.
+        return
+
+
 def _seed_parameters(run: CoverageRun) -> None:
     operation = run.operation
     template = run.template
@@ -916,6 +932,7 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
             continue
 
         schema = as_object_schema(body.unoptimized_schema)
+        _reject_malformed_definition(operation, schema, validator_cls)
         schema_is_clone = False
         if error_feedback is not None:
             adjusted = apply_adjustments(
@@ -1558,6 +1575,9 @@ def iter_coverage_cases(
         responses=responses,
         correlated=correlated,
     )
+    for parameter_set in (operation.path_parameters, operation.headers, operation.cookies, operation.query):
+        if parameter_set:
+            _reject_malformed_definition(operation, cast(OpenApiParameterSet, parameter_set).schema, validator_cls)
     _seed_parameters(run)
     if operation.has_skipped_required_body:
         # No body can be built, so every request is body-less; omitting the required body is the
