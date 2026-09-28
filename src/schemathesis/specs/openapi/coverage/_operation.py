@@ -54,6 +54,7 @@ if TYPE_CHECKING:
 class Template:
     __slots__ = (
         "_components",
+        "_content_type_header",
         "_json_encoded",
         "_optional_query",
         "_parameter_modes",
@@ -78,6 +79,8 @@ class Template:
         self._serializers = serializers
         self._optional_query = optional_query
         self._json_encoded = json_encoded
+        # Declared `Content-Type` header name and the body media types its schema admits.
+        self._content_type_header: tuple[str, frozenset[str]] | None = None
         # A required body that never produced a value, or a required parameter without a positive
         # value, leaves no valid positive request; a fallback-negative body forbids stacking a
         # second negative on top.
@@ -117,10 +120,26 @@ class Template:
             return GenerationMode.NEGATIVE
         return GenerationMode.POSITIVE
 
+    def pin_content_type(self, name: str, admitted: frozenset[str]) -> None:
+        self._content_type_header = (name, admitted)
+
+    def _headers_for(self, media_type: str) -> dict[str, Any] | None:
+        """Headers whose pinned `Content-Type` names `media_type`, or `None` when they stay as they are."""
+        if self._content_type_header is None:
+            return None
+        name, admitted = self._content_type_header
+        headers = self._template.get("headers")
+        if media_type not in admitted or not isinstance(headers, dict) or name not in headers:
+            return None
+        return {**headers, name: media_type}
+
     def set_body(self, body: GeneratedValue, media_type: str) -> None:
         self._template["body"] = body.value
         self._template["media_type"] = media_type
         self._components[ParameterLocation.BODY] = ComponentInfo(mode=body.generation_mode)
+        headers = self._headers_for(media_type)
+        if headers is not None:
+            self._template["headers"] = headers
 
     def _serialize(self, kwargs: dict[str, Any], components: dict[ParameterLocation, ComponentInfo]) -> dict[str, Any]:
         output = {}
@@ -165,6 +184,9 @@ class Template:
 
     def with_body(self, *, media_type: str, value: GeneratedValue) -> TemplateValue:
         raw = {**self._template, "media_type": media_type, "body": value.value}
+        headers = self._headers_for(media_type)
+        if headers is not None:
+            raw["headers"] = headers
         components = {**self._components, ParameterLocation.BODY: ComponentInfo(mode=value.generation_mode)}
         kwargs = self._serialize(raw, components)
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
@@ -734,10 +756,11 @@ def _seed_parameters(run: CoverageRun) -> None:
         # header parameter — otherwise body cases inherit a fuzzed CT (often empty) and ship bodies
         # that downstream tools can't dispatch. CT-mutation variants still flow through the iterator.
         if location == ParameterLocation.HEADER and name.lower() == "content-type" and operation.body:
-            media_type = _media_type_the_header_admits(parameter, operation.body, validator_cls)
-            if media_type is not None:
+            admitted = _media_types_the_header_admits(parameter, operation.body, validator_cls)
+            if admitted:
+                template.pin_content_type(name, frozenset(admitted))
                 value = GeneratedValue.with_positive(
-                    value=media_type,
+                    value=admitted[0],
                     scenario=CoverageScenario.VALID_STRING,
                     description="Valid Content-Type pinned to body media type",
                 )
@@ -803,12 +826,12 @@ def _container_without_wire_bounds(
     return {**schema, "properties": {**properties, **declared}}
 
 
-def _media_type_the_header_admits(
+def _media_types_the_header_admits(
     parameter: OpenApiParameter,
     body: PayloadAlternatives[OpenApiBody],
     validator_cls: type[jsonschema_rs.Validator],
-) -> str | None:
-    """First declared body media type the header's own contract accepts, or `None` when it accepts none."""
+) -> list[str]:
+    """Declared body media types the header's own contract accepts, in declaration order."""
     declared = parameter.validation_schema
     validator = None
     if isinstance(declared, dict):
@@ -818,11 +841,8 @@ def _media_type_the_header_admits(
             # Schema rejected by `jsonschema_rs` — validity is unknown, so keep the body's media type.
             pass
     if validator is None:
-        return body[0].media_type
-    for alternative in body:
-        if validator.is_valid(alternative.media_type):
-            return alternative.media_type
-    return None
+        return [alternative.media_type for alternative in body]
+    return [alternative.media_type for alternative in body if validator.is_valid(alternative.media_type)]
 
 
 def _drop_negatives_the_schema_admits(

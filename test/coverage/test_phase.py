@@ -6987,6 +6987,26 @@ def test_content_type_header_pins_to_a_declared_body_media_type_it_admits(ctx):
     assert values == {"application/xml"}
 
 
+def test_content_type_header_matches_each_body_media_type(ctx):
+    operation = load_schema(
+        ctx,
+        parameters=[{"in": "header", "name": "Content-Type", "schema": {"type": "string"}}],
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {"schema": {"type": "object"}},
+                "text/plain": {"schema": {"type": "string"}},
+            },
+        },
+    )["/foo"]["post"]
+    pairs = {
+        (case.media_type, (case.headers or {}).get("Content-Type"))
+        for case in collect_cases(operation, GenerationMode.POSITIVE)
+        if case.body is not NOT_SET
+    }
+    assert pairs == {("application/json", "application/json"), ("text/plain", "text/plain")}
+
+
 def test_recursive_ref_negative_descends_past_self_reference(ctx):
     # Self-referential arms must receive a type-violating element at the inner-`$ref` position,
     # not just be skipped when the negative generator hits the recursion boundary.
