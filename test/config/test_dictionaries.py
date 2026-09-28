@@ -2,9 +2,8 @@ import os
 
 import pytest
 
-from schemathesis.config import ConfigError, SchemathesisConfig
+from schemathesis.config import ConfigError, GenerationConfig, SchemathesisConfig
 from schemathesis.config._dictionaries import coerce_entries_for_type, parse_body_path
-from schemathesis.config._generation import GenerationConfig
 
 
 def test_from_file_loaded_with_relative_path_and_escapes(tmp_path):
@@ -185,23 +184,64 @@ def test_parse_body_path_valid(expr, expected):
 
 
 @pytest.mark.parametrize(
-    "expr",
+    "expr,message",
     [
-        "body.",
-        "body..x",
-        "body.x..y",
-        "body.x[3]",
-        "body.x[a]",
-        "body.x[*][*]",
-        "body.x[**]",
-        "body.@invalid",
-        "body.@bad[*]",
-        "body.[a]",
-        "body.x.",
-        "not_body.x",
+        ("body.", "Body binding key has empty path: `body.`"),
+        ("body..x", "Empty segment in path: `body..x`"),
+        ("body.x..y", "Empty segment in path: `body.x..y`"),
+        ("body.x[3]", "Only `[*]` is supported in paths (got `[3]` in `body.x[3]`)"),
+        ("body.x[a]", "Only `[*]` is supported in paths (got `[a]` in `body.x[a]`)"),
+        ("body.x[*][*]", "Only `[*]` is supported in paths (got `[*][*]` in `body.x[*][*]`)"),
+        ("body.x[**]", "Only `[*]` is supported in paths (got `[**]` in `body.x[**]`)"),
+        ("body.@invalid", "Invalid segment `@invalid` in path: `body.@invalid`"),
+        ("body.@bad[*]", "Invalid segment `@bad` in path: `body.@bad[*]`"),
+        ("body.[a]", "Invalid segment `` in path: `body.[a]`"),
+        ("body.x.", "Empty segment in path: `body.x.`"),
     ],
-    ids=lambda v: v,
+    ids=lambda v: v if v.startswith("body") else "",
 )
-def test_parse_body_path_rejects(expr):
-    with pytest.raises(ConfigError):
-        parse_body_path(expr)
+def test_invalid_body_binding_key_rejected(expr, message):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_dict(
+            {"dictionaries": {"d": {"values": ["a"]}}, "parameters": {expr: {"dictionary": "d"}}}
+        )
+    assert str(exc.value) == message
+
+
+@pytest.mark.parametrize(
+    "values,ty",
+    [
+        (["", "  ", 3.14, "abc"], "integer"),
+        (["", " ", "abc"], "number"),
+    ],
+    ids=["integer", "number"],
+)
+def test_type_wide_binding_without_eligible_entries_rejected(values, ty):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_dict(
+            {
+                "dictionaries": {"x": {"values": values}},
+                "generation": {"dictionaries": {ty: {"dictionary": "x", "probability": 0.5}}},
+            }
+        )
+    assert str(exc.value) == f"Dictionary `x` has no entries eligible for `{ty}` under `generation.dictionaries`"
+
+
+@pytest.mark.parametrize(
+    "values,ty",
+    [
+        ([7, ""], "integer"),
+        ([42, "", "abc"], "number"),
+    ],
+    ids=["integer", "number"],
+)
+def test_type_wide_binding_accepts_dictionary_with_some_eligible_entries(values, ty):
+    config = SchemathesisConfig.from_dict(
+        {
+            "dictionaries": {"x": {"values": values}},
+            "generation": {"dictionaries": {ty: {"dictionary": "x", "probability": 0.5}}},
+        }
+    )
+    assert repr(config.projects.default.generation.dictionaries) == (
+        f"{{'{ty}': DictionaryBinding(dictionary='x', probability=0.5)}}"
+    )

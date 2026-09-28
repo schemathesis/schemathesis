@@ -29,8 +29,6 @@ class ConstantsConfig(DiffBase):
 
     @classmethod
     def from_hierarchy(cls, configs: list[ConstantsConfig]) -> ConstantsConfig:  # type: ignore[override]
-        if len(configs) == 1:
-            return configs[0]
         return next((cls(enabled=config.enabled) for config in configs if not config._is_default), cls())
 
 

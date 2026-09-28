@@ -39,8 +39,6 @@ def is_graphql_binding_key(key: str) -> bool:
 
 def parse_body_path(expr: str) -> str:
     """Translate a `body.<path>` binding key to a JSON Pointer with `*` wildcards."""
-    if not expr.startswith(BODY_PREFIX):
-        raise ConfigError(f"Body binding key must start with `body.`: `{expr}`")
     rest = expr[len(BODY_PREFIX) :]
     if not rest:
         raise ConfigError(f"Body binding key has empty path: `{expr}`")

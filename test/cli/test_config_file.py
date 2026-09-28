@@ -95,12 +95,56 @@ from flask import jsonify
             ),
             id="auth_openapi_wrong_value_type",
         ),
+        pytest.param('base-url = "not-a-url"', id="invalid_base_url"),
+        pytest.param('origin = "http://127.0.0.1/api"', id="origin_with_path"),
+        pytest.param(
+            textwrap.dedent(
+                """
+                [[operations]]
+                include-path = "/users"
+                rate-limit = "fast"
+                """
+            ),
+            id="operation_invalid_rate_limit",
+        ),
+        pytest.param(
+            textwrap.dedent(
+                """
+                [auth.basic]
+                username = "пользователь"
+                password = "secret"
+                """
+            ),
+            id="basic_auth_username_not_latin1",
+        ),
+        pytest.param(
+            textwrap.dedent(
+                """
+                [auth.openapi.ApiKeyAuth]
+                api_key = "secret"
+
+                [auth.wfc]
+                path = "auth.yaml"
+                """
+            ),
+            id="openapi_and_wfc_auth",
+        ),
+        pytest.param(
+            textwrap.dedent(
+                """
+                [auth.openapi.ApiKeyAuth]
+                api_key = "secret"
+                bearer = "token"
+                """
+            ),
+            id="openapi_auth_mixed_schemes",
+        ),
         pytest.param('suppress-health-check = ["all", "all"]', id="duplicate_health_checks"),
     ],
 )
 def test_incorrect_config(cli, snapshot_cli, tmp_path, config_content):
     config_file = tmp_path / "config.toml"
-    config_file.write_text(textwrap.dedent(config_content))
+    config_file.write_text(textwrap.dedent(config_content), encoding="utf-8")
     result = cli.main(f"--config-file={config_file}", "run", "http://127.0.0.1")
     if result.exception and not isinstance(result.exception, SystemExit):
         raise result.exception
