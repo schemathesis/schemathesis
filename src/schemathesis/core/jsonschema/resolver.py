@@ -14,7 +14,7 @@ import jsonschema_rs
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import RefResolutionError, RemoteDocumentError, unresolvable_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
-from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
+from schemathesis.core.transforms import UNRESOLVABLE, describe_non_json_value, resolve_pointer
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
 IN_MEMORY_BASE_URI = "urn:schemathesis:root"
@@ -109,7 +109,9 @@ def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
         # A reference is arbitrary text, and text with a null byte in it names no file.
         raise OSError(str(exc)) from exc
     with fd:
-        return deserialize_yaml(fd)
+        document = deserialize_yaml(fd)
+    _reject_non_json_value(document)
+    return document
 
 
 @lru_cache
@@ -153,6 +155,7 @@ def load_remote_uri(uri: str) -> Any:
         raise RemoteDocumentError(f"Expected YAML/JSON, got HTML {_suffix()}")
 
     document = deserialize_yaml(response.content)
+    _reject_non_json_value(document)
 
     if not isinstance(document, dict | list):
         raise RemoteDocumentError(
@@ -160,6 +163,12 @@ def load_remote_uri(uri: str) -> Any:
         )
 
     return document
+
+
+def _reject_non_json_value(document: object) -> None:
+    description = describe_non_json_value(document)
+    if description is not None:
+        raise RemoteDocumentError(description)
 
 
 def retrieve(uri: str) -> Any:

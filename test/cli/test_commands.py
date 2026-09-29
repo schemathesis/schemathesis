@@ -1297,6 +1297,36 @@ def test_malformed_keyword(ctx, cli, snapshot_cli, operation, phase):
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", f"--phases={phase}") == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    ("key_schema", "components"),
+    [
+        ("{type: string, const: !!binary aGVsbG8=, minLength: x}", None),
+        ('{$ref: "components.yaml#/Key"}', "Key:\n  type: string\n  const: !!binary aGVsbG8=\n  minLength: x\n"),
+    ],
+    ids=["inline", "referenced-file"],
+)
+@pytest.mark.parametrize("phase", ["coverage", "fuzzing"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_yaml_value_json_cannot_represent(ctx, cli, snapshot_cli, tmp_path, key_schema, components, phase):
+    api = ctx.openapi.apps.success()
+    schema_path = tmp_path / "openapi.yaml"
+    schema_path.write_text(
+        f"""openapi: 3.0.2
+info: {{title: Test, version: 0.1.0}}
+paths:
+  /data:
+    post:
+      parameters:
+        - {{name: key, in: query, required: true, schema: {key_schema}}}
+      responses:
+        "200": {{description: OK}}
+"""
+    )
+    if components is not None:
+        (tmp_path / "components.yaml").write_text(components)
+    assert cli.run(str(schema_path), f"--url={api.base_url}/api", f"--phases={phase}") == snapshot_cli
+
+
 def test_nested_binary_in_yaml(ctx, cli, app_runner, snapshot_cli):
     paths = {
         "/property": {

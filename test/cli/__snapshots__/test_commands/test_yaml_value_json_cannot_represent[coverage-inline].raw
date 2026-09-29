@@ -1,0 +1,14 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ❌  Failed to load specification from /tmp/openapi.yaml after 0.00s
+
+ Schema Loading Error
+
+ The provided API schema does not appear to be a valid OpenAPI schema
+
+     Unsupported value at `paths -> /data -> post -> parameters -> 0 -> schema -> const`: binary data is not valid JSON

@@ -13,7 +13,7 @@ from schemathesis.core import media_types
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
-from schemathesis.core.transforms import stringify_keys
+from schemathesis.core.transforms import describe_non_json_value, is_json, stringify_keys
 from schemathesis.core.transport import decode_lossy
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -228,8 +228,9 @@ def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, str
     hook_context = HookContext()
     dispatch_before_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, raw_schema=schema)
     # Built-in loaders only produce string keys; dicts parsed elsewhere, e.g. by a YAML 1.1 parser, may not.
-    if stringify:
+    if stringify and not is_json(schema):
         stringify_keys(schema)
+        _reject_non_json_value(schema)
 
     if config is None:
         config = SchemathesisConfig.discover()
@@ -333,13 +334,22 @@ def _load_yaml(content: str) -> dict[str, Any]:
     import yaml
 
     try:
-        return deserialize_yaml(content)
+        document = deserialize_yaml(content)
     except yaml.YAMLError as exc:
         raise LoaderError(
             LoaderErrorKind.SYNTAX_ERROR,
             SCHEMA_SYNTAX_ERROR,
             extras=[entry for entry in str(exc).splitlines() if entry],
         ) from exc
+    _reject_non_json_value(document)
+    return document
+
+
+def _reject_non_json_value(document: object) -> None:
+    # Open API documents must survive a JSON round-trip, so YAML tags like `!!binary` are not allowed.
+    description = describe_non_json_value(document)
+    if description is not None:
+        raise LoaderError(LoaderErrorKind.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR, extras=[description])
 
 
 SCHEMA_INVALID_ERROR = "The provided API schema does not appear to be a valid OpenAPI schema"

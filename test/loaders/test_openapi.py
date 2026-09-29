@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from flask import Flask, Response
 
 import schemathesis
-from schemathesis.core.errors import LoaderError
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from test.utils import make_schema
 
 
@@ -232,3 +232,70 @@ def test_from_file_invalid_input(data: str) -> None:
     for input_data in (data, io.StringIO(data)):
         with pytest.raises(LoaderError):
             schemathesis.openapi.from_file(input_data)
+
+
+YAML_PARAMETER_SCHEMA = """openapi: 3.0.2
+info: {{title: Test, version: 0.1.0}}
+paths:
+  /data:
+    post:
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+            {keyword}: {value}
+      responses:
+        "200": {{description: OK}}
+"""
+
+
+@pytest.mark.parametrize(
+    ("keyword", "value", "description"),
+    [
+        ("const", "!!binary aGVsbG8=", "binary data"),
+        ("const", "!!set {a, b}", "a set"),
+        ("example", "!!timestamp 2024-01-01", "a date"),
+        ("default", "!!timestamp 2020-01-01T00:00:00Z", "a timestamp"),
+    ],
+    ids=["binary", "set", "date", "timestamp"],
+)
+def test_yaml_value_json_cannot_represent(tmp_path, keyword, value, description):
+    schema_path = tmp_path / "openapi.yaml"
+    schema_path.write_text(YAML_PARAMETER_SCHEMA.format(keyword=keyword, value=value))
+
+    with pytest.raises(LoaderError) as exc:
+        schemathesis.openapi.from_path(str(schema_path))
+
+    assert (exc.value.kind, exc.value.message, exc.value.extras) == (
+        LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
+        "The provided API schema does not appear to be a valid OpenAPI schema",
+        [
+            f"Unsupported value at `paths -> /data -> post -> parameters -> 0 -> schema -> {keyword}`: "
+            f"{description} is not valid JSON"
+        ],
+    )
+
+
+def test_dict_value_json_cannot_represent(ctx):
+    raw_schema = ctx.openapi.build_schema({"/data": {"get": {"responses": {"200": {"description": b"OK"}}}}})
+
+    with pytest.raises(LoaderError) as exc:
+        schemathesis.openapi.from_dict(raw_schema)
+
+    assert exc.value.extras == [
+        "Unsupported value at `paths -> /data -> get -> responses -> 200 -> description`: binary data is not valid JSON"
+    ]
+
+
+def test_yaml_unquoted_dates_stay_strings(tmp_path):
+    schema_path = tmp_path / "openapi.yaml"
+    schema_path.write_text(YAML_PARAMETER_SCHEMA.format(keyword="default", value="2020-01-01T00:00:00Z"))
+
+    schema = schemathesis.openapi.from_path(str(schema_path))
+
+    assert schema.raw_schema["paths"]["/data"]["post"]["parameters"][0]["schema"] == {
+        "type": "string",
+        "default": "2020-01-01T00:00:00Z",
+    }

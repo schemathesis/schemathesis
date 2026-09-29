@@ -8634,11 +8634,15 @@ def test_parameter_with_an_always_true_not_still_gets_a_value(ctx):
 
 
 def test_negative_query_array_with_items_the_validator_cannot_load(ctx):
-    # A value JSON cannot hold, such as YAML `!!binary`, keeps the validator from loading, so every negative ships.
-    schema = {"type": "array", "items": {"type": "string", "x-raw": b"\x00"}}
-    operation = load_schema(
-        ctx, parameters=[{"in": "query", "name": "ids", "required": True, "schema": schema}], method="get"
-    )["/foo"]["GET"]
+    # A value JSON cannot hold, e.g. set by a hook after loading, keeps the validator from loading, so every negative ships.
+    items = {"type": "string"}
+    schema = load_schema(
+        ctx,
+        parameters=[{"in": "query", "name": "ids", "required": True, "schema": {"type": "array", "items": items}}],
+        method="get",
+    )
+    items["x-raw"] = b"\x00"
+    operation = schema["/foo"]["GET"]
     assert targeted_values(operation, GenerationMode.NEGATIVE, "query", "ids") == [[], "AAA", "null", "false"]
 
 

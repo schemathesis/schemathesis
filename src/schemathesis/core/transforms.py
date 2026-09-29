@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import string
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import lru_cache
@@ -36,14 +37,20 @@ def to_wire_string(value: object) -> str:
     return str(value)
 
 
+def is_json(document: object) -> bool:
+    """Whether the document holds only JSON values and string keys."""
+    # Serializing stops at the first offending value and is several times faster than walking the document.
+    try:
+        jsonschema_rs.canonical.json.to_string(document)
+    except ValueError:
+        return False
+    return True
+
+
 def stringify_keys(document: object) -> None:
     """Spell every non-string mapping key in place as the wire does, e.g. a YAML 1.1 `on:` read as `True`."""
-    try:
-        # Serializing rejects non-string keys and is several times faster than the walk below.
-        jsonschema_rs.canonical.json.to_string(document)
+    if is_json(document):
         return
-    except ValueError:
-        pass
     stack = [document]
     # YAML anchors can make a container its own descendant.
     seen: set[int] = set()
@@ -63,6 +70,39 @@ def stringify_keys(document: object) -> None:
                 continue
             seen.add(id(item))
             stack.extend(item)
+
+
+def describe_non_json_value(document: object) -> str | None:
+    """Describe the first value JSON cannot represent, e.g. bytes from a YAML `!!binary` tag, with its location."""
+    if is_json(document):
+        return None
+    stack: list[tuple[list[str | int], object]] = [([], document)]
+    # YAML anchors can make a container its own descendant.
+    seen: set[int] = set()
+    while stack:
+        path, item = stack.pop()
+        if isinstance(item, (dict, list, tuple)):
+            if id(item) in seen:
+                continue
+            seen.add(id(item))
+            entries = item.items() if isinstance(item, dict) else enumerate(item)
+            stack.extend(([*path, key], value) for key, value in reversed(list(entries)))
+        elif not (item is None or isinstance(item, (str, int, float))):
+            location = " -> ".join(str(entry) for entry in path)
+            return f"Unsupported value at `{location}`: {_describe_type(item)} is not valid JSON"
+    return None
+
+
+def _describe_type(value: object) -> str:
+    if isinstance(value, bytes):
+        return "binary data"
+    if isinstance(value, (set, frozenset)):
+        return "a set"
+    if isinstance(value, datetime.datetime):
+        return "a timestamp"
+    if isinstance(value, datetime.date):
+        return "a date"
+    return f"`{type(value).__name__}`"
 
 
 def diff(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:

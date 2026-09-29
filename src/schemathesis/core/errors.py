@@ -193,12 +193,12 @@ class InvalidSchema(SchemathesisError):
         message = "Unresolvable reference in the schema"
         # Get the pointer value from "Unresolvable JSON pointer: 'components/UnknownParameter'"
         message += f"\n\nError details:\n    Reference: {reference}"
-        if not reference.startswith(("http://", "https://", "#/")):
+        if isinstance(error.__cause__, RemoteDocumentError):
+            message += f"\n    {error.__cause__}"
+        elif not reference.startswith(("http://", "https://", "#/")):
             message += "\n    File reference could not be resolved. Check that the file exists."
         elif reference.startswith(("#/components", "#/definitions")):
             message += "\n    Component does not exist in the schema."
-        elif isinstance(error.__cause__, RemoteDocumentError):
-            message += f"\n    {error.__cause__}"
         return cls(message, path=path, method=method)
 
     def as_failing_test_function(self) -> Callable:
