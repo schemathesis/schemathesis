@@ -3374,33 +3374,30 @@ def test_negative_type_drops_false_negatives_against_loose_ref_target(ctx):
     )
 
 
-# Second component forces bundling — single-definition schemas get inlined and lose
-# the `$ref` + sibling shape that triggers the bug.
-BUNDLING_PADDING = {"Sku": {"type": "object", "properties": {"name": {"type": "string"}}}}
+WRAPPER = {"type": "object", "properties": {"location": {"type": "string"}, "sku": {"type": "string"}}}
 
 
-def test_negative_required_drops_false_negatives_at_body_root_with_ref_sibling(ctx):
-    # Body root is `$ref` + sibling `required: [...]`. Draft 4 ignores siblings of `$ref`,
-    # so the validator only enforces the bare ref target — which has no matching `required`.
-    # Removing the listed required field passes the target vacuously and must not be emitted.
-    operation = body_operation(
-        ctx,
-        {"$ref": "#/definitions/Wrapper", "required": ["location"]},
-        version="2.0",
-        definitions={
-            "Wrapper": {
-                "type": "object",
-                "properties": {
-                    "location": {"type": "string"},
-                    "sku": {"$ref": "#/definitions/Sku"},
-                },
-            },
-            **BUNDLING_PADDING,
-        },
-    )
-    assert_bodies(
-        operation, GenerationMode.NEGATIVE, valid=False, validator_cls=operation.schema.adapter.jsonschema_validator_cls
-    )
+@pytest.mark.parametrize(
+    ("version", "container"),
+    [("2.0", {"definitions": {"Wrapper": WRAPPER}}), ("3.0.2", {"components": {"schemas": {"Wrapper": WRAPPER}}})],
+    ids=["swagger-2", "openapi-3.0"],
+)
+@pytest.mark.parametrize(
+    "sibling", [{"required": ["location"]}, {"minProperties": 5}], ids=["required", "min-properties"]
+)
+def test_negative_bodies_ignore_keywords_next_to_root_ref(ctx, version, container, sibling):
+    prefix = "#/definitions" if version == "2.0" else "#/components/schemas"
+    body = {"$ref": f"{prefix}/Wrapper", **sibling}
+    operation = body_operation(ctx, body, version=version, **container)
+    # Draft 4 ignores keywords next to `$ref`, so mutating them yields bodies the spec still accepts.
+    validator = jsonschema_rs.Draft4Validator({**body, **container})
+    bodies = [
+        case.body
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.body is not NOT_SET and body_mode(case) == GenerationMode.NEGATIVE
+    ]
+    assert bodies
+    assert [value for value in bodies if validator.is_valid(value)] == []
 
 
 def test_negative_ref_sibling_with_binary_format_does_not_crash_validator(ctx):
@@ -3417,12 +3414,8 @@ def test_negative_ref_sibling_with_binary_format_does_not_crash_validator(ctx):
             "schemas": {
                 "Upload": {
                     "type": "object",
-                    "properties": {
-                        "file": {"type": "string", "format": "binary"},
-                        "sku": {"$ref": "#/components/schemas/Sku"},
-                    },
+                    "properties": {"file": {"type": "string", "format": "binary"}},
                 },
-                **BUNDLING_PADDING,
             }
         },
     )

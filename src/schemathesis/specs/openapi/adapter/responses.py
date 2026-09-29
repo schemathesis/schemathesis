@@ -355,7 +355,7 @@ def _prepare_schema(
     merge_ref_siblings: bool = False,
 ) -> Bundle:
     # `RefResolutionError` propagates: callers decide what an unassemblable response schema means.
-    bundled = bundle(schema, resolver)
+    bundled = bundle(schema, resolver, ref_siblings=merge_ref_siblings)
     # Do not clone the schema, as bundling already does it
     converted = to_json_schema(
         bundled.schema,
