@@ -124,6 +124,7 @@
 
 - Crash files lost when a negative mutation stored a `bytes` value.
 - Wrong or crashing request URLs for GraphQL schemas loaded from files or dictionaries.
+- Crash on non-string property names from YAML 1.1 parsers, e.g. `on:`, passed to `from_dict`.
 - Network errors when a server closes a keep-alive connection without `Connection: close`.
 - Raw or misleading config errors for wrong value types, duplicate list items and non-string choices.
 

@@ -371,7 +371,7 @@ def test_schema_error_on_path(ctx, simple_schema):
     assert len(operations) == 2
     errors = [op for op in operations if isinstance(op, Err)]
     assert len(errors) == 1
-    assert errors[0].err().path is None
+    assert errors[0].err().path == "null"
     assert errors[0].err().method is None
     # And all valid operations should be parsed as `Ok`
     oks = [op for op in operations if isinstance(op, Ok)]
