@@ -807,34 +807,32 @@ class CoverageContext:
         return value
 
     def _generate_from_schema_inner(self, schema: JsonSchemaObject) -> Any:
-        if isinstance(schema, dict):
-            described = _prepared(schema, drop=_CONDITIONAL_KEYS)
-            if described is not schema:
-                # What the rest of the schema describes usually already clears its `not` / `if`
-                # guards, and describing beats filtering: the value stays as small as the rest allows.
-                candidate = self._generate_around_conditionals(schema, described)
-                if candidate is not NOT_SET:
-                    return candidate
+        described = _prepared(schema, drop=_CONDITIONAL_KEYS)
+        if described is not schema:
+            # What the rest of the schema describes usually already clears its `not` / `if`
+            # guards, and describing beats filtering: the value stays as small as the rest allows.
+            candidate = self._generate_around_conditionals(schema, described)
+            if candidate is not NOT_SET:
+                return candidate
         # Prefer spec-declared concrete values when valid: example > examples[0] > default.
         # Surfaces author intent into recursively-generated templates; without this, nested
         # properties whose schemas declare `example`/`default` get synthetic Hypothesis values.
-        if isinstance(schema, dict):
-            example = schema.get("example", NOT_SET)
-            if example is not NOT_SET:
-                accepted = _accept_spec_value(example, schema, self)
+        example = schema.get("example", NOT_SET)
+        if example is not NOT_SET:
+            accepted = _accept_spec_value(example, schema, self)
+            if accepted is not NOT_SET:
+                return accepted
+        examples = schema.get("examples")
+        if isinstance(examples, list):
+            for candidate in examples:
+                accepted = _accept_spec_value(candidate, schema, self)
                 if accepted is not NOT_SET:
                     return accepted
-            examples = schema.get("examples")
-            if isinstance(examples, list):
-                for candidate in examples:
-                    accepted = _accept_spec_value(candidate, schema, self)
-                    if accepted is not NOT_SET:
-                        return accepted
-            default = schema.get("default", NOT_SET)
-            if default is not NOT_SET:
-                accepted = _accept_spec_value(default, schema, self)
-                if accepted is not NOT_SET:
-                    return accepted
+        default = schema.get("default", NOT_SET)
+        if default is not NOT_SET:
+            accepted = _accept_spec_value(default, schema, self)
+            if accepted is not NOT_SET:
+                return accepted
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ANNOTATION_KEYWORDS])
         # Past the generation buffer there is no container worth building, whatever else the schema says.
         min_properties = schema.get("minProperties")
@@ -1095,11 +1093,7 @@ def _update_schema_pattern(
             apply_rewritten_pattern(schema, new_pattern, min_length, max_length)
 
 
-def _apply_pattern_optimizations(
-    obj: object, update_pattern: Callable[[str, int | None, int | None], str] | None
-) -> None:
-    if update_pattern is None:
-        return
+def _apply_pattern_optimizations(obj: object, update_pattern: Callable[[str, int | None, int | None], str]) -> None:
     if isinstance(obj, dict):
         _update_schema_pattern(obj, update_pattern)
         for value in obj.values():
@@ -1499,23 +1493,6 @@ def _intersect_types(current: Any, value: Any) -> Any:
     return shared[0] if len(shared) == 1 else shared
 
 
-def _with_effective_required(schema: JsonSchemaObject) -> JsonSchemaObject:
-    existing_required: list[str] = schema.get("required", [])
-    properties = schema.get("properties", {})
-    if not properties:
-        return schema
-    for key in ("anyOf", "oneOf"):
-        sub_schemas = schema.get(key)
-        if sub_schemas:
-            for sub_schema in sub_schemas:
-                if isinstance(sub_schema, dict) and "required" in sub_schema:
-                    extra = [f for f in sub_schema["required"] if f not in existing_required and f in properties]
-                    if extra:
-                        return {**schema, "required": list(existing_required) + extra}
-                    break
-    return schema
-
-
 def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
     """Resolve a $ref sub-schema to its concrete content before merging."""
     if not isinstance(sub, dict) or "$ref" not in sub:
@@ -1575,9 +1552,7 @@ def _generate_oversized_string(
         except (InvalidArgument, Unsatisfiable):
             # Format constrains the length (e.g. uuid is fixed at 36); synthesize a plain
             # string that violates maxLength regardless.
-            if target_length < MAX_STRING_LENGTH:
-                return "a" * target_length
-            return None
+            return "a" * target_length
     try:
         if target_length - 1 > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
             # Pattern combined with a large length is too slow; drop it.
@@ -1827,31 +1802,30 @@ def _cover_positive_for_type(
     else:
         # Another type's values need no container template, and one that cannot be built must not take them along.
         template = None
-    if GenerationMode.POSITIVE in ctx.generation_modes:
-        ctx = ctx.with_positive()
-        enum = schema.get("enum", NOT_SET)
-        const = schema.get("const", NOT_SET)
-        if enum is not NOT_SET:
-            for value in enum:
-                if _is_valid_with_formats(value, schema, ctx) and _is_representable(value, ctx, declared=True):
-                    yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
-        elif const is not NOT_SET:
-            if _is_valid_with_formats(const, schema, ctx) and _is_representable(const, ctx, declared=True):
-                yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
-        elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
-            yield from _positive_for_describing_keywords(ctx, schema, ty, template)
-        if "not" in schema and isinstance(schema["not"], dict | bool):
-            # For 'not' schemas: generate negative cases of inner schema (violations)
-            # These violations are positive for the outer schema, so flip the mode.
-            # The inner-violation alone doesn't guarantee the value satisfies the outer's
-            # other constraints (type, properties, etc.); validate before yielding.
-            nctx = ctx.with_negative()
-            for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen)):
-                if flipped.generation_mode == GenerationMode.POSITIVE and not _is_valid_with_formats(
-                    flipped.value, schema, ctx
-                ):
-                    continue
-                yield flipped
+    ctx = ctx.with_positive()
+    enum = schema.get("enum", NOT_SET)
+    const = schema.get("const", NOT_SET)
+    if enum is not NOT_SET:
+        for value in enum:
+            if _is_valid_with_formats(value, schema, ctx) and _is_representable(value, ctx, declared=True):
+                yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
+    elif const is not NOT_SET:
+        if _is_valid_with_formats(const, schema, ctx) and _is_representable(const, ctx, declared=True):
+            yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
+    elif ty is not None or _implies_object_type(schema) or _implies_array_type(schema):
+        yield from _positive_for_describing_keywords(ctx, schema, ty, template)
+    if "not" in schema and isinstance(schema["not"], dict | bool):
+        # For 'not' schemas: generate negative cases of inner schema (violations)
+        # These violations are positive for the outer schema, so flip the mode.
+        # The inner-violation alone doesn't guarantee the value satisfies the outer's
+        # other constraints (type, properties, etc.); validate before yielding.
+        nctx = ctx.with_negative()
+        for flipped in _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen)):
+            if flipped.generation_mode == GenerationMode.POSITIVE and not _is_valid_with_formats(
+                flipped.value, schema, ctx
+            ):
+                continue
+            yield flipped
 
 
 def _inline_allof_refs(
@@ -2577,15 +2551,11 @@ def _positive_for_describing_keywords(
     elif ty == "array":
         yield from _drop_invalid_for_location(_positive_array(ctx, schema, cast(list, template)), ctx)
     elif ty == "object":
-        yield from _drop_invalid_for_location(
-            _positive_object(ctx, _with_effective_required(schema), cast(dict, template)), ctx
-        )
+        yield from _drop_invalid_for_location(_positive_object(ctx, schema, cast(dict, template)), ctx)
     elif ty is None:
         if _implies_object_type(schema):
-            yield from _drop_invalid_for_location(
-                _positive_object(ctx, _with_effective_required(schema), cast(dict, template)), ctx
-            )
-        elif _implies_array_type(schema):
+            yield from _drop_invalid_for_location(_positive_object(ctx, schema, cast(dict, template)), ctx)
+        else:
             yield from _drop_invalid_for_location(_positive_array(ctx, schema, cast(list, template)), ctx)
 
 
@@ -2623,10 +2593,8 @@ def _filter_against_not(
             yield case
 
 
-def _is_valid_with_formats(value: object, schema: JsonSchema, ctx: CoverageContext) -> bool:
+def _is_valid_with_formats(value: object, schema: JsonSchemaObject, ctx: CoverageContext) -> bool:
     """Whether the schema admits the value, passing a value nothing can check."""
-    if not isinstance(schema, dict):
-        return True
     return _admitted(value, schema, ctx, unjudged=True)
 
 
@@ -3121,8 +3089,8 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
         if not has_valid_example and minimum is None and maximum is None:
             value = ctx.generate_from_schema(schema)
-            if seen.insert(value):
-                yield PositiveValue(value, scenario=CoverageScenario.VALID_NUMBER, description="Valid number")
+            seen.insert(value)
+            yield PositiveValue(value, scenario=CoverageScenario.VALID_NUMBER, description="Valid number")
     elif minimum is None and maximum is None:
         value = ctx.generate_from_schema(schema)
         seen.insert(value)
@@ -3544,24 +3512,23 @@ def _negative_enum(
     )
     # Self-contradictory schemas (e.g. `enum: [2, 4]` or `const: 2` with `type: string`) skip every entry
     # on the positive path, so emit each mismatched entry as a negative to keep the keyword covered.
-    if isinstance(schema, dict):
-        declared_types = set(get_type(schema))
-        if declared_types:
-            for entry in value:
-                entry_type = to_json_type_name(entry)
-                if entry_type in declared_types:
-                    continue
-                # Integer values satisfy `type: number` in JSON Schema.
-                if entry_type == "integer" and "number" in declared_types:
-                    continue
-                if not ctx.wire.representable(entry) or not seen.insert(entry):
-                    continue
-                yield NegativeValue(
-                    entry,
-                    scenario=CoverageScenario.INCORRECT_TYPE,
-                    description="Enum value with type mismatching the declared 'type'",
-                    location=ctx.current_path,
-                )
+    declared_types = set(get_type(schema))
+    if declared_types:
+        for entry in value:
+            entry_type = to_json_type_name(entry)
+            if entry_type in declared_types:
+                continue
+            # Integer values satisfy `type: number` in JSON Schema.
+            if entry_type == "integer" and "number" in declared_types:
+                continue
+            if not ctx.wire.representable(entry) or not seen.insert(entry):
+                continue
+            yield NegativeValue(
+                entry,
+                scenario=CoverageScenario.INCORRECT_TYPE,
+                description="Enum value with type mismatching the declared 'type'",
+                location=ctx.current_path,
+            )
     inferred = _inferred_value_types(schema)
     if inferred:
         yield from _negative_type(ctx, schema, inferred, seen)
@@ -3636,8 +3603,6 @@ def _negative_property_names(
         if not isinstance(bad_key, str) or bad_key in template:
             continue
         candidate = {**template, bad_key: ""}
-        if not ctx.wire.leads_to_negative_test_case(candidate):
-            continue
         yield NegativeValue(
             candidate,
             scenario=CoverageScenario.OBJECT_INVALID_PROPERTY_NAME,
@@ -4170,9 +4135,6 @@ def _negative_type(
         # In such a scenario it is better to generate at least something with some chances to have a false
         # positive failure
         apply_validation = False
-
-        def is_valid(x: object) -> bool:
-            return True
 
     def _does_not_match_the_original_schema(value: Any) -> bool:
         # A query list travels as one repeated parameter per item, and the server may read any of them.

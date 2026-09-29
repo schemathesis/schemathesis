@@ -157,9 +157,7 @@ class Template:
             if serializer is not None:
                 # Shallow-copy dict containers before serializing to avoid mutating
                 # self._template through shared references in shallow-copy kwargs
-                if isinstance(value, dict):
-                    value = dict(value)
-                value = serializer(value)
+                value = serializer(dict(value))
             if container_name == "query" and isinstance(value, dict):
                 query_component = components.get(ParameterLocation.QUERY)
                 if query_component is None or query_component.mode == GenerationMode.POSITIVE:
@@ -200,10 +198,7 @@ class Template:
         if isinstance(headers, dict):
             headers = {name: value for name, value in headers.items() if name.lower() != "content-type"}
             raw["headers"] = headers
-            if ParameterLocation.HEADER in components:
-                components[ParameterLocation.HEADER] = ComponentInfo(
-                    mode=self._mode_for(ParameterLocation.HEADER, headers)
-                )
+            components[ParameterLocation.HEADER] = ComponentInfo(mode=self._mode_for(ParameterLocation.HEADER, headers))
         kwargs = self._serialize(raw, components)
         return TemplateValue(kwargs=kwargs, raw=raw, components=components)
 
@@ -428,8 +423,6 @@ def _body_pool_overlays(
     validator_cls: type,
 ) -> dict[str, Any]:
     """Return pool overlay values for body properties valid against the destination schema."""
-    if not isinstance(body_schema, dict):
-        return {}
     properties = body_schema.get("properties")
     if not isinstance(properties, dict):
         return {}
@@ -555,13 +548,8 @@ def _filter_draws_for_case(
         return ()
     result: list[PoolDraw] = []
     for draw in draws:
-        try:
-            location = ParameterLocation(draw.location)
-        except ValueError:
-            continue
-        expected = correlated.get((location, draw.parameter_name))
-        if expected is None:
-            continue
+        location = ParameterLocation(draw.location)
+        expected = correlated[(location, draw.parameter_name)]
         actual = _case_slot_value(raw, location, draw.parameter_name)
         if actual is _SENTINEL_ABSENT:
             continue
@@ -584,10 +572,7 @@ def _filter_misses_for_case(
         return ()
     result: list[tuple[str, str]] = []
     for miss in misses:
-        try:
-            location = ParameterLocation(miss[0])
-        except ValueError:
-            continue
+        location = ParameterLocation(miss[0])
         if _case_slot_value(raw, location, miss[1]) is not _SENTINEL_ABSENT:
             result.append(miss)
     return tuple(result)
@@ -702,22 +687,18 @@ def _seed_parameters(run: CoverageRun) -> None:
             return inferred_properties_per_location[target_location]
         # Caller guards with `error_feedback is not None`; the narrowing is invisible inside the closure.
         assert error_feedback is not None
-        container = getattr(operation, target_location.container_name, None)
+        base = getattr(operation, target_location.container_name).schema
+        adjusted = apply_adjustments(
+            operation=operation,
+            location=target_location,
+            schema=base,
+            store=error_feedback,
+        )
         result: dict[str, Any] | None = None
-        if isinstance(container, OpenApiParameterSet):
-            base = container.schema
-            adjusted = apply_adjustments(
-                operation=operation,
-                location=target_location,
-                schema=base,
-                store=error_feedback,
-            )
-            # `apply_adjustments` returns the input unchanged when there are no observations;
-            # only splice when something was actually inferred.
-            if adjusted is not base and isinstance(adjusted, dict):
-                properties = adjusted.get("properties")
-                if isinstance(properties, dict):
-                    result = properties
+        # `apply_adjustments` returns the input unchanged when there are no observations;
+        # only splice when something was actually inferred.
+        if adjusted is not base and isinstance(adjusted, dict):
+            result = adjusted["properties"]
         inferred_properties_per_location[target_location] = result
         return result
 
@@ -1082,8 +1063,9 @@ def _default_positive(run: CoverageRun) -> Generator[Case, None, None]:
         scenario=CoverageScenario.DEFAULT_POSITIVE_TEST,
         description="Default positive test case",
     )
-    if case is not None:
-        yield case
+    # The first request of a run, so nothing sent earlier can repeat it.
+    assert case is not None
+    yield case
 
 
 def _parameter_mutations(run: CoverageRun) -> Generator[Case, None, None]:
@@ -1113,7 +1095,7 @@ def _parameter_mutations(run: CoverageRun) -> Generator[Case, None, None]:
                 if not template.can_emit(GenerationMode.NEGATIVE):
                     # Skip: would emit a case with NEGATIVE body + NEGATIVE param.
                     continue
-            elif value.generation_mode == GenerationMode.POSITIVE:
+            else:
                 if (
                     template.has_required_body
                     and not template.has_generated_required_body
