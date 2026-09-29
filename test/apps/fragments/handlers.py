@@ -103,6 +103,24 @@ def register_identical_query_parameters(app: Flask) -> None:
         return jsonify({"twin": "b"})
 
 
+def register_resource_pool(app: Flask, existing_ids: frozenset[int]) -> None:
+    @app.route("/api/items/<item_id>", methods=["GET"])
+    def resource_pool_endpoint(item_id: str) -> Any:
+        try:
+            exists = int(item_id) in existing_ids
+        except ValueError:
+            exists = False
+        return jsonify({"exists": exists}), 200 if exists else 404
+
+
+def register_resource_update(app: Flask) -> None:
+    @app.route("/api/items/<item_id>", methods=["GET", "PATCH"])
+    def resource_update_endpoint(item_id: str) -> Any:
+        if item_id != "12":
+            return jsonify({}), 404
+        return jsonify({"id": 12}), 200
+
+
 def register_flaky(app: Flask) -> None:
     app.config["flaky_should_fail"] = True
 

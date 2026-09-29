@@ -28,6 +28,7 @@
 
 #### `st run` and `st fuzz`
 
+- Avoid repeating a single known resource ID in most fuzzing requests. [#4848](https://github.com/schemathesis/schemathesis/issues/4848)
 - `st fuzz --help` omitting that fuzzing stops at the first failure without `--continue-on-failure`.
 - `st fuzz` omitting schema errors of individual operations.
 - `st fuzz` workers continuing after the first failure and reporting `Stop reason: Completed`.
