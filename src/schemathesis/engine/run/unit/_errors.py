@@ -179,7 +179,9 @@ def classify_test_exception(
     if isinstance(exc, hypothesis.errors.Flaky):
         return _classify_flaky(exc, state=state, errors=errors, non_fatal_error=non_fatal_error)
     if isinstance(exc, BaseExceptionGroup):
-        return Status.ERROR, list(_iter_group_errors(exc, state=state, non_fatal_error=non_fatal_error))
+        return Status.ERROR, list(
+            _iter_group_errors(exc, operation=operation, state=state, non_fatal_error=non_fatal_error)
+        )
     if isinstance(exc, hypothesis.errors.FailedHealthCheck):
         return Status.ERROR, [non_fatal_error(build_health_check_error(operation, exc, with_tip=False))]
     if isinstance(exc, hypothesis.errors.Unsatisfiable):
@@ -252,19 +254,34 @@ def _classify_flaky(
 def _iter_group_errors(
     exc: BaseExceptionGroup,
     *,
+    operation: APIOperation,
     state: TestingState,
     non_fatal_error: NonFatalErrorFactory,
 ) -> Iterator[events.NonFatalError]:
+    unexplained = []
+    reported = False
     for sub_exc in exc.exceptions:
         if is_regex_validation_error(sub_exc):
+            reported = True
             yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(sub_exc))
         elif isinstance(sub_exc, InvalidSchema):
+            reported = True
             yield non_fatal_error(sub_exc)
         else:
             code_sample = state.get_code_sample_for(sub_exc)
             if code_sample is not None:
+                reported = True
                 clear_hypothesis_notes(sub_exc)
                 yield non_fatal_error(sub_exc, code_sample=code_sample)
+            # Check failures and errors raised while testing a case are recorded when they happen
+            elif isinstance(sub_exc, Exception) and not isinstance(sub_exc, (Failure, FailureGroup, UnexpectedError)):
+                unexplained.append(sub_exc)
+    # Other errors often restate a schema error reported above, so they are shown only when nothing else is
+    if not reported:
+        for sub_exc in unexplained:
+            yield translate_iteration_exception(
+                sub_exc, operation=operation, state=state, non_fatal_error=non_fatal_error
+            )
 
 
 def _from_assertion_error(
