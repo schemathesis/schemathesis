@@ -82,6 +82,7 @@
 - Coverage phase missing positive cases for multipart bodies with custom-encoded properties.
 - Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
 - Open API 3.1 `$ref` siblings dropped when the target defines the same keyword.
+- Coverage phase crash on malformed `contains` keywords in Open API 3.0 schemas.
 - `format: binary` strings ignoring `minLength` and `maxLength`.
 - Crash instead of a schema error on malformed keywords like `minLength: "x"`.
 - `--generation-unique-inputs` treating inputs that differ only in sensitive parameter values as duplicates.

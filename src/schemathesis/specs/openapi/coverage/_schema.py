@@ -800,7 +800,7 @@ class CoverageContext:
             if cache_key is not None:
                 self.session.values[cache_key] = UNSATISFIABLE_RESULT
             raise
-        if isinstance(value, list) and isinstance(schema, dict) and "contains" in schema:
+        if isinstance(value, list) and isinstance(schema, dict) and _honors_contains(schema):
             value = _ensure_contains_bounds(self, value, schema)
         if cache_key is not None:
             self.session.values[cache_key] = deepclone(value) if isinstance(value, (dict, list)) else value
@@ -1587,6 +1587,15 @@ def _generate_template_with_deflation_fallback(
             "required": [k for k in original_required if properties.get(k) != {"not": {}}],
         }
         return ctx.generate_from_schema(deflated)
+
+
+def _honors_contains(schema: JsonSchemaObject) -> bool:
+    """Whether `contains` and its bounds are well-formed; Draft 4 never checks them and ignores them, as fuzzing does."""
+    if "contains" not in schema:
+        return False
+    return jsonschema_rs.meta.is_valid(
+        {key: schema[key] for key in ("contains", "minContains", "maxContains") if key in schema}
+    )
 
 
 def _ensure_contains_bounds(ctx: CoverageContext, value: list, schema: JsonSchemaObject) -> list:
@@ -3297,7 +3306,7 @@ def _positive_array(
     min_items = schema.get("minItems")
     max_items = schema.get("maxItems")
     # `minContains` matching items must fit, so the array can never be shorter than it.
-    if "contains" in schema:
+    if _honors_contains(schema):
         min_contains = schema.get("minContains", 1)
         if min_contains > 1:
             min_items = max(min_items or 0, min_contains)
