@@ -13,6 +13,7 @@ from schemathesis.core import media_types
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
+from schemathesis.core.transforms import stringify_keys
 from schemathesis.core.transport import decode_lossy
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -52,7 +53,7 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
         response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(decode_lossy(response.content, response.encoding), content_type)
-    loaded = from_dict(schema=schema, config=config)
+    loaded = _from_dict(schema, config=config, stringify=False)
     loaded.app = app
     loaded.location = path
     return loaded
@@ -86,7 +87,7 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     content_type = detect_content_type(headers=response.headers, path=path)
     encoding = response.mimetype_params.get("charset", "utf-8")
     schema = load_content(decode_lossy(response.get_data(), encoding), content_type)
-    loaded = from_dict(schema=schema, config=config)
+    loaded = _from_dict(schema, config=config, stringify=False)
     loaded.app = app
     loaded.location = path
     return loaded
@@ -130,7 +131,7 @@ def from_url(
     response = load_from_url(requests.get, url=url, wait_for_schema=wait_for_schema, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=url)
     schema = load_content(decode_lossy(response.content, response.encoding), content_type)
-    loaded = from_dict(schema=schema, config=config)
+    loaded = _from_dict(schema, config=config, stringify=False)
     loaded.location = url
     return loaded
 
@@ -160,7 +161,7 @@ def from_path(
     with open(path, encoding=encoding) as file:
         content_type = detect_content_type(headers=None, path=str(path))
         schema = load_content(file.read(), content_type)
-    loaded = from_dict(schema=schema, config=config)
+    loaded = _from_dict(schema, config=config, stringify=False)
     loaded.location = Path(path).absolute().as_uri()
     return loaded
 
@@ -194,7 +195,7 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
         schema = json.loads(data)
     except json.JSONDecodeError:
         schema = _load_yaml(data)
-    return from_dict(schema, config=config)
+    return _from_dict(schema, config=config, stringify=False)
 
 
 def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = None) -> OpenApiSchema:
@@ -218,10 +219,17 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
         ```
 
     """
+    return _from_dict(schema, config=config, stringify=True)
+
+
+def _from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None, stringify: bool) -> OpenApiSchema:
     if not isinstance(schema, dict):
         raise LoaderError(LoaderErrorKind.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
     hook_context = HookContext()
     dispatch_before_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, raw_schema=schema)
+    # Built-in loaders only produce string keys; dicts parsed elsewhere, e.g. by a YAML 1.1 parser, may not.
+    if stringify:
+        stringify_keys(schema)
 
     if config is None:
         config = SchemathesisConfig.discover()

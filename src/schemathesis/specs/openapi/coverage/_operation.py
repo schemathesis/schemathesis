@@ -668,7 +668,7 @@ def _reject_malformed_definition(
             exc, path=operation.path, method=operation.method, config=operation.schema.config.output
         ) from None
     except ValueError:
-        # Not a draft violation: e.g. YAML boolean property names, which the walk handles itself.
+        # Not a draft violation: a value JSON cannot hold, e.g. YAML `!!binary` bytes, which the walk handles itself.
         return
 
 

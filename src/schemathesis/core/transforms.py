@@ -36,6 +36,35 @@ def to_wire_string(value: object) -> str:
     return str(value)
 
 
+def stringify_keys(document: object) -> None:
+    """Spell every non-string mapping key in place as the wire does, e.g. a YAML 1.1 `on:` read as `True`."""
+    try:
+        # Serializing rejects non-string keys and is several times faster than the walk below.
+        jsonschema_rs.canonical.json.to_string(document)
+        return
+    except ValueError:
+        pass
+    stack = [document]
+    # YAML anchors can make a container its own descendant.
+    seen: set[int] = set()
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            if id(item) in seen:
+                continue
+            seen.add(id(item))
+            if not all(isinstance(key, str) for key in item):
+                items = [(key if isinstance(key, str) else to_wire_string(key), value) for key, value in item.items()]
+                item.clear()
+                item.update(items)
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            if id(item) in seen:
+                continue
+            seen.add(id(item))
+            stack.extend(item)
+
+
 def diff(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
     """Calculate the difference between two dictionaries."""
     diff = {}

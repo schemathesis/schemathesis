@@ -5077,7 +5077,7 @@ def test_content_json_query_params_single_encoding_in_coverage(ctx):
         assert isinstance(parsed, list), "filters should decode to a list after single JSON encoding"
 
 
-# YAML parses bare `on:` as boolean True, so schemas loaded from YAML can have bool keys in `properties`.
+# YAML 1.1 parsers read a bare `on:` as the boolean key `True`.
 BOOLEAN_KEY_BODY_SCHEMA = {
     "type": "object",
     "properties": {
@@ -5087,8 +5087,27 @@ BOOLEAN_KEY_BODY_SCHEMA = {
 }
 
 
-def test_coverage_body_with_boolean_property_key(ctx):
-    assert iter_cases(body_operation(ctx, BOOLEAN_KEY_BODY_SCHEMA, path="/hooks"), GenerationMode.POSITIVE)
+def boolean_key_operation(ctx, location, property_schema):
+    object_schema = {"type": "object", "properties": {True: property_schema, "name": {"type": "string"}}}
+    if location == "query":
+        parameters = [{"in": "query", "name": "key", "required": True, "schema": object_schema}]
+        return load_schema(ctx, parameters, path="/hooks")["/hooks"]["post"]
+    return body_operation(ctx, object_schema, path="/hooks")
+
+
+@pytest.mark.parametrize("location", ["query", "body"])
+def test_coverage_boolean_property_key(ctx, location):
+    operation = boolean_key_operation(ctx, location, {"type": "string", "enum": ["ALPHA"]})
+    cases = iter_cases(operation, GenerationMode.POSITIVE)
+    values = [case.query if location == "query" else case.body for case in cases]
+    assert {"true": "ALPHA", "name": ""} in values
+
+
+@pytest.mark.parametrize("location", ["query", "body"])
+def test_coverage_boolean_property_key_malformed_keyword(ctx, location):
+    operation = boolean_key_operation(ctx, location, {"type": "string", "minLength": "x"})
+    with pytest.raises(InvalidSchema):
+        iter_cases(operation, GenerationMode.POSITIVE)
 
 
 def test_coverage_negative_max_length_preserved_in_optimized_schema(ctx):
@@ -8615,20 +8634,12 @@ def test_parameter_with_an_always_true_not_still_gets_a_value(ctx):
 
 
 def test_negative_query_array_with_items_the_validator_cannot_load(ctx):
-    # A YAML boolean property name keeps the validator from loading, so every negative candidate ships.
-    schema = {"type": "array", "items": {"type": "string", "properties": {True: {}}}}
+    # A value JSON cannot hold, such as YAML `!!binary`, keeps the validator from loading, so every negative ships.
+    schema = {"type": "array", "items": {"type": "string", "x-raw": b"\x00"}}
     operation = load_schema(
         ctx, parameters=[{"in": "query", "name": "ids", "required": True, "schema": schema}], method="get"
     )["/foo"]["GET"]
-    assert targeted_values(operation, GenerationMode.NEGATIVE, "query", "ids") == [
-        [],
-        [{True: "null"}],
-        [["null", "null"]],
-        ["0"],
-        "AAA",
-        "null",
-        "false",
-    ]
+    assert targeted_values(operation, GenerationMode.NEGATIVE, "query", "ids") == [[], "AAA", "null", "false"]
 
 
 def test_content_type_header_parameter_pinned_to_the_body_media_type_when_its_schema_cannot_judge(ctx):

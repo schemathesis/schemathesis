@@ -875,6 +875,65 @@ def test_non_string_parameter_name(ctx):
     test()
 
 
+@pytest.mark.parametrize("location", ["query", "body"])
+@pytest.mark.parametrize("mode", list(GenerationMode), ids=[mode.value for mode in GenerationMode])
+def test_non_string_property_name(ctx, location, mode):
+    # Specs loaded with a YAML 1.1 parser carry a property named `on` as the boolean key `True`.
+    object_schema = {
+        "type": "object",
+        "properties": {True: {"type": "string", "enum": ["ALPHA"]}, 200: {"type": "string", "enum": ["BETA"]}},
+        "required": ["true", "200"],
+        "additionalProperties": False,
+    }
+    if location == "query":
+        operation = {"parameters": [{"in": "query", "name": "key", "required": True, "schema": object_schema}]}
+    else:
+        operation = {
+            "requestBody": {"required": True, "content": {"application/json": {"schema": object_schema}}},
+        }
+    schema = ctx.openapi.load_schema({"/foo": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}})
+
+    @given(case=schema["/foo"]["POST"].as_strategy(generation_mode=mode))
+    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        if mode == GenerationMode.POSITIVE:
+            assert (case.query if location == "query" else case.body) == {"true": "ALPHA", "200": "BETA"}
+
+    test()
+
+
+def test_yaml_file_with_non_string_property_name():
+    schema = schemathesis.openapi.from_file(
+        """
+openapi: 3.0.2
+info: {title: Test, version: "1.0"}
+paths:
+  /foo:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                on: {type: string, enum: [ALPHA]}
+                200: {type: string, enum: [BETA]}
+              required: ["on", "200"]
+              additionalProperties: false
+      responses:
+        "200": {description: OK}
+"""
+    )
+
+    @given(case=schema["/foo"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert case.body == {"on": "ALPHA", "200": "BETA"}
+
+    test()
+
+
 def test_non_string_path_parameter_name_recovered_from_template(ctx):
     # The template is the only place the original name survives, and its schema must still drive the value.
     schema = ctx.openapi.load_schema(
