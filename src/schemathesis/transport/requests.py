@@ -73,6 +73,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         serializer = None
         if not isinstance(case.body, NotSet) and media_type is not None:
             media_type, serializer = self._resolve_serializer(media_type)
+            # The multipart encoder picks the boundary; a header naming the bare media type leaves the body unparsable.
+            if media_type.startswith("multipart/") and final_headers.get("Content-Type") == case.media_type:
+                del final_headers["Content-Type"]
 
         # Set content type header if needed
         if (
