@@ -4641,6 +4641,30 @@ def test_negative_only_mode_emits_required_and_optional_combinations(ctx):
     )
 
 
+def test_negative_combinations_are_invalid_under_the_declared_parameter_schema(ctx):
+    # An unanchored pattern admits any string, so a length-bounded rewrite of it must not leak into negatives.
+    declared = {"type": "string", "pattern": "[a-z]*", "maxLength": 8}
+    operation = load_schema(
+        ctx,
+        parameters=[
+            {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}},
+            {"name": "t", "in": "query", "required": False, "schema": declared},
+            {"name": "u", "in": "query", "required": False, "schema": {"type": "integer"}},
+        ],
+        path="/items",
+        method="get",
+    )["/items"]["get"]
+    validator = jsonschema_rs.validator_for(declared)
+
+    assert [
+        case.query
+        for case in iter_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.generation.mode == GenerationMode.NEGATIVE
+        and case.meta.phase.data.parameter == "t"
+        and validator.is_valid(case.query["t"])
+    ] == []
+
+
 @pytest.mark.parametrize(
     "modes",
     [[GenerationMode.POSITIVE], [GenerationMode.POSITIVE, GenerationMode.NEGATIVE]],

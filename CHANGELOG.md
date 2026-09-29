@@ -88,6 +88,7 @@
 - Coverage phase skipping negative cases for optional parameter combinations under `--mode negative`.
 - Integer path parameters violating `enum`, `multipleOf` or `not` in positive test cases.
 - Coverage phase ignoring captured identifiers for request body properties defined via `$ref`.
+- False positive `negative_data_rejection` in coverage phase for parameters with unanchored `pattern` and `maxLength`.
 - Coverage phase generating different values for an operation depending on how many operations were loaded before it.
 
 #### Request serialization

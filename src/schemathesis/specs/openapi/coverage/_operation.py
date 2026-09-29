@@ -1358,7 +1358,7 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
             combination: dict[str, Any], _required: set[str], _parameter_set: ParameterSet
         ) -> dict[str, Any]:
             properties = {
-                parameter.name: parameter.optimized_schema
+                parameter.name: parameter.unoptimized_schema
                 for parameter in _parameter_set
                 if parameter.name in combination
             }
