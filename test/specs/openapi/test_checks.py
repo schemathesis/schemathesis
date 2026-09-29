@@ -1787,6 +1787,50 @@ def test_response_schema_conformance_rejects_empty_get_body(ctx, response_factor
         response_schema_conformance(check_context(), response, case)
 
 
+def _operation_with_ref_sibling_response(ctx, version, sibling):
+    reference = {"$ref": "#/definitions/Base" if version == "2.0" else "#/components/schemas/Base", **sibling}
+    base = {"type": "object", "properties": {"id": {"type": "integer"}}}
+    if version == "2.0":
+        definition = {
+            "produces": ["application/json"],
+            "responses": {"200": {"description": "OK", "schema": reference}},
+        }
+        schema = ctx.openapi.load_schema({"/x": {"get": definition}}, version=version, definitions={"Base": base})
+    else:
+        definition = {
+            "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": reference}}}}
+        }
+        schema = ctx.openapi.load_schema(
+            {"/x": {"get": definition}}, version=version, components={"schemas": {"Base": base}}
+        )
+    return schema["/x"]["GET"]
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "2.0"], ids=["openapi-3.0", "swagger-2"])
+def test_response_schema_conformance_ignores_keywords_next_to_ref(ctx, response_factory, version):
+    case = _operation_with_ref_sibling_response(ctx, version, {"required": ["extra"], "minProperties": 3}).Case()
+    response = Response.from_requests(response_factory.requests(content=b'{"id": 1}'), True)
+    assert response_schema_conformance(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("version", "keyword"),
+    [("3.0.2", "nullable"), ("2.0", "x-nullable")],
+    ids=["openapi-3.0", "swagger-2"],
+)
+def test_response_schema_conformance_honors_nullable_next_to_ref(ctx, response_factory, version, keyword):
+    case = _operation_with_ref_sibling_response(ctx, version, {keyword: True, "required": ["extra"]}).Case()
+    response = Response.from_requests(response_factory.requests(content=b"null"), True)
+    assert response_schema_conformance(check_context(), response, case) is None
+
+
+def test_response_schema_conformance_applies_keywords_next_to_ref_in_openapi_31(ctx, response_factory):
+    case = _operation_with_ref_sibling_response(ctx, "3.1.0", {"required": ["extra"]}).Case()
+    response = Response.from_requests(response_factory.requests(content=b'{"id": 1}'), True)
+    with pytest.raises(JsonSchemaError, match='"extra" is a required property'):
+        response_schema_conformance(check_context(), response, case)
+
+
 @pytest.mark.parametrize(
     ("response_key", "expected_note"),
     [

@@ -104,7 +104,7 @@ class OpenApiSchema(BaseSchema):
         self._initialize_adapter()
         super().__post_init__()
         self.analysis = OpenAPIAnalysis(self)
-        self._bundler = Bundler()
+        self._bundler = Bundler(ref_siblings=self.adapter.ref_siblings)
         self._bundle_cache: BundleCache = {}
         self._operation_lookup = OperationLookup(self, HTTP_METHODS_SCHEMA)
         self._operations = OperationLoader(self)

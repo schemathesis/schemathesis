@@ -427,6 +427,8 @@ def test_invalid_type_with_ref(cli, ctx, snapshot_cli):
                 }
             }
         },
+        # Open API 3.0 ignores keywords next to `$ref`, so only 3.1 reads the invalid `type`.
+        version="3.1.0",
         components={"schemas": {"S": {"maxProperties": 5}}},
     )
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive") == snapshot_cli

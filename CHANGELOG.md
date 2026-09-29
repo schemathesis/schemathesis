@@ -82,6 +82,7 @@
 
 #### Data generation
 
+- Keywords next to a root `$ref` applied in Open API 3.0 and Swagger 2.0 schemas.
 - Coverage phase sending positive custom media type bodies in negative-only mode.
 - Coverage phase missing positive cases for multipart bodies with custom-encoded properties.
 - Negative test data unsatisfiable for operations with plain string headers, such as FastAPI's `Header(None)`.
