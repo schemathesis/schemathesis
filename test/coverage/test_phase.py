@@ -9070,12 +9070,12 @@ BODY_TYPE_VIOLATIONS = [[None, None], "AAA", None, False, 0]
             [[{}], [[None, None]], [0], [""], [False], [True], [None], {}, "AAA", None, False, 0],
         ),
         ("3.0.2", {"type": "object", "minProperties": 0}, None, [{}], BODY_TYPE_VIOLATIONS),
-        # Draft 4 does not know `contains`, so the schema check passes whatever its subschema holds.
+        # Draft 4 does not know `contains`, so a malformed one is ignored, as fuzzing does.
         (
             "3.0.2",
             {"type": "array", "contains": {"type": "string", "maxLength": -1, "enum": ["x"]}},
             None,
-            [["x"]],
+            [[]],
             [{}, "AAA", None, False, 0],
         ),
         (

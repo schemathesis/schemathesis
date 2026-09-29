@@ -1270,6 +1270,12 @@ def test_malformed_media_type_in_request_body(ctx, cli, snapshot_cli):
                 },
             }
         },
+        {
+            "requestBody": {
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "array", "contains": {"type": "foo"}}}},
+            }
+        },
     ],
     ids=[
         "query-min-length",
@@ -1278,6 +1284,7 @@ def test_malformed_media_type_in_request_body(ctx, cli, snapshot_cli):
         "query-max-items",
         "query-disallowed-empty-min-length",
         "body-min-length",
+        "body-contains-unknown-type",
     ],
 )
 @pytest.mark.parametrize("phase", ["coverage", "fuzzing"])
