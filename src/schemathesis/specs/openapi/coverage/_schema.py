@@ -2161,8 +2161,18 @@ def _negative_max_items(
         # Force the array to have one more item than allowed
         new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
         oversized: list | None = None
+        items = schema.get("items", True)
         try:
-            oversized = ctx.generate_from_schema(new_schema)
+            if (
+                (items is True or isinstance(items, dict))
+                and not schema.get("uniqueItems")
+                and "contains" not in schema
+                and "prefixItems" not in schema
+            ):
+                # One valid item repeated breaks `maxItems` alone; drawing each item is a search per item.
+                oversized = ctx._tiled_array(schema, value + 1)
+            else:
+                oversized = ctx.generate_from_schema(new_schema)
         except (InvalidArgument, Unsatisfiable):
             # `uniqueItems: true` over a finite items domain (e.g. enum) makes a
             # length-(max+1) unique array unsatisfiable; drop uniqueness so the

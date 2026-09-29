@@ -4436,3 +4436,26 @@ def test_invalid_enum_values_do_not_run_hypothesis_per_position(nctx, mocker):
     ]
     assert len(values) == 40
     assert generate_one.call_count < 5
+
+
+def test_array_above_max_items_repeats_one_drawn_item(nctx, mocker):
+    # Drawing every item of a recursive schema is a search per item; one valid item repeated
+    # violates `maxItems` the same way.
+    schema = {
+        "type": "array",
+        "maxItems": 3,
+        "items": {"type": "object", "required": ["op"], "properties": {"op": {"type": "string"}}},
+    }
+    generate_from_schema = mocker.spy(CoverageContext, "generate_from_schema")
+
+    oversized = [
+        value.value
+        for value in cover_schema_iter(nctx, schema)
+        if value.scenario == CoverageScenario.ARRAY_ABOVE_MAX_ITEMS
+    ]
+
+    assert len(oversized) == 1
+    assert len(oversized[0]) == 4
+    assert all(item == oversized[0][0] and item is not oversized[0][0] for item in oversized[0][1:])
+    drawn = [call.args[1] for call in generate_from_schema.call_args_list]
+    assert all(not isinstance(drawn_schema, dict) or drawn_schema.get("minItems", 0) <= 1 for drawn_schema in drawn)
