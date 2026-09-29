@@ -158,3 +158,36 @@ def test_untouched_container_of_a_negative_case_is_not_judged(ctx, case_factory)
     case = case_factory(operation=operation, query={}, _meta=meta)
 
     assert check_conformance(case) is None
+
+
+HEADER_OPERATION = {
+    "/data": {
+        "post": {
+            "parameters": [{"name": "Content-Type", "in": "header", "required": True, "schema": {"type": "string"}}],
+            "requestBody": {"required": True, "content": {"application/json": {"schema": {"type": "object"}}}},
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+}
+
+
+# A content-type probe negates the declared request media types, which a free-form header schema still admits.
+@pytest.mark.parametrize(
+    ("scenario", "content_type"),
+    [
+        (CoverageScenario.UNSUPPORTED_CONTENT_TYPE, "text/plain"),
+        (CoverageScenario.MALFORMED_CONTENT_TYPE, "application.json"),
+    ],
+    ids=["unsupported", "malformed"],
+)
+def test_content_type_probe_header_is_not_judged(ctx, case_factory, scenario, content_type):
+    operation = ctx.openapi.load_schema(HEADER_OPERATION)["/data"]["POST"]
+    meta = CaseMetadata(
+        generation=GenerationInfo(time=0.0, mode=GenerationMode.NEGATIVE),
+        components={ParameterLocation.HEADER: ComponentInfo(mode=GenerationMode.NEGATIVE)},
+        phase=PhaseInfo.coverage(scenario=scenario, description=""),
+    )
+    meta.raw_containers[ParameterLocation.HEADER] = {"Content-Type": content_type}
+    case = case_factory(operation=operation, method="POST", headers={"Content-Type": content_type}, body={}, _meta=meta)
+
+    assert check_conformance(case) is None

@@ -11,7 +11,7 @@ from schemathesis.core.jsonschema import make_validator, make_validator_for
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.meta import FuzzingPhaseData
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, FuzzingPhaseData, coverage_scenario
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
 from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -82,6 +82,8 @@ def check_conformance(case: Case) -> ConformanceViolation | None:
     phase_data = meta.phase.data
     in_fuzzing = isinstance(phase_data, FuzzingPhaseData)
     negated_location = phase_data.parameter_location if in_fuzzing and phase_data.mutations else None
+    # Content-Type probes negate the declared request media types, not the header parameter schema.
+    is_content_type_probe = coverage_scenario(case) in CONTENT_TYPE_PROBES
     for location in _CHECKED_LOCATIONS:
         component = meta.components.get(location)
         if component is None:
@@ -92,6 +94,8 @@ def check_conformance(case: Case) -> ConformanceViolation | None:
             continue
         # Negative generation leaves untouched containers incomplete, so they carry no expectation.
         if case_is_negative and not is_negative and location != ParameterLocation.BODY:
+            continue
+        if is_content_type_probe and location == ParameterLocation.HEADER:
             continue
         if location == ParameterLocation.BODY:
             violation = _check_body(case, validator_cls=validator_cls, is_negative=is_negative)
