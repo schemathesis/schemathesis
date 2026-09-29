@@ -2272,7 +2272,10 @@ def _negative_any_of(
         with nctx.at(idx):
             for generated in cover_schema_iter(nctx, sub_schema, seen):
                 # Negative value for this schema could be a positive value for another one
-                if is_valid_for_others(generated.value, idx, validators, resolved_schemas, stringify_body_fields):
+                if not contains_binary(generated.value) and any(
+                    is_valid_for_others(generated.value, idx, judge, resolved_schemas, stringify_body_fields)
+                    for judge in validators
+                ):
                     continue
                 yield generated
 
@@ -2287,7 +2290,10 @@ def _negative_one_of(
     for idx, sub_schema in _branches_to_negate(value):
         with nctx.at(idx):
             for generated in cover_schema_iter(nctx, sub_schema, seen):
-                if is_invalid_for_oneOf(generated.value, idx, validators):
+                # Binary values cannot be validated by jsonschema_rs; treat as not matching any other sub-schema
+                if contains_binary(generated.value) or all(
+                    is_invalid_for_oneOf(generated.value, idx, judge) for judge in validators
+                ):
                     yield generated
 
 
@@ -2503,8 +2509,6 @@ def is_valid_for_others(
     schemas: list[dict | bool] | None = None,
     will_be_serialized_to_string: bool = False,
 ) -> bool:
-    if contains_binary(value):
-        return False
     for vidx, validator in enumerate(validators):
         if idx == vidx:
             # This one is being negated
@@ -2528,9 +2532,6 @@ def is_valid_for_others(
 
 
 def is_invalid_for_oneOf(value: object, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
-    if contains_binary(value):
-        # Binary values cannot be validated by jsonschema_rs; treat as not matching any other sub-schema
-        return True
     valid_count = 0
     for vidx, validator in enumerate(validators):
         if idx == vidx:
@@ -2608,16 +2609,88 @@ def _is_valid_with_formats(value: object, schema: JsonSchemaObject, ctx: Coverag
     return _admitted(value, schema, ctx, unjudged=True)
 
 
-def _make_branch_validators(schemas: list[JsonSchema], ctx: CoverageContext) -> list[jsonschema_rs.Validator]:
+def _make_branch_validators(
+    schemas: list[JsonSchema], ctx: CoverageContext, *, strict: bool = True
+) -> list[list[jsonschema_rs.Validator]]:
+    """Validators for each branch, once per draft reading them; only the operation's draft is required to load."""
     bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY)
-    result = []
+    judges: list[list[jsonschema_rs.Validator]] = []
+    for draft in _branch_drafts(schemas, ctx):
+        try:
+            judges.append([make_validator(_with_bundle(schema, bundle, draft, ctx), draft) for schema in schemas])
+        except Exception:
+            if strict and draft is ctx.validator_cls:
+                raise
+    return judges
+
+
+def drop_negatives_any_draft_admits(
+    ctx: CoverageContext, schema: JsonSchema, values: Iterator[GeneratedValue]
+) -> Generator[GeneratedValue, None, None]:
+    """Negatives a judge of any draft rejects; a value one reading admits is a valid request under it."""
+    judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
+    for value in values:
+        if (
+            value.generation_mode == GenerationMode.NEGATIVE
+            and not contains_binary(value.value)
+            and any(judge.is_valid(value.value) for judge in judges)
+        ):
+            continue
+        yield value
+
+
+def _branch_drafts(schemas: list[JsonSchema], ctx: CoverageContext) -> dict[type, None]:
+    drafts: dict[type, None] = {ctx.validator_cls: None}
     for schema in schemas:
-        if bundle is not None and isinstance(schema, dict):
-            schema = {**schema, BUNDLE_STORAGE_KEY: bundle}
-        # The operation's draft, not one inferred per branch: Draft 4 ignores keywords beside
-        # `$ref`, so a branch judged under a newer draft would reject values the wire accepts.
-        result.append(make_validator(schema, ctx.validator_cls))
-    return result
+        drafts[jsonschema_rs.validator_cls_for(schema)] = None
+    return drafts
+
+
+def _with_bundle(schema: JsonSchema, bundle: Any, draft: type, ctx: CoverageContext) -> JsonSchema:
+    if bundle is not None and draft is not ctx.validator_cls:
+        anchors, bundle = _static_bundle(ctx.session, bundle)
+        schema = _static_dynamic_refs(schema, anchors)
+    if bundle is not None and isinstance(schema, dict):
+        return {**schema, BUNDLE_STORAGE_KEY: bundle}
+    return schema
+
+
+def _static_bundle(session: GenerationSession, bundle: dict) -> tuple[dict[str, str], dict]:
+    cached = session.static_bundles.get(id(bundle))
+    if cached is MISSING or cached[2] is not bundle:
+        anchors: dict[str, str] = {}
+        _collect_anchors(bundle, f"#/{BUNDLE_STORAGE_KEY}", anchors)
+        cached = (anchors, _static_dynamic_refs(bundle, anchors), bundle)
+        session.static_bundles[id(bundle)] = cached
+    return cached[0], cached[1]
+
+
+def _collect_anchors(schema: Any, pointer: str, anchors: dict[str, str]) -> None:
+    if isinstance(schema, dict):
+        name = schema.get("$dynamicAnchor")
+        if isinstance(name, str):
+            anchors.setdefault(f"#{name}", pointer)
+        for key, value in schema.items():
+            _collect_anchors(value, f"{pointer}/{key.replace('~', '~0').replace('/', '~1')}", anchors)
+    elif isinstance(schema, list):
+        for idx, item in enumerate(schema):
+            _collect_anchors(item, f"{pointer}/{idx}", anchors)
+
+
+def _static_dynamic_refs(schema: Any, anchors: dict[str, str]) -> Any:
+    # Exact while no outer resource re-binds the anchor.
+    if isinstance(schema, dict):
+        dynamic = schema.get("$dynamicRef")
+        target = anchors.get(dynamic) if isinstance(dynamic, str) and "$ref" not in schema else None
+        return {
+            ("$ref" if key == "$dynamicRef" and target is not None else key): (
+                target if key == "$dynamicRef" and target is not None else _static_dynamic_refs(value, anchors)
+            )
+            for key, value in schema.items()
+        }
+    if isinstance(schema, list):
+        return [_static_dynamic_refs(item, anchors) for item in schema]
+    return schema
 
 
 def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:

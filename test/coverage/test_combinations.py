@@ -4266,3 +4266,34 @@ def test_array_above_max_items_repeats_one_drawn_item(nctx, mocker):
     assert all(item == oversized[0][0] and item is not oversized[0][0] for item in oversized[0][1:])
     drawn = [call.args[1] for call in generate_from_schema.call_args_list]
     assert all(not isinstance(drawn_schema, dict) or drawn_schema.get("minItems", 0) <= 1 for drawn_schema in drawn)
+
+
+def test_one_of_negative_is_not_valid_for_a_sibling_under_a_newer_draft(ctx_factory):
+    # Draft 4 ignores `prefixItems`, so the sibling rejects `["x"]` under it and accepts it under 2020-12.
+    schema = {
+        "oneOf": [
+            {
+                "type": "object",
+                "required": ["op", "args"],
+                "properties": {
+                    "op": {"enum": ["casei"]},
+                    "args": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+                },
+            },
+            {
+                "type": "object",
+                "required": ["op", "args"],
+                "properties": {
+                    "op": {"type": "string", "not": {"enum": ["casei"]}},
+                    "args": {"type": "array", "prefixItems": [{"type": "string"}], "items": {"not": {}}},
+                },
+            },
+        ]
+    }
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE], root_schema=schema)
+    judges = [jsonschema_rs.Draft4Validator(schema), jsonschema_rs.Draft202012Validator(schema)]
+
+    values = cover_schema(ctx, schema)
+
+    assert values
+    assert [value for value in values if any(judge.is_valid(value) for judge in judges)] == []
