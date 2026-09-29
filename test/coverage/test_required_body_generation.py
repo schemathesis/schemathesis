@@ -1,4 +1,4 @@
-from schemathesis.generation import GenerationMode
+from schemathesis import GenerationMode
 from test.coverage.helpers import assert_bodies, body_operation, iter_cases, load_schema
 
 # Malformed regex - bad character range `\\-.`
