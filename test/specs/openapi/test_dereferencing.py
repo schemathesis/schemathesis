@@ -564,16 +564,16 @@ def test_complex_dereference(complex_schema):
     schema = schemathesis.openapi.from_path(complex_schema)
     body_definition = {
         "schema": {
-            "$ref": "#/x-bundled/schema1",
+            "$ref": "#/x-bundled/schema000001",
             "x-bundled": {
-                "schema1": {
+                "schema000001": {
                     "additionalProperties": False,
                     "description": "Test",
-                    "properties": {"profile": {"$ref": "#/x-bundled/schema2"}, "username": {"type": "string"}},
+                    "properties": {"profile": {"$ref": "#/x-bundled/schema000002"}, "username": {"type": "string"}},
                     "required": ["username", "profile"],
                     "type": "object",
                 },
-                "schema2": {
+                "schema000002": {
                     "additionalProperties": False,
                     "description": "Test",
                     "properties": {"id": {"type": "integer"}},

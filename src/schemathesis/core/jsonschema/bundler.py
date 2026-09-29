@@ -83,7 +83,8 @@ class Bundler:
             name = uri_to_name.get(uri)
             if name is None:
                 self.counter += 1
-                name = f"schema{self.counter}"
+                # Fixed width, so names sort in creation order however many schemas were bundled before.
+                name = f"schema{self.counter:06d}"
                 uri_to_name[uri] = name
             return name
 
