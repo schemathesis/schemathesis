@@ -57,12 +57,12 @@ DEFINITIONS = {
             {
                 "type": "object",
                 "properties": {
-                    "user": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
-                    "company": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2"},
+                    "user": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
+                    "company": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000002"},
                 },
                 BUNDLE_STORAGE_KEY: {
-                    "schema1": USER,
-                    "schema2": COMPANY,
+                    "schema000001": USER,
+                    "schema000002": COMPANY,
                 },
             },
         ),
@@ -78,10 +78,10 @@ DEFINITIONS = {
             {
                 "type": "object",
                 "properties": {
-                    "user1": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
-                    "user2": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
+                    "user1": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
+                    "user2": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
                 },
-                BUNDLE_STORAGE_KEY: {"schema1": USER},
+                BUNDLE_STORAGE_KEY: {"schema000001": USER},
             },
         ),
         (
@@ -92,8 +92,8 @@ DEFINITIONS = {
             DEFINITIONS,
             {
                 "type": "array",
-                "items": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
-                BUNDLE_STORAGE_KEY: {"schema1": USER},
+                "items": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
+                BUNDLE_STORAGE_KEY: {"schema000001": USER},
             },
         ),
         (
@@ -106,12 +106,12 @@ DEFINITIONS = {
             DEFINITIONS,
             {
                 "anyOf": [
-                    {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
-                    {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2"},
+                    {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
+                    {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000002"},
                 ],
                 BUNDLE_STORAGE_KEY: {
-                    "schema1": USER,
-                    "schema2": COMPANY,
+                    "schema000001": USER,
+                    "schema000002": COMPANY,
                 },
             },
         ),
@@ -129,15 +129,15 @@ DEFINITIONS = {
                 }
             },
             {
-                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001",
                 BUNDLE_STORAGE_KEY: {
-                    "schema1": {
+                    "schema000001": {
                         "type": "object",
                         "properties": {
-                            "company": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2"},
+                            "company": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000002"},
                         },
                     },
-                    "schema2": {"type": "string"},
+                    "schema000002": {"type": "string"},
                 },
             },
         ),
@@ -154,11 +154,11 @@ DEFINITIONS = {
                 },
             },
             {
-                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001",
                 BUNDLE_STORAGE_KEY: {
-                    "schema1": {
+                    "schema000001": {
                         "type": "object",
-                        "properties": {"child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}},
+                        "properties": {"child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"}},
                     }
                 },
             },
@@ -180,19 +180,19 @@ DEFINITIONS = {
                 }
             },
             {
-                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001",
                 BUNDLE_STORAGE_KEY: {
-                    "schema1": {
+                    "schema000001": {
                         "type": "object",
                         "properties": {
                             "b": {
-                                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2",
+                                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000002",
                             }
                         },
                     },
-                    "schema2": {
+                    "schema000002": {
                         "type": "object",
-                        "properties": {"a": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}},
+                        "properties": {"a": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"}},
                     },
                 },
             },
@@ -237,7 +237,7 @@ DEFINITIONS = {
                             "key": {
                                 "anyOf": [
                                     {
-                                        "$ref": "#/x-bundled/schema1",
+                                        "$ref": "#/x-bundled/schema000001",
                                     },
                                     {
                                         "items": {},
@@ -248,11 +248,11 @@ DEFINITIONS = {
                     },
                 },
                 "x-bundled": {
-                    "schema1": {
+                    "schema000001": {
                         "properties": {
                             "key": {
                                 "anyOf": [
-                                    {"$ref": "#/x-bundled/schema1"},
+                                    {"$ref": "#/x-bundled/schema000001"},
                                     {"items": {}},
                                 ],
                             },
@@ -284,24 +284,24 @@ DEFINITIONS = {
                 "definitions": {
                     "schema": {
                         "patternProperties": {
-                            "$ref": "#/x-bundled/schema1",
+                            "$ref": "#/x-bundled/schema000001",
                         },
                         "properties": {
                             "schema": {
-                                "$ref": "#/x-bundled/schema2",
+                                "$ref": "#/x-bundled/schema000002",
                             },
                         },
                     },
                     "vendorExtension": {},
                 },
                 "x-bundled": {
-                    "schema1": {},
-                    "schema2": {
+                    "schema000001": {},
+                    "schema000002": {
                         "patternProperties": {
-                            "$ref": "#/x-bundled/schema1",
+                            "$ref": "#/x-bundled/schema000001",
                         },
                         "properties": {
-                            "schema": {"$ref": "#/x-bundled/schema2"},
+                            "schema": {"$ref": "#/x-bundled/schema000002"},
                         },
                     },
                 },
@@ -329,25 +329,25 @@ DEFINITIONS = {
                 }
             },
             {
-                "$ref": "#/x-bundled/schema1",
+                "$ref": "#/x-bundled/schema000001",
                 "x-bundled": {
-                    "schema1": {
-                        "$ref": "#/x-bundled/schema2",
+                    "schema000001": {
+                        "$ref": "#/x-bundled/schema000002",
                     },
-                    "schema2": {
+                    "schema000002": {
                         "oneOf": [
                             {
-                                "$ref": "#/x-bundled/schema3",
+                                "$ref": "#/x-bundled/schema000003",
                             },
                             {
-                                "$ref": "#/x-bundled/schema4",
+                                "$ref": "#/x-bundled/schema000004",
                             },
                         ],
                     },
-                    "schema3": {},
-                    "schema4": {
+                    "schema000003": {},
+                    "schema000004": {
                         "properties": {
-                            "key": {"$ref": "#/x-bundled/schema2"},
+                            "key": {"$ref": "#/x-bundled/schema000002"},
                         },
                     },
                 },
@@ -408,12 +408,12 @@ def test_bundle_recursive_not_inlined():
     resolver = make_root_resolver(store)
 
     assert Bundler().bundle(schema, resolver).schema == {
-        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001",
         BUNDLE_STORAGE_KEY: {
-            "schema1": {
+            "schema000001": {
                 "type": "object",
                 "properties": {
-                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},  # Self-reference preserved
+                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},  # Self-reference preserved
                 },
             }
         },
@@ -436,12 +436,12 @@ def test_bundle_preserves_recursive_references():
     resolver = make_root_resolver(store)
 
     assert bundle(schema, resolver).schema == {
-        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001",
         BUNDLE_STORAGE_KEY: {
-            "schema1": {
+            "schema000001": {
                 "type": "object",
                 "properties": {
-                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
+                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
                 },
             }
         },
@@ -469,9 +469,9 @@ def test_bundle_not_inlined_when_a_sibling_also_references_the_target():
     resolver = make_root_resolver(store)
 
     assert Bundler().bundle(schema, resolver).schema == {
-        "$ref": "#/x-bundled/schema1",
-        "allOf": [{"$ref": "#/x-bundled/schema1"}],
-        BUNDLE_STORAGE_KEY: {"schema1": {"type": "object"}},
+        "$ref": "#/x-bundled/schema000001",
+        "allOf": [{"$ref": "#/x-bundled/schema000001"}],
+        BUNDLE_STORAGE_KEY: {"schema000001": {"type": "object"}},
     }
 
 
@@ -521,8 +521,10 @@ def test_bundle_infinite_recursive_required_cycle_message():
 
     bundled = Bundler().bundle(schema, resolver).schema
 
-    assert bundled["$ref"] == f"#/{BUNDLE_STORAGE_KEY}/schema1"
-    assert bundled[BUNDLE_STORAGE_KEY]["schema1"]["properties"]["b"] == {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2"}
+    assert bundled["$ref"] == f"#/{BUNDLE_STORAGE_KEY}/schema000001"
+    assert bundled[BUNDLE_STORAGE_KEY]["schema000001"]["properties"]["b"] == {
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000002"
+    }
 
 
 def test_bundle_self_recursion_through_pattern_properties_is_breakable():
@@ -689,10 +691,10 @@ def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
 def test_unbundle_decodes_pointer_escaping_in_definition_names():
     # Definition name with a literal `/` is encoded as `~1` in the URI fragment.
     # Unbundling should recover the original key, not the encoded form.
-    name_to_uri = {"schema1": "#/definitions/User~1Profile"}
+    name_to_uri = {"schema000001": "#/definitions/User~1Profile"}
     bundled = {
-        "$ref": "#/x-bundled/schema1",
-        BUNDLE_STORAGE_KEY: {"schema1": {"type": "object"}},
+        "$ref": "#/x-bundled/schema000001",
+        BUNDLE_STORAGE_KEY: {"schema000001": {"type": "object"}},
     }
     result = unbundle(bundled, name_to_uri)
     assert result["components"]["schemas"] == {"User/Profile": {"type": "object"}}
@@ -700,8 +702,8 @@ def test_unbundle_decodes_pointer_escaping_in_definition_names():
 
 def test_unbundle_path_decodes_pointer_escaping():
     # Path segments reconstructed from a URI fragment must be JSON-Pointer-decoded.
-    name_to_uri = {"schema1": "#/definitions/User~1Profile"}
-    assert unbundle_path([BUNDLE_STORAGE_KEY, "schema1", "properties", "id"], name_to_uri) == [
+    name_to_uri = {"schema000001": "#/definitions/User~1Profile"}
+    assert unbundle_path([BUNDLE_STORAGE_KEY, "schema000001", "properties", "id"], name_to_uri) == [
         "definitions",
         "User/Profile",
         "properties",
@@ -727,8 +729,26 @@ def test_bundle_drops_id_from_bundled_definitions():
     assert Bundler().bundle(schema, resolver).schema == {
         "type": "object",
         "properties": {
-            "a": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
-            "b": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
+            "a": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
+            "b": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
         },
-        BUNDLE_STORAGE_KEY: {"schema1": {"type": "string"}},
+        BUNDLE_STORAGE_KEY: {"schema000001": {"type": "string"}},
     }
+
+
+@pytest.mark.parametrize("already_bundled", [0, 5, 95])
+def test_bundle_names_sort_in_creation_order(already_bundled):
+    # Canonicalization orders definitions by name, so names that sort differently depending on how
+    # much was bundled earlier give the same schema a different shape per load order.
+    definitions = {
+        f"D{idx}": {"type": "object", "properties": {"next": {"$ref": f"#/definitions/D{idx + 1}"}}}
+        for idx in range(12)
+    }
+    definitions["D12"] = {"type": "string"}
+    resolver = make_root_resolver({"definitions": definitions})
+    bundler = Bundler()
+    bundler.counter = already_bundled
+
+    names = list(bundler.bundle({"$ref": "#/definitions/D0"}, resolver).schema[BUNDLE_STORAGE_KEY])
+
+    assert sorted(names) == sorted(names, key=lambda name: int(name.removeprefix("schema")))
