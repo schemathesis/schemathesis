@@ -76,8 +76,10 @@ def _build_examples_generator(
     )
 
 
-def _create_scheduler(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> Scheduler:
-    """Create the appropriate scheduler via the schema's specification-aware override."""
+def _create_scheduler(
+    engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None
+) -> tuple[Scheduler, int]:
+    """Create the appropriate scheduler and count the entries it will hand out."""
     operations: list[Result[APIOperation, InvalidSchema]] = list(engine.schema.get_all_operations())
     if phase.name != PhaseName.COVERAGE:
         # An operation whose required body has no usable schema cannot be sent valid data, so every phase
@@ -87,7 +89,7 @@ def _create_scheduler(engine: EngineContext, phase: Phase, *, only: frozenset[st
         operations = [item for item in operations if isinstance(item, Ok) and item.ok().label in only]
     # Entries the schema could not produce never claim a share, so counting them shrinks every other one.
     engine.start_unit_phase(total_operations=sum(1 for item in operations if isinstance(item, Ok)))
-    return engine.schema.get_unit_scheduler(operations, phase)
+    return engine.schema.get_unit_scheduler(operations, phase), len(operations)
 
 
 def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None = None) -> events.EventGenerator:
@@ -105,7 +107,7 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
 
     # Create scheduler based on ordering configuration
     try:
-        scheduler = _create_scheduler(engine, phase, only=only)
+        scheduler, total_entries = _create_scheduler(engine, phase, only=only)
     except HookExecutionError as exc:
         yield events.NonFatalError(
             error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
@@ -122,7 +124,8 @@ def execute(engine: EngineContext, phase: Phase, *, only: frozenset[str] | None 
 
     try:
         with WorkerPool(
-            workers_num=engine.config.workers,
+            # A worker beyond the entry count would find nothing to run, yet its thread still costs memory.
+            workers_num=min(engine.config.workers, total_entries),
             scheduler=scheduler,
             worker_factory=worker_task,
             ctx=engine,

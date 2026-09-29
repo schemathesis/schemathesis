@@ -146,7 +146,8 @@
     "workers": {
       "anyOf": [
         {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1
         },
         {
           "const": "auto"
@@ -995,7 +996,8 @@
         "workers": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             {
               "const": "auto"

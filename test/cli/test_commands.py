@@ -274,6 +274,34 @@ def test_cli_run_output_empty(ctx, cli, workers):
     assert "= The schema defines no API operations =" in lines[-1]
 
 
+def test_workers_beyond_operations_start_no_extra_threads(ctx, cli, tmp_path):
+    # Every started thread costs memory, so a huge `workers` value with a small API must not start them all.
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text(
+        json.dumps(ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}))
+    )
+    local = threading.local()
+
+    def run_counting_threads(workers):
+        started = []
+
+        def trace(frame, event, arg):
+            if not getattr(local, "seen", False):
+                local.seen = True
+                started.append(threading.current_thread().name)
+
+        threading.settrace(trace)
+        try:
+            result = cli.main(
+                "run", str(schema_path), "--url=http://127.0.0.1:1", "--phases=examples", config={"workers": workers}
+            )
+        finally:
+            threading.settrace(None)
+        return result.exit_code, len(started)
+
+    assert run_counting_threads(1000) == run_counting_threads(1)
+
+
 def test_cli_run_changed_base_url(ctx, cli, snapshot_cli):
     # When the CLI receives custom base URL
     api = ctx.openapi.apps.success_and_failure()
