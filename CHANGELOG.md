@@ -37,6 +37,8 @@
 - WFC auth never retrying users rejected before the API created their accounts.
 - Crash when writing a baseline file into a directory that does not exist.
 - Raw traceback for unreadable or malformed baseline files.
+- Python spelling in config type errors, e.g. `bool: True` instead of `boolean: true`.
+- Crash on TOML dates and times in the config file.
 
 #### `st replay`
 

@@ -8,7 +8,7 @@ Schemathesis dev
 
 The loaded configuration is incorrect
 
-Error in root section:
+Error in [parameters] section:
   Type error:
 
-  - 'warnings' -> Must be a boolean, an array or an object, but got integer: 42
+  - 'id' -> Dates and times are not supported, but got date: 1979-05-27. Quote the value to pass it as a string.
