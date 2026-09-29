@@ -5,6 +5,7 @@ from pathlib import Path
 
 import jsonschema_rs
 import pytest
+from flask import jsonify, request
 from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
 from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
@@ -836,6 +837,91 @@ def test_serializing_shared_header_parameters(ctx):
         assert is_valid_header(case.headers)
 
     test()
+
+
+FORM_BODY = {
+    "type": "object",
+    "properties": {"a": {"enum": ["value"]}},
+    "required": ["a"],
+    "additionalProperties": False,
+}
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        {"application/json": {"schema": {"type": "object"}}, "text/plain": {"schema": {"type": "string"}}},
+        {"application/x-www-form-urlencoded": {"schema": FORM_BODY}},
+        {"multipart/form-data": {"schema": FORM_BODY}},
+    ],
+    ids=["json-and-text", "urlencoded", "multipart"],
+)
+def test_declared_content_type_header_matches_the_sent_body(ctx, app_runner, content):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "parameters": [
+                        {"in": "header", "name": "Content-Type", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "requestBody": {"required": True, "content": content},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        return jsonify({"mimetype": request.mimetype, "form": request.form.to_dict()})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+
+    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        form = case.body if case.media_type in ("application/x-www-form-urlencoded", "multipart/form-data") else {}
+        assert case.call().json() == {"mimetype": case.media_type, "form": form}
+
+    test()
+
+
+@pytest.mark.parametrize(
+    ("header_schema", "expected"),
+    [
+        ({"enum": ["application/xml"]}, {"application/xml"}),
+        ({"type": "string", "pattern": "^text/"}, {"text/plain"}),
+    ],
+    ids=["media-type-excluded", "one-media-type-admitted"],
+)
+def test_declared_content_type_header_keeps_values_its_schema_admits(ctx, header_schema, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "parameters": [{"in": "header", "name": "Content-Type", "required": True, "schema": header_schema}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "object"}},
+                            "text/plain": {"schema": {"type": "string"}},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    seen = set()
+
+    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        if case.media_type == "text/plain" or "application/xml" in expected:
+            seen.add(case.headers["Content-Type"])
+
+    test()
+    assert seen == expected
 
 
 def test_filter_urlencoded(ctx):

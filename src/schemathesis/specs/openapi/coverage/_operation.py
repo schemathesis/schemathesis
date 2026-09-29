@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from schemathesis.core.parameters import ContainerName
     from schemathesis.core.transport import HttpMethod, HttpMethodSchema
     from schemathesis.resources import PoolDraw, ResourcePool
-    from schemathesis.schemas import APIOperation, ParameterSet, PayloadAlternatives
+    from schemathesis.schemas import APIOperation, ParameterSet
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
 
 
@@ -764,7 +764,11 @@ def _seed_parameters(run: CoverageRun) -> None:
         # header parameter — otherwise body cases inherit a fuzzed CT (often empty) and ship bodies
         # that downstream tools can't dispatch. CT-mutation variants still flow through the iterator.
         if location == ParameterLocation.HEADER and name.lower() == "content-type" and operation.body:
-            admitted = _media_types_the_header_admits(parameter, operation.body, validator_cls)
+            admitted = [
+                alternative.media_type
+                for alternative in operation.body
+                if parameter.admits(alternative.media_type, validator_cls)
+            ]
             if admitted:
                 template.pin_content_type(name, frozenset(admitted))
                 value = GeneratedValue.with_positive(
@@ -832,25 +836,6 @@ def _container_without_wire_bounds(
     if not declared:
         return None
     return {**schema, "properties": {**properties, **declared}}
-
-
-def _media_types_the_header_admits(
-    parameter: OpenApiParameter,
-    body: PayloadAlternatives[OpenApiBody],
-    validator_cls: type[jsonschema_rs.Validator],
-) -> list[str]:
-    """Declared body media types the header's own contract accepts, in declaration order."""
-    declared = parameter.validation_schema
-    validator = None
-    if isinstance(declared, dict):
-        try:
-            validator = make_validator(declared, validator_cls)
-        except Exception:
-            # Schema rejected by `jsonschema_rs` — validity is unknown, so keep the body's media type.
-            pass
-    if validator is None:
-        return [alternative.media_type for alternative in body]
-    return [alternative.media_type for alternative in body if validator.is_valid(alternative.media_type)]
 
 
 def _drop_negatives_the_schema_admits(

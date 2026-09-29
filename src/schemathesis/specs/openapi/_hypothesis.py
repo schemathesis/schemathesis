@@ -513,10 +513,14 @@ def openapi_cases(
         for container in (query_, path_parameters_, headers_, cookies_, body_)
         for draw in container.constants_draws
     )
+    header_values = headers_.value
+    # A positive `Content-Type` header must describe the body it is sent with; a negated one stays a fuzz target.
+    if media_type is not None and header_values and headers_.generator != GenerationMode.NEGATIVE:
+        header_values = _pin_content_type_header(operation, header_values, headers, media_type)
     instance = operation.Case(
         media_type=media_type,
         path_parameters=path_parameters_.value or {},
-        headers=headers_.value or CaseInsensitiveDict(),
+        headers=header_values or CaseInsensitiveDict(),
         cookies=cookies_.value or {},
         query=query_.value or {},
         body=body_value,
@@ -903,6 +907,24 @@ class ValueContainer:
     def is_generated(self) -> bool:
         """If value was generated."""
         return self.generator is not None and (self.location == "body" or self.value is not None)
+
+
+def _pin_content_type_header(
+    operation: APIOperation, headers: dict[str, Any], explicit: dict[str, Any] | None, media_type: str
+) -> dict[str, Any]:
+    """Point a generated `Content-Type` header parameter at the body media type when its schema admits it."""
+    explicit_names = {name.lower() for name in explicit or ()}
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    for parameter in operation.headers:
+        name = parameter.name
+        if (
+            name.lower() == "content-type"
+            and name in headers
+            and "content-type" not in explicit_names
+            and parameter.admits(media_type, validator_cls)
+        ):
+            return {**headers, name: media_type}
+    return headers
 
 
 def any_negated_values(values: list[ValueContainer]) -> bool:

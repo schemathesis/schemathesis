@@ -379,7 +379,7 @@ def test_text_plain_boolean_and_null_use_json_spelling(ctx, value, expected):
     )
 
 
-def multipart_echo_schema(ctx):
+def multipart_echo_app(ctx):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/upload": {
@@ -409,13 +409,28 @@ def multipart_echo_schema(ctx):
             }
         )
 
-    return schemathesis.openapi.from_wsgi("/openapi.json", app)
+    return app
+
+
+def multipart_echo_schema(ctx):
+    return schemathesis.openapi.from_wsgi("/openapi.json", multipart_echo_app(ctx))
 
 
 def test_wsgi_multipart_form_fields_reach_the_app(ctx):
     operation = multipart_echo_schema(ctx)["/upload"]["POST"]
     received = operation.Case(body={"key": "value"}, media_type="multipart/form-data").call().json()
     # The raw body carries a randomly generated boundary, so only the parsed view is comparable.
+    assert (received["mimetype"], received["has_boundary"], received["form"]) == (
+        "multipart/form-data",
+        True,
+        {"key": "value"},
+    )
+
+
+def test_explicit_multipart_content_type_header_carries_the_boundary(ctx, app_runner):
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(multipart_echo_app(ctx)))
+    case = schema["/upload"]["POST"].Case(body={"key": "value"}, media_type="multipart/form-data")
+    received = case.call(headers={"Content-Type": "multipart/form-data"}).json()
     assert (received["mimetype"], received["has_boundary"], received["form"]) == (
         "multipart/form-data",
         True,

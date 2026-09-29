@@ -1253,6 +1253,18 @@ class OpenApiParameter(OpenApiComponent):
                 result[keyword] = value
         return result
 
+    def admits(self, value: str, validator_cls: type[jsonschema_rs.Validator]) -> bool:
+        """Whether the parameter's own contract accepts `value`; unknown validity counts as accepted."""
+        declared = self.validation_schema
+        if not isinstance(declared, dict):
+            return True
+        try:
+            validator = make_validator(declared, validator_cls)
+        except Exception:
+            # Schema rejected by `jsonschema_rs` — validity is unknown.
+            return True
+        return validator.is_valid(value)
+
     def _build_schema(self, *, optimize: bool) -> JsonSchema:
         schema = super()._build_schema(optimize=optimize)
         bounds = self.wire_bounds

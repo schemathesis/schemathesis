@@ -104,6 +104,8 @@
 - Coverage phase stringifying nested values of JSON-encoded `content` parameters.
 - Coverage phase sending a declared `Content-Type` header that names another body media type.
 - Percent-encoded delimiters, missing names and dropped falsy values in `matrix`/`label`/`simple` path parameters.
+- Examples and fuzzing phases sending a declared `Content-Type` header that names another media type.
+- Missing multipart `boundary` when `Content-Type: multipart/form-data` is set explicitly.
 
 #### Unsatisfiable schema messages
 
