@@ -10,6 +10,7 @@
 - Coverage Content-Type probes for malformed multipart and undeclared request media types.
 - `format: binary` values include small valid PNG, JPEG, GIF, WebP, PDF and ZIP files.
 - Multipart file names carry the extension of the detected file format, e.g. `image.png`.
+- `use_after_free` and `ensure_resource_availability` failures note responses served from a cache.
 
 ### :wrench: Changed
 

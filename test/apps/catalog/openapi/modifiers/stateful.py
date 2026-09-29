@@ -30,6 +30,17 @@ class EnsureResourceAvailability:
 
 
 @dataclass(slots=True)
+class ServedFromCache:
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        @app.after_request
+        def mark_as_cached(response):
+            response.headers["Age"] = "120"
+            return response
+
+
+@dataclass(slots=True)
 class NoMergeBody:
     priority: int = 0
 

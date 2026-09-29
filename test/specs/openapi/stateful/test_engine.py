@@ -41,6 +41,7 @@ from test.apps.catalog.openapi.modifiers.stateful import (
     MultipleSourceLinks,
     NoReliableTransitions,
     ReuseDeletedIds,
+    ServedFromCache,
     SingleLink,
     Slowdown,
     Unsatisfiable,
@@ -636,6 +637,14 @@ def test_new_resource_is_not_available(engine_factory):
     # Then it is a failure
     assert result.events[-1].status == Status.FAILURE
     assert result.failures[0].failure_info.failure.title == "Resource is not available after creation"
+
+
+def test_new_resource_is_not_available_behind_cache(engine_factory):
+    engine = engine_factory(EnsureResourceAvailability(), ServedFromCache(), max_examples=50)
+    result = collect_result(engine)
+    assert result.failures[0].failure_info.failure.message.endswith(
+        "The response came from a cache (`Age: 120`) and may be stale"
+    )
 
 
 def test_resource_availability(engine_factory):
