@@ -2089,7 +2089,7 @@ _USER_PROFILE_SCHEMA = {
 }
 
 
-def _build_user_profile_chain(ctx, response_factory, *, delete_status: int):
+def _build_user_profile_chain(ctx, response_factory, *, delete_status: int, get_headers=None):
     schema = ctx.openapi.load_schema(_USER_PROFILE_SCHEMA)
     post_operation = schema["/users"]["POST"]
     delete_operation = schema["/users/{userId}"]["DELETE"]
@@ -2101,7 +2101,7 @@ def _build_user_profile_chain(ctx, response_factory, *, delete_status: int):
 
     post_response = Response.from_requests(response_factory.requests(status_code=201), True)
     delete_response = Response.from_requests(response_factory.requests(status_code=delete_status), True)
-    get_response = Response.from_requests(response_factory.requests(status_code=200), True)
+    get_response = Response.from_requests(response_factory.requests(status_code=200, headers=get_headers), True)
 
     recorder = ScenarioRecorder(label="use-after-free-test")
     recorder.record_case(parent_id=None, case=post_case, transition=None, is_transition_applied=False)
@@ -2126,6 +2126,28 @@ def test_use_after_free_fires_when_delete_succeeded(ctx, response_factory):
     context, get_case, get_response = _build_user_profile_chain(ctx, response_factory, delete_status=204)
     with pytest.raises(UseAfterFree):
         use_after_free(context, get_response, get_case)
+
+
+@pytest.mark.parametrize(
+    ("headers", "hint"),
+    [
+        ({"Age": "75430"}, "\n\nThe response came from a cache (`Age: 75430`) and may be stale"),
+        ({"X-Cache": "MISS, HIT"}, "\n\nThe response came from a cache (`X-Cache: MISS, HIT`) and may be stale"),
+        ({"Age": "0", "X-Cache": "MISS"}, ""),
+        (None, ""),
+    ],
+    ids=["age", "x-cache-hit", "fresh", "no-cache-headers"],
+)
+def test_use_after_free_hints_at_cached_response(ctx, response_factory, headers, hint):
+    context, get_case, get_response = _build_user_profile_chain(
+        ctx, response_factory, delete_status=204, get_headers=headers
+    )
+    with pytest.raises(UseAfterFree) as exc_info:
+        use_after_free(context, get_response, get_case)
+    assert exc_info.value.message == (
+        "The API did not return a `HTTP 404 Not Found` response (got `HTTP 200 OK`) for a resource that was "
+        f"previously deleted.\n\nThe resource was deleted with `DELETE /users/alice`{hint}"
+    )
 
 
 _NESTED_RESOURCE_SCHEMA = {

@@ -1166,6 +1166,17 @@ def _created_a_resource(*, parent: Case, parent_response: Response, case: Case) 
     return parent_response.status_code == 201 or "Location" in parent_response.headers
 
 
+def _stale_cache_hint(response: Response) -> str:
+    # A shared cache can keep serving the pre-write state, so the failure may belong to the intermediary, not the API.
+    age = response.headers.get("age", [""])[0]
+    if age.isdigit() and int(age) > 0:
+        return f"\n\nThe response came from a cache (`Age: {age}`) and may be stale"
+    x_cache = response.headers.get("x-cache", [""])[0]
+    if "HIT" in x_cache.upper():
+        return f"\n\nThe response came from a cache (`X-Cache: {x_cache}`) and may be stale"
+    return ""
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -1226,6 +1237,7 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
                     message=(
                         "The API did not return a `HTTP 404 Not Found` response "
                         f"(got `HTTP {response.status_code} {reason}`) for a resource that was previously deleted.\n\nThe resource was deleted with `{free}`"
+                        f"{_stale_cache_hint(response)}"
                     ),
                     free=free,
                     usage=usage,
@@ -1295,6 +1307,7 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
             f"The API returned `{response.status_code} {reason}` for a resource that was just created.\n\n"
             f"Created with      : `{created_with}`\n"
             f"Not available with: `{not_available_with}`"
+            f"{_stale_cache_hint(response)}"
         ),
         created_with=created_with,
         not_available_with=not_available_with,
