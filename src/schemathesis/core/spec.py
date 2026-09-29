@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Iterator
+    from collections.abc import Callable, Generator, Iterator, Mapping
 
     import jsonschema_rs
     from hypothesis.strategies import SearchStrategy
@@ -98,6 +98,8 @@ class OperationsProvider(Protocol):
         operations: list[Result[APIOperation, InvalidSchema]],
         phase: Phase,
     ) -> Scheduler: ...  # pragma: no cover
+
+    def declared_response_values(self, operation: APIOperation) -> Mapping[str, frozenset[str]]: ...  # pragma: no cover
 
 
 class CaseFactory(Protocol):

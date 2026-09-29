@@ -6,6 +6,7 @@ from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.behaviors import BehaviorSummary
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning
@@ -346,6 +347,9 @@ class RunSummary:
     reauth_count: int = 0
     # Whether the reauth circuit breaker tripped this run.
     reauth_broke: bool = False
+    # Behavior counts per operation. Recorded for offline analysis, never printed: the estimators
+    # downstream need `n`, `S(n)`, `f1` and `f2` and nothing else.
+    behaviors: BehaviorSummary = field(default_factory=lambda: BehaviorSummary(alphabet="", operations={}))
 
 
 @dataclass
