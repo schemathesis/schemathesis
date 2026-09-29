@@ -658,7 +658,7 @@ def test_create_scheduler_respects_layer_order_for_single_layer(ctx):
     engine = EngineContext(schema=loaded, stop_event=threading.Event())
     phase = Phase(name=PhaseName.FUZZING, is_enabled=True)
 
-    scheduler = _create_scheduler(engine, phase)
+    scheduler, _ = _create_scheduler(engine, phase)
 
     dispatched: list[str] = []
     while True:
@@ -711,7 +711,7 @@ def test_operation_with_unresolvable_ref_is_still_dispatched(ctx):
     )
 
     engine = EngineContext(schema=loaded, stop_event=threading.Event())
-    scheduler = _create_scheduler(engine, Phase(name=PhaseName.FUZZING, is_enabled=True))
+    scheduler, _ = _create_scheduler(engine, Phase(name=PhaseName.FUZZING, is_enabled=True))
 
     dispatched = []
     while True:
@@ -762,7 +762,7 @@ def test_create_scheduler_filters_to_requested_operations(ctx):
     engine = EngineContext(schema=loaded, stop_event=threading.Event())
     phase = Phase(name=PhaseName.COVERAGE, is_enabled=True)
 
-    scheduler = _create_scheduler(engine, phase, only=frozenset({"GET /products/{productName}"}))
+    scheduler, _ = _create_scheduler(engine, phase, only=frozenset({"GET /products/{productName}"}))
 
     dispatched: list[str] = []
     while True:

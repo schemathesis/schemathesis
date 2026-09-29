@@ -124,6 +124,7 @@
 
 #### Others
 
+- Memory exhaustion from large `workers` values; reject values below 1.
 - Crash files lost when a negative mutation stored a `bytes` value.
 - Wrong or crashing request URLs for GraphQL schemas loaded from files or dictionaries.
 - Crash on non-string property names from YAML 1.1 parsers, e.g. `on:`, passed to `from_dict`.

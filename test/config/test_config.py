@@ -290,6 +290,26 @@ def test_workers_auto_uses_available_cpus():
     assert (config.projects.default.workers, override.workers) == (get_workers_count(), get_workers_count())
 
 
+@pytest.mark.parametrize("workers", [0, -1])
+def test_workers_below_one(workers):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_str(f"workers = {workers}")
+    assert str(exc.value) == (
+        f"Invalid value for 'workers': {workers}\n\n"
+        "Expected either:\n"
+        "  - A positive integer (e.g., workers = 4)\n"
+        '  - The string "auto" for automatic detection (workers = "auto")'
+    )
+
+
+def test_project_workers_below_one():
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_str('[[project]]\ntitle = "a"\nworkers = 0')
+    assert str(exc.value) == (
+        "Error in [project.0] section:\n  Value out of range:\n\n  - 'workers' -> Must be at least 1, but got 0."
+    )
+
+
 def test_standalone_project_config_reads_discovered_config_file(tmp_path, monkeypatch):
     (tmp_path / "schemathesis.toml").write_text("seed = 42\n")
     monkeypatch.chdir(tmp_path)
