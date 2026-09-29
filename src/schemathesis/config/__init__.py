@@ -225,12 +225,18 @@ class SchemathesisConfig(DiffBase):
         """Create a config instance from a dictionary."""
         from jsonschema_rs import ValidationError
 
-        from schemathesis.config._validator import CONFIG_VALIDATOR
+        from schemathesis.config._validator import CONFIG_VALIDATOR, InstancePath, without_temporal_values
 
+        replaced: dict[InstancePath, object] = {}
+        instance = without_temporal_values(data, (), replaced)
         try:
-            CONFIG_VALIDATOR.validate(data)
+            CONFIG_VALIDATOR.validate(instance)
         except ValidationError as exc:
-            raise ConfigError.from_validation_error(exc) from None
+            raise ConfigError.from_validation_error(exc, replaced) from None
+        if replaced:
+            # Only free-form tables, such as `[parameters]`, accept a `null` in place of a date or time
+            path, value = next(iter(replaced.items()))
+            raise ConfigError.from_temporal_value(path, value)
         dictionaries = parse_dictionaries(data, base_dir=base_dir)
         projects = ProjectsConfig.from_dict(data, dictionaries=dictionaries)
         return cls(

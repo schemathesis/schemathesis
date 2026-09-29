@@ -140,6 +140,15 @@ from flask import jsonify
             id="openapi_auth_mixed_schemes",
         ),
         pytest.param('suppress-health-check = ["all", "all"]', id="duplicate_health_checks"),
+        pytest.param("[generation]\nmax-examples = true", id="max_examples_boolean"),
+        pytest.param('[generation]\nmax-examples = "ten"', id="max_examples_string"),
+        pytest.param("[generation]\nmax-examples = 1979-05-27", id="max_examples_date"),
+        pytest.param("[generation]\nmax-examples = 1979-05-27T07:32:00Z", id="max_examples_offset_datetime"),
+        pytest.param("[generation]\nmax-examples = 1979-05-27T07:32:00", id="max_examples_local_datetime"),
+        pytest.param("[generation]\nmax-examples = 07:32:00", id="max_examples_time"),
+        pytest.param("base-url = 1979-05-27", id="base_url_date"),
+        pytest.param("[auth.openapi.ApiKeyAuth]\napi_key = 1979-05-27", id="auth_openapi_date"),
+        pytest.param("[parameters]\nid = 1979-05-27", id="parameters_date"),
     ],
 )
 def test_incorrect_config(cli, snapshot_cli, tmp_path, config_content):

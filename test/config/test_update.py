@@ -48,8 +48,12 @@ def test_unknown_generation_mode_rejected(config, mode, rendered, suggestion):
 
 
 def test_non_integer_max_examples_rejected(config):
-    with pytest.raises(ConfigError, match="max-examples"):
+    with pytest.raises(ConfigError) as exc:
         config.generation.update(max_examples="ten")
+    assert str(exc.value) == (
+        "Error in [generation] section:\n  Type error:\n\n"
+        "  - 'max-examples' -> Must be an integer, but got string: 'ten'"
+    )
 
 
 def test_included_check_names_disables_unlisted_custom_checks(config, restore_checks):

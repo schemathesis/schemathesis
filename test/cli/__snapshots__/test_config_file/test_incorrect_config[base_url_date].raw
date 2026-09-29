@@ -11,4 +11,4 @@ The loaded configuration is incorrect
 Error in root section:
   Type error:
 
-  - 'warnings' -> Must be a boolean, an array or an object, but got integer: 42
+  - 'base-url' -> Must be a string, but got date: 1979-05-27
