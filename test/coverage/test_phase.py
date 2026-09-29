@@ -9236,3 +9236,58 @@ def test_positive_query_values_for_a_parameter_accepting_anything(ctx):
         "null",
         "true",
     ]
+
+
+def _ref(name):
+    return {"$ref": f"#/components/schemas/{name}"}
+
+
+PROPERTY = {"type": "object", "required": ["property"], "properties": {"property": {"type": "string"}}}
+# A trimmed CQL2 grammar: `Func` arguments recurse through `$dynamicRef`, which Draft 4 reads as "anything".
+CQL2_LIKE = {
+    "Expr": {"$dynamicAnchor": "expr", "oneOf": [_ref("Cmp"), _ref("Func"), {"type": "boolean"}]},
+    "Cmp": {
+        "type": "object",
+        "required": ["op", "args"],
+        "properties": {
+            "op": {"enum": ["="]},
+            "args": {"type": "array", "minItems": 2, "maxItems": 2, "items": _ref("Scalar")},
+        },
+    },
+    "Scalar": {"oneOf": [_ref("Casei"), _ref("Func"), _ref("Prop")]},
+    "Casei": {
+        "type": "object",
+        "required": ["op", "args"],
+        "properties": {
+            "op": {"enum": ["casei"]},
+            "args": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"oneOf": [_ref("Prop"), _ref("Func")]}},
+        },
+    },
+    "Func": {
+        "type": "object",
+        "required": ["op", "args"],
+        "properties": {
+            "op": {"type": "string", "not": {"enum": ["=", "casei"]}},
+            "args": {"type": "array", "items": {"oneOf": [_ref("Prop"), {"$dynamicRef": "#expr"}]}},
+        },
+    },
+    "Prop": PROPERTY,
+}
+
+
+def test_negative_bodies_are_rejected_under_every_draft(ctx):
+    # A 3.0 body can reference a grammar written for a newer draft; a negative only one reading
+    # rejects is a valid request under the other.
+    operation = body_operation(ctx, _ref("Expr"), version="3.0.2", components={"schemas": CQL2_LIKE})
+    document = json.loads(
+        json.dumps({"$ref": "#/$defs/Expr", "$defs": CQL2_LIKE}).replace("#/components/schemas/", "#/$defs/")
+    )
+    judges = [
+        body_validator(operation, validator_cls=jsonschema_rs.Draft4Validator),
+        jsonschema_rs.Draft202012Validator(document),
+    ]
+
+    bodies = [case.body for case in iter_cases(operation, GenerationMode.NEGATIVE) if case.body is not NOT_SET]
+
+    assert bodies, "No negative bodies generated"
+    assert [value for value in bodies if any(judge.is_valid(value) for judge in judges)] == []

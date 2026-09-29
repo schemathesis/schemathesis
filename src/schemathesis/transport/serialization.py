@@ -71,12 +71,15 @@ class Binary(str):
 
 def contains_binary(value: object) -> bool:
     """Check if the value contains any binary payload jsonschema-rs cannot validate."""
-    if isinstance(value, (Binary, bytes)):
-        return True
-    if isinstance(value, dict):
-        return any(contains_binary(v) for v in value.values())
-    if isinstance(value, list):
-        return any(contains_binary(v) for v in value)
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, (Binary, bytes)):
+            return True
+        if isinstance(item, dict):
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
     return False
 
 

@@ -36,7 +36,13 @@ from schemathesis.generation.meta import (
     PhaseInfo,
 )
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet, filter_schema_valid_examples
-from schemathesis.specs.openapi.coverage._schema import CoverageContext, GeneratedValue, HashSet, cover_schema_iter
+from schemathesis.specs.openapi.coverage._schema import (
+    CoverageContext,
+    GeneratedValue,
+    HashSet,
+    cover_schema_iter,
+    drop_negatives_any_draft_admits,
+)
 from schemathesis.specs.openapi.error_feedback import apply_adjustments
 from schemathesis.transport.serialization import quote_all
 
@@ -959,21 +965,19 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
             raise InvalidSchema.from_malformed_media_type(
                 exc, body.media_type, path=operation.path, method=operation.method
             ) from exc
-        gen = cover_schema_iter(
-            CoverageContext(
-                session=session,
-                root_schema=schema,
-                location=ParameterLocation.BODY,
-                media_type=media_type,
-                generation_modes=generation_modes,
-                is_required=body.is_required,
-                custom_formats=custom_formats,
-                validator_cls=validator_cls,
-                update_pattern=update_pattern,
-                allow_extra_parameters=generation_config.allow_extra_parameters,
-            ),
-            schema,
+        body_ctx = CoverageContext(
+            session=session,
+            root_schema=schema,
+            location=ParameterLocation.BODY,
+            media_type=media_type,
+            generation_modes=generation_modes,
+            is_required=body.is_required,
+            custom_formats=custom_formats,
+            validator_cls=validator_cls,
+            update_pattern=update_pattern,
+            allow_extra_parameters=generation_config.allow_extra_parameters,
         )
+        gen = drop_negatives_any_draft_admits(body_ctx, schema, cover_schema_iter(body_ctx, schema))
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
             continue

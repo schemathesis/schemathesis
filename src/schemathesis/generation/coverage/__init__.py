@@ -23,6 +23,7 @@ class GenerationSession:
         "pattern_strategies",
         "ready_bundles",
         "removed_examples",
+        "static_bundles",
         "values",
     )
 
@@ -33,6 +34,7 @@ class GenerationSession:
         self.ready_bundles: BoundedCache = BoundedCache(maxsize=64)
         self.draw_outcomes: BoundedCache = BoundedCache(maxsize=128)
         self.pattern_strategies: BoundedCache = BoundedCache(maxsize=128)
+        self.static_bundles: BoundedCache = BoundedCache(maxsize=64)
         # Pinning a registry keeps its `id` from being recycled into a colliding token.
         self._pinned: OrderedDict[int, object] = OrderedDict()
         self._lock = threading.Lock()
@@ -58,6 +60,7 @@ class GenerationSession:
         self.ready_bundles.clear()
         self.draw_outcomes.clear()
         self.pattern_strategies.clear()
+        self.static_bundles.clear()
         with self._lock:
             self._pinned.clear()
 
