@@ -1069,6 +1069,34 @@ def test_useful_traceback(ctx, cli, snapshot_cli, with_error):
     assert cli.main("run", api.schema_url, "-c", "with_error", hooks=with_error) == snapshot_cli
 
 
+# Errors raised from two places make Hypothesis report them together as a group.
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_traceback=True)
+def test_multiple_generation_errors_in_fuzzing(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "kind", "in": "query", "required": True, "schema": {"enum": ["a", "b"]}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    with ctx.hook(
+        """
+@schemathesis.hook
+def map_query(ctx, query):
+    if query["kind"] == "a":
+        raise ValueError("Generation failed")
+    raise ValueError("Generation failed")
+"""
+    ) as module:
+        assert (
+            cli.run_openapi_app(app, "--phases=fuzzing", "--mode=positive", "--max-examples=10", hooks=module)
+            == snapshot_cli
+        )
+
+
 @pytest.mark.parametrize("media_type", ["multipart/form-data", "multipart/mixed", "multipart/*"])
 def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_type):
     api = ctx.openapi.apps.success()

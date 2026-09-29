@@ -29,6 +29,7 @@
 
 #### `st run` and `st fuzz`
 
+- Fuzzing phase dropping data generation errors when several distinct errors occur.
 - `st fuzz --help` omitting that fuzzing stops at the first failure without `--continue-on-failure`.
 - `st fuzz` omitting schema errors of individual operations.
 - `st fuzz` workers continuing after the first failure and reporting `Stop reason: Completed`.
