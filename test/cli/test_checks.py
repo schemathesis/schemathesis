@@ -286,6 +286,70 @@ def test_negative_data_rejection_uuid_path_param_with_pattern_no_false_positive(
     )
 
 
+def test_negative_data_rejection_wildcard_media_type_link_body_no_false_positive(ctx, cli, app_runner):
+    # A link writes into a body sent under a concrete media type the operation declares only as `*/*`.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["id"],
+                                        "properties": {"id": {"type": "integer"}},
+                                    }
+                                }
+                            },
+                            "links": {
+                                "UpdateItem": {
+                                    "operationId": "updateItem",
+                                    "requestBody": {"id": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/items/update": {
+                "post": {
+                    "operationId": "updateItem",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"*/*": {"schema": {"type": "object", "properties": {"id": {"type": "integer"}}}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/api/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/api/items/update", methods=["POST"])
+    def update_item():
+        return jsonify({}), 200
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--checks=negative_data_rejection,not_a_server_error",
+        "--mode=positive",
+        "--phases=stateful",
+        "--max-examples=20",
+        exit_code=ExitCode.OK,
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, cli, snapshot_cli):
     # Type mutations for XML body string fields serialize all non-string values to their string
