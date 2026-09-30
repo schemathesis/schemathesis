@@ -118,7 +118,12 @@ def _process_entry(
 
     html_link: str | None = None
     keyword_total = ((result.statistic or {}).get("keywords") or {}).get("total", 0)
-    if outcome.coverage_map is not None and result.gaps and keyword_total > 0 and not _is_complete(result):
+    if (
+        outcome.coverage_map is not None
+        and (result.gaps or result.errors)
+        and keyword_total > 0
+        and not _is_complete(result)
+    ):
         html_path = html_out / entry.corpus / f"{api_label.replace('/', '__')}.html"
         try:
             html_path.parent.mkdir(parents=True, exist_ok=True)
