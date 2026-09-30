@@ -79,6 +79,7 @@
 - Missing inferred links for path parameters named after a resource field, e.g. `/projects/{code}`.
 - Inferred links reading response fields the schema does not define.
 - Missing inferred links for fields and nested foreign keys inherited through `allOf`.
+- Crash when a link fills the body of an operation accepting `*/*`.
 
 #### Data generation
 
