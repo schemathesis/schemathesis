@@ -5,16 +5,24 @@ from __future__ import annotations
 import datetime
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.events import LoadingFinished
-from schemathesis.core.failures import AcceptedNegativeData, MalformedJson, ResponseTimeExceeded, ServerError
+from schemathesis.core.failures import (
+    AcceptedNegativeData,
+    MalformedJson,
+    ResponseTimeExceeded,
+    ServerError,
+    format_failures,
+)
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.events import EngineFinished, EngineStarted, ScenarioFinished
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
+    AuthScenario,
     EnsureResourceAvailability,
     IgnoredAuth,
     JsonSchemaError,
@@ -31,9 +39,11 @@ from schemathesis.openapi.checks import (
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
+    from schemathesis.config import OutputConfig
     from schemathesis.core.failures import Failure
     from schemathesis.engine import events
     from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.engine.statistic import Statistic
     from schemathesis.generation.case import Case
 
 SCHEMA_VERSION = "0.7.0"
@@ -86,14 +96,107 @@ def fault_category(failure: Failure) -> tuple[int, str] | None:
     if isinstance(failure, UseAfterFree):
         return 113, description
     if isinstance(failure, IgnoredAuth):
-        # WFC 308 covers unauthenticated modifications; unauthenticated reads have no WFC category.
+        # WFC 308 covers modifications sent without credentials; other auth findings have no WFC category.
         method = (failure.operation or "").split(" ", 1)[0].upper()
-        return (308 if method in DESTRUCTIVE_METHODS else UNMAPPED_AUTH_OR_METHOD), description
+        if method in DESTRUCTIVE_METHODS and failure.scenario is AuthScenario.NO_AUTH:
+            return 308, description
+        return UNMAPPED_AUTH_OR_METHOD, description
     if isinstance(failure, EnsureResourceAvailability):
         return CREATED_RESOURCE_UNAVAILABLE, description
     if isinstance(failure, ResponseTimeExceeded):
         return SLOW_RESPONSE, description
     return None
+
+
+def _case_faults(
+    case_id: str, endpoint: str, failures: list[Failure]
+) -> list[tuple[tuple[int, str], dict[str, object]]]:
+    faults: list[tuple[tuple[int, str], dict[str, object]]] = []
+    seen: set[tuple[int, str]] = set()
+    for failure in failures:
+        category = fault_category(failure)
+        if category is None:
+            continue
+        code, description = category
+        # WFC identifies a fault by code and context, so the context names the operation.
+        context = f"{endpoint} -> {description}"
+        if (code, context) in seen:
+            continue
+        seen.add((code, context))
+        faults.append(
+            (
+                (code, context),
+                {
+                    "operationId": endpoint,
+                    "testCaseId": case_id,
+                    "faultCategories": [{"code": code, "context": context}],
+                },
+            )
+        )
+    return faults
+
+
+@dataclass(slots=True)
+class ExportedFailures:
+    script: str
+    test_cases: list[dict[str, object]]
+    found_faults: list[dict[str, object]]
+    distinct_faults: int
+    output_calls: int
+
+
+def export_failures(
+    statistic: Statistic, endpoints: dict[str, tuple[str, str]], config: OutputConfig, file_name: str
+) -> ExportedFailures:
+    """The failures the CLI reports: a shell script reproducing them, their WFC test cases and found faults."""
+    lines = ["#!/bin/sh"]
+    test_cases: list[dict[str, object]] = []
+    found_faults: list[dict[str, object]] = []
+    distinct_faults: set[tuple[int, str]] = set()
+    output_calls = 0
+    for label in sorted(statistic.failures):
+        for index, group in enumerate(statistic.failures[label].values(), 1):
+            if group.case_id is None or group.code_sample is None:
+                continue
+            endpoint, sent_as = endpoints[group.case_id]
+            faults = _case_faults(group.case_id, endpoint, group.failures)
+            if not faults:
+                continue
+            found_faults.extend(fault for _, fault in faults)
+            distinct_faults.update(key for key, _ in faults)
+            explanation = format_failures(
+                case_id=f"{index}. Test Case ID: {group.case_id}",
+                response=group.response,
+                failures=group.failures,
+                curl=None,
+                auth_identity=group.auth_identity,
+                config=config,
+            )
+            lines.append("")
+            start = len(lines)
+            lines.append(f"# {label}")
+            # Every explanation line stays a comment, whatever the response body contains.
+            lines.extend(f"# {line}" if line else "#" for line in explanation.splitlines())
+            lines.append("#")
+            commands = group.code_sample.splitlines()
+            lines.extend(commands)
+            output_calls += len(commands)
+            test_cases.append(
+                {
+                    "id": group.case_id,
+                    "name": f"{sent_as}: {group.failures[0].title}",
+                    "filePath": file_name,
+                    "startLine": start,
+                    "endLine": len(lines) - 1,
+                }
+            )
+    return ExportedFailures(
+        script="\n".join(lines) + "\n",
+        test_cases=test_cases,
+        found_faults=found_faults,
+        distinct_faults=len(distinct_faults),
+        output_calls=output_calls,
+    )
 
 
 class WfcReportHandler(EventHandler["BaseExecutionContext"]):
@@ -105,12 +208,9 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
         "finished",
         "endpoint_ids",
         "covered",
-        "found_faults",
-        "fault_keys",
-        "test_cases",
+        "failing_endpoints",
         "total_tests",
         "evaluated_calls",
-        "output_calls",
     )
 
     def __init__(self, output: Path) -> None:
@@ -119,12 +219,10 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
         self.finished: events.EngineFinished | None = None
         self.endpoint_ids: set[str] = set()
         self.covered: dict[str, set[int | None]] = {}
-        self.found_faults: list[dict[str, object]] = []
-        self.fault_keys: set[tuple[str, int, str]] = set()
-        self.test_cases: dict[str, dict[str, str]] = {}
+        # Method and path each failing case was sent with, which differ from its operation for undeclared-method probes.
+        self.failing_endpoints: dict[str, tuple[str, str]] = {}
         self.total_tests = 0
         self.evaluated_calls = 0
-        self.output_calls = 0
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, LoadingFinished):
@@ -147,33 +245,10 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             if endpoint in self.endpoint_ids:
                 status = interaction.response.status_code if interaction.response is not None else None
                 self.covered.setdefault(endpoint, set()).add(status)
-        # Checks are keyed by the case each failure belongs to, which always has a recorded response.
         for case_id, checks in recorder.checks.items():
-            endpoint = _case_operation_id(recorder.cases[case_id].value)
-            for check in checks:
-                if check.failure_info is None:
-                    continue
-                failure = check.failure_info.failure
-                category = fault_category(failure)
-                if category is None:
-                    continue
-                code, description = category
-                # WFC identifies a fault by code and context, so the context names the operation.
-                context = f"{endpoint} -> {description}"
-                key = (case_id, code, context)
-                if key in self.fault_keys:
-                    continue
-                self.fault_keys.add(key)
-                if case_id not in self.test_cases:
-                    self.test_cases[case_id] = {"id": case_id, "name": failure.title}
-                    self.output_calls += 1
-                self.found_faults.append(
-                    {
-                        "operationId": endpoint,
-                        "testCaseId": case_id,
-                        "faultCategories": [{"code": code, "context": context}],
-                    }
-                )
+            if any(check.failure_info is not None for check in checks):
+                case = recorder.cases[case_id].value
+                self.failing_endpoints[case_id] = (_case_operation_id(case), f"{case.method.upper()} {case.path}")
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         if self.finished is not None:
@@ -182,18 +257,20 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
             elapsed = time.time() - self.started_at
         else:
             elapsed = 0.0
+        script_path = self.output.with_suffix(".sh")
+        exported = export_failures(ctx.statistic, self.failing_endpoints, ctx.config.output, script_path.name)
         document = {
             "schemaVersion": SCHEMA_VERSION,
             "toolName": "Schemathesis",
             "toolVersion": SCHEMATHESIS_VERSION,
             "creationTime": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "faults": {
-                "totalNumber": len({(code, context) for _, code, context in self.fault_keys}),
-                "foundFaults": self.found_faults,
+                "totalNumber": exported.distinct_faults,
+                "foundFaults": exported.found_faults,
             },
             "problemDetails": {
                 "rest": {
-                    "outputHttpCalls": self.output_calls,
+                    "outputHttpCalls": exported.output_calls,
                     "evaluatedHttpCalls": self.evaluated_calls,
                     "endpointIds": sorted(self.endpoint_ids),
                     "coveredHttpStatus": [
@@ -208,9 +285,10 @@ class WfcReportHandler(EventHandler["BaseExecutionContext"]):
                 }
             },
             "totalTests": self.total_tests,
-            "testFilePaths": [],
-            "testCases": list(self.test_cases.values()),
+            "testFilePaths": [script_path.name],
+            "testCases": exported.test_cases,
             "executionTimeInSeconds": round(elapsed),
         }
         self.output.parent.mkdir(parents=True, exist_ok=True)
+        script_path.write_text(exported.script, encoding="utf-8")
         self.output.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")

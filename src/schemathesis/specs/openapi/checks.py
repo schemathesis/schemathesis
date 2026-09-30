@@ -28,6 +28,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.openapi.checks import (
     AllowHeaderMismatch,
+    AuthScenario,
     EnsureResourceAvailability,
     IgnoredAuth,
     JsonSchemaError,
@@ -1314,12 +1315,6 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     )
 
 
-class AuthScenario(str, enum.Enum):
-    NO_AUTH = "no_auth"
-    INVALID_AUTH = "invalid_auth"
-    GENERATED_AUTH = "generated_auth"
-
-
 class AuthKind(str, enum.Enum):
     EXPLICIT = "explicit"
     GENERATED = "generated"
@@ -1400,6 +1395,7 @@ def _raise_no_auth_error(response: Response, case: Case, auth: AuthScenario) -> 
     raise IgnoredAuth(
         operation=case.operation.label,
         message=message,
+        scenario=auth,
         title=title,
         case_id=case.id,
     )

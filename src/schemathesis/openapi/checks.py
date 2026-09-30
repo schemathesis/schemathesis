@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 import textwrap
 from typing import TYPE_CHECKING, Any
 
@@ -349,21 +350,30 @@ class EnsureResourceAvailability(Failure):
         return ""
 
 
+class AuthScenario(str, enum.Enum):
+    NO_AUTH = "no_auth"
+    INVALID_AUTH = "invalid_auth"
+    GENERATED_AUTH = "generated_auth"
+
+
 class IgnoredAuth(Failure):
     """The API operation does not check the specified authentication."""
 
-    __slots__ = ("operation", "message", "title", "case_id", "severity")
+    __slots__ = ("operation", "message", "scenario", "title", "case_id", "severity")
 
     def __init__(
         self,
         *,
         operation: str,
         message: str,
+        scenario: AuthScenario,
         title: str = "API accepts requests without authentication",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
+        # Which credentials the request carried when the API still let it through.
+        self.scenario = scenario
         self.title = title
         self.case_id = case_id
         self.severity = Severity.CRITICAL
