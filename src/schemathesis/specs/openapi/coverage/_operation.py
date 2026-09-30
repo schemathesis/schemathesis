@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, TypeGuard, cast
 import jsonschema_rs
 
 from schemathesis.core import NOT_SET, NotSet, media_types
-from schemathesis.core.errors import InvalidSchema, MalformedMediaType
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType, is_regex_validation_error
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schema
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
@@ -44,6 +44,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     drop_negatives_any_draft_admits,
 )
 from schemathesis.specs.openapi.error_feedback import apply_adjustments
+from schemathesis.specs.openapi.patterns import is_valid_jsonschema_rs_regex
 from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
@@ -664,6 +665,13 @@ def _reject_malformed_definition(
     try:
         make_validator(schema, validator_cls)
     except jsonschema_rs.ValidationError as exc:
+        # The meta-schema checks `pattern` with the ECMA-262 `u` grammar, which rejects escapes like `\-`.
+        if (
+            is_regex_validation_error(exc)
+            and isinstance(exc.instance, str)
+            and is_valid_jsonschema_rs_regex(exc.instance)
+        ):
+            return
         raise InvalidSchema.from_jsonschema_error(
             exc, path=operation.path, method=operation.method, config=operation.schema.config.output
         ) from None

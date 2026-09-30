@@ -9295,3 +9295,21 @@ def test_negative_bodies_are_rejected_under_every_draft(ctx):
 
     assert bodies, "No negative bodies generated"
     assert [value for value in bodies if any(judge.is_valid(value) for judge in judges)] == []
+
+
+def test_coverage_pattern_with_identity_escape_in_body(ctx):
+    # ECMA-262 without the `u` flag allows identity escapes such as `\-`.
+    operation = body_operation(
+        ctx, {"type": "object", "properties": {"latitude": {"type": "string", "pattern": r"^\-?\d+$"}}}
+    )
+
+    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
+
+
+def test_coverage_pattern_with_identity_escape_in_query(ctx):
+    schema = build_schema(
+        ctx,
+        [{"in": "query", "name": "latitude", "schema": {"type": "string", "pattern": r"^\-?\d+$"}, "required": True}],
+    )
+
+    assert_positive_coverage(schema, [{"query": {"latitude": "0"}}])
