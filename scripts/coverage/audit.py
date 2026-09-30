@@ -636,15 +636,10 @@ def main(argv: list[str] | None = None) -> int:
     interrupted = False
     wall_started = time.monotonic()
 
-    def _write_summary_and_exit(signum: int, frame: object) -> None:
-        print("\ninterrupted; writing summary for completed APIs", file=sys.stderr)
-        # Before writing the summary: the workers keep burning cores until they are stopped.
-        _terminate_workers()
-        _finalize(results, out_dir=args.out, baseline=baseline, wall_seconds=time.monotonic() - wall_started)
-        os._exit(130)
-
-    signal.signal(signal.SIGINT, _write_summary_and_exit)
-    signal.signal(signal.SIGTERM, _write_summary_and_exit)
+    # Both signals unwind through the pool shutdown and `except KeyboardInterrupt`, so the summary is written
+    # and multiprocessing releases its semaphores on exit.
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
 
     worker_kwargs = _WorkerKwargs(
         out_dir=args.out,
