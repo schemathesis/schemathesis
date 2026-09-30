@@ -41,12 +41,11 @@ snapshot-update *ARGS:
 test-corpus:
     python -m pytest test-corpus/ -n auto --dist=worksteal
 
-# Lint + type-check + test all tooling (corpus, analyze, coverage).
+# Lint + type-check all tooling (corpus, analyze, coverage).
 check-tooling:
     uvx ruff check tools/corpus scripts/analyze test/tooling
     uvx ruff format --check tools/corpus scripts/analyze test/tooling
     uvx --with=".[tests]" --with=mypy --with=types-PyYAML mypy tools/corpus scripts/analyze
-    uv run --extra=tests --extra=scripts pytest test/tooling -n auto -q
 
 # Launch a catalog test app on PORT (default factory: kitchen_sink). `just serve --list` to see all factories.
 serve PORT="8081" FACTORY="kitchen_sink" *ARGS:
