@@ -201,7 +201,8 @@ def _normalize_multipart_boundary(request: PreparedRequest) -> None:
     delimiter, separator, _ = body.partition(b"\r\n")
     if not separator or not delimiter.startswith(b"--"):
         return
-    existing = delimiter[2:]
+    # A body with no parts starts with the closing delimiter, whose trailing `--` is not part of the boundary.
+    existing = delimiter[2:].removesuffix(b"--")
     if not existing:
         return
     # 32 hex characters - a valid boundary token, the same shape and length the multipart encoders produce.

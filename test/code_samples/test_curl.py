@@ -381,3 +381,10 @@ def test_multipart_boundary_matches_between_header_and_body(multipart_schema, pa
 def test_multipart_curl_command_is_stable(multipart_schema, path, body):
     case = multipart_schema[path]["POST"].Case(body=body, media_type="multipart/form-data")
     assert case.as_curl_command() == case.as_curl_command()
+
+
+def test_empty_multipart_curl_body_keeps_closing_delimiter(multipart_schema):
+    case = multipart_schema["/upload"]["POST"].Case(body={}, media_type="multipart/form-data")
+    command = case.as_curl_command()
+    boundary = HEADER_BOUNDARY.search(command)[1]
+    assert f"-d $'--{boundary}--\\r\\n'" in command, command
