@@ -70,6 +70,7 @@
 - Keep schema example values that data generation hooks change in the examples phase.
 - Apply test-scoped `filter_case` and `map_case` in the pytest coverage phase.
 - Call test-scoped `after_validate`.
+- Apply `apply_to` and `skip_for` filters on hooks registered by name, e.g. `hook("before_call")`.
 
 #### Stateful testing
 

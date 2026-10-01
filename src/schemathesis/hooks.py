@@ -82,10 +82,11 @@ def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
                 if filter_used:
                     with _reset_on_error():
                         validate_filterable_hook(hook)
-                func.filter_set = filter_set  # type: ignore[attr-defined]
+                # Filters chained on the named form apply only to the hook this decorator registers
+                func.filter_set = decorator_filter_set  # type: ignore[attr-defined]
                 return dispatcher.register_hook_with_name(func, hook_name)
 
-            init_filter_set(decorator)
+            decorator_filter_set = init_filter_set(decorator)
             return decorator
 
         hook.filter_set = filter_set  # type: ignore[attr-defined]
