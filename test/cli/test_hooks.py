@@ -174,6 +174,23 @@ def filter_failure(context, failure, case, response):
     assert result.exit_code == expected, result.stdout
 
 
+@pytest.mark.parametrize(
+    "filter_call",
+    ['apply_to(name="GET /api/success")', 'skip_for(name="GET /api/failure")'],
+    ids=["apply_to", "skip_for"],
+)
+def test_named_hook_respects_filters(ctx, cli, snapshot_cli, filter_call):
+    api = ctx.openapi.apps.success_and_failure()
+    module = ctx.write_pymodule(
+        f"""
+@schemathesis.hook("before_call").{filter_call}
+def reject_call(context, case, kwargs):
+    raise ValueError(f"Called for {{case.operation.label}}")
+"""
+    )
+    assert cli.main("run", api.schema_url, "--phases=fuzzing", "--max-examples=1", hooks=module) == snapshot_cli
+
+
 @pytest.mark.parametrize("command", ["run", "fuzz"])
 @pytest.mark.parametrize(
     "hook",
