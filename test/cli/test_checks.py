@@ -1827,3 +1827,22 @@ def test_alternative_security_requirements_should_not_trigger_negative_data_reje
     assert (
         cli.run_openapi_app(app, "-c negative_data_rejection", "--phases=coverage", "--auth=user:pass") == snapshot_cli
     )
+
+
+def test_ignored_auth_probes_each_operation_until_enforcement_is_confirmed(ctx, cli):
+    # Every successful case used to trigger its own unauthenticated requests; one confirmation is enough.
+    api = ctx.openapi.apps.basic_with_query()
+
+    cli.run(
+        api.schema_url,
+        "--auth=test:test",
+        "--checks=ignored_auth",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--max-examples=20",
+    )
+
+    authorized = [request for request in api.requests if request.headers.get("Authorization") == "Basic dGVzdDp0ZXN0"]
+    unauthorized = [request for request in api.requests if request.headers.get("Authorization") != "Basic dGVzdDp0ZXN0"]
+    assert len(authorized) > 1
+    assert len(unauthorized) == 2

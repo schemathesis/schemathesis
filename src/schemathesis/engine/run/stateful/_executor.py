@@ -374,6 +374,7 @@ def execute_state_machine_loop(
                 recorder=self.recorder,
                 response_checks=engine.checks.for_responses(),
                 phase=PhaseName.STATEFUL_TESTING,
+                auth_enforced_operations=engine.auth_enforced_operations,
             )
             validate_response(
                 response=response,

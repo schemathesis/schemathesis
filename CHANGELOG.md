@@ -24,6 +24,7 @@
 - `st replay` removes fixed crash files with masked credentials once config or CLI supplies them.
 - Fuzzing and pytest seed each operation separately, so operations with identical parameters explore different inputs.
 - Stateful testing targets only metrics from `generation.maximize` or explicit `hypothesis.target()` calls.
+- `ignored_auth` stops probing an operation once it rejects missing and invalid credentials.
 
 ### :bug: Fixed
 

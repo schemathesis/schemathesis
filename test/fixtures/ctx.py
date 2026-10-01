@@ -211,6 +211,9 @@ class OpenAPIApps:
     def basic(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.basic())
 
+    def basic_with_query(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.basic_with_query())
+
     def success_and_basic(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_and_basic())
 

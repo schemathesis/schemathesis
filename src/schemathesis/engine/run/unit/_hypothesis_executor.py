@@ -88,6 +88,7 @@ def run_test(
         recorder=recorder,
         response_checks=ctx.checks.for_responses(),
         phase=phase,
+        auth_enforced_operations=ctx.auth_enforced_operations,
     )
 
     if ctx.error_feedback is not None:

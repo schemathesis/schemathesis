@@ -395,6 +395,13 @@ def basic() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def basic_with_query() -> OpenAPIApp:
+    spec = build_schema(schemas.basic_with_query(), components=_BASIC_AUTH_SCHEME)
+    app = make_flask_app_from_schema(spec)
+    handlers.register_basic_with_query(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def success_and_basic() -> OpenAPIApp:
     spec = build_schema({**schemas.success(), **schemas.basic()}, components=_BASIC_AUTH_SCHEME)
     app = make_flask_app_from_schema(spec)

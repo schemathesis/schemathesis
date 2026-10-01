@@ -1340,6 +1340,10 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
     if security_parameters and 200 <= response.status_code < 300:
         auth = _contains_auth(ctx, case, response, security_parameters)
         if auth == AuthKind.EXPLICIT:
+            enforced = ctx.auth_enforced_operations
+            # Enforcement is a property of the operation, so one confirmation per run is enough.
+            if enforced is not None and case.operation.label in enforced:
+                return None
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             no_auth_case = remove_auth(case, security_parameters)
@@ -1360,6 +1364,8 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                 ctx._record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
                 if invalid_auth_response.status_code not in AUTH_ENFORCED_STATUSES:
                     _raise_no_auth_error(invalid_auth_response, invalid_auth_case, AuthScenario.INVALID_AUTH)
+            if enforced is not None:
+                enforced.add(case.operation.label)
         elif auth == AuthKind.GENERATED:
             # If this auth is generated which means it is likely invalid, then
             # this request should have been an error

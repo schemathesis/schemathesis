@@ -418,6 +418,7 @@ def _run_forever_thread(
                     transport_kwargs=cached.transport_kwargs,
                     recorder=recorder,
                     response_checks=response_checks,
+                    auth_enforced_operations=ctx.auth_enforced_operations,
                 )
                 continue_on_failure = continue_on_failure_by_label[case.operation.label]
                 validate_response(
