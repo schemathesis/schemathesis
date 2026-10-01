@@ -120,6 +120,7 @@
 
 #### False positives
 
+- `ignored_auth` when unauthenticated requests redirect to a sign-in page.
 - `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
 - `negative_data_rejection` for numeric array path parameters sent as a single number.
 - `negative_data_rejection` for multipart bodies with `--generation-unique-inputs`.
