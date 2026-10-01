@@ -212,6 +212,11 @@ def test_has_non_printable_short_circuits_above_scan_cap():
     assert has_non_printable(huge) is True
 
 
+def test_has_non_printable_short_circuits_above_utf8_byte_cap():
+    huge = "😀" * (MAX_SHELL_SCAN_BYTES // 4 + 1)
+    assert has_non_printable(huge) is True
+
+
 def test_escape_for_shell_truncates_above_cap():
     huge = "x" * (MAX_SHELL_SCAN_BYTES * 4)
     result = escape_for_shell(huge, ShellType.BASH)
@@ -219,6 +224,22 @@ def test_escape_for_shell_truncates_above_cap():
     assert "<...truncated" in result.escaped_value
     assert str(len(huge)) in result.escaped_value
     assert len(result.escaped_value) < MAX_SHELL_SCAN_BYTES + 100
+
+
+def test_escape_for_shell_truncates_unicode_by_utf8_bytes():
+    value = "😀" * (MAX_SHELL_SCAN_BYTES + 1)
+    result = escape_for_shell(value, ShellType.BASH)
+    total_bytes = len(value.encode("utf-8"))
+    assert result.needs_warning is True
+    assert result.escaped_value == ("😀" * (MAX_SHELL_SCAN_BYTES // 4) + f" <...truncated, {total_bytes} bytes total>")
+
+
+def test_escape_for_shell_truncates_lone_surrogates_by_utf8_bytes():
+    value = "\ud800" * (MAX_SHELL_SCAN_BYTES // 3 + 1)
+    result = escape_for_shell(value, ShellType.BASH)
+    total_bytes = len(value.encode("utf-8", "surrogatepass"))
+    assert result.needs_warning is True
+    assert result.escaped_value.endswith(f"<...truncated, {total_bytes} bytes total>")
 
 
 def test_escape_for_shell_below_cap_unchanged():

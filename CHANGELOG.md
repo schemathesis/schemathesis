@@ -145,6 +145,7 @@
 - Broken `curl` reproduction commands for request data with C1 control or Unicode line-separator characters.
 - `curl` reproduction commands sending wrong bytes in fish, or `\$` for `$` in bash.
 - Equal `Case` objects hashing differently when header names differ only in case.
+- Oversized `curl` reproduction commands for non-ASCII request data.
 
 ### :racing_car: Performance
 
