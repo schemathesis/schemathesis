@@ -103,10 +103,10 @@ To mitigate it, re-check the real validation rules and update your API schema so
 ### `missing_deserializer`
 
 ```
-Schema validation skipped: 1 operation cannot validate responses due to missing deserializers
+Schema validation skipped: 1 operation cannot validate application/xml responses due to missing deserializers
 
-  - GET /reports
-    Cannot validate response 200: no deserializer registered for application/xml
+application/xml (1 operation):
+  - GET /reports (200)
 ```
 
 !!! tip
@@ -114,7 +114,7 @@ Schema validation skipped: 1 operation cannot validate responses due to missing 
 
 **Trigger**: Operation responses declare structured schemas (objects / arrays) for a media type, but Schemathesis has no deserializer registered for that `content-type`.
 
-When this warning appears, Schemathesis skips validation because it cannot deserialize the response body. Restore validation by:
+When this warning appears, Schemathesis skips validation of responses in that media type because it cannot deserialize the body. Responses in other media types of the same operation are still validated. Restore validation by:
 
 - Registering a deserializer for the media type via `@schemathesis.deserializer()` (or `schemathesis.deserializer.register`) so the payload is converted into Python data.
 - Updating the schema to advertise the actual media type (for example `application/json`) if the server already returns JSON.

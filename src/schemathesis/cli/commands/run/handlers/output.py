@@ -94,6 +94,13 @@ def bold(option: str) -> str:
     return click.style(option, bold=True)
 
 
+def _unvalidated_responses(by_media_type: dict[str, dict[str, set[str]]]) -> str:
+    # Name the media type: responses in other media types of the same operations are still validated
+    if len(by_media_type) == 1:
+        return f"{next(iter(by_media_type))} responses"
+    return f"responses in {len(by_media_type)} media types"
+
+
 def _is_graphql(ctx: ExecutionContext) -> bool:
     return ctx.specification is not None and ctx.specification.kind is SpecificationKind.GRAPHQL
 
@@ -1315,7 +1322,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 title="Schema validation skipped",
                 warnings=ctx.warnings.missing_deserializer,
                 entity_name="operation",
-                suffix_text=" cannot validate responses due to missing deserializers",
+                suffix_text=f" cannot validate {_unvalidated_responses(ctx.warnings.missing_deserializer)} due to missing deserializers",
                 tips=["💡 Register a deserializer with @schemathesis.deserializer() to enable validation"],
             )
 
@@ -1482,7 +1489,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 "operation",
                 "mostly rejected generated data",
             ),
-            (len(missing_deserializer), "Schema validation skipped", "operation", "cannot validate responses"),
+            (
+                len(missing_deserializer),
+                "Schema validation skipped",
+                "operation",
+                f"cannot validate {_unvalidated_responses(ctx.warnings.missing_deserializer)}",
+            ),
             (
                 len(ctx.warnings.unused_openapi_auth),
                 "Unused OpenAPI auth",

@@ -81,6 +81,32 @@ def test_missing_deserializer_warning_grouped_by_media_type(cli, ctx, snapshot_c
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_deserializer_warning_names_unvalidated_media_type(cli, ctx, snapshot_cli):
+    # JSON responses are validated; only the CSV variant is skipped
+    body = {"type": "object", "properties": {"id": {"type": "integer"}}}
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {"application/json": {"schema": body}, "text/csv": {"schema": body}},
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    api = ctx.openapi.apps.success()
+    result = cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1")
+    assert "1 operation cannot validate text/csv responses" in result.stdout
+    assert "operation cannot validate responses" not in result.stdout
+    assert result == snapshot_cli
+
+
 def test_missing_deserializer_warning_with_fail_on(cli, ctx, tmp_path, monkeypatch):
     # Given a schema with a custom media type and config that fails on missing deserializer
     schema_path = ctx.openapi.write_schema(
