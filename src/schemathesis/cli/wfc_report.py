@@ -58,12 +58,9 @@ VALIDATION_FAILURES = (
     MissingHeaders,
 )
 DESTRUCTIVE_METHODS = frozenset({"DELETE", "PUT", "PATCH"})
-# Codes 901-905 are Schemathesis-specific: WFC has no category for these oracles yet.
-VALID_INPUT_REJECTED = 901
-CREATED_RESOURCE_UNAVAILABLE = 902
-SLOW_RESPONSE = 903
+# Codes 904-905 are Schemathesis-specific: WFC has no category for these oracles yet.
 INVALID_INPUT_ACCEPTED = 904
-UNMAPPED_AUTH_OR_METHOD = 905
+UNMAPPED_METHOD = 905
 
 
 def operation_id(method: str, path: str) -> str:
@@ -78,13 +75,14 @@ def fault_category(failure: Failure) -> tuple[int, str] | None:
     """WFC fault code and a description of the failure, or `None` when WFC has nothing for it."""
     description = f"{type(failure).__name__}: {failure.title}"
     if isinstance(failure, ServerError):
-        return (205 if failure.status_code == 501 else 100), f"{description} (status {failure.status_code})"
+        code = {500: 100, 501: 205}.get(failure.status_code, 121)
+        return code, f"{description} (status {failure.status_code})"
     if isinstance(failure, VALIDATION_FAILURES):
         return 200, description
     if isinstance(failure, AllowHeaderMismatch):
         return 201, description
     if isinstance(failure, RejectedPositiveData):
-        return (204 if failure.status_code == 406 else VALID_INPUT_REJECTED), description
+        return (204 if failure.status_code == 406 else 207), description
     if isinstance(failure, (AcceptedNegativeData, MissingHeaderNotRejected)):
         return (206 if 200 <= failure.status_code < 300 else INVALID_INPUT_ACCEPTED), description
     if isinstance(failure, UnsupportedMethodResponse):
@@ -92,19 +90,19 @@ def fault_category(failure: Failure) -> tuple[int, str] | None:
             return 110, description
         if failure.failure_reason == "wrong_status" and 200 <= failure.status_code < 300:
             return 310, description
-        return UNMAPPED_AUTH_OR_METHOD, description
+        return UNMAPPED_METHOD, description
     if isinstance(failure, UseAfterFree):
         return 113, description
     if isinstance(failure, IgnoredAuth):
-        # WFC 308 covers modifications sent without credentials; other auth findings have no WFC category.
+        # WFC 308 covers modifications sent without credentials; 311 covers every other unenforced declared auth.
         method = (failure.operation or "").split(" ", 1)[0].upper()
         if method in DESTRUCTIVE_METHODS and failure.scenario is AuthScenario.NO_AUTH:
             return 308, description
-        return UNMAPPED_AUTH_OR_METHOD, description
+        return 311, f"{description} ({failure.scenario.value})"
     if isinstance(failure, EnsureResourceAvailability):
-        return CREATED_RESOURCE_UNAVAILABLE, description
+        return 122, description
     if isinstance(failure, ResponseTimeExceeded):
-        return SLOW_RESPONSE, description
+        return 312, description
     return None
 
 
