@@ -140,6 +140,8 @@
 - Crash on non-string property names from YAML 1.1 parsers, e.g. `on:`, passed to `from_dict`.
 - Network errors when a server closes a keep-alive connection without `Connection: close`.
 - Raw or misleading config errors for wrong value types, duplicate list items and non-string choices.
+- Broken `curl` reproduction commands for request data with C1 control or Unicode line-separator characters.
+- `curl` reproduction commands sending wrong bytes in fish, or `\$` for `$` in bash.
 
 ### :racing_car: Performance
 

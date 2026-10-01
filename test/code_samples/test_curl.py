@@ -208,11 +208,11 @@ def test_curl_command_validity(curl, loose_schema):
             "curl -X GET -H $'X-Test: value\\x1f' http://localhost/users",
             id="bash-header-control-char",
         ),
-        # Fish: hex escaping in quotes for headers
+        # Fish: hex escapes outside the quotes, where fish interprets them
         pytest.param(
             ShellType.FISH,
             {"headers": {"X-Test": "value\x1f"}},
-            "curl -X GET -H 'X-Test: value\\x1f' http://localhost/users",
+            "curl -X GET -H 'X-Test: value'\\x1f http://localhost/users",
             id="fish-header-control-char",
         ),
         # Bash: ANSI-C quoting for body with null byte

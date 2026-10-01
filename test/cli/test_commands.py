@@ -4,6 +4,8 @@ import os
 import pathlib
 import platform
 import re
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -1989,6 +1991,59 @@ def test_curl_with_non_printable_characters(ctx, cli, snapshot_cli, monkeypatch)
         cli.run(str(schema_path), f"--url={api.base_url}", "--output-sanitize=false", "-c not_a_server_error")
         == snapshot_cli
     )
+
+
+# Stand-ins for `curl` that print the request body they receive
+CURL_ECHO = {
+    ShellType.BASH: 'curl() { while [ $# -gt 0 ]; do if [ "$1" = -d ]; then printf %s "$2"; shift; fi; shift; done; }',
+    ShellType.FISH: "function curl; set -l i (contains -i -- -d $argv); printf %s $argv[(math $i + 1)]; end",
+}
+
+
+@pytest.mark.parametrize("shell", list(CURL_ECHO), ids=lambda shell: shell.value)
+@pytest.mark.parametrize(
+    "body",
+    [
+        "7\x92Y\x83",
+        "line separator paragraph\x85next",
+        "mixed\x1c\x85\U0009c8e5\x01​",
+    ],
+    ids=["c1-controls", "unicode-line-separators", "mixed-with-ascii-controls"],
+)
+def test_curl_reproduces_body_with_line_separator_characters(ctx, cli, monkeypatch, body, shell):
+    executable = shutil.which(shell.value)
+    if executable is None:
+        pytest.skip(f"{shell.value} is not installed")
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", shell)
+    api = ctx.openapi.apps.failure()
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/api/failure": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"text/plain": {"schema": {"type": "string"}, "example": body}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    result = cli.run(
+        str(schema_path),
+        f"--url={api.base_url}",
+        "--phases=examples",
+        "--output-sanitize=false",
+        "-c status_code_conformance",
+    )
+    printed = result.stdout.split("Reproduce with:\n\n", 1)[1].split("\n    \n", 1)[0]
+    command = "\n".join(line.removeprefix("    ") for line in printed.split("\n"))
+    # Paste the printed command into a real shell
+    echoed = subprocess.run([executable, "-c", f"{CURL_ECHO[shell]}\n{command}"], capture_output=True, check=False)
+    assert echoed.stderr == b""
+    assert echoed.stdout == body.encode("utf-8")
+    # Raw control characters in the terminal can be interpreted as escape sequences.
+    assert command.isprintable()
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires more complex setup")
