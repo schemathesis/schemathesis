@@ -28,9 +28,9 @@ FAULT_CATEGORY = {
     "properties": {
         "code": {
             "anyOf": [
-                {"type": "integer", "minimum": 100, "maximum": 120},
-                {"type": "integer", "minimum": 200, "maximum": 206},
-                {"type": "integer", "minimum": 300, "maximum": 310},
+                {"type": "integer", "minimum": 100, "maximum": 122},
+                {"type": "integer", "minimum": 200, "maximum": 207},
+                {"type": "integer", "minimum": 300, "maximum": 312},
                 {"type": "integer", "minimum": 900, "maximum": 999},
             ]
         },
@@ -287,7 +287,7 @@ def test_undeclared_method_fault_names_the_probed_method(ctx, cli, tmp_path):
 
 @pytest.mark.parametrize(
     ("accepts_anonymous", "code"),
-    [(True, 308), (False, 905)],
+    [(True, 308), (False, 311)],
     ids=["missing-credentials", "invalid-credentials"],
 )
 def test_only_anonymous_modifications_are_308(ctx, cli, tmp_path, accepts_anonymous, code):
@@ -559,7 +559,7 @@ OPERATION = "GET /users/{id}"
     ("failure", "code"),
     [
         (ServerError(operation=OPERATION, status_code=500), 100),
-        (ServerError(operation=OPERATION, status_code=503), 100),
+        (ServerError(operation=OPERATION, status_code=503), 121),
         (ServerError(operation=OPERATION, status_code=501), 205),
         (
             MalformedJson(
@@ -574,7 +574,7 @@ OPERATION = "GET /users/{id}"
             201,
         ),
         (RejectedPositiveData(operation=OPERATION, message="", status_code=406, allowed_statuses=["2xx"]), 204),
-        (RejectedPositiveData(operation=OPERATION, message="", status_code=400, allowed_statuses=["2xx"]), 901),
+        (RejectedPositiveData(operation=OPERATION, message="", status_code=400, allowed_statuses=["2xx"]), 207),
         (AcceptedNegativeData(operation=OPERATION, message="", status_code=200, expected_statuses=["400"]), 206),
         (AcceptedNegativeData(operation=OPERATION, message="", status_code=302, expected_statuses=["400"]), 904),
         (
@@ -609,17 +609,24 @@ OPERATION = "GET /users/{id}"
         ),
         (UseAfterFree(operation=OPERATION, message="", free="DELETE /users/1", usage="GET /users/1"), 113),
         (IgnoredAuth(operation="DELETE /users/{id}", message="", scenario=AuthScenario.NO_AUTH), 308),
-        (IgnoredAuth(operation="DELETE /users/{id}", message="", scenario=AuthScenario.GENERATED_AUTH), 905),
-        (IgnoredAuth(operation=OPERATION, message="", scenario=AuthScenario.NO_AUTH), 905),
+        (IgnoredAuth(operation="DELETE /users/{id}", message="", scenario=AuthScenario.GENERATED_AUTH), 311),
+        (IgnoredAuth(operation=OPERATION, message="", scenario=AuthScenario.NO_AUTH), 311),
         (
             EnsureResourceAvailability(
                 operation=OPERATION, message="", created_with="POST /users", not_available_with="GET /users/1"
             ),
-            902,
+            122,
         ),
-        (ResponseTimeExceeded(operation=OPERATION, elapsed=2.0, deadline=1.0, message=""), 903),
+        (ResponseTimeExceeded(operation=OPERATION, elapsed=2.0, deadline=1.0, message=""), 312),
     ],
     ids=lambda value: type(value).__name__ if not isinstance(value, int) else str(value),
 )
 def test_fault_category(failure, code):
     assert fault_category(failure)[0] == code
+
+
+def test_declared_auth_not_enforced_context_names_the_scenario():
+    failure = IgnoredAuth(
+        operation=OPERATION, message="", scenario=AuthScenario.INVALID_AUTH, title="API accepts invalid authentication"
+    )
+    assert fault_category(failure) == (311, "IgnoredAuth: API accepts invalid authentication (invalid_auth)")
