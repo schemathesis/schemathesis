@@ -258,7 +258,7 @@ class SchemathesisCase(PyCollector):
             # On pytest 7, Class collects the test methods directly, therefore
             funcobj = partial(funcobj, self.parent.obj)
 
-        operation_label = operation.label if isinstance(result, Ok) else None
+        operation_label = operation.label if isinstance(result, Ok) else result.err().label
         operation_tags = operation.tags if isinstance(result, Ok) else None
 
         if not metafunc._calls:

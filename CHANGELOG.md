@@ -60,6 +60,7 @@
 - Duplicate pytest Allure results for the same operation.
 - pytest errors and skips marked as passed in JUnit.
 - `from_fixture` tests missing from pytest Allure and JUnit results.
+- Operations with schema errors missing from pytest Allure and JUnit results.
 - Missing `epic` label with the API title in CLI Allure results.
 - `exit_code` of `0` in `--report json` for runs aborted by a fatal error.
 - `stop_reason` of `interrupted` and empty `errors` in `--report json` for runs aborted by an error.

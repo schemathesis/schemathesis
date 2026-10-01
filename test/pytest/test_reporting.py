@@ -51,6 +51,7 @@ def _junit_outcomes(report_path):
             ("error", "Unsatisfiable: Cannot generate test data for request body (application/json)"),
         ),
         ("network_error", ("error", "ConnectionError")),
+        ("schema_error", ("error", "InvalidSchema: Unresolvable reference in the schema")),
         ("skip", ("skipped", "why")),
         ("mark_skip", ("skipped", "why")),
     ],

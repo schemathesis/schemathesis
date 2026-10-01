@@ -187,12 +187,9 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
                 operations.append(result.ok())
             continue
         error = result.err()
-        if error.method and error.path:
-            yield events.NonFatalError(
-                error=error, phase=None, label=f"{error.method.upper()} {error.path}", related_to_operation=True
-            )
-        else:
-            yield events.NonFatalError(error=error, phase=None, label=error.path or "-", related_to_operation=False)
+        yield events.NonFatalError(
+            error=error, phase=None, label=error.label, related_to_operation=bool(error.method and error.path)
+        )
     if not operations:
         return
 
