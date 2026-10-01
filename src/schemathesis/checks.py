@@ -425,7 +425,10 @@ def _check_content_type_probe(
         media_type=case.media_type,
         multipart_content_types=case.multipart_content_types,
         meta=case.meta,
+        _auth=case._auth,
+        _has_explicit_auth=case._has_explicit_auth,
     )
+    control._auth_identity = case._auth_identity
     kwargs = dict(ctx._transport_kwargs or {})
     if case.operation.app is not None:
         kwargs.setdefault("app", case.operation.app)
