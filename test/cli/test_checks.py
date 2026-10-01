@@ -706,6 +706,49 @@ def test_login_redirect_counts_as_enforced_auth(ctx, cli, snapshot_cli):
     )
 
 
+TOKEN_HEADER_SCHEME = {"type": "apiKey", "in": "header", "name": "Token"}
+BEARER_SCHEME = {"type": "http", "scheme": "bearer"}
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    ["scheme", "enforced", "args"],
+    [
+        pytest.param(
+            TOKEN_HEADER_SCHEME,
+            True,
+            ["-H", "Authorization: Bearer secret"],
+            id="credentials-in-undeclared-authorization",
+        ),
+        pytest.param(
+            TOKEN_HEADER_SCHEME,
+            True,
+            ["-H", "authorization: Bearer secret"],
+            id="credentials-in-undeclared-lowercase-authorization",
+        ),
+        pytest.param(TOKEN_HEADER_SCHEME, False, [], id="auth-not-enforced"),
+        # `Authorization` is declared, so probes can strip it and the check keeps its verdict
+        pytest.param(BEARER_SCHEME, False, ["-H", "Authorization: Bearer secret"], id="declared-authorization"),
+    ],
+)
+def test_ignored_auth_with_credentials_in_undeclared_authorization_header(
+    ctx, cli, snapshot_cli, scheme, enforced, args
+):
+    # The `Token` scheme is declared, but the enforcing server reads `Authorization`
+    app, _ = ctx.openapi.make_flask_app(
+        {"/items": {"get": {"security": [{"auth": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"auth": scheme}},
+    )
+
+    @app.route("/items", methods=["GET"])
+    def items():
+        if enforced and request.headers.get("Authorization") != "Bearer secret":
+            return jsonify({"detail": "unauthorized"}), 401
+        return jsonify([])
+
+    assert cli.run_openapi_app(app, "-c ignored_auth", "--phases=fuzzing", "--max-examples=3", *args) == snapshot_cli
+
+
 @pytest.mark.parametrize(
     ["version", "kwargs"],
     [

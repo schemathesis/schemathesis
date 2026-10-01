@@ -288,7 +288,8 @@ def test_passing_transport_kwargs(ctx, mocker):
     )
     mocked = mocker.patch("schemathesis.specs.openapi.checks._contains_auth")
 
-    headers = {"Authorization": "Bearer SECRET!", "Content-Type": "application/json"}
+    # Not `Authorization`: credentials in a header the schema does not declare skip the auth check entirely
+    headers = {"X-Token": "SECRET!", "Content-Type": "application/json"}
     kwargs = {"verify": False, "headers": headers}
 
     # State machine should properly pass transport kwargs to `validate_response`
