@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 from _pytest.main import ExitCode
-from flask import jsonify, request
+from flask import jsonify, redirect, request
 
 import schemathesis
 from schemathesis.checks import CHECKS
@@ -679,6 +679,31 @@ def test_optional_auth_should_not_trigger_ignored_auth_check(ctx, cli, snapshot_
         return jsonify({"status": "Ok"})
 
     assert cli.run_openapi_app(app, "-c ignored_auth", "--phases=fuzzing", "--max-examples=3") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_login_redirect_counts_as_enforced_auth(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/me": {"get": {"security": [{"session": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"session": {"type": "apiKey", "in": "cookie", "name": "session"}}},
+    )
+
+    @app.route("/me", methods=["GET"])
+    def me():
+        if request.cookies.get("session") != "valid":
+            return redirect("/login?next=/me")
+        return jsonify({"user": "alice"})
+
+    @app.route("/login", methods=["GET"])
+    def login():
+        return "<form>Sign in</form>", 200, {"Content-Type": "text/html"}
+
+    assert (
+        cli.run_openapi_app(
+            app, "-c ignored_auth", "--phases=fuzzing", "--max-examples=1", "-H", "Cookie: session=valid"
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.parametrize(

@@ -1353,7 +1353,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             ctx._record_case(parent_id=case.id, case=no_auth_case)
             no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
             ctx._record_response(case_id=no_auth_case.id, response=no_auth_response)
-            if no_auth_response.status_code not in AUTH_ENFORCED_STATUSES:
+            if not _enforces_auth(no_auth_response, response):
                 _raise_no_auth_error(no_auth_response, no_auth_case, AuthScenario.NO_AUTH)
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
@@ -1362,7 +1362,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                 ctx._record_case(parent_id=case.id, case=invalid_auth_case)
                 invalid_auth_response = case.operation.schema.transport.send(invalid_auth_case, **kwargs)
                 ctx._record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
-                if invalid_auth_response.status_code not in AUTH_ENFORCED_STATUSES:
+                if not _enforces_auth(invalid_auth_response, response):
                     _raise_no_auth_error(invalid_auth_response, invalid_auth_case, AuthScenario.INVALID_AUTH)
             if enforced is not None:
                 enforced.add(case.operation.label)
@@ -1374,6 +1374,13 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Successful response when there is no auth
             _raise_no_auth_error(response, case, AuthScenario.NO_AUTH)
     return None
+
+
+def _enforces_auth(response: Response, authenticated: Response) -> bool:
+    if response.status_code in AUTH_ENFORCED_STATUSES or 300 <= response.status_code < 400:
+        return True
+    # Session-based auth redirects to a sign-in page; a followed redirect ends on a different path.
+    return urlparse(response.request.url).path != urlparse(authenticated.request.url).path
 
 
 def _raise_no_auth_error(response: Response, case: Case, auth: AuthScenario) -> NoReturn:

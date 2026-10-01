@@ -1,8 +1,9 @@
 import pytest
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, redirect, request
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
+from schemathesis.specs.openapi.checks import ignored_auth
 
 
 @pytest.mark.hypothesis_nested
@@ -39,6 +40,37 @@ def test_cookies(ctx):
         response = case.call(app=app)
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_login_redirect_counts_as_enforced_auth(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/me": {"get": {"security": [{"session": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"session": {"type": "apiKey", "in": "cookie", "name": "session"}}},
+    )
+
+    @app.route("/me", methods=["GET"])
+    def me():
+        if request.cookies.get("session") != "valid":
+            return redirect("/login")
+        return jsonify({"user": "alice"})
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+    @schema.auth()
+    class Session:
+        def get(self, case, context):
+            return "valid"
+
+        def set(self, case, data, context):
+            case.cookies = {"session": data}
+
+    @given(case=schema["/me"]["GET"].as_strategy())
+    @settings(max_examples=1, deadline=None)
+    def test(case):
+        assert case.call_and_validate(checks=[ignored_auth]).json() == {"user": "alice"}
 
     test()
 
