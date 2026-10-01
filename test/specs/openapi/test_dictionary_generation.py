@@ -508,9 +508,7 @@ def test_probability_below_one_takes_both_substitute_and_skip_branches(ctx):
 
 
 @pytest.mark.hypothesis_nested
-def test_overlay_shares_slot_with_prior_semantic_substitution(ctx):
-    # When the inner strategy already substituted the same parameter via the semantic
-    # pool, the dict overlay splits the slot 50/50 instead of always overriding.
+def test_overlay_overrides_prior_semantic_substitution(ctx):
     schema = _load_schema_with_dictionaries(
         ctx,
         {
@@ -556,24 +554,13 @@ def test_overlay_shares_slot_with_prior_semantic_substitution(ctx):
         validator_cls=operation.schema.adapter.jsonschema_validator_cls,
         generation_mode=GenerationMode.POSITIVE,
     )
-    kept_semantic = 0
-    dict_won = 0
 
     @given(value=overlay)
-    @settings(max_examples=40, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
-    def collect(value):
-        nonlocal kept_semantic, dict_won
-        assert isinstance(value, GeneratedValue)
-        q = value.value.get("q")
-        if q == "SEMANTIC":
-            kept_semantic += 1
-        elif q == "DICT":
-            dict_won += 1
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def check(value):
+        assert value.value["q"] == "DICT"
 
-    collect()
-    assert kept_semantic > 0 and dict_won > 0, (
-        f"semantic/dict 50/50 split never took both paths: semantic={kept_semantic}, dict={dict_won}"
-    )
+    check()
 
 
 def _path_with_body(body_schema: dict, *, required: bool = True) -> dict:

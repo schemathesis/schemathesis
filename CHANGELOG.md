@@ -97,6 +97,7 @@
 - Coverage phase ignoring captured identifiers for request body properties defined via `$ref`.
 - False positive `negative_data_rejection` in coverage phase for parameters with unanchored `pattern` and `maxLength`.
 - Coverage phase generating different values for an operation depending on how many operations were loaded before it.
+- Fuzz dictionary bindings overridden by path, query or header values captured from earlier responses.
 
 #### Request serialization
 

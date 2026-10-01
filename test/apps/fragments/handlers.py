@@ -404,3 +404,13 @@ def register_additional_properties_bug(app: Flask) -> None:
             if not isinstance(value, str):
                 return jsonify({"error": "values must be strings"}), 400
         return jsonify({"ok": True}), 200
+
+
+def register_languages_with_codes(app: Flask) -> None:
+    @app.route("/languages/", methods=["GET"])
+    def list_languages() -> Any:
+        return jsonify({"results": [{"code": "en"}]}), 200
+
+    @app.route("/languages/<code>", methods=["DELETE"])
+    def delete_language(code: str) -> Any:
+        return "", 204
