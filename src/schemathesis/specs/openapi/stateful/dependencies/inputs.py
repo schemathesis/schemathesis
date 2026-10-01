@@ -596,8 +596,7 @@ def _match_field(parameter_name: str, resource_name: str, fields: list[str]) -> 
     if "id" in fields:
         # Conventional fallback: `<resource>Id` parameters point at the resource's `id` field.
         return "id"
-    # Resource has no `id` field — use the parameter name itself so request-pool
-    # captures from peer operations land in the same field this slot will read.
+    # Without an `id` field, use the parameter name so peer captures reach this slot.
     return parameter_name
 
 

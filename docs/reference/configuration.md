@@ -780,7 +780,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     **Type**: `Boolean`  
     **Default**: `true`  
 
-    Derive schema constraints from rejected requests. Despite the `fuzzing` key, this switch covers the whole run: examples, coverage, fuzzing and stateful phases. When the API rejects a positive-mode request with a recognized 4xx validation envelope, the reported rules (required fields, formats, bounds, enums, patterns) are applied to the operation's schema so later test cases are more likely to be accepted. See [Adaptive Testing](../explanations/adaptive-testing.md).
+    Derive schema constraints from rejected requests. The setting sits under `fuzzing` but covers the whole run: examples, coverage, fuzzing, and stateful phases. When the API rejects a positive-mode request with a recognized 4xx validation envelope, Schemathesis applies the reported rules (required fields, formats, bounds, enums, patterns) to the operation's schema so later test cases are more likely to be accepted. See [Adaptive Testing](../explanations/adaptive-testing.md).
 
     ```toml
     [phases.fuzzing.error-feedback]

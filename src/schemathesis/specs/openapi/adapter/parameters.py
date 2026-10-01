@@ -1270,7 +1270,7 @@ class OpenApiParameter(OpenApiComponent):
         try:
             validator = make_validator(declared, validator_cls)
         except Exception:
-            # Schema rejected by `jsonschema_rs` — validity is unknown.
+            # `jsonschema_rs` rejected the schema, so validity is unknown.
             return True
         return validator.is_valid(value)
 

@@ -1,6 +1,6 @@
 # Adding Schema Conformance Validation to Existing Tests
 
-This guide shows how to check requests and responses in your existing tests against your OpenAPI schema, without changing how those tests generate data or call the API.
+Check requests and responses in your existing tests against your OpenAPI schema without changing how those tests generate data or call the API.
 
 ## Prerequisites
 

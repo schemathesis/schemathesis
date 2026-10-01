@@ -98,7 +98,7 @@ class CoverageScenario(str, Enum):
     MISSING_PARAMETER = "missing_parameter"
     DUPLICATE_PARAMETER = "duplicate_parameter"
 
-    # Negative scenarios - Request-shape probes
+    # Negative scenarios: request-shape probes.
     UNSUPPORTED_PATH_PATTERN = "unsupported_path_pattern"
     UNSPECIFIED_HTTP_METHOD = "unspecified_http_method"
     MALFORMED_CONTENT_TYPE = "malformed_content_type"

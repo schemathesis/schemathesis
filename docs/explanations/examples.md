@@ -60,7 +60,7 @@ content:
 
 ## Using Examples in Tests
 
-Schemathesis automatically detects schema examples and uses them as test cases. Examples that fail validation against their own schema are skipped. For parameters and properties without examples, it uses their `default` when it matches the schema and generates a value from the schema otherwise. A required parameter's `default` counts as an example on its own.
+Schemathesis uses schema examples as test cases. Examples that fail validation against their own schema are skipped. For parameters and properties without examples, it uses their `default` when it matches the schema and generates a value from the schema otherwise. A required parameter's `default` counts as an example on its own.
 
 ```yaml
 # Schema

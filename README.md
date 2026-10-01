@@ -124,7 +124,7 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 
 ## Documentation
 
-📚 **[Documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference. New to Schemathesis? Start here:
+📚 **[Documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference. Start here:
 
 - [Quick Start](https://schemathesis.readthedocs.io/en/stable/quick-start/) - 5 minutes
 - [CLI Tutorial](https://schemathesis.readthedocs.io/en/stable/tutorials/cli/) - 20 minutes

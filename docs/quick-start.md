@@ -20,7 +20,7 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json
 
 `uvx` is from the uv package manager and runs Schemathesis in an isolated environment without a permanent install. Replace `uvx schemathesis` with `schemathesis` or `st` if you have it installed directly.
 
-The run takes about 20 seconds and ends with a list of failures and a summary:
+The run takes about 20 seconds and reports failures and a summary:
 
 ```
 ...
@@ -82,7 +82,7 @@ Each failure names the broken check, shows the response, and gives a `curl` comm
     uv add --dev schemathesis pytest
     ```
 
-    Or `pip install schemathesis pytest` in your virtual environment. Then create `test_api.py`:
+    Alternatively, run `pip install schemathesis pytest` in your virtual environment, then create `test_api.py`:
 
     ```python
     import schemathesis
@@ -98,7 +98,7 @@ Each failure names the broken check, shows the response, and gives a `curl` comm
 
     Run it with `pytest test_api.py`. The [Pytest Tutorial](tutorials/pytest.md) walks through a complete example.
 
-The CLI output has the same shape as the demo: a `FAILURES` section, then a `SUMMARY`. A run that finds nothing ends with `No issues found`. If your first run reports many failures, [Triaging Failures](guides/triage.md) shows how to work through them.
+The CLI output has a `FAILURES` section followed by `SUMMARY`. A run with no failures ends with `No issues found`. If your first run reports many failures, [Triaging Failures](guides/triage.md) shows how to work through them.
 
 ## What's next?
 

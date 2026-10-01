@@ -90,7 +90,7 @@ A case can fail several checks at once. When only some of them are fixed, the st
     x status_code_conformance
 ```
 
-Here the server stopped returning `500` but answers with an undocumented `409`, so the `not_a_server_error` crash file is removed and the `status_code_conformance` one is kept.
+The server returns an undocumented `409` instead of `500`, so Schemathesis removes the `not_a_server_error` crash file and keeps the `status_code_conformance` file.
 
 Crash files written by an incompatible Schemathesis version are skipped and left on disk - a matching version may still reproduce them.
 
@@ -158,7 +158,7 @@ A replay the API rejects is never reported as fixed either. When a step gets `40
 
 In a stateful sequence the note names the step, such as `at step 1`. If another check still fails, the case stays `x FAILED` and each passing check shows a row such as `! not_a_server_error  replay was not authenticated (401)`. Crash files whose recorded response was itself `401` or `403` replay as usual, so authentication failures can still be verified as fixed.
 
-Masked values in path parameters or request bodies cannot be supplied. Such crash files are never deleted automatically, even when the replay passes.
+Masked values in path parameters or request bodies cannot be supplied. Schemathesis never deletes such crash files, even when the replay passes.
 
 ## Stateful sequences
 

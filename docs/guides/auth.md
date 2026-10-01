@@ -90,9 +90,9 @@ Each config block name must match a `securityScheme` name from your OpenAPI spec
 | `http` | `basic` | `username`, `password` | 3.x (2.0 as `basic`) |
 | `http` | `bearer` | `bearer` | 3.x |
 
-When several sources provide authentication:
+Authentication sources have this precedence:
 
-- Any configured authentication - an `[auth.*]` section, `--auth` or `--auth-wfc` - disables auth classes registered with `@schemathesis.auth()` in hooks. Those classes apply only when nothing else configures authentication.
+- Any configured authentication (`[auth.*]`, `--auth`, or [`--auth-wfc`](#web-fuzzing-commons)) disables auth classes registered with `@schemathesis.auth()` in hooks. Those classes apply only when nothing else configures authentication.
 - `--auth` and `--auth-wfc` on the command line override the matching settings in `schemathesis.toml`.
 - Headers from `-H` or `[headers]` are not authentication settings: they are sent with every request and do not disable auth classes.
 
@@ -240,7 +240,7 @@ The `[auth.wfc]` keys in `schemathesis.toml` do support `${VAR}`, so `path = "${
 | `user` | `--auth-wfc-user` | unset | `name` of the auth entry to use for every request |
 | `refresh_interval` | — | `300` | Seconds before re-running the login flow |
 
-When the document lists several users and `user` is unset, Schemathesis chooses an identity per operation. It starts with the first user, and each time the operation answers `401` or `403` it moves on: next to sending no credentials, then to the remaining users in document order. Once the operation answers with a `2xx` or `3xx` status, it keeps that identity for the rest of the run. Set `user` to send one identity with every request.
+If the document lists several users and `user` is unset, Schemathesis chooses an identity per operation. It starts with the first user, and each time the operation answers `401` or `403` it moves on: next to sending no credentials, then to the remaining users in document order. Once the operation answers with a `2xx` or `3xx` status, it keeps that identity for the rest of the run. Set `user` to send one identity with every request.
 
 ## Dynamic Token Authentication
 
@@ -575,7 +575,7 @@ def test_with_session(case: schemathesis.Case) -> None:
 
 **`Cannot use multiple authentication methods simultaneously`**: The config file sets more than one of `[auth.basic]`, `[auth.openapi.*]`/`[auth.dynamic.openapi.*]`, and `[auth.wfc]`. Keep one.
 
-**The `Authorization` header is missing or modified on some requests**: This is intentional. Schemathesis removes or alters auth on some requests to check that your API rejects unauthenticated calls. See [Why is Schemathesis skipping my Authorization header?](../faq.md#why-is-schemathesis-skipping-my-authorization-header).
+**The `Authorization` header is missing or modified on some requests**: Schemathesis removes or alters auth on some requests to check that your API rejects unauthenticated calls. See [Why is Schemathesis skipping my Authorization header?](../faq.md#why-is-schemathesis-skipping-my-authorization-header).
 
 **You need to see the credentials Schemathesis sent**: Output and reproduction commands hide sensitive values by default. Disable sanitization to see them:
 

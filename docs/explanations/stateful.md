@@ -1,6 +1,6 @@
 # Understanding Stateful Testing
 
-Why does fuzzing `GET /users/{userId}` rarely get past `404 Not Found`, and what does Schemathesis do about it? This page explains how the stateful phase chains operations with real response data, where the connections between operations come from, and what a stateful run does to your API.
+The stateful phase chains operations with real response data, so `GET /users/{userId}` can test existing resources instead of mostly receiving `404 Not Found`. This page describes the connections between operations and what a stateful run does to your API.
 
 ## What is Stateful Testing?
 
@@ -245,10 +245,10 @@ x-links:
 
 ## What to Expect From a Stateful Run
 
-The stateful phase sends real requests, so it really creates, updates, and deletes data on the target API. Run it against a disposable environment, not against data you need to keep.
+The stateful phase sends real requests, so it creates, updates, and deletes data on the target API. Run it against a disposable environment, not against data you need to keep.
 
 Links do not fix every value. For each step, Schemathesis applies a link's value with some probability and otherwise keeps the generated value, so that the chain also tests what happens with an ID that does not exist. Random IDs next to real ones in a stateful run are expected, not a sign that a link is broken.
 
 ## Response Data Outside the Stateful Phase
 
-Values captured from responses are not limited to stateful chains. The examples, coverage, and fuzzing phases also draw real IDs from a shared resource pool, so `GET /users/{id}` reaches its success path even without a link. See [how the resource pool works](adaptive-testing.md#reusing-response-data-across-operations).
+The shared resource pool lets the examples, coverage, and fuzzing phases draw real IDs from responses, so `GET /users/{id}` reaches its success path even without a link. See [how the resource pool works](adaptive-testing.md#reusing-response-data-across-operations).

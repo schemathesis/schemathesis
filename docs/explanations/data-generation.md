@@ -1,6 +1,6 @@
 # Understanding Data Generation
 
-Point Schemathesis at one API operation and it may send it hundreds of requests, many of them deliberately invalid. This page explains where those requests come from: several phases each contribute their own test cases, all phases except Examples generate both valid and invalid data by default, and a failure triggers extra requests to shrink it to a minimal reproduction.
+Point Schemathesis at one API operation and it may send hundreds of requests, including deliberately invalid ones. Several phases contribute test cases, all phases except Examples generate valid and invalid data by default, and a failure triggers extra requests to shrink it to a minimal reproduction.
 
 ## The Generation Hierarchy
 
@@ -59,7 +59,7 @@ Generates random data based on the schema constraints.
 
 ### Stateful Phase
 
-Runs when Schemathesis knows how operations connect: OpenAPI links in the schema, links inferred by dependency analysis, links learned from `Location` headers during earlier phases, or, for GraphQL, the connections in the type graph. Creates sequences where response data feeds into subsequent requests. See [Stateful Testing](stateful.md).
+Runs when Schemathesis knows how operations connect: OpenAPI links in the schema, links inferred by dependency analysis, links learned from `Location` headers during earlier CLI phases, or, for GraphQL, the connections in the type graph. Creates sequences where response data feeds into subsequent requests. See [Stateful Testing](stateful.md).
 
 ```yaml
 # Connection: POST /users -> GET /users/{id}
@@ -93,7 +93,7 @@ Generates data that **should be accepted** by your API — valid according to yo
 
 ### Negative Testing
 
-Generates data that **should be rejected** by your API — deliberately invalid according to your schema. Schemathesis mutates your schema to produce it.
+Generates data that **should be rejected** by your API because it is deliberately invalid according to your schema. Schemathesis mutates your schema to produce it.
 
 ```python
 # Schema: {"type": "string", "minLength": 3}

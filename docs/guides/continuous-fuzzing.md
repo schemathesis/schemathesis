@@ -2,7 +2,7 @@
 
 This guide shows how to fuzz an API for a fixed time window, such as an overnight session or a scheduled fuzzing pipeline, with `st run --max-time`.
 
-With `--max-time`, `st run` first runs the examples and coverage phases once, then repeats the fuzzing and stateful phases, generating new test cases on every pass, until the time is spent. Values captured from API responses feed later passes, so the session reaches deeper into the API as it goes.
+With `--max-time`, `st run` first runs the examples and coverage phases once, then repeats the fuzzing and stateful phases, generating new test cases on every pass, until the time is spent. Values captured from API responses feed later passes, so the session reaches deeper into the API over time.
 
 ## Prerequisites
 

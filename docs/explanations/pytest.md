@@ -1,6 +1,6 @@
 # How Schemathesis Integrates with Pytest
 
-This document explains the mechanics of how Schemathesis works within pytest to automatically generate and run property-based API tests.
+Schemathesis integrates with pytest to generate and run property-based API tests.
 
 ## Test Execution Flow
 

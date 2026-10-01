@@ -1,6 +1,6 @@
 # Testing Python Apps
 
-This guide shows how to test a Python web application (FastAPI, Flask, Django, and others) by calling it in-process with Schemathesis instead of sending requests over the network. Requests go straight to the ASGI or WSGI callable, so no server has to be running.
+Test a Python web application (FastAPI, Flask, Django, and others) in-process with Schemathesis instead of sending requests over the network. Requests go straight to the ASGI or WSGI callable, so no server has to be running.
 
 ## Prerequisites
 
@@ -214,7 +214,7 @@ The decorated function returns what to inspect: a module, an application instanc
 
 ASGI lifespan is handled for you: loading a schema with `from_asgi` starts the application's lifespan, every generated call reuses it, and shutdown runs at interpreter exit. You do not need a custom client to get startup and shutdown events.
 
-Reach for one when you need requests to share state that Schemathesis does not manage - a cookie jar carried across cases, a fixed header set, or a connection the surrounding test owns. Create the client once, in a module-scoped fixture, and pass it to every call:
+Use one when requests need to share state that Schemathesis does not manage: a cookie jar carried across cases, a fixed header set, or a connection the surrounding test owns. Create the client once in a module-scoped fixture and pass it to every call:
 
 ```python
 import pytest

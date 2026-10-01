@@ -1,6 +1,6 @@
 # Targeted Testing
 
-This guide shows how to steer data generation toward inputs that maximize a metric, such as response time, so Schemathesis reaches slow or failing inputs in fewer test cases.
+Steer data generation toward inputs that maximize a metric, such as response time, so Schemathesis reaches slow or failing inputs in fewer test cases.
 
 ## Prerequisites
 

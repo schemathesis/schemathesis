@@ -1,6 +1,6 @@
 # Using Schemathesis with Docker
 
-This guide shows how to run Schemathesis from the official Docker image, without installing Python.
+Run Schemathesis from the official Docker image without installing Python.
 
 ## Prerequisites
 
@@ -55,7 +55,7 @@ docker run \
 
 See [Extending Schemathesis](extending.md) for the full list of available hooks.
 
-TraceCov is pre-installed and active by default — the built-in `hooks.py` enables schema coverage tracking automatically. See [Schema Coverage — Docker](coverage.md#docker) for details, opt-out, and custom hooks patterns.
+TraceCov is pre-installed and active by default. The built-in `hooks.py` enables schema coverage tracking. See [Schema Coverage for Docker](coverage.md#docker) for details, opt-out, and custom hooks patterns.
 
 ## Reports
 

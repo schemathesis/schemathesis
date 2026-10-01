@@ -9,7 +9,7 @@ Once a test starts, Schemathesis watches what the API returns and updates its pl
 
 Four kinds of runtime signal feed adaptation.
 
-- **Schema constraints from error responses** — rejected positive-mode 4xx responses (other than 401 and 403) with a recognized framework envelope yield validation rules (required fields, formats, bounds, enums, patterns, type mismatches, unknown-property rejections) that get applied to the operation's schema. A single rejection is enough; the rule applies from the next checkpoint, which is when Schemathesis next starts testing that operation in a phase, or starts the next stateful suite.
+- **Schema constraints from error responses:** rejected positive-mode 4xx responses (other than 401 and 403) with a recognized framework envelope yield validation rules (required fields, formats, bounds, enums, patterns, type mismatches, unknown-property rejections) that get applied to the operation's schema. A single rejection is enough; the rule applies from the next checkpoint, which is when Schemathesis next starts testing that operation in a phase, or starts the next stateful suite.
 - **Resource lifecycle** — successful 2xx responses populate a per-resource pool that later operations draw on; successful and "not-found" deletes mark ids as gone so they're less likely to be redrawn. A separate use-after-free check looks at the recorded scenario, independent of pool state.
 - **Authentication** — a 401 or 403 on a public operation produces an inferred auth requirement; if credentials are configured for a declared scheme, subsequent calls retry with them automatically.
 - **Operation health and budget allocation** — operations that don't produce useful signal (undocumented method-not-allowed responses, repeated transport timeouts in the stateful phase) get de-prioritized or skipped so budget shifts elsewhere. Connection-level failures (resets, premature disconnects) surface immediately as scenario errors.
@@ -25,7 +25,7 @@ Most learning happens in Examples and Coverage; Fuzzing and Stateful pick it up 
 
 ## Worked example
 
-A schema declares `POST /events` with a `scheduled_at` field typed as a plain `string` — no `format`. The first case sends a random string; the server returns Spring's default 400 envelope carrying a Jackson error:
+A schema declares `POST /events` with a `scheduled_at` field typed as a plain `string` with no `format`. The first case sends a random string; the server returns Spring's default 400 envelope carrying a Jackson error:
 
 ```json
 {
@@ -36,13 +36,13 @@ A schema declares `POST /events` with a `scheduled_at` field typed as a plain `s
 }
 ```
 
-The message names the rejected value but not the field, so Schemathesis looks for `"xQ7kPz"` in the request it sent and finds it in `scheduled_at`. From the next checkpoint on, the field's schema has `format: date`, and subsequent cases generate valid dates like `"2026-03-14"` — no schema or test edits required.
+The message names the rejected value but not the field, so Schemathesis looks for `"xQ7kPz"` in the request it sent and finds it in `scheduled_at`. From the next checkpoint on, the field's schema has `format: date`, and subsequent cases generate valid dates like `"2026-03-14"` without schema or test edits.
 
 Attribution by value needs a value that identifies one field: values shorter than four characters, `true`, `false`, and `null` are not attributed, and neither is a value that appears in more than one place in the request. When the message includes Jackson's `through reference chain: ...`, the field comes from the chain instead.
 
 ## Reusing response data across operations
 
-When fuzzing `GET /users/{id}`, a random ID only reaches an existing user by chance. Small sequential integers match now and then; UUIDs and other opaque identifiers practically never do, so nearly every request returns 404. Error handling gets thoroughly tested, but success logic — response schema validation, data serialization, permission checks — remains largely untouched.
+When fuzzing `GET /users/{id}`, a random ID only reaches an existing user by chance. Small sequential integers match now and then; UUIDs and other opaque identifiers almost never do, so nearly every request returns 404. Schemathesis tests error handling, but these requests rarely test success logic such as response schema validation, data serialization, and permission checks.
 
 Schemathesis captures useful values from successful responses into the resource pool and reuses them when generating test cases. Dependency analysis identifies which operations produce resources and which consume them. For example, it recognizes that `POST /users` creates users with IDs, and `GET /users/{id}` needs those IDs.
 
@@ -71,5 +71,5 @@ Schemathesis keeps a per-project [cache](../reference/configuration.md#cache) of
 
 ## Related
 
-- **[Stateful Testing](stateful.md)** — how operations are chained with links.
+- **[Stateful Testing](stateful.md):** how operations are chained with links.
 - **[Data Generation](data-generation.md)** — the four phases at a higher level.

@@ -2,7 +2,7 @@
 
 A sample booking API that demonstrates how Schemathesis automatically discovers various types of bugs that manual testing typically misses.
 
-> 📚 **Tutorials available:** This API is used in the **[CLI Tutorial](../../docs/tutorials/cli.md)** (20 minutes) and the **[Pytest Tutorial](../../docs/tutorials/pytest.md)** (15 minutes).
+> 📚 The **[CLI Tutorial](../../docs/tutorials/cli.md)** (20 minutes) and **[Pytest Tutorial](../../docs/tutorials/pytest.md)** (15 minutes) use this API.
 
 ## Overview
 

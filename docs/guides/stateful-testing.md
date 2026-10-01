@@ -61,7 +61,7 @@ test_stateful.py .                                                       [100%]
 ============================== 1 passed in 13.69s ==============================
 ```
 
-When a check fails, pytest reports the failure with the sequence of calls that led to it and a `curl` command to reproduce the last one.
+On failure, pytest reports the sequence of calls that led to the failure and a `curl` command to reproduce the last one.
 
 ## Choose where to hook in
 
@@ -136,7 +136,7 @@ class TestAPI(APIWorkflow.TestCase):
 
 ## Load the schema inside a fixture
 
-When the schema is only available after fixtures run (for example, the app starts inside a fixture), build the state machine in a fixture and call `run()`:
+If the schema is available only after fixtures run (for example, the app starts inside a fixture), build the state machine in a fixture and call `run()`:
 
 ```python
 import pytest
@@ -192,7 +192,7 @@ state_machine.run(settings=settings(state_machine.TestCase.settings, max_example
 
 ## Defining OpenAPI links
 
-When Schemathesis does not discover a connection you need, add a link to your schema. A link connects a **producer** operation (`POST /users`) with a **consumer** operation (`GET /users/{userId}`):
+Add a link to your schema if Schemathesis does not discover a connection you need. A link connects a **producer** operation (`POST /users`) with a **consumer** operation (`GET /users/{userId}`):
 
 ```yaml
 paths:
@@ -228,7 +228,7 @@ paths:
 
 Define the link under the status code your API actually returns. See the [OpenAPI Links specification](https://spec.openapis.org/oas/v3.1.0.html#link-object) for the full syntax.
 
-To take part of a header value, such as the ID from a `Location: /orders/42` header, use Schemathesis's regex extension. See [Regex Extraction](../explanations/stateful.md#regex-extraction) for the matching rules:
+Use Schemathesis's regex extension to extract part of a header value, such as the ID from a `Location: /orders/42` header. See [Regex Extraction](../explanations/stateful.md#regex-extraction) for the matching rules:
 
 ```yaml
           links:
@@ -263,6 +263,6 @@ In the CLI, Schemathesis also learns links from `Location` headers it sees in ea
 
 **`API Links: 0 covered`**: Schemathesis found links but no producer call succeeded, so there was nothing to pass along. In the output above, the API rejected every request without a token. Pass credentials with `--header` or a [config file](auth.md).
 
-**Every call fails with 401 in pytest**: `setup` did not obtain a token, or `before_call` does not attach it. Call `response.raise_for_status()` after the login request so a failed login stops the scenario with a clear error.
+**Calls fail with 401 in pytest**: `setup` did not obtain a token, or `before_call` does not attach it. Call `response.raise_for_status()` after the login request so a failed login stops the scenario with a clear error.
 
 **Links are defined but never followed**: Check that the link sits under the status code the producer actually returns, and that the referenced field or header is present in real responses.

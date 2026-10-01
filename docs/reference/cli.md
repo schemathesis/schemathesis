@@ -599,7 +599,7 @@ These options control the reporting and output format of test results:
 
     **Type**: `String`
 
-    Custom path for a [Web Fuzzing Commons Report](https://github.com/WebFuzzing/Commons). It exports REST findings using WFC fault codes. Checks without an upstream WFC code use Schemathesis-specific 9xx codes: 904 invalid input accepted with a non-2xx status, and 905 unsupported-method responses without a matching WFC code. A shell script with the curl commands that reproduce each reported failure is written next to the report, named after it (e.g. `wfc-report.sh`).
+    Custom path for a [Web Fuzzing Commons Report](https://github.com/WebFuzzing/Commons). Schemathesis exports REST findings using WFC fault codes. Checks without an upstream WFC code use Schemathesis-specific 9xx codes: 904 for invalid input accepted with a non-2xx status and 905 for unsupported-method responses without a matching WFC code. Schemathesis writes a shell script with curl commands that reproduce each reported failure next to the report, named after it (e.g. `wfc-report.sh`).
 
     ```console
     $ st run openapi.yaml --report-wfc-path ./wfc-report.json
@@ -962,5 +962,5 @@ Schemathesis uses predictable exit codes so automation can interpret results:
 
 - `0` — All configured checks passed
 - `1` — At least one check failed or a bug was reported
-- `2` — Schemathesis could not do its job: invalid options or configuration, a schema that fails to load, an internal error, or a run that tested nothing (the schema defines no operations, no operations matched the filters, or every selected operation was skipped)
-- `130` — The run was interrupted with Ctrl+C before it finished, even if it had already found failures
+- `2`: Schemathesis could not do its job: invalid options or configuration, a schema that fails to load, an internal error, or a run that tested nothing (the schema defines no operations, no operations matched the filters, or every selected operation was skipped)
+- `130`: The run was interrupted with Ctrl+C before it finished, even if it had already found failures

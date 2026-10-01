@@ -1,6 +1,6 @@
 # Custom Media Types
 
-This guide shows how to make Schemathesis send valid payloads for media types it cannot generate on its own, such as PDFs, images or archives.
+Register media type strategies to make Schemathesis send valid payloads for media types it cannot generate, such as PDFs, images or archives.
 
 ## Prerequisites
 
@@ -38,7 +38,7 @@ Operations that accept `application/pdf` receive one of these documents as the r
 
 ## Common Media Type Patterns
 
-The snippets below assume the same imports:
+Use these imports in the snippets below:
 
 ```python
 from hypothesis import strategies as st

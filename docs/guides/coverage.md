@@ -69,7 +69,7 @@ For more details, see the [TraceCov documentation](https://docs.tracecov.sh).
 
 Treat an uncovered constraint as a task: add an example, correct the schema, or reach the state that produces that response. Treat the percentage as a description of what was reached rather than a score to raise; a higher percentage between two configurations or tools does not mean more defects found ([Böhme et al., ICSE 2022](https://doi.org/10.1145/3510003.3510230)).
 
-A drop between releases of the same schema is worth acting on: constraints that used to be exercised and no longer are point at a real change in the schema or in the tests.
+A drop between releases of the same schema indicates a change in the schema or in the tests: some constraints are no longer exercised.
 
 ## Improving Coverage
 
@@ -124,7 +124,7 @@ docker run -e SCHEMATHESIS_COVERAGE=false \
 
 ### Custom hooks
 
-When you mount your own `hooks.py` at `/app/hooks.py`, it replaces the built-in stub. Add the TraceCov activation lines at the top to keep coverage enabled:
+Mounting your own `hooks.py` at `/app/hooks.py` replaces the built-in stub. Add the TraceCov activation lines at the top to keep coverage enabled:
 
 ```python
 import tracecov

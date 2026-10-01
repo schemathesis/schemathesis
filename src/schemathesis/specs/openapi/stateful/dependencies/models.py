@@ -154,8 +154,7 @@ class DependencyGraph:
                                 pointer = pointer.rstrip("/") + "/*"
                             value_expr = f"$response.body#{pointer}"
                         elif input_slot.resource_field is not None:
-                            # A pointer to a field the producer's response does not declare would always
-                            # resolve to nothing.
+                            # A pointer to an undeclared response field always resolves to nothing.
                             declared: Collection[str] = (
                                 output_slot.resource.fields
                                 if output_slot.response_fields is None

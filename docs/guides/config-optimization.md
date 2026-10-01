@@ -39,7 +39,7 @@ Test cases:
 
 ### `--max-time SECONDS`
 
-Bounds the run by the clock rather than by example count: the fuzzing and stateful phases run again and again, drawing new cases, until the budget is spent. Without it, the run ends once each operation has generated `--max-examples` cases, which can be a fraction of the time available.
+Bounds the run by the clock rather than by example count: the fuzzing and stateful phases keep drawing new cases until the budget is spent. Without it, the run ends once each operation has generated `--max-examples` cases, which can be a fraction of the time available.
 
 ### `--continue-on-failure` (default: stop an operation at its first failure)
 

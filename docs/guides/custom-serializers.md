@@ -1,6 +1,6 @@
 # Custom Serializers
 
-This guide shows how to send generated request bodies in a format Schemathesis does not serialize by default, such as CSV or MessagePack.
+Register custom serializers to send generated request bodies in formats Schemathesis does not serialize by default, such as CSV or MessagePack.
 
 !!! note "Custom Serializers vs Media Types"
     Use custom **serializers** when you have a JSON Schema describing your data structure but need a different output format. Use custom [media types](custom-media-types.md) when you need to generate raw data without a schema structure (like PDFs or images).
@@ -119,7 +119,7 @@ schemathesis.serializer.alias("application/vnd.company.internal", "application/j
 schemathesis.serializer.alias(["text/x-json", "application/jsonrequest"], "application/json")
 ```
 
-Media types with `+json` or `+xml` suffixes (like `application/vnd.api+json`) are handled without aliases, as are `text/json`, `application/x-json`, `application/jwt` and `application/jose+jwe`.
+Schemathesis handles media types with `+json` or `+xml` suffixes (like `application/vnd.api+json`) without aliases, along with `text/json`, `application/x-json`, `application/jwt` and `application/jose+jwe`.
 
 ## Register one serializer for several media types
 

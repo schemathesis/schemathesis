@@ -1,13 +1,13 @@
 # Using Hypothesis Strategies with Schemathesis
 
-This guide shows how to combine Schemathesis with your own [Hypothesis](https://hypothesis.readthedocs.io/) strategies: injecting custom data into Schemathesis tests, and drawing Schemathesis test cases inside your own Hypothesis tests.
+Use your own [Hypothesis](https://hypothesis.readthedocs.io/) strategies to inject custom data into Schemathesis tests and draw Schemathesis test cases inside your own Hypothesis tests.
 
 ## Prerequisites
 
 - Schemathesis and pytest installed
 - Familiarity with Hypothesis strategies and `@given`
 
-The examples load the schema from an ASGI app in `myapp.py` with `POST /users`, `GET`/`PUT`/`DELETE /users/{user_id}` and `POST /posts`. Any loader works the same way, for example `schemathesis.openapi.from_url(...)`.
+The examples load the schema from an ASGI app in `myapp.py` with `POST /users`, `GET`/`PUT`/`DELETE /users/{user_id}` and `POST /posts`. You can use any schema loader, for example `schemathesis.openapi.from_url(...)`.
 
 ## Turn API operations into strategies
 
@@ -143,13 +143,13 @@ def test_api_with_db_setup(db, case, user_data):
         db.delete_user(user_id)
 ```
 
-A function-scoped fixture such as `db` is created once per test function, not once per generated case, so Hypothesis raises `FailedHealthCheck` unless you suppress `HealthCheck.function_scoped_fixture`. The `try`/`finally` block creates and removes a user for every generated case.
+pytest creates a function-scoped fixture such as `db` once per test function, not once per generated case, so Hypothesis raises `FailedHealthCheck` unless you suppress `HealthCheck.function_scoped_fixture`. The `try`/`finally` block creates and removes a user for every generated case.
 
 With Django, load the schema from the WSGI application, `schemathesis.openapi.from_wsgi("/openapi.json", get_wsgi_application())`. WSGI requests run in the test's thread and see the rows the fixture creates inside pytest-django's transaction. Django's ASGI application serves requests on another database connection, outside that transaction, and the test fails.
 
 ### Choose the next request from a response
 
-`st.data()` lets the test draw more values while it runs. Here the response to `POST /users` decides which request follows:
+`st.data()` lets the test draw more values while it runs. Use the response to `POST /users` to choose the next request:
 
 ```python
 get_user_operation = schema["/users/{user_id}"]["GET"].as_strategy()

@@ -88,7 +88,7 @@ Expect the remaining failures to differ from the original set, not just shrink: 
 
 ## Checks Send Their Own Requests
 
-[`ignored_auth`](../reference/checks.md#ignored_auth) verifies that an operation declaring authentication enforces it, by re-sending each successful request twice — once with credentials stripped, once with invalid ones. Your application therefore sees three distinct `Authorization` values; the missing or invalid ones are these extra requests, not a lost token. If the extra requests trip a rate limiter or a login lockout, exclude the check:
+[`ignored_auth`](../reference/checks.md#ignored_auth) verifies that an operation declaring authentication enforces it by re-sending each successful request twice: once with credentials stripped and once with invalid ones. Your application therefore sees three distinct `Authorization` values; the missing or invalid ones come from these extra requests, rather than a lost token. If the extra requests trip a rate limiter or a login lockout, exclude the check:
 
 ```bash
 uvx schemathesis run https://api.example.com/openapi.json --exclude-checks ignored_auth
@@ -122,7 +122,7 @@ Or `--include-tag users` if your schema uses tags.
 
 ## Server Errors
 
-Fewest and most severe. Run the reproduction `curl`, read the body, trace the minimal failing input back to its schema definition — there is no batch fix. After a fix, confirm with [`uvx schemathesis replay`](crash-reproduction.md) instead of re-running the suite.
+Fewest and most severe. Run the reproduction `curl`, read the body, and trace the minimal failing input back to its schema definition. Each failure needs its own fix. After a fix, confirm with [`uvx schemathesis replay`](crash-reproduction.md) instead of re-running the suite.
 
 ## Accept What You Are Not Fixing Yet
 

@@ -1,6 +1,6 @@
 # Allure Integration
 
-This guide shows how to export Schemathesis test results as [Allure report](https://allurereport.org/) files and turn them into an HTML report.
+Export Schemathesis test results as [Allure report](https://allurereport.org/) files and turn them into an HTML report.
 
 ## Prerequisites
 
@@ -104,7 +104,7 @@ reported as **broken**. For `from_fixture` tests, `allure-pytest` keeps only the
 
 ## Docker
 
-The Schemathesis Docker image has Allure support pre-installed. Create a directory, mount it and pass `--report-allure-path` to write raw result files to your host. Create the directory first: the container runs as UID 1000 and cannot write to a directory Docker creates as `root` (see [Docker troubleshooting](docker.md#troubleshooting)):
+The Schemathesis Docker image has Allure support pre-installed. Create a directory, mount it, and pass `--report-allure-path` to write raw result files to your host. Create the directory first: the container runs as UID 1000 and cannot write to a directory Docker creates as `root` (see [Docker troubleshooting](docker.md#troubleshooting)):
 
 ```bash
 mkdir -p allure-results

@@ -61,7 +61,7 @@ Starting with an imperfect schema is fine - Schemathesis can help you refine it 
 
 ## How long does it usually take for Schemathesis to test an API?
 
-It depends on the number of operations and parameters, the API's response time, and the configuration. Control the duration with:
+Run duration depends on the number of operations and parameters, the API's response time, and the configuration. Control it with:
 
 - `--max-examples` - test cases the fuzzing phase generates per operation, and scenarios in the stateful phase
 - `--max-time` - a wall-clock budget for the whole run

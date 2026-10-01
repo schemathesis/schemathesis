@@ -1,6 +1,6 @@
 # Extending CLI
 
-This guide shows how to add your own command-line options and an event handler that reacts to test progress, for example to write custom reports or send results to another system.
+Add command-line options and an event handler that reacts to test progress, for example to write custom reports or send results to another system.
 
 ## Prerequisites
 
