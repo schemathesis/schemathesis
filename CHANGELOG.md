@@ -25,6 +25,7 @@
 - Fuzzing and pytest seed each operation separately, so operations with identical parameters explore different inputs.
 - Stateful testing targets only metrics from `generation.maximize` or explicit `hypothesis.target()` calls.
 - `ignored_auth` stops probing an operation once it rejects missing and invalid credentials.
+- `missing_deserializer` warning names the response media types that go unvalidated.
 
 ### :bug: Fixed
 
