@@ -123,6 +123,7 @@
 
 - `ignored_auth` when unauthenticated requests redirect to a sign-in page.
 - `ignored_auth` when an API-key cookie is passed via the `Cookie` header.
+- `ignored_auth` when credentials are passed in an `Authorization` header the schema does not declare.
 - `negative_data_rejection` for numeric array path parameters sent as a single number.
 - `negative_data_rejection` for multipart bodies with `--generation-unique-inputs`.
 - `negative_data_rejection` for string parameters declared as `anyOf`/`oneOf` with a `false` branch.

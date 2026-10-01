@@ -316,3 +316,5 @@ Expected 401 or 403, got `200 OK` for `GET /protected-resource`
 
 !!! warning "Additional requests"
     For each operation, this check sends one request without credentials and one with invalid credentials per security scheme, until the operation rejects them once.
+
+The check gives no verdict when an explicitly configured `Authorization` header (e.g. `-H 'Authorization: ...'`) carries credentials the schema's security schemes do not declare: the probes cannot remove them, so a successful response proves nothing. While such a header is configured, an API that ignores the declared scheme entirely is not reported for that operation.

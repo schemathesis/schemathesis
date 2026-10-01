@@ -1338,6 +1338,9 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
     security_parameters = get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful
     if security_parameters and 200 <= response.status_code < 300:
+        # Probes can't remove credentials the schema doesn't declare, so their outcome proves nothing
+        if _has_undeclared_explicit_authorization(ctx, response, security_parameters):
+            return None
         auth = _contains_auth(ctx, case, response, security_parameters)
         if auth == AuthKind.EXPLICIT:
             enforced = ctx.auth_enforced_operations
@@ -1374,6 +1377,19 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Successful response when there is no auth
             _raise_no_auth_error(response, case, AuthScenario.NO_AUTH)
     return None
+
+
+def _has_undeclared_explicit_authorization(
+    ctx: CheckContext, response: Response, security_parameters: list[Mapping[str, Any]]
+) -> bool:
+    if any(p["in"] == "header" and p["name"].lower() == "authorization" for p in security_parameters):
+        return False
+    sources = [
+        ctx._headers,
+        ctx._override.headers if ctx._override else None,
+        response._override.headers if response._override else None,
+    ]
+    return any(headers is not None and any(name.lower() == "authorization" for name in headers) for headers in sources)
 
 
 def _enforces_auth(response: Response, authenticated: Response) -> bool:
