@@ -79,6 +79,23 @@ def _parse_shell_name(name: str) -> ShellType:
 MAX_SHELL_SCAN_BYTES = 64 * 1024
 
 
+def _utf8_length(value: str) -> int:
+    if value.isascii():
+        return len(value)
+    return len(value.encode("utf-8", "surrogatepass"))
+
+
+def _truncate_utf8(value: str) -> str:
+    if value.isascii():
+        return value[:MAX_SHELL_SCAN_BYTES]
+    truncated = value.encode("utf-8", "surrogatepass")[:MAX_SHELL_SCAN_BYTES]
+    while True:
+        try:
+            return truncated.decode("utf-8", "surrogatepass")
+        except UnicodeDecodeError:
+            truncated = truncated[:-1]
+
+
 def has_non_printable(value: str | bytes) -> bool:
     """Check if value contains control, line separator or other non-printable characters."""
     if isinstance(value, bytes):
@@ -89,7 +106,7 @@ def has_non_printable(value: str | bytes) -> bool:
             return True
 
     # Above the cap, skip the scan and force the escape path; truncation marker comes from `escape_for_shell`.
-    if len(value) > MAX_SHELL_SCAN_BYTES:
+    if _utf8_length(value) > MAX_SHELL_SCAN_BYTES:
         return True
 
     # Unicode line separators and C1 controls break the printed command into several lines
@@ -108,9 +125,9 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
     # Truncate before the per-char escape: `_escape_with_ansi_c` builds a
     # ~10x list-of-chars; an MB input would explode without this guard.
     truncated = False
-    full_size = len(value)
+    full_size = _utf8_length(value)
     if full_size > MAX_SHELL_SCAN_BYTES:
-        value = value[:MAX_SHELL_SCAN_BYTES]
+        value = _truncate_utf8(value)
         truncated = True
 
     # Fast path: no non-printable characters
