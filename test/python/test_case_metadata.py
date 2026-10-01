@@ -472,6 +472,25 @@ def test_header_case_insensitive_dict_hash(ctx):
     _ = case.meta.generation.mode
 
 
+def test_case_hash_is_case_insensitive_for_headers(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/users"]["GET"]
+
+    lower_case = operation.Case(headers={"x-token": "a"})
+    upper_case = operation.Case(headers={"X-Token": "a"})
+
+    assert lower_case == upper_case
+    assert len({lower_case, upper_case}) == 1
+
+
 def test_path_parameter_modification_revalidates(ctx):
     schema = ctx.openapi.load_schema(
         {
