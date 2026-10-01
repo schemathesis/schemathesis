@@ -18,6 +18,7 @@ from schemathesis.core.failures import (
     ServerError,
     format_failures,
 )
+from schemathesis.core.shell import ShellType, detect_shell
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine.events import EngineFinished, EngineStarted, ScenarioFinished
 from schemathesis.openapi.checks import (
@@ -147,7 +148,7 @@ def export_failures(
     statistic: Statistic, endpoints: dict[str, tuple[str, str]], config: OutputConfig, file_name: str
 ) -> ExportedFailures:
     """The failures the CLI reports: a shell script reproducing them, their WFC test cases and found faults."""
-    lines = ["#!/bin/sh"]
+    lines = [f"#!/usr/bin/env {'fish' if detect_shell() is ShellType.FISH else 'bash'}"]
     test_cases: list[dict[str, object]] = []
     found_faults: list[dict[str, object]] = []
     distinct_faults: set[tuple[int, str]] = set()

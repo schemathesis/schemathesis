@@ -158,7 +158,7 @@ def test_server_error_report(ctx, cli, tmp_path):
     ]
     assert (
         (tmp_path / "report.sh").read_text(encoding="utf-8")
-        == f"""#!/bin/sh
+        == f"""#!/usr/bin/env bash
 
 # GET /api/failure
 # 1. Test Case ID: {fault["testCaseId"]}
@@ -175,6 +175,37 @@ curl -X GET {api.base_url}/api/failure
     assert report["problemDetails"]["rest"]["coveredHttpStatus"] == [
         {"endpointId": "GET:/api/failure", "testCaseId": "GET:/api/failure", "httpStatus": [500]}
     ]
+
+
+def test_failure_report_uses_detected_shell(ctx, cli, tmp_path, monkeypatch):
+    monkeypatch.setenv("SHELL", "/usr/bin/fish")
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", None)
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"text/plain": {"schema": {"type": "string"}, "example": "line1\nline2"}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        return "", 500
+
+    path = tmp_path / "report.json"
+    result = cli.run_openapi_app(app, f"--report-wfc-path={path}", "--phases=examples", "--checks=not_a_server_error")
+    assert result.exit_code == ExitCode.TESTS_FAILED
+
+    script = tmp_path / "report.sh"
+    content = script.read_text(encoding="utf-8")
+    assert content.startswith("#!/usr/bin/env fish\n")
+    assert "-d 'line1'\\n'line2'" in content
 
 
 def test_failure_reported_once_is_one_test_case(ctx, cli, tmp_path):
@@ -496,7 +527,7 @@ def test_failures_without_wfc_category_are_left_out(ctx, cli, tmp_path, unmapped
 
     report = load_report(path)
     assert (report["faults"], report["testCases"]) == ({"totalNumber": 0, "foundFaults": []}, [])
-    assert (tmp_path / "report.sh").read_text(encoding="utf-8") == "#!/bin/sh\n"
+    assert (tmp_path / "report.sh").read_text(encoding="utf-8") == "#!/usr/bin/env bash\n"
 
 
 def test_path_extensions_are_not_endpoints(ctx, cli, tmp_path):
