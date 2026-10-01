@@ -227,7 +227,8 @@ class Case(Generic[OperationT]):
     def __hash__(self) -> int:
         # Identity is the wire request with unmasked values; masked ones would make distinct cases collide.
         request = prepare_request(self, {SCHEMATHESIS_TEST_CASE_HEADER: "0"}, config=_NO_SANITIZATION)
-        return hash((request.method, request.url, tuple(sorted(request.headers.items())), request.body))
+        headers = tuple(sorted((name.lower(), value) for name, value in request.headers.items()))
+        return hash((request.method, request.url, headers, request.body))
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 

@@ -142,6 +142,7 @@
 - Raw or misleading config errors for wrong value types, duplicate list items and non-string choices.
 - Broken `curl` reproduction commands for request data with C1 control or Unicode line-separator characters.
 - `curl` reproduction commands sending wrong bytes in fish, or `\$` for `$` in bash.
+- Equal `Case` objects hashing differently when header names differ only in case.
 
 ### :racing_car: Performance
 
