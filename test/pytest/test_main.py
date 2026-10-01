@@ -853,6 +853,34 @@ def test(case):
     testdir.runpytest().assert_outcomes(passed=2)
 
 
+def test_content_type_probe_control_request_keeps_requests_auth(testdir, ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/items")
+    def items():
+        if "Authorization" not in request.headers:
+            return "", 401
+        return "", 500
+
+    testdir.make_test(
+        f"""
+from requests.auth import HTTPBasicAuth
+from schemathesis.checks import not_a_server_error
+from schemathesis.generation.meta import CONTENT_TYPE_PROBES, coverage_scenario
+
+schema.config.update(base_url="{app_runner.openapi_url(app, path="")}")
+schema.auth.set_from_requests(HTTPBasicAuth("test", "test"))
+
+@schema.parametrize()
+def test(case):
+    if coverage_scenario(case) in CONTENT_TYPE_PROBES:
+        case.call_and_validate(checks=[not_a_server_error])
+""",
+        paths={"/items": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    testdir.runpytest().assert_outcomes(passed=2)
+
+
 @pytest.mark.parametrize("enabled", [True, False])
 def test_output_sanitization_via_config_file(ctx, testdir, enabled):
     api = ctx.openapi.apps.basic()
