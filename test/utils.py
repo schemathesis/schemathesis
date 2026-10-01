@@ -342,6 +342,20 @@ def make_pytest_outcome_test(testdir: Any, ctx: Any, outcome: str, report_config
         config = 'schema.config.update(base_url="http://127.0.0.1:1")'
         body = "case.call()"
         label = "GET /network"
+    elif outcome == "schema_error":
+        schema_dict = ctx.openapi.build_schema(
+            {
+                "/invalid": {
+                    "get": {
+                        "parameters": [{"$ref": "#/components/parameters/Missing"}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            }
+        )
+        schema = f"schemathesis.openapi.from_dict({schema_dict!r})"
+        body = "case.call()"
+        label = "GET /invalid"
     else:
         api = ctx.openapi.apps.success()
         schema = f'schemathesis.openapi.from_url("{api.schema_url}")'

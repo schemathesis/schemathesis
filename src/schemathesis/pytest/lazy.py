@@ -287,7 +287,9 @@ class LazySchema:
                         with report_subtest(request.node, schema, operation.label, operation.tags):
                             run_subtest(operation, fixtures, sub_test, subtests)
                     else:
-                        _schema_error(subtests, result.err(), node_id, request.node)
+                        error = result.err()
+                        with report_subtest(request.node, schema, error.label, None):
+                            _schema_error(subtests, error, node_id, request.node)
                 request.node._nodeid = node_id
 
             sig = signature(test_func)

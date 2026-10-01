@@ -112,6 +112,7 @@ def test_api(case):
         ("runtime_error", ("broken", "error")),
         ("unsatisfiable", ("broken", "error")),
         ("network_error", ("broken", "error")),
+        ("schema_error", ("broken", "error")),
         ("skip", ("skipped", "skipped")),
     ],
 )
