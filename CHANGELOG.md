@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.29.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
+
 ## [4.29.0](https://github.com/schemathesis/schemathesis/compare/v4.28.0...v4.29.0) - 2026-10-02
 
 ### :rocket: Added
