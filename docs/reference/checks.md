@@ -315,4 +315,4 @@ Expected 401 or 403, got `200 OK` for `GET /protected-resource`
 ```
 
 !!! warning "Additional requests"
-    This check sends extra HTTP requests per operation (one without auth, one with invalid auth).
+    For each operation, this check sends one request without credentials and one with invalid credentials per security scheme, until the operation rejects them once.

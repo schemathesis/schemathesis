@@ -925,3 +925,15 @@ def languages_with_codes() -> dict[str, Any]:
             }
         },
     }
+
+
+def basic_with_query() -> dict[str, Any]:
+    return {
+        "/api/basic_query": {
+            "get": {
+                "security": [{"basicAuth": []}],
+                "parameters": [{"in": "query", "name": "q", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+            }
+        }
+    }

@@ -89,8 +89,20 @@ class CheckContext:
     _checks: list[CheckFunction]
     phase: PhaseName | None
     """The testing phase this context belongs to, or `None` for standalone validation."""
+    auth_enforced_operations: set[str] | None
+    """Operations already shown to reject missing and invalid credentials, shared across a run."""
 
-    __slots__ = ("_override", "_auth", "_headers", "config", "_transport_kwargs", "_recorder", "_checks", "phase")
+    __slots__ = (
+        "_override",
+        "_auth",
+        "_headers",
+        "config",
+        "_transport_kwargs",
+        "_recorder",
+        "_checks",
+        "phase",
+        "auth_enforced_operations",
+    )
 
     def __init__(
         self,
@@ -103,6 +115,7 @@ class CheckContext:
         *,
         response_checks: ResponseChecks | None,
         phase: PhaseName | None = None,
+        auth_enforced_operations: set[str] | None = None,
     ) -> None:
         self._override = override
         self._auth = auth
@@ -111,6 +124,7 @@ class CheckContext:
         self._transport_kwargs = transport_kwargs
         self._recorder = recorder
         self.phase = phase
+        self.auth_enforced_operations = auth_enforced_operations
         self._checks = []
         for check in CHECKS.get_all():
             if is_check_class(check):

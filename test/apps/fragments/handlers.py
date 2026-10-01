@@ -414,3 +414,11 @@ def register_languages_with_codes(app: Flask) -> None:
     @app.route("/languages/<code>", methods=["DELETE"])
     def delete_language(code: str) -> Any:
         return "", 204
+
+
+def register_basic_with_query(app: Flask) -> None:
+    @app.route("/api/basic_query", methods=["GET"])
+    def basic_query_endpoint() -> Any:
+        if request.headers.get("Authorization") == _BASIC_AUTH_TOKEN:
+            return jsonify({"ok": True})
+        return {"detail": "Unauthorized"}, 401
