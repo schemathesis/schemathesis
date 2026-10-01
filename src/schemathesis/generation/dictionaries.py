@@ -204,11 +204,6 @@ def build_dictionary_overlay_strategy(
 
         random = draw(st.randoms())
 
-        # Share the slot 50/50 when the semantic-pool overlay already filled the same parameter.
-        semantically_substituted: set[str] = {
-            semantic.path[0] for semantic in existing_semantic if len(semantic.path) == 1
-        }
-
         new_value = dict(value)
         new_draws: list[DictionaryDraw] = []
         for parameter_name, eligible in eligible_per_parameter.items():
@@ -217,10 +212,8 @@ def build_dictionary_overlay_strategy(
             # Type-wide fills only if the strategy already included the param; parameter-specific forces it.
             if not present and not binding.is_parameter_specific:
                 continue
-            if parameter_name in semantically_substituted:
-                if random.random() >= 0.5:
-                    continue
-            elif random.random() >= binding.probability:
+            # A binding is explicit intent, so it overrides a value the resource pool put in the same slot.
+            if random.random() >= binding.probability:
                 continue
             entry_index, entry_value, matches_schema = draw(st.sampled_from(eligible))
             new_value[parameter_name] = entry_value

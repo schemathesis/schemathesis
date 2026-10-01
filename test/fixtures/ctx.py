@@ -477,6 +477,9 @@ class OpenAPIApps:
     def additional_properties_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_nested.additional_properties_bug())
 
+    def languages_with_codes(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_nested.languages_with_codes())
+
 
 @dataclass(slots=True)
 class GraphQLApps:

@@ -41,3 +41,10 @@ def additional_properties_bug() -> OpenAPIApp:
     app = make_flask_app_from_schema(spec)
     handlers.register_additional_properties_bug(app)
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def languages_with_codes() -> OpenAPIApp:
+    spec = build_schema(schemas.languages_with_codes())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_languages_with_codes(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

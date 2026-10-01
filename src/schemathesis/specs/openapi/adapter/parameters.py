@@ -670,20 +670,29 @@ def build_hybrid_strategy(
             # toward early indices when using cumulative probability selection.
             idx = usage_tracker.weighted_select(variant_keys, random)
         chosen = captured_variants[idx]
+        overlay = chosen.overlay
+        pool_draws = chosen.draws
+        # A dictionary binding is explicit intent, so a captured value never replaces its entry.
+        bound = {draw_.parameter_name for draw_ in base_dictionary_draws if draw_.body_path is None}
+        if bound & overlay.keys():
+            overlay = {key: value for key, value in overlay.items() if key not in bound}
+            pool_draws = tuple(pool_draw for pool_draw in pool_draws if pool_draw.parameter_name not in bound)
+            if not overlay:
+                return drawn
 
         if container_validator is not None:
             merged = deepclone(base)
-            _deep_merge_overlay(merged, chosen.overlay)
+            _deep_merge_overlay(merged, overlay)
             if not _example_is_valid(merged, container_validator):
                 return drawn
             base = merged
         else:
-            _deep_merge_overlay(base, chosen.overlay)
+            _deep_merge_overlay(base, overlay)
         usage_tracker.record_draw(variant_keys[idx])
         return GeneratedValue(
             value=base,
             meta=base_meta,
-            pool_draws=base_pool_draws + chosen.draws,
+            pool_draws=base_pool_draws + pool_draws,
             semantic_draws=base_semantic_draws,
             dictionary_draws=base_dictionary_draws,
             constants_draws=_prune_overwritten_constants(base_constants_draws, base),
