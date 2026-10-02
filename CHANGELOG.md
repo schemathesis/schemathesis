@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
+- Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 
 ## [4.29.0](https://github.com/schemathesis/schemathesis/compare/v4.28.0...v4.29.0) - 2026-10-02
 
