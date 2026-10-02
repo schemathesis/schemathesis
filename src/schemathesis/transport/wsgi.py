@@ -4,6 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit, urlunsplit
 
 from typing_extensions import override
 
@@ -41,6 +42,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         headers = kwargs.get("headers")
         params_override = kwargs.get("params")
+        base_url = kwargs.get("base_url")
 
         final_headers = prepare_headers(case, headers)
 
@@ -85,6 +87,12 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             **extra,
         }
 
+        if base_url is not None:
+            # Werkzeug reads a path in its `base_url` as the mount point, so it only gets the origin.
+            url = urlsplit(case.operation.schema.build_request_url(case, base_url))
+            data["path"] = url.path
+            data["base_url"] = urlunsplit((url.scheme, url.netloc, "", "", ""))
+
         if params_override is not None:
             if isinstance(data.get("query_string"), str) or isinstance(params_override, str):
                 data["query_string"] = _merge_query_components(data.get("query_string"), params_override)
@@ -107,8 +115,9 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         params = kwargs.pop("params", None)
         cookies = kwargs.pop("cookies", None)
         application = kwargs.pop("app")
+        base_url = normalize_base_url(kwargs.pop("base_url", None), host=wsgi.HOST)
 
-        data = self.serialize_case(case, headers=headers, params=params)
+        data = self.serialize_case(case, headers=headers, params=params, base_url=base_url)
         data.update({key: value for key, value in kwargs.items() if key not in data})
 
         excluded_headers = get_exclude_headers(case)
@@ -135,7 +144,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
 
         requests_kwargs = REQUESTS_TRANSPORT.serialize_case(
             case,
-            base_url=normalize_base_url(case.operation.base_url, host=wsgi.HOST),
+            base_url=base_url or normalize_base_url(case.operation.base_url, host=wsgi.HOST),
             headers=headers,
             params=params,
             cookies=cookies,

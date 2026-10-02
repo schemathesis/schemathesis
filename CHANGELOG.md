@@ -9,6 +9,7 @@
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
+- `base_url` passed to `Case.call` ignored for WSGI applications.
 
 ## [4.29.0](https://github.com/schemathesis/schemathesis/compare/v4.28.0...v4.29.0) - 2026-10-02
 
