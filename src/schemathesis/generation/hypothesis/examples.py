@@ -34,12 +34,25 @@ def generate_one(strategy: st.SearchStrategy[T], suppress_health_check: list | N
     return examples[0]
 
 
+def generate_many(strategy: st.SearchStrategy[T], max_examples: int) -> list[T]:
+    """Up to `max_examples` values; past the first, which is the simplest one, they are random."""
+    examples: list[T] = []
+    _add_examples(strategy, examples, None, max_examples)
+    return examples
+
+
 def add_single_example(
     strategy: st.SearchStrategy[T], examples: list[T], suppress_health_check: list | None = None
 ) -> None:
+    _add_examples(strategy, examples, suppress_health_check, 1)
+
+
+def _add_examples(
+    strategy: st.SearchStrategy[T], examples: list[T], suppress_health_check: list | None, max_examples: int
+) -> None:
     from hypothesis import given, seed, settings
 
-    applied_settings = default_settings()
+    applied_settings = settings(default_settings(), max_examples=max_examples)
     if suppress_health_check is not None:
         applied_settings = settings(applied_settings, suppress_health_check=suppress_health_check)
 

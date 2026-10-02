@@ -4,7 +4,9 @@
 
 ### :bug: Fixed
 
-- Minute-long stalls or health-check errors for arrays requiring thousands of items.
+- Coverage phase hanging on unique arrays with a large `minItems`.
+- Invalid coverage-phase positives for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.
+- Generation hanging, or failing a health check, on arrays with a large `minItems`.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 
