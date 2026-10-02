@@ -2,6 +2,11 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.29.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Dependency inference unwraps `result` / `data` envelopes that carry metadata such as `status` or `time`.
+- Dependency inference treats `PUT /items/{name}` as the creator when nothing `POST`s to `/items`.
+
 ### :bug: Fixed
 
 - Coverage phase hanging on unique arrays with a large `minItems`.
@@ -10,6 +15,7 @@
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
+- Inferred links reading foreign keys from responses that do not declare them.
 
 ## [4.29.0](https://github.com/schemathesis/schemathesis/compare/v4.28.0...v4.29.0) - 2026-10-02
 
