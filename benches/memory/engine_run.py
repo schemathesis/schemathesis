@@ -79,6 +79,10 @@ WIDE_PROPERTIES_CLI = _wide_properties(3, 4)
 def _execute(raw_schema: dict[str, Any], phase: str) -> None:
     schema = schemathesis.openapi.from_dict(raw_schema)
     schema.config.update(base_url="http://127.0.0.1:8080/", suppress_health_check=list(HealthCheck))
+    # A fresh draw sequence per round measures exploration, not memory: replayed examples and an
+    # unseeded generator both move the number of cases a round produces.
+    schema.config.generation.update(database="none", deterministic=True)
+    schema.config.seed = 1
     schema.config.phases.update(phases=[phase])
     for _ in from_schema(schema).execute():
         pass
