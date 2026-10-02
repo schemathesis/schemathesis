@@ -877,6 +877,24 @@ class CoverageContext:
                     isinstance(max_length, int) and max_length < shortest
                 ):
                     raise Unsatisfiable
+        if isinstance(min_items, int) and min_items > MAX_DRAWN_ARRAY_ITEMS and "array" in get_type(schema):
+            items = schema.get("items", True)
+            max_items = schema.get("maxItems")
+            # Elements placed by position or demanded by `contains` are not interchangeable, and no length fits
+            # a ceiling under the floor.
+            if (
+                (items is True or isinstance(items, dict))
+                and "contains" not in schema
+                and (not isinstance(max_items, int) or max_items >= min_items)
+            ):
+                if schema.get("uniqueItems"):
+                    built = self._distinct_array(schema, min_items)
+                else:
+                    built = self._tiled_array(schema, min_items)
+                # Each element satisfies `items`, but not what depends on its position, on the whole array, or on a
+                # combinator beside it; an array that misses those is drawn whole below instead.
+                if _is_strictly_valid(built, schema, self):
+                    return built
         # Shortcuts read the describing keywords alone, which a combinator beside them can still narrow;
         # such a schema is built whole instead.
         if not any(key in schema for key in _FOLDED_KEYS):
@@ -1003,24 +1021,6 @@ class CoverageContext:
                     # such an object is drawn whole below instead.
                     if _is_strictly_valid(filled, schema, self):
                         return filled
-            if isinstance(min_items, int) and min_items > MAX_DRAWN_ARRAY_ITEMS and "array" in get_type(schema):
-                items = schema.get("items", True)
-                max_items = schema.get("maxItems")
-                # Elements placed by position or demanded by `contains` are not interchangeable, and no length fits
-                # a ceiling under the floor.
-                if (
-                    (items is True or isinstance(items, dict))
-                    and "contains" not in schema
-                    and (not isinstance(max_items, int) or max_items >= min_items)
-                ):
-                    if schema.get("uniqueItems"):
-                        built = self._distinct_array(schema, min_items)
-                    else:
-                        built = self._tiled_array(schema, min_items)
-                    # Each element satisfies `items`, but not what depends on its position or on the whole array;
-                    # an array that misses those is drawn whole below instead.
-                    if _is_strictly_valid(built, schema, self):
-                        return built
             if (
                 (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
                 and isinstance(schema["items"], dict)
