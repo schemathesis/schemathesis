@@ -11,7 +11,7 @@ from typing import Any, TypeAlias
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.parameters import ParameterLocation, iter_path_parameters
 from schemathesis.core.text import to_pascal_case
-from schemathesis.core.transforms import encode_pointer, get_template_fields
+from schemathesis.core.transforms import encode_pointer, get_template_fields, iter_decoded_pointer_segments
 from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies.naming import (
@@ -247,8 +247,12 @@ class DependencyGraph:
 
                 resource = output_slot.resource
                 fk_links: dict[str, LinkDefinition] = {}
+                # The resource merges every schema that described it; this response may declare only some fields.
+                declared = output_slot.response_fields
 
                 for fk_field in resource.fk_fields:
+                    if declared is not None and fk_field.field_name not in declared:
+                        continue
                     # Find the target resource in our resource map
                     target_resource = self.resources.get(fk_field.target_resource)
                     if target_resource is None:
@@ -304,6 +308,8 @@ class DependencyGraph:
 
                 # Process nested FK fields (e.g., shipping.warehouse_id, line_items[].product_id)
                 for nested_fk in resource.nested_fk_fields:
+                    if declared is not None and next(iter_decoded_pointer_segments(nested_fk.pointer)) not in declared:
+                        continue
                     target_resource = self.resources.get(nested_fk.target_resource)
                     if target_resource is None:
                         continue

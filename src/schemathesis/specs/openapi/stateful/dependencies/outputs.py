@@ -24,8 +24,7 @@ if TYPE_CHECKING:
 
 # HTTP methods whose 2xx response confirms a newly-created resource keyed by
 # the trailing path parameter (e.g. `POST /products/{productName}`). PUT is
-# excluded because it is far more often an updater than an upserting creator,
-# and we don't want a successful update to be mistaken for resource creation.
+# usually an updater, so it only counts when nothing POSTs to the parent collection.
 _PATH_KEYED_PRODUCER_METHODS = frozenset({"post"})
 
 
@@ -86,11 +85,14 @@ def _path_keyed_outputs(
     contributes no producer edges and downstream operations on the same
     resource never get linked.
     """
-    if operation.method.lower() not in _PATH_KEYED_PRODUCER_METHODS:
-        return
-
     trailing = naming.trailing_path_parameter(operation.path)
     if trailing is None:
+        return
+
+    method = operation.method.lower()
+    if method not in _PATH_KEYED_PRODUCER_METHODS and not (
+        method == "put" and not _has_post_creator(operation, trailing)
+    ):
         return
 
     matching = next(
@@ -121,6 +123,13 @@ def _path_keyed_outputs(
         status_code=success_status,
         path_parameter=trailing,
     )
+
+
+def _has_post_creator(operation: APIOperation, trailing: str) -> bool:
+    # With a `POST` on the parent collection, `PUT` on the item is an updater; without one, it is the creator.
+    parent = operation.path.rstrip("/")[: -len(f"/{{{trailing}}}")]
+    paths = operation.schema.raw_schema.get("paths", {})
+    return any("post" in item for path, item in paths.items() if path.rstrip("/") == parent)
 
 
 def _body_keyed_outputs(

@@ -173,17 +173,27 @@ def iter_resources_from_response(
     parent_ref = schema.get("$ref")
     _, resolved = maybe_resolve_with_resolver(schema, current_resolver)
 
-    # Sometimes data is wrapped in a single wrapper field
-    # Common patterns: {data: {...}}, {result: {...}}, {response: {...}}
+    # Sometimes data is wrapped in a wrapper field, optionally next to request metadata
+    # Common patterns: {data: {...}}, {result: {...}, status: ..., time: ...}
     pointer = None
     properties = resolved.get("properties", {})
-    if properties and len(properties) == 1:
-        wrapper_field = list(properties)[0]
-        # Check if it's a known wrapper field name
-        common_wrappers = {"data", "result", "response", "payload", "content"}
-        if wrapper_field.lower() in common_wrappers:
-            pointer = f"/{wrapper_field}"
-            resolved = properties[wrapper_field]
+    wrapper_field = _envelope_wrapper_field(properties)
+    # Next to metadata, a referenced list is a pagination wrapper (`{data: List, meta: ...}`) handled further down,
+    # and an object without properties (free-form or a map) carries no fields worth unwrapping into.
+    if wrapper_field is not None and (
+        len(properties) == 1
+        or not (
+            _is_referenced_array(properties[wrapper_field], current_resolver)
+            or _is_object_without_properties(properties[wrapper_field], current_resolver)
+        )
+    ):
+        pointer = f"/{wrapper_field}"
+        resolved = properties[wrapper_field]
+        if len(properties) > 1 and "$ref" in resolved:
+            # The wrapped schema names the resource and may hold a nested page (`{response: Page, status}`),
+            # which the steps below only see once resolved.
+            parent_ref = resolved["$ref"]
+            _, resolved = maybe_resolve_with_resolver(resolved, current_resolver)
 
     resolved = try_unwrap_composition(resolved, current_resolver)
 
@@ -300,6 +310,37 @@ def iter_resources_from_response(
                                             pointer=subresource_pointer + sub_unwrapped.pointer,
                                             response_fields=inner_fields,
                                         )
+
+
+ENVELOPE_WRAPPER_FIELDS = frozenset({"data", "result", "response", "payload", "content"})
+# Siblings a wrapper may carry without them describing the wrapped resource. Matched by name
+# only: an `id` next to `result` identifies the response itself, so it must block unwrapping.
+ENVELOPE_METADATA_FIELDS = frozenset(
+    {"status", "time", "usage", "message", "messages", "success", "error", "errors", "warnings", "meta", "metadata"}
+)
+
+
+def _envelope_wrapper_field(properties: Mapping[str, Any]) -> str | None:
+    wrappers = [name for name in properties if name.lower() in ENVELOPE_WRAPPER_FIELDS]
+    if len(wrappers) != 1:
+        return None
+    if all(name == wrappers[0] or name.lower() in ENVELOPE_METADATA_FIELDS for name in properties):
+        return wrappers[0]
+    return None
+
+
+def _is_referenced_array(schema: Mapping[str, Any], resolver: Resolver) -> bool:
+    if "$ref" not in schema:
+        return False
+    _, resolved = maybe_resolve_with_resolver(schema, resolver)
+    return resolved.get("type") == "array" or "items" in resolved
+
+
+def _is_object_without_properties(schema: Mapping[str, Any], resolver: Resolver) -> bool:
+    _, resolved = maybe_resolve_with_resolver(schema, resolver)
+    return resolved.get("type") == "object" and not any(
+        keyword in resolved for keyword in ("properties", "allOf", "anyOf", "oneOf")
+    )
 
 
 def _recover_ref_from_allof(*, branches: list[dict], pointer: str, resolver: Resolver) -> str | None:

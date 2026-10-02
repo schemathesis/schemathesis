@@ -6745,6 +6745,197 @@ def test_content_wrapper_unwrapped_around_single_object(ctx):
     assert (output.resource.name, output.pointer, output.cardinality.value) == ("Album", "/content", "ONE")
 
 
+def envelope(result):
+    # Qdrant-style envelope: the resource sits under `result`, next to scalar request metadata.
+    return {
+        "type": "object",
+        "properties": {"result": result, "status": {"type": "string"}, "time": {"type": "number"}},
+    }
+
+
+def test_envelope_with_metadata_siblings_unwrapped(ctx):
+    album = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/albums", "201", envelope(album)),
+            **operation("get", "/albums/{album_id}", "200", envelope(album), [path_param("album_id")]),
+        },
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1albums/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1albums~1{album_id}/get",
+                "parameters": {"path.album_id": "$response.body#/result/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_envelope_around_list_links_into_item(ctx):
+    point = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("get", "/points", "200", envelope({"type": "array", "items": point})),
+            **operation("get", "/points/{id}", "200", envelope(point), [path_param("id")]),
+        },
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1points/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1points~1{id}/get",
+                "parameters": {"path.id": "$response.body#/result/*/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"type": "object"},
+        {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}},
+    ],
+    ids=["free-form", "map"],
+)
+def test_envelope_around_object_without_properties_kept_whole(ctx, data):
+    # Unwrapping into an object that declares no properties would leave a resource with no fields at all.
+    _, graph = analyze_dependencies(
+        ctx,
+        operation(
+            "post",
+            "/reports",
+            "201",
+            {"type": "object", "properties": {"data": data, "success": {"type": "boolean"}}},
+        ),
+    )
+    assert [(resource.name, resource.fields) for resource in graph.resources.values()] == [
+        ("Report", ["data", "success"])
+    ]
+
+
+def test_fk_link_requires_field_in_producer_response(ctx):
+    # The full order has `customer_id`, but the create response only returns `id`:
+    # a link reading `customer_id` from it would always resolve to nothing.
+    order = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "customer_id": {"type": "string"}},
+        "required": ["id", "customer_id"],
+    }
+    created = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+            **operation("post", "/orders", "201", created),
+            **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
+        },
+        components={"schemas": {"Order": order, "Customer": SCHEMA_WITH_ID}},
+    )
+    assert [
+        (producer, consumer["parameters"])
+        for producer, _, consumer in inferred_links(graph)
+        if consumer["operationRef"] == "#/paths/~1customers~1{id}/get"
+    ] == [("#/paths/~1orders~1{id}/get", {"path.id": "$response.body#/customer_id"})]
+
+
+def test_paginated_list_next_to_metadata_links_into_item(ctx):
+    # `{data: [...], meta: {...}}` is a paginated list, not an envelope around one resource.
+    requirement = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation(
+                "get",
+                "/requirements",
+                "200",
+                {
+                    "type": "object",
+                    "properties": {
+                        "data": component_ref("RequirementList"),
+                        "meta": {"type": "object", "properties": {"total": {"type": "integer"}}},
+                    },
+                },
+            ),
+            **operation("get", "/requirements/{id}", "200", requirement, [path_param("id")]),
+        },
+        components={
+            "schemas": {
+                "Requirement": requirement,
+                "RequirementList": {"type": "array", "items": component_ref("Requirement")},
+            }
+        },
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1requirements/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1requirements~1{id}/get",
+                "parameters": {"path.id": "$response.body#/data/*/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_put_creates_resource_keyed_by_path_param_without_post(ctx):
+    # The only way to create a collection is `PUT /collections/{collection_name}`.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation(
+                "put",
+                "/collections/{collection_name}",
+                "200",
+                envelope({"type": "boolean"}),
+                [path_param("collection_name")],
+            ),
+            **operation(
+                "get",
+                "/collections/{collection_name}/points",
+                "200",
+                envelope({"type": "array", "items": {"type": "object"}}),
+                [path_param("collection_name")],
+            ),
+        },
+    )
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1collections~1{collection_name}/put",
+            "200",
+            {
+                "operationRef": "#/paths/~1collections~1{collection_name}~1points/get",
+                "parameters": {"path.collection_name": "$request.path.collection_name"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_put_with_post_creator_stays_an_updater(ctx):
+    user = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/users", "201", user),
+            **operation("put", "/users/{user_id}", "200", {"type": "boolean"}, [path_param("user_id")]),
+            **operation("get", "/users/{user_id}/orders", "200", {"type": "array"}, [path_param("user_id")]),
+        },
+    )
+    assert [(producer, consumer["operationRef"]) for producer, _, consumer in inferred_links(graph)] == [
+        ("#/paths/~1users/post", "#/paths/~1users~1{user_id}/put"),
+        ("#/paths/~1users/post", "#/paths/~1users~1{user_id}~1orders/get"),
+    ]
+
+
 def test_self_referencing_component_terminates(ctx):
     # A component that refers to itself must not send reference resolution into infinite recursion.
     node = {
