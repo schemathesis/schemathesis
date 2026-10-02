@@ -17,7 +17,7 @@ from hypothesis.strategies._internal.deferred import DeferredStrategy
 from jsonschema_rs import canonical
 
 from schemathesis.config import OutputConfig
-from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_STRING_LENGTH
+from schemathesis.core import INTERNAL_BUFFER_SIZE, MAX_DRAWN_ARRAY_ITEMS, MAX_STRING_LENGTH
 from schemathesis.core.errors import (
     InvalidSchema,
     UnsupportedRegexPattern,
@@ -32,6 +32,7 @@ from schemathesis.core.jsonschema import (
     make_validator_for,
 )
 from schemathesis.core.output import truncate_json
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
 from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
@@ -458,8 +459,14 @@ def _array(
     if all_distinct:
         return st.lists(element, unique_by=json_identity, **kwargs)
     if view.distinctness is canonical.Distinctness.SOME_REPEATED:
-        return st.lists(element, **kwargs).map(_repeat_one)
-    return st.lists(element, **kwargs)
+        drawn = st.lists(element, **kwargs).map(_repeat_one)
+    else:
+        drawn = st.lists(element, **kwargs)
+    floor = view.min_items or 0
+    if floor > MAX_DRAWN_ARRAY_ITEMS and (max_items is None or max_items >= floor):
+        # Every element spends several choices, so a long floor can outgrow one draw; one element repeated never does.
+        return st.one_of(element.map(lambda item: _tiled(item, floor)), drawn)
+    return drawn
 
 
 def _with_fixed_elements(
@@ -919,6 +926,13 @@ def _parts_unique(parts: tuple[Sequence[JsonValue], ...]) -> bool:
             return False
         seen |= keys
     return True
+
+
+def _tiled(item: JsonValue, length: int) -> list[JsonValue]:
+    # A shared container would let an edit at one index show up at every other.
+    if isinstance(item, (dict, list)):
+        return [deepclone(item) for _ in range(length)]
+    return [item] * length
 
 
 def _repeat_one(value: list[JsonValue]) -> list[JsonValue]:

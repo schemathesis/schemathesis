@@ -14,6 +14,9 @@ INTERNAL_BUFFER_SIZE = 32 * 1024
 # two per character matched against a `pattern`. Past these sizes it never returns a value.
 MAX_GENERATED_ITEMS = INTERNAL_BUFFER_SIZE // 2
 MAX_GENERATED_PATTERN_LENGTH = INTERNAL_BUFFER_SIZE // 4
+# Longest array still drawn element by element; a pattern-matched element spends budget per
+# character, so past this the draw stops being affordable.
+MAX_DRAWN_ARRAY_ITEMS = 64
 # Longest string worth building; specs spell "no real limit" as `Integer.MAX_VALUE`.
 MAX_STRING_LENGTH = 1024 * 1024
 DEFAULT_MAX_SCENARIO_STEPS = 6

@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Minute-long stalls or health-check errors for arrays requiring thousands of items.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 
