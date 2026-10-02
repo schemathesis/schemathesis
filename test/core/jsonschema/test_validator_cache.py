@@ -1,3 +1,5 @@
+import socket
+
 import jsonschema_rs
 import pytest
 
@@ -24,3 +26,13 @@ def test_failure_cache_is_keyed_by_schema():
 def test_unevaluated_beside_self_reference_builds(keyword):
     validator = make_validator({"$ref": "#", keyword: False}, jsonschema_rs.Draft202012Validator)
     assert validator.is_valid([] if keyword == "unevaluatedItems" else {})
+
+
+def test_meta_schema_url_is_not_fetched():
+    with socket.create_server(("127.0.0.1", 0)) as listener:
+        listener.setblocking(False)
+        schema = {"$schema": f"http://127.0.0.1:{listener.getsockname()[1]}/meta", "type": "object"}
+        assert make_validator(schema, jsonschema_rs.Draft202012Validator).is_valid({})
+        # A pending connection means the validator build tried to fetch the meta-schema.
+        with pytest.raises(BlockingIOError):
+            listener.accept()

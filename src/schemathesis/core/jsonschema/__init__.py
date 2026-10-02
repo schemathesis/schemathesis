@@ -247,7 +247,8 @@ def _split_bundle(schema: JsonSchema, validator_cls: type) -> tuple[JsonSchema, 
 def _build_validator(
     schema: JsonSchema, validator_cls: type, registry: jsonschema_rs.Registry | None = None
 ) -> jsonschema_rs.Validator:
-    kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS}
+    # References arrive bundled, so a build never needs the network; a `$schema` URL would otherwise be fetched.
+    kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS, "offline": True}
     if validator_cls is jsonschema_rs.Draft4Validator:
         kwargs["formats"] = DRAFT4_SUPPLEMENTAL_FORMATS
     if registry is not None:
