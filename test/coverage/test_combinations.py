@@ -4451,3 +4451,17 @@ def test_positive_unique_array_bounded_by_item_domain(ctx_factory):
     values = cover_schema(ctx, schema)
     assert values, schema
     assert_conform(values, schema)
+
+
+# A combinator beside a large floor can still narrow the elements, so the array is checked against it.
+@pytest.mark.parametrize("combinator", ["oneOf", "anyOf", "allOf"])
+def test_negative_unique_array_one_short_of_a_large_floor_beside_a_combinator(ctx_factory, combinator):
+    schema = {"type": "array", "minItems": 500, "uniqueItems": True, combinator: [{}]}
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    without_floor = jsonschema_rs.Draft4Validator({**schema, "minItems": 0})
+    below = [
+        generated.value
+        for generated in cover_schema_iter(ctx, schema)
+        if generated.scenario == CoverageScenario.ARRAY_BELOW_MIN_ITEMS
+    ]
+    assert [(len(value), without_floor.is_valid(value)) for value in below] == [(499, True)]
