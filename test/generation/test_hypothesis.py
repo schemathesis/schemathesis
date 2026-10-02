@@ -26,7 +26,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.jsonschema import strategy
 from schemathesis.generation.jsonschema.context import Alphabet
@@ -1133,9 +1133,9 @@ def test_jsonify_python_specific_types_leaves_input_alone():
     assert value == {"foo": True, "bar": [None]}
 
 
-# Inside the generation buffer the floor is drawable but its minimal example is too large; past the buffer no
-# example exists at all, which is a schema error rather than a health check.
-@pytest.mark.parametrize("min_items", [20000, 100000], ids=["health-check", "schema-error"])
+# Inside the generation buffer the floor is reached by repeating one element; past the buffer no example
+# exists at all, which is a schema error.
+@pytest.mark.parametrize("min_items", [20000, 100000], ids=["drawable", "schema-error"])
 def test_large_minimum_array_size(ctx, cli, snapshot_cli, min_items):
     api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
@@ -3646,6 +3646,26 @@ def test_canonical_array_admits_nothing(schema):
     # is a strategy that draws nothing.
     built = _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
     assert built.is_empty
+
+
+HEAVY_OBJECT = {
+    "type": "object",
+    "properties": {name: {"type": "string", "minLength": 5} for name in "abcde"},
+    "required": list("abcde"),
+}
+
+
+# Every element spends several choices, so a floor well under the buffer size can still outgrow one draw.
+@pytest.mark.parametrize(
+    ("items", "min_items"),
+    [(True, 8000), (HEAVY_OBJECT, 1000), ({"type": "integer", "minimum": 3}, 16000)],
+    ids=["any", "object", "integer"],
+)
+def test_canonical_array_reaches_a_floor_past_what_one_draw_fits(items, min_items):
+    setup()
+    schema = {"type": "array", "items": items, "minItems": min_items, "maxItems": min_items + 5}
+    value = examples.generate_one(_canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator))
+    assert jsonschema_rs.Draft202012Validator(schema).is_valid(value)
 
 
 def test_canonical_array_min_contains_beyond_what_hypothesis_draws():

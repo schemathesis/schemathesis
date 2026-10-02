@@ -4297,3 +4297,11 @@ def test_one_of_negative_is_not_valid_for_a_sibling_under_a_newer_draft(ctx_fact
 
     assert values
     assert [value for value in values if any(judge.is_valid(value) for judge in judges)] == []
+
+
+# A value beyond a negated large ceiling needs more elements than one draw holds.
+def test_positive_array_beyond_a_negated_large_ceiling(pctx):
+    schema = {"type": "array", "not": {"maxItems": 8000}}
+    values = cover_schema(pctx, schema)
+    assert values, schema
+    assert_conform(values, schema)

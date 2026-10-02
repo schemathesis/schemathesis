@@ -56,6 +56,7 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 
 from schemathesis.core import (
     INTERNAL_BUFFER_SIZE,
+    MAX_DRAWN_ARRAY_ITEMS,
     MAX_GENERATED_ITEMS,
     MAX_GENERATED_PATTERN_LENGTH,
     MAX_STRING_LENGTH,
@@ -240,9 +241,6 @@ NEGATIVE_MODE_MAX_ITEMS = 15
 # How many levels of one object graph may merge the same base before the walk stops unfolding it.
 # Keeps a base reused all the way down a deep document from turning every level into its own sweep.
 SHARED_BASE_REUSE_LIMIT = 3
-# Longest array still drawn element by element; a pattern-matched element spends budget per
-# character, so past this the draw stops being affordable.
-MAX_DRAWN_ARRAY_ITEMS = 64
 # Largest object still drawn whole; free values past this overrun the buffer before the floor is met.
 MAX_DRAWN_OBJECT_PROPERTIES = 64
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
