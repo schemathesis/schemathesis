@@ -4021,8 +4021,23 @@ def test_positive_object_keeps_properties_named_like_keywords(ctx_factory, name)
             {"type": "integer", "minimum": 5, "multipleOf": 3},
         ),
         ({"type": "string", "pattern": "^[a-z]+$", "anyOf": [{"type": "null"}]}, {"not": {}}),
+        ({"allOf": [{"type": "array", "items": {"type": "string"}}], "anyOf": [{"type": "null"}]}, {"not": {}}),
+        (
+            {
+                "type": "object",
+                "properties": {"a": {"type": "string", "pattern": "^[a-z]+$", "anyOf": [{"type": "null"}]}},
+            },
+            {"type": "object", "properties": {"a": {"not": {}}}},
+        ),
     ],
-    ids=["oneOf-beside-allOf", "oneOf-beside-anyOf", "type-beside-anyOf", "pattern-beside-anyOf"],
+    ids=[
+        "oneOf-beside-allOf",
+        "oneOf-beside-anyOf",
+        "type-beside-anyOf",
+        "pattern-beside-anyOf",
+        "allOf-beside-anyOf",
+        "nested-pattern-beside-anyOf",
+    ],
 )
 def test_positive_branch_values_meet_their_siblings(pctx, schema, folded):
     assert cover_schema(pctx, schema) == cover_schema(pctx, folded)
@@ -4395,3 +4410,44 @@ def test_unique_array_floor_past_its_item_domain_is_unsatisfiable(ctx_factory):
     ctx = ctx_factory(location=ParameterLocation.BODY, validator_cls=jsonschema_rs.Draft202012Validator)
     with pytest.raises(Unsatisfiable):
         ctx._distinct_array(schema, 100)
+
+
+# A closed branch forbids the name another branch requires, so no object satisfies the `allOf`.
+def test_all_of_closed_branch_conflicting_with_required_emits_nothing(pctx):
+    schema = {
+        "allOf": [
+            {"type": "object", "properties": {"b": {"type": "null"}}, "additionalProperties": False},
+            {"type": "object", "properties": {"a": {"type": "null"}}, "required": ["a"]},
+        ]
+    }
+    assert cover_schema(pctx, schema) == []
+
+
+# Branches pin the same property to incompatible schemas; values must leave that property out.
+def test_all_of_merges_conflicting_property_schemas(ctx_factory):
+    schema = {
+        "allOf": [
+            {"type": "object", "properties": {"a": {"type": "boolean"}}},
+            {"type": "object", "properties": {"a": {"const": None}}},
+        ]
+    }
+    ctx = ctx_factory(validator_cls=jsonschema_rs.Draft202012Validator, generation_modes=[GenerationMode.POSITIVE])
+    values = cover_schema(ctx, schema)
+    assert values, schema
+    assert_conform(values, schema)
+
+
+# A `$ref` target that only admits `null` caps a unique array at one element.
+def test_positive_unique_array_bounded_by_item_domain(ctx_factory):
+    schema = {
+        "type": "array",
+        "items": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/A"},
+        "minItems": 0,
+        "uniqueItems": True,
+        "maxItems": 2,
+        BUNDLE_STORAGE_KEY: {"A": {"type": "null"}},
+    }
+    ctx = ctx_factory(root_schema=schema, generation_modes=[GenerationMode.POSITIVE])
+    values = cover_schema(ctx, schema)
+    assert values, schema
+    assert_conform(values, schema)
