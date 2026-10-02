@@ -2,6 +2,7 @@ import json
 import re
 from unittest.mock import ANY
 
+import flask
 import pytest
 import requests
 from fastapi import FastAPI
@@ -19,6 +20,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
+from test.apps.catalog.graphql.bookstore import books
 
 
 @pytest.fixture
@@ -658,6 +660,45 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     except ValueError:
         pass
     _assert_override(spy, client_arg, original, overridden)
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected"),
+    [
+        ("https://tenant.example/api/v1/aas/X", "https://tenant.example/api/v1/aas/X/views"),
+        ("/api/v1/aas/X", "http://localhost/api/v1/aas/X/views"),
+    ],
+)
+def test_call_base_url_override_wsgi(base_url, expected):
+    app = flask.Flask(__name__)
+
+    @app.route("/<path:path>")
+    def echo(path):
+        return {"url": flask.request.url}
+
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1"},
+            "paths": {"/views": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        }
+    )
+    schema.app = app
+    schema.config.base_url = "http://localhost/api/v1"
+    case = schema["/views"]["GET"].Case()
+
+    response = case.call(base_url=base_url)
+
+    assert (response.json(), response.request.url) == ({"url": expected}, expected)
+
+
+def test_call_base_url_override_wsgi_graphql():
+    schema = schemathesis.graphql.from_wsgi("/graphql", app=books().server)
+    case = next(iter(schema.get_all_operations())).ok().Case(body="{ __typename }")
+
+    response = case.call(base_url="http://localhost/prefix")
+
+    assert (response.status_code, response.request.url) == (200, "http://localhost/graphql")
 
 
 @pytest.mark.parametrize(
