@@ -25,6 +25,7 @@
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 - Serialize captured array path parameters with their declared OpenAPI style.
 - Crash in dependency inference for Open API 3.1 references to boolean schemas.
+- Crash in dependency inference for response references targeting non-object values.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
 - Dictionary bindings on body paths ignored through recursive `$ref` schemas.
 - Inferred links reading foreign keys from responses that do not declare them.

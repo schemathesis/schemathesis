@@ -79,8 +79,8 @@ def extract_resources_from_responses(
                     canonicalization_cache=canonicalization_cache,
                 )
             )
-        except RefResolutionError:
-            # A dangling `$ref` (typo, missing component, unavailable file) hides only this response's resources
+        except (RefResolutionError, InvalidSchema):
+            # An unusable `$ref` hides only this response's resources
             continue
         for item in extracted:
             yield response, item

@@ -3210,6 +3210,24 @@ def test_reference_to_boolean_response_schema(ctx):
     }
 
 
+@pytest.mark.parametrize(
+    "response_schema",
+    [
+        pytest.param(ref("#/info/title"), id="direct"),
+        pytest.param(
+            {"type": "object", "properties": {"x": ref("#/info/title")}},
+            id="nested-property",
+        ),
+    ],
+)
+def test_reference_to_non_object_response_schema(ctx, response_schema):
+    schema = ctx.openapi.load_schema(operation("get", "/items", "200", response_schema))
+
+    schema.as_state_machine()
+
+    assert schema.raw_schema["paths"]["/items"]["get"] == response("200", response_schema)
+
+
 def test_path_param_named_after_collection_links_create_to_read(ctx):
     # `/sessions/{session}` names its path param after the singular collection (route-model-binding
     # style); the create operation must still link into read.
