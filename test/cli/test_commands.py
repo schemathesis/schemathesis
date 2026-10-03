@@ -4032,6 +4032,54 @@ def test_link_extraction_from_malformed_json_response(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_link_extraction_from_binary_json_response(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return Response(b"\xff\xfe\x00", status=201, content_type="application/json")
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=stateful",
+            "--max-examples=5",
+            "-c not_a_server_error",
+            config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
+        )
+        == snapshot_cli
+    )
+
+
 # Every repeated stateful pass folds into the single block reported at the end.
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):

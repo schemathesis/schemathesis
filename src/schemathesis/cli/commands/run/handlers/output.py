@@ -1400,7 +1400,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
                 indent = "        "
                 if failure.error:
-                    if isinstance(failure.error, JSONDecodeError):
+                    if isinstance(failure.error, (JSONDecodeError, UnicodeDecodeError)):
                         click.echo(f"\n{indent}Failed to parse JSON from response")
                     else:
                         click.echo(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
