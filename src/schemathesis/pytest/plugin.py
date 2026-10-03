@@ -76,13 +76,12 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 _CASSETTE_KEY: pytest.StashKey[
-    dict[str, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]]]
+    dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]]]
 ] = pytest.StashKey()
 _STATEFUL_WRITERS_KEY: pytest.StashKey[list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]] = pytest.StashKey()
 _ALLURE_FORWARDER_KEY: pytest.StashKey[_AllureHookForwarder] = pytest.StashKey()
 _ALLURE_BUFFER_KEY: pytest.StashKey[_AllureCallBuffer] = pytest.StashKey()
 _REPORT_OUTCOME_KEY: pytest.StashKey[PytestReportOutcome] = pytest.StashKey()
-_WRITERS_KEY_CACHE: pytest.StashKey[dict[int, tuple[SchemaMetadata, str]]] = pytest.StashKey()
 
 
 # Present only while a lazy-schema subtest runs; holds that subtest's outcome.
@@ -526,7 +525,6 @@ def _is_xdist_worker(config: pytest.Config) -> bool:
 
 def pytest_configure(config: pytest.Config) -> None:
     config.stash[_CASSETTE_KEY] = {}
-    config.stash[_WRITERS_KEY_CACHE] = {}
     if not HAS_CORE_SUBTESTS:
         config.pluginmanager.register(_subtests, "schemathesis-subtests")
     if config.pluginmanager.hasplugin("xdist"):
@@ -608,15 +606,10 @@ def _write_to_writers(
             writer.write(recorder)
 
 
-def _writers_key(config: pytest.Config, schema: SchemaMetadata) -> str:
-    # Hashing an in-memory schema is costly, so it happens once per schema object; holding the object keeps its id unique.
-    from schemathesis.pytest.xdist import _schema_id
-
-    cache = config.stash[_WRITERS_KEY_CACHE]
-    cached = cache.get(id(schema))
-    if cached is None:
-        cached = cache[id(schema)] = (schema, _schema_id(schema))
-    return cached[1]
+def _writers_key(schema: SchemaMetadata) -> int:
+    # Schemas cloned for each test share their report config, so it identifies whose reports a result belongs to.
+    # The registered entry keeps that config alive, so its id cannot be reused while the entry exists.
+    return id(schema.config)
 
 
 def _register_allure_forwarder(
@@ -764,7 +757,7 @@ def report_subtest(
 
     from schemathesis.pytest.reporting import PytestReportDispatcher
 
-    schema_id = _writers_key(item.config, schema)
+    schema_id = _writers_key(schema)
     entry = item.config.stash[_CASSETTE_KEY].get(schema_id)
     if entry is None:
         writers = [] if _is_xdist_worker(item.config) else _open_writers(schema)
@@ -848,7 +841,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     reports = schema.config.reports
     if not (reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.allure.enabled):
         return
-    schema_id = _writers_key(item.config, schema)
+    schema_id = _writers_key(schema)
 
     if _is_xdist_worker(item.config):
         dispatcher = PytestReportDispatcher(schema)
@@ -917,7 +910,7 @@ def _teardown_reporting(item: pytest.Item) -> None:
     cassettes = item.config.stash[_CASSETTE_KEY]
     if not cassettes:
         return
-    entry = cassettes.get(_writers_key(item.config, schema))
+    entry = cassettes.get(_writers_key(schema))
     if entry is None:
         return
     dispatcher, writers = entry
