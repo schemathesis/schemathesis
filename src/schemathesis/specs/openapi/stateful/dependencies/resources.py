@@ -171,7 +171,7 @@ def iter_resources_from_response(
 
     current_resolver = response.resolver if response.resolver is not None else resolver
     parent_ref = schema.get("$ref")
-    _, resolved = maybe_resolve_with_resolver(schema, current_resolver)
+    _, resolved = maybe_resolve_with_resolver(schema, current_resolver, allow_boolean=True)
 
     # Sometimes data is wrapped in a wrapper field, optionally next to request metadata
     # Common patterns: {data: {...}}, {result: {...}, status: ..., time: ...}
