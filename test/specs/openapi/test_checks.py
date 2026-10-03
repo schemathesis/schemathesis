@@ -428,6 +428,50 @@ def test_negative_data_rejection_reports_invalid_boolean_next_to_extras(ctx, res
         negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
+def _array_query_case(ctx, query, mutation):
+    schema = ctx.openapi.load_schema(
+        {
+            "/tags": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "tag",
+                            "required": True,
+                            "style": "form",
+                            "explode": True,
+                            "schema": {"type": "array", "items": {"type": "string"}, "maxItems": 1},
+                        },
+                    ]
+                }
+            }
+        }
+    )
+    return schema["/tags"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            parameter=mutation.parameter,
+            parameter_location=ParameterLocation.QUERY,
+            mutations=(mutation,),
+        ),
+        query=query,
+    )
+
+
+def test_negative_data_rejection_reports_negated_array_query_parameter(ctx, response_factory):
+    case = _array_query_case(ctx, {"tag": ["", ""]}, _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("maxItems",), "tag"))
+    assert has_only_additional_properties_in_non_body_parameters(case) is False
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+def test_negative_data_rejection_ignores_extras_next_to_array_query_parameter(ctx, response_factory):
+    case = _array_query_case(ctx, {"tag": ["a"], "unknown": "junk"}, _ADDITIONAL_PROPERTIES_MUTATION)
+    assert has_only_additional_properties_in_non_body_parameters(case) is True
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
 def _opaque_rejection(response_factory):
     # A rejection with nothing to attribute, so the hint falls back to its schema-side reasoning.
     return Response.from_requests(response_factory.requests(status_code=400), verify=True)
