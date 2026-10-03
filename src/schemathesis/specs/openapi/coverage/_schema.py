@@ -3069,6 +3069,8 @@ def _as_number(value: Fraction) -> int | float:
 
 def _spelled_multiple(candidate: Fraction, step: Fraction, *, going_up: bool) -> int | float | None:
     """The candidate where a float's JSON text spells it exactly, else the nearest multiple past it one does."""
+    integer_step = step.numerator
+    integer_candidate = (ceil(candidate / integer_step) if going_up else floor(candidate / integer_step)) * integer_step
     # Multiples of an awkward step can miss every float for a stretch; a few floats on is as far as it is worth going.
     for _ in range(8):
         number = _as_number(candidate)
@@ -3079,7 +3081,7 @@ def _spelled_multiple(candidate: Fraction, step: Fraction, *, going_up: bool) ->
         edge = _rational(nextafter(number, inf if going_up else -inf))
         quotient, remainder = divmod(edge, step)
         candidate = edge if remainder == 0 else step * (quotient + 1 if going_up else quotient)
-    return None
+    return integer_candidate
 
 
 def closest_multiple_greater_than(y: int | float, x: int | float) -> int | float | None:

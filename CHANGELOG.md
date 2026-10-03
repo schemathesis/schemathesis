@@ -29,6 +29,7 @@
 - Crash in dependency inference for Open API 3.1 references to boolean schemas.
 - Crash in dependency inference for response references targeting non-object values.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
+- Missing positive coverage cases for satisfiable numeric `multipleOf` schemas with large bounds.
 - Dictionary bindings on body paths ignored through recursive `$ref` schemas.
 - Inferred links reading foreign keys from responses that do not declare them.
 - Crash in dependency inference for Open API 3.1 boolean schemas inside `anyOf` and `oneOf`.
