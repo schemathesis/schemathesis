@@ -12,6 +12,7 @@
 - Report malformed Open API `servers` definitions as clean schema loading errors.
 - `ImportError` on `from schemathesis.checks import content_type_conformance` (and other built-in checks) before a schema is loaded.
 - Coverage phase hanging on unique arrays with a large `minItems`.
+- Report custom CLI handler startup errors with a clean error message.
 - Stateful worker hangs after Ctrl-C from custom CLI handlers.
 - Invalid coverage-phase positives for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
