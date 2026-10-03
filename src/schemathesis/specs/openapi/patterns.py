@@ -809,7 +809,7 @@ def update_quantifier(pattern: str, min_length: int | None, max_length: int | No
         updated = _serialize(result, global_flags=global_flags)
         try:
             re.compile(updated)
-        except re.error:
+        except (re.error, OverflowError):
             return pattern
         return updated
     except (re.error, InternalError):
