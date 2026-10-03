@@ -32,6 +32,7 @@
 - Missing positive coverage cases for satisfiable numeric `multipleOf` schemas with large bounds.
 - Dictionary bindings on body paths ignored through recursive `$ref` schemas.
 - Inferred links reading foreign keys from responses that do not declare them.
+- Report infinite recursive and unresolvable references as schema errors.
 - Crash in dependency inference for Open API 3.1 boolean schemas inside `anyOf` and `oneOf`.
 - Memory growing without bound during long stateful runs with a time limit.
 - pytest plugin reports including results from an identical schema that did not configure reports.

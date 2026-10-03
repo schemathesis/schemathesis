@@ -103,6 +103,8 @@ class EngineErrorInfo:
         if self._kind in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION,
+            RuntimeErrorKind.SCHEMA_INVALID_INFINITE_RECURSION,
+            RuntimeErrorKind.SCHEMA_INVALID_UNRESOLVABLE_REFERENCE,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
         ):
