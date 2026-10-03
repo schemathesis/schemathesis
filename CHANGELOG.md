@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.29.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Display report write failures with the format, path, and operating-system error.
+
 ## [4.29.1](https://github.com/schemathesis/schemathesis/compare/v4.29.0...v4.29.1) - 2026-10-04
 
 ### :rocket: Added

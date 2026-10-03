@@ -305,6 +305,23 @@ def test_permission_denied(ctx, cli, tmp_path, path):
     assert "Permission denied" in result.stdout or "Permission denied" in result.stderr
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.skipif(platform.system() != "Linux", reason="Requires /dev/full")
+def test_report_write_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    result = cli.run(
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-examples=1",
+        "--checks=not_a_server_error",
+        "--report-junit-path=/dev/full",
+    )
+    assert result.exit_code == ExitCode.OK
+    assert "Failed to write JUnit report to /dev/full: No space left on device" in result.stdout
+    assert "Please consider reporting this error" not in result.stdout
+    assert result == snapshot_cli
+
+
 def test_coverage_unspecified_method_in_junit(cli, ctx, tmp_path):
     # See GH-3699
     # When coverage phase triggers an `unsupported_method` failure via UNSPECIFIED_HTTP_METHOD,
