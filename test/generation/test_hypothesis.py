@@ -4398,6 +4398,41 @@ def test_query_dictionary_binding(ctx, parameter_schema, config, expected):
 
 
 @pytest.mark.hypothesis_nested
+def test_body_dictionary_binding_through_recursive_reference(ctx):
+    node = {"type": "object", "properties": {"token": {"type": "string"}, "child": {"$ref": "#/components/schemas/A"}}}
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/A"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"schemas": {"A": node}},
+    )
+    config = SchemathesisConfig.from_dict(
+        {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.child.token": {"dictionary": "tokens"}}}
+    )
+    operation = schemathesis.openapi.from_dict(raw_schema, config=config)["/items"]["POST"]
+    tokens = []
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        child = case.body.get("child") if isinstance(case.body, dict) else None
+        if isinstance(child, dict) and "token" in child:
+            tokens.append(child["token"])
+
+    collect()
+    assert tokens
+    assert set(tokens) == {"DICT"}
+
+
+@pytest.mark.hypothesis_nested
 def test_body_dictionary_binding_on_unknown_item_field_is_ignored(ctx):
     body_schema = {
         "type": "array",
