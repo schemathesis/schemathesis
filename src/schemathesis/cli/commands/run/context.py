@@ -10,6 +10,7 @@ from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
 from schemathesis.cli.summary import SummaryData, WarningData
+from schemathesis.config import ConfigError
 from schemathesis.core.failures import RUN_CHECKS_LABEL, is_reproducible_failure
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
@@ -81,7 +82,11 @@ class ExecutionContext(BaseExecutionContext):
             self._write_baseline()
         if isinstance(event, events.NonFatalError):
             self.errors.add(event)
-        if isinstance(event, events.NonFatalError) or (
+            if isinstance(event.value, ConfigError) and not event.related_to_operation:
+                self.exit_code = ExitCode.ERROR
+            else:
+                self.exit_code = ExitCode.FAILURES
+        elif (
             isinstance(event, events.PhaseFinished)
             and event.phase.is_enabled
             and event.status in (Status.FAILURE, Status.ERROR)

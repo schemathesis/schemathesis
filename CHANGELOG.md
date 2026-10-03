@@ -10,6 +10,7 @@
 ### :bug: Fixed
 
 - Report malformed Open API `servers` definitions as clean schema loading errors.
+- Return exit code 2 for run-wide configuration errors.
 - `ImportError` on `from schemathesis.checks import content_type_conformance` (and other built-in checks) before a schema is loaded.
 - Preserve case-sensitive cookie parameter names during test generation.
 - Coverage phase hanging on unique arrays with a large `minItems`.

@@ -175,6 +175,14 @@ def test_config_file_error_exit_code(cli, command):
     assert result.exit_code == 2, result.stdout
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_runtime_config_error_exit_code(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    result = cli.run(api.schema_url, config={"checks": {"no_such_check": {"threshold": 1}}})
+    assert result.exit_code == 2, result.stdout
+    assert result == snapshot_cli
+
+
 def test_force_color_nocolor(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     assert cli.run(api.schema_url, "--force-color", "--no-color") == snapshot_cli
