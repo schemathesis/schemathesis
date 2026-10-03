@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import _thread
+import gc
 import json
 import platform
 import sys
@@ -23,6 +24,7 @@ from schemathesis.engine.recorder import Request
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import add_examples
+from schemathesis.generation.stateful.state_machine import APIStateMachine
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
     positive_data_acceptance,
@@ -833,6 +835,22 @@ def test_max_time_in_stateful_phase_is_not_an_interrupt(ctx):
     assert stream.find_all(events.Interrupted) == []
     stateful = stream.find(events.PhaseFinished, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
     assert stateful.status != Status.INTERRUPTED
+
+
+def test_stateful_cycles_release_their_state_machines(ctx):
+    # Hypothesis caches every state machine class it runs; each cycle builds a new one, so unless the
+    # finished ones are released, memory grows for as long as the run lasts.
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = execute(schema, max_time=3, max_examples=5, phases=[PhaseName.STATEFUL_TESTING])
+    cycles = stream.find_all(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
+    gc.collect()
+    machines = [
+        obj
+        for obj in gc.get_objects()
+        if isinstance(obj, type) and issubclass(obj, APIStateMachine) and getattr(obj, "schema", None) is schema
+    ]
+    assert (len(cycles) > 1, machines) == (True, [])
 
 
 def test_max_time_keeps_operation_errors_visible(ctx, restore_checks):

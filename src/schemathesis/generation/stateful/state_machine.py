@@ -3,12 +3,11 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any, ClassVar, Final
 
 import hypothesis
 from hypothesis.errors import InvalidDefinition
-from hypothesis.stateful import RuleBasedStateMachine
+from hypothesis.stateful import RuleBasedStateMachine, RuleStrategy
 
 from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
@@ -182,6 +181,20 @@ class _ValidRuleFallbackFlags:
         return not self._any_valid_enabled
 
 
+def release_state_machines(*classes: type) -> None:
+    """Drop Hypothesis' per-class caches for state machine classes that will not run again."""
+    # Both are private to Hypothesis; if either moves, the classes simply stay cached as before.
+    per_class = getattr(RuleBasedStateMachine, "_setup_state_per_class", None)
+    if isinstance(per_class, dict):
+        for cls in classes:
+            per_class.pop(cls, None)
+    setup_for = getattr(RuleStrategy, "_setup_for", None)
+    cache_clear = getattr(setup_for, "cache_clear", None)
+    if cache_clear is not None:
+        # An `lru_cache` cannot drop one key; other live classes recompute their rule list once.
+        cache_clear()
+
+
 class APIStateMachine(RuleBasedStateMachine):
     """State machine for executing API operation sequences based on inferred transitions.
 
@@ -215,8 +228,12 @@ class APIStateMachine(RuleBasedStateMachine):
         self.setup()
 
     @classmethod
-    @lru_cache
     def _to_test_case(cls) -> type:
+        # Memoized on the class itself: Hypothesis reads `TestCase` whenever it instantiates a machine,
+        # and a process-wide cache would keep every state machine class alive.
+        cached = cls.__dict__.get("_test_case_class")
+        if cached is not None:
+            return cached
         from schemathesis.generation.stateful import run_state_machine_as_test
 
         class StateMachineTestCase(RuleBasedStateMachine.TestCase):
@@ -277,12 +294,16 @@ class APIStateMachine(RuleBasedStateMachine):
                     run_state_machine_as_test(machine, settings=self.settings)
                 except FailureGroup as exc:
                     raise as_reported_failure(exc) from None
+                finally:
+                    if machine is not cls:
+                        release_state_machines(machine)
 
             runTest.is_hypothesis_test = True  # type: ignore[attr-defined]
 
         StateMachineTestCase.__name__ = cls.__name__ + ".TestCase"
         StateMachineTestCase.__qualname__ = cls.__qualname__ + ".TestCase"
         StatefulSchemaMark.set(StateMachineTestCase, cls.schema)
+        cls._test_case_class = StateMachineTestCase
         return StateMachineTestCase
 
     def _new_name(self, target: str) -> str:
