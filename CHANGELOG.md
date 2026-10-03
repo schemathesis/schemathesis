@@ -16,6 +16,7 @@
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
 - Inferred links reading foreign keys from responses that do not declare them.
+- Memory growing without bound during long stateful runs with a time limit.
 
 ## [4.29.0](https://github.com/schemathesis/schemathesis/compare/v4.28.0...v4.29.0) - 2026-10-02
 

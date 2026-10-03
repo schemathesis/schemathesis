@@ -38,6 +38,7 @@ from schemathesis.engine._rate_limit_retry import call_and_validate_with_retry
 from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
+from schemathesis.generation.stateful.state_machine import release_state_machines
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.reporting import UnsatisfiableSchema, ignore_hypothesis_output
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
@@ -409,70 +410,75 @@ def execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
-    while True:
-        # Promote observations from the previous run into the stable read state.
-        if engine.link_calibration is not None:
-            engine.link_calibration.begin_iteration()
-        engine.health.begin_iteration()
-        suite_recorders.clear()
-        # This loop is running until no new failures are found in a single iteration
-        if engine.error_feedback is not None:
-            engine.error_feedback.checkpoint()
-        suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
-        suite_id = suite_started.id
-        event_queue.put(suite_started)
-        if engine.is_interrupted:
-            event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
-            event_queue.put(
-                events.SuiteFinished(
-                    id=suite_started.id,
-                    phase=PhaseName.STATEFUL_TESTING,
-                    status=Status.INTERRUPTED,
+    try:
+        while True:
+            # Promote observations from the previous run into the stable read state.
+            if engine.link_calibration is not None:
+                engine.link_calibration.begin_iteration()
+            engine.health.begin_iteration()
+            suite_recorders.clear()
+            # This loop is running until no new failures are found in a single iteration
+            if engine.error_feedback is not None:
+                engine.error_feedback.checkpoint()
+            suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
+            suite_id = suite_started.id
+            event_queue.put(suite_started)
+            if engine.is_interrupted:
+                event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
+                event_queue.put(
+                    events.SuiteFinished(
+                        id=suite_started.id,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        status=Status.INTERRUPTED,
+                    )
                 )
-            )
+                break
+            if engine.has_reached_time_limit:
+                # No scenario ran, so there is nothing this suite can vouch for.
+                event_queue.put(
+                    events.SuiteFinished(
+                        id=suite_started.id,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        status=Status.SKIP,
+                    )
+                )
+                break
+            suite_status = Status.SUCCESS
+            retry = False
+            # A fresh seed per suite: a retry or a later cycle must not replay what an earlier suite did.
+            InstrumentedStateMachine = hypothesis.seed(engine.next_stateful_seed())(_InstrumentedStateMachine)
+            try:
+                with catch_warnings(), ignore_hypothesis_output():
+                    filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
+                    InstrumentedStateMachine.run(settings=hypothesis_settings)
+            except (Exception, KeyboardInterrupt, FailureGroup) as exc:
+                suite_status, retry, error_events = _classify_suite_error(
+                    exc, ctx=ctx, engine=engine, state=state, settings=hypothesis_settings
+                )
+                for error_event in error_events:
+                    event_queue.put(error_event)
+            finally:
+                # Drain this suite's recorders into the pool before the next iteration's strategies
+                # are built; mirrors `record_extra_data_from_recorder` in the unit phase.
+                if engine.extra_data_source is not None and suite_recorders:
+                    _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
+                event_queue.put(
+                    events.SuiteFinished(
+                        id=suite_started.id,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        status=suite_status,
+                    )
+                )
+                ctx.reset()
+            if retry:
+                continue
+            # One clean pass, then hand the budget back: under a time limit the engine repeats the whole
+            # sequence, and holding on here would leave every later phase without a turn.
             break
-        if engine.has_reached_time_limit:
-            # No scenario ran, so there is nothing this suite can vouch for.
-            event_queue.put(
-                events.SuiteFinished(
-                    id=suite_started.id,
-                    phase=PhaseName.STATEFUL_TESTING,
-                    status=Status.SKIP,
-                )
-            )
-            break
-        suite_status = Status.SUCCESS
-        retry = False
-        # A fresh seed per suite: a retry or a later cycle must not replay what an earlier suite did.
-        InstrumentedStateMachine = hypothesis.seed(engine.next_stateful_seed())(_InstrumentedStateMachine)
-        try:
-            with catch_warnings(), ignore_hypothesis_output():
-                filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")
-                InstrumentedStateMachine.run(settings=hypothesis_settings)
-        except (Exception, KeyboardInterrupt, FailureGroup) as exc:
-            suite_status, retry, error_events = _classify_suite_error(
-                exc, ctx=ctx, engine=engine, state=state, settings=hypothesis_settings
-            )
-            for error_event in error_events:
-                event_queue.put(error_event)
-        finally:
-            # Drain this suite's recorders into the pool before the next iteration's strategies
-            # are built; mirrors `record_extra_data_from_recorder` in the unit phase.
-            if engine.extra_data_source is not None and suite_recorders:
-                _replay_recorders_into_pool(engine.extra_data_source, suite_recorders)
-            event_queue.put(
-                events.SuiteFinished(
-                    id=suite_started.id,
-                    phase=PhaseName.STATEFUL_TESTING,
-                    status=suite_status,
-                )
-            )
-            ctx.reset()
-        if retry:
-            continue
-        # One clean pass, then hand the budget back: under a time limit the engine repeats the whole
-        # sequence, and holding on here would leave every later phase without a turn.
-        break
+
+    finally:
+        # Each cycle builds new classes; Hypothesis would otherwise keep every finished one alive.
+        release_state_machines(_InstrumentedStateMachine, state_machine)
 
 
 def validate_response(
