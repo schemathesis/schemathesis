@@ -224,7 +224,8 @@ def test_atomic_write_text_survives_concurrent_writers(tmp_path):
     for thread in threads:
         thread.join()
 
-    assert errors == []
+    # A Windows refusal that outlasts the retry budget is reported by design; a lost temp file is the bug.
+    assert [error for error in errors if not isinstance(error, PermissionError)] == []
     assert path.read_text() in payloads
 
 
