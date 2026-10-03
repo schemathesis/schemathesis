@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import http.client
+import math
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import wraps
@@ -53,6 +54,8 @@ from schemathesis.transport.prepare import prepare_path
 from schemathesis.transport.serialization import contains_binary
 
 if TYPE_CHECKING:
+    import jsonschema_rs
+
     from schemathesis.engine.recorder import RecordedScenario
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
@@ -413,6 +416,12 @@ def _coerce_string_to_numeric(value: str, expected_types: list[str]) -> int | fl
     return None
 
 
+def _numeric_wire_value_is_valid(coerced: int | float | list[int | float], validator: jsonschema_rs.Validator) -> bool:
+    # Values like `nan` or `1e400` parse as non-finite floats that servers may read as numbers.
+    values = coerced if isinstance(coerced, list) else [coerced]
+    return any(isinstance(value, float) and not math.isfinite(value) for value in values) or validator.is_valid(coerced)
+
+
 def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     """Check if an array value for a scalar parameter becomes valid after serialization.
 
@@ -493,7 +502,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
                 # raw query value to integer/number will accept it.
                 if isinstance(element, str):
                     coerced = _coerce_string_to_numeric(element, expected_types)
-                    if coerced is not None and validator.is_valid(coerced):
+                    if coerced is not None and _numeric_wire_value_is_valid(coerced, validator):
                         neutralized.add((location, param_name))
                         break
 
@@ -512,7 +521,7 @@ def _wire_value_matches_parameter(parameter: OpenApiParameter, expected_types: l
         # Schema rejected by jsonschema_rs - validity is unknown, so don't report a failure.
         return True
     if coerced is not None:
-        return validator.is_valid(coerced)
+        return _numeric_wire_value_is_valid(coerced, validator)
     return validator.is_valid(wire_value)
 
 
@@ -626,7 +635,8 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
         # Items arrive as text, so `18` is the wire form of `[18]` for an integer array.
         item_types = get_type(schema.get("items", {}))
         coerced = [_coerce_string_to_numeric(item, item_types) for item in items]
-        if None not in coerced and validator.is_valid(coerced):
+        numbers = [value for value in coerced if value is not None]
+        if len(numbers) == len(coerced) and _numeric_wire_value_is_valid(numbers, validator):
             return True
 
     return False

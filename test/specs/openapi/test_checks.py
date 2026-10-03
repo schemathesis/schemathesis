@@ -878,6 +878,96 @@ def test_negative_data_rejection_validates_numeric_wire_value_against_query_sche
         assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
+# Servers commonly parse these as floats, so they may legitimately read them as numbers.
+@pytest.mark.parametrize("value", ["nan", "inf", "-Infinity", "1e400"])
+@pytest.mark.parametrize("location", [ParameterLocation.PATH, ParameterLocation.QUERY], ids=["path", "query"])
+def test_negative_data_rejection_ignores_non_finite_numeric_wire_value(ctx, response_factory, value, location):
+    schema = ctx.openapi.load_schema(
+        {
+            "/rate/{value}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "value", "required": True, "schema": {"type": "number"}},
+                        {"in": "query", "name": "value", "required": True, "schema": {"type": "number"}},
+                    ]
+                }
+            }
+        }
+    )
+    mutation = _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="value", location=location)
+    meta = build_metadata(generation_modes=[GenerationMode.NEGATIVE], mutations=(mutation,))
+    meta.components = {location: ComponentInfo(mode=GenerationMode.NEGATIVE)}
+    case = schema["/rate/{value}"]["GET"].Case(
+        _meta=meta,
+        path_parameters={"value": value if location == ParameterLocation.PATH else 1.5},
+        query={"value": value if location == ParameterLocation.QUERY else 1.5},
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
+def test_negative_data_rejection_ignores_huge_integer_wire_value(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "get": {"parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}]}
+            }
+        }
+    )
+    mutation = _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="id", location=ParameterLocation.PATH)
+    meta = build_metadata(generation_modes=[GenerationMode.NEGATIVE], mutations=(mutation,))
+    meta.components = {ParameterLocation.PATH: ComponentInfo(mode=GenerationMode.NEGATIVE)}
+    case = schema["/items/{id}"]["GET"].Case(_meta=meta, path_parameters={"id": "9" * 400})
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
+def test_negative_data_rejection_ignores_non_finite_element_in_query_array(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {"/rates": {"get": {"parameters": [{"in": "query", "name": "rate", "schema": {"type": "number"}}]}}}
+    )
+    case = schema["/rates"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            parameter="rate",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={"rate": [{"a": None}, "nan"]},
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
+def test_negative_data_rejection_ignores_non_finite_item_in_path_array(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/rates/{values}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "path",
+                            "name": "values",
+                            "required": True,
+                            "schema": {"type": "array", "items": {"type": "number"}},
+                        }
+                    ]
+                }
+            }
+        }
+    )
+    case = schema["/rates/{values}"]["GET"].Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            parameter="values",
+            parameter_location=ParameterLocation.PATH,
+            mutations=(
+                _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="values", location=ParameterLocation.PATH),
+            ),
+        ),
+        path_parameters={"values": EncodedPath("1.5,inf")},
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
 _READ_ONLY_COMPONENTS = {
     "schemas": {
         "Item": {
