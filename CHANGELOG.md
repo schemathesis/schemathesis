@@ -26,6 +26,7 @@
 - Inferred links reading foreign keys from responses that do not declare them.
 - Crash in dependency inference for Open API 3.1 boolean schemas inside `anyOf` and `oneOf`.
 - Memory growing without bound during long stateful runs with a time limit.
+- pytest plugin reports including results from an identical schema that did not configure reports.
 - Missed `negative_data_rejection` failures for invalid single-element arrays in query, header or cookie parameters.
 - Report empty or non-object Open API parameter `content` as a schema error.
 - Missed `negative_data_rejection` failures when an array parameter with a valid element accompanies invalid ones.
