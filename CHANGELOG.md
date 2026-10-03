@@ -21,6 +21,7 @@
 - Missed `negative_data_rejection` failures for invalid single-element arrays in query, header or cookie parameters.
 - Missed `negative_data_rejection` failures when an array parameter with a valid element accompanies invalid ones.
 - Missed `negative_data_rejection` failures for invalid path parameters beside undeclared query parameters.
+- Report `negative_data_rejection` failures for invalid array or object query, header and cookie parameters.
 
 ## [4.29.0](https://github.com/schemathesis/schemathesis/compare/v4.28.0...v4.29.0) - 2026-10-02
 

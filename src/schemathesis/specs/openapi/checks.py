@@ -15,7 +15,7 @@ from schemathesis.core import NOT_SET, media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator
 from schemathesis.core.jsonschema.types import JsonSchema
-from schemathesis.core.mutations import OperatorKind, render_mutations
+from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code
 from schemathesis.generation.case import Case
@@ -1067,7 +1067,11 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
             schema = container.schema
 
             if _has_serialization_sensitive_types(schema, container):
-                # Can't reliably determine if only additional properties were added
+                # Wire-serialized arrays and objects can't be re-validated, so only mutation metadata can tell.
+                if isinstance(phase_data, FuzzingPhaseData) and any(
+                    _negates_declared_parameter(mutation, location, schema) for mutation in phase_data.mutations
+                ):
+                    return False
                 continue
 
             properties = schema.get("properties", {})
@@ -1085,6 +1089,17 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 return False
     # Only additional properties are added
     return True
+
+
+def _negates_declared_parameter(mutation: Mutation, location: ParameterLocation, schema: dict) -> bool:
+    """Whether `mutation` invalidates a declared parameter in a way that survives wire serialization."""
+    if mutation.parameter_location != location or mutation.parameter is None:
+        return False
+    types = get_type(schema.get("properties", {}).get(mutation.parameter, {}))
+    if "array" not in types and "object" not in types:
+        return True
+    # Other types arrive as a string that reads as a one-element array, and an empty value is sent as no value.
+    return mutation.operator != OperatorKind.CHANGE_TYPE and "required" not in mutation.keywords
 
 
 def _boolean_from_wire_spelling(value: object, schema: JsonSchema) -> object:
