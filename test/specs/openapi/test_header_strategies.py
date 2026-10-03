@@ -109,3 +109,34 @@ def test_negative_mode_range_has_three_tiers():
     assert any(not v.startswith("bytes=") and not v.startswith("invalid=") for v in values), (
         "Expected random header values in negative mode"
     )
+
+
+@pytest.mark.parametrize(
+    ("name", "pattern"),
+    [("If-Match", ETAG_RE), ("If-Modified-Since", HTTP_DATE_RE)],
+    ids=["if-match", "if-modified-since"],
+)
+def test_negative_cases_keep_structured_values_for_known_headers(ctx, name, pattern):
+    operation = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": name, "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-Count", "in": "header", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/items"]["GET"]
+    values = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+    def inner(case):
+        values.append(case.headers.get(name))
+
+    inner()
+
+    assert any(value is not None and pattern.match(value) for value in values)

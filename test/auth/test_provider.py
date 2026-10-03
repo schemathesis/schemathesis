@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import pytest
 from flask import jsonify, request
+from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
-from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.errors import AuthenticationError, IncorrectUsage
 from schemathesis.engine import Status, from_schema
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.run import PhaseName
@@ -111,6 +112,35 @@ def test_set_noop(auth_storage, case_factory):
     with pytest.raises(IncorrectUsage, match="No auth provider is defined."):
         auth_storage.set(case, AuthContext(operation=case.operation, app=None))
     # This normally should not happen, as it is checked before.
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"refresh_interval": None}, "Boom"),
+        ({}, "Boom"),
+        ({"cache_by_key": lambda case, context: 1 / 0}, "division by zero"),
+    ],
+    ids=["uncached", "cached", "broken-cache-key"],
+)
+def test_filtered_provider_error_names_user_class(ctx, kwargs, message):
+    schema = ctx.openapi.load_schema({"/a": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @schema.auth(**kwargs).apply_to(method="GET")
+    class Broken:
+        def get(self, case, context):
+            raise ValueError("Boom")
+
+        def set(self, case, data, context):
+            pass
+
+    @given(schema["/a"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    with pytest.raises(AuthenticationError, match=rf"^Error in 'Broken.get\(\)': {message}\n"):
+        test()
 
 
 MULTI_SCOPE_SCHEMA = {

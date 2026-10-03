@@ -1893,3 +1893,93 @@ def test_api(case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     testdir.runpytest().assert_outcomes(failed=1)
+
+
+def test_pytest_parametrize_without_schemas(testdir):
+    testdir.make_test(
+        """
+@schemathesis.pytest.parametrize()
+def test_api(case):
+    pass
+""",
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(errors=1)
+    result.stdout.re_match_lines([r".*test_api does not match any API operations and therefore has no effect"])
+
+
+def test_examples_only_with_custom_media_type_and_non_binary_example(testdir):
+    testdir.make_test(
+        """
+schemathesis.openapi.media_type("text/csv", st.just(b"a,b"))
+schema.config.phases.fuzzing.enabled = False
+schema.config.phases.coverage.enabled = False
+
+@schema.include(path="/csv").parametrize()
+def test_api(case):
+    pass
+""",
+        paths={
+            "/csv": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"text/csv": {"schema": {"type": "array"}, "example": [{"a": 1}]}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest("-p", "no:xdist")
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([r".*unsupported payload media types: text/csv"])
+
+
+def test_examples_only_with_invalid_header_example(testdir):
+    testdir.make_test(
+        """
+schema.config.phases.fuzzing.enabled = False
+schema.config.phases.coverage.enabled = False
+
+@schema.include(path="/items").parametrize()
+def test_api(case):
+    pass
+""",
+        paths={
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "X-Token",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "a\nb",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([r".*some header examples are invalid:", r".*- 'X-Token'='a\\nb'"])
+
+
+def test_undeclared_path_parameter(testdir):
+    testdir.make_test(
+        """
+@schema.include(path="/items/{item_id}").parametrize()
+def test_api(case):
+    pass
+""",
+        paths={"/items/{item_id}": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([r".*InvalidSchema: Path parameter 'item_id' is not defined"])

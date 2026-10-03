@@ -3940,3 +3940,128 @@ def test_origin_conflicts_with_url(ctx, cli, app_runner, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
     base_url = app_runner.openapi_url(app, path="")
     assert cli.run(f"{base_url}/openapi.json", f"--origin={base_url}", f"--url={base_url}") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_ctrl_c_in_custom_handler_after_probing(ctx, cli, snapshot_cli):
+    @schemathesis.cli.handler()
+    class Interrupter(schemathesis.cli.EventHandler):
+        def handle_event(self, run_ctx, event) -> None:
+            if isinstance(event, events.PhaseFinished) and event.phase.name == PhaseName.PROBING:
+                raise KeyboardInterrupt
+
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--max-examples=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_link_extraction_from_malformed_json_response(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return Response(b"not json", status=201, content_type="application/json")
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=stateful",
+            "--max-examples=5",
+            "-c not_a_server_error",
+            config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
+        )
+        == snapshot_cli
+    )
+
+
+# Every repeated stateful pass folds into the single block reported at the end.
+@pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
+def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return jsonify({"id": user_id})
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-time=2",
+            "--max-examples=5",
+            "--generation-database=none",
+            "--phases=stateful",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
+@pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
+def test_keyboard_interrupt_under_time_budget(ctx, cli, snapshot_cli, phase):
+    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        return jsonify({"id": user_id})
+
+    module = ctx.write_pymodule(INTERRUPT_ON_SECOND_RESPONSE)
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-time=10",
+            "--max-examples=5",
+            f"--phases={phase}",
+            "--checks=not_a_server_error",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_custom_handler_error_under_time_budget(ctx, cli, snapshot_cli):
+    @schemathesis.cli.handler()
+    class BrokenHandler(schemathesis.cli.EventHandler):
+        def handle_event(self, run_ctx, event) -> None:
+            if isinstance(event, events.ScenarioFinished):
+                raise AttributeError("oops")
+
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--max-time=10", "--phases=fuzzing") == snapshot_cli

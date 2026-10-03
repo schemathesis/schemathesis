@@ -871,3 +871,33 @@ def test_missing_test_data_ignores_negative_not_found(ctx, cli, snapshot_cli):
         return jsonify({"detail": "Invalid"}), 422
 
     assert cli.run_openapi_app(app, "--phases=coverage", "-c not_a_server_error") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_method_not_allowed_warning_hidden_when_not_displayed(cli, ctx, snapshot_cli):
+    api = ctx.openapi.apps.unimplemented_method()
+
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=10",
+            "--phases=examples,coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+            "--warnings=missing_auth",
+        )
+        == snapshot_cli
+    )
+
+
+# Only phases whose accepted share falls below the threshold are listed.
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_low_valid_rate_lists_only_phases_below_threshold(ctx, cli, snapshot_cli):
+    app = _orders_app(ctx, accept_every=10)
+
+    assert (
+        cli.run_openapi_app(
+            app, "--max-examples=10", "--phases=coverage,fuzzing", "-m", "positive", "--warnings=low_valid_rate"
+        )
+        == snapshot_cli
+    )

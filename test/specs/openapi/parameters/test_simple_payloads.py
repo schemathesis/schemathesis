@@ -1,7 +1,9 @@
 """Tests for behavior not specific to forms."""
 
 import pytest
+from hypothesis import HealthCheck, given, settings
 
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.schemas import PayloadAlternatives
 from schemathesis.specs.openapi.adapter import v2, v3_0
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
@@ -89,3 +91,132 @@ def test_parameter_set_get(ctx, make_openapi_3_schema):
     headers = schema["/users"]["POST"].headers
     assert "id" in headers
     assert "foo" not in headers
+
+
+def generated(operation, attribute):
+    values = []
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None, database=None)
+    def inner(case):
+        values.append(getattr(case, attribute))
+
+    inner()
+    return values
+
+
+def test_query_after_querystring_is_rejected(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {"name": "raw", "in": "querystring", "content": {"text/plain": {"schema": {"type": "string"}}}},
+                        {"name": "a", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+    with pytest.raises(InvalidSchema, match="Invalid `parameters` definition"):
+        schema["/users"]["GET"]
+
+
+def test_swagger_parameter_with_non_string_location_is_skipped(ctx):
+    operation = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [{"name": "q", "in": 5, "type": "string"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )["/users"]["GET"]
+
+    assert set(map(str, generated(operation, "query"))) == {"{}"}
+
+
+def test_swagger_array_enum_intersects_item_enum(ctx):
+    operation = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "tags",
+                            "in": "query",
+                            "required": True,
+                            "type": "array",
+                            "maxItems": 1,
+                            "enum": ["a", "b"],
+                            "items": {"type": "string", "enum": ["a", ["x"], {"k": "v"}]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )["/users"]["GET"]
+
+    assert {query["tags"] for query in generated(operation, "query")} == {"a"}
+
+
+@pytest.mark.parametrize(
+    ("ref", "match"),
+    [
+        ("#/components/schemas/Null", "Invalid Schema Object definition for `Null`"),
+        ("#/components/schemas/Missing", "Unresolvable reference in the schema"),
+    ],
+    ids=["ref-to-null", "missing-ref"],
+)
+def test_required_content_parameter_with_broken_schema_reference(ctx, ref, match):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "content": {"application/json": {"schema": {"$ref": ref}}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"schemas": {"Null": None}},
+    )
+    with pytest.raises(InvalidSchema, match=match):
+        schema["/users"]["GET"]
+
+
+# Examples replace a generated value at random one draw in five; 50 draws make missing it negligible.
+def test_fuzzing_mixes_in_examples_of_boolean_schema_query_parameter(ctx):
+    operation = ctx.openapi.load_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": True, "example": "picked"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )["/users"]["GET"]
+    values = []
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=50, suppress_health_check=list(HealthCheck), deadline=None, database=None)
+    def inner(case):
+        values.append(case.query["q"])
+
+    inner()
+
+    assert "picked" in values

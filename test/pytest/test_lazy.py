@@ -1109,3 +1109,18 @@ def test_(case):
     result = testdir.runpytest("-v", "-s")
     # Then the custom database from the decorator should be used
     result.assert_outcomes(passed=1)
+
+
+def test_without_capture_plugin(testdir):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+def test_api(case):
+    pass
+"""
+    )
+    result = testdir.runpytest("-v", "-p", "no:capture")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"test_without_capture_plugin.py::test_api PASSED"])

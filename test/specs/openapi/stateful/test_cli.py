@@ -1,3 +1,4 @@
+import json
 import platform
 import uuid
 from xml.etree import ElementTree
@@ -769,6 +770,184 @@ def test_nested_path_shared_parameter_propagation(cli, ctx, snapshot_cli, phase)
             "--max-examples=50",
             "-c not_a_server_error",
             "--mode=positive",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_without_error_feedback_and_link_calibration(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--phases=stateful",
+            "-c not_a_server_error",
+            "--mode=positive",
+            "--max-examples=5",
+            "--seed=1",
+            config={
+                "phases": {
+                    "fuzzing": {"error-feedback": {"enabled": False}},
+                    "stateful": {"link-calibration": False},
+                }
+            },
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_links_between_error_responses_only(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/first": {
+                "post": {
+                    "responses": {
+                        "409": {
+                            "description": "Conflict",
+                            "links": {"Next": {"operationId": "second", "parameters": {"q": "$response.body#/x"}}},
+                        }
+                    }
+                }
+            },
+            "/second": {
+                "get": {
+                    "operationId": "second",
+                    "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"409": {"description": "Conflict"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/first", methods=["POST"])
+    def first():
+        return jsonify({"x": "value"}), 409
+
+    @app.route("/second", methods=["GET"])
+    def second():
+        return jsonify({}), 409
+
+    assert cli.run_openapi_app(app, "--phases=stateful", "--max-examples=5", "--seed=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_links_from_operations_that_produce_no_resources(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/first": {
+                "post": {
+                    "responses": {
+                        "409": {
+                            "description": "Conflict",
+                            "links": {"Next": {"operationId": "second", "parameters": {"q": "$response.body#/x"}}},
+                        }
+                    }
+                }
+            },
+            "/second": {
+                "get": {
+                    "operationId": "second",
+                    "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"409": {"description": "Conflict"}},
+                }
+            },
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+        }
+    )
+
+    @app.route("/first", methods=["POST"])
+    def first():
+        return jsonify({"x": "value"}), 409
+
+    @app.route("/second", methods=["GET"])
+    def second():
+        return jsonify({}), 409
+
+    @app.route("/users", methods=["POST"])
+    def users():
+        return jsonify({"id": 1}), 201
+
+    assert cli.run_openapi_app(app, "--phases=stateful", "--max-examples=5", "--seed=1") == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_known_stateful_failure_does_not_fail_the_run(ctx, cli, snapshot_cli, tmp_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                            "links": {
+                                "GetUser": {"operationId": "getUser", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    }
+                }
+            },
+            "/users/{id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        return jsonify({}), 500
+
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(
+        json.dumps(
+            {
+                "format_version": 1,
+                "entries": [
+                    {
+                        "operation": "GET /users/{id}",
+                        "check": "not_a_server_error",
+                        "failure": "ServerError",
+                        "signature": "500",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=stateful",
+            "--checks=not_a_server_error",
+            "--max-examples=5",
+            config={"baseline": str(baseline)},
         )
         == snapshot_cli
     )

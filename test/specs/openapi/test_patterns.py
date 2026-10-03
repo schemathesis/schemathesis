@@ -18,6 +18,8 @@ except ImportError:
 import schemathesis
 from schemathesis.core.errors import InternalError
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
+from schemathesis.engine import from_schema
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import examples
 from schemathesis.specs.openapi.converter import update_pattern_in_schema
 from schemathesis.specs.openapi.patterns import (
@@ -1561,3 +1563,116 @@ def test_unreadable_pattern_rules_nothing_out(pattern):
     # A pattern Python cannot read says nothing about length, so generation keeps its own path.
     assert pattern_length_is_unreachable(pattern, 1, 5) is False
     assert pin_pattern_length(pattern, 1, 5) == pattern
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("parameter_schema", "expected"),
+    [
+        (
+            {"type": "string", "pattern": "^a+", "minLength": 3},
+            {"type": "string", "pattern": "^a{3,}"},
+        ),
+        (
+            {"type": "string", "pattern": "^(ab|c)", "maxLength": 5},
+            {"type": "string", "pattern": "^(ab|c)", "maxLength": 5},
+        ),
+        (
+            {"type": "string", "pattern": "(ab|c)$", "maxLength": 5},
+            {"type": "string", "pattern": "(ab|c)$", "maxLength": 5},
+        ),
+        (
+            {"type": "string", "pattern": "^(?:a|bb){1,2}$", "minLength": 1, "maxLength": 10},
+            {"type": "string", "pattern": "^(?:a|bb){1,2}$", "minLength": 1, "maxLength": 10},
+        ),
+        (
+            {"type": "string", "pattern": "^(?:(?:a|bb){2}){1,3}$", "minLength": 1, "maxLength": 100},
+            {"type": "string", "pattern": "^(?:(?:a|bb){2}){1,3}$", "minLength": 1, "maxLength": 100},
+        ),
+        (
+            {"type": "string", "pattern": "^(?:(?:ab){2}c){1,3}$", "minLength": 1, "maxLength": 100},
+            {"type": "string", "pattern": "^(?:(?:ab){2}c){1,3}$", "minLength": 1, "maxLength": 100},
+        ),
+        (
+            {"type": "string", "pattern": "^(?:(ab)c){1,3}$", "minLength": 1, "maxLength": 100},
+            {"type": "string", "pattern": "^(?:(ab)c){1,3}$", "minLength": 1, "maxLength": 100},
+        ),
+        (
+            {"type": "string", "pattern": "^x(?:a|bb)+$", "minLength": 5, "maxLength": 5},
+            {"type": "string", "pattern": "^x(?:a|bb)+$", "minLength": 5, "maxLength": 5},
+        ),
+        (
+            {"type": "string", "pattern": "^a{1,2}b{1,2}c{3}$", "minLength": 7, "maxLength": 7},
+            {"type": "string", "pattern": "^a{2}b{2}c{3}$"},
+        ),
+    ],
+    ids=[
+        "leading-anchor-floor",
+        "leading-anchor-group",
+        "trailing-anchor-group",
+        "repeated-alternation",
+        "fixed-count-alternation",
+        "fixed-count-group",
+        "capturing-group-inside-repeat",
+        "exact-length-alternation",
+        "exact-length-searched",
+    ],
+)
+def test_length_bounds_beside_a_pattern(ctx, parameter_schema, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/items"]["GET"]
+    assert next(iter(operation.query)).optimized_schema == expected
+    validator = jsonschema_rs.validator_for(parameter_schema)
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    def check(case):
+        assert validator.is_valid(case.query["q"]), case.query
+
+    check()
+
+
+@pytest.mark.parametrize("pattern", ["[^ab]x", "[[:alpha:]]+"], ids=["negated-class", "posix-class"])
+def test_coverage_phase_header_values_match_pattern(ctx, app_runner, pattern):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "X-Key",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": pattern},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.phases.update(phases=["coverage"])
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    values = []
+    with ctx.restore_hooks():
+
+        @schemathesis.hook
+        def before_call(context, case, **kwargs):
+            if case.meta.generation.mode == GenerationMode.POSITIVE:
+                values.append(case.headers["X-Key"])
+
+        for _ in from_schema(schema).execute():
+            pass
+    validator = jsonschema_rs.validator_for({"type": "string", "pattern": pattern})
+    assert values
+    assert all(validator.is_valid(value) for value in values), values

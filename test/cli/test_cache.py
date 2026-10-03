@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import socket
 from pathlib import Path
 
 import pytest
 
-from schemathesis.core.cache import Entry, Kind, Manifest, Request, write
+from schemathesis.core.cache import Entry, Kind, Manifest, Request, load, write
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 
@@ -110,3 +111,27 @@ def test_cache_row_shows_unavailable_when_corrupt(ctx, cli, snapshot_cli, tmp_pa
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize("kind", [Kind.ERROR_FEEDBACK, Kind.AUTH_REQUIRED])
+def test_entries_kept_when_replay_cannot_reach_the_server(ctx, cli, tmp_path, kind):
+    api = ctx.openapi.apps.success()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        closed_port = sock.getsockname()[1]
+    cache_dir = tmp_path / "cache"
+    _seed(cache_dir, [Entry(id=1, kind=kind, operation="GET /api/success", request=Request(method="GET"))])
+
+    cli.run(
+        api.schema_url,
+        f"--url=http://127.0.0.1:{closed_port}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "--request-timeout=1",
+        config={"cache": {"directory": str(cache_dir)}},
+    )
+
+    _, entries = load(cache_dir)
+    assert entries == [
+        Entry(id=1, kind=kind, operation="GET /api/success", request=Request(method="GET"), last_replayed_run=1)
+    ]

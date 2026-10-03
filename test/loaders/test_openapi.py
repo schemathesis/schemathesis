@@ -64,6 +64,17 @@ def test_openapi_wsgi_loader(ctx, run_test):
     run_test(strategy)
 
 
+def test_openapi_wsgi_loader_plain_application(ctx):
+    spec = json.dumps(ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}))
+
+    def app(environ, start_response):
+        start_response("200 OK", [("Content-Type", "application/json")])
+        return [spec.encode() if environ["PATH_INFO"] == "/openapi.json" else b'{"success": true}']
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    assert schema["/users"]["GET"].Case().call().json() == {"success": True}
+
+
 @pytest.mark.parametrize(
     ("version", "expected"),
     [
@@ -102,6 +113,33 @@ def test_number_deserializing(ctx, testdir):
     # and the value should be a number
     value = parsed.raw_schema["paths"]["/teapot"]["get"]["parameters"][0]["schema"]["multipleOf"]
     assert isinstance(value, float)
+
+
+def test_from_dict_yaml_aliases_with_non_string_keys():
+    raw_schema = yaml.safe_load("""
+openapi: 3.0.2
+info: {title: t, version: "1"}
+paths:
+  /a:
+    get:
+      parameters: &parameters
+        - {name: q, in: query, schema: {type: string}}
+      responses: &responses
+        200: {description: OK}
+  /b:
+    get:
+      parameters: *parameters
+      responses: *responses
+""")
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    assert [schema[p]["GET"].definition.raw for p in ("/a", "/b")] == [
+        {
+            "parameters": [{"name": "q", "in": "query", "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        }
+    ] * 2
 
 
 def test_split_file_schema_with_uri_reserved_path_chars(tmp_path):

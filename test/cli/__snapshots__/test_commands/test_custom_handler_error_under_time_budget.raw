@@ -1,0 +1,29 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+CLI Handler Error
+
+An error occurred within your custom CLI handler `BrokenHandler`.
+
+Traceback (most recent call last):
+  File "/test-root/cli/test_commands.py", line XXX, in handle_event
+    raise AttributeError("oops")
+AttributeError: oops
+
+For more information on implementing extensions for Schemathesis CLI, visit https://schemathesis.readthedocs.io/en/stable/guides/extending/

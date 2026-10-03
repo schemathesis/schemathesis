@@ -190,3 +190,43 @@ def test_secondary_planted_bug_detected(cli, ctx, snapshot_cli, factory_name):
         "--seed=42",
     )
     assert result == snapshot_cli
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        pytest.param({"type": "array", "items": [{"type": "integer"}, {"type": "string"}]}, id="tuple-items"),
+        pytest.param({"type": "string", "not": {"maxLength": 2}}, id="not-with-type-specific-keyword"),
+        pytest.param(
+            {
+                "type": "object",
+                "patternProperties": {
+                    "^x": {"type": "object", "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}}}
+                },
+            },
+            id="pattern-properties-with-sibling-leaves",
+        ),
+    ],
+)
+def test_negative_body_stays_invalid(ctx, body_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    validator = jsonschema_rs.Draft4Validator(body_schema)
+
+    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=schemathesis.GenerationMode.NEGATIVE))
+    @settings(max_examples=10, deadline=None, derandomize=True, suppress_health_check=list(HealthCheck))
+    def test(case):
+        if isinstance(case.body, bytes):
+            return
+        assert not validator.is_valid(case.body), f"False positive: body {case.body!r}"
+
+    test()

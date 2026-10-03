@@ -5,7 +5,7 @@ import platform
 import re
 import string
 from io import StringIO
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, unquote
 from xml.etree import ElementTree
 
 import pytest
@@ -2063,3 +2063,126 @@ def test_multipart_serialization_keeps_case_body(ctx, transport):
     transport.serialize_case(case)
     assert case.body == {"data": data, "price": 0.5, "empty": None, "meta": {"a": 1}, "items": [1.5, "x"]}
     assert case.body["data"] is data
+
+
+def query_echo_operation(ctx, app_runner, transport, parameters, version="3.0.2"):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/q": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}}, version=version
+    )
+
+    @app.route("/q")
+    def echo_query():
+        return jsonify(unquote(request.query_string.decode()))
+
+    if transport == "wsgi":
+        return schemathesis.openapi.from_wsgi("/openapi.json", app)["/q"]["GET"]
+    return schemathesis.openapi.from_url(app_runner.openapi_url(app))["/q"]["GET"]
+
+
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+@pytest.mark.parametrize(
+    ("query", "params", "expected"),
+    [({"a": "1"}, "b=2", "a=1&b=2"), ({"a": "1"}, "", "a=1"), ({}, "?b=2", "b=2")],
+    ids=["both", "empty-params", "empty-query"],
+)
+def test_string_params_merge_into_case_query(ctx, app_runner, transport, query, params, expected):
+    operation = query_echo_operation(ctx, app_runner, transport, [])
+    assert operation.Case(query=query).call(params=params).json() == expected
+
+
+@pytest.mark.parametrize("transport", ["requests", "wsgi"])
+@pytest.mark.parametrize("params", ["x=1", {"x": "1"}, [("x", "1")]], ids=["string", "dict", "pairs"])
+@pytest.mark.parametrize(
+    ("parameter", "version", "encoded"),
+    [
+        (
+            {
+                "name": "ids",
+                "in": "query",
+                "required": True,
+                "style": "pipeDelimited",
+                "explode": False,
+                "schema": {"type": "array", "items": {"enum": [1]}, "minItems": 2, "maxItems": 2},
+            },
+            "3.0.2",
+            "ids=1|1",
+        ),
+        (
+            {
+                "name": "filter",
+                "in": "querystring",
+                "required": True,
+                "content": {"application/json": {"schema": {"enum": [{"k": "v"}]}}},
+            },
+            "3.2.0",
+            '{"k":"v"}',
+        ),
+    ],
+    ids=["pipe-delimited", "querystring"],
+)
+def test_extra_params_appended_to_pre_encoded_query(ctx, app_runner, transport, params, parameter, version, encoded):
+    operation = query_echo_operation(ctx, app_runner, transport, [parameter], version=version)
+
+    @given(operation.as_strategy())
+    @settings(max_examples=1, phases=[Phase.generate], deadline=None)
+    def test(case):
+        assert case.call(params=params).json() == f"{encoded}&x=1"
+
+    test()
+
+
+def test_multipart_encoded_field_absent_from_body(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}, "meta": {"type": "object"}},
+                                },
+                                "encoding": {"meta": {"contentType": "application/json"}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        return jsonify(dict(request.form))
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/upload"]["POST"]
+    assert operation.Case(body={"name": "x"}, media_type="multipart/form-data").call().json() == {"name": "x"}
+
+
+def test_wsgi_swagger_multipart_mixed_form_field_reaches_the_app(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "consumes": ["multipart/mixed"],
+                    "parameters": [{"name": "name", "in": "formData", "type": "string", "required": True}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    @app.route("/api/upload", methods=["POST"])
+    def upload():
+        return jsonify({"mimetype": request.mimetype, "raw": request.get_data().decode()})
+
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/upload"]["POST"]
+    received = operation.Case(body={"name": "x"}, media_type="multipart/mixed").call().json()
+    assert (received["mimetype"], 'Content-Disposition: form-data; name="name"\r\n\r\nx\r\n' in received["raw"]) == (
+        "multipart/mixed",
+        True,
+    )
