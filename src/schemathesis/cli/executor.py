@@ -36,6 +36,15 @@ class ExecutionContext(Protocol):
 try:
     from schemathesis.cli.commands.run.handlers.allure import AllureHandler
 
+    _REPORT_HANDLER_FORMATS: dict[type[EventHandler], ReportFormat] = {
+        VcrHandler: ReportFormat.VCR,
+        HarHandler: ReportFormat.HAR,
+        JunitXMLHandler: ReportFormat.JUNIT,
+        NdjsonHandler: ReportFormat.NDJSON,
+        JsonReportHandler: ReportFormat.JSON,
+        WfcReportHandler: ReportFormat.WFC,
+        AllureHandler: ReportFormat.ALLURE,
+    }
     _BUILT_IN_HANDLERS: tuple[type[EventHandler], ...] = (
         VcrHandler,
         HarHandler,
@@ -46,7 +55,26 @@ try:
         AllureHandler,
     )
 except ImportError:
+    _REPORT_HANDLER_FORMATS = {
+        VcrHandler: ReportFormat.VCR,
+        HarHandler: ReportFormat.HAR,
+        JunitXMLHandler: ReportFormat.JUNIT,
+        NdjsonHandler: ReportFormat.NDJSON,
+        JsonReportHandler: ReportFormat.JSON,
+        WfcReportHandler: ReportFormat.WFC,
+    }
     _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, WfcReportHandler, OutputHandler)
+
+
+_REPORT_NAMES = {
+    ReportFormat.JUNIT: "JUnit",
+    ReportFormat.VCR: "VCR",
+    ReportFormat.HAR: "HAR",
+    ReportFormat.NDJSON: "NDJSON",
+    ReportFormat.JSON: "JSON",
+    ReportFormat.WFC: "WFC",
+    ReportFormat.ALLURE: "Allure",
+}
 
 
 def is_built_in_handler(handler: EventHandler) -> bool:
@@ -113,8 +141,15 @@ def initialize_report_handlers(
     return handlers
 
 
-def display_handler_error(handler: EventHandler, exc: Exception) -> None:
+def display_handler_error(handler: EventHandler, exc: Exception, config: ProjectConfig) -> None:
     """Display an error that occurred within an event handler."""
+    report_format = _REPORT_HANDLER_FORMATS.get(type(handler))
+    if report_format is not None and isinstance(exc, OSError):
+        path = config.reports.get_path(report_format)
+        click.secho(
+            f"Failed to write {_REPORT_NAMES[report_format]} report to {path}: {exc.strerror or str(exc)}", fg="red"
+        )
+        return
     is_built_in = is_built_in_handler(handler)
     if is_built_in:
         title = "Internal Error"
@@ -165,7 +200,7 @@ def execute_event_loop(
                 try:
                     h.shutdown(ctx)
                 except Exception as exc:
-                    display_handler_error(h, exc)
+                    display_handler_error(h, exc, config)
 
     try:
         ctx = context_factory(config)
@@ -174,7 +209,7 @@ def execute_event_loop(
                 h.start(ctx)
             except Exception as exc:
                 if not isinstance(exc, click.Abort):
-                    display_handler_error(h, exc)
+                    display_handler_error(h, exc, config)
                     raise click.Abort() from exc
                 raise
 
@@ -185,7 +220,7 @@ def execute_event_loop(
                     h.handle_event(ctx, event)
                 except Exception as exc:
                     if not isinstance(exc, click.Abort):
-                        display_handler_error(h, exc)
+                        display_handler_error(h, exc, config)
                         raise click.Abort() from exc
                     raise
 
