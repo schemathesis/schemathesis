@@ -421,7 +421,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     - Multi-element [True, 1] -> "?page_size=True&page_size=1"
 
     For single-element arrays, the serialized form is indistinguishable from a scalar,
-    so the server will accept any value valid for the original schema.
+    so the server accepts it only when that element is valid for the original schema.
 
     For multi-element arrays, some frameworks pick one value from repeated keys (e.g.
     the last one). If any element in the array is valid for the original scalar schema,
@@ -434,6 +434,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     if meta is None:
         return False
 
+    neutralized: set[tuple[ParameterLocation, str]] = set()
     # Check query, header, and cookie parameters
     for location in (
         ParameterLocation.QUERY,
@@ -476,29 +477,30 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
             if "array" in expected_types or not expected_types:
                 continue
 
-            # Single-element arrays serialize identically to a scalar
-            if len(param_value) == 1:
-                return True
-
-            # Multi-element arrays serialize as repeated keys. If any element is valid
-            # for the full original schema (including enum, minimum, pattern, etc.),
-            # some frameworks may accept the request by picking that element.
+            # A single element serializes identically to a scalar; multiple elements become repeated keys and
+            # some frameworks pick one of them. Either way, the request is valid if any element is.
             try:
                 validator = make_validator(schema, param.adapter.jsonschema_validator_cls)
             except Exception:
-                return True
+                neutralized.add((location, param_name))
+                continue
             for element in param_value:
                 if validator.is_valid(element):
-                    return True
+                    neutralized.add((location, param_name))
+                    break
                 # Query/header/cookie values are transmitted as strings, so a string element
                 # like "44" produces the same wire form as int 44. Frameworks that coerce the
                 # raw query value to integer/number will accept it.
                 if isinstance(element, str):
                     coerced = _coerce_string_to_numeric(element, expected_types)
                     if coerced is not None and validator.is_valid(coerced):
-                        return True
+                        neutralized.add((location, param_name))
+                        break
 
-    return False
+    # Any other mutated parameter or location still makes the request invalid.
+    return bool(neutralized) and all(
+        (mutation.parameter_location, mutation.parameter) in neutralized for mutation in meta.phase.data.mutations
+    )
 
 
 def _wire_value_matches_parameter(parameter: OpenApiParameter, expected_types: list[str], wire_value: str) -> bool:
