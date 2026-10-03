@@ -415,6 +415,7 @@ TYPE_SPECIFIC_KEYS = {
         "propertyNames",
     ),
 }
+ALL_TYPE_SPECIFIC_KEYS = frozenset(keyword for keywords in TYPE_SPECIFIC_KEYS.values() for keyword in keywords)
 
 
 class MutationContext:
@@ -876,20 +877,29 @@ def has_negatable_target(
     if not isinstance(schema, dict) or depth > MAX_WALK_DEPTH:
         return False
     # `change_type` only declines where the value serializes to a string anyway.
-    if "type" in schema and "string" not in get_type(schema):
+    types = get_type(schema)
+    if "type" in schema and "string" not in types:
         return True
+    applicable = {keyword for name in types for keyword in TYPE_SPECIFIC_KEYS.get(name, ())}
+
+    # Keywords of other types hold for any value of the declared ones, so barring them is unsatisfiable.
+    def applies(keyword: str) -> bool:
+        return keyword in applicable or keyword not in ALL_TYPE_SPECIFIC_KEYS
+
     if any(
-        is_negatable_keyword(key, value, location=location, allow_extra_parameters=allow_extra_parameters)
+        applies(key)
+        and is_negatable_keyword(key, value, location=location, allow_extra_parameters=allow_extra_parameters)
         for key, value in schema.items()
     ):
         return True
     nested: list[Any] = []
     for keyword in ("properties", "patternProperties"):
         value = schema.get(keyword)
-        if isinstance(value, dict):
+        if isinstance(value, dict) and applies(keyword):
             nested.extend(value.values())
     for keyword in ("items", "additionalProperties"):
-        nested.append(schema.get(keyword))
+        if applies(keyword):
+            nested.append(schema.get(keyword))
     for keyword in ("oneOf", "anyOf", "allOf"):
         value = schema.get(keyword)
         if isinstance(value, list):
