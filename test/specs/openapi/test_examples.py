@@ -2083,13 +2083,13 @@ paths:
 
 
 def test_yaml_example_with_binary_tag(tmp_path):
-    # `!!binary` loads as bytes, which no validator can be built over; the declared example still comes through.
+    # `!!binary` keeps its base64 text, so the declared example can be sent as JSON.
     spec = tmp_path / "api.yaml"
     spec.write_text(SPEC_WITH_BINARY_EXAMPLE)
     schema = schemathesis.openapi.from_path(str(spec))
     operation = schema["/items"]["POST"]
     cases = generate_example_cases(test=lambda: None, operation=operation, fill_missing=False)
-    assert [case.body for case in cases] == [{"blob": b"abc"}]
+    assert [case.body for case in cases] == [{"blob": "YWJj"}]
 
 
 def test_schema_level_body_example_dropped_when_the_rest_cannot_be_drawn(ctx):

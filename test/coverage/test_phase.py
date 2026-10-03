@@ -6,7 +6,7 @@ from unittest.mock import ANY
 
 import jsonschema_rs
 import pytest
-from flask import jsonify, request
+from flask import Flask, jsonify, request
 from hypothesis import strategies as st
 from requests import Request
 
@@ -670,6 +670,62 @@ def test_default_wrong_type_is_not_used(ctx):
         },
         positive=True,
     )
+
+
+BINARY_KEYWORDS_SCHEMA = """
+openapi: 3.0.2
+info: {title: t, version: "1"}
+paths:
+  /query:
+    get:
+      parameters:
+        - {name: day, in: query, required: true, schema: {type: string, format: date, default: !!binary enp6}}
+      responses: {"200": {description: OK}}
+  /header:
+    get:
+      parameters:
+        - {name: X-Count, in: header, required: true, schema: {type: integer, default: !!binary eA==}}
+      responses: {"200": {description: OK}}
+  /form:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [value]
+              properties: {value: {type: string, default: !!binary enp6}}
+      responses: {"200": {description: OK}}
+  /json:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties: {value: {type: string, example: !!binary enp6, enum: [!!binary enp6, valid]}}
+      responses: {"200": {description: OK}}
+"""
+
+
+def test_yaml_binary_keyword_values_do_not_break_coverage(ctx, tmp_path, app_runner):
+    path = tmp_path / "openapi.yaml"
+    path.write_text(BINARY_KEYWORDS_SCHEMA)
+    app = Flask(__name__)
+    app.add_url_rule("/<path:anything>", "any", lambda anything: ("", 200), methods=["GET", "POST"])
+    schema = schemathesis.openapi.from_path(path)
+    schema.config.update(base_url=app_runner.openapi_url(app, path=""))
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["coverage"])
+    errors = [
+        event.value
+        for event in schemathesis.engine.from_schema(schema).execute()
+        if isinstance(event, schemathesis.engine.events.NonFatalError)
+    ]
+    assert errors == []
 
 
 @pytest.mark.parametrize(

@@ -142,6 +142,27 @@ paths:
     ] * 2
 
 
+def test_yaml_binary_values_load_as_their_text(tmp_path):
+    # JSON Schema has no bytes type, so `!!binary` stays the base64 text written in the document.
+    path = tmp_path / "openapi.yaml"
+    path.write_text("""
+openapi: 3.0.2
+info: {title: t, version: "1"}
+paths:
+  /items:
+    get:
+      parameters:
+        - {name: q, in: query, schema: {type: string, default: !!binary enp6, enum: [!!binary eA==, plain]}}
+      responses: {"200": {description: OK}}
+""")
+    schema = schemathesis.openapi.from_path(path)
+    assert schema.raw_schema["paths"]["/items"]["get"]["parameters"][0]["schema"] == {
+        "type": "string",
+        "default": "enp6",
+        "enum": ["eA==", "plain"],
+    }
+
+
 def test_split_file_schema_with_uri_reserved_path_chars(tmp_path):
     # Split-file OpenAPI layouts mirror path templates; refs like './paths/{id}/op.yaml' must resolve.
     target_dir = tmp_path / "paths" / "{id}"
