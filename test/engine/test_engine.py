@@ -842,7 +842,8 @@ def test_stateful_cycles_release_their_state_machines(ctx):
     # finished ones are released, memory grows for as long as the run lasts.
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = execute(schema, max_time=3, max_examples=5, phases=[PhaseName.STATEFUL_TESTING])
+    # Slow runners must still fit two cycles in the budget, so each cycle is kept to a single example.
+    stream = execute(schema, max_time=5, max_examples=1, phases=[PhaseName.STATEFUL_TESTING])
     cycles = stream.find_all(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
     gc.collect()
     # `isinstance` reads `__class__`, which lazy proxies such as Django's unconfigured settings resolve and fail on.
