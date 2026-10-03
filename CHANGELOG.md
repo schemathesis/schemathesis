@@ -18,6 +18,7 @@
 - Send binary Open API 3.2 `querystring` parameters as percent-encoded raw queries.
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
 - Crash while processing patterns beside string length bounds too large for regex engines.
+- Keep pytest reports separate for identical schemas with different report configurations.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - False `unsupported_method` failures when a rate limiter answers an undeclared method with `429 Too Many Requests`.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
