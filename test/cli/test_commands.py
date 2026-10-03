@@ -3853,6 +3853,23 @@ def test_origin_appends_declared_base_path(ctx, cli, app_runner, snapshot_cli, v
     assert cli.run(f"{base_url}/openapi.json", f"--origin={base_url}", "--max-examples=1") == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    "servers",
+    [
+        {"url": "/"},
+        ["/"],
+        [{"url": 1}],
+    ],
+    ids=["object", "non-object-entry", "non-string-url"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_invalid_servers(ctx, cli, snapshot_cli, servers):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/success": {"get": {"responses": {"200": {"description": "OK"}}}}}, servers=servers
+    )
+    assert cli.run_openapi_app(app) == snapshot_cli
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_origin_satisfies_the_base_url_requirement_for_files(ctx, cli, app_runner, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
