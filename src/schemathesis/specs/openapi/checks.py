@@ -985,6 +985,9 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
             # undeclared method with 401/403 without ever reaching routing.
             if response.status_code in AUTH_REJECTION_STATUSES and _requires_authentication(case.operation):
                 return None
+            # Rate limiters usually run as middleware ahead of routing and throttle every method alike.
+            if response.status_code == 429:
+                return None
             raise UnsupportedMethodResponse(
                 operation=case.operation.label,
                 method=cast(str, response.request.method),
