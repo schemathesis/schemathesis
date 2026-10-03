@@ -8,6 +8,7 @@ import requests
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
+import schemathesis
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.coverage._operation import iter_coverage_cases
@@ -659,6 +660,39 @@ def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
     decoded = json.loads(unquote(kwargs["params"]))
     assert decoded == {"numbers": [1, 2], "flag": None}
+
+
+def test_querystring_binary_serialization_is_sent_as_raw_query(ctx):
+    schemathesis.openapi.format("binary", st.just(b"\xff\x00A"))
+    schema = ctx.openapi.load_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "ignored",
+                            "in": "querystring",
+                            "required": True,
+                            "content": {
+                                "application/octet-stream": {
+                                    "schema": {"type": "string", "format": "binary", "minLength": 3}
+                                }
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+
+    @given(case=schema["/teapot"]["GET"].as_strategy())
+    @settings(max_examples=1, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    def test(case):
+        assert prepared_query_string(case) == "%FF%00A"
+
+    test()
 
 
 DELIMITED_ARRAY_SCHEMA = {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string", "enum": ["a,b"]}}
