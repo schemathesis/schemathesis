@@ -1050,7 +1050,8 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     # available, trust the actually-targeted location over the coarse flags.
     phase_data = meta.phase.data
     if isinstance(phase_data, FuzzingPhaseData) and phase_data.mutations:
-        if phase_data.parameter_location in (ParameterLocation.BODY, ParameterLocation.PATH):
+        targeted = {phase_data.parameter_location, *(mutation.parameter_location for mutation in phase_data.mutations)}
+        if ParameterLocation.BODY in targeted or ParameterLocation.PATH in targeted:
             return False
     elif (ParameterLocation.BODY in meta.components and meta.components[ParameterLocation.BODY].mode.is_negative) or (
         ParameterLocation.PATH in meta.components and meta.components[ParameterLocation.PATH].mode.is_negative
