@@ -1,0 +1,44 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+     Configuration:    /tmp/config.toml
+
+==================================== ERRORS ====================================
+____________________________________ checks ____________________________________
+Configuration Error
+
+Unknown check(s) in configuration: no_such_check. Each configured `[checks.<name>]` must match a built-in check or a registered custom check.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Skipped: 1
+
+Test Phases:
+  ⏭  Examples
+  ⏭  Coverage
+  ⏭  Fuzzing
+  ⏭  Stateful
+
+Errors:
+  🚫 Configuration Error: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================
