@@ -17,6 +17,7 @@
 - Report custom CLI handler startup errors with a clean error message.
 - Stateful worker hangs after Ctrl-C from custom CLI handlers.
 - Invalid coverage-phase positives for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.
+- Coverage-phase crashes and invalid positives from YAML binary keyword values.
 - Send binary Open API 3.2 `querystring` parameters as percent-encoded raw queries.
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
 - Report undecodable JSON response bodies as JSON parsing errors.

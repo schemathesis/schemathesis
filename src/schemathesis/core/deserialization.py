@@ -184,6 +184,12 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
         return mapping
 
     cls.construct_mapping = construct_mapping  # type: ignore[method-assign,assignment]
+
+    def construct_binary(self: yaml.SafeLoader, node: yaml.ScalarNode) -> str:
+        return self.construct_scalar(node)
+
+    # JSON has no bytes type, so a `!!binary` value stays the base64 text written in the document.
+    cls.add_constructor("tag:yaml.org,2002:binary", construct_binary)
     return cls
 
 
