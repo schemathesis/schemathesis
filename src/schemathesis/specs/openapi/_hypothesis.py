@@ -653,6 +653,8 @@ def _build_form_strategy_with_encoding(
             content_types = [ct.strip() for ct in raw_content_type if isinstance(ct, str)]
 
         if content_types:
+            if generation_mode.is_negative and is_binary_format(properties[property_name]):
+                continue
             strategies_for_types = []
             for ct in content_types:
                 strategy = find_media_type_strategy(ct)
@@ -661,15 +663,6 @@ def _build_form_strategy_with_encoding(
                     strategies_for_types.append(st.tuples(st.just(ct), strategy))
 
             if strategies_for_types:
-                # In negative mode with binary format, custom strategies always produce valid data
-                # Skip them to allow structural mutations instead
-                if generation_mode.is_negative:
-                    prop_schema = properties.get(property_name, {})
-                    if is_binary_format(prop_schema):
-                        # Skip custom strategy but still select content type if multiple
-                        if len(content_types) > 1:
-                            property_content_type_selections[property_name] = content_types
-                        continue
                 # Store strategy that returns (content_type, data) tuple
                 property_with_content_type_strategies[property_name] = st.one_of(*strategies_for_types)
             elif len(content_types) > 1:

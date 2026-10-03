@@ -67,6 +67,38 @@ def test_binary_format_negative_mutations(ctx, encoding):
     check()
 
 
+def test_binary_format_negative_mutations_with_multiple_content_types(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["file"],
+                                    "properties": {"file": {"type": "string", "format": "binary"}},
+                                },
+                                "encoding": {"file": {"contentType": "image/jpeg, text/plain"}},
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(case=schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck))
+    def check(case):
+        assert is_structural_mutation(case.body, "file") or is_type_mutation(case.body, "file", bytes)
+
+    check()
+
+
 def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optional_binary(ctx):
     # `format: binary` is permissive at runtime; mutations producing valid strings aren't actually negative.
     schema = ctx.openapi.load_schema(
