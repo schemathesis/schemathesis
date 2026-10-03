@@ -23,6 +23,7 @@
 - Crash while processing patterns beside string length bounds too large for regex engines.
 - Keep pytest reports separate for identical schemas with different report configurations.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
+- `checks.enabled = false` not disabling custom checks.
 - `schemathesis.check` return type: decorated functions and classes keep their own type.
 - False `unsupported_method` failures when a rate limiter answers an undeclared method with `429 Too Many Requests`.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.

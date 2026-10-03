@@ -168,6 +168,8 @@ class ChecksConfig(DiffBase):
     _custom_kwargs: dict[str, dict[str, Any]]
     # Checks named on the command line, so merging can tell an explicit `enabled` from the default.
     _explicit: dict[str, bool]
+    # The top-level `enabled` value, applied to custom checks without their own `enabled`.
+    _default_enabled: bool | None
 
     def __init__(
         self,
@@ -204,6 +206,7 @@ class ChecksConfig(DiffBase):
         self._unknown = {}
         self._custom_kwargs = {}
         self._explicit = {}
+        self._default_enabled = None
 
     @property
     def custom_kwargs(self) -> dict[str, dict[str, Any]]:
@@ -258,11 +261,12 @@ class ChecksConfig(DiffBase):
             if not isinstance(value, dict):
                 # Top-level non-dict values (e.g. `enabled = true`) are not custom check sections.
                 continue
-            enabled = value.get("enabled", True)
+            enabled = value.get("enabled", True if default_enabled is None else default_enabled)
             kwargs = {k: v for k, v in value.items() if k != "enabled"}
             config._unknown[name] = SimpleCheckConfig(enabled=enabled)
             if kwargs:
                 config._custom_kwargs[name] = kwargs
+        config._default_enabled = default_enabled
         return config
 
     @classmethod
@@ -281,6 +285,9 @@ class ChecksConfig(DiffBase):
             for name, kwargs in config._custom_kwargs.items():
                 custom_kwargs.setdefault(name, {}).update(kwargs)
         merged._custom_kwargs = custom_kwargs
+        merged._default_enabled = next(
+            (config._default_enabled for config in configs if config._default_enabled is not None), None
+        )
         # `enabled = True` is the default, so the generic merge cannot tell it from "not configured";
         # without this a lower-priority `false` would win over a check named on the command line.
         known_names = {f.name for f in fields(cls) if not f.name.startswith("_")}
@@ -296,7 +303,9 @@ class ChecksConfig(DiffBase):
         except AttributeError:
             # Read-only: don't record unconfigured names, so `_unknown` stays user-declared.
             existing = self._unknown.get(name)
-            return existing if existing is not None else SimpleCheckConfig()
+            if existing is not None:
+                return existing
+            return SimpleCheckConfig(enabled=self._default_enabled is not False)
 
     def _set_enabled(self, name: str, *, known_names: set[str], enabled: bool) -> None:
         self._explicit[name] = enabled
