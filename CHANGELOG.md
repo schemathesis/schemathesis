@@ -19,6 +19,7 @@
 - Invalid coverage-phase positives for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.
 - Send binary Open API 3.2 `querystring` parameters as percent-encoded raw queries.
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
+- Report undecodable JSON response bodies as JSON parsing errors.
 - Crash while processing patterns beside string length bounds too large for regex engines.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - False `unsupported_method` failures when a rate limiter answers an undeclared method with `429 Too Many Requests`.
