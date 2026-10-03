@@ -19,6 +19,7 @@
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 - Crash in dependency inference for Open API 3.1 references to boolean schemas.
+- Crash in dependency inference for response references targeting non-object values.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
 - Inferred links reading foreign keys from responses that do not declare them.
 - Crash in dependency inference for Open API 3.1 boolean schemas inside `anyOf` and `oneOf`.
