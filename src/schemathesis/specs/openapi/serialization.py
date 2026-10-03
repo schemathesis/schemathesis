@@ -10,6 +10,7 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, maybe_resolve_bundl
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, DelimitedValue, RawQueryString
 from schemathesis.core.transforms import to_wire_string
 from schemathesis.specs.openapi.checks import _COLLECTION_FORMAT_DELIMITERS
+from schemathesis.transport.serialization import Binary
 
 Generated = dict[str, Any]
 Definition = dict[str, Any]
@@ -193,10 +194,13 @@ def _serialize_querystring_other_media_type(name: str, media_type: str) -> Calla
         if payload is None:
             return item
 
+        serialized: str | bytes
         if media_type == "application/json":
             serialized = json.dumps(payload, separators=(",", ":"))
+        elif isinstance(payload, Binary):
+            serialized = payload.data
         elif isinstance(payload, bytes):
-            serialized = payload.decode("utf-8", errors="ignore")
+            serialized = payload
         else:
             serialized = str(payload)
 
