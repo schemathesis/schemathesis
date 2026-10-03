@@ -801,6 +801,83 @@ def test_negative_data_rejection_names_no_parameters_when_several_locations_are_
     assert "parameters" not in exc.value.message
 
 
+@pytest.fixture
+def path_and_query_schema(ctx):
+    return ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "id", "required": True, "schema": {"type": "integer", "minimum": 1}},
+                        {"in": "query", "name": "key", "required": True, "schema": {"type": "integer", "minimum": 1}},
+                        {"in": "header", "name": "X-Key", "required": True, "schema": {"type": "integer"}},
+                    ]
+                }
+            }
+        }
+    )
+
+
+def _path_and_query_case(schema, path_parameters, query, headers, mutations):
+    meta = build_metadata(generation_modes=[GenerationMode.NEGATIVE], mutations=mutations)
+    meta.components = {
+        mutation.parameter_location: ComponentInfo(mode=GenerationMode.NEGATIVE) for mutation in mutations
+    }
+    return schema["/items/{id}"]["GET"].Case(
+        _meta=meta,
+        path_parameters=path_parameters,
+        query=query,
+        headers=headers,
+    )
+
+
+_PATH_TYPE_MUTATION = _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="id", location=ParameterLocation.PATH)
+_HEADER_TYPE_MUTATION = _mutation(
+    OperatorKind.CHANGE_TYPE, ("type",), parameter="X-Key", location=ParameterLocation.HEADER
+)
+
+
+def test_negative_data_rejection_ignores_type_mutations_wire_identical_in_every_location(
+    response_factory, path_and_query_schema
+):
+    case = _path_and_query_case(
+        path_and_query_schema,
+        {"id": "7"},
+        {"key": "7"},
+        {"X-Key": "7"},
+        (_PATH_TYPE_MUTATION, _QUERY_TYPE_MUTATION),
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
+@pytest.mark.parametrize(
+    ("query", "headers", "mutations"),
+    [
+        ({"key": "abc"}, {"X-Key": "7"}, (_PATH_TYPE_MUTATION, _QUERY_TYPE_MUTATION)),
+        ({"key": 7}, {"X-Key": "bad"}, (_PATH_TYPE_MUTATION, _HEADER_TYPE_MUTATION)),
+    ],
+    ids=["query-not-numeric", "header-not-numeric"],
+)
+def test_negative_data_rejection_reports_when_one_location_stays_invalid_on_the_wire(
+    response_factory, path_and_query_schema, query, headers, mutations
+):
+    case = _path_and_query_case(path_and_query_schema, {"id": "7"}, query, headers, mutations)
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+@pytest.mark.parametrize(("value", "is_accepted"), [("-1", True), ("5", False)], ids=["below-minimum", "valid"])
+def test_negative_data_rejection_validates_numeric_wire_value_against_query_schema(
+    response_factory, path_and_query_schema, value, is_accepted
+):
+    case = _path_and_query_case(path_and_query_schema, {"id": 7}, {"key": value}, {"X-Key": 7}, (_QUERY_TYPE_MUTATION,))
+    if is_accepted:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response_factory.requests(), case)
+    else:
+        assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
 _READ_ONLY_COMPONENTS = {
     "schemas": {
         "Item": {
