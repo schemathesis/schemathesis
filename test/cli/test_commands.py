@@ -892,6 +892,19 @@ def test_keyboard_interrupt_exit_code_during_hooks_loading(ctx, cli):
     assert cli.main("run", api.schema_url, hooks=module).exit_code == 130
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_keyboard_interrupt_in_custom_handler_during_stateful(ctx, cli, snapshot_cli):
+    @schemathesis.cli.handler()
+    class Interrupter(schemathesis.cli.EventHandler):
+        def handle_event(self, context, event) -> None:
+            if isinstance(event, events.ScenarioStarted) and event.phase == PhaseName.STATEFUL_TESTING:
+                raise KeyboardInterrupt
+
+    api = ctx.openapi.apps.users_crud()
+    assert cli.run(api.schema_url, "--phases=stateful", "--max-examples=1") == snapshot_cli
+    assert [thread.name for thread in threading.enumerate() if thread.name == "schemathesis_stateful_tests"] == []
+
+
 def test_multiple_files_schema(ctx, cli, hypothesis_max_examples):
     api = ctx.openapi.apps.teapot()
     # When the schema contains references to other files

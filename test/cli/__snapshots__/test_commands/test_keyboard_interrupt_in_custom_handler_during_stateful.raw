@@ -1,0 +1,18 @@
+Exit code: 130
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       3 selected / 3 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓

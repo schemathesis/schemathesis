@@ -196,7 +196,10 @@ def execute_event_loop(
         abnormal_exit_code = 1
         raise
     finally:
-        shutdown()
+        try:
+            event_stream.close()
+        finally:
+            shutdown()
 
     if abnormal_exit_code is not None:
         sys.exit(abnormal_exit_code)
