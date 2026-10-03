@@ -574,6 +574,9 @@ def collect_after_run_failures(
 
 
 def __getattr__(name: str) -> Any:
+    # Import machinery probes dunders like `__path__` while this module is still initializing
+    if not name.startswith("__"):
+        load_all_checks()
     try:
         return CHECKS.get_one(name)
     except KeyError:
@@ -581,4 +584,5 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
+    load_all_checks()
     return sorted(list(globals().keys()) + CHECKS.get_all_names())
