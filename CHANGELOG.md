@@ -11,6 +11,7 @@
 
 - Report malformed Open API `servers` definitions as clean schema loading errors.
 - `ImportError` on `from schemathesis.checks import content_type_conformance` (and other built-in checks) before a schema is loaded.
+- Preserve case-sensitive cookie parameter names during test generation.
 - Coverage phase hanging on unique arrays with a large `minItems`.
 - Stateful worker hangs after Ctrl-C from custom CLI handlers.
 - Invalid coverage-phase positives for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.

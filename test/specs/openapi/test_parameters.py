@@ -66,6 +66,29 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
+def test_cookie_names_are_case_sensitive(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/x": {
+                "get": {
+                    "parameters": [
+                        {"name": "sid", "in": "cookie", "required": True, "schema": {"enum": ["lower"]}},
+                        {"name": "SID", "in": "cookie", "required": True, "schema": {"enum": ["upper"]}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(case=schema["/x"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        assert case.cookies == {"sid": "lower", "SID": "upper"}
+
+    test()
+
+
 def test_body(testdir):
     # When parameter is specified for "body"
     testdir.make_test(
