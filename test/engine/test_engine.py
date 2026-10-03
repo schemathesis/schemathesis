@@ -845,10 +845,11 @@ def test_stateful_cycles_release_their_state_machines(ctx):
     stream = execute(schema, max_time=3, max_examples=5, phases=[PhaseName.STATEFUL_TESTING])
     cycles = stream.find_all(events.PhaseStarted, phase=lambda phase: phase.name == PhaseName.STATEFUL_TESTING)
     gc.collect()
+    # `isinstance` reads `__class__`, which lazy proxies such as Django's unconfigured settings resolve and fail on.
     machines = [
         obj
         for obj in gc.get_objects()
-        if isinstance(obj, type) and issubclass(obj, APIStateMachine) and getattr(obj, "schema", None) is schema
+        if issubclass(type(obj), type) and issubclass(obj, APIStateMachine) and getattr(obj, "schema", None) is schema
     ]
     assert (len(cycles) > 1, machines) == (True, [])
 
