@@ -18,6 +18,7 @@
 - Crash while processing patterns beside string length bounds too large for regex engines.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
+- Serialize captured array path parameters with their declared OpenAPI style.
 - Crash in dependency inference for Open API 3.1 references to boolean schemas.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
 - Inferred links reading foreign keys from responses that do not declare them.
