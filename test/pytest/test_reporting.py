@@ -753,6 +753,38 @@ def test_without_report(case):
     assert _junit_outcomes(report_path) == {"GET /success": ("passed", ""), "GET /users": ("passed", "")}
 
 
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+def test_junit_reports_for_schemas_with_identical_content(testdir, ctx, xdist):
+    first_report_path = str(testdir.tmpdir.join("first.xml"))
+    second_report_path = str(testdir.tmpdir.join("second.xml"))
+    api = ctx.openapi.apps.success()
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+schema.config.reports.update(junit_path=r"{first_report_path}")
+other = schemathesis.openapi.from_dict(raw_schema)
+other.config.update(base_url="{api.base_url}/api")
+other.config.reports.update(junit_path=r"{second_report_path}")
+
+@schema.include(path="/success").parametrize()
+@settings(max_examples=1)
+def test_first_report(case):
+    case.call()
+
+@other.include(path="/users").parametrize()
+@settings(max_examples=1)
+def test_second_report(case):
+    case.call()
+""",
+        paths={"/success": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    args = ("-n", "1") if xdist else ()
+    testdir.runpytest("-p", "no:randomly", *args).assert_outcomes(passed=2)
+
+    assert _junit_outcomes(first_report_path) == {"GET /success": ("passed", "")}
+    assert _junit_outcomes(second_report_path) == {"GET /users": ("passed", "")}
+
+
 def test_stateful_test_via_xdist_without_reports(ctx, testdir):
     api = ctx.openapi.apps.users_crud()
     testdir.makepyfile(

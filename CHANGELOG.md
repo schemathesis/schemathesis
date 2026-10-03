@@ -21,6 +21,7 @@
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
 - Report undecodable JSON response bodies as JSON parsing errors.
 - Crash while processing patterns beside string length bounds too large for regex engines.
+- Keep pytest reports separate for identical schemas with different report configurations.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - False `unsupported_method` failures when a rate limiter answers an undeclared method with `429 Too Many Requests`.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.

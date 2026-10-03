@@ -246,11 +246,19 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
 def _schema_id(schema: SchemaMetadata) -> str:
     """Stable cross-process identifier for a schema instance.
 
-    Uses the schema's source location when available; falls back to a canonical
-    hash of the raw schema content for in-memory (from_dict) schemas.
+    Uses the schema's source location when available; falls back to the raw schema content for in-memory schemas.
+    The writer configuration separates identical schemas whose results belong to different reports.
     """
     source = schema.location or jsonschema_rs.canonical.json.to_string(schema.raw_schema)
-    return hashlib.sha256(source.encode()).hexdigest()[:16]
+    writer_config = _serialize_writer_config(schema)
+    report_config = jsonschema_rs.canonical.json.to_string(
+        {
+            "directory": writer_config["directory"],
+            "paths": writer_config["paths"],
+            "preserve_bytes": writer_config["preserve_bytes"],
+        }
+    )
+    return hashlib.sha256(f"{source}\0{report_config}".encode()).hexdigest()[:16]
 
 
 def _serialize_writer_config(schema: SchemaMetadata) -> dict:
