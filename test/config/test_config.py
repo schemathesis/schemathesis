@@ -335,6 +335,22 @@ def test_custom_check_disabled_in_config():
 
 
 @pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("[checks]\nenabled = false\n", False),
+        ("[checks]\nenabled = false\n[checks.custom_check]\nthreshold = 1\n", False),
+        ("[checks]\nenabled = false\n[checks.custom_check]\nenabled = true\n", True),
+        ("[checks]\nenabled = false\n[phases.fuzzing.generation]\nmax-examples = 5\n", False),
+    ],
+    ids=["unconfigured", "kwargs-only", "re-enabled", "phase-merged"],
+)
+def test_global_checks_enabled_applies_to_custom_checks(source, expected):
+    project = SchemathesisConfig.from_str(source).projects.default
+
+    assert project.checks_config_for(phase="fuzzing").get_by_name(name="custom_check").enabled is expected
+
+
+@pytest.mark.parametrize(
     ("override", "project", "expected"),
     [
         ({"excluded_check_names": ["not_a_server_error"]}, {"included_check_names": ["not_a_server_error"]}, False),
