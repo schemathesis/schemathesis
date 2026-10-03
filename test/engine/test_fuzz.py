@@ -13,7 +13,7 @@ from werkzeug.exceptions import InternalServerError
 
 import schemathesis
 import schemathesis.auths
-from schemathesis.config import FuzzConfig, OperationConfig, OperationsConfig
+from schemathesis.config import FuzzConfig, OperationConfig, OperationsConfig, SchemathesisConfig
 from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
@@ -140,6 +140,35 @@ def test_fuzz_no_operations_emits_no_scenarios(ctx):
     assert not any(isinstance(e, events.FuzzScenarioStarted) for e in collected)
 
 
+def test_fuzz_skips_operation_with_unresolvable_required_body(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Missing"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    collected = _fuzz_events(schema)
+    assert [type(event) for event in collected] == [events.EngineStarted, events.EngineFinished]
+
+
+def test_fuzz_wsgi_app_without_error_feedback_and_response_data(ctx):
+    # A WSGI app supplies source constants; the fuzz run draws them alongside disabled feedback sources.
+    api = ctx.openapi.apps.success()
+    config = SchemathesisConfig.from_dict(
+        {"phases": {"fuzzing": {"error-feedback": {"enabled": False}, "extra-data-sources": {"responses": False}}}}
+    )
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app, config=config)
+    collected = _collect_until_finished(schema)
+    assert _finished_scenarios(collected) == _finished_scenarios(collected, status=Status.SUCCESS)
+
+
 def test_fuzz_single_unsatisfiable_operation_emits_non_fatal_error(ctx):
     api = ctx.openapi.apps.unsatisfiable()
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -173,6 +202,37 @@ def test_fuzz_preflight_excludes_non_generatable_operation_before_hypothesis(ctx
     assert any(isinstance(event.value, SerializationNotPossible) and event.label == "POST /csv" for event in errors)
     assert not any(isinstance(event.value, Flaky) for event in errors)
     assert any(event.status == Status.FAILURE for event in finished)
+
+
+def test_fuzz_reports_once_when_generation_fails_after_preflight(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/search": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/search")
+    def search():
+        return {}
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.seed = 1
+
+    # The minimal empty string passes the preflight draw; later non-ASCII values break the hook.
+    @schema.hook
+    def map_query(ctx, query):
+        value = query.get("q")
+        if isinstance(value, str):
+            value.encode("ascii")
+        return query
+
+    errors = _non_fatal_errors(_fuzz_events(schema))
+    assert [(type(event.value), event.label) for event in errors] == [(UnicodeEncodeError, "GET /search")]
 
 
 def test_fuzz_preflight_all_operations_excluded(ctx):

@@ -135,6 +135,18 @@ def test_no_metadata_no_crash(simple_operation):
     assert case.meta is None
 
 
+@pytest.mark.hypothesis_nested
+def test_body_under_undeclared_media_type_becomes_negative(simple_operation):
+    @given(case=simple_operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=1, database=None)
+    def test(case):
+        case.media_type = "text/plain"
+        case.body = {"id": "valid"}
+        assert case.meta.generation.mode == GenerationMode.NEGATIVE
+
+    test()
+
+
 def test_nested_dict_modification_detected(ctx):
     schema = ctx.openapi.load_schema(
         {

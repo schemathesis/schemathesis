@@ -120,6 +120,68 @@ def test_cleanup_with_multiple_id_args_wires_secondary_bundles(ctx):
     assert "Mutation_removeBookFromAuthor_double" in cls.__dict__
 
 
+@pytest.mark.parametrize(
+    ("sdl", "expected"),
+    [
+        (
+            """
+            type Book { id: ID! isbnCode: String! title: String! }
+            type Query { books: [Book!]! }
+            type Mutation { addBook(title: String!): Book! tagBook(bookPrimaryIsbnCode: String!): Boolean }
+            """,
+            [
+                "Book__isbnCode",
+                "Mutation_addBook",
+                "Mutation_addBook__isbnCode",
+                "Mutation_tagBook",
+                "Query_books__isbnCode",
+            ],
+        ),
+        (
+            """
+            type Book { id: ID! slug: String! urlSlug: String! pathSlug: String! shortSlug: String! oldSlug: String! }
+            type Query { books: [Book!]! book(slug: String!): Book }
+            type Mutation { addBook(title: String!): Book! }
+            """,
+            [
+                "Book__slug",
+                "Mutation_addBook",
+                "Mutation_addBook__slug",
+                "Query_book",
+                "Query_book__slug",
+                "Query_books__slug",
+            ],
+        ),
+        (
+            """
+            type Book { id: ID! slug: String! urlSlug: String! pathSlug: String! shortSlug: String! oldSlug: String! }
+            type Query { books: [Book!]! }
+            type Mutation { addBook(title: String!): Book! tagBook(bookSlug: String!): Boolean }
+            """,
+            ["Book__slug", "Mutation_addBook", "Mutation_addBook__slug", "Mutation_tagBook", "Query_books__slug"],
+        ),
+        (
+            """
+            type Book { id: ID! title: String! }
+            type Query { books: [Book!]! book(code: String!): Book }
+            type Mutation { addBook(title: String!): Book! }
+            """,
+            ["Mutation_addBook"],
+        ),
+    ],
+    ids=[
+        "qualified-argument-ends-with-field",
+        "bare-argument-prefers-exact-field",
+        "typed-argument-prefers-exact-field",
+        "bare-argument-without-matching-field",
+    ],
+)
+def test_identifier_argument_bound_to_producer_field(ctx, sdl, expected):
+    cls = ctx.graphql.load_sdl(sdl).as_state_machine()
+    common = {"Book_ids", "deleted_Book_ids", "schema"}
+    assert sorted(name for name in cls.__dict__ if not name.startswith("_") and name not in common) == expected
+
+
 def test_init_raises_NoProducers_when_no_rules(ctx):
     cls = create_state_machine(
         ctx.graphql.load_sdl("""

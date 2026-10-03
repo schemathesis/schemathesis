@@ -167,6 +167,32 @@ def test_max_examples(request, case):
     result.stdout.re_match_lines([rf"Hypothesis calls: {max_examples}"])
 
 
+def test_examples_fill_missing_generates_a_case_for_operations_without_examples(testdir):
+    testdir.make_test(
+        """
+schema.config.phases.examples.fill_missing = True
+schema.config.phases.fuzzing.enabled = False
+schema.config.phases.coverage.enabled = False
+
+@schema.include(path_regex="test").parametrize()
+def test_fill_missing(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert set(case.query) == {"id"}
+""",
+        paths={
+            "/test": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+
+
 @pytest.mark.skipif(
     platform.system() == "Windows", reason="conn.close() on Windows does not raise ConnectionError on the client side"
 )

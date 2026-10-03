@@ -170,6 +170,11 @@ def test_infinite_recursive_reference_example_generation_error(ctx):
     assert any(isinstance(event.value, InfiniteRecursiveReference) for event in errors), [
         type(e.value).__name__ for e in errors
     ]
+    assert [
+        (event.info.message, event.info.has_useful_traceback)
+        for event in errors
+        if isinstance(event.value, InfiniteRecursiveReference)
+    ] == [("Schema `#/components/schemas/Node` has a required reference to itself", False)]
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert any(event.status == Status.ERROR for event in finished), [event.status for event in finished]
 
@@ -211,6 +216,11 @@ def test_unresolvable_reference_example_generation_error(ctx):
     assert any(isinstance(event.value, UnresolvableReference) for event in errors), [
         type(e.value).__name__ for e in errors
     ]
+    assert [
+        (event.info.message, event.info.has_useful_traceback)
+        for event in errors
+        if isinstance(event.value, UnresolvableReference)
+    ] == [("Reference `#/components/schemas/Missing` cannot be resolved", False)]
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert any(event.status == Status.ERROR for event in finished), [event.status for event in finished]
 

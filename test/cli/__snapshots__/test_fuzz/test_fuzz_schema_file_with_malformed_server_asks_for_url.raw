@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+Usage: schemathesis fuzz [OPTIONS] LOCATION
+Try 'schemathesis fuzz --help' for help.
+
+Error: The `--url` option is required when specifying a schema via a file.
