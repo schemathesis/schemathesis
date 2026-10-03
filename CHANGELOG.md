@@ -22,6 +22,7 @@
 - Inferred links reading foreign keys from responses that do not declare them.
 - Memory growing without bound during long stateful runs with a time limit.
 - Missed `negative_data_rejection` failures for invalid single-element arrays in query, header or cookie parameters.
+- Report empty or non-object Open API parameter `content` as a schema error.
 - Missed `negative_data_rejection` failures when an array parameter with a valid element accompanies invalid ones.
 - Missed `negative_data_rejection` failures for invalid path parameters beside undeclared query parameters.
 - Report `negative_data_rejection` failures for invalid array or object query, header and cookie parameters.
