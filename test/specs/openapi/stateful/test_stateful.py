@@ -745,3 +745,34 @@ def test_linked_steps_keep_negative_share_of_scenario_starts(ctx, response_facto
 
     test()
     assert 0 < modes[GenerationMode.NEGATIVE] / modes.total() < 0.45, modes
+
+
+def test_test_case_runs_in_process(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    test_case = schema.as_state_machine().TestCase
+
+    class QuickTestCase(test_case):
+        settings = settings(test_case.settings, max_examples=2, stateful_step_count=2, database=None)
+
+    QuickTestCase().runTest()
+    assert {request.method for request in api.requests} >= {"POST"}
+
+
+def test_rule_names_stay_unique_when_operation_labels_normalize_alike(ctx):
+    links = {"Next": {"operationId": "next", "parameters": {}}}
+    schema = ctx.openapi.load_schema(
+        {
+            path: {"get": {"responses": {"200": {"description": "OK", "links": links}}}}
+            for path in ("/users", "/users/", "/users-", "/users_")
+        }
+        | {"/next": {"get": {"operationId": "next", "responses": {"200": {"description": "OK"}}}}}
+    )
+    state_machine = schema.as_state_machine()
+    assert sorted(name for name in vars(state_machine) if name.startswith("RANDOM__GET_users")) == [
+        "RANDOM__GET_users",
+        "RANDOM__GET_users_",
+        "RANDOM__GET_users__2",
+        "RANDOM__GET_users__3",
+    ]

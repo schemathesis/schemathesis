@@ -7394,3 +7394,508 @@ def test_name_is_copied_only_into_an_update_of_its_resource(ctx):
             },
         ],
     ]
+
+
+def injected_links(schema):
+    schema.as_state_machine()
+    links = {}
+    for path, item in schema.raw_schema["paths"].items():
+        for method, definition in item.items():
+            for status, response_definition in definition["responses"].items():
+                if "links" in response_definition:
+                    links[f"{method.upper()} {path} {status}"] = {
+                        name: {key: value for key, value in link.items() if key != "x-schemathesis"}
+                        for name, link in response_definition["links"].items()
+                    }
+    return links
+
+
+ITEM_WITH_ID = {"type": "object", "properties": {"id": {"type": "string"}}}
+USER_WITH_NAME = {"type": "object", "properties": {"id": {"type": "string"}, "name": {"type": "string"}}}
+STRING_IDS = {"type": "array", "items": {"type": "string"}}
+GET_USER = operation("get", "/users/{id}", "200", parameters=[path_param("id")])
+TAG_ARRAY = {"type": "array", "items": component_ref("Tag")}
+TAG = {"schemas": {"Tag": {"type": "object", "properties": {"label": {"type": "string"}}}}}
+
+
+def module_disambiguation(resource_item):
+    paths = {
+        "/addressbook/key_date_resources": {
+            "get": json_response("200", {"type": "array", "items": component_ref("KeyDateResource")})
+        },
+        "/bookings/resources": {"get": json_response("200", {"type": "array", "items": component_ref("ResourceItem")})},
+        **operation(
+            "get", "/bookings/resources/{id}", "200", component_ref("ResourceItem"), parameters=[path_param("id")]
+        ),
+    }
+    components = {
+        "schemas": {
+            "KeyDateResource": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                "required": ["id"],
+            },
+            "ResourceItem": resource_item,
+        }
+    }
+    return paths, components
+
+
+LINK_INFERENCE_CASES = [
+    (
+        "primitive-array-at-root-path",
+        {
+            "/": {"get": json_response("200", STRING_IDS)},
+            **operation("get", "/{id}", "200", parameters=[path_param("id")]),
+        },
+        None,
+        {},
+    ),
+    (
+        "object-array-at-root-path",
+        {
+            "/": {"get": json_response("200", {"type": "array", "items": ITEM_WITH_ID})},
+            **operation("get", "/{id}", "200", parameters=[path_param("id")]),
+        },
+        None,
+        {},
+    ),
+    (
+        "primitive-array-after-object-producer",
+        {"/users": {"post": json_response("201", USER_WITH_NAME), "get": json_response("200", STRING_IDS)}, **GET_USER},
+        None,
+        {
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+            "GET /users 200": {
+                "GetUser": {"operationRef": "#/paths/~1users~1{id}/get", "parameters": {"path.id": "$response.body#/*"}}
+            },
+        },
+    ),
+    (
+        "primitive-array-after-boolean-producer",
+        {"/users": {"post": json_response("201", True), "get": json_response("200", STRING_IDS)}, **GET_USER},
+        None,
+        {
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+            "GET /users 200": {
+                "GetUser": {"operationRef": "#/paths/~1users~1{id}/get", "parameters": {"path.id": "$response.body#/*"}}
+            },
+        },
+    ),
+    (
+        "boolean-producer-after-primitive-array",
+        {"/users": {"get": json_response("200", STRING_IDS), "post": json_response("201", True)}, **GET_USER},
+        None,
+        {
+            "GET /users 200": {
+                "GetUser": {"operationRef": "#/paths/~1users~1{id}/get", "parameters": {"path.id": "$response.body#/*"}}
+            },
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+        },
+    ),
+    (
+        "primitive-create-after-object-list",
+        {
+            "/users": {
+                "get": json_response("200", {"type": "array", "items": USER_WITH_NAME}),
+                "post": json_response("201", {"type": "string"}),
+            },
+            **GET_USER,
+        },
+        None,
+        {
+            "GET /users 200": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/*/id"},
+                }
+            },
+            "POST /users 201": {
+                "GetUser": {"operationRef": "#/paths/~1users~1{id}/get", "parameters": {"path.id": "$response.body#/"}}
+            },
+        },
+    ),
+    (
+        "map-by-id-after-object-producer",
+        {
+            "/teams": {"post": json_response("201", USER_WITH_NAME)},
+            "/teams/statuses": {
+                "get": json_response("200", {"type": "object", "additionalProperties": {"type": "object"}})
+            },
+            **operation("get", "/teams/{id}", "200", parameters=[path_param("id")]),
+        },
+        None,
+        {
+            "POST /teams 201": {
+                "GetTeam": {
+                    "operationRef": "#/paths/~1teams~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+            "GET /teams/statuses 200": {
+                "GetTeam": {
+                    "operationRef": "#/paths/~1teams~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/*/id"},
+                }
+            },
+        },
+    ),
+    (
+        "envelope-inside-sub-resource",
+        {
+            "/orders": {"post": json_response("201", component_ref("Order"))},
+            **operation("get", "/orders/{id}", "200", parameters=[path_param("id")]),
+            **operation("get", "/items/{id}", "200", parameters=[path_param("id")]),
+        },
+        {
+            "schemas": {
+                "Order": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "page": component_ref("ItemPage")},
+                },
+                "ItemPage": {
+                    "type": "object",
+                    "properties": {
+                        "data": {"type": "array", "items": component_ref("Item")},
+                        "total": {"type": "integer"},
+                    },
+                },
+                "Item": ITEM_WITH_ID,
+            }
+        },
+        {
+            "POST /orders 201": {
+                "GetOrder": {
+                    "operationRef": "#/paths/~1orders~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                },
+                "GetItem": {
+                    "operationRef": "#/paths/~1items~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/page/data/*/id"},
+                },
+            }
+        },
+    ),
+    (
+        "array-body-at-root-path",
+        operation_with_body(
+            "post",
+            "/",
+            "201",
+            {"type": "array", "items": {"type": "object", "properties": {"x": {"type": "string"}}}},
+            ITEM_WITH_ID,
+        )
+        | operation("get", "/{id}", "200", parameters=[path_param("id")]),
+        None,
+        {},
+    ),
+    (
+        "update-body-field-type-mismatch",
+        {
+            "/users": {"post": json_response("201", USER_WITH_NAME)},
+            "/users/{id}": {
+                "get": json_response("200", USER_WITH_NAME) | {"parameters": [path_param("id")]},
+                **operation_with_body(
+                    "patch",
+                    "/users/{id}",
+                    "200",
+                    {"type": "object", "properties": {"name": {"type": "integer"}}, "required": ["name"]},
+                    USER_WITH_NAME,
+                    parameters=[path_param("id")],
+                )["/users/{id}"],
+            },
+        },
+        None,
+        {
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                },
+                "PatchUser": {
+                    "operationRef": "#/paths/~1users~1{id}/patch",
+                    "parameters": {"path.id": "$response.body#/id"},
+                },
+            },
+            "GET /users/{id} 200": {
+                "PatchUser": {
+                    "operationRef": "#/paths/~1users~1{id}/patch",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+            "PATCH /users/{id} 200": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+        },
+    ),
+    (
+        "all-of-repeats-required",
+        {
+            "/users": {
+                "post": json_response(
+                    "201",
+                    {
+                        "allOf": [
+                            {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+                            {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["id", "name"]},
+                        ]
+                    },
+                )
+            },
+            **GET_USER,
+        },
+        None,
+        {
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            }
+        },
+    ),
+    (
+        "envelope-with-untyped-items",
+        {
+            "/users": {
+                "get": json_response(
+                    "200",
+                    {
+                        "type": "object",
+                        "properties": {"data": {"type": "array", "items": True}, "total": {"type": "integer"}},
+                    },
+                )
+            },
+            **GET_USER,
+        },
+        None,
+        {},
+    ),
+    (
+        "envelope-at-root-path",
+        {
+            "/": {
+                "get": json_response(
+                    "200",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "things": {"type": "array", "items": ITEM_WITH_ID},
+                            "a": {"type": "string"},
+                            "b": {"type": "string"},
+                        },
+                    },
+                )
+            },
+            **operation("get", "/{id}", "200", parameters=[path_param("id")]),
+        },
+        None,
+        {},
+    ),
+    (
+        "collection-named-array-beside-unrelated-fields",
+        {
+            "/users": {
+                "get": json_response(
+                    "200",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "users": {"type": "array", "items": ITEM_WITH_ID},
+                            "a": {"type": "string"},
+                            "b": {"type": "string"},
+                        },
+                    },
+                )
+            },
+            **GET_USER,
+        },
+        None,
+        {},
+    ),
+    (
+        "snake-and-camel-foreign-keys-to-one-resource",
+        {
+            "/orders": {
+                "post": json_response(
+                    "201",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "user_id": {"type": "string"},
+                            "userId": {"type": "string"},
+                        },
+                    },
+                )
+            },
+            "/users": {"post": json_response("201", USER_WITH_NAME)},
+            **GET_USER,
+        },
+        None,
+        {
+            "POST /orders 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/userId"},
+                }
+            },
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+        },
+    ),
+    (
+        "foreign-key-to-three-readers",
+        {
+            "/orders": {
+                "post": json_response(
+                    "201", {"type": "object", "properties": {"id": {"type": "string"}, "user_id": {"type": "string"}}}
+                )
+            },
+            "/users": {"post": json_response("201", USER_WITH_NAME)},
+            **GET_USER,
+            **operation("get", "/admin/users/{id}", "200", parameters=[path_param("id")]),
+            **operation("get", "/v2/people/users/{id}", "200", parameters=[path_param("id")]),
+        },
+        None,
+        {
+            "POST /orders 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/user_id"},
+                },
+                "GetUser2": {
+                    "operationRef": "#/paths/~1admin~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/user_id"},
+                },
+                "GetUser3": {
+                    "operationRef": "#/paths/~1v2~1people~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/user_id"},
+                },
+            },
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+        },
+    ),
+    (
+        "nested-foreign-key-beside-untyped-array",
+        {
+            "/orders": {
+                "post": json_response(
+                    "201",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "lines": {"type": "array", "items": True},
+                            "ship": {"type": "object", "properties": {"warehouse_id": {"type": "string"}}},
+                        },
+                    },
+                )
+            },
+            "/warehouses": {"post": json_response("201", ITEM_WITH_ID)},
+            **operation("get", "/warehouses/{id}", "200", parameters=[path_param("id")]),
+        },
+        None,
+        {
+            "POST /orders 201": {
+                "GetWarehouse": {
+                    "operationRef": "#/paths/~1warehouses~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/ship/warehouse_id"},
+                }
+            },
+            "POST /warehouses 201": {
+                "GetWarehouse": {
+                    "operationRef": "#/paths/~1warehouses~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            },
+        },
+    ),
+    (
+        "camel-foreign-key-with-short-base",
+        {
+            "/orders": {
+                "post": json_response(
+                    "201", {"type": "object", "properties": {"id": {"type": "string"}, "abId": {"type": "string"}}}
+                )
+            },
+            **operation("get", "/abs/{id}", "200", parameters=[path_param("id")]),
+        },
+        None,
+        {},
+    ),
+    (
+        "create-takes-array-of-other-resource",
+        {**operation_with_body("post", "/users", "201", TAG_ARRAY, USER_WITH_NAME), **GET_USER},
+        TAG,
+        {
+            "POST /users 201": {
+                "GetUser": {
+                    "operationRef": "#/paths/~1users~1{id}/get",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            }
+        },
+    ),
+    (
+        "update-takes-array-of-other-resource",
+        {
+            "/users": {"post": json_response("201", USER_WITH_NAME)},
+            **operation_with_body(
+                "patch", "/users/{id}", "200", TAG_ARRAY, USER_WITH_NAME, parameters=[path_param("id")]
+            ),
+        },
+        TAG,
+        {
+            "POST /users 201": {
+                "PatchUser": {
+                    "operationRef": "#/paths/~1users~1{id}/patch",
+                    "parameters": {"path.id": "$response.body#/id"},
+                }
+            }
+        },
+    ),
+    (
+        "same-module-resource-without-path-field",
+        *module_disambiguation(
+            {"type": "object", "properties": {"uuid": {"type": "string"}, "title": {"type": "string"}}}
+        ),
+        {},
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("paths", "components", "expected"),
+    [pytest.param(paths, components, expected, id=name) for name, paths, components, expected in LINK_INFERENCE_CASES],
+)
+def test_inferred_links_for_schema_shapes(ctx, paths, components, expected):
+    kwargs = {"components": components} if components is not None else {}
+    assert injected_links(ctx.openapi.load_schema(paths, **kwargs)) == expected

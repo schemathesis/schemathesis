@@ -111,3 +111,18 @@ def test_two(case):
     result.assert_outcomes(passed=2)
     assert result.ret == 0
     assert int(pathlib.Path(counter_path).read_text()) == 2
+
+
+def test_after_run_failure_alongside_failed_test(testdir, restore_checks):
+    testdir.make_test(
+        _ALWAYS_FAIL_CHECK
+        + """
+@schema.parametrize()
+def test_api(case):
+    raise AssertionError("test body fails")
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    assert result.ret == 1
+    result.stdout.fnmatch_lines(["*- Custom check failed: `AlwaysFail`*", "*    always fails in after_run*"])

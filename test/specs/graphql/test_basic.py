@@ -69,6 +69,20 @@ def test_operation_strategy(ctx):
     test()
 
 
+def test_operation_strategy_keeps_explicit_components(ctx):
+    schema = _books_schema(ctx)
+    strategy = schema["Query"]["getBooks"].as_strategy(
+        headers={"X-Token": "secret"}, query={"trace": "1"}, cookies={"session": "abc"}
+    )
+
+    @given(case=strategy)
+    @settings(max_examples=1, phases=[Phase.generate], deadline=None)
+    def test(case):
+        assert (case.headers, case.query, case.cookies) == ({"X-Token": "secret"}, {"trace": "1"}, {"session": "abc"})
+
+    test()
+
+
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_as_wsgi_kwargs(ctx):
     schema = _books_schema(ctx)
@@ -617,6 +631,23 @@ def test_unknown_type_name(ctx):
         schema["Qwery"]["getBooks"]
 
 
+def test_unknown_type_name_without_close_match(ctx):
+    schema = _books_schema(ctx)
+    with pytest.raises(LookupError, match="^`Zzzzzz` type not found$"):
+        schema["Zzzzzz"]
+
+
+def test_query_only_schema_lists_query_type(ctx):
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def ping(self) -> str:
+            return "pong"
+
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.from_schema(strawberry.Schema(Query)).schema_url)
+    assert list(schema) == ["Query"]
+
+
 @pytest.mark.parametrize(
     ("name", "expected"),
     [
@@ -919,8 +950,9 @@ def test_not_a_server_error_graphql_bad_charset(ctx, charset):
         (b'{"data": null}', CallOutcome.REJECTED),
         (b'{"data": {"getBooks": []}, "errors": []}', CallOutcome.ACCEPTED),
         (b"INTERNAL SERVER ERROR", CallOutcome.UNINFORMATIVE),
+        (b"[]", CallOutcome.UNINFORMATIVE),
     ],
-    ids=["data", "errors", "partial-data", "null-data", "empty-errors", "not-a-graphql-response"],
+    ids=["data", "errors", "partial-data", "null-data", "empty-errors", "not-a-graphql-response", "non-object"],
 )
 def test_classify_call_outcome(ctx, response_factory, content, expected):
     schema = _books_schema(ctx)

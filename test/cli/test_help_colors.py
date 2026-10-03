@@ -58,3 +58,12 @@ def test_help_output_no_colors(cli, monkeypatch, command, args, use_env):
 
     # Should not contain ANSI escape codes
     assert "\x1b[" not in result.stdout
+
+
+def test_run_help_force_color(cli, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["st", "run", "--force-color", "-h"])
+
+    stdout = cli.main("run", "--force-color", "-h", color=True).stdout
+
+    assert click.style("Filtering options", fg="green", bold=True) in stdout
+    assert click.style("--include-TYPE VALUE", fg="cyan") in stdout

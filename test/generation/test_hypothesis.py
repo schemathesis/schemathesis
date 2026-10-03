@@ -16,7 +16,7 @@ from hypothesis.internal.observability import with_observability_callback
 from jsonschema_rs import canonical
 
 import schemathesis
-from schemathesis.config import GenerationConfig
+from schemathesis.config import GenerationConfig, SchemathesisConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import (
     InvalidRegexPattern,
@@ -4278,3 +4278,150 @@ def test_whole_float_never_misrepresents_a_large_integer():
     values = _positive_values(schema, ParameterLocation.BODY, "application/json", jsonschema_rs.Draft202012Validator)
 
     assert all(is_valid(value) for value in values), values
+
+
+def _body_operation(ctx, body_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    return schema["/items"]["POST"]
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        {"type": "object", "patternProperties": {"(?<!a+)b": {"type": "integer"}}},
+        {
+            "type": "object",
+            "additionalProperties": {"type": "integer"},
+            "not": {"additionalProperties": {"type": "integer", "minimum": 0}},
+        },
+        {"type": "number", "format": "float", "minimum": 1},
+    ],
+    ids=["pattern-property-python-cannot-read", "barred-additional-properties", "float-format-inclusive-bound"],
+)
+def test_body_draws_satisfy_schema(ctx, body_schema):
+    operation = _body_operation(ctx, body_schema)
+    validator = jsonschema_rs.validator_for(body_schema, pattern_options=FANCY_REGEX_OPTIONS)
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    def check(case):
+        assert validator.is_valid(case.body), case.body
+
+    check()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        {"type": "object", "minProperties": 100000},
+        {
+            "type": "number",
+            "exclusiveMinimum": 9007199254740992,
+            "exclusiveMaximum": 9007199254740994,
+            "not": {"multipleOf": 0.5},
+        },
+    ],
+    ids=["object-wider-than-a-draw", "only-integer-in-range-is-barred"],
+)
+def test_body_nothing_can_be_drawn_for(ctx, body_schema):
+    operation = _body_operation(ctx, body_schema)
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    def check(case):
+        pass
+
+    with pytest.raises(Unsatisfiable):
+        check()
+
+
+def _query_operation(ctx, parameter_schema, config):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": parameter_schema}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    return schemathesis.openapi.from_dict(raw_schema, config=SchemathesisConfig.from_dict(config))["/items"]["GET"]
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("parameter_schema", "config", "expected"),
+    [
+        (
+            {"type": "string"},
+            {
+                "dictionaries": {"tokens": {"values": ["DICT"]}},
+                "operations": [{"include-name": "GET /items", "parameters": {"query.q": {"dictionary": "tokens"}}}],
+            },
+            {"DICT"},
+        ),
+        (
+            {"enum": ["a", "b"]},
+            {
+                "dictionaries": {"tokens": {"values": ["DICT"]}},
+                "generation": {"dictionaries": {"string": {"dictionary": "tokens", "probability": 1.0}}},
+            },
+            {"a", "b"},
+        ),
+    ],
+    ids=["operation-scoped-binding", "type-wide-binding-skips-untyped-parameter"],
+)
+def test_query_dictionary_binding(ctx, parameter_schema, config, expected):
+    operation = _query_operation(ctx, parameter_schema, config)
+    values = set()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        values.add(case.query["q"])
+
+    collect()
+    assert values == expected
+
+
+@pytest.mark.hypothesis_nested
+def test_body_dictionary_binding_on_unknown_item_field_is_ignored(ctx):
+    body_schema = {
+        "type": "array",
+        "items": {"type": "object", "properties": {"x": {"type": "string"}}, "additionalProperties": False},
+    }
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    config = SchemathesisConfig.from_dict(
+        {"dictionaries": {"tokens": {"values": ["DICT"]}}, "parameters": {"body.[*].missing": {"dictionary": "tokens"}}}
+    )
+    operation = schemathesis.openapi.from_dict(raw_schema, config=config)["/items"]["POST"]
+    validator = jsonschema_rs.validator_for(body_schema)
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    def check(case):
+        assert validator.is_valid(case.body), case.body
+
+    check()

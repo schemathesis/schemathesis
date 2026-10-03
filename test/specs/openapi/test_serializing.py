@@ -1441,3 +1441,92 @@ def test_nested_object_corner_cases(input_value, expected):
 )
 def test_schema_has_nested_object_properties_detection(schema, expected):
     assert _schema_has_nested_object_properties(schema) is expected
+
+
+def querystring_operation(ctx, content, *, required):
+    return ctx.openapi.load_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [{"name": "ignored", "in": "querystring", "required": required, "content": content}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )["/teapot"]["GET"]
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        pytest.param(
+            {"application/x-www-form-urlencoded": {"schema": {"type": "string", "enum": ["a=1&b=2"]}}},
+            {"", "a=1&b=2"},
+            id="urlencoded-scalar",
+        ),
+        pytest.param(
+            {"text/plain": {"schema": {"type": "string", "enum": ["hello world"]}}},
+            {"", "hello%20world"},
+            id="text-plain",
+        ),
+    ],
+)
+def test_optional_querystring_is_omitted_or_sent_raw(ctx, content, expected):
+    operation = querystring_operation(ctx, content, required=False)
+
+    assert fuzzing_rendered(operation, prepared_query_string) == expected
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("schema", "style", "expected"),
+    [
+        pytest.param(
+            {"$ref": "#/components/schemas/Filter"},
+            "deepObject",
+            "filter%5Binner%5D%5Ba%5D=x",
+            id="recursive-ref-deepObject-nested",
+        ),
+        pytest.param(
+            {"enum": [{"a": "x"}], "anyOf": [{"properties": {"a": {}}}]},
+            "form",
+            "a=x",
+            id="untyped-anyOf-object-branch",
+        ),
+    ],
+)
+def test_query_object_serialization_styles(ctx, schema, style, expected):
+    operation = ctx.openapi.load_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {"name": "filter", "in": "query", "required": True, "style": style, "schema": schema}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Filter": {
+                    "type": "object",
+                    "properties": {
+                        "inner": {
+                            "type": "object",
+                            "properties": {"a": {"enum": ["x"]}},
+                            "required": ["a"],
+                            "additionalProperties": False,
+                        },
+                        "next": {"$ref": "#/components/schemas/Filter"},
+                    },
+                    "required": ["inner"],
+                    "maxProperties": 1,
+                }
+            }
+        },
+    )["/teapot"]["GET"]
+
+    assert fuzzing_rendered(operation, prepared_query_string) == {expected}
