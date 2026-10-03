@@ -15,6 +15,7 @@
 - Stateful worker hangs after Ctrl-C from custom CLI handlers.
 - Invalid coverage-phase positives for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
+- Crash while processing patterns beside string length bounds too large for regex engines.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 - `base_url` passed to `Case.call` ignored for WSGI applications.

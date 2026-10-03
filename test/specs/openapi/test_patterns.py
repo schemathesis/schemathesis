@@ -1463,6 +1463,39 @@ def test_quantifier_rewrite_the_validator_cannot_compile_is_not_taken():
     assert schema == {"type": "string", "pattern": "^.{1,}$", "maxLength": 2147483647}
 
 
+@pytest.mark.parametrize("length_keyword", ["minLength", "maxLength"], ids=["min", "max"])
+def test_huge_length_is_not_folded_into_pattern(ctx, length_keyword):
+    length = 9223372036854775807
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": "^a+$", length_keyword: length},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/items"]["GET"]
+
+    assert next(iter(operation.query)).optimized_schema == {
+        "type": "string",
+        "pattern": "^a+$",
+        length_keyword: length,
+    }
+    if length_keyword == "maxLength":
+        value = examples.generate_one(operation.as_strategy()).query["q"]
+        assert re.fullmatch("^a+$", value)
+        assert len(value) <= length
+
+
 def test_quantifier_rewrite_within_reach_is_taken():
     schema = {"type": "string", "pattern": "^.{1,}$", "maxLength": 10}
 
