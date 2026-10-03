@@ -726,6 +726,33 @@ def test_without_report(case):
     assert _junit_outcomes(report_path) == {"GET /success": ("passed", ""), "GET /users": ("passed", "")}
 
 
+@pytest.mark.parametrize("xdist", [False, True], ids=["in-process", "xdist"])
+def test_junit_report_only_for_schema_that_configures_it_with_identical_content(testdir, ctx, xdist):
+    report_path = str(testdir.tmpdir.join("report.xml"))
+    api = ctx.openapi.apps.success()
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+schema.config.reports.update(junit_path=r"{report_path}")
+other = schemathesis.openapi.from_dict(raw_schema)
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_with_report(case):
+    case.call()
+
+@other.parametrize()
+def test_without_report(case):
+    raise AssertionError("not reported")
+""",
+        paths={"/success": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    args = ("-n", "1") if xdist else ()
+    testdir.runpytest("-p", "no:randomly", *args).assert_outcomes(passed=2, failed=2)
+
+    assert _junit_outcomes(report_path) == {"GET /success": ("passed", ""), "GET /users": ("passed", "")}
+
+
 def test_stateful_test_via_xdist_without_reports(ctx, testdir):
     api = ctx.openapi.apps.users_crud()
     testdir.makepyfile(
