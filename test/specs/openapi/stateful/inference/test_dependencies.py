@@ -3192,6 +3192,24 @@ def test_dependency_graph(request, ctx, paths, components, snapshot_json):
     )
 
 
+def test_reference_to_boolean_response_schema(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            **operation("post", "/items", "201", component_ref("Any")),
+            **operation("get", "/items/{id}", "200", parameters=[path_param("id")]),
+        },
+        version="3.1.0",
+        components={"schemas": {"Any": True}},
+    )
+
+    schema.as_state_machine()
+
+    assert schema.raw_schema["paths"]["/items"]["post"]["responses"]["201"] == {
+        "description": "Text",
+        "content": {"application/json": {"schema": component_ref("Any")}},
+    }
+
+
 def test_path_param_named_after_collection_links_create_to_read(ctx):
     # `/sessions/{session}` names its path param after the singular collection (route-model-binding
     # style); the create operation must still link into read.
