@@ -219,16 +219,18 @@ def try_unwrap_all_of(schema: Mapping[str, Any]) -> Mapping[str, Any]:
     return schema
 
 
-def _filter_composition_alternatives(alternatives: list[dict], resolver: Resolver) -> list[dict]:
+def _filter_composition_alternatives(alternatives: list[JsonSchema], resolver: Resolver) -> list[JsonSchemaObject]:
     """Filter oneOf/anyOf alternatives to keep only interesting schemas."""
-    interesting = []
+    interesting: list[JsonSchemaObject] = []
 
-    for alt_schema in alternatives:
-        _, resolved = maybe_resolve_with_resolver(alt_schema, resolver)
+    for alternative_schema in alternatives:
+        if not isinstance(alternative_schema, dict):
+            continue
+        _, resolved = maybe_resolve_with_resolver(alternative_schema, resolver)
 
         if _is_interesting_schema(resolved):
             # Keep original (with $ref)
-            interesting.append(alt_schema)
+            interesting.append(alternative_schema)
 
     return interesting
 

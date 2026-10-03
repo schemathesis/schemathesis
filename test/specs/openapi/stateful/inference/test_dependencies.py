@@ -4849,6 +4849,45 @@ def test_body_composition_with_boolean_branch_does_not_crash(ctx):
     assert bindings.get(("body", "category_id")) == ("Category", "id"), bindings
 
 
+@pytest.mark.parametrize(
+    ["composition", "boolean_schema"],
+    [
+        pytest.param("anyOf", True, id="anyOf-true"),
+        pytest.param("anyOf", False, id="anyOf-false"),
+        pytest.param("oneOf", True, id="oneOf-true"),
+        pytest.param("oneOf", False, id="oneOf-false"),
+    ],
+)
+def test_response_composition_with_boolean_branch_infers_link(ctx, composition, boolean_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            **operation(
+                "post",
+                "/items",
+                "201",
+                {
+                    composition: [
+                        boolean_schema,
+                        {"type": "object", "properties": {"id": {"type": "string"}}},
+                    ]
+                },
+            ),
+            **operation("get", "/items/{id}", "200", parameters=[path_param("id")]),
+        },
+        version="3.1.0",
+    )
+
+    schema.as_state_machine()
+
+    assert schema.raw_schema["paths"]["/items"]["post"]["responses"]["201"]["links"] == {
+        "GetItem": {
+            "operationRef": "#/paths/~1items~1{id}/get",
+            "parameters": {"path.id": "$response.body#/id"},
+            "x-schemathesis": {"is_inferred": True},
+        }
+    }
+
+
 def test_nested_body_fk_inside_composition_branch(ctx):
     # Composition keywords inside nested objects must still be traversed for FK fields.
     _, graph = analyze_dependencies(

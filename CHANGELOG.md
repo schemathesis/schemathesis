@@ -20,6 +20,7 @@
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
 - Inferred links reading foreign keys from responses that do not declare them.
+- Crash in dependency inference for Open API 3.1 boolean schemas inside `anyOf` and `oneOf`.
 - Memory growing without bound during long stateful runs with a time limit.
 - Missed `negative_data_rejection` failures for invalid single-element arrays in query, header or cookie parameters.
 - Report empty or non-object Open API parameter `content` as a schema error.
