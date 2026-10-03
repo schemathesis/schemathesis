@@ -343,16 +343,17 @@ def _walk_leaf_schema(
     if not isinstance(current, dict):
         return None
     segment, *rest = segments
+    # Consuming a segment shortens the path, so re-entering a recursive reference below can't loop.
     if segment == "*":
         items = current.get("items")
         if isinstance(items, (dict, bool)):
-            found = _walk_leaf_schema(items, rest, bundled, visited)
+            found = _walk_leaf_schema(items, rest, bundled, ())
             if found is not None:
                 return found
     else:
         properties = current.get("properties")
         if isinstance(properties, dict) and segment in properties:
-            found = _walk_leaf_schema(properties[segment], rest, bundled, visited)
+            found = _walk_leaf_schema(properties[segment], rest, bundled, ())
             if found is not None:
                 return found
     # The field may live inside a subschema, so descend combinator branches with the same path.
