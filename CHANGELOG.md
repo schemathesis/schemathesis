@@ -9,45 +9,74 @@
 
 ### :bug: Fixed
 
-- Report malformed Open API `servers` definitions as clean schema loading errors.
+#### CLI
+
 - Return exit code 2 for run-wide configuration errors.
+- Report custom handler startup errors with a clean message.
+- Stateful worker hangs after Ctrl-C from custom handlers.
+
+#### pytest plugin
+
+- Keep reports separate for identical schemas with different report configurations.
+- Reports including results from an identical schema that did not configure reports.
+
+#### Python API
+
 - `ImportError` on `from schemathesis.checks import content_type_conformance` (and other built-in checks) before a schema is loaded.
-- Preserve case-sensitive cookie parameter names during test generation.
-- Coverage phase hanging on unique arrays with a large `minItems`.
-- Report custom CLI handler startup errors with a clean error message.
-- Stateful worker hangs after Ctrl-C from custom CLI handlers.
-- Invalid coverage-phase positives for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.
-- Coverage-phase crashes and invalid positives from YAML binary keyword values.
-- Send binary Open API 3.2 `querystring` parameters as percent-encoded raw queries.
-- Generation hanging, or failing a health check, on arrays with a large `minItems`.
-- Report undecodable JSON response bodies as JSON parsing errors.
-- Crash while processing patterns beside string length bounds too large for regex engines.
-- Keep pytest reports separate for identical schemas with different report configurations.
-- Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
-- `checks.enabled = false` not disabling custom checks.
 - `schemathesis.check` return type: decorated functions and classes keep their own type.
-- False `unsupported_method` failures when a rate limiter answers an undeclared method with `429 Too Many Requests`.
-- Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
-- Serialize captured array path parameters with their declared OpenAPI style.
-- Crash in dependency inference for Open API 3.1 references to boolean schemas.
-- Crash in dependency inference for response references targeting non-object values.
 - `base_url` passed to `Case.call` ignored for WSGI applications.
-- Missing positive coverage cases for satisfiable numeric `multipleOf` schemas with large bounds.
-- Dictionary bindings on body paths ignored through recursive `$ref` schemas.
-- Inferred links reading foreign keys from responses that do not declare them.
-- Report infinite recursive and unresolvable references as schema errors.
+
+#### Stateful testing
+
+- Memory growing without bound during long runs with a time limit.
+- Crash in dependency inference for Open API 3.1 references to boolean schemas.
 - Crash in dependency inference for Open API 3.1 boolean schemas inside `anyOf` and `oneOf`.
-- Memory growing without bound during long stateful runs with a time limit.
-- pytest plugin reports including results from an identical schema that did not configure reports.
-- Missed `negative_data_rejection` failures for invalid single-element arrays in query, header or cookie parameters.
-- Report empty or non-object Open API parameter `content` as a schema error.
-- Generate negative multipart bodies for binary fields with multiple content types.
-- Missed `negative_data_rejection` failures when an array parameter with a valid element accompanies invalid ones.
+- Crash in dependency inference for response references targeting non-object values.
+- Inferred links reading foreign keys from responses that do not declare them.
+
+#### Data generation
+
+- Hanging, or failing a health check, on arrays with a large `minItems`.
+- Crash while processing patterns beside string length bounds too large for regex engines.
 - "Failed Health Check" in negative mode for string path parameters carrying keywords of other types.
-- Missed `negative_data_rejection` failures for invalid path parameters beside undeclared query parameters.
-- Report `negative_data_rejection` failures for invalid array or object query, header and cookie parameters.
-- False positive `negative_data_rejection` when path and query numeric values are both valid on the wire.
-- Missed `negative_data_rejection` failures for numeric strings violating `minimum` or other bounds.
+- Missing negative multipart bodies for binary fields with multiple content types.
+- Preserve case-sensitive cookie parameter names.
+- Dictionary bindings on body paths ignored through recursive `$ref` schemas.
+
+#### Coverage phase
+
+- Hanging on unique arrays with a large `minItems`.
+- Crashes and invalid positive cases from YAML binary keyword values.
+- Invalid positive cases for large arrays and objects beside `prefixItems`, `if`, or `unevaluatedProperties`.
+- Missing positive cases for satisfiable numeric `multipleOf` schemas with large bounds.
+
+#### Request serialization
+
+- Send binary Open API 3.2 `querystring` parameters as percent-encoded raw queries.
+- Captured array path parameters ignoring their declared Open API style.
+
+#### Schema handling
+
+- Report malformed Open API `servers` definitions as clean loading errors.
+- Report infinite recursive and unresolvable references as clean errors.
+- Report empty or non-object Open API parameter `content` as a clean error.
+- Stalls of up to 30s per document carrying an unreachable `$schema` URL.
+
+#### `negative_data_rejection`
+
+- False positive when path and query numeric values are both valid on the wire.
+- Missed failures for invalid single-element arrays in query, header or cookie parameters.
+- Missed failures for invalid array or object query, header and cookie parameters.
+- Missed failures when an array parameter with a valid element accompanies invalid ones.
+- Missed failures for invalid path parameters beside undeclared query parameters.
+- Missed failures for numeric strings violating `minimum` or other bounds.
+
+#### Others
+
+- False `unsupported_method` failures when a rate limiter answers an undeclared method with `429 Too Many Requests`.
+- `checks.enabled = false` not disabling custom checks.
+- Report undecodable JSON response bodies as JSON parsing errors.
+- Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
 
 ## [4.29.0](https://github.com/schemathesis/schemathesis/compare/v4.28.0...v4.29.0) - 2026-10-02
 
