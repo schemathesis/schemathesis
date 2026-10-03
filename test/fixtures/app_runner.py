@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import requests
 import uvicorn
+from werkzeug.serving import make_server
 
 if TYPE_CHECKING:
     from flask import Flask
@@ -134,7 +135,12 @@ def subprocess_runner(tmp_path):
 
 def run_flask_app(app: Flask, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int:
     """Start a thread with the given Flask application."""
-    return run(app.run, port=port, timeout=timeout, wait=wait)
+    if port is not None or not wait:
+        return run(app.run, port=port, timeout=timeout, wait=wait)
+    # Binding port 0 inside the server leaves no window for another socket to take a pre-picked port.
+    server = make_server("127.0.0.1", 0, app, threaded=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server.server_port
 
 
 def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -> str:
@@ -145,11 +151,16 @@ def openapi_url(app: Flask, *, path: str = "/openapi.json", wait: bool = True) -
 
 def run_asgi_app(app: ASGIApp, port: int | None = None, timeout: float = 5.0, wait: bool = True) -> int:
     """Start a daemon thread running uvicorn against the given ASGI application."""
+    sockets = []
     if port is None:
-        port = unused_port()
+        # Keep the bound socket so no other socket can take the port before uvicorn listens on it.
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+        sockets.append(sock)
     config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error", lifespan="off")
     server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
+    thread = threading.Thread(target=server.run, kwargs={"sockets": sockets or None}, daemon=True)
     thread.start()
     if wait:
         wait_for_port(port, timeout=timeout)
