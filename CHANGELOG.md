@@ -17,6 +17,7 @@
 - Generation hanging, or failing a health check, on arrays with a large `minItems`.
 - Crash while processing patterns beside string length bounds too large for regex engines.
 - Missing closing delimiter in reproduce cURL commands for empty multipart bodies.
+- False `unsupported_method` failures when a rate limiter answers an undeclared method with `429 Too Many Requests`.
 - Stalls of up to 30s per schema carrying an unreachable `$schema` URL.
 - Crash in dependency inference for Open API 3.1 references to boolean schemas.
 - `base_url` passed to `Case.call` ignored for WSGI applications.

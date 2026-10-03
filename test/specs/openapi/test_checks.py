@@ -2650,6 +2650,8 @@ def test_missing_required_header_404_on_templated_path(ctx, response_factory, pi
         (False, 403, "Unsupported method TRACE returned 403"),
         (True, 500, "Unsupported method TRACE returned 500"),
         (True, 405, "TRACE returned 405 without required `Allow` header"),
+        (True, 429, None),
+        (False, 429, None),
     ],
     ids=[
         "secured-401",
@@ -2658,10 +2660,12 @@ def test_missing_required_header_404_on_templated_path(ctx, response_factory, pi
         "open-403",
         "secured-non-auth-status",
         "secured-405-without-allow",
+        "secured-429",
+        "open-429",
     ],
 )
 def test_unsupported_method_auth_before_routing(ctx, response_factory, secured, status_code, expected_message):
-    # Many frameworks authenticate before method dispatch, so a protected path answers 401/403 instead of 405.
+    # Many frameworks authenticate and rate-limit before method dispatch, so 401/403/429 can precede 405.
     schema = ctx.openapi.load_schema(
         {
             "/items": {
