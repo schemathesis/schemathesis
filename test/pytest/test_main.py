@@ -732,6 +732,7 @@ def test_a(case):
     case.call_and_validate()
 
 @given(st.integers())
+@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_b(v):
     1 / v""",
     )
