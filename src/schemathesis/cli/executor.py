@@ -170,7 +170,13 @@ def execute_event_loop(
     try:
         ctx = context_factory(config)
         for h in handlers:
-            h.start(ctx)
+            try:
+                h.start(ctx)
+            except Exception as exc:
+                if not isinstance(exc, click.Abort):
+                    display_handler_error(h, exc)
+                    raise click.Abort() from exc
+                raise
 
         for event in event_stream:
             ctx.on_event(event)

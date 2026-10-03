@@ -3002,6 +3002,23 @@ def test_custom_handler_shutdown_error_keeps_exit_code(ctx, cli):
     assert "CLI Handler Error" in result.stdout
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_custom_handler_start_error(ctx, cli, snapshot_cli):
+    shutdown_exit_codes = []
+
+    @schemathesis.cli.handler()
+    class BrokenStart(schemathesis.cli.EventHandler):
+        def start(self, run_ctx) -> None:
+            raise ValueError("broken start")
+
+        def shutdown(self, run_ctx) -> None:
+            shutdown_exit_codes.append(run_ctx.exit_code)
+
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--max-examples=1") == snapshot_cli
+    assert shutdown_exit_codes == [2]
+
+
 @pytest.mark.parametrize(
     ["ordering_mode", "expected"],
     [
