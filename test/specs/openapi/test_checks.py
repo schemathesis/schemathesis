@@ -328,6 +328,28 @@ _PATH_PATTERN_MUTATION = _mutation(OperatorKind.VALUE_VIOLATOR, ("pattern",), pa
             False,
             id="real-path-mutation-still-denies",
         ),
+        # Mutating several locations leaves no single targeted location on the case.
+        pytest.param(
+            {
+                "query": {"key": 5, "": "null"},
+                "_meta": build_metadata(
+                    query=GenerationMode.NEGATIVE,
+                    path_parameters=GenerationMode.NEGATIVE,
+                    generation_modes=[GenerationMode.NEGATIVE],
+                    mutations=(
+                        _ADDITIONAL_PROPERTIES_MUTATION,
+                        _mutation(
+                            OperatorKind.NEGATE_CONSTRAINTS,
+                            ("pattern",),
+                            parameter="id",
+                            location=ParameterLocation.PATH,
+                        ),
+                    ),
+                ),
+            },
+            False,
+            id="path-mutation-beside-query-extra-denies",
+        ),
     ],
 )
 def test_has_only_additional_properties_mutations_aware(sample_schema, kwargs, expected):
