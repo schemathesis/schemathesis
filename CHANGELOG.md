@@ -30,6 +30,7 @@
 - pytest plugin reports including results from an identical schema that did not configure reports.
 - Missed `negative_data_rejection` failures for invalid single-element arrays in query, header or cookie parameters.
 - Report empty or non-object Open API parameter `content` as a schema error.
+- Generate negative multipart bodies for binary fields with multiple content types.
 - Missed `negative_data_rejection` failures when an array parameter with a valid element accompanies invalid ones.
 - "Failed Health Check" in negative mode for string path parameters carrying keywords of other types.
 - Missed `negative_data_rejection` failures for invalid path parameters beside undeclared query parameters.
