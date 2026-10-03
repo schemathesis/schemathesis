@@ -3613,6 +3613,12 @@ def test_positive_number_near_boundary_respects_multiple_of(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
+def test_positive_number_multiple_above_large_minimum(ctx):
+    schema = {"type": "number", "multipleOf": 1.1, "minimum": 7e16}
+    operation = body_operation(ctx, schema)
+    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
+
+
 def test_positive_number_boundary_respects_exclusive_bounds(ctx):
     # Boolean `exclusiveMinimum: true` + `exclusiveMaximum: true` combined with `minimum: 0`
     # / `maximum: 1` (legacy OpenAPI 3.0 form). The boundary generator's `+= 1` / `-= 1`
