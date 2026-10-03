@@ -2671,11 +2671,11 @@ def _merge_parameters_to_object_schema(
                 if "minLength" not in subschema:
                     subschema = {**subschema, "minLength": 1}
 
-        if location.is_in_header:
+        if location == ParameterLocation.HEADER:
             canonical = canonical_by_lower.setdefault(name.lower(), name)
             if canonical != name:
                 # Same header under different case — first definition wins.
-                if (location == ParameterLocation.PATH or is_required) and canonical not in required:
+                if is_required and canonical not in required:
                     required.append(canonical)
                 continue
             name = canonical
