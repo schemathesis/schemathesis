@@ -2422,6 +2422,9 @@ class OpenApiParameterSet(ParameterSet):
                     generation_mode=generation_mode,
                 )
 
+            if captured_variants and usage_tracker is not None and not generation_mode.is_negative:
+                strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
+
             serialize = operation.get_parameter_serializer(self.location)
             if serialize is not None:
                 if is_negative:
@@ -2530,22 +2533,19 @@ class OpenApiParameterSet(ParameterSet):
                     assert_never(self.location)
 
         # Apply hybrid approach when captured variants are available
-        if captured_variants and usage_tracker is not None:
-            if generation_mode.is_negative:
-                # In negative mode with captured values, mostly use positive strategy
-                # to leverage valuable captured IDs for testing deeper application logic
-                strategy = self._build_negative_aware_strategy(
-                    operation,
-                    generation_config,
-                    exclude,
-                    captured_variants,
-                    usage_tracker,
-                    mix_examples=mix_examples,
-                    error_feedback=error_feedback,
-                    constants_value_source=constants_value_source,
-                )
-            else:
-                strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
+        if captured_variants and usage_tracker is not None and generation_mode.is_negative:
+            assert extra_data_source is not None
+            # In negative mode with captured values, mostly use positive strategy
+            # to leverage valuable captured IDs for testing deeper application logic
+            strategy = self._build_negative_aware_strategy(
+                operation,
+                generation_config,
+                exclude,
+                extra_data_source,
+                mix_examples=mix_examples,
+                error_feedback=error_feedback,
+                constants_value_source=constants_value_source,
+            )
 
         if use_cache:
             self._strategy_cache[cache_key] = strategy
@@ -2556,8 +2556,7 @@ class OpenApiParameterSet(ParameterSet):
         operation: APIOperation,
         generation_config: GenerationConfig,
         exclude: Iterable[str],
-        captured_variants: list[CapturedVariant],
-        usage_tracker: VariantUsageTracker,
+        extra_data_source: ExtraDataSource,
         *,
         mix_examples: bool = True,
         error_feedback: ErrorFeedbackStore | None = None,
@@ -2576,12 +2575,11 @@ class OpenApiParameterSet(ParameterSet):
             generation_config,
             GenerationMode.POSITIVE,
             exclude,
-            extra_data_source=None,
+            extra_data_source=extra_data_source,
             mix_examples=mix_examples,
             error_feedback=error_feedback,
             constants_value_source=constants_value_source,
         )
-        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         # Wrap in GeneratedValue for consistent return type with negative strategy
         # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
         # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.

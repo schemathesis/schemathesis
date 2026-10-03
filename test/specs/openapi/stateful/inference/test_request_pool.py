@@ -182,6 +182,61 @@ def test_coverage_phase_capture_feeds_fuzzing_pool(cli, snapshot_cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_request_pool_serializes_array_path_parameters(cli, snapshot_cli, ctx):
+    paths = {
+        "/items": {
+            "post": {
+                "operationId": "createItem",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["id"],
+                                    "properties": {"id": {"type": "array", "items": {"type": "string"}}},
+                                }
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        "/items/{itemId}": {
+            "delete": {
+                "operationId": "deleteItem",
+                "parameters": [
+                    {
+                        "name": "itemId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "array", "items": {"type": "string"}},
+                    }
+                ],
+                "responses": {"204": {"description": "Deleted"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+    request_paths = []
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": ["a", "b"]}), 201
+
+    @app.route("/items/<path:item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        request_paths.append(request.path)
+        return "", 204
+
+    result = cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=1")
+
+    assert request_paths == ["/items/a,b"]
+    assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_request_pool_captures_body_fields(cli, snapshot_cli, ctx):
     paths = {
         "/sessions": {
