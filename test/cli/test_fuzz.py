@@ -93,6 +93,13 @@ def test_fuzz_fatal_error_loader(cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_schema_file_with_malformed_server_asks_for_url(cli, ctx, snapshot_cli):
+    # A server URL that cannot be read gives no target to suggest.
+    schema_path = ctx.openapi.write_schema(USERS_OK_PATHS, servers=[{"url": 5}])
+    assert_cli_snapshot(cli.main("fuzz", str(schema_path)), snapshot_cli)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_fatal_error_internal(cli, app_runner, ctx, snapshot_cli, monkeypatch):
     url = _make_fuzz_app(ctx, app_runner)
     monkeypatch.setattr(fuzz_executor, "from_schema", lambda schema: _RaisingEngine())

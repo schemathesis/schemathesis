@@ -451,6 +451,22 @@ def test_graphql_constants_cover_scalar_shapes():
         _graphql_case(operations["Query.byColor"], pool, _has_any_draw)
 
 
+@pytest.mark.usefixtures("_clean_registry")
+def test_graphql_constants_replace_only_some_list_elements():
+    def partly_substituted(case):
+        tags = graphql.value_from_ast_untyped(
+            graphql.parse(case.body).definitions[0].selection_set.selections[0].arguments[0].value
+        )
+        return case._meta is not None and 0 < len(case._meta.constants_draws) < len(tags)
+
+    case = find(
+        _graphql_operations()["Query.byTags"].as_strategy(generation_mode=GenerationMode.POSITIVE),
+        partly_substituted,
+        settings=_FIND,
+    )
+    assert all(draw.body_path == "/byTags/tags" for draw in case._meta.constants_draws)
+
+
 def test_graphql_numeric_argument_untouched_without_numeric_constants():
     pool = _app_constants(graphql_string_pool)
     operations = _graphql_operations()

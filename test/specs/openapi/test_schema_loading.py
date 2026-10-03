@@ -539,6 +539,11 @@ def test_get_operation(ctx, operation_id, reference, path, method):
         assert operation.method.upper() == method
 
 
+def test_find_operation_by_path_without_operation_id(ctx):
+    schema = ctx.openapi.load_schema({"/users/{user_id}": {"get": RESPONSES}})
+    assert schema.find_operation_by_path("GET", "/users/42").label == "GET /users/{user_id}"
+
+
 def test_operation_lookup_cache_built_once(ctx, monkeypatch):
     schema = ctx.openapi.load_schema(SCHEMA["paths"])
     calls = 0

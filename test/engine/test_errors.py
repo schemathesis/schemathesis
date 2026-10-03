@@ -1,6 +1,7 @@
 import re
 
 import hypothesis.errors
+import jsonschema_rs
 import pytest
 import requests
 from hypothesis import strategies as st
@@ -10,6 +11,7 @@ from schemathesis.config import ConfigError
 from schemathesis.core.errors import (
     AuthenticationError,
     InternalError,
+    InvalidRegexPattern,
     InvalidRegexType,
     InvalidSchema,
     UnboundPrefix,
@@ -177,6 +179,119 @@ def test_non_string_pattern_in_hook_reports_invalid_regex_type(ctx):
         )
     ]
     assert statuses == [Status.ERROR]
+
+
+def _invalid_regex_error():
+    try:
+        jsonschema_rs.validator_for({"format": "regex"}, validate_formats=True).validate("[a-")
+    except jsonschema_rs.ValidationError as exc:
+        return exc
+
+
+def _type_mismatch_error():
+    try:
+        jsonschema_rs.validate({"type": "integer"}, "x")
+    except jsonschema_rs.ValidationError as exc:
+        return exc
+
+
+def _raise_in_map_case(schema, error_for):
+    def map_case(context, case):
+        raise error_for(case.query["q"])
+
+    schema.hook("map_case")(map_case)
+
+
+def test_invalid_regex_in_hook_reports_schema_error(ctx):
+    schema = _schema_with_query(ctx, {"type": "string"})
+    _raise_in_map_case(schema, lambda value: _invalid_regex_error())
+    errors, statuses = _fuzz_errors(schema)
+    assert [event.info.format() for event in errors] == [
+        "Schema Error\n\n"
+        "Failed to generate test cases for this API operation because of unsupported regular expression `[a-`\n\n"
+        "Tip: Ensure your regex follows ECMA 262 (JavaScript) syntax.\n"
+        "For guidance, visit: https://json-schema.org/understanding-json-schema/reference/regular_expressions"
+    ]
+    assert statuses == [Status.ERROR]
+
+
+def test_validation_error_in_hook_is_reported_as_is(ctx):
+    schema = _schema_with_query(ctx, {"type": "string"})
+    _raise_in_map_case(schema, lambda value: _type_mismatch_error())
+    errors, statuses = _fuzz_errors(schema)
+    assert [(type(event.value), str(event.value)) for event in errors] == [
+        (
+            jsonschema_rs.ValidationError,
+            '"x" is not of type "integer"\n\nFailed validating "type" in schema\n\nOn instance:\n    "x"',
+        )
+    ]
+    assert statuses == [Status.ERROR]
+
+
+# Errors raised alongside an invalid regex usually restate it, so only the regex error is shown.
+def test_invalid_regex_hides_other_hook_errors(ctx):
+    schema = _schema_with_query(ctx, {"type": "string"})
+    _raise_in_map_case(schema, lambda value: _invalid_regex_error() if value else ValueError("empty"))
+    errors, statuses = _fuzz_errors(schema)
+    assert [(type(event.value), str(event.value)) for event in errors] == [
+        (
+            InvalidRegexPattern,
+            "Failed to generate test cases for this API operation because of unsupported regular expression `[a-`",
+        )
+    ]
+    assert statuses == [Status.ERROR]
+
+
+def test_custom_format_over_empty_elements_reports_unsatisfiable(ctx):
+    schemathesis.openapi.format("no-elements", st.lists(st.nothing().map(str), max_size=3).map(str))
+    schema = _schema_with_query(ctx, {"type": "string", "format": "no-elements"})
+    errors, statuses = _fuzz_errors(schema)
+    assert [event.info.format() for event in errors] == [
+        "Schema Error\n\n"
+        "Cannot generate test data for query parameter 'q'\n"
+        "Schema:\n\n"
+        '{\n    "type": "string",\n    "format": "no-elements"\n}\n\n'
+        "This usually means:\n"
+        "  - Type mismatch (e.g., enum with strings but type: integer)\n"
+        "  - Contradictory constraints (e.g., minimum > maximum)\n"
+        "  - Regex that's too complex to generate values for\n\n"
+        "Tip: Review all parameters and request body schemas for conflicting constraints."
+    ]
+    assert statuses == [Status.ERROR]
+
+
+def test_custom_format_beyond_size_limit_in_examples_reports_failed_health_check(ctx):
+    schemathesis.openapi.format("oversized", st.lists(st.just("a"), min_size=10**7).map("".join))
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "format": "oversized"},
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"type": "object"}, "example": {"x": 1}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    stream = EventStream(schema, phases=[PhaseName.EXAMPLES]).execute()
+    assert [event.info.format() for event in stream.find_all(events.NonFatalError)] == [
+        "Failed Health Check\n\n"
+        "ListStrategy(just('a'), min_size=10_000_000, max_size=inf) can never generate a value, because min_size is "
+        "larger than Hypothesis supports.  Including it is at best slowing down your tests for no benefit; at worst "
+        "making them fail (maybe flakily) with a HealthCheck error.\n\n"
+        "Tip: Reduce minimum size requirements or number of required properties or bypass this health check using "
+        "`--suppress-health-check=large_base_example`."
+    ]
+    assert [event.status for event in stream.find_all(events.ScenarioFinished)] == [Status.ERROR]
 
 
 def _compile_pattern(pattern):

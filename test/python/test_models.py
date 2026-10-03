@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 from unittest.mock import ANY
@@ -6,7 +7,9 @@ import flask
 import pytest
 import requests
 from fastapi import FastAPI
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis import strategies as st
+from hypothesis.vendor.pretty import pretty
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
@@ -485,6 +488,13 @@ def test_method_suggestion_without_parameters(swagger_20):
         swagger_20["/users"]["PUT"]
 
 
+def test_method_lookup_on_path_without_operations(ctx):
+    schema = ctx.openapi.load_schema({"/users": {"parameters": []}})
+    assert len(schema["/users"]) == 1
+    with pytest.raises(LookupError, match="^Method `GET` not found.$"):
+        schema["/users"]["GET"]
+
+
 @pytest.mark.parametrize("mode", list(GenerationMode))
 @pytest.mark.hypothesis_nested
 def test_generation_mode_is_available(ctx, mode):
@@ -508,6 +518,73 @@ def test_generation_mode_is_available(ctx, mode):
     def test(case):
         # Then its generator mode should be available
         assert case.meta.generation.mode == mode
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_disabled_security_parameters_are_not_serialized_into_query(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "ids",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "array", "items": {"type": "integer"}, "minItems": 2},
+                            "explode": False,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        components={"securitySchemes": {"ApiKey": {"type": "apiKey", "in": "query", "name": "key"}}},
+        security=[{"ApiKey": []}],
+    )
+    schema.config.generation.update(with_security_parameters=False)
+
+    @given(case=schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        assert list(case.query) == ["ids"]
+        assert case.query["ids"].count(",") >= 1
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_multipart_keeps_registered_media_type_for_text_property(ctx):
+    schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG"))
+    schema = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file": {"type": "string"}, "size": {"type": "integer"}},
+                                    "required": ["file", "size"],
+                                },
+                                "encoding": {"file": {"contentType": "image/png"}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(case=schema["/upload"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=5, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert case.body["file"] == b"\x89PNG"
 
     test()
 
@@ -590,6 +667,27 @@ def test_validate_response_failure_is_catchable_from_public_errors(ctx, response
 def test_operation_hash(openapi_30):
     # API Operations should be hashable
     _ = {i.ok() for i in openapi_30.get_all_operations()}
+
+
+def test_operation_and_case_never_equal_foreign_objects(ctx):
+    operation = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})["/data"][
+        "GET"
+    ]
+    assert operation != "GET /data"
+    assert operation.Case() != "GET /data"
+
+
+def test_hypothesis_reports_omit_schema_and_parameter_sets(ctx):
+    # Falsifying-example reports would otherwise dump whole schemas into the output.
+    schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    assert (pretty(schema), pretty(schema["/data"]["GET"].query)) == ("", "")
+
+
+def test_operation_survives_deepcopy_as_the_same_object(ctx):
+    operation = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})["/data"][
+        "GET"
+    ]
+    assert copy.deepcopy(operation) is operation  # noqa: TID251
 
 
 def _assert_override(spy, arg, original, overridden):
@@ -701,6 +799,39 @@ def test_call_base_url_override_wsgi_graphql():
     assert (response.status_code, response.request.url) == (200, "http://localhost/graphql")
 
 
+@pytest.mark.hypothesis_nested
+def test_call_and_validate_refreshes_expired_graphql_token(ctx):
+    app = flask.Flask(__name__)
+    received = []
+
+    @app.route("/graphql", methods=["POST"])
+    def graphql_endpoint():
+        received.append(flask.request.headers.get("Authorization"))
+        if len(received) == 1:
+            return flask.jsonify({"errors": [{"message": "Token expired"}]}), 401
+        return flask.jsonify({"data": {"hello": "world"}})
+
+    schema = ctx.graphql.load_sdl("type Query { hello: String }")
+    issued = []
+
+    @schema.auth(retry_on=[401])
+    class TokenAuth:
+        def get(self, case, ctx):
+            issued.append(f"token-{len(issued)}")
+            return issued[-1]
+
+        def set(self, case, data, ctx):
+            case.headers = {**(case.headers or {}), "Authorization": f"Bearer {data}"}
+
+    @given(case=schema["Query"]["hello"].as_strategy())
+    @settings(max_examples=1, phases=[Phase.generate])
+    def test(case):
+        case.call_and_validate(app=app, base_url="http://localhost/graphql")
+
+    test()
+    assert received == [f"Bearer {token}" for token in issued[-2:]]
+
+
 @pytest.mark.parametrize(
     ("name", "location", "exists"),
     [
@@ -747,3 +878,13 @@ def test_get_parameter(ctx, name, location, exists):
     if exists:
         assert parameter.name == name
         assert parameter.location == location
+
+
+def test_parameter_containers_for_locations_without_parameters(ctx):
+    operation = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})["/data"][
+        "GET"
+    ]
+    with pytest.raises(ValueError, match="`body` is not a parameter location"):
+        operation.get_parameter_set(ParameterLocation.BODY)
+    assert operation.Case().get_container(ParameterLocation.UNKNOWN) is None
+    assert list(operation.get_bodies_for_media_type("application/json")) == []

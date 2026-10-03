@@ -47,6 +47,61 @@ def test_prefix_items_to_items_array(schema, expected):
     assert result == expected
 
 
+CONTAINS_ONE = {"contains": {"const": 1}}
+CONTAINS_TWO = {"contains": {"const": 2}}
+
+
+@pytest.mark.parametrize(
+    ("version", "schema", "expected"),
+    [
+        pytest.param(
+            "3.0.2",
+            {"type": "array", "items": {"type": "integer"}, "allOf": [CONTAINS_ONE, CONTAINS_TWO, {"maxItems": 4}]},
+            {
+                "type": "array",
+                "items": [{"enum": [1]}, {"enum": [2]}],
+                "additionalItems": {"type": "integer"},
+                "allOf": [{"maxItems": 4}],
+                "minItems": 2,
+            },
+            id="items-and-other-allof-entries-kept",
+        ),
+        pytest.param(
+            "3.0.2",
+            {"type": "array", "allOf": [CONTAINS_ONE, CONTAINS_TWO], "minItems": 3},
+            {"type": "array", "items": [{"enum": [1]}, {"enum": [2]}], "minItems": 3},
+            id="larger-min-items-kept",
+        ),
+        pytest.param(
+            "3.0.2",
+            {"type": "array", "allOf": [CONTAINS_ONE, {"maxItems": 4}]},
+            {"type": "array", "allOf": [CONTAINS_ONE, {"maxItems": 4}]},
+            id="single-contains-untouched",
+        ),
+        pytest.param(
+            "3.0.2",
+            {"type": "array", "items": [{"type": "integer"}], "allOf": [CONTAINS_ONE, CONTAINS_TWO]},
+            {"type": "array", "items": [{"type": "integer"}], "allOf": [CONTAINS_ONE, CONTAINS_TWO]},
+            id="positional-items-untouched",
+        ),
+    ],
+)
+def test_allof_of_contains_consts_placed_positionally(ctx, version, schema, expected):
+    # Draft 4 ignores `contains`, so each required value needs its own position to land in generated arrays.
+    loaded = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+    assert loaded["/items"]["POST"].body[0].optimized_schema == expected
+
+
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
@@ -365,6 +420,24 @@ def test_does_not_upgrade_legacy_exclusive_bounds_by_default():
     result = transform(schema, converter.to_json_schema, nullable_keyword="nullable")
 
     assert result == schema
+
+
+def test_legacy_exclusive_flag_without_bound_dropped_on_openapi_3_1(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "number", "exclusiveMinimum": True}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    assert schema["/items"]["POST"].body[0].optimized_schema == {"type": "number"}
 
 
 @pytest.mark.parametrize(
@@ -877,6 +950,36 @@ def test_discriminator_pin_skipped_for_polymorphic_branch_target(ctx):
     assert validator.is_valid({"type": "msg"})
     assert validator.is_valid({"type": "resp"})
     assert not validator.is_valid({"type": "Item"})
+
+
+def test_discriminator_pin_applies_to_boolean_branch_target(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [{"$ref": "#/components/schemas/Any"}],
+                                    "discriminator": {"propertyName": "kind"},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={"schemas": {"Any": True}},
+    )
+    assert schema["/items"]["POST"].body[0].optimized_schema == {
+        "oneOf": [{"allOf": [{"$ref": "#/x-bundled/schema000001"}, {"properties": {"kind": {"enum": ["Any"]}}}]}],
+        "discriminator": {"propertyName": "kind"},
+        "x-bundled": {"schema000001": True},
+    }
 
 
 def test_discriminator_pin_validates_with_openapi_3_0_draft4(ctx):

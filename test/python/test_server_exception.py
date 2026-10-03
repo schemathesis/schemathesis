@@ -26,6 +26,25 @@ def test_wsgi_reraises_server_exception(ctx):
     test()
 
 
+def test_wsgi_server_exception_keeps_its_own_notes(ctx):
+    app = Flask(__name__)
+
+    @app.route("/api/crash", methods=["GET"])
+    def crash():
+        error = ValueError("something broke")
+        # `add_note` needs Python 3.11; Python 3.10 users attach notes this way.
+        error.__notes__ = ["Raised by the app"]
+        raise error
+
+    schema = ctx.openapi.load_schema({"/api/crash": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    with pytest.raises(ValueError, match="something broke") as exc_info:
+        schema["/api/crash"]["GET"].Case().call(app=app)
+    assert exc_info.value.__notes__ == [
+        "Raised by the app",
+        "\nReproduce with:\n\n    curl -X GET http://localhost/api/crash",
+    ]
+
+
 def test_wsgi_returns_response_for_handled_http_exception(ctx):
     # Some extensions emit the exception signal even for errors they already turned into a response
     app = Flask(__name__)

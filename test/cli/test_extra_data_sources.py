@@ -584,6 +584,93 @@ def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_pool_skips_values_that_cannot_be_compared(cli, snapshot_cli, ctx):
+    # A custom deserializer may produce maps with non-string keys, which the pool cannot deduplicate.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/vnd.custom": {
+                                    "schema": _object_schema({"id": {"type": "string"}}, required=["id"])
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [_path_param("id")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return "packed", 201, {"Content-Type": "application/vnd.custom"}
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        return jsonify({}), 200
+
+    hooks_module = ctx.write_pymodule("""
+@schemathesis.deserializer("application/vnd.custom")
+def deserialize_custom(ctx, response):
+    return {"id": {1: "packed"}}
+""")
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--max-examples=5",
+            "-c not_a_server_error",
+            "--mode=positive",
+            hooks=hooks_module,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_pool_records_responses_with_unbundlable_schema(cli, snapshot_cli, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "operationId": "listItems",
+                    "responses": {
+                        "200": _json_response({"type": "object", "additionalProperties": {"$ref": "#/info/title"}})
+                    },
+                }
+            },
+        }
+    )
+
+    @app.route("/items", methods=["GET"])
+    def list_items():
+        return jsonify({"name": "first"}), 200
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=fuzzing",
+            "--max-examples=5",
+            "-c not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, snapshot_cli, ctx):
     # Docker Engine /volumes shape: `{Volumes: [...], Warnings: [...]}`. Server-seeded names;
     # no POST creator. UUIDs make blind generation practically incapable of guessing.
@@ -727,6 +814,132 @@ def test_parent_aware_pool_correlates_path_params(cli, snapshot_cli, ctx):
         )
         == snapshot_cli
     )
+
+
+def test_pool_chains_picks_when_no_instance_covers_every_slot(cli, ctx):
+    # No captured resource knows project, user and tag at once, so each slot is picked from its own resource.
+    string = {"type": "string"}
+    projects: list[str] = []
+    users: dict[str, str] = {}
+    tag_calls: list[str | None] = []
+    task_bodies: list[dict] = []
+    tag_lookups: list[tuple[str, str, str]] = []
+
+    def created(name):
+        return {"201": _json_response({"$ref": f"#/components/schemas/{name}"}, description="Created")}
+
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/projects": {
+                "post": {
+                    "operationId": "createProject",
+                    "requestBody": _json_request_body(_object_schema({"name": string}), example={"name": "first"}),
+                    "responses": created("Project"),
+                }
+            },
+            "/projects/{project_id}/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "parameters": [_path_param("project_id", example="ex-project")],
+                    "responses": {**created("User"), "404": {"description": "Not found"}},
+                }
+            },
+            "/tags": {
+                "post": {
+                    "operationId": "createTag",
+                    "requestBody": _json_request_body(_object_schema({"name": string}), example={"name": "first"}),
+                    "responses": created("Tag"),
+                }
+            },
+            "/tags/{tag_id}": {
+                "delete": {
+                    "operationId": "deleteTag",
+                    "parameters": [_path_param("tag_id", example="g-dead")],
+                    "responses": {"204": {"description": "Deleted"}},
+                }
+            },
+            "/tasks": {
+                "post": {
+                    "operationId": "createTask",
+                    "requestBody": _json_request_body(
+                        _object_schema(
+                            {
+                                "project_id": string,
+                                "owner": _object_schema({"user_id": string}, required=["user_id"]),
+                                "tag_id": string,
+                            },
+                            required=["project_id", "owner", "tag_id"],
+                        )
+                    ),
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+            "/projects/{project_id}/users/{user_id}/tags/{tag_id}": {
+                "get": {
+                    "operationId": "getUserTag",
+                    "parameters": [_path_param("project_id"), _path_param("user_id"), _path_param("tag_id")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        components={
+            "schemas": {name: _object_schema({"id": string}, required=["id"]) for name in ("Project", "User", "Tag")}
+        },
+    )
+
+    @app.route("/projects", methods=["POST"])
+    def create_project():
+        projects.append(f"p-{uuid.uuid4().hex}")
+        return jsonify({"id": projects[-1]}), 201
+
+    @app.route("/projects/<project_id>/users", methods=["POST"])
+    def create_user(project_id):
+        # Users live only under the example project, never under the first project the pool knows.
+        if project_id != "ex-project":
+            return "", 404
+        user_id = f"u-{uuid.uuid4().hex}"
+        users[user_id] = project_id
+        return jsonify({"id": user_id}), 201
+
+    @app.route("/tags", methods=["POST"])
+    def create_tag():
+        # The first tag has no id and the second reuses an id deleted earlier.
+        tag_id = [None, "g-dead"][len(tag_calls)] if len(tag_calls) < 2 else f"g-{uuid.uuid4().hex}"
+        tag_calls.append(tag_id)
+        return jsonify({"id": tag_id}), 201
+
+    @app.route("/tags/<tag_id>", methods=["DELETE"])
+    def delete_tag(tag_id):
+        return "", 204
+
+    @app.route("/tasks", methods=["POST"])
+    def create_task():
+        task_bodies.append(request.get_json())
+        return "", 201
+
+    @app.route("/projects/<project_id>/users/<user_id>/tags/<tag_id>", methods=["GET"])
+    def get_user_tag(project_id, user_id, tag_id):
+        tag_lookups.append((project_id, user_id, tag_id))
+        return "", 200
+
+    cli.run_openapi_app(
+        app,
+        "--phases=examples,coverage,fuzzing",
+        "--max-examples=10",
+        "-c not_a_server_error",
+        "--mode=positive",
+    )
+
+    live_tags = set(tag_calls[2:])
+    assert any(
+        project_id in projects and user_id in users and tag_id in live_tags
+        for project_id, user_id, tag_id in tag_lookups
+    )
+    assert any(
+        body["project_id"] in projects and body["owner"]["user_id"] in users and body["tag_id"] in live_tags
+        for body in task_bodies
+    )
+    assert "g-dead" not in {tag_id for *_, tag_id in tag_lookups} | {body["tag_id"] for body in task_bodies}
 
 
 def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, ctx):
@@ -1107,6 +1320,48 @@ def test_extra_data_sources_handles_boolean_body_schema(cli, snapshot_cli, ctx):
         )
         == snapshot_cli
     )
+
+
+def test_extra_data_sources_fills_boolean_schema_property(cli, ctx):
+    project_ids = set()
+    task_project_ids = set()
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/projects": {
+                "post": {
+                    "operationId": "createProject",
+                    "responses": {
+                        "201": _json_response(
+                            _object_schema({"id": {"type": "string"}}, required=["id"]), description="Created"
+                        )
+                    },
+                }
+            },
+            "/tasks": {
+                "post": {
+                    "operationId": "createTask",
+                    "requestBody": _json_request_body(_object_schema({"project_id": True}, required=["project_id"])),
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+        },
+        version="3.1.0",
+    )
+
+    @app.route("/projects", methods=["POST"])
+    def create_project():
+        project_id = f"p-{uuid.uuid4().hex}"
+        project_ids.add(project_id)
+        return jsonify({"id": project_id}), 201
+
+    @app.route("/tasks", methods=["POST"])
+    def create_task():
+        task_project_ids.add(str(request.get_json()["project_id"]))
+        return "", 201
+
+    cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=10", "--mode=positive")
+
+    assert task_project_ids & project_ids
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
