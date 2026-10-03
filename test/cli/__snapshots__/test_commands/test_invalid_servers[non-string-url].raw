@@ -1,0 +1,12 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ❌  Failed to load specification from http://127.0.0.1/openapi.json after 0.00s
+
+ Schema Loading Error
+
+ 'servers[0].url' must be a string
