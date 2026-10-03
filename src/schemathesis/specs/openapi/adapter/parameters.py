@@ -61,6 +61,10 @@ MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
     "It should have either `schema` or `content` keywords defined"
 )
 
+EMPTY_CONTENT_MESSAGE = (
+    "Can not generate data for {location} parameter `{name}`! Its `content` must contain exactly one entry"
+)
+
 INVALID_SCHEMA_MESSAGE = (
     "Can not generate data for {location} parameter `{name}`! Its schema should be an object or boolean, got {schema}"
 )
@@ -1728,8 +1732,12 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
                 location=parameter.get("in", ""), name=parameter.get("name", "<UNKNOWN>")
             ),
         ) from exc
-    options = iter(content.values())
-    media_type_object = next(options)
+    location = parameter.get("in", "")
+    name = parameter.get("name", "<UNKNOWN>")
+    if not content:
+        raise InvalidSchema(EMPTY_CONTENT_MESSAGE.format(location=location, name=name))
+    media_type, media_type_object = next(iter(content.items()))
+    ensure_object(media_type_object, f"Media type `{media_type}` for {location} parameter `{name}`")
     return media_type_object.get("schema", {})
 
 
