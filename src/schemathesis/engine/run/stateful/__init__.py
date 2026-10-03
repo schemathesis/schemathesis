@@ -66,8 +66,12 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         engine.stop()
         status = Status.INTERRUPTED
         yield events.Interrupted(phase=PhaseName.STATEFUL_TESTING)
+    except GeneratorExit:
+        engine.stop()
+        raise
     finally:
-        thread.join()
+        if thread is not threading.current_thread():
+            thread.join()
 
     outage = engine.server.take_report(phase.name)
     if outage is not None:
