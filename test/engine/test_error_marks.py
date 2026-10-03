@@ -11,6 +11,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.jsonschema import make_validator_for
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.engine import Status, events
+from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.examples import ExampleWalk, extract_from_schema
 from test.utils import EventStream
@@ -113,6 +114,17 @@ def test_invalid_headers_example_mark(ctx):
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, InvalidHeadersExample) for event in errors), [
         type(e.value).__name__ for e in errors
+    ]
+
+
+def test_reference_errors_are_titled_as_schema_errors():
+    errors = [
+        InfiniteRecursiveReference("#/components/schemas/Node", ["#/components/schemas/Node"]),
+        UnresolvableReference("#/components/schemas/Missing"),
+    ]
+    assert [EngineErrorInfo(error).format() for error in errors] == [
+        "Schema Error\n\nSchema `#/components/schemas/Node` has a required reference to itself",
+        "Schema Error\n\nReference `#/components/schemas/Missing` cannot be resolved",
     ]
 
 
