@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 from flask import Flask, Response, jsonify, stream_with_context
 from hypothesis import HealthCheck, given, settings
@@ -875,6 +877,28 @@ def test_sse_item_schema_ref_with_composed_branches_enforces_content_schema():
 def test_sse_invalid_schema_reports_invalid_schema(item_schema):
     case, response = _call_sse(_sse_schema(item_schema), 'data: {"value": 42}\n\n')
     with pytest.raises(InvalidSchema):
+        case.validate_response(response, checks=[response_schema_conformance])
+
+
+@pytest.mark.parametrize(
+    "item_schema",
+    [
+        pytest.param({"type": "bogus"}, id="unknown_type"),
+        pytest.param({"required": "not-a-list"}, id="non_list_required"),
+    ],
+)
+def test_sse_invalid_item_schema_reports_formatted_schema_error(item_schema):
+    # SSE itemSchema errors must be reported like any other invalid response schema definition.
+    case, response = _call_sse(_sse_schema(item_schema), 'data: {"value": 42}\n\n')
+    with pytest.raises(InvalidSchema, match=r"Invalid Schema Object in response definition"):
+        case.validate_response(response, checks=[response_schema_conformance])
+
+
+def test_sse_item_schema_with_non_json_value_reports_schema_error():
+    case, response = _call_sse(
+        _sse_schema({"type": "object", "default": datetime.date(2020, 1, 1)}), 'data: {"value": 42}\n\n'
+    )
+    with pytest.raises(InvalidSchema, match=r"Invalid response schema for SSE content validation"):
         case.validate_response(response, checks=[response_schema_conformance])
 
 
