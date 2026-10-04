@@ -1130,6 +1130,51 @@ def test_remote_ref_fails(ctx, kind, cli, app_runner, snapshot_cli):
     )
 
 
+def test_remote_ref_missing_fragment_reports_document_url(ctx, cli, app_runner, snapshot_cli):
+    app = Flask(__name__)
+    path = "/external/parameters.json"
+    base_url = ""
+
+    @app.route("/openapi.json")
+    def openapi():
+        return jsonify(
+            ctx.openapi.build_schema(
+                {
+                    "/test": {
+                        "get": {
+                            "parameters": [
+                                {
+                                    "name": "key",
+                                    "in": "query",
+                                    "required": True,
+                                    "schema": {"$ref": f"{base_url}{path}#/Missing"},
+                                }
+                            ],
+                            "responses": {"200": {"description": "OK"}},
+                        }
+                    }
+                }
+            )
+        )
+
+    @app.route(path)
+    def external():
+        return jsonify({"Other": {"schema": {"type": "string"}}})
+
+    schema_url = app_runner.openapi_url(app)
+    base_url = schema_url.removesuffix("/openapi.json")
+
+    assert (
+        cli.run(
+            schema_url,
+            "--phases=fuzzing",
+            "--checks=not_a_server_error",
+            config={"warnings": False},
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.hypothesis_nested
 def test_bundling_cache_with_shared_references(ctx):
     schema = ctx.openapi.load_schema(

@@ -277,6 +277,18 @@ def resolve_reference(resolver: Resolver, reference: str) -> tuple[Resolver, Any
     return resolve_reference_with_uri(resolver, reference)[1:]
 
 
+def _resolve_document_fragment(target_resolver: Resolver, fragment: str, target_uri: str) -> tuple[str, Resolver, Any]:
+    """Resolve a fragment inside an external document, reporting the full target URI on failure."""
+    try:
+        return resolve_reference_with_uri(target_resolver, f"#{fragment}")
+    except RefResolutionError as exc:
+        # A bare `#/fragment` note reads like a broken reference in the main schema; attribute
+        # it to the document that actually missed the key.
+        # `add_note` is 3.11+, and this error is ours, so mypy has no `__notes__` to see.
+        exc.__notes__ = [target_uri]  # type: ignore[attr-defined]
+        raise
+
+
 def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str, Resolver, Any]:
     """Resolve a `$ref` and return `(target_uri, target_resolver, target_value)`.
 
@@ -294,12 +306,12 @@ def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str,
             if named is not None:
                 named_resolver = Resolver(resolver.inner, named, resolver.ids)
                 if fragment:
-                    return resolve_reference_with_uri(named_resolver, f"#{fragment}")
+                    return _resolve_document_fragment(named_resolver, fragment, resolved_uri)
                 return resolved_uri, named_resolver, named
             document = retrieve(document_uri)
             external_resolver = make_root_resolver(document, location=document_uri)
             if fragment:
-                return resolve_reference_with_uri(external_resolver, f"#{fragment}")
+                return _resolve_document_fragment(external_resolver, fragment, resolved_uri)
             return resolved_uri, external_resolver, document
 
         # Local fragment: walk the bound schema directly. `Registry.lookup()` deep-clones
