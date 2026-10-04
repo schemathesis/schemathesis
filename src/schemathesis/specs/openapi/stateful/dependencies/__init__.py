@@ -20,6 +20,7 @@ from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     disambiguate_path_suffix_matches,
     extract_inputs,
     merge_related_resources,
+    rebind_body_fields_to_unique_producers,
     rebind_inherited_suffix_matches,
     rebind_orphan_synthetics,
     update_input_field_bindings,
@@ -71,6 +72,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
     deferred_nested_fks: dict[str, list[tuple[str, str, str]]] = {}
     deferred_named_scalars: dict[str, list[tuple[str, str, JsonSchema]]] = {}
+    deferred_body_fields: dict[str, list[tuple[str, JsonSchema]]] = {}
     deferred_field_named_path_parameters: dict[str, list[tuple[str, str]]] = {}
 
     # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
@@ -81,6 +83,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             operation = result.ok()
             pending: list[tuple[str, str, str]] = []
             pending_named_scalars: list[tuple[str, str, JsonSchema]] = []
+            pending_body_fields: list[tuple[str, JsonSchema]] = []
             pending_field_named_path_parameters: list[tuple[str, str]] = []
             inputs = list(
                 extract_inputs(
@@ -92,6 +95,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     response_resource_cache=response_resource_cache,
                     deferred_nested_fks=pending,
                     deferred_named_scalars=pending_named_scalars,
+                    deferred_body_fields=pending_body_fields,
                     deferred_field_named_path_parameters=pending_field_named_path_parameters,
                     candidate_resource_names=candidate_resource_names,
                 )
@@ -115,6 +119,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 deferred_nested_fks[operation.label] = pending
             if pending_named_scalars:
                 deferred_named_scalars[operation.label] = pending_named_scalars
+            if pending_body_fields:
+                deferred_body_fields[operation.label] = pending_body_fields
             if pending_field_named_path_parameters:
                 deferred_field_named_path_parameters[operation.label] = pending_field_named_path_parameters
 
@@ -204,6 +210,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Merge parameter-inferred resources with schema-defined ones
     merge_related_resources(operations, resources)
+
+    # Bind required body fields to a producer only when the response field identifies it uniquely.
+    rebind_body_fields_to_unique_producers(operations, deferred_body_fields)
 
     # Rebind orphan synthetics (e.g. `Spouse` from `spouse_id`) to the path-derived parent.
     rebind_orphan_synthetics(operations, resources)

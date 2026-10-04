@@ -6,6 +6,7 @@
 
 - Crash in the coverage phase for large arrays of binary strings.
 - Missing inferred links for paths with generic identifier parameters such as `{identifier}`.
+- Missing inferred links for body fields returned under differently named response schemas.
 - Positive cases violating negated Unicode property patterns such as `\p{L}`.
 - `FutureWarning` printed to stderr for some schema `pattern` values.
 - Display report write failures with the format, path, and operating-system error.

@@ -1372,3 +1372,88 @@ def test_inferred_body_link_sends_a_listed_value(ctx, app_runner, stop_event, me
     )
 
     assert "planted-code" in sent
+
+
+def test_inferred_form_body_link_sends_credentials_from_unique_producer(ctx, app_runner, stop_event):
+    application = {
+        "type": "object",
+        "properties": {
+            "client_id": {"type": "string"},
+            "client_secret": {"type": "string"},
+            "name": {"type": "string"},
+            "msg": {"type": "string"},
+        },
+        "required": ["client_id", "client_secret", "name", "msg"],
+    }
+    token_request = {
+        "type": "object",
+        "properties": {
+            "client_id": {"type": "string"},
+            "client_secret": {"type": "string"},
+            "grant_type": {"type": "string", "enum": ["client_credentials"]},
+        },
+        "required": ["client_id", "client_secret", "grant_type"],
+    }
+    components = {"schemas": {"OAuth2Application": application, "OAuth2TokenRequest": token_request}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/v1/auth_tokens/register/": {
+                "post": {
+                    "operationId": "register",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {"schema": {"$ref": "#/components/schemas/OAuth2Application"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/v1/auth_tokens/token/": {
+                "post": {
+                    "operationId": "token",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/x-www-form-urlencoded": {
+                                "schema": {"$ref": "#/components/schemas/OAuth2TokenRequest"}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        components=components,
+    )
+    sent = []
+
+    @app.route("/v1/auth_tokens/register/", methods=["POST"])
+    def register_application():
+        return jsonify(
+            {
+                "client_id": "registered-client",
+                "client_secret": "registered-secret",
+                "name": "Test application",
+                "msg": "Created",
+            }
+        ), 201
+
+    @app.route("/v1/auth_tokens/token/", methods=["POST"])
+    def create_token():
+        sent.append((request.form.get("client_id"), request.form.get("client_secret")))
+        return jsonify({}), 200
+
+    config = schemathesis.Config.from_dict(
+        {"checks": {"enabled": False}, "generation": {"mode": "positive", "max-examples": 10, "database": "none"}}
+    )
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app), config=config)
+    collect_result(
+        stateful.execute(
+            engine=EngineContext(schema=schema, stop_event=stop_event),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+        )
+    )
+
+    assert ("registered-client", "registered-secret") in sent
