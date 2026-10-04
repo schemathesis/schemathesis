@@ -1,8 +1,7 @@
-import json
-
 import pytest
 
 from scripts.analyze.metrics import _parse_transition_id, _walk_depth, analyze
+from test.tooling.analyze.helpers import scenario, write_run
 
 
 def _stateful_case(case_id, *, parent_id=None, transition=None, applied=False, status=200):
@@ -22,21 +21,6 @@ def _stateful_case(case_id, *, parent_id=None, transition=None, applied=False, s
         case["transition"] = transition
     interaction = {"response": {"status_code": status}} if status is not None else {}
     return {case_id: case}, {case_id: interaction}
-
-
-def _scenario(label, cases, interactions, *, timestamp=100.5):
-    return {
-        "ScenarioFinished": {
-            "timestamp": timestamp,
-            "recorder": {"label": label, "cases": cases, "interactions": interactions},
-        }
-    }
-
-
-def _write(path, payloads):
-    lines = [json.dumps({"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}})]
-    lines.extend(json.dumps(payload) for payload in payloads)
-    path.write_text("\n".join(lines) + "\n")
 
 
 @pytest.mark.parametrize(
@@ -102,7 +86,7 @@ def test_accumulate_transitions_counts_per_id_with_status_split(tmp_path):
         cases.update(c)
         interactions.update(i)
     path = tmp_path / "run.ndjson"
-    _write(path, [_scenario("Stateful tests", cases, interactions)])
+    write_run(path, [scenario("Stateful tests", cases, interactions)])
 
     run = analyze(path)
     by_id = run.transitions.by_id
@@ -142,12 +126,12 @@ def test_depth_aggregation_only_includes_stateful_scenarios(tmp_path):
     stateful_intr.update(chained_intr)
 
     path = tmp_path / "run.ndjson"
-    _write(
+    write_run(
         path,
         [
-            _scenario("Coverage", coverage_cases, coverage_intr),
-            _scenario("Fuzz tests", fuzzing_cases, fuzzing_intr),
-            _scenario("Stateful tests", stateful_cases, stateful_intr),
+            scenario("Coverage", coverage_cases, coverage_intr),
+            scenario("Fuzz tests", fuzzing_cases, fuzzing_intr),
+            scenario("Stateful tests", stateful_cases, stateful_intr),
         ],
     )
 
@@ -171,11 +155,11 @@ def test_distinct_targets_collected_across_scenarios(tmp_path):
     s2_intr.update(i)
 
     path = tmp_path / "run.ndjson"
-    _write(
+    write_run(
         path,
         [
-            _scenario("Stateful tests", s1_cases, s1_intr),
-            _scenario("Stateful tests", s2_cases, s2_intr, timestamp=200.0),
+            scenario("Stateful tests", s1_cases, s1_intr),
+            scenario("Stateful tests", s2_cases, s2_intr, timestamp=200.0),
         ],
     )
 
@@ -186,7 +170,7 @@ def test_distinct_targets_collected_across_scenarios(tmp_path):
 def test_no_transitions_for_stateful_runs_with_only_initial_steps(tmp_path):
     cases, intr = _stateful_case("init", status=200)
     path = tmp_path / "run.ndjson"
-    _write(path, [_scenario("Stateful tests", cases, intr)])
+    write_run(path, [scenario("Stateful tests", cases, intr)])
     run = analyze(path)
     assert run.transitions.by_id == {}
     assert run.transitions.depth.cases == 1

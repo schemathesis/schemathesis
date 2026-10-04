@@ -17,7 +17,7 @@ from schemathesis.generation.value import GeneratedValue
 from schemathesis.python._constants.adapters import default_adapters
 from schemathesis.python._constants.orchestrator import extract_all, extract_registered
 from schemathesis.python._constants.pool import ConstantDraw, ConstantEntry, ConstantsPool, Origin
-from schemathesis.python._constants.registry import SourceRegistry, default_registry
+from schemathesis.python._constants.registry import SourceRegistry
 from schemathesis.specs.graphql.substitution import substitute_constants
 from schemathesis.specs.openapi._hypothesis import _build_form_strategy_with_encoding
 from schemathesis.specs.openapi.adapter.parameters import (
@@ -58,13 +58,6 @@ def _harvested(source, type_):
     return [entry.value for entry in _app_constants(source).entries_for(type_)]
 
 
-@pytest.fixture
-def _clean_registry():
-    default_registry().clear()
-    yield
-    default_registry().clear()
-
-
 def test_constant_from_wsgi_app_unlocks_bug():
     # The high-entropy unlock code exists only in the app source; reaching it requires harvesting it.
     assert buggy_app.UNLOCK_CODE in _harvested(buggy_app.app, "string")
@@ -93,7 +86,7 @@ def test_constant_from_fastapi_app_unlocks_bug():
     assert case.body["code"] == buggy_asgi_app.UNLOCK_CODE
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_registered_constants_apply_to_direct_operation_strategy():
     @schemathesis.python.constants
     def source():
@@ -112,7 +105,7 @@ def test_registered_constants_apply_to_direct_operation_strategy():
     assert case.body["code"] == graphql_string_pool.TOKEN
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_registered_constants_apply_to_direct_state_machine():
     @schemathesis.python.constants
     def source():
@@ -315,7 +308,7 @@ def test_constant_usage_recorded_in_case_metadata():
     assert draw.origin.module == "test.python._constants.fixtures.buggy_app"
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_constants_auto_extracted_from_wsgi_app():
     # No registered source and no explicit pool: loading a WSGI app introspects its modules by default.
     operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app)["/unlock"]["POST"]
@@ -327,7 +320,7 @@ def test_constants_auto_extracted_from_wsgi_app():
     assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_app_constants_are_cached_across_strategy_builds():
     calls = 0
 
@@ -345,7 +338,7 @@ def test_app_constants_are_cached_across_strategy_builds():
     assert calls == 1
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_app_constants_cache_survives_schema_clone():
     # `@schema.parametrize()` clones the schema per test function; each clone must not re-import the app.
     calls = 0
@@ -364,7 +357,7 @@ def test_app_constants_cache_survives_schema_clone():
     assert calls == 1
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_app_constants_cache_is_invalidated_when_registry_changes():
     calls = []
 
@@ -386,7 +379,7 @@ def test_app_constants_cache_is_invalidated_when_registry_changes():
     assert calls == ["first", "first", "second"]
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_constants_auto_extracted_from_asgi_app():
     operation = schemathesis.openapi.from_asgi("/openapi.json", app=buggy_asgi_app.app)["/unlock"]["POST"]
     case = find(
@@ -397,7 +390,7 @@ def test_constants_auto_extracted_from_asgi_app():
     assert any(draw.origin.source == "application" for draw in case._meta.constants_draws)
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_auto_extraction_disabled_by_config():
     config = SchemathesisConfig.from_str("[analysis.constants]\nenabled = false\n")
     operation = schemathesis.openapi.from_wsgi("/openapi.json", app=buggy_app.app, config=config)["/unlock"]["POST"]
@@ -439,7 +432,7 @@ def test_constant_applied_to_graphql_argument():
     assert any(d.value == graphql_app.SECRET_CODE for d in case._meta.constants_draws)
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_constants_auto_extracted_from_graphql_wsgi_app():
     # The strawberry request handler is a library view, but Flask records the app's own module,
     # so its resolver literals are reached without manual registration.
@@ -499,7 +492,7 @@ def test_graphql_constants_cover_scalar_shapes():
         _graphql_case(operations["Query.byColor"], pool, _has_any_draw)
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_graphql_constants_replace_only_some_list_elements():
     def partly_substituted(case):
         tags = graphql.value_from_ast_untyped(
@@ -625,7 +618,7 @@ def test_stateful_prune_keeps_non_body_constant_draws():
     assert _prune_overwritten_body_constants((query_draw, kept_body, overwritten_body), body) == (query_draw, kept_body)
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_registered_constants_extracted_once_until_registry_changes():
     calls = []
 
@@ -1219,7 +1212,7 @@ def test_constant_draw_survives_metadata_round_trip(value):
     assert restored.constants_draws[0].body_path == "/payload/blob"
 
 
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_stateful_body_merge_prunes_overwritten_constant_provenance():
     @schemathesis.python.constants
     def source():

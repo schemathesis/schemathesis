@@ -7,13 +7,10 @@ import pytest
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.run import Phase, PhaseName, stateful
+from schemathesis.engine.run import stateful
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
-
-
-def _stateful_phase() -> Phase:
-    return Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)
+from test.utils import stateful_phase
 
 
 def _run_stateful(ctx, stop_event, *, max_examples=10):
@@ -28,7 +25,7 @@ def _run_stateful(ctx, stop_event, *, max_examples=10):
     )
     schema = schemathesis.openapi.from_url(api.schema_url, config=config)
     engine_ctx = EngineContext(schema=schema, stop_event=stop_event)
-    list(stateful.execute(engine=engine_ctx, phase=_stateful_phase()))
+    list(stateful.execute(engine=engine_ctx, phase=stateful_phase()))
     return engine_ctx
 
 

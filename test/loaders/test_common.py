@@ -12,6 +12,7 @@ from flask import Flask, jsonify
 import schemathesis
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.transport import USER_AGENT
+from test.utils import graphql_url, openapi_url
 
 
 @pytest.mark.parametrize(
@@ -30,19 +31,11 @@ def test_absolute_urls_for_apps(loader):
         loader("http://127.0.0.1:1/schema.json", app=None)  # actual app doesn't matter here
 
 
-def _openapi_url(ctx):
-    return ctx.openapi.apps.success().schema_url
-
-
-def _graphql_url(ctx):
-    return ctx.graphql.apps.books().schema_url
-
-
 @pytest.mark.parametrize(
     ("loader", "make_url"),
     [
-        (schemathesis.openapi.from_url, _openapi_url),
-        (schemathesis.graphql.from_url, _graphql_url),
+        (schemathesis.openapi.from_url, openapi_url),
+        (schemathesis.graphql.from_url, graphql_url),
     ],
 )
 @pytest.mark.parametrize("base_url", ["http://example.com/", "http://example.com"])

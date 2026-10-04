@@ -1,23 +1,25 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 
 import hypothesis
 import hypothesis.errors
 import jsonschema_rs
-from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core.errors import InvalidRegexPattern, InvalidRegexType, InvalidSchema, SerializationNotPossible
-from schemathesis.core.jsonschema import make_validator_for
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
+from test.engine.helpers import (
+    examples_only,
+    raise_invalid_argument,
+    raise_keyboard_interrupt,
+    raise_non_regex_validation_error,
+    raise_regex_validation_error,
+    raise_unsatisfiable,
+    raise_yaml_pattern_as_float_typeerror,
+)
 from test.utils import EventStream
-
-
-def _examples_only(schema) -> EventStream:
-    return EventStream(schema, phases=[PhaseName.EXAMPLES]).execute()
 
 
 def _example_schema(ctx):
@@ -85,13 +87,13 @@ def _hooked_examples_stream(ctx, raise_naturally: Callable[[], None]) -> EventSt
         raise_naturally()
         return strategy
 
-    return _examples_only(schema)
+    return examples_only(schema)
 
 
 def test_examples_phase_skip_when_no_examples_defined(ctx):
     schema = ctx.openapi.load_schema({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert finished
@@ -101,7 +103,7 @@ def test_examples_phase_skip_when_no_examples_defined(ctx):
 
 def test_examples_phase_success_runs_through_iteration(ctx, app_runner):
     app, schema = _items_with_query_example(ctx, app_runner)
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert finished
@@ -112,7 +114,7 @@ def test_examples_phase_success_runs_through_iteration(ctx, app_runner):
 
 def test_examples_phase_failure_status_for_check_failure(ctx, app_runner):
     _, schema = _items_with_query_example(ctx, app_runner, status_code=500)
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert any(event.status == Status.FAILURE for event in finished), [event.status for event in finished]
@@ -122,7 +124,7 @@ def test_examples_phase_promotes_success_to_failure_on_continue_on_failure(ctx, 
     _, schema = _items_with_query_example(ctx, app_runner, status_code=500)
     schema.config.continue_on_failure = True
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert any(event.status == Status.FAILURE for event in finished), [event.status for event in finished]
@@ -135,7 +137,7 @@ def test_examples_phase_translates_generation_exception(ctx):
     def before_generate_query(context, strategy):
         raise RuntimeError("boom during generation")
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any("boom during generation" in str(event.value) for event in errors), [str(e.value) for e in errors]
@@ -152,14 +154,14 @@ def test_examples_phase_drains_deduplicated_errors(ctx):
         def before_call(context, case, **kwargs):
             raise RuntimeError("kaboom")
 
-        stream = _examples_only(schema)
+        stream = examples_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any("kaboom" in str(event.value) for event in errors), [str(e.value) for e in errors]
 
 
 def test_examples_phase_translates_unsatisfiable_during_generation(ctx):
-    stream = _hooked_examples_stream(ctx, _raise_unsatisfiable)
+    stream = _hooked_examples_stream(ctx, raise_unsatisfiable)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert [(type(event.value), str(event.value)) for event in errors] == [
@@ -203,7 +205,7 @@ def test_examples_phase_unsatisfiable_names_the_offending_parameter(ctx):
         }
     )
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert [(type(event.value), str(event.value)) for event in errors] == [
@@ -226,7 +228,7 @@ Nothing satisfies `minimum: 5` and `maximum: 4`""",
 
 
 def test_examples_phase_translates_invalid_argument(ctx):
-    stream = _hooked_examples_stream(ctx, _raise_invalid_argument)
+    stream = _hooked_examples_stream(ctx, raise_invalid_argument)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, hypothesis.errors.InvalidArgument) for event in errors), [
@@ -235,7 +237,7 @@ def test_examples_phase_translates_invalid_argument(ctx):
 
 
 def test_examples_phase_translates_regex_validation_error(ctx):
-    stream = _hooked_examples_stream(ctx, _raise_regex_validation_error)
+    stream = _hooked_examples_stream(ctx, raise_regex_validation_error)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, InvalidRegexPattern) for event in errors), [
@@ -244,14 +246,14 @@ def test_examples_phase_translates_regex_validation_error(ctx):
 
 
 def test_examples_phase_translates_yaml_pattern_as_float(ctx):
-    stream = _hooked_examples_stream(ctx, _raise_yaml_pattern_as_float_typeerror)
+    stream = _hooked_examples_stream(ctx, raise_yaml_pattern_as_float_typeerror)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, InvalidRegexType) for event in errors), [type(e.value).__name__ for e in errors]
 
 
 def test_examples_phase_handles_keyboard_interrupt_during_iteration(ctx):
-    stream = _hooked_examples_stream(ctx, _raise_keyboard_interrupt)
+    stream = _hooked_examples_stream(ctx, raise_keyboard_interrupt)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert any(event.status == Status.INTERRUPTED for event in finished), [event.status for event in finished]
@@ -279,7 +281,7 @@ def test_examples_phase_fill_missing_fallback_defers_unsatisfiable(ctx):
     )
     schema.config.phases.examples.fill_missing = True
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(
@@ -318,7 +320,7 @@ def test_examples_phase_serialization_not_possible_wraps_message(ctx):
         }
     )
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(
@@ -332,7 +334,7 @@ def test_examples_phase_runs_when_error_feedback_disabled(ctx, app_runner):
     _, schema = _items_with_query_example(ctx, app_runner)
     schema.config.phases.fuzzing.error_feedback.is_enabled = False
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert all(event.status == Status.SUCCESS for event in finished), [event.status for event in finished]
@@ -384,40 +386,11 @@ def test_examples_phase_applies_parameter_and_header_overrides(ctx, app_runner):
     assert all(request.query.get("id") == "123" for request in calls)
 
 
-def _raise_unsatisfiable():
-    @hypothesis.given(st.integers().filter(lambda x: False))
-    @hypothesis.settings(max_examples=1, suppress_health_check=list(hypothesis.HealthCheck))
-    def t(_):
-        pass
-
-    t()
-
-
-def _raise_invalid_argument():
-    hypothesis.settings(max_examples=-1)
-
-
-def _raise_regex_validation_error():
-    make_validator_for({"type": "string", "pattern": "[unclosed"})
-
-
-def _raise_non_regex_validation_error():
-    make_validator_for({"type": 12345})
-
-
-def _raise_yaml_pattern_as_float_typeerror():
-    re.compile(12345)
-
-
-def _raise_keyboard_interrupt():
-    raise KeyboardInterrupt
-
-
 def test_examples_phase_emits_missing_path_parameters_error(ctx):
     api = ctx.openapi.apps.missing_path_parameter()
     schema = schemathesis.openapi.from_url(api.schema_url)
 
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(
@@ -430,7 +403,7 @@ def test_examples_phase_emits_missing_path_parameters_error(ctx):
 
 def test_examples_phase_absorbs_non_regex_validation_error(ctx):
     # Non-regex validation errors are absorbed here; Coverage surfaces the schema-level signal.
-    stream = _hooked_examples_stream(ctx, _raise_non_regex_validation_error)
+    stream = _hooked_examples_stream(ctx, raise_non_regex_validation_error)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert all(not isinstance(event.value, jsonschema_rs.ValidationError) for event in errors), [

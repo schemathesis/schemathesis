@@ -25,6 +25,7 @@ import schemathesis.specs.openapi.schemas  # noqa: F401
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core import storage
 from schemathesis.core.transport import Response
+from schemathesis.python._constants.registry import default_registry
 
 from .utils import make_schema
 
@@ -514,3 +515,10 @@ RESPONSE = Response(
 @pytest.fixture
 def mocked_call(mocker):
     mocker.patch("schemathesis.Case.call", return_value=RESPONSE)
+
+
+@pytest.fixture
+def clean_constants_registry():
+    default_registry().clear()
+    yield
+    default_registry().clear()

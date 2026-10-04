@@ -14,11 +14,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.examples import ExampleWalk, extract_from_schema
-from test.utils import EventStream
-
-
-def _examples_only(schema) -> EventStream:
-    return EventStream(schema, phases=[PhaseName.EXAMPLES]).execute()
+from test.engine.helpers import examples_only
 
 
 def _schema_with_query_and_body_example(ctx, *, query_schema=None, extra_operation=None):
@@ -79,7 +75,7 @@ def test_create_test_auth_provider_failure_surfaces_as_non_fatal_error(ctx):
     )
     loaded = schemathesis.openapi.from_dict(schema_dict)
     try:
-        stream = _examples_only(loaded)
+        stream = examples_only(loaded)
     finally:
         schemathesis.auths.unregister()
 
@@ -110,7 +106,7 @@ def test_invalid_headers_example_mark(ctx):
         }
     )
     loaded = schemathesis.openapi.from_dict(schema)
-    stream = _examples_only(loaded)
+    stream = examples_only(loaded)
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, InvalidHeadersExample) for event in errors), [
         type(e.value).__name__ for e in errors
@@ -141,7 +137,7 @@ def test_invalid_regex_example_generation_error(ctx):
         make_validator_for(invalid_schema)
         return strategy
 
-    stream = _examples_only(loaded)
+    stream = examples_only(loaded)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, InvalidRegexPattern) for event in errors), [
@@ -164,7 +160,7 @@ def test_infinite_recursive_reference_example_generation_error(ctx):
 
         return strategy.map(fail)
 
-    stream = _examples_only(loaded)
+    stream = examples_only(loaded)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, InfiniteRecursiveReference) for event in errors), [
@@ -210,7 +206,7 @@ def test_unresolvable_reference_example_generation_error(ctx):
 
         return strategy.map(extract)
 
-    stream = _examples_only(loaded)
+    stream = examples_only(loaded)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any(isinstance(event.value, UnresolvableReference) for event in errors), [
@@ -228,7 +224,7 @@ def test_unresolvable_reference_example_generation_error(ctx):
 def test_missing_path_parameters_mark(ctx):
     api = ctx.openapi.apps.missing_path_parameter()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = _examples_only(schema)
+    stream = examples_only(schema)
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
     assert any("Path parameter 'id' is not defined" in str(event.value) for event in errors), [
         str(e.value) for e in errors

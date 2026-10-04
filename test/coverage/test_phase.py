@@ -3709,20 +3709,6 @@ def test_duplicate_items_case_leaves_the_declared_example_alone(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, cases=parameter_cases)
 
 
-def test_positive_number_near_boundary_respects_multiple_of(ctx):
-    # IEEE-754 subtraction `maximum - multipleOf` drifts (e.g. `99999.99 - 0.01 = 99999.98000000001`).
-    # The validator rejects the drifted value as not a multiple. Decimal-based arithmetic stays exact.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {"amount": {"type": "number", "minimum": 0, "maximum": 99999.99, "multipleOf": 0.01}},
-        },
-        version="2.0",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
-
-
 def test_positive_number_multiple_above_large_minimum(ctx):
     schema = {"type": "number", "multipleOf": 1.1, "minimum": 7e16}
     operation = body_operation(ctx, schema)
@@ -4200,30 +4186,6 @@ def test_required_outside_allof_propagated_into_canonicalised_branches(ctx):
     assert not bad, f"Generated nested object missing outer-required properties. Got: {bad}"
 
 
-def test_positive_body_under_allof_with_optional_outer_property_only(ctx):
-    # Base's `additionalProperties: false` forbids the outer's only optional property in positive cases.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "additionalProperties": False,
-            "allOf": [{"$ref": "#/components/schemas/Base"}],
-            "properties": {"properties": {"properties": {"x": {"type": "string"}}}},
-        },
-        path="/x",
-        components={
-            "schemas": {
-                "Base": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {"etag": {"type": "string"}},
-                }
-            }
-        },
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
-
-
 def test_no_positive_body_under_unsatisfiable_allof_chain(ctx):
     # Base forbids `first`/`second` and Wrapper forbids `baseField`, so the required keys can never be present;
     # coverage may only emit schema-invalid negatives - never a relaxed body labelled positive.
@@ -4265,34 +4227,6 @@ def test_no_positive_body_under_unsatisfiable_allof_chain(ctx):
     run_test(operation, collect)
 
     assert {(body_mode(case), validator.is_valid(case.body)) for case in cases} == {(GenerationMode.NEGATIVE, False)}
-
-
-def test_positive_body_with_sibling_oneof_required_via_ref(ctx):
-    # Sibling `oneOf: [{required: [a]}, {required: [b]}]` makes a and b mutually exclusive;
-    # the combinator filter needs the root bundle attached to resolve sub-refs and apply it.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {"inner": {"$ref": "#/components/schemas/Inner"}},
-        },
-        path="/x",
-        version="3.1.0",
-        components={
-            "schemas": {
-                "Inner": {
-                    "type": "object",
-                    "properties": {
-                        "a": {"$ref": "#/components/schemas/Leaf"},
-                        "b": {"$ref": "#/components/schemas/Leaf"},
-                    },
-                    "oneOf": [{"required": ["a"]}, {"required": ["b"]}],
-                },
-                "Leaf": {"type": "array", "items": {"type": "string"}},
-            }
-        },
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
 
 
 def test_ref_with_type_sibling_dropped_in_openapi_3_0(ctx):
@@ -4647,31 +4581,6 @@ def test_duration_format_generates_required_query_positive_cases(ctx, version):
     assert cases
 
 
-def test_all_of_branch_judging_outer_properties_as_additional(ctx):
-    # The branch sees the outer schema's own properties as additional, so folding the two property
-    # sets together would admit values the branch rejects.
-    operation = body_operation(
-        ctx,
-        {"$ref": "#/components/schemas/Outer"},
-        path="/x",
-        components={
-            "schemas": {
-                "Base": {
-                    "type": "object",
-                    "additionalProperties": {"type": "object"},
-                    "properties": {"a": {"type": "string"}},
-                },
-                "Outer": {
-                    "allOf": [{"$ref": "#/components/schemas/Base"}],
-                    "type": "object",
-                    "properties": {"b": {"type": "boolean"}},
-                },
-            }
-        },
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
-
-
 def test_positive_body_covers_nested_enum_under_an_unfoldable_all_of(ctx):
     operation = body_operation(
         ctx,
@@ -4749,31 +4658,6 @@ def test_no_positive_body_when_an_inherited_required_property_admits_nothing(ctx
     )
 
     assert iter_cases(operation, GenerationMode.POSITIVE) == []
-
-
-def test_all_of_branch_that_stays_a_reference(ctx):
-    # A branch left as a bare reference cannot carry its siblings' constraints - `$ref` wins over them.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {"data": {"$ref": "#/components/schemas/Outer"}},
-        },
-        path="/x",
-        components={
-            "schemas": {
-                "Inner": {"allOf": [{"type": "object"}]},
-                "Middle": {"allOf": [{"$ref": "#/components/schemas/Inner"}]},
-                "Outer": {
-                    "allOf": [
-                        {"$ref": "#/components/schemas/Middle"},
-                        {"properties": {"workspace": {"type": "string"}}, "required": ["workspace"]},
-                    ]
-                },
-            }
-        },
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
 @pytest.mark.parametrize(
@@ -5396,46 +5280,6 @@ def test_coverage_negative_max_length_preserved_in_optimized_schema(ctx):
     assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, cases=max_length_cases)
 
 
-def test_coverage_positive_pattern_skipped_for_non_string_type(ctx):
-    # When a schema has 'pattern' alongside a non-string 'type', the coverage
-    # phase must not generate string values as POSITIVE cases — they violate 'type'
-    # and are schema-invalid, causing false positive_data_acceptance failures.
-    operation = body_operation(ctx, {"type": "number", "pattern": "[0-9]{4}"}, path="/pin")
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
-
-
-def test_coverage_positive_allof_ref_property_merge(ctx):
-    # Multi-level allOf chain (Child -> Intermediate -> Base) where Base defines 'location'.
-    # canonicalish leaves an unresolved $ref inside the merged schema; cover_schema_iter must
-    # deep-merge 'properties' from the resolved ref, not overwrite, so 'location' stays present.
-    operation = body_operation(
-        ctx,
-        {"$ref": "#/definitions/Child"},
-        parameters=[{"name": "name", "in": "path", "required": True, "type": "string"}],
-        path="/resources/{name}",
-        method="put",
-        version="2.0",
-        definitions={
-            "Base": {
-                "properties": {
-                    "location": {"type": "string"},
-                    "id": {"type": "string", "readOnly": True},
-                }
-            },
-            "Intermediate": {
-                "allOf": [{"$ref": "#/definitions/Base"}],
-                "properties": {"tags": {"type": "object", "additionalProperties": {"type": "string"}}},
-                "required": ["location"],
-            },
-            "Child": {
-                "allOf": [{"$ref": "#/definitions/Intermediate"}],
-                "properties": {"extra": {"type": "string"}},
-            },
-        },
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
-
-
 def test_coverage_body_with_boolean_property_key_negative(ctx):
     operation = body_operation(
         ctx,
@@ -5473,81 +5317,6 @@ def test_coverage_form_urlencoded_binary_format_negative(ctx):
     assert len(cases) > 0
     for case in cases:
         assert case.meta.phase.name == TestPhase.COVERAGE
-
-
-def test_coverage_negative_empty_dict_additional_properties_not_treated_as_false(ctx):
-    # `additionalProperties: {}` is equivalent to `true` — any extra property is valid.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {
-                "params": {
-                    "type": "object",
-                    "additionalProperties": {},
-                },
-                "query": {"type": "string"},
-            },
-            "required": ["query"],
-        },
-        path="/search",
-    )
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=generate_cases, validate_formats=False)
-
-
-def test_coverage_negative_pattern_with_control_chars_uses_schema_validator(ctx):
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "pattern": r"^.{0,99}\S$",
-                    "minLength": 1,
-                    "maxLength": 100,
-                }
-            },
-            "required": ["name"],
-        },
-        path="/items",
-    )
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=generate_cases, validate_formats=False)
-
-
-def test_coverage_positive_body_uuid_format_with_uppercase_pattern(ctx):
-    # A property schema with format:uuid AND a pattern that restricts to uppercase hex
-    # must generate a POSITIVE value that is valid for BOTH constraints - i.e. an
-    # uppercase UUID with hyphens.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {
-                "templateId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^[0-9A-F]{8}[-]?[0-9A-F]{4}[-]?[0-9A-F]{4}[-]?[0-9A-F]{4}[-]?[0-9A-F]{12}$",
-                }
-            },
-        },
-        path="/docs",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases)
-
-
-def test_coverage_positive_body_required_format_with_wider_pattern(ctx):
-    # A lowercase UUID satisfies both keywords, so this required property must not sink the whole body.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "required": ["id"],
-            "properties": {"id": {"type": "string", "format": "uuid", "pattern": "^[0-9a-f-]+$"}},
-        },
-        path="/docs",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases)
 
 
 def test_coverage_positive_body_only_long_enough_pattern_branch_satisfies_format(ctx):
@@ -5592,51 +5361,6 @@ def test_coverage_positive_body_only_long_enough_pattern_branch_violates_format(
         path="/reports",
     )
     assert assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases) == [{}]
-
-
-def test_coverage_positive_body_skips_properties_with_no_valid_enum_values(ctx):
-    # A property schema like {enum: ["MALE", "FEMALE"], maxLength: 1} has contradictory
-    # constraints — all enum values violate maxLength. The coverage phase must not pick
-    # an invalid enum value as the positive body template, causing POSITIVE body failures.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string"},
-                "gender": {
-                    "type": "string",
-                    "enum": ["MALE", "FEMALE", "UNKNOWN"],
-                    "maxLength": 1,
-                },
-            },
-            "required": ["name"],
-        },
-        path="/users",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases, validate_formats=False)
-
-
-def test_coverage_positive_object_type_with_items(ctx):
-    # Schema property with type:"object" and "items" (a schema inconsistency) must not
-    # cause generate_from_schema to produce a list — the items/type fast path must only
-    # trigger for type:"array", not type:"object".
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "required": ["value"],
-            "properties": {
-                "ids": {
-                    "type": "object",
-                    "items": {"type": "string"},
-                },
-                "value": {"type": "string"},
-            },
-        },
-        path="/register",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
 def test_items_with_conflicting_object_type_gets_negative_coverage(ctx):
@@ -5909,26 +5633,6 @@ def test_oneof_ref_branches_with_discriminator_each_get_distinct_positive_covera
     assert creds_only > 0 and assume_only > 0, f"creds_only={creds_only}, assume_only={assume_only}"
 
 
-def test_coverage_negative_string_length_with_enum(ctx):
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "required": ["version"],
-            "properties": {
-                "version": {
-                    "type": "string",
-                    "enum": ["1.2", "1.3"],
-                    "minLength": 3,
-                    "maxLength": 3,
-                }
-            },
-        },
-        path="/submit",
-    )
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False)
-
-
 def test_negative_enum_emits_entries_with_type_mismatch_for_keyword_coverage(ctx):
     # Positive path skips every entry as `type`-invalid, so only negatives can exercise `enum` here.
     operation = body_operation(
@@ -6122,21 +5826,6 @@ def test_coverage_positive_template_skips_false_schema_property(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, cases=iter_cases(operation, GenerationMode.NEGATIVE))
 
 
-def test_coverage_negative_string_length_nullable(ctx):
-    # STRING_ABOVE_MAX_LENGTH / STRING_BELOW_MIN_LENGTH must produce a string, not `None`,
-    # when the schema has `type: ["string", "null"]`.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {"name": {"type": ["string", "null"], "maxLength": 10}},
-        },
-        path="/items",
-    )
-
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False)
-
-
 def test_negative_min_length_emitted_when_pattern_requires_more_than_bound(ctx):
     # When `minLength > 1` AND `pattern` requires more chars than `minLength - 1`,
     # the bounded draw is unsatisfiable; fall back to truncation rather than dropping the negative.
@@ -6246,81 +5935,6 @@ def test_coverage_positive_oneof_body_valid_for_whole_schema(ctx):
             assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid for oneOf: {case.body!r}"
 
 
-def test_coverage_positive_body_ref_with_pattern_and_length_constraints(ctx):
-    # POSITIVE bodies must satisfy the anchored pattern even when the object body uses
-    # `additionalProperties: false` alongside `$ref` properties with pattern/length constraints.
-    operation = body_operation(
-        ctx,
-        {"$ref": "#/components/schemas/TaskRequest"},
-        path="/tasks",
-        components={
-            "schemas": {
-                "TaskRequest": {
-                    "type": "object",
-                    "required": ["TaskId"],
-                    "properties": {"TaskId": {"$ref": "#/components/schemas/BatchLoadTaskId"}},
-                    "additionalProperties": False,
-                },
-                "BatchLoadTaskId": {
-                    "type": "string",
-                    "pattern": "[A-Z0-9]+",
-                    "minLength": 3,
-                    "maxLength": 32,
-                },
-            }
-        },
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
-
-
-def test_coverage_positive_body_oneof_branch_required_field_missing_from_branch_properties(ctx):
-    # POSITIVE bodies must satisfy the full schema when a oneOf branch requires a field
-    # that is defined only in the parent schema's properties, not in the branch's own properties.
-    operation = body_operation(
-        ctx,
-        {
-            "oneOf": [
-                {
-                    "additionalProperties": True,
-                    "properties": {"status": {"enum": ["completed"]}},
-                    "required": ["status", "conclusion"],
-                },
-                {
-                    "additionalProperties": True,
-                    "properties": {"status": {"enum": ["queued"]}},
-                },
-            ],
-            "properties": {
-                "name": {"type": "string"},
-                "head_sha": {"type": "string"},
-                "status": {"enum": ["queued", "completed"], "type": "string"},
-                "conclusion": {
-                    "enum": ["success", "failure"],
-                    "type": "string",
-                },
-            },
-            "required": ["name", "head_sha"],
-            "type": "object",
-        },
-        path="/runs",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
-
-
-def test_coverage_negative_format_nullable(ctx):
-    # INVALID_FORMAT must produce a non-null string when the schema has `type: ["string", "null"]`.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {"email": {"type": ["string", "null"], "format": "email"}},
-        },
-        path="/items",
-    )
-
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False)
-
-
 def test_coverage_form_urlencoded_primitive_body_negative_no_crash(ctx):
     operation = body_operation(
         ctx, {"type": "integer", "format": "int32"}, media_type="application/x-www-form-urlencoded", path="/convert"
@@ -6355,64 +5969,6 @@ def test_coverage_negative_string_above_max_length_invalid_when_pattern_quantifi
         generate_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.STRING_ABOVE_MAX_LENGTH
     )
     assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, cases=above_max_cases, validate_formats=False)
-
-
-def test_coverage_negative_max_length_preserved_when_pattern_has_inner_quantifier(ctx):
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "required": ["namespace"],
-            "properties": {
-                "namespace": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-                    "minLength": 1,
-                    "maxLength": 63,
-                }
-            },
-        },
-        path="/items",
-    )
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=generate_cases, validate_formats=False)
-
-
-def test_coverage_negative_max_length_preserved_when_outer_optional_group_has_variable_inner(ctx):
-    # Optional group with variable inner: minLength absorbed (? to {1}) but maxLength unrepresentable.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "required": ["key"],
-            "properties": {
-                "key": {
-                    "type": "string",
-                    "pattern": r"^([a-zA-Z0-9!_.*'()-][/a-zA-Z0-9!_.*'()-]*)?$",
-                    "minLength": 1,
-                    "maxLength": 5,
-                }
-            },
-        },
-        path="/items",
-    )
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=generate_cases, validate_formats=False)
-
-
-def test_coverage_negative_missing_required_with_additional_properties_schema(ctx):
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {
-                "type": {"type": "string"},
-                "linkedServiceName": {"type": "object"},
-            },
-            "additionalProperties": {"type": "object"},
-            "required": ["type", "linkedServiceName"],
-        },
-        path="/items",
-    )
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=generate_cases, validate_formats=False)
 
 
 @pytest.mark.parametrize(
@@ -6491,27 +6047,6 @@ def test_coverage_positive_pattern_with_branch_group_not_corrupted(ctx):
     assert len(positive_cases) > 0
     for case in positive_cases:
         assert validator.is_valid(case.query["name"]), f"Rewritten pattern corrupted: {case.query['name']!r}"
-
-
-def test_coverage_positive_pattern_with_variable_suffix_not_overconstrained(ctx):
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "required": ["lastName"],
-            "properties": {
-                "lastName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 30,
-                    "pattern": r"^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\.?$",
-                    "example": "Franklin",
-                }
-            },
-        },
-        path="/owners",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=generate_cases, validate_formats=False)
 
 
 def test_coverage_positive_property_names_enum_respected(ctx):
@@ -6629,47 +6164,6 @@ def test_negative_data_rejection_no_false_positive_for_multipart_body_type_mutat
         assert negative_data_rejection(ctx_check, response, case) is None, (
             f"False positive: body {case.body!r} ({type(case.body).__name__})"
         )
-
-
-def test_coverage_positive_body_nested_allof_inner_required_preserved(ctx):
-    # Required fields from the second inner $ref (e.g. 'direction') must appear in POSITIVE bodies
-    # when a oneOf branch resolves to allOf[{$ref: base}, {$ref: extension}].
-    operation = body_operation(
-        ctx,
-        {
-            "discriminator": {"propertyName": "product"},
-            "oneOf": [{"$ref": "#/components/schemas/SMS"}],
-        },
-        path="/reports",
-        components={
-            "schemas": {
-                "SMS": {
-                    "allOf": [
-                        {"$ref": "#/components/schemas/base_request"},
-                        {"$ref": "#/components/schemas/sms_fields"},
-                    ]
-                },
-                "base_request": {
-                    "type": "object",
-                    "properties": {
-                        "product": {"type": "string"},
-                        "account_id": {"type": "string"},
-                    },
-                    "required": ["product", "account_id"],
-                },
-                "sms_fields": {
-                    "type": "object",
-                    "properties": {
-                        "product": {"type": "string"},
-                        "account_id": {"type": "string"},
-                        "direction": {"type": "string"},
-                    },
-                    "required": ["product", "account_id", "direction"],
-                },
-            }
-        },
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
 def test_coverage_positive_body_string_type_with_empty_properties(ctx):
@@ -6805,28 +6299,6 @@ def test_coverage_positive_oneof_branch_with_conflicting_root_type(ctx):
         ],
     }
     collect_coverage_cases(ctx, body_schema, positive=True)
-
-
-def test_coverage_positive_body_anyof_const_null_excluded_by_sibling_type(ctx):
-    # When anyOf has a {const: null} branch but the sibling `type` constraint forbids null,
-    # POSITIVE coverage must not yield null as a valid value for that property.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "required": ["count"],
-            "properties": {
-                "count": {
-                    "anyOf": [{"const": None}, {"type": "integer", "minimum": 0}],
-                    "type": "integer",
-                    "minimum": 0,
-                }
-            },
-        },
-        path="/items",
-        version="3.1.0",
-    )
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
 def test_coverage_positive_body_nested_required_unsatisfiable_field(ctx):
@@ -7052,54 +6524,6 @@ def test_coverage_form_urlencoded_filters_nested_wire_identical_mutations(ctx):
         path="/t",
     )
     _assert_form_negatives_survive_stringification(operation)
-
-
-def test_coverage_array_above_max_items_with_complex_items_schema(ctx):
-    # Every NEGATIVE body must fail schema validation.
-    operation = body_operation(
-        ctx,
-        {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "maxItems": 20,
-                    "items": {
-                        "oneOf": [
-                            {
-                                "allOf": [
-                                    {
-                                        "type": "object",
-                                        "required": ["type", "role", "content"],
-                                        "properties": {
-                                            "role": {
-                                                "type": "string",
-                                                "enum": ["user", "assistant"],
-                                            },
-                                            "content": {
-                                                "oneOf": [
-                                                    {"type": "string"},
-                                                    {"type": "array"},
-                                                ]
-                                            },
-                                            "type": {
-                                                "type": "string",
-                                                "enum": ["message"],
-                                            },
-                                        },
-                                    },
-                                    {"properties": {"type": {"const": "EasyInputMessage"}}},
-                                ]
-                            }
-                        ],
-                        "discriminator": {"propertyName": "type"},
-                    },
-                }
-            },
-        },
-        path="/items",
-    )
-    assert_bodies(operation, GenerationMode.NEGATIVE, valid=False)
 
 
 def test_coverage_array_above_max_items_with_draft_mismatch_sibling(ctx):
@@ -8681,6 +8105,590 @@ def test_coverage_bodies_match_their_mode(ctx, version, body):
     assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=collect_cases)
 
 
+@pytest.mark.parametrize(
+    ("mode", "body", "schema_kwargs", "assert_kwargs"),
+    [
+        # Float subtraction drifts off the multiple (`99999.99 - 0.01 = 99999.98000000001`).
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "properties": {"amount": {"type": "number", "minimum": 0, "maximum": 99999.99, "multipleOf": 0.01}},
+            },
+            {"version": "2.0"},
+            {},
+            id="positive_number_near_boundary_respects_multiple_of",
+        ),
+        # Base's `additionalProperties: false` forbids the outer's only optional property.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "allOf": [{"$ref": "#/components/schemas/Base"}],
+                "properties": {"properties": {"properties": {"x": {"type": "string"}}}},
+            },
+            {
+                "components": {
+                    "schemas": {
+                        "Base": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {"etag": {"type": "string"}},
+                        }
+                    }
+                }
+            },
+            {"source": collect_cases},
+            id="positive_body_under_allof_with_optional_outer_property_only",
+        ),
+        # Sibling `oneOf` over `required` makes `a` and `b` mutually exclusive behind a reference.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"type": "object", "properties": {"inner": {"$ref": "#/components/schemas/Inner"}}},
+            {
+                "version": "3.1.0",
+                "components": {
+                    "schemas": {
+                        "Inner": {
+                            "type": "object",
+                            "properties": {
+                                "a": {"$ref": "#/components/schemas/Leaf"},
+                                "b": {"$ref": "#/components/schemas/Leaf"},
+                            },
+                            "oneOf": [{"required": ["a"]}, {"required": ["b"]}],
+                        },
+                        "Leaf": {"type": "array", "items": {"type": "string"}},
+                    }
+                },
+            },
+            {"source": collect_cases},
+            id="positive_body_with_sibling_oneof_required_via_ref",
+        ),
+        # The branch judges the outer schema's own properties as additional.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"$ref": "#/components/schemas/Outer"},
+            {
+                "components": {
+                    "schemas": {
+                        "Base": {
+                            "type": "object",
+                            "additionalProperties": {"type": "object"},
+                            "properties": {"a": {"type": "string"}},
+                        },
+                        "Outer": {
+                            "allOf": [{"$ref": "#/components/schemas/Base"}],
+                            "type": "object",
+                            "properties": {"b": {"type": "boolean"}},
+                        },
+                    }
+                }
+            },
+            {},
+            id="all_of_branch_judging_outer_properties_as_additional",
+        ),
+        # A branch left as a bare reference cannot carry its siblings' constraints.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"type": "object", "properties": {"data": {"$ref": "#/components/schemas/Outer"}}},
+            {
+                "components": {
+                    "schemas": {
+                        "Inner": {"allOf": [{"type": "object"}]},
+                        "Middle": {"allOf": [{"$ref": "#/components/schemas/Inner"}]},
+                        "Outer": {
+                            "allOf": [
+                                {"$ref": "#/components/schemas/Middle"},
+                                {"properties": {"workspace": {"type": "string"}}, "required": ["workspace"]},
+                            ]
+                        },
+                    }
+                }
+            },
+            {},
+            id="all_of_branch_that_stays_a_reference",
+        ),
+        # `pattern` beside a non-string `type` must not yield strings.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"type": "number", "pattern": "[0-9]{4}"},
+            {},
+            {},
+            id="coverage_positive_pattern_skipped_for_non_string_type",
+        ),
+        # A multi-level `allOf` chain keeps `location` from the base schema.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"$ref": "#/definitions/Child"},
+            {
+                "parameters": [{"name": "name", "in": "path", "required": True, "type": "string"}],
+                "path": "/resources/{name}",
+                "method": "put",
+                "version": "2.0",
+                "definitions": {
+                    "Base": {
+                        "properties": {"location": {"type": "string"}, "id": {"type": "string", "readOnly": True}}
+                    },
+                    "Intermediate": {
+                        "allOf": [{"$ref": "#/definitions/Base"}],
+                        "properties": {"tags": {"type": "object", "additionalProperties": {"type": "string"}}},
+                        "required": ["location"],
+                    },
+                    "Child": {
+                        "allOf": [{"$ref": "#/definitions/Intermediate"}],
+                        "properties": {"extra": {"type": "string"}},
+                    },
+                },
+            },
+            {},
+            id="coverage_positive_allof_ref_property_merge",
+        ),
+        # `additionalProperties: {}` allows any extra property.
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {
+                "type": "object",
+                "properties": {"params": {"type": "object", "additionalProperties": {}}, "query": {"type": "string"}},
+                "required": ["query"],
+            },
+            {},
+            {"source": generate_cases, "validate_formats": False},
+            id="coverage_negative_empty_dict_additional_properties_not_treated_as_false",
+        ),
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {
+                "type": "object",
+                "properties": {"name": {"type": "string", "pattern": "^.{0,99}\\S$", "minLength": 1, "maxLength": 100}},
+                "required": ["name"],
+            },
+            {},
+            {"source": generate_cases, "validate_formats": False},
+            id="coverage_negative_pattern_with_control_chars_uses_schema_validator",
+        ),
+        # Values satisfy both `format: uuid` and an uppercase-only pattern.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "properties": {
+                    "templateId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^[0-9A-F]{8}[-]?[0-9A-F]{4}[-]?[0-9A-F]{4}[-]?[0-9A-F]{4}[-]?[0-9A-F]{12}$",
+                    }
+                },
+            },
+            {},
+            {"source": generate_cases},
+            id="coverage_positive_body_uuid_format_with_uppercase_pattern",
+        ),
+        # A lowercase UUID satisfies both keywords, so the required property must not sink the body.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "required": ["id"],
+                "properties": {"id": {"type": "string", "format": "uuid", "pattern": "^[0-9a-f-]+$"}},
+            },
+            {},
+            {"source": generate_cases},
+            id="coverage_positive_body_required_format_with_wider_pattern",
+        ),
+        # Every enum value violates `maxLength`, so none can serve as the positive template.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "gender": {"type": "string", "enum": ["MALE", "FEMALE", "UNKNOWN"], "maxLength": 1},
+                },
+                "required": ["name"],
+            },
+            {},
+            {"source": generate_cases, "validate_formats": False},
+            id="coverage_positive_body_skips_properties_with_no_valid_enum_values",
+        ),
+        # `items` beside `type: object` must not produce a list.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "required": ["value"],
+                "properties": {"ids": {"type": "object", "items": {"type": "string"}}, "value": {"type": "string"}},
+            },
+            {},
+            {},
+            id="coverage_positive_object_type_with_items",
+        ),
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {
+                "type": "object",
+                "required": ["version"],
+                "properties": {"version": {"type": "string", "enum": ["1.2", "1.3"], "minLength": 3, "maxLength": 3}},
+            },
+            {},
+            {},
+            id="coverage_negative_string_length_with_enum",
+        ),
+        # Length violations stay strings when the type also allows `null`.
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {"type": "object", "properties": {"name": {"type": ["string", "null"], "maxLength": 10}}},
+            {},
+            {},
+            id="coverage_negative_string_length_nullable",
+        ),
+        # The anchored pattern holds for `$ref` properties under `additionalProperties: false`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"$ref": "#/components/schemas/TaskRequest"},
+            {
+                "components": {
+                    "schemas": {
+                        "TaskRequest": {
+                            "type": "object",
+                            "required": ["TaskId"],
+                            "properties": {"TaskId": {"$ref": "#/components/schemas/BatchLoadTaskId"}},
+                            "additionalProperties": False,
+                        },
+                        "BatchLoadTaskId": {"type": "string", "pattern": "[A-Z0-9]+", "minLength": 3, "maxLength": 32},
+                    }
+                }
+            },
+            {},
+            id="coverage_positive_body_ref_with_pattern_and_length_constraints",
+        ),
+        # A `oneOf` branch requires a field defined only in the parent's properties.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "oneOf": [
+                    {
+                        "additionalProperties": True,
+                        "properties": {"status": {"enum": ["completed"]}},
+                        "required": ["status", "conclusion"],
+                    },
+                    {"additionalProperties": True, "properties": {"status": {"enum": ["queued"]}}},
+                ],
+                "properties": {
+                    "name": {"type": "string"},
+                    "head_sha": {"type": "string"},
+                    "status": {"enum": ["queued", "completed"], "type": "string"},
+                    "conclusion": {"enum": ["success", "failure"], "type": "string"},
+                },
+                "required": ["name", "head_sha"],
+                "type": "object",
+            },
+            {},
+            {},
+            id="coverage_positive_body_oneof_branch_required_field_missing_from_branch_properties",
+        ),
+        # Invalid formats stay strings when the type also allows `null`.
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {"type": "object", "properties": {"email": {"type": ["string", "null"], "format": "email"}}},
+            {},
+            {},
+            id="coverage_negative_format_nullable",
+        ),
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {
+                "type": "object",
+                "required": ["namespace"],
+                "properties": {
+                    "namespace": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                        "minLength": 1,
+                        "maxLength": 63,
+                    }
+                },
+            },
+            {},
+            {"source": generate_cases, "validate_formats": False},
+            id="coverage_negative_max_length_preserved_when_pattern_has_inner_quantifier",
+        ),
+        # Optional group with a variable inner part: `maxLength` is not representable in the pattern.
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {
+                "type": "object",
+                "required": ["key"],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "pattern": "^([a-zA-Z0-9!_.*'()-][/a-zA-Z0-9!_.*'()-]*)?$",
+                        "minLength": 1,
+                        "maxLength": 5,
+                    }
+                },
+            },
+            {},
+            {"source": generate_cases, "validate_formats": False},
+            id="coverage_negative_max_length_preserved_when_outer_optional_group_has_variable_inner",
+        ),
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {
+                "type": "object",
+                "properties": {"type": {"type": "string"}, "linkedServiceName": {"type": "object"}},
+                "additionalProperties": {"type": "object"},
+                "required": ["type", "linkedServiceName"],
+            },
+            {},
+            {"source": generate_cases, "validate_formats": False},
+            id="coverage_negative_missing_required_with_additional_properties_schema",
+        ),
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "required": ["lastName"],
+                "properties": {
+                    "lastName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 30,
+                        "pattern": "^[a-zA-Z]+([ '-][a-zA-Z]+){0,2}\\.?$",
+                        "example": "Franklin",
+                    }
+                },
+            },
+            {},
+            {"source": generate_cases, "validate_formats": False},
+            id="coverage_positive_pattern_with_variable_suffix_not_overconstrained",
+        ),
+        # Required fields from the second `allOf` reference in a `oneOf` branch are kept.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"discriminator": {"propertyName": "product"}, "oneOf": [{"$ref": "#/components/schemas/SMS"}]},
+            {
+                "components": {
+                    "schemas": {
+                        "SMS": {
+                            "allOf": [
+                                {"$ref": "#/components/schemas/base_request"},
+                                {"$ref": "#/components/schemas/sms_fields"},
+                            ]
+                        },
+                        "base_request": {
+                            "type": "object",
+                            "properties": {"product": {"type": "string"}, "account_id": {"type": "string"}},
+                            "required": ["product", "account_id"],
+                        },
+                        "sms_fields": {
+                            "type": "object",
+                            "properties": {
+                                "product": {"type": "string"},
+                                "account_id": {"type": "string"},
+                                "direction": {"type": "string"},
+                            },
+                            "required": ["product", "account_id", "direction"],
+                        },
+                    }
+                }
+            },
+            {},
+            id="coverage_positive_body_nested_allof_inner_required_preserved",
+        ),
+        # The `const: null` branch is excluded by the sibling `type`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "required": ["count"],
+                "properties": {
+                    "count": {
+                        "anyOf": [{"const": None}, {"type": "integer", "minimum": 0}],
+                        "type": "integer",
+                        "minimum": 0,
+                    }
+                },
+            },
+            {"version": "3.1.0"},
+            {},
+            id="coverage_positive_body_anyof_const_null_excluded_by_sibling_type",
+        ),
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "allOf": [
+                                        {
+                                            "type": "object",
+                                            "required": ["type", "role", "content"],
+                                            "properties": {
+                                                "role": {"type": "string", "enum": ["user", "assistant"]},
+                                                "content": {"oneOf": [{"type": "string"}, {"type": "array"}]},
+                                                "type": {"type": "string", "enum": ["message"]},
+                                            },
+                                        },
+                                        {"properties": {"type": {"const": "EasyInputMessage"}}},
+                                    ]
+                                }
+                            ],
+                            "discriminator": {"propertyName": "type"},
+                        },
+                    }
+                },
+            },
+            {},
+            {},
+            id="coverage_array_above_max_items_with_complex_items_schema",
+        ),
+        # ECMA-262 without the `u` flag allows identity escapes such as `\-`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"type": "object", "properties": {"latitude": {"type": "string", "pattern": "^\\-?\\d+$"}}},
+            {},
+            {},
+            id="coverage_pattern_with_identity_escape_in_body",
+        ),
+        # `host` is required but has no definition in `properties`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "required": ["name", "host"],
+                "properties": {"name": {"type": "string"}, "port": {"type": "integer"}},
+            },
+            {},
+            {},
+            id="required_property_not_in_properties_is_generated",
+        ),
+        # `false` in a string enum, as YAML parses a bare `NO`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"type": "object", "properties": {"country": {"type": "string", "enum": ["US", "GB", False]}}},
+            {},
+            {},
+            id="invalid_enum_values_excluded_from_positive_cases",
+        ),
+        # `false` in a string items enum, as YAML parses a bare `NO`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "properties": {
+                    "countries": {"type": "array", "items": {"type": "string", "enum": ["US", "GB", False]}}
+                },
+            },
+            {},
+            {},
+            id="invalid_enum_items_excluded_from_positive_array_cases",
+        ),
+        # Outer properties without an explicit type beside an `allOf` that declares required fields.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "allOf": [{"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}],
+                "properties": {"details": {"properties": {"key": {"type": "string"}}}},
+            },
+            {"method": "put"},
+            {},
+            id="allof_with_outer_properties_includes_required_fields",
+        ),
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "allOf": [{"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}],
+                "properties": {"details": {"properties": {"key": {"type": "string"}}}},
+            },
+            {"method": "put"},
+            {},
+            id="allof_with_explicit_type_object_includes_required_fields",
+        ),
+        # Azure's `7.00:00:00` default is not an ISO 8601 duration, so it must not become a constant.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "properties": {
+                    "constraints": {
+                        "type": "object",
+                        "properties": {
+                            "maxWallClockTime": {"type": "string", "format": "duration", "default": "7.00:00:00"}
+                        },
+                    }
+                },
+            },
+            {"method": "put"},
+            {},
+            id="format_invalid_default_not_used_as_const",
+        ),
+        # `maxItems: 0` permits only `[]`.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "properties": {
+                    "stacks": {"type": "array", "maxItems": 0, "items": {"type": "string", "enum": ["unknown"]}}
+                },
+            },
+            {},
+            {},
+            id="positive_array_with_maxitems_zero",
+        ),
+        # The `not` flip must still satisfy the outer property types.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {
+                "type": "object",
+                "properties": {"image_url": {"type": "string"}, "file_id": {"type": "string"}},
+                "anyOf": [{"required": ["image_url"]}, {"required": ["file_id"]}],
+                "not": {"required": ["image_url", "file_id"]},
+                "additionalProperties": False,
+            },
+            {"version": "3.1.0"},
+            {},
+            id="positive_not_flip_validates_against_outer_constraints",
+        ),
+        # `minLength`/`maxLength` do not apply to an integer.
+        pytest.param(
+            GenerationMode.NEGATIVE,
+            {"type": "object", "properties": {"ttl": {"type": "integer", "minLength": 30, "maxLength": 3600}}},
+            {},
+            {},
+            id="minlength_maxlength_negative_skipped_for_integer_type",
+        ),
+        # `additionalProperties: false` beside `allOf` judges the branch's own property names too.
+        pytest.param(
+            GenerationMode.POSITIVE,
+            {"type": "object", "additionalProperties": False, "allOf": [{"$ref": "#/components/schemas/Inner"}]},
+            {
+                "components": {
+                    "schemas": {
+                        "Inner": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {"ids": {"type": "array", "items": {"type": "string"}}},
+                        }
+                    }
+                }
+            },
+            {},
+            id="single_branch_allof_keeps_outer_additional_properties",
+        ),
+    ],
+)
+def test_coverage_bodies_match_a_single_mode(ctx, mode, body, schema_kwargs, assert_kwargs):
+    operation = body_operation(ctx, body, **schema_kwargs)
+    assert_bodies(operation, mode, valid=mode == GenerationMode.POSITIVE, **assert_kwargs)
+
+
 def test_positive_body_drops_every_any_of_shape_the_parent_forbids(ctx):
     # Each branch proposes a key `additionalProperties: false` rejects, leaving only `null`.
     body = {
@@ -9655,15 +9663,6 @@ def test_negative_bodies_are_rejected_under_every_draft(ctx):
 
     assert bodies, "No negative bodies generated"
     assert [value for value in bodies if any(judge.is_valid(value) for judge in judges)] == []
-
-
-def test_coverage_pattern_with_identity_escape_in_body(ctx):
-    # ECMA-262 without the `u` flag allows identity escapes such as `\-`.
-    operation = body_operation(
-        ctx, {"type": "object", "properties": {"latitude": {"type": "string", "pattern": r"^\-?\d+$"}}}
-    )
-
-    assert_bodies(operation, GenerationMode.POSITIVE, valid=True)
 
 
 def test_coverage_pattern_with_identity_escape_in_query(ctx):

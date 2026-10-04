@@ -1,15 +1,6 @@
 import pytest
 
-from schemathesis.python._constants.registry import default_registry
-
-
-@pytest.fixture(autouse=True)
-def _clean_registry():
-    # `testdir.runpytest()` runs in-process, so a `@schemathesis.python.constants` in the generated
-    # module registers on the global registry; clear it so it does not leak into later tests.
-    default_registry().clear()
-    yield
-    default_registry().clear()
+pytestmark = pytest.mark.usefixtures("clean_constants_registry")
 
 
 def test_constants_extraction_warning_in_pytest_mode(testdir):

@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis.core.error_feedback.pipeline import _reset_pipeline_for_tests
+
 _ENSURE_REACHABILITY = """
 @schemathesis.check
 class EnsureReachability:
@@ -23,3 +25,8 @@ class EnsureReachability:
 @pytest.fixture
 def ensure_reachability_module(ctx, restore_checks):
     yield ctx.write_pymodule(_ENSURE_REACHABILITY)
+
+
+@pytest.fixture
+def reset_feedback_pipeline():
+    _reset_pipeline_for_tests()
