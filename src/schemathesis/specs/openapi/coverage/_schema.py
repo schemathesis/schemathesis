@@ -2309,7 +2309,7 @@ def _negative_any_of(
 ) -> Generator[GeneratedValue, None, None]:
     nctx = ctx.with_negative()
     resolved_schemas = [ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value]
-    validators = _make_branch_validators(resolved_schemas, ctx)
+    validators = _make_branch_validators(value, ctx)
     # Body fields in multipart/form-urlencoded are serialized as strings via str().
     # Query/path/header parameters are also stringified, but servers parse them
     # back to their declared type before validation, so str() doesn't make them
