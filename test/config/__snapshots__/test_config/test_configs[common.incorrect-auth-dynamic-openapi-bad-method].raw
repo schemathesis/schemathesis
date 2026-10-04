@@ -1,0 +1,6 @@
+Error in [auth.dynamic.openapi.BearerAuth] section:
+  Invalid value:
+
+  - 'method' -> 'FETCH' is not a valid value. Did you mean 'PATCH'?
+
+Valid values are: 'DELETE', 'GET', 'PATCH', 'POST', 'PUT'.
