@@ -942,6 +942,122 @@ def test_negative_data_rejection_validates_repeated_query_with_allowed_empty_val
 
 
 @pytest.mark.parametrize(
+    ("parameter", "value", "query", "accepted"),
+    [
+        ({"schema": {"type": "string"}}, {"first": [], "second": None}, "title=first&title=second", True),
+        ({"schema": {"type": "string", "maxLength": 3}}, {"long": [], "ok": None}, "title=long&title=ok", True),
+        ({"schema": {"enum": ["ok"]}}, {"bad": [], "worse": None}, "title=bad&title=worse", False),
+        ({"schema": {"enum": ["ok"]}}, {"bad": [], "ok": None}, "title=bad&title=ok", True),
+        (
+            {"schema": {"enum": ["asc"]}, "allowEmptyValue": True},
+            ["null", {"key": [], "": None}],
+            "title=null&title=key&title=",
+            True,
+        ),
+        ({"schema": {"enum": ["asc"]}}, ["null", {"key": [], "": None}], "title=null&title=key&title=", False),
+        ({"schema": {"type": "string"}}, [[{"key": "value"}]], "title=%7B%27key%27%3A+%27value%27%7D", True),
+        ({"schema": {"enum": ["asc"]}}, [[{"key": "value"}]], "title=%7B%27key%27%3A+%27value%27%7D", False),
+        (
+            {"schema": {"type": "string", "maxLength": 200}, "allowEmptyValue": True},
+            [[{"key": "value"}]],
+            "title=%7B%27key%27%3A+%27value%27%7D",
+            True,
+        ),
+        (
+            {"schema": {"type": "array", "items": {"enum": ["ok"]}}},
+            {"bad": [], "ok": None},
+            "title=bad&title=ok",
+            False,
+        ),
+        *(
+            ({"schema": {"type": "number", "maximum": 10}}, ["bad", {text: None}], f"title=bad&title={text}", True)
+            for text in ("nan", "inf", "-Infinity", "1e400")
+        ),
+    ],
+    ids=[
+        "object-keys",
+        "one-key-valid",
+        "all-keys-invalid",
+        "enum-key-valid",
+        "nested-object-sends-allowed-empty-value",
+        "nested-object-all-invalid",
+        "nested-list-sends-object-text",
+        "nested-list-object-text-invalid",
+        "nested-list-object-text-with-allowed-empty-value",
+        "declared-array",
+        "nested-nan",
+        "nested-inf",
+        "nested-negative-infinity",
+        "nested-overflow",
+    ],
+)
+def test_negative_data_rejection_validates_scalar_query_by_sent_values(
+    ctx, response_factory, parameter, value, query, accepted
+):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "title", **parameter}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(_mutation(OperatorKind.NEGATE_CONSTRAINTS, ("enum",), parameter="title"),),
+        ),
+        query={"title": value},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    assert response.request.url == f"http://127.0.0.1/items?{query}"
+    if accepted:
+        assert negative_data_rejection(check_context(), response, case) is None
+    else:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+
+
+def test_negative_data_rejection_reports_object_query_with_another_invalid_parameter(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"in": "query", "name": "title", "schema": {"type": "string"}},
+                        {"in": "header", "name": "X-Mode", "schema": {"enum": ["fast"]}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            headers=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(
+                _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("type",), parameter="title"),
+                _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("enum",), "X-Mode", ParameterLocation.HEADER),
+            ),
+        ),
+        query={"title": {"first": [], "second": None}},
+        headers={"X-Mode": "slow"},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response, case)
+
+
+@pytest.mark.parametrize(
     ("extra_schema", "extra_value", "url"),
     [
         ({"type": "integer"}, 5, "http://127.0.0.1/items"),
