@@ -203,6 +203,24 @@ def test_get_raises_on_connection_error(ctx, cli, app_runner):
         provider.get(operation.Case(), auth_ctx)
 
 
+def test_get_raises_on_missing_request_cert_file(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = schema["/data"]["GET"]
+    schema.config.request_cert = "/nonexistent/cert.pem"
+
+    provider = DynamicTokenAuthProvider(
+        path="/api/auth",
+        method="post",
+        payload=None,
+        extract_from="body",
+        extract_selector="/token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    with pytest.raises(AuthenticationError, match="Connection to auth endpoint failed"):
+        provider.get(operation.Case(), AuthContext(operation=operation, app=None))
+
+
 @pytest.mark.parametrize(
     "applier,token,expected_header,expected_value",
     [
