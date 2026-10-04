@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import NOT_SET, media_types, string_to_boolean
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator
 from schemathesis.core.jsonschema.types import JsonSchema
@@ -422,7 +423,7 @@ def _numeric_wire_value_is_valid(coerced: int | float | list[int | float], valid
     return any(isinstance(value, float) and not math.isfinite(value) for value in values) or validator.is_valid(coerced)
 
 
-def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
+def _single_element_array_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
     """Check if an array value for a scalar parameter becomes valid after serialization.
 
     In query/header/cookie parameters, arrays are serialized as repeated keys:
@@ -436,6 +437,8 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     the last one). If any element in the array is valid for the original scalar schema,
     the server may accept the request, making it an unreliable negative test.
 
+    Query values are also judged by the text actually sent, as nested lists and objects
+    serialize into repeated keys or their string representation.
     """
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
@@ -461,6 +464,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
 
         # Get the parameter definitions
         container = getattr(case.operation, location.container_name)
+        sent_query = _sent_query_values(response, case) if location == ParameterLocation.QUERY else None
 
         # Check each parameter in the container
         for param_name, param_value in value.items():
@@ -468,7 +472,9 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
                 # This is an additional property, not a schema-defined parameter
                 continue
 
-            if not isinstance(param_value, list) or not param_value:
+            elements = param_value if isinstance(param_value, list) else []
+            sent_texts = sent_query.get(param_name, []) if sent_query is not None else []
+            if not elements and not sent_texts:
                 continue
 
             # Get the parameter definition
@@ -493,7 +499,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
             except Exception:
                 neutralized.add((location, param_name))
                 continue
-            for element in param_value:
+            for element in elements:
                 if validator.is_valid(element):
                     neutralized.add((location, param_name))
                     break
@@ -505,11 +511,24 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
                     if coerced is not None and _numeric_wire_value_is_valid(coerced, validator):
                         neutralized.add((location, param_name))
                         break
+            # Nested lists and objects reach the server as repeated keys or their string representation.
+            if any(_sent_text_is_valid(text, validator, expected_types) for text in sent_texts):
+                neutralized.add((location, param_name))
 
     # Any other mutated parameter or location still makes the request invalid.
     return bool(neutralized) and all(
         (mutation.parameter_location, mutation.parameter) in neutralized for mutation in meta.phase.data.mutations
     )
+
+
+def _sent_text_is_valid(text: str, validator: jsonschema_rs.Validator, expected_types: list[str]) -> bool:
+    if validator.is_valid(text):
+        return True
+    # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
+    if not text.isascii() or "_" in text or text != text.strip():
+        return False
+    coerced = _coerce_string_to_numeric(text, expected_types)
+    return coerced is not None and _numeric_wire_value_is_valid(coerced, validator)
 
 
 def _wire_value_matches_parameter(parameter: OpenApiParameter, expected_types: list[str], wire_value: str) -> bool:
@@ -647,15 +666,26 @@ def _declares_type(schema: JsonSchema, name: str) -> bool:
     return declared == name or isinstance(declared, list) and name in declared
 
 
+def _sent_query_values(response: Response, case: Case) -> dict[str, list[str]] | None:
+    """Parse the query actually sent, or `None` if the request was not sent to this case's operation."""
+    request_url = urlparse(response.request.url)
+    try:
+        expected_path = _get_openapi_schema(case).get_full_path(prepare_path(case.path, case.path_parameters))
+    except InvalidSchema:
+        # Path parameters are missing, so the request could not have been sent to this operation.
+        return None
+    if request_url.path != expected_path:
+        return None
+    return parse_qs(request_url.query, keep_blank_values=True)
+
+
 def _query_as_sent(
     response: Response, case: Case, query: Mapping[str, object], properties: dict[str, JsonSchema]
 ) -> dict[str, object] | None:
     """Replace generated query values with the text actually sent wherever the server reads that text as is."""
-    request_url = urlparse(response.request.url)
-    expected_path = _get_openapi_schema(case).get_full_path(prepare_path(case.path, case.path_parameters))
-    if request_url.path != expected_path:
+    sent_values = _sent_query_values(response, case)
+    if sent_values is None:
         return None
-    sent_values = parse_qs(request_url.query, keep_blank_values=True)
     sent: dict[str, object] = {}
     # Iterating the generated query skips keys added outside of generation, e.g. query-based auth.
     for name, value in query.items():
@@ -740,7 +770,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not has_only_additional_properties_in_non_body_parameters(case)
         and not _body_negation_becomes_valid_after_serialization(case)
         and not _body_negation_is_only_forbidden_property(case)
-        and not _single_element_array_becomes_valid_after_serialization(case)
+        and not _single_element_array_becomes_valid_after_serialization(response, case)
         and not _type_mutations_become_valid_after_serialization(case)
         and not _path_array_becomes_valid_after_serialization(case)
         and not _non_body_negative_values_match_schema(response, case)
