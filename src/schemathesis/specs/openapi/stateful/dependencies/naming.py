@@ -137,7 +137,22 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
 
     # Bare identifier-shaped parameter - use path context if it's a path parameter.
     # Strip API version prefixes first so `/v1/{name}` doesn't infer a fictitious `V1`.
-    BARE_IDENTIFIER_NAMES = ("slug", "name", "username", "namespace", "token", "tag", "uri", "address", "arn")
+    BARE_IDENTIFIER_NAMES = (
+        "identifier",
+        "uuid",
+        "guid",
+        "pk",
+        "uid",
+        "slug",
+        "name",
+        "username",
+        "namespace",
+        "token",
+        "tag",
+        "uri",
+        "address",
+        "arn",
+    )
     if lower in BARE_IDENTIFIER_NAMES and f"{{{parameter}}}" in path:
         return from_path(strip_version_prefix(path), parameter_name=parameter)
 
@@ -563,6 +578,10 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
             for field in fields:
                 if normalize_for_matching(field) == id_name:
                     return field
+    elif suffix_normalized in ("identifier", "pk"):
+        for field in fields:
+            if normalize_for_matching(field) == "id":
+                return field
     elif suffix_normalized in ID_FIELD_NAMES or suffix_normalized == "ids":
         # Try to match with any identifier field, preferring exact match first
         for id_name in ID_FIELD_NAMES:

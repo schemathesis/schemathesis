@@ -4,9 +4,11 @@ import uuid
 
 import pytest
 from flask import jsonify, request
+from hypothesis import HealthCheck, Phase, settings
 from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies import analyze, naming
 from schemathesis.specs.openapi.stateful.dependencies.models import infer_fk_target
@@ -6424,6 +6426,99 @@ def test_inject_links_with_reference_to_components(ctx):
     )
 
     assert dependencies.inject_links(schema) == 1
+
+
+def test_paginated_list_links_to_detail_through_identifier(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/v1/images/": {
+                "get": {
+                    "operationId": "listImages",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {"schema": {"$ref": "#/components/schemas/PaginatedImageList"}}
+                            },
+                        }
+                    },
+                }
+            },
+            "/v1/images/{identifier}/": {
+                "get": {
+                    "operationId": "getImage",
+                    "parameters": [
+                        {
+                            "name": "identifier",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Image"}}},
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Image": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "PaginatedImageList": {
+                    "type": "object",
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Image"},
+                        }
+                    },
+                    "required": ["results"],
+                },
+            }
+        },
+    )
+    requested_identifiers = []
+
+    @app.route("/v1/images/", methods=["GET"])
+    def list_images():
+        return jsonify({"results": [{"id": "openverse-image-id"}]})
+
+    @app.route("/v1/images/<identifier>/", methods=["GET"])
+    def get_image(identifier):
+        requested_identifiers.append(identifier)
+        return jsonify({"id": identifier})
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
+    assert dependencies.inject_links(schema) == 1
+    assert schema.raw_schema["paths"]["/v1/images/"]["get"]["responses"]["200"]["links"] == {
+        "GetImage": {
+            "operationRef": "#/paths/~1v1~1images~1{identifier}~1/get",
+            "parameters": {"path.identifier": "$response.body#/results/*/id"},
+            "x-schemathesis": {"is_inferred": True},
+        }
+    }
+
+    schema.as_state_machine().run(
+        settings=settings(
+            max_examples=1,
+            stateful_step_count=2,
+            deadline=None,
+            derandomize=True,
+            phases=[Phase.generate],
+            suppress_health_check=list(HealthCheck),
+        )
+    )
+
+    assert requested_identifiers == ["openverse-image-id"]
 
 
 def test_iter_links_with_nested_refs(ctx):
