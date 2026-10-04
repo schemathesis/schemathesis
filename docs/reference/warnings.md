@@ -218,7 +218,7 @@ The counts distinguish the two causes, which need different fixes:
 - **Not found** - the requests were well-formed but addressed resources that do not exist. Supply real identifiers through `parameters` in an `[[operations]]` section, schema examples, or a [fuzz dictionary](../guides/fuzz-dictionary.md).
 - **Rejected** - the API refused the data itself, so the schema is likely missing constraints the API enforces.
 
-Authentication failures and server errors are excluded from the rate, since neither says anything about whether the data was acceptable.
+Authentication failures, rate limiting (`429`), and server errors are excluded from the rate, since none says anything about whether the data was acceptable. If many requests are rate-limited, set [`rate-limit`](configuration.md#rate-limit) so they get answered.
 
 For GraphQL, the status code carries no such answer, so a request counts as accepted when the response carries `data` and no `errors`.
 
