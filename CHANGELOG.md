@@ -17,6 +17,7 @@
 - Raw `ValueError` for non-JSON values such as `datetime.date` in schemas passed to `from_dict`.
 - False `negative_data_rejection` failures for empty query values of parameters with `allowEmptyValue: true`.
 - `phases.stateful.max-steps = 50` silently capping scenarios at 6 steps.
+- Report the document URL when a fragment is missing in a remote `$ref` document.
 
 ## [4.29.1](https://github.com/schemathesis/schemathesis/compare/v4.29.0...v4.29.1) - 2026-10-04
 
