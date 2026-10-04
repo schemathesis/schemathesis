@@ -6865,6 +6865,47 @@ def test_negative_coverage_emits_invalid_format_for_uuid_body_property(ctx):
         uuid.UUID(value)
 
 
+@pytest.mark.parametrize(
+    "property_schema",
+    [
+        {"$ref": "#/components/schemas/Item"},
+        {"type": "object", "$ref": "#/components/schemas/Item"},
+    ],
+    ids=["plain-ref", "ref-with-sibling"],
+)
+def test_negative_coverage_emits_invalid_format_for_referenced_body_property(ctx, property_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"a": property_schema},
+                                }
+                            }
+                        },
+                    },
+                    "responses": DEFAULT_RESPONSES,
+                }
+            }
+        },
+        version="3.1.0",
+        components={"schemas": {"Item": {"properties": {"url": {"format": "uri"}}}}},
+    )
+    operation = schema["/items"]["POST"]
+
+    assert [
+        (case.body, case.meta.phase.data.description)
+        for case in scenario_cases(iter_cases(operation, GenerationMode.NEGATIVE), CoverageScenario.INVALID_FORMAT)
+    ] == [
+        ({"a": {"url": ""}}, "a -> url: Value not matching the 'uri' format"),
+    ]
+
+
 def test_negative_coverage_emits_invalid_format_for_duration_body_property(ctx):
     operation = body_operation(
         ctx,
