@@ -647,6 +647,14 @@ def test_low_valid_rate_distinguishes_rejections_from_missing_resources(ctx, cli
     assert "refused on their data" in result.stdout
 
 
+def test_no_low_valid_rate_warning_for_rate_limited_requests(ctx, cli):
+    app = _orders_app(ctx, accept_every=10, rejection_status=429)
+
+    result = cli.run_openapi_app(app, *LOW_VALID_RATE_ARGS, "--checks=not_a_server_error")
+
+    assert "Low valid-input rate" not in result.stdout
+
+
 def test_no_low_valid_rate_warning_when_most_requests_are_accepted(ctx, cli):
     app = _orders_app(ctx, accept_every=1)
 

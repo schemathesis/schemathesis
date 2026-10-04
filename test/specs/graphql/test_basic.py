@@ -978,7 +978,7 @@ def test_classify_call_outcome(ctx, response_factory, content, expected):
     assert schema.classify_call_outcome(response_factory.requests(content=content)) is expected
 
 
-@pytest.mark.parametrize("status_code", [401, 403, 500])
+@pytest.mark.parametrize("status_code", [401, 403, 429, 500])
 def test_classify_call_outcome_ignores_uninformative_responses(ctx, response_factory, status_code):
     schema = _books_schema(ctx)
     response = response_factory.requests(status_code=status_code, content=b'{"errors": [{"message": "Nope"}]}')

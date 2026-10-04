@@ -26,7 +26,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
 from schemathesis.core.timing import Instant
-from schemathesis.core.transport import CallOutcome
+from schemathesis.core.transport import CallOutcome, is_uninformative_status
 from schemathesis.filters import FilterUsage
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -444,7 +444,7 @@ class GraphQLSchema(BaseSchema):
         """
         from schemathesis.specs.graphql.validation import parse_payload
 
-        if response.status_code in (401, 403) or response.status_code >= 500:
+        if is_uninformative_status(response.status_code):
             return CallOutcome.UNINFORMATIVE
         try:
             payload = parse_payload(response)

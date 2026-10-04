@@ -89,6 +89,15 @@ class CallOutcome(enum.Enum):
     UNINFORMATIVE = "uninformative"
 
 
+def is_uninformative_status(status_code: int) -> bool:
+    """Whether a response status says nothing about the data the request carried.
+
+    Auth failures, rate limiting, and server errors depend on who sent the request, how often, and the server's
+    health, not on what the request contained.
+    """
+    return status_code in (401, 403, 429) or status_code >= 500
+
+
 class Response:
     """HTTP response wrapper that normalizes different transport implementations.
 

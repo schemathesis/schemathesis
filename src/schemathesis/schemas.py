@@ -26,7 +26,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.runtime import RuntimeProbeState
 from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic, StatefulInference
-from schemathesis.core.transport import CallOutcome, HttpMethod, HttpMethodSchema, Response
+from schemathesis.core.transport import CallOutcome, HttpMethod, HttpMethodSchema, Response, is_uninformative_status
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
@@ -601,9 +601,11 @@ class BaseSchema(Mapping):
         status_code = response.status_code
         if 200 <= status_code < 300:
             return CallOutcome.ACCEPTED
+        if is_uninformative_status(status_code):
+            return CallOutcome.UNINFORMATIVE
         if status_code == 404:
             return CallOutcome.UNREACHABLE
-        if 400 <= status_code < 500 and status_code not in (401, 403):
+        if 400 <= status_code < 500:
             return CallOutcome.REJECTED
         return CallOutcome.UNINFORMATIVE
 
