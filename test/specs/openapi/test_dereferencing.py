@@ -24,6 +24,35 @@ ELIDABLE_SCHEMA = {"description": "Test", "type": "object", "properties": {"foo"
 ALL_OF_ROOT = {"allOf": [USER_REFERENCE, {"description": "Test"}], "type": "object", "additionalProperties": False}
 
 
+@pytest.mark.hypothesis_nested
+def test_request_body_schema_reference_to_plain_name_anchor(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/pets": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#petName"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={"schemas": {"Name": {"$anchor": "petName", "type": "string"}}},
+    )
+    operation = schema["/pets"]["POST"]
+
+    assert [body.media_type for body in operation.body] == ["application/json"]
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=3)
+    def test(case):
+        assert isinstance(case.body, str)
+
+    test()
+
+
 def build_schema_with_recursion(schema, definition):
     schema["paths"]["/users"] = {
         "post": {
