@@ -1887,6 +1887,45 @@ def test_negative_data_rejection_query_string_parameter_wire_form(ctx, response_
         assert negative_data_rejection(check_context(), response, case) is None
 
 
+@pytest.mark.parametrize(
+    "parameter_schema",
+    [{"type": "boolean"}, {"type": "string", "enum": ["asc"]}, {"type": "string", "minLength": 1}],
+    ids=["boolean", "enum", "min-length"],
+)
+@pytest.mark.parametrize("allow_empty_value", [True, False, None], ids=["allowed", "forbidden", "default"])
+def test_negative_data_rejection_query_allow_empty_value(ctx, response_factory, parameter_schema, allow_empty_value):
+    parameter = {"name": "filter", "in": "query", "required": True, "schema": parameter_schema}
+    if allow_empty_value is not None:
+        parameter["allowEmptyValue"] = allow_empty_value
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [parameter],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="Invalid query parameter",
+            parameter="filter",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={"filter": ""},
+    )
+    response = response_factory.requests(status_code=200)
+
+    if allow_empty_value is True:
+        assert negative_data_rejection(check_context(), response, case) is None
+    else:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+
+
 def test_negative_data_rejection_path_string_numeric_serialization(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {

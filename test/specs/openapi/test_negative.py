@@ -6,8 +6,9 @@ import pytest
 import requests
 from _pytest.main import ExitCode
 from flask import jsonify
-from hypothesis import HealthCheck, Phase, given, seed, settings
+from hypothesis import HealthCheck, Phase, find, given, seed, settings
 from hypothesis import strategies as st
+from hypothesis.errors import NoSuchExample
 from jsonschema_rs import canonical
 
 import schemathesis
@@ -658,6 +659,39 @@ def test_optional_query_param_negation(ctx):
         assert urlparse(request.url).query != ""
 
     test()
+
+
+@pytest.mark.parametrize(
+    "parameter_schema",
+    [{"type": "boolean"}, {"type": "string", "enum": ["asc"]}, {"type": "string", "minLength": 1}],
+    ids=["boolean", "enum", "min-length"],
+)
+def test_allow_empty_value_is_not_generated_as_negative(ctx, parameter_schema):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "filter",
+                            "in": "query",
+                            "required": True,
+                            "allowEmptyValue": True,
+                            "schema": parameter_schema,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    with pytest.raises(NoSuchExample):
+        find(
+            schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE),
+            lambda case: case.query == {"filter": ""},
+            settings=settings(max_examples=100, deadline=None),
+        )
 
 
 @pytest.mark.hypothesis_nested
