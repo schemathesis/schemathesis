@@ -483,13 +483,13 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
             # Get the expected type(s) from the schema
             expected_types = get_type(schema)
 
-            if "array" in expected_types or not expected_types:
+            if _declares_type(schema, "array"):
                 continue
 
             # A single element serializes identically to a scalar; multiple elements become repeated keys and
             # some frameworks pick one of them. Either way, the request is valid if any element is.
             try:
-                validator = make_validator(schema, param.adapter.jsonschema_validator_cls)
+                validator = make_validator(param.validation_schema, param.adapter.jsonschema_validator_cls)
             except Exception:
                 neutralized.add((location, param_name))
                 continue
@@ -642,7 +642,36 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
     return False
 
 
-def _non_body_negative_values_match_schema(case: Case) -> bool:
+def _declares_type(schema: JsonSchema, name: str) -> bool:
+    declared = schema.get("type") if isinstance(schema, dict) else None
+    return declared == name or isinstance(declared, list) and name in declared
+
+
+def _query_as_sent(
+    response: Response, case: Case, query: Mapping[str, object], properties: dict[str, JsonSchema]
+) -> dict[str, object] | None:
+    """Replace generated query values with the text actually sent wherever the server reads that text as is."""
+    request_url = urlparse(response.request.url)
+    expected_path = _get_openapi_schema(case).get_full_path(prepare_path(case.path, case.path_parameters))
+    if request_url.path != expected_path:
+        return None
+    sent_values = parse_qs(request_url.query, keep_blank_values=True)
+    sent: dict[str, object] = {}
+    # Iterating the generated query skips keys added outside of generation, e.g. query-based auth.
+    for name, value in query.items():
+        # Values like `[]` or `None` are not sent at all.
+        if name not in sent_values:
+            continue
+        texts = sent_values[name]
+        # Other types keep their generated value, as the server parses the text back into it.
+        if texts == [""] or _declares_type(properties.get(name, {}), "string"):
+            sent[name] = texts[0] if len(texts) == 1 else texts
+        else:
+            sent[name] = value
+    return sent
+
+
+def _non_body_negative_values_match_schema(response: Response, case: Case) -> bool:
     """Check if all negative non-body parameter values are still valid against their original schema."""
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -675,6 +704,10 @@ def _non_body_negative_values_match_schema(case: Case) -> bool:
         container = getattr(case.operation, location.container_name)
         if not container:
             continue
+        if location == ParameterLocation.QUERY:
+            sent = _query_as_sent(response, case, value, container.schema.get("properties", {}))
+            if sent is not None:
+                value = sent
         v = dict(value) if location == ParameterLocation.HEADER else value
         if isinstance(v, dict):
             v = plain_str_values(v)
@@ -710,7 +743,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not _single_element_array_becomes_valid_after_serialization(case)
         and not _type_mutations_become_valid_after_serialization(case)
         and not _path_array_becomes_valid_after_serialization(case)
-        and not _non_body_negative_values_match_schema(case)
+        and not _non_body_negative_values_match_schema(response, case)
     ):
         extra_info = ""
         phase = meta.phase
