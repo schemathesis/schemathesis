@@ -8527,6 +8527,41 @@ def test_negative_bodies_violate_one_of_with_ref_sibling_keywords(ctx, version, 
     assert_bodies(operation, GenerationMode.NEGATIVE, valid=False, source=collect_cases)
 
 
+def test_negative_bodies_survive_invalid_keyword_behind_ref_in_any_of(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Filters"}}},
+                    },
+                    "responses": DEFAULT_RESPONSES,
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Filters": {
+                    "anyOf": [
+                        {"type": "integer"},
+                        {"$ref": "#/components/schemas/Compound"},
+                    ]
+                },
+                "Compound": {"$recursiveAnchor": True, "type": "string"},
+            }
+        },
+    )
+    assert coverage_bodies(schema["/test"]["POST"], GenerationMode.NEGATIVE) == [
+        {},
+        [None, None],
+        None,
+        False,
+        2.5890419884777833e-42,
+    ]
+
+
 def test_positive_arrays_meet_contains_the_openapi_30_validator_ignores(ctx):
     # Draft 4 has no `contains`, yet a server reading it still expects a matching element.
     body = {
