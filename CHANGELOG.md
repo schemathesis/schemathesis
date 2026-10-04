@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Crash in the coverage phase for large arrays of binary strings.
 - Positive cases violating negated Unicode property patterns such as `\p{L}`.
 - Display report write failures with the format, path, and operating-system error.
 - Missing invalid-format coverage cases for Open API 3.1 `$ref` with sibling keywords.
