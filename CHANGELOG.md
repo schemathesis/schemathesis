@@ -20,6 +20,7 @@
 - Config errors for invalid HTTP method values show the section and the valid values.
 - Raw `ValueError` for non-JSON values such as `datetime.date` in schemas passed to `from_dict`.
 - False `negative_data_rejection` failures for empty query values of parameters with `allowEmptyValue: true`.
+- False `negative_data_rejection` failures for query values that become valid or disappear during serialization.
 - `phases.stateful.max-steps = 50` silently capping scenarios at 6 steps.
 - Report the document URL when a fragment is missing in a remote `$ref` document.
 - Crash fetching a dynamic token when the client certificate file does not exist.

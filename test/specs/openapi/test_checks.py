@@ -878,6 +878,159 @@ def test_negative_data_rejection_validates_numeric_wire_value_against_query_sche
         assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
+@pytest.mark.parametrize(
+    ("parameter", "value"),
+    [
+        ({"schema": {"type": "string"}}, -6.922717852139307e16),
+        ({"schema": {"type": "string"}}, []),
+        ({"schema": {"type": "integer"}, "allowEmptyValue": True}, {}),
+    ],
+    ids=["number-becomes-string", "empty-list-is-omitted", "empty-object-becomes-blank"],
+)
+def test_negative_data_rejection_validates_serialized_query(ctx, response_factory, parameter, value):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "value", "required": False, **parameter}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        query={"value": value},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    assert negative_data_rejection(check_context(), response, case) is None
+
+
+def test_negative_data_rejection_validates_repeated_query_with_allowed_empty_value(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "page",
+                            "schema": {"anyOf": [{"type": "integer"}, {"type": "string", "enum": ["first"]}]},
+                            "allowEmptyValue": True,
+                        },
+                        {"in": "query", "name": "filter_dead", "schema": {"type": "boolean"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(_mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), parameter="page"),),
+        ),
+        query={"page": ["not-an-integer", ""], "filter_dead": True},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    assert negative_data_rejection(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("extra_schema", "extra_value", "url"),
+    [
+        ({"type": "integer"}, 5, "http://127.0.0.1/items"),
+        ({"type": "number"}, 1.5, "http://127.0.0.1/items"),
+        ({"type": "boolean"}, True, "http://127.0.0.1/items"),
+        ({"type": "array", "items": {"type": "integer"}}, [1], "http://127.0.0.1/items"),
+        ({"type": "array", "items": {"type": "integer"}}, [1, 2], "http://127.0.0.1/items"),
+        ({"enum": ["123"]}, "123", "http://127.0.0.1/items"),
+        ({"type": "integer"}, 5, "http://127.0.0.1/items?api_key=secret"),
+    ],
+    ids=[
+        "integer",
+        "number",
+        "boolean",
+        "single-item-array",
+        "array",
+        "untyped-enum",
+        "query-key-added-outside-case",
+    ],
+)
+def test_negative_data_rejection_validates_serialized_query_with_typed_values(
+    ctx, response_factory, extra_schema, extra_value, url
+):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"in": "query", "name": "value", "schema": {"type": "string"}},
+                        {"in": "query", "name": "extra", "schema": extra_schema},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        query={"value": 42, "extra": extra_value},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url(url, case.as_transport_kwargs()["params"])
+
+    assert negative_data_rejection(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("parameter_schema", "required", "value"),
+    [
+        ({"type": "integer"}, False, "not-an-integer"),
+        ({"type": "integer"}, True, []),
+        ({"type": "integer"}, False, "1_0"),
+        ({"type": "integer"}, False, " 5"),
+        ({"type": "integer"}, False, "\u0665"),
+        ({"type": "boolean"}, False, "True"),
+    ],
+    ids=["text", "omitted-required", "underscore", "whitespace", "non-ascii-digit", "capitalized-boolean"],
+)
+def test_negative_data_rejection_reports_invalid_serialized_query(
+    ctx, response_factory, parameter_schema, required, value
+):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "value",
+                            "required": required,
+                            "schema": parameter_schema,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        query={"value": value},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url("http://127.0.0.1/items", case.as_transport_kwargs()["params"])
+
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response, case)
+
+
 # Servers commonly parse these as floats, so they may legitimately read them as numbers.
 @pytest.mark.parametrize("value", ["nan", "inf", "-Infinity", "1e400"])
 @pytest.mark.parametrize("location", [ParameterLocation.PATH, ParameterLocation.QUERY], ids=["path", "query"])
