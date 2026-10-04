@@ -127,6 +127,40 @@ def test_negative_case_can_negate_the_body_alone(ctx):
     )
 
 
+@pytest.mark.parametrize(
+    ("parameters", "location", "explicit"),
+    [
+        (
+            [{"name": "limit", "in": "query", "required": True, "schema": {"type": "integer"}}],
+            ParameterLocation.QUERY,
+            {"query": {"LIMIT": "5"}},
+        ),
+        (
+            [
+                {"name": "sid", "in": "cookie", "required": True, "schema": {"type": "integer"}},
+                {"name": "SID", "in": "cookie", "required": True, "schema": {"type": "integer"}},
+            ],
+            ParameterLocation.COOKIE,
+            {"cookies": {"sid": "5"}},
+        ),
+    ],
+    ids=["query", "cookie"],
+)
+def test_explicit_value_differing_in_case_leaves_location_negatable(ctx, parameters, location, explicit):
+    # Only header names are case-insensitive, so `LIMIT` does not cover `limit`.
+    header = {"name": "X-Id", "in": "header", "required": True, "schema": {"type": "integer"}}
+    schema = ctx.openapi.load_schema(
+        {"/items": {"get": {"parameters": [*parameters, header], "responses": {"200": {"description": "OK"}}}}}
+    )
+    strategy = schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE, **explicit)
+
+    find(
+        strategy,
+        lambda case: location in case.meta.components and case.meta.components[location].mode.is_negative,
+        settings=settings(max_examples=100, database=None),
+    )
+
+
 @pytest.mark.parametrize("version", ["3.0.2", "2.0"], ids=["openapi-3.0", "swagger-2"])
 def test_positive_bodies_ignore_keywords_next_to_root_ref(ctx, version):
     prefix = "#/definitions" if version == "2.0" else "#/components/schemas"

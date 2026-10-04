@@ -1020,8 +1020,10 @@ def _draw_negated_locations(
     ):
         properties = cast(OpenApiParameterSet, operation.get_parameter_set(location)).schema["properties"]
         # Explicit values are sent as given, so a location they fully cover has nothing left to negate.
-        given = {name.lower() for name in explicit[location] or ()}
-        if not properties or {name.lower() for name in properties} <= given:
+        # Only header names are case-insensitive.
+        fold = str.lower if location == ParameterLocation.HEADER else str
+        given = {fold(name) for name in explicit[location] or ()}
+        if not properties or {fold(name) for name in properties} <= given:
             continue
         if location == ParameterLocation.PATH and not can_negate_path_parameters(operation):
             continue

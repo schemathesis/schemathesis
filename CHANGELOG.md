@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Display report write failures with the format, path, and operating-system error.
+- Negative cases never breaking query or cookie parameters given explicit values differing in name case.
 
 ## [4.29.1](https://github.com/schemathesis/schemathesis/compare/v4.29.0...v4.29.1) - 2026-10-04
 
