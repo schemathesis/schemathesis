@@ -1680,6 +1680,37 @@ def test_path_keywords_for_other_types_leave_nothing_to_negate(ctx, path_schema)
         test()
 
 
+def test_untyped_path_object_is_negated_through_its_properties(ctx):
+    # Without a `type` the path value may be an object, so a property constraint is something to violate.
+    operation = _operation_with_parameters(
+        ctx, [{**PLAIN_STRING_PARAMETER, "schema": {"properties": {"x": {"minLength": 2}}}}]
+    )
+    modes = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), database=None)
+    def test(case):
+        modes.append(case.meta.components[ParameterLocation.PATH].mode)
+
+    test()
+    assert set(modes) == {GenerationMode.NEGATIVE}
+
+
+def test_untyped_path_object_with_min_length_one_property_has_nothing_to_negate(ctx):
+    operation = _operation_with_parameters(
+        ctx, [{**PLAIN_STRING_PARAMETER, "schema": {"properties": {"x": {"minLength": 1}}}}]
+    )
+    operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=1, database=None)
+    def test(case):
+        pass
+
+    with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
+        test()
+
+
 @pytest.mark.parametrize(
     "header_schema",
     [

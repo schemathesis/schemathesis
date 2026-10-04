@@ -7,6 +7,7 @@ import graphql
 import pytest
 from hypothesis import HealthCheck, given, settings
 
+from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 from schemathesis.specs.graphql.handles import Handle, SchemaIndex
@@ -70,6 +71,46 @@ def test_capture_skips_when_errors_present(pool, rng):
     body = json.dumps({"data": {"addBook": {"id": "abc-2"}}, "errors": [{"message": "boom"}]}).encode("utf-8")
     pool.capture_response(response_body=body, operation_node=operation)
     assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
+
+
+_RECORD_SDL = """
+type Book { id: ID! title: String! }
+type Query { getBooks: [Book!]! }
+type Mutation { addBook(title: String!): Book! }
+"""
+_CREATED_BOOK = json.dumps({"data": {"addBook": {"id": "b-1", "__typename": "Book"}}}).encode("utf-8")
+
+
+@pytest.mark.parametrize(
+    ("query", "content"),
+    [
+        ('mutation { addBook(title: "x") { id } }', b""),
+        ('mutation { addBook(title: "x") { id } }', b"not json"),
+        ("mutation { addBook(title: ", _CREATED_BOOK),
+        ("fragment F on Book { id }", _CREATED_BOOK),
+    ],
+    ids=["empty-body", "non-json-body", "unparsable-query", "no-operation"],
+)
+def test_record_response_ignores_unusable_payloads(ctx, response_factory, rng, query, content):
+    schema = ctx.graphql.load_sdl(_RECORD_SDL)
+    operation = schema["Mutation"]["addBook"]
+    pool = GraphQLResourcePool(client_schema=schema.client_schema)
+    response = Response.from_requests(response_factory.requests(content=content), True)
+    pool.record_response(operation=operation, response=response, case=operation.Case(body=query))
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
+
+
+def test_record_response_skips_typename_selection(ctx, response_factory, rng):
+    schema = ctx.graphql.load_sdl(_RECORD_SDL)
+    operation = schema["Mutation"]["addBook"]
+    pool = GraphQLResourcePool(client_schema=schema.client_schema)
+    response = Response.from_requests(response_factory.requests(content=_CREATED_BOOK), True)
+    pool.record_response(
+        operation=operation,
+        response=response,
+        case=operation.Case(body='mutation { addBook(title: "x") { __typename id } }'),
+    )
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) == "b-1"
 
 
 def test_capture_walks_lists(pool, rng):
@@ -391,6 +432,45 @@ def test_substitution_skips_fragment_spreads_inside_selection(rng):
     substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
     # The outer arg is substituted; the fragment spread doesn't break the walk.
     assert "captured-id" in graphql.print_ast(operation)
+
+
+_UNKNOWN_NODES_SDL = """
+scalar BookID
+input BookFilter { id: BookID }
+type Book { id: BookID! title: String! }
+type Query { book(id: BookID!): Book  books(filter: BookFilter): [Book!]! }
+type Mutation { addBook(title: String!): Book! }
+"""
+
+
+def test_substitution_leaves_nodes_unknown_to_the_schema_untouched(rng):
+    schema, pool = _schema_and_pool(_UNKNOWN_NODES_SDL)
+    _capture_book(pool)
+    operation = _parse(
+        'query { __typename book(id: "placeholder", extra: "keep") '
+        'books(filter: {id: "placeholder", unknown: "keep"}) { id } }'
+    )
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert graphql.print_ast(operation) == (
+        "{\n"
+        "  __typename\n"
+        '  book(id: "captured-id", extra: "keep")\n'
+        '  books(filter: {id: "captured-id", unknown: "keep"}) {\n'
+        "    id\n"
+        "  }\n"
+        "}"
+    )
+
+
+def test_iter_operation_pool_values_skips_nodes_unknown_to_the_schema():
+    schema = graphql.build_schema(_UNKNOWN_NODES_SDL)
+    operation = _parse(
+        'query { __typename book(id: "abc", extra: "keep") books(filter: {id: "def", unknown: "x"}) { id } }'
+    )
+    assert list(iter_operation_pool_values(operation, schema)) == [
+        (Handle("Book", "id"), "abc"),
+        (Handle("Book", "id"), "def"),
+    ]
 
 
 @pytest.mark.parametrize(

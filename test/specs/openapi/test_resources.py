@@ -24,6 +24,7 @@ from schemathesis.resources.repository import (
 from schemathesis.specs.openapi._hypothesis import openapi_cases
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
 from schemathesis.specs.openapi.semantic_pool import SemanticValueIndex
+from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot, ResourceDefinition
 
 USER_RESOURCE = "User"
 POST_USERS = "POST /users"
@@ -216,6 +217,68 @@ def test_wildcard_pointer_unresolvable_before_wildcard_yields_no_entries():
     )
     repository.record_response(operation="GET /items", status_code=200, payload={"data": [{"id": "a"}]})
     assert repository.iter_instances("Item") == ()
+
+
+def test_wildcard_many_pointer_keeps_single_objects_and_drops_primitives():
+    repository = ResourceRepository(
+        [
+            ResourceDescriptor(
+                resource_name="Member",
+                operation="GET /groups",
+                status_code="200",
+                pointer="/groups/*/members",
+                cardinality=Cardinality.MANY,
+            )
+        ]
+    )
+    repository.record_response(
+        operation="GET /groups",
+        status_code=200,
+        payload={"groups": [{"members": [{"id": "a"}]}, {"members": {"id": "b"}}, {"members": "c"}]},
+    )
+    assert [instance.data for instance in repository.iter_instances("Member")] == [{"id": "a"}, {"id": "b"}]
+
+
+def test_seed_input_values_skips_empty_buckets():
+    repository = ResourceRepository([])
+    repository.seed_input_values({"User": {}, "Pet": {"id": "1"}}, source="config")
+    assert repository.iter_instances("User") == ()
+    assert [(i.data, i.source_operation, i.status_code) for i in repository.iter_instances("Pet")] == [
+        ({"id": "1"}, "config", 200)
+    ]
+
+
+def test_record_request_ignores_unusable_slots(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/users/{user_id}": {
+                "post": {
+                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {"content": {"application/json": {"schema": {}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/users/{user_id}"]["POST"]
+    user = ResourceDefinition.inferred_from_parameter("User", "id")
+    slots = [
+        InputSlot(
+            resource=user, resource_field=None, parameter_name="user_id", parameter_location=ParameterLocation.PATH
+        ),
+        InputSlot(resource=user, resource_field="id", parameter_name=0, parameter_location=ParameterLocation.BODY),
+        InputSlot(
+            resource=user, resource_field="id", parameter_name="owner_id", parameter_location=ParameterLocation.BODY
+        ),
+    ]
+    repository = ResourceRepository([])
+    repository.record_request(
+        operation=operation.label,
+        inputs=slots,
+        case=operation.Case(path_parameters={"user_id": "u1"}, body=["x"]),
+        status_code=200,
+    )
+    assert repository.iter_instances("User") == ()
 
 
 @pytest.mark.parametrize(
@@ -830,6 +893,60 @@ def test_record_successful_delete_evicts_pool_entry_and_filters_subsequent_draws
         for _ in range(10)
     }
     assert drawn == {"alive"}, "tombstoned id must not be drawn even when it is the highest-weighted candidate"
+
+
+_ITEMS_PATHS = {
+    "/items": {
+        "post": {
+            "operationId": "createItem",
+            "responses": {
+                "201": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+                        }
+                    },
+                }
+            },
+        }
+    },
+    "/items/{itemId}": {
+        "delete": {
+            "operationId": "deleteItem",
+            "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"204": {"description": "Deleted"}},
+        },
+        "get": {
+            "operationId": "getItem",
+            "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+            "responses": {"200": {"description": "OK"}},
+        },
+    },
+}
+
+
+def test_record_successful_delete_with_list_path_value_keeps_pool(ctx):
+    schema = ctx.openapi.load_schema(_ITEMS_PATHS)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "alive"})
+    operation = schema["/items/{itemId}"]["DELETE"]
+    data_source.record_successful_delete(
+        operation=operation, case=operation.Case(path_parameters={"itemId": ["alive"]})
+    )
+    assert [instance.data for instance in data_source.repository.iter_instances("Item")] == [{"id": "alive"}]
+
+
+def test_record_request_captures_path_value_only_for_bound_operations(ctx):
+    schema = ctx.openapi.load_schema(_ITEMS_PATHS)
+    data_source = schema.create_extra_data_source()
+    create = schema["/items"]["POST"]
+    data_source.record_request(operation=create, case=create.Case(), status_code=201)
+    read = schema["/items/{itemId}"]["GET"]
+    data_source.record_request(
+        operation=read, case=read.Case(path_parameters={"itemId": "from-request"}), status_code=200
+    )
+    assert [instance.data for instance in data_source.repository.iter_instances("Item")] == [{"id": "from-request"}]
 
 
 def test_tombstoned_value_falls_through_when_pool_is_otherwise_empty(ctx):

@@ -196,6 +196,47 @@ def test_explicit_content_type_overrides_payload_media_type(ctx):
     } == {"multipart/form-data"}
 
 
+def test_custom_serializer_returning_none_omits_body(ctx):
+    @schemathesis.serializer("application/x-empty")
+    def serialize_empty(ctx, value):
+        return None
+
+    try:
+        schema = ctx.openapi.load_schema(
+            {
+                "/data": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {"application/x-empty": {"schema": {"type": "object"}}},
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    },
+                }
+            }
+        )
+        case = schema["/data"]["POST"].Case(body={"key": "value"}, media_type="application/x-empty")
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+            serialized = transport.serialize_case(case)
+            assert serialized["headers"]["Content-Type"] == "application/x-empty"
+            assert "data" not in serialized
+    finally:
+        for transport in (ASGI_TRANSPORT, REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+            transport.unregister_serializer("application/x-empty")
+
+
+@pytest.mark.parametrize(
+    ("media_range", "expected"),
+    [
+        ("application/*+json", ["application/json"]),
+        ("application/*+yaml", ["application/yaml", "application/x-yaml"]),
+    ],
+    ids=["json", "yaml"],
+)
+def test_media_range_matches_only_its_own_main_type(media_range, expected):
+    assert [media_type for media_type, _ in REQUESTS_TRANSPORT.get_matching_media_types(media_range)] == expected
+
+
 @pytest.mark.parametrize("media_type", ["text/html", "text/csv", "text/markdown", "text/powershell"])
 def test_unknown_text_subtype_sent_as_plain_text(ctx, media_type):
     schema = ctx.openapi.load_schema(

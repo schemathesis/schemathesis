@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from flask import jsonify
 from hypothesis import given
 from hypothesis import strategies as st
@@ -106,6 +107,35 @@ def test_malformed_registered_media_type_is_skipped(ctx):
         assert case.media_type == "application/json"
 
     test()
+
+
+@pytest.mark.parametrize(
+    ("media_type", "body", "expected"),
+    [
+        ("application/yaml", "hello", "hello\n"),
+        ("application/yaml", 42, "42\n"),
+        ("application/xml", b"<a>1</a>", b"<a>1</a>"),
+    ],
+    ids=["yaml-string", "yaml-integer", "xml-bytes"],
+)
+def test_transport_data_for_scalar_yaml_and_bytes_xml_bodies(ctx, media_type, body, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/yaml": {"schema": {"type": "string"}},
+                            "application/xml": {"schema": {"type": "string"}},
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/data"]["POST"].Case(body=body, media_type=media_type)
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["data"] == expected
 
 
 def test_jose_jwe_generation(ctx):

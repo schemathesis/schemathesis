@@ -3210,6 +3210,45 @@ def test_reference_to_boolean_response_schema(ctx):
     }
 
 
+def test_all_of_response_with_boolean_schema_properties_keeps_fields_and_link(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            **operation("post", "/items", "201", component_ref("Item")),
+            **operation("get", "/items/{id}", "200", parameters=[path_param("id")]),
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Base": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
+                "Item": {
+                    "allOf": [
+                        component_ref("Base"),
+                        {
+                            "type": "object",
+                            "properties": {"extra": component_ref("Any"), "never": component_ref("Never")},
+                        },
+                    ]
+                },
+                "Any": True,
+                "Never": False,
+            }
+        },
+    )
+    assert graph.resources["Item"].fields == ["extra", "id", "never"]
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1items/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1items~1{id}/get",
+                "x-schemathesis": {"is_inferred": True},
+                "parameters": {"path.id": "$response.body#/id"},
+            },
+        ]
+    ]
+
+
 @pytest.mark.parametrize(
     "response_schema",
     [
@@ -4419,6 +4458,52 @@ def test_path_consumer_picks_same_module_suffix_match(ctx):
         for slot in graph.operations["GET /bookings/resources/{id}"].inputs
     }
     assert bindings.get(("path", "id")) == "ResourceItem", bindings
+
+
+@pytest.mark.parametrize(
+    "consumer_path",
+    [
+        "/bookings/gadgets/{widgetId}",
+        "/{tenant}/{widgetId}",
+    ],
+    ids=["path-names-another-resource", "path-has-only-parameters"],
+)
+def test_path_binding_from_other_module_kept_when_path_does_not_name_it(ctx, consumer_path):
+    parameters = [
+        {"name": name, "in": "path", "required": True, "schema": {"type": "string"}}
+        for name in ("tenant", "widgetId")
+        if "{" + name + "}" in consumer_path
+    ]
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/catalog/widgets": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Widget"}}},
+                        }
+                    }
+                }
+            },
+            consumer_path: {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}},
+        },
+        components={
+            "schemas": {
+                "Widget": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                    "required": ["id"],
+                },
+            }
+        },
+    )
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): (slot.resource.name, slot.resource_field)
+        for slot in graph.operations[f"GET {consumer_path}"].inputs
+    }
+    assert bindings == {("path", "widgetId"): ("Widget", "id")}
 
 
 def test_body_fk_inside_all_of_with_one_of_branches(ctx):

@@ -414,6 +414,41 @@ def pytest_terminal_summary(terminalreporter) -> None:
     result.stdout.re_match_lines([r"test_generation_modes.py::test_\[GET /users\] SUBPASSED"])
 
 
+def test_disabled_fuzzing_phase_leaves_only_examples(testdir):
+    testdir.make_test(
+        """
+@pytest.fixture()
+def api_schema():
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.phases.fuzzing.enabled = False
+    schema.config.phases.coverage.enabled = False
+    return schema
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=10)
+def test_(case):
+    assert case.query == {"key": 42}
+""",
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {"in": "query", "name": "key", "required": True, "type": "integer", "x-example": 42}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines(
+        [r"test_disabled_fuzzing_phase_leaves_only_examples.py::test_\[GET /users\] SUBPASSED"]
+    )
+
+
 def test_error_on_no_matches(testdir):
     # When test filters don't match any operation
     testdir.make_test(

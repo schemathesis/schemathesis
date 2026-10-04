@@ -7140,6 +7140,18 @@ def test_restler_parser_can_parse_rejects_non_restler_bodies(body):
     assert RestlerParser().can_parse(body=body) is False
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"error": {"code": 400, "message": 5}},
+        _restler("Thirdparty ID is mandatory"),
+    ],
+    ids=["non-string-message", "unrecognised-message"],
+)
+def test_restler_parser_parse_ignores_unclassifiable_bodies(make_operation, case_factory, body):
+    assert parse_observations(RestlerParser(), body, make_operation, case_factory) == ()
+
+
 @_RESTLER_VERSIONS
 @pytest.mark.parametrize(("message", "expected"), _RESTLER_MESSAGES)
 def test_restler_parser_parse(make_operation, case_factory, message, expected, version):
@@ -9847,6 +9859,36 @@ def test_additional_properties_adjustment_forbids_extras(input_schema, path, exp
         ),
     )
     _assert_valid_schema_object(input_schema, out)
+    assert out == expected
+
+
+@pytest.mark.parametrize(
+    "input_schema, path, expected",
+    [
+        pytest.param(True, (), True, id="boolean-schema"),
+        pytest.param(
+            {"type": "object", "properties": {"a": {}}},
+            ("missing",),
+            {"type": "object", "properties": {"a": {}}},
+            id="unknown-nested-property",
+        ),
+    ],
+)
+def test_additional_properties_adjustment_skips_unreachable_targets(input_schema, path, expected, case_factory):
+    out = AdditionalPropertiesAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=(
+            Observation(
+                operation_label="POST /api/users",
+                location=ParameterLocation.BODY,
+                parameter_path=path,
+                kind=ObservationKind.FORBIDS_ADDITIONAL_PROPERTIES,
+                raw_message="Extra inputs are not permitted",
+            ),
+        ),
+    )
     assert out == expected
 
 

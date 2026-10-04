@@ -358,6 +358,60 @@ def test_nullable_recursive_reference(ctx):
     assert find(strategy, lambda case: isinstance(case.body, dict)).body == {}
 
 
+def _tags_body_schema(ctx, body):
+    return ctx.openapi.load_schema(
+        {
+            "/tags": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+
+@pytest.mark.hypothesis_nested
+def test_contains_no_item_can_match_with_zero_min_contains(ctx):
+    body = {
+        "type": "array",
+        "items": {"type": "integer"},
+        "contains": {"type": "string"},
+        "minContains": 0,
+        "maxContains": 1,
+    }
+    schema = _tags_body_schema(ctx, body)
+    validator = jsonschema_rs.validator_for(body)
+
+    @given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert validator.is_valid(case.body), case.body
+        assert all(isinstance(item, int) for item in case.body), case.body
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_contains_contradicting_items_leaves_only_other_branch(ctx):
+    # Every item has at most one character, so no item matches a two-character pattern.
+    body = {
+        "anyOf": [
+            {"type": "array", "items": {"type": "string", "maxLength": 1}, "contains": {"pattern": "^..$"}},
+            {"type": "null"},
+        ]
+    }
+    schema = _tags_body_schema(ctx, body)
+
+    @given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert case.body is None, case.body
+
+    test()
+
+
 @pytest.mark.hypothesis_nested
 def test_valid_headers():
     # When headers are generated

@@ -157,6 +157,18 @@ def test_django_disallowed_host_with_debug(django_settings):
     )
 
 
+def test_server_error_is_not_explained_as_disallowed_host():
+    app = Flask("test_app")
+
+    @app.route("/schema")
+    def schema():
+        return "", 500
+
+    with pytest.raises(LoaderError) as exc:
+        schemathesis.openapi.from_wsgi("/schema", app)
+    assert str(exc.value) == "Failed to load schema due to server error (HTTP 500 Internal Server Error)"
+
+
 def make_flask_bad_request_app():
     app = Flask("test_app")
 

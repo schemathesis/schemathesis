@@ -2429,6 +2429,58 @@ def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_
     assert exc_info.value.title == "Discriminator value not in schema mapping"
 
 
+def _single_response_schema(ctx, content):
+    return ctx.openapi.load_schema(
+        {"/test": {"get": {"responses": {"200": {"description": "OK", "content": content}}}}}
+    )
+
+
+def test_response_schema_conformance_skips_malformed_media_type_key(ctx, response_factory):
+    schema = _single_response_schema(
+        ctx,
+        {
+            "not a media type": {"schema": {"type": "string"}},
+            "application/*": {"schema": {"type": "integer"}},
+        },
+    )
+    case = schema["/test"]["GET"].Case()
+    valid = Response.from_requests(response_factory.requests(content=b"42"), True)
+    assert response_schema_conformance(_CHECK_CTX, valid, case) is None
+
+    invalid = Response.from_requests(response_factory.requests(content=b'"text"'), True)
+    with pytest.raises(JsonSchemaError, match='is not of type "integer"'):
+        response_schema_conformance(_CHECK_CTX, invalid, case)
+
+
+def test_response_schema_conformance_ignores_non_object_media_type_entry(ctx, response_factory):
+    schema = _single_response_schema(ctx, {"application/json": "not an object"})
+    case = schema["/test"]["GET"].Case()
+    response = Response.from_requests(response_factory.requests(content=b'"anything"'), True)
+    assert response_schema_conformance(_CHECK_CTX, response, case) is None
+
+
+def test_response_schema_conformance_discriminator_inline_branch(ctx, response_factory):
+    schema = _single_response_schema(
+        ctx,
+        {
+            "application/json": {
+                "schema": {
+                    "oneOf": [{"type": "object", "properties": {"petType": {"type": "string"}}}],
+                    "discriminator": {"propertyName": "petType", "mapping": {"cat": "#/components/schemas/Cat"}},
+                }
+            }
+        },
+    )
+    case = schema["/test"]["GET"].Case()
+    valid = Response.from_requests(response_factory.requests(content=b'{"petType": "cat"}'), True)
+    assert response_schema_conformance(_CHECK_CTX, valid, case) is None
+
+    invalid = Response.from_requests(response_factory.requests(content=b'{"petType": "fish"}'), True)
+    with pytest.raises(Failure) as exc_info:
+        response_schema_conformance(_CHECK_CTX, invalid, case)
+    assert exc_info.value.title == "Discriminator value not in schema mapping"
+
+
 _USER_PROFILE_SCHEMA = {
     "/users": {
         "post": {

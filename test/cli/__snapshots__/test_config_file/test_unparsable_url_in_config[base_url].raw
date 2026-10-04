@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. Make sure it is a properly formatted URL.

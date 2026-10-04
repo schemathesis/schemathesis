@@ -2404,6 +2404,128 @@ def test_replay_keeps_fixed_crash_with_masked_body(cli, app_runner, ctx, crash_f
     assert crash_file.exists()
 
 
+@pytest.mark.parametrize(
+    ("url_path", "step_fields"),
+    [
+        ("/users/[Filtered]", {"path_parameters": {"id": "[Filtered]"}}),
+        ("/users/1", {"path_parameters": {"id": "1"}, "request_headers": {"X-Trace": "abc [Filtered] def"}}),
+    ],
+    ids=["masked-path-parameter", "partially-masked-header"],
+)
+def test_replay_keeps_fixed_crash_with_unrestorable_masked_value(
+    cli, app_runner, ctx, crash_factory, tmp_path, url_path, step_fields
+):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/users/<id>")
+    def user(id):
+        return jsonify({}), 200
+
+    schema_url = app_runner.openapi_url(app)
+    fields = dict(step_fields)
+    crash_file = _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{schema_url.rsplit('/', 1)[0]}{url_path}",
+        schema_location=schema_url,
+        path_template="/users/{id}",
+        status=500,
+        body='{"error": "was broken"}',
+        request_headers=fields.pop("request_headers", None),
+        **fields,
+    )
+
+    result = cli.main("replay", str(crash_file))
+
+    assert result.exit_code == 0, result.output
+    assert "FIXED" in result.output
+    assert crash_file.exists()
+
+
+def test_replay_ignores_link_with_out_of_range_parent_index(cli, app_runner, ctx, tmp_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/source": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/target": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"500": {"description": "Error"}},
+                }
+            },
+        }
+    )
+    sent_ids = []
+
+    @app.route("/source")
+    def source():
+        return jsonify({"id": "x"})
+
+    @app.route("/target")
+    def target():
+        sent_ids.append(request.args.get("id"))
+        return jsonify({"error": "boom"}), 500
+
+    schema_url = app_runner.openapi_url(app)
+    base = schema_url.rsplit("/", 1)[0]
+    crash_dir = _crashes_dir(tmp_path)
+    crash_dir.mkdir(parents=True, exist_ok=True)
+    writer = CrashWriter(directory=crash_dir)
+    writer.open(schema_location=schema_url, base_url=base)
+    step1 = CrashStep(
+        method="GET",
+        url=f"{base}/source",
+        url_template="/source",
+        request_headers={},
+        response_status=200,
+        response_headers={"content-type": "application/json"},
+        response_body='{"id": "x"}',
+        link=None,
+        checks=[],
+        meta=None,
+        path="/source",
+    )
+    step2 = CrashStep(
+        method="GET",
+        url=f"{base}/target?id=stale",
+        url_template="/target",
+        request_headers={},
+        response_status=500,
+        response_headers={"content-type": "application/json"},
+        response_body='{"error": "boom"}',
+        link=CrashLink(operation_id="target", parameters={"query.id": "$response.body#/id"}),
+        checks=[CrashCheck(name="not_a_server_error", status="failure", message="boom")],
+        meta=None,
+        path="/target",
+        query={"id": "stale"},
+        parent_index=7,
+    )
+    writer.write(
+        CrashFile(
+            operation="GET /source -> GET /target",
+            method="GET",
+            path_template="/target",
+            fingerprint="stalepar",
+            case_id="Sp1Ix9",
+            code_sample="",
+            sequence=[step1, step2],
+        )
+    )
+
+    result = cli.main("replay", "--keep")
+
+    assert result.exit_code == 1, result.output
+    assert sent_ids == ["stale"]
+
+
 def test_replay_config_auth_disables_auth_providers_from_hooks(cli, app_runner, ctx, crash_factory, tmp_path):
     # As in a run, configured auth replaces hook providers, even for operations it does not cover.
     api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))

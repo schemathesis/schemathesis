@@ -310,6 +310,28 @@ def test_project_workers_below_one():
     )
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            '[[project]]\ntitle = "a"\nworkers = "many"\n',
+            "Error in [project.0] section:\n  Type error:\n\n"
+            "  - 'workers' -> Must be an integer or 'auto', but got string: 'many'",
+        ),
+        (
+            'generation.maximize = "foo"\n',
+            "Error in [generation] section:\n  Type error:\n\n"
+            "  - 'maximize' -> Must be 'response_time' or an array, but got string: 'foo'",
+        ),
+    ],
+    ids=["project-workers-const", "maximize-enum"],
+)
+def test_any_of_with_literal_alternative_lists_allowed_values(source, expected):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_str(source)
+    assert str(exc.value) == expected
+
+
 def test_standalone_project_config_reads_discovered_config_file(tmp_path, monkeypatch):
     (tmp_path / "schemathesis.toml").write_text("seed = 42\n")
     monkeypatch.chdir(tmp_path)
