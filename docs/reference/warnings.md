@@ -213,9 +213,10 @@ Low valid-input rate: 1 operation accepted few of the requests sent to it, leavi
 
 An operation where almost every request is turned away has exercised the request parser and little behind it, and nothing else in the output says so - the run still reports the same case count and passes. The two adjacent warnings cover the extreme: [`missing_test_data`](#missing_test_data) and [`validation_mismatch`](#validation_mismatch) fire when *every* request was rejected, and this one covers the middle ground they leave silent.
 
-The counts distinguish the two causes, which need different fixes:
+The counts distinguish three causes, which need different fixes:
 
 - **Not found** - the requests were well-formed but addressed resources that do not exist. Supply real identifiers through `parameters` in an `[[operations]]` section, schema examples, or a [fuzz dictionary](../guides/fuzz-dictionary.md).
+- **Conflicts** - the requests were well-formed but clashed with the current state of a resource (`409`), usually a value that must be unique and that Schemathesis had already sent in an earlier case. Neither the schema nor the data is at fault. If the conflicts hide logic you need tested, a [`before_call`](hooks.md) hook can give unique fields fresh values.
 - **Rejected** - the API refused the data itself, so the schema is likely missing constraints the API enforces.
 
 Authentication failures, rate limiting (`429`), and server errors are excluded from the rate, since none says anything about whether the data was acceptable. If many requests are rate-limited, set [`rate-limit`](configuration.md#rate-limit) so they get answered.

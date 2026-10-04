@@ -83,6 +83,8 @@ class CallOutcome(enum.Enum):
     ACCEPTED = "accepted"
     # Well-formed, but the addressed resource does not exist.
     UNREACHABLE = "unreachable"
+    # Well-formed, but at odds with the current state of the resource, e.g. a duplicate of a unique value.
+    CONFLICT = "conflict"
     # Refused on the data itself.
     REJECTED = "rejected"
     # Says nothing about whether the data was acceptable, e.g. an auth failure or a server error.

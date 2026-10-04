@@ -98,12 +98,14 @@ class ValidRate:
     accepted: int = 0
     # Well-formed, but the addressed resource does not exist.
     unreachable: int = 0
+    # Well-formed, but at odds with the current state of the resource.
+    conflicts: int = 0
     # Refused on the data itself.
     rejected: int = 0
 
     @property
     def total(self) -> int:
-        return self.accepted + self.unreachable + self.rejected
+        return self.accepted + self.unreachable + self.conflicts + self.rejected
 
     @property
     def rate(self) -> float:
@@ -128,6 +130,8 @@ def positive_call_outcomes(recorder: RecordedScenario) -> ValidRate:
             outcomes.accepted += 1
         elif outcome is CallOutcome.UNREACHABLE:
             outcomes.unreachable += 1
+        elif outcome is CallOutcome.CONFLICT:
+            outcomes.conflicts += 1
         elif outcome is CallOutcome.REJECTED:
             outcomes.rejected += 1
     return outcomes
