@@ -299,6 +299,7 @@ class ExecutionPlan:
             ),
             reauth_count=ctx.reauth.reauth_count,
             reauth_broke=ctx.reauth.broke,
+            behaviors=ctx.behaviors.summary(),
         )
         # Skip after_run on a partial run (interrupt/abort); the fuzz path runs them on stop.
         # Spending the whole time budget is a planned finish, so it keeps them.
