@@ -413,7 +413,8 @@ def multipart_schema(ctx, app_runner):
     [("/upload", {"file": b"00"}), ("/raw", "00")],
     ids=["dict-body", "non-dict-body"],
 )
-def test_multipart_boundary_matches_between_header_and_body(multipart_schema, path, body):
+def test_multipart_boundary_matches_between_header_and_body(multipart_schema, monkeypatch, path, body):
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
     case = multipart_schema[path]["POST"].Case(body=body, media_type="multipart/form-data")
     response = case.call()
     command = case.as_curl_command(headers=dict(response.request.headers))
@@ -430,7 +431,8 @@ def test_multipart_curl_command_is_stable(multipart_schema, path, body):
     assert case.as_curl_command() == case.as_curl_command()
 
 
-def test_empty_multipart_curl_body_keeps_closing_delimiter(multipart_schema):
+def test_empty_multipart_curl_body_keeps_closing_delimiter(multipart_schema, monkeypatch):
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
     case = multipart_schema["/upload"]["POST"].Case(body={}, media_type="multipart/form-data")
     command = case.as_curl_command()
     boundary = HEADER_BOUNDARY.search(command)[1]
