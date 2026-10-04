@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sys
+import warnings
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, Literal, TypeAlias, TypeGuard
@@ -631,7 +632,10 @@ def is_valid_python_regex(pattern: object) -> TypeGuard[str]:
     if _POSIX_CLASS_RE.search(pattern):
         return False
     try:
-        re.compile(pattern)
+        # Only whether it compiles matters; CPython warns about some bracket shapes it will parse differently.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            re.compile(pattern)
         return True
     except re.error:
         return False
