@@ -91,14 +91,21 @@ def _build(
         canonical_schema = cached_form
     else:
         with _reported():
-            canonical_schema = jsonschema_rs.canonicalize(
-                schema,
-                draft=draft,
-                pattern_options=FANCY_REGEX_OPTIONS,
-                # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a
-                # `format`-carrying schema generating arbitrary strings on this path.
-                validate_formats=True,
-            )
+            try:
+                canonical_schema = jsonschema_rs.canonicalize(
+                    schema,
+                    draft=draft,
+                    pattern_options=FANCY_REGEX_OPTIONS,
+                    # Draft 2020-12 treats `format` as an annotation and drops it, which would leave a
+                    # `format`-carrying schema generating arbitrary strings on this path.
+                    validate_formats=True,
+                )
+            except ValueError as exc:
+                # A value no JSON document can hold (e.g. `datetime.date` in a dict built in Python) arrives
+                # as a bare `ValueError`; the library's own error types are subclasses and stay as reported.
+                if type(exc) is not ValueError:
+                    raise
+                raise InvalidSchema(f"Failed to generate test cases for this API operation: {exc}") from None
         if canonical_key is not None:
             canonical_form_cache[canonical_key] = canonical_schema
     if canonical_schema.kind is canonical.CanonicalKind.RAW:
