@@ -8289,6 +8289,14 @@ STRING_QUERY_PARAMETER_WITH_MIN_LENGTH = {
     "allowEmptyValue": False,
     "schema": {"type": "string", "minLength": 1},
 }
+QUERY_PARAMETERS_ALLOWING_EMPTY = [
+    {"in": "query", "name": "value", "required": True, "allowEmptyValue": True, "schema": schema}
+    for schema in (
+        {"type": "boolean"},
+        {"type": "string", "enum": ["asc"]},
+        {"type": "string", "minLength": 1},
+    )
+]
 
 
 @pytest.mark.parametrize(
@@ -8335,6 +8343,13 @@ def test_negative_data_rejection_for_empty_query_string(ctx, response_factory, p
             reported.append(str(exc))
 
     assert bool(reported) is reports_failure, reported
+
+
+@pytest.mark.parametrize("parameter", QUERY_PARAMETERS_ALLOWING_EMPTY, ids=["boolean", "enum", "min-length"])
+def test_allow_empty_value_is_not_negative(ctx, parameter):
+    operation = load_schema(ctx, parameters=[parameter], method="get")["/foo"]["GET"]
+
+    assert all(case.query.get("value") != "" for case in collect_cases(operation, GenerationMode.NEGATIVE))
 
 
 SECOND_REQUIRED_QUERY_PARAMETER = {"in": "query", "name": "kind", "required": True, "schema": {"type": "string"}}

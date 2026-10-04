@@ -1700,7 +1700,7 @@ def extract_parameter_schema_v2(parameter: Mapping[str, Any]) -> JsonSchemaObjec
             items["enum"] = list(schema["enum"])
         schema["items"] = items
         del schema["enum"]
-    return schema
+    return cast(JsonSchemaObject, _with_empty_value(schema, parameter))
 
 
 def _hashable(value: object) -> object:
@@ -1721,7 +1721,7 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
                     schema=parameter["schema"],
                 ),
             )
-        return parameter["schema"]
+        return _with_empty_value(parameter["schema"], parameter)
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
     # > The map MUST only contain one entry.
     try:
@@ -1738,7 +1738,17 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
         raise InvalidSchema(EMPTY_CONTENT_MESSAGE.format(location=location, name=name))
     media_type, media_type_object = next(iter(content.items()))
     ensure_object(media_type_object, f"Media type `{media_type}` for {location} parameter `{name}`")
-    return media_type_object.get("schema", {})
+    return _with_empty_value(media_type_object.get("schema", {}), parameter)
+
+
+def _with_empty_value(schema: JsonSchema, parameter: Mapping[str, Any]) -> JsonSchema:
+    if parameter.get("allowEmptyValue") is not True or parameter.get("in") not in ("query", "formData"):
+        return schema
+    if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in schema:
+        schema = dict(schema)
+        bundled = schema.pop(BUNDLE_STORAGE_KEY)
+        return {"anyOf": [schema, {"enum": [""]}], BUNDLE_STORAGE_KEY: bundled}
+    return {"anyOf": [schema, {"enum": [""]}]}
 
 
 def _bundle_parameter(

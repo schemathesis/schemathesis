@@ -1171,6 +1171,58 @@ def test_query_parameter_validate(ctx):
         limit.validate(0)
 
 
+@pytest.mark.parametrize(
+    "parameter_schema",
+    [{"type": "boolean"}, {"type": "string", "enum": ["asc"]}, {"type": "string", "minLength": 1}],
+    ids=["boolean", "enum", "min-length"],
+)
+@pytest.mark.parametrize("allow_empty_value", [True, False, None], ids=["allowed", "forbidden", "default"])
+def test_query_parameter_allow_empty_value(ctx, parameter_schema, allow_empty_value):
+    parameter = {"name": "filter", "in": "query", "required": True, "schema": parameter_schema}
+    if allow_empty_value is not None:
+        parameter["allowEmptyValue"] = allow_empty_value
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [parameter],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    query = schema["/items"]["GET"].query[0]
+
+    assert query.is_valid("") is (allow_empty_value is True)
+
+
+@pytest.mark.parametrize("location", ["query", "formData"])
+@pytest.mark.parametrize("allow_empty_value", [True, False, None], ids=["allowed", "forbidden", "default"])
+def test_swagger_parameter_allow_empty_value(ctx, location, allow_empty_value):
+    parameter = {"name": "filter", "in": location, "required": True, "type": "boolean"}
+    if allow_empty_value is not None:
+        parameter["allowEmptyValue"] = allow_empty_value
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [parameter],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+        consumes=["application/x-www-form-urlencoded"],
+    )
+    operation = schema["/items"]["GET"]
+
+    if location == "query":
+        is_valid = operation.query[0].is_valid("")
+    else:
+        is_valid = operation.body[0].is_valid({"filter": ""})
+    assert is_valid is (allow_empty_value is True)
+
+
 # An empty array serializes to nothing, so generation raises `minItems`; the contract still admits it.
 def test_validate_ignores_serialization_bounds(ctx):
     schema = ctx.openapi.load_schema(
