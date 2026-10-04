@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     DefinitionSource,
     InputSlot,
     OperationMap,
+    OperationNode,
     OutputSlot,
     ResourceDefinition,
     ResourceMap,
@@ -41,6 +42,7 @@ def extract_inputs(
     response_resource_cache: ResponseResourceCache,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
+    deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     deferred_field_named_path_parameters: list[tuple[str, str]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
@@ -110,6 +112,7 @@ def extract_inputs(
             updated_resource=updated_resource,
             deferred_nested_fks=deferred_nested_fks,
             deferred_named_scalars=deferred_named_scalars,
+            deferred_body_fields=deferred_body_fields,
             candidate_resource_names=candidate_resource_names,
         )
 
@@ -338,6 +341,7 @@ def _resolve_body_dependencies(
     updated_resource: str | None = None,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
+    deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
@@ -377,6 +381,8 @@ def _resolve_body_dependencies(
         return
     path = operation.path
     for property_name, subschema in properties.items():
+        if deferred_body_fields is not None and property_name in required and _is_scalar(subschema):
+            deferred_body_fields.append((property_name, subschema))
         resource_name = naming.from_parameter(property_name, path, body_field=True)
         # `_name` body fields are usually attributes; only invent a resource when its
         # name is backed by a path segment or component schema. Otherwise fall through
@@ -647,6 +653,88 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap) ->
                 # Update input slot to use the better resource definition
                 input_slot.resource = resources[new_resource_name]
                 input_slot.resource_field = new_field_name
+
+
+def rebind_body_fields_to_unique_producers(
+    operations: OperationMap,
+    deferred_body_fields: dict[str, list[tuple[str, JsonSchema]]],
+) -> None:
+    """Bind required scalar body fields to the sole response output that declares them."""
+    candidates: dict[str, list[tuple[OperationNode, OutputSlot]]] = {}
+    produced_resources = set()
+    for operation in operations.values():
+        for output in operation.outputs:
+            produced_resources.add(id(output.resource))
+            if output.resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
+                continue
+            declared = output.response_fields
+            if declared is None:
+                declared = frozenset(output.resource.fields)
+            for field in declared:
+                candidates.setdefault(field, []).append((operation, output))
+
+    for label, fields in deferred_body_fields.items():
+        consumer = operations[label]
+        slots = {
+            slot.parameter_name: slot
+            for slot in consumer.inputs
+            if slot.parameter_location == ParameterLocation.BODY and isinstance(slot.parameter_name, str)
+        }
+        matched_outputs: dict[int, tuple[OutputSlot, set[str]]] = {}
+        for field, field_schema in fields:
+            slot = slots.get(field)
+            if (
+                slot is None
+                or slot.resource.source != DefinitionSource.PARAMETER_INFERENCE
+                or id(slot.resource) in produced_resources
+            ):
+                continue
+            matches = [
+                (producer, output)
+                for producer, output in candidates.get(field, ())
+                if output.resource.types.get(field, set()) & set(get_type(field_schema))
+            ]
+            if (
+                len(matches) != 1
+                or matches[0][0] is consumer
+                or any(slot.parameter_name == field for slot in matches[0][0].inputs)
+            ):
+                continue
+            output = matches[0][1]
+            inferred_resource_name = slot.resource.name
+            slot.resource = output.resource
+            slot.resource_field = field
+            matched_output = matched_outputs.setdefault(id(output), (output, set()))
+            matched_output[1].add(inferred_resource_name)
+
+        if len(matched_outputs) != 1:
+            continue
+        output, inferred_resource_names = next(iter(matched_outputs.values()))
+        declared = output.response_fields
+        if declared is None:
+            declared = frozenset(output.resource.fields)
+        for field, field_schema in fields:
+            if (
+                field not in slots
+                and field in declared
+                and any(_has_resource_prefix(field, resource_name) for resource_name in inferred_resource_names)
+                and output.resource.types.get(field, set()) & set(get_type(field_schema))
+            ):
+                consumer.inputs.append(
+                    InputSlot(
+                        resource=output.resource,
+                        resource_field=field,
+                        parameter_name=field,
+                        parameter_location=ParameterLocation.BODY,
+                    )
+                )
+
+
+def _has_resource_prefix(field: str, resource_name: str) -> bool:
+    if len(field) <= len(resource_name) or field[: len(resource_name)].lower() != resource_name.lower():
+        return False
+    boundary = field[len(resource_name)]
+    return boundary in "_-" or boundary.isupper()
 
 
 def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -> None:

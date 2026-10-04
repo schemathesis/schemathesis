@@ -7325,6 +7325,98 @@ def test_form_body_field_links_to_its_producer(ctx, create_news, version):
     ]
 
 
+def test_form_body_fields_link_to_unique_response_field_producer(ctx):
+    application = {
+        "type": "object",
+        "properties": {
+            "client_id": {"type": "string"},
+            "client_secret": {"type": "string"},
+            "name": {"type": "string"},
+            "msg": {"type": "string"},
+        },
+        "required": ["client_id", "client_secret", "name", "msg"],
+    }
+    token_request = {
+        "type": "object",
+        "properties": {
+            "client_id": {"type": "string"},
+            "client_secret": {"type": "string"},
+            "grant_type": {"type": "string", "enum": ["client_credentials"]},
+        },
+        "required": ["client_id", "client_secret", "grant_type"],
+    }
+    components = {"schemas": {"OAuth2Application": application, "OAuth2TokenRequest": token_request}}
+    paths = {
+        **operation(
+            "post",
+            "/v1/auth_tokens/register/",
+            "201",
+            component_ref("OAuth2Application"),
+            operation_id="register",
+        ),
+        "/v1/auth_tokens/token/": {
+            "post": {
+                "operationId": "token",
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/x-www-form-urlencoded": {"schema": component_ref("OAuth2TokenRequest")}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1v1~1auth_tokens~1register~1/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1v1~1auth_tokens~1token~1/post",
+                "requestBody": {
+                    "client_id": "$response.body#/client_id",
+                    "client_secret": "$response.body#/client_secret",
+                },
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
+            },
+        ]
+    ]
+
+
+def test_body_field_does_not_link_when_multiple_responses_produce_it(ctx):
+    credential = {
+        "type": "object",
+        "properties": {"client_id": {"type": "string"}},
+        "required": ["client_id"],
+    }
+    paths = {
+        **operation("post", "/applications", "201", credential, operation_id="createApplication"),
+        **operation("post", "/sessions", "201", credential, operation_id="createSession"),
+        **operation_with_body("post", "/tokens", "200", credential, operation_id="createToken"),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert inferred_links(graph) == []
+
+
+def test_body_field_does_not_link_from_response_that_requires_the_same_field(ctx):
+    credential = {
+        "type": "object",
+        "properties": {"client_id": {"type": "string"}},
+        "required": ["client_id"],
+    }
+    paths = {
+        **operation_with_body("post", "/lookup", "200", credential, credential, operation_id="lookupApplication"),
+        **operation_with_body("post", "/tokens", "200", credential, operation_id="createToken"),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    assert inferred_links(graph) == []
+
+
 LANGUAGE_ITEM = {
     "type": "object",
     "properties": {"name": {"type": "string"}, "code": {"type": "string"}, "longCode": {"type": "string"}},
