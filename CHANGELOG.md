@@ -12,6 +12,7 @@
 - Missing `anyOf` negative coverage cases when a referenced schema contains invalid keywords.
 - Missing invalid-format coverage cases for Open API 3.1 `$ref` with sibling keywords.
 - Request bodies dropped when referenced through a plain-name `$anchor` in Open API 3.1.
+- Empty schema location in failures when a `$ref` points at a whole external file.
 - Negative cases never breaking query or cookie parameters given explicit values differing in name case.
 - Unsupported regex patterns inside `contains` reported as Hypothesis `Unsatisfiable`.
 - Raw `ValueError` for non-JSON values such as `datetime.date` in schemas passed to `from_dict`.
