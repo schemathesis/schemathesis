@@ -167,7 +167,8 @@ class DynamicTokenAuthProvider:
             kwargs["cert"] = cert
         try:
             response = requests.request(self.method, url, data=body, headers=headers, timeout=timeout, **kwargs)
-        except requests.exceptions.RequestException as exc:
+        except (requests.exceptions.RequestException, OSError) as exc:
+            # OSError: requests surfaces TLS setup failures (e.g. a missing client certificate file) as raw OSError.
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
                 "get",
