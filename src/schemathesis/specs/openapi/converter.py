@@ -79,6 +79,7 @@ def _to_json_schema(
     schema: JsonSchema,
     *,
     nullable_keyword: str,
+    is_negated: bool = False,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
@@ -143,7 +144,11 @@ def _to_json_schema(
     if pattern is not None:
         # One the validator compiles is kept even where Python cannot read it - the API enforces it,
         # so dropping it would draw values the API turns down.
-        enforced = enforced_pattern(pattern)
+        enforced = (
+            pattern
+            if is_negated and isinstance(pattern, str) and is_valid_jsonschema_rs_regex(pattern)
+            else enforced_pattern(pattern)
+        )
         if enforced is None:
             del schema["pattern"]
         else:
@@ -202,6 +207,7 @@ def _to_json_schema(
             schema[keyword] = _to_json_schema(
                 value,
                 nullable_keyword=nullable_keyword,
+                is_negated=is_negated != (keyword == "not"),
                 is_response_schema=is_response_schema,
                 update_quantifiers=update_quantifiers,
                 upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
@@ -216,6 +222,7 @@ def _to_json_schema(
                 value[idx] = _to_json_schema(
                     subschema,
                     nullable_keyword=nullable_keyword,
+                    is_negated=is_negated,
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
@@ -230,6 +237,7 @@ def _to_json_schema(
                 value[name] = _to_json_schema(
                     subschema,
                     nullable_keyword=nullable_keyword,
+                    is_negated=is_negated,
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,

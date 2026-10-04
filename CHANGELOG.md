@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Positive cases violating negated Unicode property patterns such as `\p{L}`.
 - Display report write failures with the format, path, and operating-system error.
 - Negative cases never breaking query or cookie parameters given explicit values differing in name case.
 
