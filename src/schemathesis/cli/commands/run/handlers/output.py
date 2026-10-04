@@ -1265,12 +1265,16 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             " accepted few of the requests sent to it, leaving the logic behind them untested",
         )
         unreachable_dominates = False
+        conflicts_dominate = False
         for label in sorted(ctx.warnings.low_valid_rate_reported):
             for phase, rate in sorted(ctx.warnings.valid_rates.get(label, {}).items()):
                 if rate.accepted and rate.rate < ctx.config.warnings.low_valid_rate.threshold:
-                    if rate.unreachable > rate.rejected:
+                    if rate.unreachable > max(rate.rejected, rate.conflicts):
                         unreachable_dominates = True
                         cause = f"{rate.unreachable} not found"
+                    elif rate.conflicts > rate.rejected:
+                        conflicts_dominate = True
+                        cause = f"{rate.conflicts} conflicts"
                     else:
                         cause = f"{rate.rejected} rejected"
                     click.echo(
@@ -1283,6 +1287,11 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             tip = "💡 Most requests came back with errors; supply argument values via a fuzz dictionary"
         elif unreachable_dominates:
             tip = "💡 Most requests addressed resources that do not exist; supply identifiers via examples or a dictionary"
+        elif conflicts_dominate:
+            tip = (
+                "💡 Most requests collided with existing resources, often with values repeated across cases; "
+                "a `before_call` hook can give unique fields fresh values"
+            )
         else:
             tip = "💡 Most requests were refused on their data; the schema likely omits constraints the API enforces"
         self._print_warning_tips([tip])

@@ -124,6 +124,7 @@ def build_document(
                 phase: {
                     "accepted": rate.accepted,
                     "unreachable": rate.unreachable,
+                    "conflicts": rate.conflicts,
                     "rejected": rate.rejected,
                 }
                 for phase, rate in phases.items()

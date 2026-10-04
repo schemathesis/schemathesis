@@ -605,6 +605,8 @@ class BaseSchema(Mapping):
             return CallOutcome.UNINFORMATIVE
         if status_code == 404:
             return CallOutcome.UNREACHABLE
+        if status_code == 409:
+            return CallOutcome.CONFLICT
         if 400 <= status_code < 500:
             return CallOutcome.REJECTED
         return CallOutcome.UNINFORMATIVE

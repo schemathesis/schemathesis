@@ -26,6 +26,7 @@
 - Report the document URL when a fragment is missing in a remote `$ref` document.
 - Crash fetching a dynamic token when the client certificate file does not exist.
 - Rate-limited (`429`) responses counted as rejected data in the `low_valid_rate` warning.
+- Report `409` responses as conflicts, not rejected data, in the `low_valid_rate` warning. [#4932](https://github.com/schemathesis/schemathesis/issues/4932)
 
 ## [4.29.1](https://github.com/schemathesis/schemathesis/compare/v4.29.0...v4.29.1) - 2026-10-04
 
