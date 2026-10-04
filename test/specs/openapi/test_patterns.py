@@ -27,6 +27,7 @@ from schemathesis.specs.openapi.patterns import (
     _UNICODE_PROPERTY_RAW_MAP,
     _serialize,
     is_valid_jsonschema_rs_regex,
+    is_valid_python_regex,
     matches_every_string,
     normalize_regex,
     pattern_length_bounds,
@@ -743,6 +744,18 @@ def test_normalize_regex_never_produces_nested_classes(pattern: str) -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", FutureWarning)
         re.compile(result)
+
+
+# CPython emits a FutureWarning for some bracket shapes while compiling; pattern validation must stay quiet.
+@pytest.mark.parametrize(
+    "pattern",
+    ["^[[:a]b]+$", "[[:]]", "^a+$"],
+    ids=["nested-set", "empty-nested-set", "plain"],
+)
+def test_is_valid_python_regex_does_not_warn(pattern: str) -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        assert is_valid_python_regex(pattern) is True
 
 
 @given(st.data())
