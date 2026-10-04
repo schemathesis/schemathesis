@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import difflib
 import json
+import re
 from typing import TYPE_CHECKING
 
 from jsonschema_rs import ValidationErrorKind
@@ -61,6 +62,8 @@ def _format_validation_error(error: ValidationError, replaced: dict[InstancePath
         return _format_required_error(error)
     if error.kind.name == "type":
         return _format_type_error(error, replaced)
+    if error.kind.name == "pattern":
+        return _format_pattern_error(error)
     if error.kind.name == "minProperties":
         return _format_min_properties_error(error)
     if error.kind.name == "additionalProperties":
@@ -108,17 +111,7 @@ def _format_enum_error(error: ValidationError, replaced: dict[InstancePath, obje
     assert isinstance(variants, list)
     valid_values = sorted(variants)
 
-    path = error.instance_path
-
-    if path and isinstance(path[-1], int):
-        idx = path[-1]
-        prop_name = path[-2]
-        section_path = path[:-2]
-        description = f"Item #{idx} in the '{prop_name}' array"
-    else:
-        prop_name = path[-1] if path else "value"
-        section_path = path[:-1]
-        description = f"'{prop_name}'"
+    description, section_path = _describe_instance_location(error.instance_path)
 
     suggestion = ""
     if isinstance(error.instance, str) and all(isinstance(v, str) for v in valid_values):
@@ -133,6 +126,43 @@ def _format_enum_error(error: ValidationError, replaced: dict[InstancePath, obje
         f"  - {description} -> {_format_value(_original_instance(error, replaced))} is not a valid value.{suggestion}\n\n"
         f"Valid values are: {valid_values_str}."
     )
+
+
+# A pattern that is a plain case-insensitive alternation, like `(?i)(?:GET|POST)`, lists its valid values.
+_ALTERNATION_PATTERN = re.compile(r"\(\?i\)\(\?:([A-Z]+(?:\|[A-Z]+)*)\)")
+
+
+def _valid_values_from_pattern(pattern: str) -> list[str]:
+    match = _ALTERNATION_PATTERN.fullmatch(pattern)
+    assert match is not None
+    return sorted(match.group(1).split("|"))
+
+
+def _format_pattern_error(error: ValidationError) -> str:
+    description, section_path = _describe_instance_location(error.instance_path)
+    section = path_to_section_name(section_path)
+    pattern = error.kind.as_dict().get("pattern")
+    assert isinstance(pattern, str)
+    valid_values = _valid_values_from_pattern(pattern)
+    suggestion = ""
+    instance = error.instance
+    if isinstance(instance, str):
+        match = _find_closest_match(instance, valid_values)
+        if match:
+            suggestion = f" Did you mean '{match}'?"
+    valid_values_str = ", ".join(repr(v) for v in valid_values)
+    return (
+        f"Error in {section} section:\n  Invalid value:\n\n"
+        f"  - {description} -> {_format_value(instance)} is not a valid value.{suggestion}\n\n"
+        f"Valid values are: {valid_values_str}."
+    )
+
+
+def _describe_instance_location(path: list[str | int]) -> tuple[str, list[str | int]]:
+    if path and isinstance(path[-1], int):
+        return f"Item #{path[-1]} in the '{path[-2]}' array", path[:-2]
+    prop_name = path[-1] if path else "value"
+    return f"'{prop_name}'", path[:-1]
 
 
 _JSON_TYPES = {

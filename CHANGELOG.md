@@ -16,6 +16,7 @@
 - Empty schema location in failures when a `$ref` points at a whole external file.
 - Negative cases never breaking query or cookie parameters given explicit values differing in name case.
 - Unsupported regex patterns inside `contains` reported as Hypothesis `Unsatisfiable`.
+- Config errors for invalid HTTP method values show the section and the valid values.
 - Raw `ValueError` for non-JSON values such as `datetime.date` in schemas passed to `from_dict`.
 - False `negative_data_rejection` failures for empty query values of parameters with `allowEmptyValue: true`.
 - `phases.stateful.max-steps = 50` silently capping scenarios at 6 steps.

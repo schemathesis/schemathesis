@@ -1,0 +1,5 @@
+# method must be a valid HTTP method
+[auth.dynamic.openapi.BearerAuth]
+path = "/token"
+extract_selector = "/access_token"
+method = "FETCH"

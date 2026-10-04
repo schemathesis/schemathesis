@@ -1,0 +1,6 @@
+Error in [phases.coverage] section:
+  Invalid value:
+
+  - Item #0 in the 'unexpected-methods' array -> 'FETCH' is not a valid value. Did you mean 'PATCH'?
+
+Valid values are: 'DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT', 'QUERY', 'TRACE'.

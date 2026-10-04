@@ -1,0 +1,3 @@
+# unexpected-methods entries must be valid HTTP methods
+[phases.coverage]
+unexpected-methods = ["FETCH"]
