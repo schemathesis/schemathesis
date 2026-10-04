@@ -763,16 +763,24 @@ def _matching(
     steered: jsonschema_rs.CanonicalSchema | None = schema
     for other in avoid:
         steered = None if steered is None else _narrowed(steered, other, negate=True)
+    declined: UnsupportedRegexPattern | None = None
     if steered is not None:
         try:
             return from_schema(steered, ctx), True
+        except UnsupportedRegexPattern as exc:
+            declined = exc
         except DECLINED:
             pass
     counted = not avoid
     try:
         return from_schema(schema, ctx), counted
+    except UnsupportedRegexPattern as exc:
+        declined = exc
     except DECLINED:
         pass
+    if declined is not None:
+        # The demand names no value a draw can produce, so a filter against it could never pass.
+        raise declined
     # The intersection is not one this builds from, so the demand narrows the elements by filter.
     return _element(items, ctx).filter(_validator(demand)), counted
 
