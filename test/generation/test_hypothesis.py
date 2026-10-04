@@ -3014,6 +3014,17 @@ def test_canonical_meta_invalid_schema_is_reported(schema, keyword):
         _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
 
+@pytest.mark.parametrize(
+    "value",
+    [datetime.date(2020, 1, 1), datetime.time(1, 2, 3), datetime.datetime(2020, 1, 1, 2, 3, 4)],
+    ids=["date", "time", "datetime"],
+)
+def test_canonical_schema_with_a_non_json_value_is_reported(value):
+    # Python dicts can hold values the Rust engine cannot serialize into a JSON document.
+    with pytest.raises(InvalidSchema, match="Unsupported type"):
+        _canonical_strategy({"type": "string", "default": value}, GenerationConfig(), jsonschema_rs.Draft7Validator)
+
+
 # Real-world spellings the validator's engine turns down: a character class with `\w` as a range
 # bound, a lone surrogate range, Python's open-ended `{,2}`, and its `\Z` anchor.
 UNCOMPILABLE_PATTERNS = [

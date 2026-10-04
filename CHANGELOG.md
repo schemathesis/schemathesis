@@ -12,6 +12,7 @@
 - Missing invalid-format coverage cases for Open API 3.1 `$ref` with sibling keywords.
 - Negative cases never breaking query or cookie parameters given explicit values differing in name case.
 - Unsupported regex patterns inside `contains` reported as Hypothesis `Unsatisfiable`.
+- Raw `ValueError` for non-JSON values such as `datetime.date` in schemas passed to `from_dict`.
 - False `negative_data_rejection` failures for empty query values of parameters with `allowEmptyValue: true`.
 - `phases.stateful.max-steps = 50` silently capping scenarios at 6 steps.
 
