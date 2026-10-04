@@ -87,6 +87,39 @@ def test_nested_literal_substitutes_every_case(ctx):
 
 
 @pytest.mark.hypothesis_nested
+def test_nested_literal_replaces_null_parent(ctx):
+    schema = _load_schema(
+        ctx,
+        {"parameters": {"body.user.email": "pinned@example.com"}},
+        _path_with_body(
+            {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "type": "object",
+                        "nullable": True,
+                        "properties": {"email": {"type": "string"}},
+                        "additionalProperties": False,
+                    }
+                },
+                "required": ["user"],
+                "additionalProperties": False,
+            }
+        ),
+    )
+    operation = schema["/items"]["POST"]
+    bodies = []
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=10, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        bodies.append(case.body)
+
+    collect()
+    assert bodies == [{"user": {"email": "pinned@example.com"}}] * 10
+
+
+@pytest.mark.hypothesis_nested
 def test_force_inserts_missing_optional_leaf(ctx):
     schema = _load_schema(
         ctx,

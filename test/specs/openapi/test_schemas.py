@@ -311,6 +311,13 @@ def test_schema_endpoint_is_not_tested_for_a_relative_wsgi_path(ctx):
     assert [result.ok().label for result in schema.get_all_operations()] == ["GET /users"]
 
 
+def test_schema_endpoint_is_not_found_by_path(ctx):
+    app, _ = ctx.openapi.make_flask_app(SELF_DOCUMENTED_PATHS)
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    assert schema.find_operation_by_path("GET", "/openapi.json") is None
+    assert schema.find_operation_by_path("GET", "/users").label == "GET /users"
+
+
 def test_filter_excluding_the_schema_endpoint_is_not_reported_as_unmatched(ctx, app_runner):
     app, _ = ctx.openapi.make_flask_app(SELF_DOCUMENTED_PATHS)
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app)).exclude(path="/openapi.json")

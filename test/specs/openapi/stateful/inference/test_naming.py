@@ -346,6 +346,48 @@ def test_find_matching_field(parameter, resource, fields, expected):
 
 
 @pytest.mark.parametrize(
+    ["parameter", "resource", "fields", "expected"],
+    [
+        pytest.param("org-id-or-slug", "Org", ["name", "slug"], "slug", id="hyphen-id-or-slug-falls-back-to-slug"),
+        pytest.param("org_id_or_slug", "Org", ["name"], None, id="id-or-slug-without-id-or-slug-field"),
+        pytest.param("_name", "User", ["title"], None, id="leading-underscore-has-no-prefix"),
+    ],
+)
+def test_find_matching_field_fallbacks(parameter, resource, fields, expected):
+    assert naming.find_matching_field(parameter=parameter, resource=resource, fields=fields) == expected
+
+
+@pytest.mark.parametrize(
+    ["name", "expected"],
+    [
+        pytest.param("ABCDTO", "ABCDTO", id="uppercase-before-dto"),
+        pytest.param("XOut", "XOut", id="single-char-base-before-out"),
+    ],
+)
+def test_normalize_schema_name_keeps_names_without_lowercase_base(name, expected):
+    assert naming.normalize_schema_name(name) == expected
+
+
+@pytest.mark.parametrize(
+    ["raw_schema", "expected"],
+    [
+        pytest.param(
+            {
+                "paths": {"/v1/users/{id}": {}, 1: {}},
+                "components": {"schemas": {"UserOut": {}, "": {}, 2: {}}},
+                "definitions": {"Pet": {}},
+            },
+            frozenset({"Pet", "User", "UserOut"}),
+            id="skips-non-string-and-empty-names",
+        ),
+        pytest.param({"paths": ["/users"], "definitions": {"Pet": {}}}, frozenset({"Pet"}), id="non-dict-paths"),
+    ],
+)
+def test_collect_candidate_resource_names(raw_schema, expected):
+    assert naming.collect_candidate_resource_names(raw_schema) == expected
+
+
+@pytest.mark.parametrize(
     ["name", "expected"],
     [
         # Hyphenated suffixes (safest - always normalize)

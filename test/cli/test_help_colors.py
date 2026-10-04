@@ -60,6 +60,17 @@ def test_help_output_no_colors(cli, monkeypatch, command, args, use_env):
     assert "\x1b[" not in result.stdout
 
 
+# Colors are decided from sys.argv; --force-color is not a root option, so it is only patched into argv
+def test_root_help_force_color(cli, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["st", "--force-color", "-h"])
+
+    stdout = cli.main("-h", color=True).stdout
+
+    assert click.style("Options", fg="green", bold=True) in stdout
+    assert click.style("Commands", fg="green", bold=True) in stdout
+    assert click.style("run", fg="cyan", bold=True) in stdout
+
+
 def test_run_help_force_color(cli, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["st", "run", "--force-color", "-h"])
 

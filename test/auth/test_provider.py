@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from flask import jsonify, request
 from hypothesis import given, settings
@@ -11,10 +13,12 @@ from schemathesis.engine import Status, from_schema
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.run import PhaseName
 from schemathesis.generation.case import Case
+from schemathesis.specs.openapi.auths import DynamicTokenAuthProvider, HttpBearerAuthProvider
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from test.utils import EventStream
 
 TOKEN = "EXAMPLE-TOKEN"
+CERT_PATH = Path(__file__).parent.parent / "cli" / "cert.pem"
 
 
 @pytest.fixture
@@ -261,6 +265,35 @@ def test_auth_cache_with_scopes(ctx):
     list(from_schema(schema).execute())
     assert counts["list"] == 1
     assert counts["create"] == 1
+
+
+def test_dynamic_auth_malformed_payload_content_type(auth_operation):
+    provider = DynamicTokenAuthProvider(
+        path="/api/body-auth",
+        method="post",
+        payload={"key": "value"},
+        payload_content_type="json",
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    with pytest.raises(
+        AuthenticationError, match="Malformed payload_content_type 'json': Malformed media type: `json`"
+    ):
+        provider.get(auth_operation.Case(), AuthContext(operation=auth_operation, app=None))
+
+
+def test_dynamic_auth_token_fetch_with_request_cert(auth_operation):
+    auth_operation.schema.config.request_cert = str(CERT_PATH)
+    provider = DynamicTokenAuthProvider(
+        path="/api/body-auth",
+        method="post",
+        payload=None,
+        extract_from="body",
+        extract_selector="/access_token",
+        _applier=HttpBearerAuthProvider(bearer=""),
+    )
+    assert provider.get(auth_operation.Case(), AuthContext(operation=auth_operation, app=None)) == "test-token"
 
 
 def test_negative_data_rejection_no_false_positive_with_cookie_security_scheme(ctx, app_runner):

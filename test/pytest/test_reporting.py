@@ -114,6 +114,30 @@ def test_api(case):
     assert any(c["status"] == "FAILURE" for c in all_checks)
 
 
+def test_vcr_report_hand_built_case_has_null_metadata(testdir, ctx):
+    api = ctx.openapi.apps.success()
+    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{api.base_url}/api")
+schema.config.reports.update(vcr_path=r"{cassette_path}")
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_api(case):
+    case.operation.Case().call()
+""",
+        paths={"/success": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    testdir.runpytest().assert_outcomes(passed=2)
+
+    cassette = load_yaml_or_fail(cassette_path)
+    assert cassette["http_interactions"]
+    assert {(interaction["status"], interaction["metadata"]) for interaction in cassette["http_interactions"]} == {
+        ("SKIP", None)
+    }
+
+
 def test_vcr_report_no_interactions_when_call_raises(testdir, ctx):
     api = ctx.openapi.apps.success()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))

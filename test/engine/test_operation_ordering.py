@@ -2,13 +2,17 @@ import threading
 from queue import Queue
 
 import pytest
+from flask import jsonify
 
+import schemathesis
+from schemathesis.engine import events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.engine.run.unit import _create_scheduler
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.specs.openapi._ordering import compute_operation_layers
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
+from test.utils import EventStream
 
 
 def _operations(schema):
@@ -721,6 +725,62 @@ def test_operation_with_unresolvable_ref_is_still_dispatched(ctx):
         dispatched.append(result.ok().label)
 
     assert sorted(dispatched) == sorted(operation.label for operation in _operations(loaded))
+
+
+# A definition-level schema error must not abort a dependency-ordered run; it is reported after all layers finish.
+def test_layered_run_reports_operations_with_schema_errors(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"userId": {"type": "string"}},
+                                        "required": ["userId"],
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [_path_param(name="userId", param_type="string")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/broken": {
+                "get": {
+                    "parameters": [{"$ref": "#/components/parameters/Missing"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"userId": "1"}), 201
+
+    @app.route("/users/<user_id>")
+    def get_user(user_id):
+        return jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = EventStream(schema, phases=[PhaseName.FUZZING], max_examples=1).execute()
+    assert [(event.label, event.info.format()) for event in stream.find_all(events.NonFatalError)] == [
+        (
+            "GET /broken",
+            "Schema Error\n\nUnresolvable reference in the schema\n\nError details:\n"
+            "    Reference: #/components/parameters/Missing\n    Component does not exist in the schema.",
+        )
+    ]
 
 
 def test_create_scheduler_filters_to_requested_operations(ctx):

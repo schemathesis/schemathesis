@@ -6,7 +6,7 @@ import os
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, Response, jsonify, redirect, request
 
 import schemathesis
 from schemathesis.auths import AuthContext
@@ -462,6 +462,40 @@ def test_wfc_wsgi_login_redirect_back_to_login_is_rejected(ctx):
     context = AuthContext(operation=operation, app=app)
     with pytest.raises(WFCLoginError, match="redirected back to the login endpoint"):
         provider.get(operation.Case(), context)
+
+
+def test_wfc_external_login_redirect_back_to_login_is_rejected(ctx, app_runner):
+    base_url = app_runner.openapi_url(_bouncing_login_app(ctx), path="")
+    operation = schemathesis.openapi.from_url(f"{base_url}/openapi.json")["/api/protected"]["GET"]
+    provider = _provider_for(
+        {
+            "verb": "POST",
+            "externalEndpointURL": f"{base_url}/api/login",
+            "contentType": "application/json",
+            "payloadUserPwd": CREDENTIALS,
+            "expectCookies": True,
+        }
+    )
+    context = AuthContext(operation=operation, app=None)
+    with pytest.raises(WFCLoginError, match="redirected back to the login endpoint"):
+        provider.get(operation.Case(), context)
+
+
+def test_wfc_login_redirect_without_location_yields_cookies(ctx):
+    app, _ = ctx.openapi.make_flask_app({"/api/protected": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/login", methods=["POST"])
+    def login() -> object:
+        response = Response(status=302)
+        response.set_cookie("JSESSIONID", WFC_SESSION)
+        return response
+
+    operation = schemathesis.openapi.from_wsgi("/openapi.json", app)["/api/protected"]["GET"]
+    provider = _provider_for(_login(expectCookies=True))
+    context = AuthContext(operation=operation, app=app)
+    case = operation.Case()
+    provider.set(case, provider.get(case, context), context)
+    assert case.cookies == {"JSESSIONID": WFC_SESSION}
 
 
 @pytest.mark.parametrize("charset", ["bogus-xyz", "undefined"], ids=["unknown-charset", "undefined-codec"])

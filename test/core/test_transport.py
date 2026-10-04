@@ -1,5 +1,6 @@
 import pytest
 import requests
+from werkzeug.test import Client
 
 from schemathesis.core.transport import Response, expand_status_code
 
@@ -19,6 +20,20 @@ from schemathesis.core.transport import Response, expand_status_code
 )
 def test_expand_status_code(value, expected):
     assert expand_status_code(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [([("Content-Type", "text/plain; charset=latin-1")], "latin-1"), ([], "utf-8")],
+    ids=["declared-charset", "no-charset"],
+)
+def test_empty_wsgi_response_encoding(headers, expected):
+    def app(environ, start_response):
+        start_response("204 No Content", headers)
+        return []
+
+    response = Response.from_any(Client(app).get("/"))
+    assert (response.status_code, response.content, response.encoding) == (204, b"", expected)
 
 
 @pytest.mark.parametrize(

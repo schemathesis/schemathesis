@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from schemathesis.config import ProjectConfig, SanitizationConfig
+from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.reporting import HarWriter, JunitXmlWriter, NdjsonWriter, VcrWriter
 from schemathesis.reporting._command import sanitize_args
 
@@ -38,6 +39,18 @@ def test_junitxml_writer_context_manager():
     content = stream.getvalue()
     assert "schemathesis" in content
     assert "test_label" in content
+
+
+def test_vcr_writer_writes_header_to_stream():
+    stream = StringIO()
+    with VcrWriter(output=stream, config=ProjectConfig.from_dict({})) as writer:
+        writer.open(seed=42, command="st run http://localhost/openapi.json")
+    assert stream.getvalue() == (
+        "command: 'st run http://localhost/openapi.json'\n"
+        f"recorded_with: 'Schemathesis {SCHEMATHESIS_VERSION}'\n"
+        "seed: 42\n"
+        "http_interactions:"
+    )
 
 
 @pytest.mark.parametrize(

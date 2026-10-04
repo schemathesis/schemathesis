@@ -662,6 +662,38 @@ def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
     assert decoded == {"numbers": [1, 2], "flag": None}
 
 
+# A `querystring` parameter may legitimately generate no query pairs at all (e.g. an empty string payload).
+_EMPTY_QUERYSTRING_CONTENTS = (
+    {"text/plain": {"schema": {"type": "string", "enum": [""]}}},
+    {
+        "application/x-www-form-urlencoded": {
+            "schema": {"type": "object", "properties": [], "additionalProperties": False}
+        }
+    },
+)
+
+
+@pytest.mark.hypothesis_nested
+@given(st.data())
+@settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_querystring_without_content_sends_no_query(ctx, data):
+    for content in _EMPTY_QUERYSTRING_CONTENTS:
+        schema = ctx.openapi.load_schema(
+            {
+                "/teapot": {
+                    "get": {
+                        "parameters": [{"name": "ignored", "in": "querystring", "required": True, "content": content}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            version="3.2.0",
+        )
+        case = data.draw(schema["/teapot"]["GET"].as_strategy())
+        assert case.query == {}
+        assert case.as_transport_kwargs(base_url="http://127.0.0.1:1")["params"] == {}
+
+
 def test_querystring_binary_serialization_is_sent_as_raw_query(ctx):
     schemathesis.openapi.format("binary", st.just(b"\xff\x00A"))
     schema = ctx.openapi.load_schema(

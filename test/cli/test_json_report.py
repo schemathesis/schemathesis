@@ -1,5 +1,6 @@
 import json
 
+import click
 import pytest
 from _pytest.main import ExitCode
 
@@ -202,6 +203,19 @@ def test_handler_error_records_process_exit_code(ctx, cli, json_path, command):
     assert "CLI Handler Error" in result.stdout
     report = load_report(json_path)
     assert (result.exit_code, report["exit_code"], report["stop_reason"]) == (2, 2, "error")
+
+
+@pytest.mark.parametrize("command", [("run", "--max-examples=1"), ("fuzz", "--max-time=1")], ids=["run", "fuzz"])
+def test_handler_abort_on_start_records_process_exit_code(ctx, cli, json_path, command):
+    @schemathesis.cli.handler()
+    class AbortOnStart(schemathesis.cli.EventHandler):
+        def start(self, run_ctx) -> None:
+            raise click.Abort
+
+    api = ctx.openapi.apps.success()
+    result = cli.main(command[0], api.schema_url, command[1], f"--report-json-path={json_path}")
+    report = load_report(json_path)
+    assert (result.exit_code, report["exit_code"], report["stop_reason"], result.stdout) == (2, 2, "error", "")
 
 
 def test_hook_error_records_process_exit_code(ctx, cli, json_path):

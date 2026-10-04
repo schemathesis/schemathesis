@@ -742,3 +742,69 @@ def test_collect_link_candidates(ctx, active, exclude_get, body, expected_overri
         target, overrides = candidates[0]
         assert target.label == get_op.label
         assert overrides == expected_overrides
+
+
+@pytest.mark.parametrize(
+    "links",
+    [
+        pytest.param(
+            {"X": {"operationId": "nope", "parameters": {"productId": "$response.body#/productId"}}},
+            id="unknown-target",
+        ),
+        pytest.param(
+            {"X": {"operationId": "createItem", "requestBody": "$response.body#/missing"}}, id="unresolvable-body"
+        ),
+        pytest.param(
+            {"X": {"operationId": "getProduct", "parameters": {"productId": "$url.x"}}}, id="invalid-expression"
+        ),
+    ],
+)
+def test_iter_link_candidates_edge_links(ctx, case_factory, response_factory, links):
+    schema = ctx.openapi.load_schema(
+        {
+            "/products": {
+                "post": {
+                    "operationId": "createProduct",
+                    "responses": {
+                        "201": {
+                            "description": "C",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"productId": {"type": "string"}}}
+                                }
+                            },
+                            "links": links,
+                        }
+                    },
+                }
+            },
+            "/products/{productId}": {
+                "get": {
+                    "operationId": "getProduct",
+                    "parameters": [{"name": "productId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    post_op = schema["/products"]["POST"]
+    operations = [post_op, schema["/products/{productId}"]["GET"], schema["/items"]["POST"]]
+    response = Response.from_requests(
+        response_factory.requests(status_code=201, content=json.dumps({"productId": "abc"}).encode()),
+        verify=True,
+    )
+    candidates = schema.iter_link_candidates(
+        operation=post_op,
+        case=case_factory(operation=post_op),
+        response=response,
+        operations_by_label={operation.label: operation for operation in operations},
+        excluded_labels=set(),
+    )
+    assert candidates == []

@@ -18,9 +18,10 @@ from schemathesis.auths import (
     refresh_auth,
     set_on_case,
 )
-from schemathesis.config import ConfigError, SchemathesisConfig
+from schemathesis.config import ApiKeyAuthConfig, ConfigError, SchemathesisConfig
 from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.core.errors import AuthenticationError
+from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.adapter.security import build_auth_provider
 from schemathesis.specs.openapi.auths import (
     ApiKeyAuthProvider,
@@ -864,6 +865,39 @@ def test_api(case):
     result.stdout.fnmatch_lines(["*ASGI auth request failed*"])
 
 
+def test_per_test_auth_skipped_for_negated_security_header(ctx, testdir):
+    raw_schema = ctx.openapi.build_schema(
+        {"/protected": {"get": {"security": [{"ApiKeyAuth": []}], "responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"ApiKeyAuth": {"type": "apiKey", "name": "X-API-Key", "in": "header"}}},
+    )
+    testdir.make_test(
+        """
+class Static:
+    def get(self, case, context):
+        return "secret"
+
+    def set(self, case, data, context):
+        case.headers["X-API-Key"] = data
+
+SEEN = []
+
+@schema.auth(Static)
+@schema.parametrize()
+@settings(max_examples=5, phases=[Phase.generate])
+def test_api(case):
+    SEEN.append(case.headers.get("X-API-Key"))
+
+def test_seen():
+    assert SEEN
+    assert "secret" not in SEEN
+""",
+        schema=raw_schema,
+        generation_modes=[GenerationMode.NEGATIVE],
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=2)
+
+
 def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1000,6 +1034,44 @@ def test_refresh_auth_wsgi_propagates_app(ctx):
     refresh_auth(case)
 
     assert case.headers["Authorization"] == "Bearer token-2"
+
+
+def test_refresh_auth_keeps_static_scheme(ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "security": [{"ApiKeyAuth": [], "BearerAuth": []}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "ApiKeyAuth": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
+                "BearerAuth": {"type": "http", "scheme": "bearer"},
+            }
+        },
+    )
+    tokens = itertools.count(1)
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        return jsonify({"access_token": f"token-{next(tokens)}"})
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    schema.config.auth.openapi.schemes["ApiKeyAuth"] = ApiKeyAuthConfig(api_key="static-key")
+    schema.config.auth.dynamic.schemes["BearerAuth"] = DynamicTokenAuthConfig(
+        path="/api/auth", extract_selector="/access_token"
+    )
+    operation = schema["/protected"]["GET"]
+    case = operation.Case()
+    set_on_case(case, AuthContext(operation=operation, app=operation.app), None)
+    assert dict(case.headers) == {"X-API-Key": "static-key", "Authorization": "Bearer token-1"}
+
+    refresh_auth(case)
+
+    assert dict(case.headers) == {"X-API-Key": "static-key", "Authorization": "Bearer token-2"}
 
 
 # Single-use token 401s after first use; the hook re-authenticates and replays so the recorded response is the recovered 2xx.

@@ -262,6 +262,26 @@ def test_record_link_outcome_attribution(
 
 
 @pytest.mark.parametrize(
+    "observations,applied",
+    [
+        pytest.param((_PATH_USERID,), [], id="nothing-applied"),
+        pytest.param(
+            (_observation(location=ParameterLocation.PATH, parameter_path=("orgId",)),),
+            [(ParameterLocation.PATH, "userId")],
+            id="other-path-parameter",
+        ),
+    ],
+)
+def test_record_link_outcome_ignores_unattributed_observations(
+    observations, applied, positive_case, response_factory, recorder
+):
+    state = LinkCalibrationState()
+    step_input = StepInput(case=positive_case, transition=_make_transition(), applied_parameters=applied)
+    record_link_outcome(state, response_factory.requests(status_code=400), observations, step_input, recorder)
+    assert state.write == {}
+
+
+@pytest.mark.parametrize(
     "scenario_modifier,expected_score_drops",
     [
         pytest.param(EnsureResourceAvailability(), False, id="correct-link-flaky-resource-stays-default"),

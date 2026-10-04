@@ -143,6 +143,21 @@ def test_as_curl_command_sanitizes_string_query_params(curl):
     curl.assert_valid(command)
 
 
+def test_as_curl_command_sanitizes_raw_query_with_empty_segments(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/q": {
+                "get": {
+                    "parameters": [{"name": "token", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/q"]["GET"].Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=secret&&flag")})
+    assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&flag'"
+
+
 def test_cli_output(ctx, cli, curl):
     api = ctx.openapi.apps.failure()
     result = cli.run_and_assert(api.schema_url, exit_code=ExitCode.TESTS_FAILED)
@@ -312,6 +327,38 @@ def test_multipart_with_array_of_bytes_body(curl):
     # Then as_curl_command should not raise an error
     command = case.as_curl_command()
     curl.assert_valid(command)
+
+
+RAW_MULTIPART_PATHS = {
+    "/upload": {
+        "post": {
+            "requestBody": {"content": {"multipart/form-data": {"schema": {"type": "object"}}}},
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+}
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            b'--abc\r\nContent-Disposition: form-data; name="a"\r\n\r\nb\r\n--abc--\r\n',
+            "curl -X POST -H 'Content-Type: multipart/mixed; boundary=358a4fc91df79a930693beca09e4057c' "
+            '-d $\'--358a4fc91df79a930693beca09e4057c\\r\\nContent-Disposition: form-data; name="a"\\r\\n\\r\\nb\\r\\n'
+            "--358a4fc91df79a930693beca09e4057c--\\r\\n' http://localhost/upload",
+        ),
+        (b"--\r\n", "curl -X POST -H 'Content-Type: multipart/mixed' -d $'--\\r\\n' http://localhost/upload"),
+    ],
+    ids=["header-without-boundary", "no-boundary-in-body"],
+)
+def test_raw_multipart_bytes_body_boundary(ctx, monkeypatch, body, expected):
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
+    schema = ctx.openapi.load_schema(RAW_MULTIPART_PATHS)
+    case = schema["/upload"]["POST"].Case(
+        body=body, media_type="multipart/form-data", headers={"Content-Type": "multipart/mixed"}
+    )
+    assert case.as_curl_command() == expected
 
 
 MULTIPART_PATHS = {

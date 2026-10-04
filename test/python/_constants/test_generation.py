@@ -206,6 +206,54 @@ def test_constants_respect_allow_x00(ctx):
         )
 
 
+_CODE_BODY = {
+    "type": "object",
+    "properties": {"code": {"type": "string"}},
+    "required": ["code"],
+}
+
+
+def _unlock_schema(ctx, body_schema, version="3.0.2"):
+    return ctx.openapi.load_schema(
+        {
+            "/unlock": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+
+
+def test_constants_respect_codec(ctx):
+    schema = _unlock_schema(ctx, _CODE_BODY)
+    schema.config.generation.update(codec="ascii")
+    operation = schema["/unlock"]["POST"]
+    with pytest.raises(NoSuchExample):
+        find(
+            operation.as_strategy(
+                generation_mode=GenerationMode.POSITIVE, constants_value_source=_source("string", "café")
+            ),
+            lambda case: isinstance(case.body, dict) and case.body.get("code") == "café",
+            settings=_FIND,
+        )
+
+
+def test_constants_overlay_keeps_non_object_body(ctx):
+    schema = _unlock_schema(
+        ctx, {"type": ["object", "string"], "properties": {"code": {"type": "string"}}}, version="3.1.0"
+    )
+    operation = schema["/unlock"]["POST"]
+    case = find(
+        operation.as_strategy(constants_value_source=_source("string", "TOKEN")),
+        lambda case: isinstance(case.body, str),
+        settings=_FIND,
+    )
+    assert case.body == ""
+
+
 def test_constants_not_substituted_into_security_parameters(ctx):
     # A harvested key makes "generated" auth valid, so `ignored_auth` reports the API accepting it.
     schema = ctx.openapi.load_schema(
@@ -1057,6 +1105,60 @@ def test_constant_substituted_into_composed_or_nested_body(ctx, body_schema, bod
     for segment in body_path[1:].split("/"):
         actual = actual[segment]
     assert actual == value
+
+
+def _nested_body_operation(ctx, body_schema):
+    return ctx.openapi.load_schema(
+        {
+            "/unlock": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )["/unlock"]["POST"]
+
+
+def _leaf_at(body, depth):
+    for _ in range(depth):
+        if not isinstance(body, dict):
+            return None
+        body = body.get("nested")
+    return body
+
+
+# Leaves past the walk's depth limit are never substitution candidates.
+@pytest.mark.parametrize(("depth", "substituted"), [(8, True), (9, False)], ids=["depth-8", "depth-9"])
+def test_constant_substitution_depth_limit(ctx, depth, substituted):
+    body_schema = {"type": "string"}
+    for _ in range(depth):
+        body_schema = {"type": "object", "properties": {"nested": body_schema}, "required": ["nested"]}
+    operation = _nested_body_operation(ctx, body_schema)
+    strategy = operation.as_strategy(constants_value_source=_source("string", "TOKEN_XYZ"))
+    if substituted:
+        case = find(strategy, lambda case: _leaf_at(case.body, depth) == "TOKEN_XYZ", settings=_FIND)
+        assert _leaf_at(case.body, depth) == "TOKEN_XYZ"
+    else:
+        with pytest.raises(NoSuchExample):
+            find(strategy, lambda case: _leaf_at(case.body, depth) == "TOKEN_XYZ", settings=_FIND)
+
+
+def test_constant_substituted_through_boolean_all_of_branch(ctx):
+    operation = _nested_body_operation(
+        ctx,
+        {
+            "type": "object",
+            "allOf": [True, {"properties": {"n": {"type": ["number", "integer"]}}, "required": ["n"]}],
+        },
+    )
+    case = find(
+        operation.as_strategy(constants_value_source=_source("integer", 987654321)),
+        lambda case: isinstance(case.body, dict) and case.body.get("n") == 987654321,
+        settings=_FIND,
+    )
+    assert case.body == {"n": 987654321}
 
 
 def test_body_override_removes_overridden_constant_provenance():

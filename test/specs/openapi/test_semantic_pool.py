@@ -2112,6 +2112,34 @@ def test_schemaless_walker_skips_nameless_scalar_body():
     assert list(iter_ingestion_leaves(None, "a@b.com")) == []
 
 
+def test_name_only_lookup_without_name_returns_nothing():
+    index = SemanticValueIndex()
+    index.add(
+        type_token="string",
+        format_token=None,
+        pattern_hash=None,
+        normalized_name="city",
+        value="Berlin",
+        source_operation="GET /producer",
+    )
+    assert (
+        index.lookup(type_token="string", format_token=None, pattern_hash=None, normalized_name=None, name_only=True)
+        == ()
+    )
+
+
+def test_walker_skips_top_level_array_of_scalars():
+    assert list(iter_ingestion_leaves({"type": "array", "items": {"type": "string"}}, ["a@b.com"])) == []
+
+
+def test_schemaless_walker_stops_list_when_node_budget_runs_out():
+    body = {"emails": [f"u{i}@example.com" for i in range(10)]}
+    assert list(iter_ingestion_leaves(None, body, max_nodes=5)) == [
+        IngestionLeaf("string", "email", None, "email", "u0@example.com"),
+        IngestionLeaf("string", "email", None, "email", "u1@example.com"),
+    ]
+
+
 def test_consumer_walker_respects_max_depth():
     schema = {
         "type": "object",

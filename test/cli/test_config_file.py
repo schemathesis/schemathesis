@@ -160,6 +160,19 @@ def test_incorrect_config(cli, snapshot_cli, tmp_path, config_content):
     assert result == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    "config_content",
+    [
+        pytest.param('base-url = "http://[::1"', id="base_url"),
+        pytest.param('origin = "http://[::1"', id="origin"),
+    ],
+)
+def test_unparsable_url_in_config(cli, snapshot_cli, tmp_path, config_content):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text(config_content, encoding="utf-8")
+    assert cli.main(f"--config-file={config_file}", "run", "http://127.0.0.1") == snapshot_cli
+
+
 def test_non_existing_file(cli, snapshot_cli):
     assert cli.main("--config-file=unknown-file.toml", "run", "http://127.0.0.1") == snapshot_cli
 

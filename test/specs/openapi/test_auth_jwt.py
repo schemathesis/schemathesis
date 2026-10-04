@@ -8,7 +8,7 @@ from flask import jsonify, request
 
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import ResourceRepository
-from schemathesis.specs.openapi.auth_jwt import seed_pool_from_headers
+from schemathesis.specs.openapi.auth_jwt import seed_pool_from_basic_auth, seed_pool_from_headers
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
 
 
@@ -180,6 +180,24 @@ def test_seed_only_lands_in_buckets_with_matching_queried_field():
     seed_pool_from_headers(repo, headers, requirements)
 
     assert [i.data for i in repo.iter_instances("User")] == [{"username": "alice"}]
+    assert [i.data for i in repo.iter_instances("Order")] == []
+
+
+@pytest.mark.parametrize(
+    ("basic_auth", "expected_user"),
+    [(("alice", "wonderland"), [{"username": "alice"}]), (("", "wonderland"), [])],
+    ids=["username", "empty-username"],
+)
+def test_basic_auth_seed_only_lands_in_identifier_buckets(basic_auth, expected_user):
+    repo = _new_repository(["User", "Order"])
+    requirements = [
+        ParameterRequirement(resource_name="User", resource_field="username"),
+        ParameterRequirement(resource_name="Order", resource_field="order_id"),
+    ]
+
+    seed_pool_from_basic_auth(repo, basic_auth, requirements)
+
+    assert [i.data for i in repo.iter_instances("User")] == expected_user
     assert [i.data for i in repo.iter_instances("Order")] == []
 
 
