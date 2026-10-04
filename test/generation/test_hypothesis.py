@@ -4275,6 +4275,26 @@ def test_array_with_undrawable_items_and_a_floor_declines():
         _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "array", "items": {"type": "string"}, "contains": {"pattern": "(?<=a+)b"}, "minItems": 2},
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "contains": {"pattern": "(?<=a+)b"},
+            "maxContains": 1,
+            "minItems": 2,
+        },
+    ],
+    ids=["minItems", "maxContains"],
+)
+def test_array_with_undrawable_contains_pattern_declines(schema):
+    # The demand names characters no draw can produce, so the array is undrawable rather than filtered forever.
+    with pytest.raises(UnsupportedRegexPattern, match=r"\(\?<=a\+\)b"):
+        _canonical_strategy(schema, GenerationConfig(), jsonschema_rs.Draft202012Validator)
+
+
 BOUNDED_INTEGER = {"type": "integer", "minimum": 1, "maximum": 100}
 
 
