@@ -35,7 +35,15 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("_slug", "/groups/{_slug}", None),
         ("id", "/users/{id}", "User"),
         ("_id", "/users/{_id}", None),
-        ("uid", "/users/{uid}", None),
+        ("identifier", "/images/{identifier}", "Image"),
+        ("uuid", "/accounts/{uuid}", "Account"),
+        ("guid", "/sessions/{guid}", "Session"),
+        ("pk", "/articles/{pk}", "Article"),
+        ("uid", "/users/{uid}", "User"),
+        ("key", "/objects/{key}", None),
+        ("code", "/statuses/{code}", None),
+        ("ref", "/commits/{ref}", None),
+        ("identifier", "/images", None),
         ("someRandom", "/users/{someRandom}", None),
         # Generic prefixes - should use path context when it's a path parameter
         ("item_id", "/api/groups/{item_id}", "Group"),
@@ -291,6 +299,12 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
         # ID synonym matching
         pytest.param("user_id", "User", ["uuid", "name"], "uuid", id="id-synonym-uuid"),
         pytest.param("item_id", "Item", ["guid", "name"], "guid", id="id-synonym-guid"),
+        pytest.param("identifier", "Image", ["id", "identifier"], "identifier", id="identifier-exact"),
+        pytest.param("identifier", "Image", ["id", "title"], "id", id="identifier-to-id"),
+        pytest.param("uuid", "Image", ["id", "uuid"], "uuid", id="uuid-exact"),
+        pytest.param("uuid", "Image", ["id", "title"], "id", id="uuid-to-id"),
+        pytest.param("pk", "Image", ["id", "pk"], "pk", id="pk-exact"),
+        pytest.param("pk", "Image", ["id", "title"], "id", id="pk-to-id"),
         # Plural ids parameter resolves to the singular id field on the resource
         pytest.param("ids", "Person", ["id", "name"], "id", id="plural-ids-to-id"),
         # Resource-hint matching (parameter prefix hints at resource, suffix is field)
