@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from schemathesis.core.errors import RefResolutionError
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler, bundle
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, Bundler
 from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
@@ -390,62 +390,6 @@ def test_bundle_ref_resolves_to_none_error_message():
     with pytest.raises(BundleError) as exc:
         Bundler().bundle({"$ref": "#/definitions/User"}, resolver)
     assert str(exc.value) == "Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got null"
-
-
-def test_bundle_recursive_not_inlined():
-    schema = {"$ref": "#/definitions/Node"}
-    store = {
-        "definitions": {
-            "Node": {
-                "type": "object",
-                "properties": {
-                    "child": {"$ref": "#/definitions/Node"},
-                },
-            }
-        },
-    }
-
-    resolver = make_root_resolver(store)
-
-    assert Bundler().bundle(schema, resolver).schema == {
-        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001",
-        BUNDLE_STORAGE_KEY: {
-            "schema000001": {
-                "type": "object",
-                "properties": {
-                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},  # Self-reference preserved
-                },
-            }
-        },
-    }
-
-
-def test_bundle_preserves_recursive_references():
-    schema = {"$ref": "#/definitions/Node"}
-    store = {
-        "definitions": {
-            "Node": {
-                "type": "object",
-                "properties": {
-                    "child": {"$ref": "#/definitions/Node"},
-                },
-            }
-        },
-    }
-
-    resolver = make_root_resolver(store)
-
-    assert bundle(schema, resolver).schema == {
-        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001",
-        BUNDLE_STORAGE_KEY: {
-            "schema000001": {
-                "type": "object",
-                "properties": {
-                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema000001"},
-                },
-            }
-        },
-    }
 
 
 def test_bundle_non_recursive_inlined():

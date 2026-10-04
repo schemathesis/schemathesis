@@ -6,7 +6,6 @@ from _pytest.main import ExitCode
 from flask import Flask, Response, jsonify, request
 
 import schemathesis
-from schemathesis.python._constants.registry import default_registry
 
 
 def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
@@ -497,14 +496,7 @@ def test_missing_test_data_advice_grouped_by_cause(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.fixture
-def _clean_registry():
-    default_registry().clear()
-    yield
-    default_registry().clear()
-
-
-@pytest.mark.usefixtures("_clean_registry")
+@pytest.mark.usefixtures("clean_constants_registry")
 def test_constants_extraction_warning_displayed(cli, ctx):
     @schemathesis.python.constants
     def broken_source():

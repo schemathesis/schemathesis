@@ -2,14 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from schemathesis.core.error_feedback.pipeline import _reset_pipeline_for_tests
+pytestmark = pytest.mark.usefixtures("reset_feedback_pipeline")
 
 VALID_TOKEN = "real-token"
-
-
-@pytest.fixture(autouse=True)
-def _reset_feedback_pipeline():
-    _reset_pipeline_for_tests()
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

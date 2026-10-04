@@ -2,23 +2,12 @@ from __future__ import annotations
 
 import hypothesis
 import pytest
-from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine
 
 import schemathesis
 from schemathesis.core.errors import NoProducers
 from schemathesis.core.failures import FailureGroup
-from schemathesis.graphql import nodes
-from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
 from schemathesis.specs.graphql.stateful import GraphQLStateMachine, create_state_machine
-
-
-@pytest.fixture
-def _register_book_id_scalar():
-    schemathesis.graphql.scalar("BookID", st.uuids().map(str).map(nodes.String))
-    yield
-    CUSTOM_SCALARS.clear()
-
 
 _FULL_SCHEMA_SDL = """
     type Book { id: ID! }
@@ -217,7 +206,7 @@ def test_state_machine_has_real_transition_controller(ctx):
     assert "Query.book" in add_outgoing
 
 
-def test_state_machine_finds_planted_bug_via_python_api(_register_book_id_scalar, ctx):
+def test_state_machine_finds_planted_bug_via_python_api(book_id_scalar, ctx):
     # The CLI path wraps validate_response with its own version; `.run()` is the only path
     # that exercises the state-machine override.
     api = ctx.graphql.apps.use_after_create()

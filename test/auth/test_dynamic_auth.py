@@ -41,6 +41,22 @@ def _run_cli(cli, app_runner, app, *flags, config, **kwargs):
     return cli.run(f"{base_url}/openapi.json", *flags, config={"base-url": base_url, **config}, **kwargs)
 
 
+def _protected_app(ctx, scheme_name, scheme):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "operationId": "getProtected",
+                    "security": [{scheme_name: []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={"securitySchemes": {scheme_name: scheme}},
+    )
+    return app
+
+
 def _register_single_use_token(app):
     # Token is valid for exactly one request, so every later call must re-authenticate.
     state = {"issued": 0, "valid": None}
@@ -484,22 +500,7 @@ def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
 
 
 def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/protected": {
-                "get": {
-                    "operationId": "getProtected",
-                    "security": [{"BearerAuth": []}],
-                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
-                }
-            }
-        },
-        components={
-            "securitySchemes": {
-                "BearerAuth": {"type": "http", "scheme": "bearer"},
-            }
-        },
-    )
+    app = _protected_app(ctx, "BearerAuth", {"type": "http", "scheme": "bearer"})
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():
@@ -528,22 +529,7 @@ def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
 
 
 def test_dynamic_auth_cookie_integration(ctx, cli, app_runner, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/protected": {
-                "get": {
-                    "operationId": "getProtected",
-                    "security": [{"SessionCookie": []}],
-                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
-                }
-            }
-        },
-        components={
-            "securitySchemes": {
-                "SessionCookie": {"type": "apiKey", "in": "cookie", "name": "SESSION"},
-            }
-        },
-    )
+    app = _protected_app(ctx, "SessionCookie", {"type": "apiKey", "in": "cookie", "name": "SESSION"})
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():
@@ -917,22 +903,7 @@ def test_seen():
 
 
 def test_dynamic_auth_integration_oauth2(ctx, cli, app_runner, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/protected": {
-                "get": {
-                    "operationId": "getProtected",
-                    "security": [{"OAuth2": []}],
-                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
-                }
-            }
-        },
-        components={
-            "securitySchemes": {
-                "OAuth2": OAUTH2_SCHEME,
-            }
-        },
-    )
+    app = _protected_app(ctx, "OAuth2", OAUTH2_SCHEME)
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():
@@ -1132,22 +1103,7 @@ def test_reauth_recovers_expired_token(ctx, cli, app_runner, snapshot_cli):
 
 # A negated-security case's 401 is the expected outcome, not an expired token - the hook must not re-authenticate for it.
 def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner, mocker):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/protected": {
-                "get": {
-                    "operationId": "getProtected",
-                    "security": [{"ApiKeyAuth": []}],
-                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
-                }
-            }
-        },
-        components={
-            "securitySchemes": {
-                "ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"},
-            }
-        },
-    )
+    app = _protected_app(ctx, "ApiKeyAuth", {"type": "apiKey", "in": "header", "name": "X-API-Key"})
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():
@@ -1175,22 +1131,7 @@ def test_negative_auth_case_does_not_reauth(ctx, cli, app_runner, mocker):
 
 
 def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/protected": {
-                "get": {
-                    "operationId": "getProtected",
-                    "security": [{"ApiKeyAuth": []}],
-                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
-                }
-            }
-        },
-        components={
-            "securitySchemes": {
-                "ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-API-Key"},
-            }
-        },
-    )
+    app = _protected_app(ctx, "ApiKeyAuth", {"type": "apiKey", "in": "header", "name": "X-API-Key"})
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():

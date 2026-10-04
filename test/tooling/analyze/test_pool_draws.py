@@ -1,6 +1,5 @@
-import json
-
 from scripts.analyze.metrics import analyze
+from test.tooling.analyze.helpers import scenario, write_run
 
 
 def _case(
@@ -37,25 +36,10 @@ def _draw(parameter_name="user_id", source_operation="POST /api/users", source_s
     }
 
 
-def _scenario(label, cases, interactions, *, timestamp=100.5):
-    return {
-        "ScenarioFinished": {
-            "timestamp": timestamp,
-            "recorder": {"label": label, "cases": cases, "interactions": interactions},
-        }
-    }
-
-
-def _write(path, payloads):
-    lines = [json.dumps({"Initialize": {"command": "x", "schemathesis_version": "t", "seed": 0}})]
-    lines.extend(json.dumps(payload) for payload in payloads)
-    path.write_text("\n".join(lines) + "\n")
-
-
 def test_no_pool_draws_yields_empty_stats(tmp_path):
     cases, interactions = _case("c1", status=200)
     path = tmp_path / "run.ndjson"
-    _write(path, [_scenario("Fuzz tests", cases, interactions)])
+    write_run(path, [scenario("Fuzz tests", cases, interactions)])
     run = analyze(path)
     assert run.pool_draws.total_draws == 0
     assert run.pool_draws.cases_with_draws == 0
@@ -77,7 +61,7 @@ def test_per_edge_counts_with_status_split(tmp_path):
         interactions.update(i)
 
     path = tmp_path / "run.ndjson"
-    _write(path, [_scenario("Fuzz tests", cases, interactions)])
+    write_run(path, [scenario("Fuzz tests", cases, interactions)])
     run = analyze(path)
 
     assert run.pool_draws.cases_with_draws == 7
@@ -104,7 +88,7 @@ def test_multi_draw_case_counted_once_for_cases_but_per_draw_for_edges(tmp_path)
     ]
     cases, interactions = _case("c1", method="PATCH", path="/api/posts/{id}", pool_draws=draws, status=200)
     path = tmp_path / "run.ndjson"
-    _write(path, [_scenario("Fuzz tests", cases, interactions)])
+    write_run(path, [scenario("Fuzz tests", cases, interactions)])
     run = analyze(path)
 
     assert run.pool_draws.cases_with_draws == 1
@@ -120,11 +104,11 @@ def test_aggregates_across_scenarios(tmp_path):
     s1_cases, s1_intr = _case("a", pool_draws=[_draw()], status=200)
     s2_cases, s2_intr = _case("b", pool_draws=[_draw()], status=200)
     path = tmp_path / "run.ndjson"
-    _write(
+    write_run(
         path,
         [
-            _scenario("Coverage", s1_cases, s1_intr),
-            _scenario("Fuzz tests", s2_cases, s2_intr, timestamp=200.0),
+            scenario("Coverage", s1_cases, s1_intr),
+            scenario("Fuzz tests", s2_cases, s2_intr, timestamp=200.0),
         ],
     )
     run = analyze(path)
@@ -137,7 +121,7 @@ def test_missing_response_buckets_into_other_status(tmp_path):
     # Interaction with no response (engine errored or timed out before getting one).
     cases, interactions = _case("c1", pool_draws=[_draw()], status=None)
     path = tmp_path / "run.ndjson"
-    _write(path, [_scenario("Fuzz tests", cases, interactions)])
+    write_run(path, [scenario("Fuzz tests", cases, interactions)])
     run = analyze(path)
     edge = run.pool_draws.by_edge["GET /api/sessions||POST /api/users||User"]
     assert edge.count == 1

@@ -38,6 +38,7 @@ from test.apps.catalog.openapi.modifiers.under_declared_security import (
     RotateTokenOnLogin,
 )
 from test.fixtures.crashes import FailingCheck, Link, LinkParameter, Step
+from test.utils import crash_cache_dir
 
 
 def _write_crash(
@@ -75,6 +76,14 @@ def _write_crash(
     return directory / crash.filename()
 
 
+def _open_writer(tmp_path: Path, schema_url: str) -> CrashWriter:
+    crash_dir = crash_cache_dir(tmp_path)
+    crash_dir.mkdir(parents=True, exist_ok=True)
+    writer = CrashWriter(directory=crash_dir)
+    writer.open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
+    return writer
+
+
 def _users_app(ctx, app_runner):
     # A healthy GET /users endpoint used as the replay target for crashes recorded against it.
     app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
@@ -109,7 +118,7 @@ def test_replay_fixed_case_with_multiple_checks_shows_single_block(
     cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli
 ):
     schema_url, base = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     for check in ("not_a_server_error", "status_code_conformance"):
         _write_crash(
@@ -263,7 +272,7 @@ def test_replay_uses_recorded_base_url_without_override(cli, app_runner, ctx, cr
     schema_file.write_text(
         json.dumps(ctx.openapi.build_schema({"/boom": {"get": {"responses": {"200": {"description": "OK"}}}}}))
     )
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     _write_crash(
         crash_dir,
@@ -319,7 +328,7 @@ def test_replay_corrupt_meta_is_errored_not_crash(cli, app_runner, ctx, tmp_path
     # A crash file on disk that loads fine but carries metadata the current format can't decode is reported
     # errored and kept, rather than aborting the whole run with a traceback.
     schema_url, base = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     CrashWriter(directory=crash_dir).open(schema_location=schema_url, base_url=base)
     (crash_dir / "corrupt.json").write_text(
@@ -404,7 +413,7 @@ def test_replay_unsupported_method_crash(cli, ctx, tmp_path):
 def test_replay_by_case_id_removes_fixed_crash(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     # Replaying by bare case ID removes the fixed crash from its real directory, not the current one.
     schema_url, base = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     crash_file = _write_crash(
         crash_dir,
@@ -487,10 +496,6 @@ def test_build_case_drops_stale_cookie_header(ctx, crash_factory):
     assert case.cookies == {"session": "fresh"}
 
 
-def _crashes_dir(tmp_path: Path) -> Path:
-    return tmp_path / ".schemathesis" / "default" / "cache" / "crashes"
-
-
 def _list_crash_files(directory: Path) -> list[Path]:
     return sorted(f for f in directory.glob("*.json") if f.name != MANIFEST_FILENAME)
 
@@ -520,12 +525,8 @@ def test_replay_applies_terminal_step_link(cli, app_runner, ctx, tmp_path, crash
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
-    base = schema_url.rsplit("/", 1)[0]
 
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=base)
+    writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
             Step(method="GET", path="/tokens", status=200, body=b'{"id": "fresh-123"}'),
@@ -576,12 +577,8 @@ def test_replay_applies_non_path_link_parameter(cli, app_runner, ctx, tmp_path, 
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
-    base = schema_url.rsplit("/", 1)[0]
 
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=base)
+    writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
             Step(method="GET", path="/tokens", status=200, body=b'{"token": "fresh-123"}'),
@@ -634,11 +631,7 @@ def test_replay_re_extracts_request_body_link(cli, app_runner, ctx, tmp_path, cr
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
-    base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=base)
+    writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
             Step(method="GET", path="/source", status=200, body=b'{"token": "fresh"}'),
@@ -665,7 +658,7 @@ def test_replay_reproduces_recorded_unit_failures(cli, ctx, tmp_path):
 
     cli.run(api.schema_url, "--max-examples=3")
 
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert crash_files, "Expected `schemathesis run` to record at least one crash"
 
     result = cli.main("replay", "--keep")
@@ -682,7 +675,7 @@ def test_replay_by_case_id(cli, ctx, tmp_path):
 
     cli.run(api.schema_url)
 
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert crash_files
 
     data = json.loads(crash_files[0].read_text())
@@ -700,7 +693,7 @@ def test_replay_by_case_id_replays_all_checks(cli, ctx, tmp_path):
 
     cli.run(api.schema_url)
 
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     case_ids = [json.loads(f.read_text())["case_id"] for f in crash_files]
     shared = next((cid for cid in case_ids if case_ids.count(cid) > 1), None)
     assert shared is not None, "Expected a case that failed multiple checks"
@@ -734,7 +727,7 @@ def test_replay_failure_order_matches_run(cli, app_runner, ctx, tmp_path):
 
     run = cli.run(app_runner.openapi_url(app))
 
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     case_ids = [json.loads(f.read_text())["case_id"] for f in crash_files]
     shared = next((cid for cid in case_ids if case_ids.count(cid) > 1), None)
     assert shared is not None, run.output
@@ -760,7 +753,7 @@ def test_timing_only_failure_not_recorded_or_hinted(cli, ctx, tmp_path):
     assert result.exit_code == 1
     assert "Response time" in result.output
     assert "st replay" not in result.output
-    assert not _list_crash_files(_crashes_dir(tmp_path))
+    assert not _list_crash_files(crash_cache_dir(tmp_path))
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -778,7 +771,7 @@ def test_replay_kitchen_sink_at_scale(cli, ctx, tmp_path):
     # /api/flaky is non-deterministic by design, so it is excluded to keep the roundtrip assertion stable.
     cli.run(api.schema_url, "--max-examples=2", "--phases=fuzzing", "--exclude-path=/api/flaky")
 
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert len(crash_files) >= 10, f"Expected many crashes from kitchen sink, got {len(crash_files)}"
 
     result = cli.main("replay", "--keep")
@@ -798,7 +791,7 @@ def test_replay_stateful_chain(cli, ctx, tmp_path):
     # Enough examples to reliably build a multi-step linked failing scenario.
     cli.run(api.schema_url, "--max-examples=30", "--phases=stateful")
 
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert crash_files, "Expected the stateful run to record at least one crash"
 
     multi_step = [json.loads(f.read_text()) for f in crash_files if len(json.loads(f.read_text())["sequence"]) > 1]
@@ -845,10 +838,7 @@ def test_replay_re_evaluates_history_dependent_stateful_check(cli, app_runner, c
         return jsonify({"id": item_id}), 200
 
     schema_url = app_runner.openapi_url(app)
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
+    writer = _open_writer(tmp_path, schema_url)
     extract_id = LinkParameter(location="path", name="item_id", expression="$response.body#/id")
     crash = crash_factory.chain(
         steps=[
@@ -918,10 +908,7 @@ def test_replay_links_resolve_against_recorded_parent_not_previous_step(cli, app
         return (jsonify({"id": item_id}), 200) if item_id in created else (jsonify({}), 404)
 
     schema_url = app_runner.openapi_url(app)
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
+    writer = _open_writer(tmp_path, schema_url)
     extract_id = LinkParameter(location="path", name="item_id", expression="$response.body#/id")
     crash = crash_factory.chain(
         steps=[
@@ -1046,7 +1033,7 @@ def _items_chain(crash_factory, *, parent: int | None, request_headers: dict[str
 def test_replay_chain_reproduces_with_fresh_ids(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
     # The reproduce commands and step diffs must use the ids this replay minted, not the recorded ones.
     schema_url, base = _items_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=base)
     writer.write(_items_chain(crash_factory, parent=0))
@@ -1060,7 +1047,7 @@ def test_replay_sibling_link_values_do_not_mask_body_changes(
 ):
     # The last step shares only the root with the linked DELETE, so its changed id is a real difference.
     schema_url, base = _items_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=base)
     extract_id = LinkParameter(location="path", name="item_id", expression="$response.body#/id")
@@ -1104,7 +1091,7 @@ def test_replay_old_crash_file_without_parent_index_or_case_headers(
 ):
     # Without recorded parents or case headers, each step links to the previous one and resends the wire headers.
     schema_url, base = _items_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     CrashWriter(directory=crash_dir).open(schema_location=schema_url, base_url=base)
     data = _items_chain(crash_factory, parent=None, request_headers={"X-Api-Key": "secret-key"}).to_dict()
     for step in data["sequence"]:
@@ -1465,7 +1452,7 @@ def test_render_step_chain(snapshot, crash_factory):
 def test_replay_unrunnable_check_is_not_deleted(cli, app_runner, ctx, tmp_path, crash_factory, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
 
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=base)
@@ -1489,7 +1476,7 @@ def test_replay_without_schema_bails(cli, app_runner, ctx, tmp_path, crash_facto
     # An unloadable schema with a live 200 server would falsely mark the crash fixed and delete it without a bail.
     _, base = _users_app(ctx, app_runner)
 
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
     # Point the schema location at a URL that serves non-schema content.
@@ -1550,7 +1537,7 @@ def test_replay_applies_per_operation_check_config(cli, app_runner, ctx, crash_f
 def test_replay_empty_sequence_marked_incompatible(cli, app_runner, ctx, tmp_path, snapshot_cli):
     # Foreign file the writer never emits: an empty sequence, treated as incompatible rather than crashing.
     schema_url, _ = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     CrashWriter(directory=crash_dir).open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
     (crash_dir / "broken_x.json").write_text(
@@ -1576,7 +1563,7 @@ def test_replay_empty_sequence_marked_incompatible(cli, app_runner, ctx, tmp_pat
 def test_replay_unreadable_crash_file_is_skipped(cli, app_runner, ctx, tmp_path, snapshot_cli):
     # A crash file that errors on read (permissions, or vanished mid-scan) is skipped and kept, not aborted.
     schema_url, _ = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     CrashWriter(directory=crash_dir).open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])
     # A path that matches the `*.json` scan but raises OSError on read.
@@ -1614,11 +1601,7 @@ def test_replay_query_link_param_falls_back_to_recorded_when_unresolvable(
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
-    base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=base)
+    writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
             Step(method="GET", path="/first", status=200, body=b'{"other": "no token here"}'),
@@ -1698,7 +1681,7 @@ def test_replay_intermediate_step_operation_removed_is_errored(
     cli, app_runner, ctx, tmp_path, snapshot_cli, crash_factory
 ):
     schema_url, base = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=base)
@@ -1790,11 +1773,7 @@ def test_replay_unresolvable_request_body_link_keeps_recorded_body(
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
-    base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=base)
+    writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
             Step(method="GET", path="/source", status=200, body=b'{"other": "no token here"}'),
@@ -1843,11 +1822,7 @@ def test_replay_request_body_link_installs_extracted_value_wholesale(
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
-    base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=base)
+    writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
             Step(method="GET", path="/source", status=200, body=b'{"token": "fresh"}'),
@@ -1893,7 +1868,7 @@ def test_replay_invalid_link_location_is_errored(cli, app_runner, ctx, tmp_path,
 
     schema_url = app_runner.openapi_url(app)
     base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=base)
@@ -1957,11 +1932,7 @@ def test_replay_multi_step_terminal_without_link(cli, app_runner, ctx, tmp_path,
         return jsonify({"error": "boom"}), 500
 
     schema_url = app_runner.openapi_url(app)
-    base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
-    crash_dir.mkdir(parents=True, exist_ok=True)
-    writer = CrashWriter(directory=crash_dir)
-    writer.open(schema_location=schema_url, base_url=base)
+    writer = _open_writer(tmp_path, schema_url)
     crash = crash_factory.chain(
         steps=[
             Step(method="GET", path="/first", status=200, body=b'{"ok": true}'),
@@ -2025,7 +1996,7 @@ def test_replay_nonexistent_path_errors(cli, tmp_path, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_without_manifest_or_schema_location_bails(cli, app_runner, ctx, crash_factory, tmp_path, snapshot_cli):
     schema_url, base = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     crash_file = _write_crash(
         crash_dir,
@@ -2045,7 +2016,7 @@ def test_replay_without_manifest_or_schema_location_bails(cli, app_runner, ctx, 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_replay_case_id_scan_skips_unreadable_files(cli, tmp_path, snapshot_cli):
     # Foreign file the writer never emits: garbage JSON the case-ID scan must skip without aborting.
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     (crash_dir / "garbage.json").write_text("{not valid json")
 
@@ -2054,7 +2025,7 @@ def test_replay_case_id_scan_skips_unreadable_files(cli, tmp_path, snapshot_cli)
 
 def test_replay_case_id_scan_skips_non_object_json(cli, tmp_path, snapshot_cli):
     # Foreign file the writer never emits: valid JSON that isn't an object must be skipped, not abort the scan.
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     (crash_dir / "list.json").write_text("[]")
 
@@ -2065,7 +2036,7 @@ def test_replay_case_id_scan_skips_non_object_json(cli, tmp_path, snapshot_cli):
 def test_replay_no_recorded_checks_is_errored(cli, app_runner, ctx, tmp_path, snapshot_cli):
     # Foreign file the writer never emits: a crash with no recorded checks, reported as an error.
     schema_url, base = _users_app(ctx, app_runner)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=base)
@@ -2128,7 +2099,7 @@ def _write_partially_fixed_crash(app_runner, ctx, crash_factory, tmp_path, **ste
 
     schema_url = app_runner.openapi_url(app)
     base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     for check in ("not_a_server_error", "response_schema_conformance"):
         _write_crash(
@@ -2214,7 +2185,7 @@ def test_replay_restores_masked_credentials_from_config(cli, ctx, tmp_path, conf
         "not_a_server_error",
         config=config,
     )
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert "[Filtered]" in crash_files[0].read_text()
     api.requests.clear()
 
@@ -2222,7 +2193,7 @@ def test_replay_restores_masked_credentials_from_config(cli, ctx, tmp_path, conf
 
     assert result.exit_code == 1, result.output
     assert _replayed_authorization(api) == [f"Bearer {VALID_TOKEN}"]
-    assert _list_crash_files(_crashes_dir(tmp_path)) == crash_files
+    assert _list_crash_files(crash_cache_dir(tmp_path)) == crash_files
 
 
 LOGIN_AUTH_MODULE = """
@@ -2247,7 +2218,7 @@ def test_replay_applies_auth_provider_from_hooks(cli, ctx, tmp_path):
     cli.main(
         "run", api.schema_url, "--phases=examples,fuzzing", "--max-examples=1", "-c", "not_a_server_error", hooks=module
     )
-    assert _list_crash_files(_crashes_dir(tmp_path))
+    assert _list_crash_files(crash_cache_dir(tmp_path))
     api.requests.clear()
 
     result = cli.main("replay", hooks=module)
@@ -2273,7 +2244,7 @@ def test_replay_applies_auth_provider_from_hooks(cli, ctx, tmp_path):
 def test_replay_credentials_from_cli(cli, ctx, tmp_path, modifiers, args, config, expected):
     api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500), *modifiers)
     cli.main("run", api.schema_url, "--phases=examples,fuzzing", "--max-examples=1", "-c", "not_a_server_error", *args)
-    assert _list_crash_files(_crashes_dir(tmp_path))
+    assert _list_crash_files(crash_cache_dir(tmp_path))
     api.requests.clear()
 
     result = cli.main("replay", *args, config=config)
@@ -2307,7 +2278,7 @@ def test_replay_credentials_from_wfc_file(cli, ctx, tmp_path):
     )
     args = (f"--auth-wfc={wfc_file}", "--auth-wfc-user=valid")
     cli.main("run", api.schema_url, "--phases=examples,fuzzing", "--max-examples=1", "-c", "not_a_server_error", *args)
-    assert _list_crash_files(_crashes_dir(tmp_path))
+    assert _list_crash_files(crash_cache_dir(tmp_path))
     api.requests.clear()
 
     result = cli.main("replay", *args)
@@ -2330,11 +2301,11 @@ def test_replay_masked_credentials_not_supplied_is_errored(cli, ctx, tmp_path, s
         "not_a_server_error",
         config=config,
     )
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert crash_files
 
     assert cli.main("replay") == snapshot_cli
-    assert _list_crash_files(_crashes_dir(tmp_path)) == crash_files
+    assert _list_crash_files(crash_cache_dir(tmp_path)) == crash_files
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -2476,7 +2447,7 @@ def test_replay_ignores_link_with_out_of_range_parent_index(cli, app_runner, ctx
 
     schema_url = app_runner.openapi_url(app)
     base = schema_url.rsplit("/", 1)[0]
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=base)
@@ -2573,11 +2544,11 @@ def test_replay_with_rejected_credentials_is_errored(cli, ctx, tmp_path, snapsho
         "-H",
         f"Authorization: Bearer {VALID_TOKEN}",
     )
-    crash_files = _list_crash_files(_crashes_dir(tmp_path))
+    crash_files = _list_crash_files(crash_cache_dir(tmp_path))
     assert crash_files
 
     assert cli.main("replay", "-H", "Authorization: Bearer nope") == snapshot_cli
-    assert _list_crash_files(_crashes_dir(tmp_path)) == crash_files
+    assert _list_crash_files(crash_cache_dir(tmp_path)) == crash_files
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -2591,7 +2562,7 @@ def test_replay_rejected_credentials_with_failing_check_keeps_every_file(
         return jsonify({"error": "no auth"}), 401
 
     schema_url = app_runner.openapi_url(app)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     for check in ("not_a_server_error", "status_code_conformance"):
         _write_crash(
@@ -2674,7 +2645,7 @@ def test_replay_chain_with_rejected_credentials_at_earlier_step_is_errored(
         return jsonify({"error": "not found"}), 404
 
     schema_url = app_runner.openapi_url(app)
-    crash_dir = _crashes_dir(tmp_path)
+    crash_dir = crash_cache_dir(tmp_path)
     crash_dir.mkdir(parents=True, exist_ok=True)
     writer = CrashWriter(directory=crash_dir)
     writer.open(schema_location=schema_url, base_url=schema_url.rsplit("/", 1)[0])

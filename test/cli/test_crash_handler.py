@@ -19,6 +19,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.reporting.crashes import MANIFEST_FILENAME
+from test.utils import crash_cache_dir
 
 
 def _failure() -> Failure:
@@ -126,10 +127,6 @@ def _crash_files(directory: Path) -> list[Path]:
     return [path for path in directory.iterdir() if path.suffix == ".json" and path.name != MANIFEST_FILENAME]
 
 
-def _crashes_dir(tmp_path: Path) -> Path:
-    return tmp_path / ".schemathesis" / "default" / "cache" / "crashes"
-
-
 def test_crash_file_written_on_failure(cli, ctx, tmp_path):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -150,7 +147,7 @@ def test_crash_file_written_on_failure(cli, ctx, tmp_path):
 
     cli.run_openapi_app(app, "--max-examples=1")
 
-    crash_files = _crash_files(_crashes_dir(tmp_path))
+    crash_files = _crash_files(crash_cache_dir(tmp_path))
     assert len(crash_files) == 1, crash_files
 
     crash = json.loads(crash_files[0].read_text())
@@ -171,7 +168,7 @@ def test_crash_file_written_for_failures_in_errored_scenario(cli, ctx, tmp_path)
 
     cli.run_openapi_app(app, "--max-examples=5")
 
-    crash_files = _crash_files(_crashes_dir(tmp_path))
+    crash_files = _crash_files(crash_cache_dir(tmp_path))
     checks = {
         check["name"] for f in crash_files for step in json.loads(f.read_text())["sequence"] for check in step["checks"]
     }
@@ -204,7 +201,7 @@ def test_no_crash_file_when_cache_disabled(cli, ctx, tmp_path, snapshot_cli):
         return jsonify({"error": "crash"}), 500
 
     assert cli.run_openapi_app(app, "--max-examples=1", config={"cache": {"enabled": False}}) == snapshot_cli
-    assert not _crash_files(_crashes_dir(tmp_path))
+    assert not _crash_files(crash_cache_dir(tmp_path))
 
 
 def test_no_crash_file_on_success(cli, ctx, tmp_path):
@@ -216,7 +213,7 @@ def test_no_crash_file_on_success(cli, ctx, tmp_path):
 
     cli.run_openapi_app(app, "--max-examples=1")
 
-    assert not _crash_files(_crashes_dir(tmp_path))
+    assert not _crash_files(crash_cache_dir(tmp_path))
 
 
 def test_crash_file_sanitizes_url_and_response_headers(cli, ctx, tmp_path):
@@ -237,7 +234,7 @@ def test_crash_file_sanitizes_url_and_response_headers(cli, ctx, tmp_path):
 
     cli.run_openapi_app(app, "--max-examples=1", config={"parameters": {"api_key": "SECRETVALUE"}})
 
-    crash = json.loads(_crash_files(_crashes_dir(tmp_path))[0].read_text())
+    crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
     step = crash["sequence"][0]
     assert "super-secret-token" not in json.dumps(crash)
     assert "SECRETVALUE" not in step["url"], step["url"]
@@ -277,7 +274,7 @@ def test_crash_file_does_not_persist_raw_request_body(cli, ctx, tmp_path):
 
     cli.run_openapi_app(app, "--max-examples=5", "--phases=fuzzing")
 
-    crash = json.loads(_crash_files(_crashes_dir(tmp_path))[0].read_text())
+    crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
     assert "body" not in crash["sequence"][0]
 
 
@@ -304,7 +301,7 @@ def test_crash_file_respects_disabled_sanitization(cli, ctx, tmp_path):
         config={"parameters": {"api_key": "SECRETVALUE"}, "output": {"sanitization": {"enabled": False}}},
     )
 
-    crash = json.loads(_crash_files(_crashes_dir(tmp_path))[0].read_text())
+    crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
     assert "SECRETVALUE" in crash["sequence"][0]["url"]
 
 
@@ -339,7 +336,7 @@ def test_crash_file_stores_structured_case(cli, ctx, tmp_path):
 
     cli.run_openapi_app(app, "--max-examples=5", "--phases=fuzzing")
 
-    crash = json.loads(_crash_files(_crashes_dir(tmp_path))[0].read_text())
+    crash = json.loads(_crash_files(crash_cache_dir(tmp_path))[0].read_text())
     step = crash["sequence"][0]
     # The generated body value varies, so assert its shape; the rest of the structured case is fixed.
     assert step["case_body"]["encoding"] == "json"

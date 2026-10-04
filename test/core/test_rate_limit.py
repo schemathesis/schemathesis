@@ -5,21 +5,14 @@ from pyrate_limiter import Duration
 
 import schemathesis.graphql
 from schemathesis.core.rate_limit import parse_units
-
-
-def _graphql_url(ctx):
-    return ctx.graphql.apps.books().schema_url
-
-
-def _openapi_url(ctx):
-    return ctx.openapi.apps.success().schema_url
+from test.utils import graphql_url, openapi_url
 
 
 @pytest.mark.parametrize(
     ("loader", "make_url", "kind"),
     [
-        (schemathesis.graphql.from_url, _graphql_url, "graphql"),
-        (schemathesis.openapi.from_url, _openapi_url, "openapi"),
+        (schemathesis.graphql.from_url, graphql_url, "graphql"),
+        (schemathesis.openapi.from_url, openapi_url, "openapi"),
     ],
 )
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

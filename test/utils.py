@@ -23,7 +23,7 @@ from schemathesis.core.errors import format_exception
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.recorder import Interaction
-from schemathesis.engine.run import PhaseName
+from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.schemas import BaseSchema
 from test.apps import builders
 
@@ -397,3 +397,19 @@ def test_api(case):
 """
     testdir.make_test(source)
     return label
+
+
+def crash_cache_dir(tmp_path: Path) -> Path:
+    return tmp_path / ".schemathesis" / "default" / "cache" / "crashes"
+
+
+def openapi_url(ctx):
+    return ctx.openapi.apps.success().schema_url
+
+
+def graphql_url(ctx):
+    return ctx.graphql.apps.books().schema_url
+
+
+def stateful_phase() -> Phase:
+    return Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True)

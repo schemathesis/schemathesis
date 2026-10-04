@@ -585,155 +585,77 @@ def test_record_response_excludes_path_parameter_names(ctx, case_factory, respon
     assert "owner@example.com" in pool_values
 
 
-def test_scenario_email_cross_operation_flow(ctx, case_factory, response_factory):
-    schema, extra_data_source = _extra_data_source_for(
-        ctx,
-        {
-            "/api/users": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"email": {"type": "string", "format": "email"}},
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-    )
-    _ingest_2xx(
-        schema["/api/users"]["GET"],
-        body={"email": "alice@example.com"},
-        extra_data_source=extra_data_source,
-        case_factory=case_factory,
-        response_factory=response_factory,
-    )
-    consumer = {
-        "type": "object",
-        "properties": {"recipient_email": {"type": "string", "format": "email"}},
+@pytest.mark.parametrize(
+    ("path", "properties", "body", "consumer", "expected"),
+    [
+        pytest.param(
+            "/api/users",
+            {"email": {"type": "string", "format": "email"}},
+            {"email": "alice@example.com"},
+            {
+                "type": "object",
+                "properties": {"recipient_email": {"type": "string", "format": "email"}},
+            },
+            "alice@example.com",
+            id="scenario_email_cross_operation_flow",
+        ),
+        pytest.param(
+            "/api/products",
+            {"currency": {"type": "string"}},
+            {"currency": "EUR"},
+            {"type": "object", "properties": {"currency": {"type": "string"}}},
+            "EUR",
+            id="scenario_currency_named_fallback_cross_operation_flow",
+        ),
+        pytest.param(
+            "/api/events",
+            {"start_at": {"type": "string", "format": "date-time"}},
+            {"start_at": "2026-05-08T10:00:00Z"},
+            {
+                "type": "object",
+                "properties": {"start_at": {"type": "string", "format": "date-time"}},
+            },
+            "2026-05-08T10:00:00Z",
+            id="scenario_date_time_cross_operation_flow",
+        ),
+        pytest.param(
+            "/api/webhooks",
+            {"url": {"type": "string", "format": "uri"}},
+            {"url": "https://example.com/cb"},
+            {
+                "type": "object",
+                "properties": {"callback_url": {"type": "string", "format": "uri"}},
+            },
+            "https://example.com/cb",
+            id="scenario_url_cross_operation_flow",
+        ),
+        pytest.param(
+            "/customer",
+            {"name": {"type": "string"}},
+            {"name": "alice"},
+            {"type": "object", "properties": {"name": {"type": "string"}}},
+            "alice",
+            id="restgym_market_name_query_cross_operation",
+        ),
+    ],
+)
+def test_pooled_response_value_reaches_consumer(
+    ctx, case_factory, response_factory, path, properties, body, consumer, expected
+):
+    response = {
+        "description": "OK",
+        "content": {"application/json": {"schema": {"type": "object", "properties": properties}}},
     }
-    [descriptor] = iter_consumer_leaves(consumer)
-    assert "alice@example.com" in _lookup_by_descriptor(extra_data_source.semantic_index, descriptor)
-
-
-def test_scenario_currency_named_fallback_cross_operation_flow(ctx, case_factory, response_factory):
-    schema, extra_data_source = _extra_data_source_for(
-        ctx,
-        {
-            "/api/products": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"currency": {"type": "string"}},
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-    )
+    schema, extra_data_source = _extra_data_source_for(ctx, {path: {"get": {"responses": {"200": response}}}})
     _ingest_2xx(
-        schema["/api/products"]["GET"],
-        body={"currency": "EUR"},
+        schema[path]["GET"],
+        body=body,
         extra_data_source=extra_data_source,
         case_factory=case_factory,
         response_factory=response_factory,
     )
-    consumer = {"type": "object", "properties": {"currency": {"type": "string"}}}
     [descriptor] = iter_consumer_leaves(consumer)
-    assert "EUR" in _lookup_by_descriptor(extra_data_source.semantic_index, descriptor)
-
-
-def test_scenario_date_time_cross_operation_flow(ctx, case_factory, response_factory):
-    schema, extra_data_source = _extra_data_source_for(
-        ctx,
-        {
-            "/api/events": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "start_at": {"type": "string", "format": "date-time"},
-                                        },
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-    )
-    _ingest_2xx(
-        schema["/api/events"]["GET"],
-        body={"start_at": "2026-05-08T10:00:00Z"},
-        extra_data_source=extra_data_source,
-        case_factory=case_factory,
-        response_factory=response_factory,
-    )
-    consumer = {
-        "type": "object",
-        "properties": {"start_at": {"type": "string", "format": "date-time"}},
-    }
-    [descriptor] = iter_consumer_leaves(consumer)
-    assert "2026-05-08T10:00:00Z" in _lookup_by_descriptor(extra_data_source.semantic_index, descriptor)
-
-
-def test_scenario_url_cross_operation_flow(ctx, case_factory, response_factory):
-    schema, extra_data_source = _extra_data_source_for(
-        ctx,
-        {
-            "/api/webhooks": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"url": {"type": "string", "format": "uri"}},
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-    )
-    _ingest_2xx(
-        schema["/api/webhooks"]["GET"],
-        body={"url": "https://example.com/cb"},
-        extra_data_source=extra_data_source,
-        case_factory=case_factory,
-        response_factory=response_factory,
-    )
-    consumer = {
-        "type": "object",
-        "properties": {"callback_url": {"type": "string", "format": "uri"}},
-    }
-    [descriptor] = iter_consumer_leaves(consumer)
-    assert "https://example.com/cb" in _lookup_by_descriptor(extra_data_source.semantic_index, descriptor)
+    assert expected in _lookup_by_descriptor(extra_data_source.semantic_index, descriptor)
 
 
 def test_restgym_flight_search_departure_time_cross_operation(ctx, case_factory, response_factory):
@@ -824,41 +746,6 @@ def test_restgym_traccar_device_time_cross_operation(ctx, case_factory, response
     assert all(d.format == "date-time" for d in descriptors)
     [pool] = {tuple(_lookup_by_descriptor(extra_data_source.semantic_index, d)) for d in descriptors}
     assert "2026-05-08T12:00:00Z" in pool
-
-
-def test_restgym_market_name_query_cross_operation(ctx, case_factory, response_factory):
-    schema, extra_data_source = _extra_data_source_for(
-        ctx,
-        {
-            "/customer": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"name": {"type": "string"}},
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            }
-        },
-    )
-    _ingest_2xx(
-        schema["/customer"]["GET"],
-        body={"name": "alice"},
-        extra_data_source=extra_data_source,
-        case_factory=case_factory,
-        response_factory=response_factory,
-    )
-    consumer = {"type": "object", "properties": {"name": {"type": "string"}}}
-    [descriptor] = iter_consumer_leaves(consumer)
-    assert "alice" in _lookup_by_descriptor(extra_data_source.semantic_index, descriptor)
 
 
 def test_restgym_pet_clinic_last_name_query_cross_operation(ctx, case_factory, response_factory):
@@ -963,46 +850,48 @@ def _attach_planted_bug(app, producer_path, producer_payload, consumer_path, tri
         return Response(status=200)
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_planted_bug_surfaces_via_email_format_pool(ctx, cli, snapshot_cli):
+_PLANTED_BUG_ARGS = (
+    "--max-examples=30",
+    "--seed=42",
+    "--checks=not_a_server_error",
+    "--suppress-health-check=filter_too_much",
+)
+
+
+def _planted_bug_app(ctx, producer_path, producer_property, consumer_path, consumer_property, property_schema):
+    def body(name):
+        return {"type": "object", "properties": {name: property_schema}, "required": [name]}
+
     app, _ = ctx.openapi.make_flask_app(
         {
-            "/api/contacts": {
+            producer_path: {
                 "get": {
                     "responses": {
                         "200": {
                             "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"email": {"type": "string", "format": "email"}},
-                                        "required": ["email"],
-                                    }
-                                }
-                            },
+                            "content": {"application/json": {"schema": body(producer_property)}},
                         }
                     }
                 }
             },
-            "/api/messages": {
+            consumer_path: {
                 "post": {
                     "requestBody": {
                         "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"recipient_email": {"type": "string", "format": "email"}},
-                                    "required": ["recipient_email"],
-                                }
-                            }
-                        },
+                        "content": {"application/json": {"schema": body(consumer_property)}},
                     },
                     "responses": {"200": {"description": "OK"}},
                 }
             },
         }
+    )
+    return app
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_planted_bug_surfaces_via_email_format_pool(ctx, cli, snapshot_cli):
+    app = _planted_bug_app(
+        ctx, "/api/contacts", "email", "/api/messages", "recipient_email", {"type": "string", "format": "email"}
     )
     _attach_planted_bug(
         app,
@@ -1011,59 +900,12 @@ def test_planted_bug_surfaces_via_email_format_pool(ctx, cli, snapshot_cli):
         "/api/messages",
         lambda body: body.get("recipient_email") == _HARVESTED_EMAIL,
     )
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--max-examples=30",
-            "--seed=42",
-            "--checks=not_a_server_error",
-            "--suppress-health-check=filter_too_much",
-        )
-        == snapshot_cli
-    )
+    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_planted_bug_surfaces_via_named_fallback_pool(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/api/catalog": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"currency": {"type": "string"}},
-                                        "required": ["currency"],
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            },
-            "/api/orders": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"currency": {"type": "string"}},
-                                    "required": ["currency"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        }
-    )
+    app = _planted_bug_app(ctx, "/api/catalog", "currency", "/api/orders", "currency", {"type": "string"})
     _attach_planted_bug(
         app,
         "/api/catalog",
@@ -1071,58 +913,13 @@ def test_planted_bug_surfaces_via_named_fallback_pool(ctx, cli, snapshot_cli):
         "/api/orders",
         lambda body: body.get("currency") == _HARVESTED_CURRENCY,
     )
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--max-examples=30",
-            "--seed=42",
-            "--checks=not_a_server_error",
-            "--suppress-health-check=filter_too_much",
-        )
-        == snapshot_cli
-    )
+    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_planted_bug_surfaces_via_date_time_format_pool(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/api/calendar": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"start_at": {"type": "string", "format": "date-time"}},
-                                        "required": ["start_at"],
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            },
-            "/api/events": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"start_at": {"type": "string", "format": "date-time"}},
-                                    "required": ["start_at"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        }
+    app = _planted_bug_app(
+        ctx, "/api/calendar", "start_at", "/api/events", "start_at", {"type": "string", "format": "date-time"}
     )
     _attach_planted_bug(
         app,
@@ -1131,58 +928,13 @@ def test_planted_bug_surfaces_via_date_time_format_pool(ctx, cli, snapshot_cli):
         "/api/events",
         lambda body: body.get("start_at") == _HARVESTED_DATETIME,
     )
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--max-examples=30",
-            "--seed=42",
-            "--checks=not_a_server_error",
-            "--suppress-health-check=filter_too_much",
-        )
-        == snapshot_cli
-    )
+    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_planted_bug_surfaces_via_uri_format_pool(ctx, cli, snapshot_cli):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/api/integrations": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"url": {"type": "string", "format": "uri"}},
-                                        "required": ["url"],
-                                    }
-                                }
-                            },
-                        }
-                    }
-                }
-            },
-            "/api/webhooks": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"callback_url": {"type": "string", "format": "uri"}},
-                                    "required": ["callback_url"],
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            },
-        }
+    app = _planted_bug_app(
+        ctx, "/api/integrations", "url", "/api/webhooks", "callback_url", {"type": "string", "format": "uri"}
     )
     _attach_planted_bug(
         app,
@@ -1191,16 +943,7 @@ def test_planted_bug_surfaces_via_uri_format_pool(ctx, cli, snapshot_cli):
         "/api/webhooks",
         lambda body: isinstance(body, dict) and body.get("callback_url") == _HARVESTED_URL,
     )
-    assert (
-        cli.run_openapi_app(
-            app,
-            "--max-examples=30",
-            "--seed=42",
-            "--checks=not_a_server_error",
-            "--suppress-health-check=filter_too_much",
-        )
-        == snapshot_cli
-    )
+    assert cli.run_openapi_app(app, *_PLANTED_BUG_ARGS) == snapshot_cli
 
 
 def test_overlay_skips_candidate_violating_consumer_constraint():

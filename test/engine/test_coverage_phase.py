@@ -1,20 +1,25 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 
 import hypothesis
 import hypothesis.errors
 import jsonschema_rs
 from flask import request
-from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core.errors import InvalidRegexPattern, InvalidRegexType, InvalidSchema
-from schemathesis.core.jsonschema import make_validator_for
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.checks import negative_data_rejection
+from test.engine.helpers import (
+    raise_invalid_argument,
+    raise_keyboard_interrupt,
+    raise_non_regex_validation_error,
+    raise_regex_validation_error,
+    raise_unsatisfiable,
+    raise_yaml_pattern_as_float_typeerror,
+)
 from test.utils import EventStream
 
 
@@ -368,37 +373,8 @@ def test_unique_inputs_dedupes_repeated_explicit_examples(ctx, app_runner):
     assert with_dedupe.count("kind=alpha") == 1, with_dedupe
 
 
-def _raise_unsatisfiable():
-    @hypothesis.given(st.integers().filter(lambda x: False))
-    @hypothesis.settings(max_examples=1, suppress_health_check=list(hypothesis.HealthCheck))
-    def t(_):
-        pass
-
-    t()
-
-
-def _raise_invalid_argument():
-    hypothesis.settings(max_examples=-1)
-
-
-def _raise_regex_validation_error():
-    make_validator_for({"type": "string", "pattern": "[unclosed"})
-
-
-def _raise_non_regex_validation_error():
-    make_validator_for({"type": 12345})
-
-
-def _raise_yaml_pattern_as_float_typeerror():
-    re.compile(12345)
-
-
-def _raise_keyboard_interrupt():
-    raise KeyboardInterrupt
-
-
 def test_coverage_phase_translates_unsatisfiable(ctx):
-    stream = _hooked_coverage_stream(ctx, _raise_unsatisfiable)
+    stream = _hooked_coverage_stream(ctx, raise_unsatisfiable)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.COVERAGE)
     assert any(isinstance(event.value, hypothesis.errors.Unsatisfiable) for event in errors), [
@@ -407,7 +383,7 @@ def test_coverage_phase_translates_unsatisfiable(ctx):
 
 
 def test_coverage_phase_translates_invalid_argument(ctx):
-    stream = _hooked_coverage_stream(ctx, _raise_invalid_argument)
+    stream = _hooked_coverage_stream(ctx, raise_invalid_argument)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.COVERAGE)
     assert any(isinstance(event.value, hypothesis.errors.InvalidArgument) for event in errors), [
@@ -416,7 +392,7 @@ def test_coverage_phase_translates_invalid_argument(ctx):
 
 
 def test_coverage_phase_translates_regex_validation_error(ctx):
-    stream = _hooked_coverage_stream(ctx, _raise_regex_validation_error)
+    stream = _hooked_coverage_stream(ctx, raise_regex_validation_error)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.COVERAGE)
     assert any(isinstance(event.value, InvalidRegexPattern) for event in errors), [
@@ -425,7 +401,7 @@ def test_coverage_phase_translates_regex_validation_error(ctx):
 
 
 def test_coverage_phase_translates_non_regex_validation_error(ctx):
-    stream = _hooked_coverage_stream(ctx, _raise_non_regex_validation_error)
+    stream = _hooked_coverage_stream(ctx, raise_non_regex_validation_error)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.COVERAGE)
     assert any(
@@ -435,14 +411,14 @@ def test_coverage_phase_translates_non_regex_validation_error(ctx):
 
 
 def test_coverage_phase_translates_yaml_pattern_as_float(ctx):
-    stream = _hooked_coverage_stream(ctx, _raise_yaml_pattern_as_float_typeerror)
+    stream = _hooked_coverage_stream(ctx, raise_yaml_pattern_as_float_typeerror)
 
     errors = stream.find_all(events.NonFatalError, phase=PhaseName.COVERAGE)
     assert any(isinstance(event.value, InvalidRegexType) for event in errors), [type(e.value).__name__ for e in errors]
 
 
 def test_coverage_phase_handles_keyboard_interrupt_during_iteration(ctx):
-    stream = _hooked_coverage_stream(ctx, _raise_keyboard_interrupt)
+    stream = _hooked_coverage_stream(ctx, raise_keyboard_interrupt)
 
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.COVERAGE)
     assert any(event.status == Status.INTERRUPTED for event in finished), [event.status for event in finished]
