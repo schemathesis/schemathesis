@@ -214,3 +214,39 @@ def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
     assert "#/x-bundled/" not in result.stdout
 
     assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_whole_external_file_reference_in_schema_location(ctx, cli, app_runner, snapshot_cli):
+    # A `$ref` without a fragment points at the whole referenced file, so the "Schema at"
+    # location must name that file instead of coming out empty.
+    paths = {
+        "/pets": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "pets.json"}}}},
+                    }
+                }
+            }
+        }
+    }
+    app = ctx.openapi.make_permissive_flask_app(ctx.openapi.build_schema(paths, version="3.0.2"))
+    base_url = app_runner.openapi_url(app, path="")
+    schema_path = ctx.openapi.write_schema(paths, version="3.0.2")
+    ctx.makefile({"type": "object", "required": ["name"]}, filename="pets")
+
+    @app.route("/api/pets", methods=["GET"])
+    def pets():
+        # Missing "name" — always violates the externally referenced schema
+        return jsonify([{"x": 1}]), 200
+
+    result = cli.run(
+        str(schema_path),
+        f"--url={base_url}/api",
+        "--checks=response_schema_conformance",
+        "--max-examples=1",
+    )
+    assert "Schema at /pets.json" in result.stdout
+    assert result == snapshot_cli

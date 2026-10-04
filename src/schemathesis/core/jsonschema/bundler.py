@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from schemathesis.core.cache import MISSING, BoundedCache
 from schemathesis.core.jsonschema.resolver import (
@@ -226,15 +227,23 @@ def unbundle_path(path: list[str | int], name_to_uri: dict[str, str]) -> list[st
         next_key = path[i + 1] if i + 1 < len(path) else None
         if path[i] == BUNDLE_STORAGE_KEY and isinstance(next_key, str) and next_key in name_to_uri:
             uri = name_to_uri[next_key]
-            if "#" in uri:
-                fragment = uri.split("#", 1)[1]
-                if fragment.startswith("/"):
-                    result.extend(decode_pointer(segment) for segment in fragment[1:].split("/"))
+            fragment = uri.split("#", 1)[1] if "#" in uri else ""
+            if fragment.startswith("/"):
+                result.extend(decode_pointer(segment) for segment in fragment[1:].split("/"))
+            else:
+                # A whole-file reference has no pointer segments; name the referenced file instead.
+                result.append(_document_display_name(uri))
             i += 2
         else:
             result.append(path[i])
             i += 1
     return result
+
+
+def _document_display_name(uri: str) -> str:
+    """Name of the referenced document inside a URI, e.g. `pet.json` in `file:///dir/pet.json`."""
+    path = urlsplit(uri).path.rstrip("/").rsplit("/", 1)[-1]
+    return path or uri
 
 
 _UNBUNDLED_COMPONENTS_CACHE: BoundedCache = BoundedCache(maxsize=32)
