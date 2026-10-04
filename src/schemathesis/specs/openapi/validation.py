@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema_rs
 
 from schemathesis.core import deserialization
-from schemathesis.core.errors import InvalidSchema, MalformedMediaType, SchemaLocation
+from schemathesis.core.errors import InvalidSchema, SchemaLocation
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.transport import Response
@@ -63,12 +63,6 @@ class ResponseValidator:
         validator = None
         try:
             sse_validator = definition.get_sse_validator(resolved.media_type, resolved.schema)
-        except (MalformedMediaType, ValueError) as exc:
-            raise InvalidSchema(
-                f"Invalid response schema for SSE content validation:\n\n  {exc}",
-                path=operation.path,
-                method=operation.method,
-            ) from exc
         except jsonschema_rs.ValidationError as exc:
             raise InvalidSchema.from_jsonschema_error(
                 exc,
@@ -76,6 +70,13 @@ class ResponseValidator:
                 method=operation.method,
                 config=schema.config.output,
                 location=SchemaLocation.response_schema(schema.specification.version),
+            ) from exc
+        # Schemas built in Python can hold values no JSON document can (e.g. a `datetime.date`).
+        except ValueError as exc:
+            raise InvalidSchema(
+                f"Invalid response schema for SSE content validation:\n\n  {exc}",
+                path=operation.path,
+                method=operation.method,
             ) from exc
         if sse_validator is None:
             validate_formats = schema.config.checks_config_for(
