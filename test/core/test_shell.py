@@ -231,7 +231,8 @@ def test_escape_for_shell_truncates_unicode_by_utf8_bytes():
     result = escape_for_shell(value, ShellType.BASH)
     total_bytes = len(value.encode("utf-8"))
     assert result.needs_warning is True
-    assert result.escaped_value == ("😀" * (MAX_SHELL_SCAN_BYTES // 4) + f" <...truncated, {total_bytes} bytes total>")
+    truncated = "😀" * (MAX_SHELL_SCAN_BYTES // 4)
+    assert result.escaped_value == f"'{truncated} <...truncated, {total_bytes} bytes total>'"
 
 
 def test_escape_for_shell_truncates_lone_surrogates_by_utf8_bytes():
