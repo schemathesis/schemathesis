@@ -3331,6 +3331,33 @@ def test_canonical_number_generation_respects_original_schema(ctx, body_schema):
     test()
 
 
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_positive_generation_respects_not_with_unicode_property_pattern(ctx, version):
+    body_schema = {"type": "string", "not": {"pattern": "[\\p{L}]"}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+    is_valid = jsonschema_rs.validator_for(body_schema).is_valid
+
+    @given(schema["/data"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, deadline=None)
+    def test(case):
+        assert is_valid(case.body), case.body
+
+    test()
+
+
 @pytest.mark.parametrize(
     ("schema", "rejected"),
     [
