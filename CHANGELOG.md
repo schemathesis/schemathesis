@@ -9,6 +9,7 @@
 - Missing inferred links for body fields returned under differently named response schemas.
 - Positive cases violating negated Unicode property patterns such as `\p{L}`.
 - `FutureWarning` printed to stderr for some schema `pattern` values.
+- Broken shell quoting for truncated request bodies in generated `curl` commands.
 - Display report write failures with the format, path, and operating-system error.
 - Missing `anyOf` negative coverage cases when a referenced schema contains invalid keywords.
 - Missing invalid-format coverage cases for Open API 3.1 `$ref` with sibling keywords.

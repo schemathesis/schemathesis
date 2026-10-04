@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from enum import Enum
+from shlex import quote
 
 
 class ShellType(str, Enum):
@@ -133,8 +134,9 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
     # Fast path: no non-printable characters
     if not has_non_printable(value):
         if truncated:
+            # Keep the marker inside the quotes; unquoted it would be parsed as a shell redirect
             return EscapeResult(
-                escaped_value=value + _truncated_marker(full_size),
+                escaped_value=quote(value + _truncated_marker(full_size)),
                 needs_warning=True,
                 original_bytes=None,
                 shell_used=shell,

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 import schemathesis
 from schemathesis import Case
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, ParameterLocation, RawQueryString
-from schemathesis.core.shell import ShellType
+from schemathesis.core.shell import MAX_SHELL_SCAN_BYTES, ShellType
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -269,6 +269,25 @@ def test_shell_aware_escaping(curl, monkeypatch, shell_type, case_kwargs, expect
 
     assert command == expected_command
     curl.assert_valid(command)
+
+
+@pytest.mark.parametrize(
+    "shell_type",
+    [ShellType.BASH, ShellType.ZSH, ShellType.FISH, ShellType.UNKNOWN],
+    ids=["bash", "zsh", "fish", "unknown"],
+)
+def test_truncated_printable_body_is_quoted(monkeypatch, shell_type):
+    # Unquoted, the truncation marker's `<` would be read as a shell redirect
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", shell_type)
+    body = "a" * (MAX_SHELL_SCAN_BYTES + 1)
+    case = schema["/users"]["GET"].Case(body=body, media_type="text/plain")
+    command = case.as_curl_command()
+    quoted_body = f"'{'a' * MAX_SHELL_SCAN_BYTES} <...truncated, {MAX_SHELL_SCAN_BYTES + 1} bytes total>'"
+    expected_command = (
+        f"curl -X GET -H 'Content-Type: text/plain' -d {quoted_body} http://localhost/users"
+        "\n\n⚠️  Request body was truncated for shell display."
+    )
+    assert command == expected_command
 
 
 def test_multipart_with_array_of_bytes_body(curl):
