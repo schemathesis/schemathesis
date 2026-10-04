@@ -853,6 +853,24 @@ def test_unique_inputs(engine_factory):
             assert len(cases) == len(set(cases)), "Duplicate cases found"
 
 
+def test_explicit_hypothesis_default_max_steps(ctx):
+    api = ctx.openapi.apps.stateful_users()
+    config = schemathesis.Config.from_dict(
+        {
+            "phases": {"stateful": {"max-steps": 50}},
+            "generation": {"max-examples": 1, "database": "none"},
+            "checks": {"enabled": False},
+        }
+    )
+    schema = schemathesis.openapi.from_url(api.schema_url, config=config)
+    engine = stateful.execute(
+        engine=EngineContext(schema=schema, stop_event=threading.Event()),
+        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_enabled=True),
+    )
+
+    assert [len(event.recorder.cases) for event in engine if isinstance(event, events.ScenarioFinished)][-1] == 50
+
+
 def test_ignored_auth_valid(engine_factory):
     # When auth works properly
     token = "Test"

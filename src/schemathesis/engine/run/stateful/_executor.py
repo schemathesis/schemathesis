@@ -85,8 +85,6 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
     hypothesis_default = hypothesis.settings.get_profile("default")
     if settings.phases == hypothesis_default.phases:
         kwargs["phases"] = DEFAULT_STATE_MACHINE_SETTINGS.phases
-    if settings.stateful_step_count == hypothesis_default.stateful_step_count:
-        kwargs["stateful_step_count"] = DEFAULT_STATE_MACHINE_SETTINGS.stateful_step_count
     if settings.deadline == hypothesis_default.deadline:
         kwargs["deadline"] = DEFAULT_STATE_MACHINE_SETTINGS.deadline
     # Suppressing a subset must not re-enable the rest, hence the union rather than a swap
