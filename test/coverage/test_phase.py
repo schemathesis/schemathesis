@@ -729,6 +729,59 @@ def test_yaml_binary_keyword_values_do_not_break_coverage(ctx, tmp_path, app_run
 
 
 @pytest.mark.parametrize(
+    "body_schema",
+    [
+        {"type": "array", "maxItems": 500, "items": {"type": "string", "format": "binary"}},
+        {
+            "type": "object",
+            "required": ["files"],
+            "properties": {
+                "files": {"type": "array", "maxItems": 500, "items": {"type": "string", "format": "binary"}}
+            },
+        },
+        {
+            "type": "object",
+            "required": ["files"],
+            "properties": {
+                "files": {
+                    "oneOf": [
+                        {
+                            "type": "array",
+                            "maxItems": 500,
+                            "items": {"type": "string", "format": "binary"},
+                        }
+                    ]
+                }
+            },
+        },
+    ],
+    ids=["root", "property", "property-oneOf"],
+)
+def test_binary_array_near_max_items_does_not_break_coverage(ctx, app_runner, body_schema):
+    raw_schema = build_schema(ctx, body=body_schema)
+    app = ctx.openapi.make_permissive_flask_app(raw_schema)
+    schema = ctx.openapi.from_full_schema(raw_schema)
+    schema.config.update(base_url=app_runner.openapi_url(app, path=""))
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["coverage"])
+    cases = []
+
+    with ctx.restore_hooks():
+
+        @schemathesis.hook
+        def before_call(context, case, **kwargs):
+            cases.append(case)
+
+        errors = [
+            event.value
+            for event in schemathesis.engine.from_schema(schema).execute()
+            if isinstance(event, schemathesis.engine.events.NonFatalError)
+        ]
+    assert errors == []
+    assert cases
+
+
+@pytest.mark.parametrize(
     "body",
     [
         {"type": "array", "contains": {"type": "integer"}, "minContains": 5},

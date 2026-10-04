@@ -211,8 +211,9 @@ def _extra_property_schema(schema: JsonSchemaObject) -> JsonSchema:
 
 
 def _is_strictly_valid(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> bool:
-    # Fails closed, so a value nothing can check is dropped rather than shipped as a valid positive.
-    return _admitted(value, schema, ctx, unjudged=False)
+    # Binary payloads cannot be validated and pass, as elsewhere in this module. Anything else fails closed,
+    # so a value nothing can check is dropped rather than shipped as a valid positive.
+    return contains_binary(value) or _admitted(value, schema, ctx, unjudged=False)
 
 
 def _without_forbidden_keys(value: Any, schema: dict[str, Any]) -> Any:

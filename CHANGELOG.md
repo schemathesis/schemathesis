@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Crash in the coverage phase for large arrays of binary strings.
 - Positive cases violating negated Unicode property patterns such as `\p{L}`.
 - `FutureWarning` printed to stderr for some schema `pattern` values.
 - Display report write failures with the format, path, and operating-system error.
