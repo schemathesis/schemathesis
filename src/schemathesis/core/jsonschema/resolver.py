@@ -21,6 +21,19 @@ IN_MEMORY_BASE_URI = "urn:schemathesis:root"
 _FRAGMENT_MISS = object()
 
 
+def _find_anchor(root_schema: object, anchor: str) -> object:
+    stack = [root_schema]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            if node.get("$anchor") == anchor:
+                return node
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return UNRESOLVABLE
+
+
 class Resolver:
     """Wraps `jsonschema_rs.Resolver` with a bound schema and per-instance fragment cache.
 
@@ -63,11 +76,14 @@ class Resolver:
         # rely on the lenient interpretation.
         if not fragment or fragment == "/":
             value: Any = self.schema
+        elif not fragment.startswith("/"):
+            value = _find_anchor(self.schema, fragment)
+            if value is UNRESOLVABLE:
+                # Tolerate refs like `#components/parameters/X` (no leading `/`) that schemas
+                # in the wild produce.
+                value = resolve_pointer(self.schema, f"/{fragment}")
         else:
-            # Tolerate refs like `#components/parameters/X` (no leading `/`) that schemas
-            # in the wild produce.
-            pointer = fragment if fragment.startswith("/") else f"/{fragment}"
-            value = resolve_pointer(self.schema, pointer)
+            value = resolve_pointer(self.schema, fragment)
         cache[fragment] = value
         return value
 
