@@ -2393,7 +2393,9 @@ def cover_schema_iter(
                     bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
                     check_schema = schema if bundle is None else {**schema, BUNDLE_STORAGE_KEY: bundle}
                     try:
-                        unmerged_validator = ctx.validator_cls(check_schema, pattern_options=FANCY_REGEX_OPTIONS)
+                        unmerged_validator = ctx.validator_cls(
+                            check_schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
+                        )
                     except Exception:
                         pass
                 with ctx.expand(reference):
