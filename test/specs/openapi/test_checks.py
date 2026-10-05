@@ -3823,7 +3823,8 @@ def test_negative_data_rejection_skips_schemas_rejected_by_validator(
     assert negative_data_rejection(check_context(), response_factory.requests(status_code=200), case) is None
 
 
-def test_negative_data_rejection_reports_header_beside_query_rejected_by_validator(ctx, response_factory):
+@pytest.mark.parametrize("query_value", ["abc", ["abc"]], ids=["scalar", "array"])
+def test_negative_data_rejection_reports_header_beside_query_rejected_by_validator(ctx, response_factory, query_value):
     operation = ctx.openapi.load_schema(
         {
             "/items": {
@@ -3843,8 +3844,12 @@ def test_negative_data_rejection_reports_header_beside_query_rejected_by_validat
             headers=GenerationMode.NEGATIVE,
             generation_modes=[GenerationMode.NEGATIVE],
             description="Invalid component",
+            mutations=(
+                _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="q"),
+                _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="X-Id", location=ParameterLocation.HEADER),
+            ),
         ),
-        query={"q": "abc"},
+        query={"q": query_value},
         headers={"X-Id": "abc"},
     )
     with pytest.raises(AcceptedNegativeData):

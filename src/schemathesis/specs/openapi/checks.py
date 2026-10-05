@@ -513,9 +513,9 @@ def _numeric_wire_value_is_valid(coerced: int | float | list[int | float], valid
 
 
 def _single_element_array_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
-    """Check if an array value for a scalar parameter becomes valid after serialization.
+    """Check if an array value for a scalar query parameter becomes valid after serialization.
 
-    In query/header/cookie parameters, arrays are serialized as repeated keys:
+    Query arrays are serialized as repeated keys:
     - Single-element [67] -> "?page=67" (identical to scalar 67)
     - Multi-element [True, 1] -> "?page_size=True&page_size=1"
 
@@ -535,79 +535,58 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
     if meta is None:
         return False
 
+    location = ParameterLocation.QUERY
+    component = meta.components.get(location)
+    if component is None or not component.mode.is_negative:
+        return False
+
     neutralized: set[tuple[ParameterLocation, str]] = set()
-    # Check query, header, and cookie parameters
-    for location in (
-        ParameterLocation.QUERY,
-        ParameterLocation.HEADER,
-        ParameterLocation.COOKIE,
-    ):
-        component = meta.components.get(location)
-        if component is None or not component.mode.is_negative:
+    sent_query = _sent_query_values(response, case)
+
+    for param_name, param_value in (case.query or {}).items():
+        param = case.operation.query.get(param_name)
+        if param is None:
+            # This is an additional property, not a schema-defined parameter
+            continue
+        assert isinstance(param, OpenApiParameter)
+
+        # An optional parameter that was not sent at all can't make the request invalid.
+        if sent_query is not None and param_name not in sent_query and not param.is_required:
+            neutralized.add((location, param_name))
             continue
 
-        # Get the container (query, headers, cookies)
-        value = case.get_container(location)
-        if not isinstance(value, Mapping):
+        elements = param_value if isinstance(param_value, list) else []
+        sent_texts = sent_query.get(param_name, []) if sent_query is not None else []
+        if not elements and not sent_texts:
             continue
 
-        # Get the parameter definitions
-        container = getattr(case.operation, location.container_name)
-        sent_query = _sent_query_values(response, case) if location == ParameterLocation.QUERY else None
+        schema = param.definition.get("schema", {})
+        expected_types = get_type(schema)
 
-        # Check each parameter in the container
-        for param_name, param_value in value.items():
-            if param_name not in container:
-                # This is an additional property, not a schema-defined parameter
-                continue
+        if _declares_type(schema, "array"):
+            continue
 
-            # Get the parameter definition
-            param = container.get(param_name)
-            if param is None:
-                continue
-            assert isinstance(param, OpenApiParameter)
-
-            # An optional parameter that was not sent at all can't make the request invalid.
-            if sent_query is not None and param_name not in sent_query and not param.is_required:
+        # A single element serializes identically to a scalar; multiple elements become repeated keys and
+        # some frameworks pick one of them. Either way, the request is valid if any element is.
+        try:
+            validator = make_validator(param.validation_schema, param.adapter.jsonschema_validator_cls)
+        except Exception:
+            neutralized.add((location, param_name))
+            continue
+        for element in elements:
+            if validator.is_valid(element):
                 neutralized.add((location, param_name))
-                continue
-
-            elements = param_value if isinstance(param_value, list) else []
-            sent_texts = sent_query.get(param_name, []) if sent_query is not None else []
-            if not elements and not sent_texts:
-                continue
-
-            # Get the parameter schema from definition
-            schema = param.definition.get("schema", {})
-
-            # Get the expected type(s) from the schema
-            expected_types = get_type(schema)
-
-            if _declares_type(schema, "array"):
-                continue
-
-            # A single element serializes identically to a scalar; multiple elements become repeated keys and
-            # some frameworks pick one of them. Either way, the request is valid if any element is.
-            try:
-                validator = make_validator(param.validation_schema, param.adapter.jsonschema_validator_cls)
-            except Exception:
-                neutralized.add((location, param_name))
-                continue
-            for element in elements:
-                if validator.is_valid(element):
+                break
+            # Query values are transmitted as strings, so a string element like "44" produces the same wire
+            # form as int 44. Frameworks that coerce the raw query value to integer/number/boolean will accept it.
+            if isinstance(element, str):
+                coerced = _coerce_wire_string(element, expected_types)
+                if coerced is not None and _numeric_wire_value_is_valid(coerced, validator):
                     neutralized.add((location, param_name))
                     break
-                # Query/header/cookie values are transmitted as strings, so a string element
-                # like "44" produces the same wire form as int 44. Frameworks that coerce the
-                # raw query value to integer/number/boolean will accept it.
-                if isinstance(element, str):
-                    coerced = _coerce_wire_string(element, expected_types)
-                    if coerced is not None and _numeric_wire_value_is_valid(coerced, validator):
-                        neutralized.add((location, param_name))
-                        break
-            # Nested lists and objects reach the server as repeated keys or their string representation.
-            if any(_sent_text_is_valid(text, validator, expected_types) for text in sent_texts):
-                neutralized.add((location, param_name))
+        # Nested lists and objects reach the server as repeated keys or their string representation.
+        if any(_sent_text_is_valid(text, validator, expected_types) for text in sent_texts):
+            neutralized.add((location, param_name))
 
     # Any other mutated parameter or location still makes the request invalid.
     return bool(neutralized) and all(
