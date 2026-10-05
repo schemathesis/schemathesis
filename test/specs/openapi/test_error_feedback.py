@@ -1439,6 +1439,79 @@ def test_drf_parser_parse_get_request_yields_query_location(make_operation, case
     )
 
 
+_DRF_DETAIL_WRAPPED_BODY = {"detail": {"tags": ["This field may not be blank."]}}
+
+
+def _drf_query_operation(ctx, parameters):
+    schema = ctx.openapi.load_schema(
+        {"/api/audio": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}}
+    )
+    return schema["/api/audio"]["GET"]
+
+
+@pytest.mark.parametrize(
+    ("parameters", "expected_path"),
+    [
+        ([{"name": "tags", "in": "query", "schema": {"type": "string"}}], ("tags",)),
+        (
+            [
+                {
+                    "name": "detail",
+                    "in": "query",
+                    "style": "deepObject",
+                    "schema": {"type": "object", "properties": {"tags": {"type": "string"}}},
+                }
+            ],
+            ("detail", "tags"),
+        ),
+    ],
+    ids=["detail-envelope", "declared-detail-parameter"],
+)
+def test_drf_parser_unwraps_detail_envelope_around_query_errors(ctx, case_factory, parameters, expected_path):
+    operation = _drf_query_operation(ctx, parameters)
+    assert DRFParser().parse(
+        operation=operation, body=_DRF_DETAIL_WRAPPED_BODY, case=case_factory(operation=operation)
+    ) == (
+        _drf_obs(
+            op="GET /api/audio",
+            location=ParameterLocation.QUERY,
+            path=expected_path,
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="This field may not be blank.",
+        ),
+    )
+
+
+def test_drf_parser_keeps_nested_detail_body_field(make_operation, case_factory):
+    assert parse_observations(DRFParser(), _DRF_DETAIL_WRAPPED_BODY, make_operation, case_factory) == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("detail", "tags"),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="This field may not be blank.",
+        ),
+    )
+
+
+def test_drf_detail_envelope_refines_declared_query_parameter(ctx, case_factory):
+    operation = _drf_query_operation(ctx, [{"name": "tags", "in": "query", "schema": {"type": "string"}}])
+    store = ErrorFeedbackStore()
+    for observation in DRFParser().parse(
+        operation=operation, body=_DRF_DETAIL_WRAPPED_BODY, case=case_factory(operation=operation)
+    ):
+        store.record(observation)
+    schema = operation.query.schema
+    adjusted = apply_adjustments(operation=operation, location=ParameterLocation.QUERY, schema=schema, store=store)
+    _assert_valid_schema_object(schema, adjusted)
+    assert adjusted == {
+        "type": "object",
+        "properties": {"tags": {"type": "string", "minLength": 1}},
+        "additionalProperties": False,
+        "required": ["tags"],
+    }
+
+
 def test_drf_parser_parse_skips_unrecognised_messages(make_operation, case_factory):
     body = {"name": ["Custom validate_name message."]}
     assert parse_observations(DRFParser(), body, make_operation, case_factory) == ()
