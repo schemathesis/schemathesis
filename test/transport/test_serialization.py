@@ -4,6 +4,8 @@ import json
 import platform
 import re
 import string
+from email.parser import BytesParser
+from email.policy import HTTP
 from io import StringIO
 from urllib.parse import parse_qsl, unquote
 from xml.etree import ElementTree
@@ -575,6 +577,81 @@ def test_urlencoded_body_follows_encoding(ctx, app_runner, body_schema, encoding
         media_type="application/x-www-form-urlencoded",
     )
     assert sorted(parse_qsl(case.call().text)) == sorted(expected)
+
+
+def _received_part(part):
+    name = part.get_param("name", header="content-disposition")
+    if part.is_multipart():
+        return [name, part.get_content_type(), [_received_part(nested) for nested in part.iter_parts()]]
+    return [name, part.get_content_type(), part.get_payload(decode=True).decode()]
+
+
+@pytest.mark.parametrize("transport", ["wsgi", "http"])
+@pytest.mark.parametrize(
+    ("content_type", "schema", "value", "expected"),
+    [
+        (
+            "multipart/form-data",
+            {"type": "object"},
+            {"x": "1", "y": True},
+            [["f", "multipart/form-data", [["x", "text/plain", "1"], ["y", "text/plain", "true"]]]],
+        ),
+        (
+            "application/x-www-form-urlencoded",
+            {"type": "object"},
+            {"x": "1", "y": [True, None]},
+            [["f", "application/x-www-form-urlencoded", "x=1&y=true&y=null"]],
+        ),
+        (
+            "text/plain",
+            {"type": "array", "items": {"type": "string"}},
+            ["a", 1],
+            [["f", "text/plain", "a"], ["f", "text/plain", "1"]],
+        ),
+        ("text/plain", {"type": "object"}, {"x": None}, [["f", "text/plain", '{"x": null}']]),
+        (
+            "application/x-yaml",
+            {"type": "object"},
+            {"x": "1", "y": True},
+            [["f", "application/x-yaml", "x: '1'\ny: true\n"]],
+        ),
+    ],
+    ids=["nested-multipart", "urlencoded", "text-list-with-number", "text-object", "yaml"],
+)
+def test_multipart_part_encoded_with_its_content_type(
+    ctx, app_runner, transport, content_type, schema, value, expected
+):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {"type": "object", "properties": {"f": schema}},
+                                "encoding": {"f": {"contentType": content_type}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        header = f"Content-Type: {request.content_type}\r\n\r\n".encode()
+        message = BytesParser(policy=HTTP).parsebytes(header + request.get_data())
+        return jsonify([_received_part(part) for part in message.iter_parts()])
+
+    if transport == "wsgi":
+        loaded = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = loaded["/upload"]["POST"].Case(body={"f": value}, media_type="multipart/form-data")
+    assert case.call().json() == expected
 
 
 def test_multipart_nested_object_serializes_as_json(ctx, case_factory):
