@@ -397,8 +397,8 @@ def _body_negation_is_only_forbidden_property(case: Case) -> bool:
     return False
 
 
-def _coerce_string_to_numeric(value: str, expected_types: list[str]) -> int | float | None:
-    """Try to coerce `value` to one of the numeric types in `expected_types`.
+def _coerce_wire_string(value: str, expected_types: list[str]) -> int | float | bool | None:
+    """Try to coerce `value` to one of the numeric or boolean types in `expected_types`.
 
     Returns the coerced value, or `None` if the string is not parseable as any expected type.
     Used to bridge wire-level string transmission (query/header/cookie/path) and
@@ -414,6 +414,11 @@ def _coerce_string_to_numeric(value: str, expected_types: list[str]) -> int | fl
             return float(value)
         except (ValueError, TypeError):
             pass
+    if "boolean" in expected_types:
+        # Spellings such as `0`, `yes`, or `True` are read as booleans by most frameworks.
+        coerced = string_to_boolean(value)
+        if isinstance(coerced, bool):
+            return coerced
     return None
 
 
@@ -505,9 +510,9 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
                     break
                 # Query/header/cookie values are transmitted as strings, so a string element
                 # like "44" produces the same wire form as int 44. Frameworks that coerce the
-                # raw query value to integer/number will accept it.
+                # raw query value to integer/number/boolean will accept it.
                 if isinstance(element, str):
-                    coerced = _coerce_string_to_numeric(element, expected_types)
+                    coerced = _coerce_wire_string(element, expected_types)
                     if coerced is not None and _numeric_wire_value_is_valid(coerced, validator):
                         neutralized.add((location, param_name))
                         break
@@ -527,13 +532,13 @@ def _sent_text_is_valid(text: str, validator: jsonschema_rs.Validator, expected_
     # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
     if not text.isascii() or "_" in text or text != text.strip():
         return False
-    coerced = _coerce_string_to_numeric(text, expected_types)
+    coerced = _coerce_wire_string(text, expected_types)
     return coerced is not None and _numeric_wire_value_is_valid(coerced, validator)
 
 
 def _wire_value_matches_parameter(parameter: OpenApiParameter, expected_types: list[str], wire_value: str) -> bool:
     """Check whether the text actually sent for `parameter` satisfies its original schema."""
-    coerced = _coerce_string_to_numeric(wire_value, expected_types)
+    coerced = _coerce_wire_string(wire_value, expected_types)
     try:
         validator = make_validator(parameter.validation_schema, parameter.adapter.jsonschema_validator_cls)
     except Exception:
@@ -653,7 +658,7 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
             return True
         # Items arrive as text, so `18` is the wire form of `[18]` for an integer array.
         item_types = get_type(schema.get("items", {}))
-        coerced = [_coerce_string_to_numeric(item, item_types) for item in items]
+        coerced = [_coerce_wire_string(item, item_types) for item in items]
         numbers = [value for value in coerced if value is not None]
         if len(numbers) == len(coerced) and _numeric_wire_value_is_valid(numbers, validator):
             return True
@@ -694,8 +699,11 @@ def _query_as_sent(
             continue
         texts = sent_values[name]
         # Other types keep their generated value, as the server parses the text back into it.
-        if texts == [""] or _declares_type(properties.get(name, {}), "string"):
+        schema = properties.get(name, {})
+        if texts == [""] or _declares_type(schema, "string"):
             sent[name] = texts[0] if len(texts) == 1 else texts
+        elif len(texts) == 1 and _declares_type(schema, "boolean"):
+            sent[name] = string_to_boolean(texts[0])
         else:
             sent[name] = value
     return sent
@@ -1177,9 +1185,9 @@ def _negates_declared_parameter(mutation: Mutation, location: ParameterLocation,
 
 
 def _boolean_from_wire_spelling(value: object, schema: JsonSchema) -> object:
-    """Booleans reach the check spelled as the wire sends them, so read `true` / `false` back."""
-    if value in ("true", "false") and "boolean" in get_type(schema):
-        return value == "true"
+    """Booleans reach the check spelled as the wire sends them, so read spellings like `true`, `0`, or `yes` back."""
+    if isinstance(value, str) and "boolean" in get_type(schema):
+        return string_to_boolean(value)
     return value
 
 
