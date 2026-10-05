@@ -3,6 +3,7 @@ from flask import Flask, jsonify, redirect, request
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
+from schemathesis.core.transforms import to_wire_string
 from schemathesis.specs.openapi.checks import ignored_auth
 
 
@@ -87,7 +88,7 @@ def test_form_data(ctx):
         response = case.call()
         assert response.status_code == 200
         # converted to string in the app
-        assert response.json() == {key: str(value) for key, value in case.body.items()}
+        assert response.json() == {key: to_wire_string(value) for key, value in case.body.items()}
 
     test()
 

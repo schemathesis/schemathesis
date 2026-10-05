@@ -2,8 +2,8 @@ import json
 import re
 
 import pytest
-import requests
 import yaml
+from flask import jsonify
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
@@ -1560,7 +1560,9 @@ def test_negative_data_rejection_read_only_property_media_types(ctx, response_fa
         ("text/plain", None, GenerationMode.NEGATIVE, None, False),
     ],
 )
-def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_mode, query_mode, header_mode, expected):
+def test_body_negation_becomes_valid_after_serialization(
+    ctx, response_factory, media_type, body_mode, query_mode, header_mode, expected
+):
     schema = ctx.openapi.load_schema(
         {
             "/endpoint": {
@@ -1591,14 +1593,14 @@ def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_m
         body={},
         media_type=media_type,
     )
-    assert _body_negation_becomes_valid_after_serialization(case) is expected
+    assert _body_negation_becomes_valid_after_serialization(response_factory.requests(), case) is expected
 
 
 MULTIPART = "multipart/form-data"
 URLENCODED = "application/x-www-form-urlencoded"
 
 
-def _load_form_operation(ctx, media_type, properties=None, encoding=None, version="3.0.2"):
+def _load_form_operation(ctx, app_runner, media_type, properties=None, encoding=None, version="3.0.2"):
     definition = {
         "schema": {
             "type": "object",
@@ -1612,7 +1614,7 @@ def _load_form_operation(ctx, media_type, properties=None, encoding=None, versio
     }
     if encoding is not None:
         definition["encoding"] = encoding
-    schema = ctx.openapi.load_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/post": {
                 "post": {
@@ -1624,42 +1626,71 @@ def _load_form_operation(ctx, media_type, properties=None, encoding=None, versio
         },
         version=version,
     )
-    return schema["/post"]["POST"]
 
+    @app.route("/post", methods=["POST"])
+    def post():
+        return jsonify({}), 201
 
-def _sent_body(case):
-    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
-    body = (
-        requests.Request(**{key: kwargs.get(key) for key in ("method", "url", "headers", "data", "files")})
-        .prepare()
-        .body
-    )
-    return body.encode() if isinstance(body, str) else body
+    return schemathesis.openapi.from_url(app_runner.openapi_url(app))["/post"]["POST"]
 
 
 @pytest.mark.parametrize(
     ("media_type", "properties", "value", "wire"),
     [
-        (MULTIPART, None, True, b'name="description"\r\n\r\nTrue\r\n'),
-        (URLENCODED, None, True, b"description=true"),
+        (MULTIPART, None, True, b'name="description"\r\n\r\ntrue\r\n'),
+        (URLENCODED, None, True, "description=true"),
         (MULTIPART, {"count": {"type": "string", "pattern": "^[0-9]+$"}}, 42, b'name="count"\r\n\r\n42\r\n'),
         (MULTIPART, None, 1.5, b'name="description"\r\n\r\n1.5\r\n'),
-        (URLENCODED, None, 1.5, b"description=1.5"),
+        (URLENCODED, None, 1.5, "description=1.5"),
+        (MULTIPART, None, [True, 1], b'name="description"\r\n\r\n1\r\n'),
+        (MULTIPART, None, ["x", {"b": None}], b'name="description"\r\n\r\n{"b": null}\r\n'),
+        (MULTIPART, {"count": {"type": "integer", "maximum": 10}}, 5, b'name="count"\r\n\r\n5\r\n'),
+        (URLENCODED, None, {"x": 1}, "description=x"),
     ],
-    ids=["multipart-boolean", "urlencoded-boolean", "multipart-integer", "multipart-float", "urlencoded-float"],
+    ids=[
+        "multipart-boolean",
+        "urlencoded-boolean",
+        "multipart-integer",
+        "multipart-float",
+        "urlencoded-float",
+        "repeated-values",
+        "repeated-values-with-object",
+        "integer-read-from-text",
+        "object-sent-as-its-keys",
+    ],
 )
 def test_negative_data_rejection_accepts_form_scalars_sent_as_valid_strings(
-    ctx, response_factory, media_type, properties, value, wire
+    ctx, app_runner, media_type, properties, value, wire
 ):
-    operation = _load_form_operation(ctx, media_type, properties)
+    operation = _load_form_operation(ctx, app_runner, media_type, properties)
     name = "count" if properties else "description"
     case = operation.Case(
         _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
         body={"reason": "dmca", name: value},
         media_type=media_type,
     )
-    assert wire in _sent_body(case)
-    assert negative_data_rejection(check_context(), response_factory.requests(status_code=201), case) is None
+    response = case.call()
+    assert wire in response.request.body
+    assert negative_data_rejection(check_context(), response, case) is None
+
+
+@pytest.mark.parametrize(
+    ("media_type", "value"),
+    [(MULTIPART, []), (URLENCODED, []), (URLENCODED, {})],
+    ids=["multipart-empty-list", "urlencoded-empty-list", "urlencoded-empty-object"],
+)
+def test_negative_data_rejection_accepts_optional_form_fields_not_sent(ctx, app_runner, media_type, value):
+    operation = _load_form_operation(ctx, app_runner, media_type)
+    case = operation.Case(
+        _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        body={"reason": "dmca", "description": value},
+        media_type=media_type,
+    )
+    response = case.call()
+    assert "description" not in (
+        response.request.body.decode() if isinstance(response.request.body, bytes) else response.request.body
+    )
+    assert negative_data_rejection(check_context(), response, case) is None
 
 
 @pytest.mark.parametrize(
@@ -1682,7 +1713,25 @@ def test_negative_data_rejection_accepts_form_scalars_sent_as_valid_strings(
             None,
         ),
         (MULTIPART, {"file": {"type": "string", "format": "binary"}}, None, "3.0.2", {"file": True}, None),
-        (MULTIPART, None, None, "3.0.2", {"description": [True, 1]}, None),
+        (MULTIPART, None, None, "3.0.2", {"reason": ["bad", "worse"]}, None),
+        (MULTIPART, None, None, "3.0.2", {"reason": []}, None),
+        (URLENCODED, None, None, "3.0.2", {"reason": {}}, None),
+        (
+            MULTIPART,
+            {"file": {"type": "string", "format": "binary"}},
+            None,
+            "3.0.2",
+            {"file": b"\x00", "description": True},
+            None,
+        ),
+        (
+            MULTIPART,
+            {'na"me': {"type": "string"}},
+            {'na"me': {"contentType": "application/json"}},
+            "3.0.2",
+            {'na"me': True},
+            None,
+        ),
     ],
     ids=[
         "max-length",
@@ -1695,13 +1744,17 @@ def test_negative_data_rejection_accepts_form_scalars_sent_as_valid_strings(
         "object-field",
         "array-field",
         "binary-field",
-        "repeated-field",
+        "repeated-field-all-invalid",
+        "required-field-omitted",
+        "urlencoded-required-field-omitted",
+        "binary-content-cannot-be-validated",
+        "escaped-name-typed-part",
     ],
 )
 def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
-    ctx, response_factory, media_type, properties, encoding, version, body, query
+    ctx, app_runner, media_type, properties, encoding, version, body, query
 ):
-    operation = _load_form_operation(ctx, media_type, properties, encoding, version)
+    operation = _load_form_operation(ctx, app_runner, media_type, properties, encoding, version)
     case = operation.Case(
         _meta=build_metadata(
             body=GenerationMode.NEGATIVE,
@@ -1713,7 +1766,18 @@ def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
         media_type=media_type,
     )
     with pytest.raises(AcceptedNegativeData):
-        negative_data_rejection(check_context(), response_factory.requests(status_code=201), case)
+        negative_data_rejection(check_context(), case.call(), case)
+
+
+def test_negative_data_rejection_reports_form_body_with_undeclared_media_type(ctx, app_runner):
+    operation = _load_form_operation(ctx, app_runner, URLENCODED)
+    case = operation.Case(
+        _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        body={"reason": "dmca", "description": True},
+        media_type=MULTIPART,
+    )
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), case.call(), case)
 
 
 def test_response_schema_conformance_with_unspecified_method(response_factory, sample_raw_schema):

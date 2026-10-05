@@ -446,6 +446,10 @@ def multipart_echo_app(ctx):
                 "mimetype": request.mimetype,
                 "has_boundary": "boundary=" in (request.headers.get("Content-Type") or ""),
                 "form": dict(request.form),
+                "fields": {
+                    name: request.form.getlist(name) + [part.read().decode() for part in request.files.getlist(name)]
+                    for name in {*request.form, *request.files}
+                },
                 "raw": request.get_data().decode("latin-1"),
             }
         )
@@ -468,6 +472,29 @@ def test_wsgi_multipart_form_fields_reach_the_app(ctx):
     )
 
 
+@pytest.mark.parametrize("transport", ["wsgi", "http"])
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (True, ["true"]),
+        (False, ["false"]),
+        (None, ["null"]),
+        (1.5, ["1.5"]),
+        ({"b": 1}, ['{"b": 1}']),
+        (["x", {"b": None}], ["x", '{"b": null}']),
+    ],
+    ids=["true", "false", "null", "float", "object", "list-with-object"],
+)
+def test_multipart_plain_fields_use_json_spellings(ctx, app_runner, transport, value, expected):
+    app = multipart_echo_app(ctx)
+    if transport == "wsgi":
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/upload"]["POST"].Case(body={"key": value}, media_type="multipart/form-data")
+    assert case.call().json()["fields"] == {"key": expected}
+
+
 def test_explicit_multipart_content_type_header_carries_the_boundary(ctx, app_runner):
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(multipart_echo_app(ctx)))
     case = schema["/upload"]["POST"].Case(body={"key": "value"}, media_type="multipart/form-data")
@@ -482,7 +509,7 @@ def test_explicit_multipart_content_type_header_carries_the_boundary(ctx, app_ru
 def test_wsgi_raw_multipart_body_reaches_the_app(ctx):
     operation = multipart_echo_schema(ctx)["/upload"]["POST"]
     case = operation.Case(body=b"\x92\x42", media_type="multipart/form-data")
-    assert case.call().json() == {"mimetype": "", "has_boundary": False, "form": {}, "raw": "\x92B"}
+    assert case.call().json() == {"mimetype": "", "has_boundary": False, "form": {}, "fields": {}, "raw": "\x92B"}
 
 
 URLENCODED_NESTED_SCHEMA = {
