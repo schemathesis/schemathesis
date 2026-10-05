@@ -8,7 +8,7 @@ import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.config._checks import ChecksConfig
-from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
+from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup, MalformedJson
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import EncodedPath, ParameterLocation
 from schemathesis.core.transport import Response
@@ -2336,6 +2336,28 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     assert failure.position == 1
     assert failure.lineno == 1
     assert failure.colno == 2
+
+
+def test_response_schema_conformance_reports_malformed_response_media_type(response_factory, ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo": {
+                "get": {
+                    "responses": {"200": {"description": "OK", "content": {"text": {"schema": {"type": "object"}}}}}
+                }
+            }
+        }
+    )
+    case = schema["/foo"]["GET"].Case()
+    response = response_factory.requests(content=b'{"a": 1}', content_type="text")
+
+    with pytest.raises(FailureGroup) as exc_info:
+        case.validate_response(response, checks=[response_schema_conformance])
+
+    failures = exc_info.value.exceptions
+    assert len(failures) == 1
+    assert failures[0].title == "Content deserialization error"
+    assert "Malformed media type: `text`" in failures[0].message
 
 
 BODY_SCHEMA = {"type": "object", "properties": {"a": {"type": "integer"}}, "required": ["a"]}

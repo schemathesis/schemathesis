@@ -760,6 +760,24 @@ def test_after_validate_fires_for_schema_level_hook(ctx):
     ]
 
 
+def test_after_validate_reports_success_when_filter_failure_drops_every_failure(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/foo": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    results = []
+
+    @schema.hooks.hook
+    def filter_failure(context, failure, case, response):
+        return False
+
+    @schema.hooks.hook
+    def after_validate(context, case, response, check_results):
+        results.extend((r.name, r.status) for r in check_results)
+
+    case = schema["/foo"]["GET"].Case()
+    response = response_factory.requests(status_code=500)
+    assert case.validate_response(response, checks=[schemathesis.checks.not_a_server_error]) is None
+    assert results == [("not_a_server_error", Status.SUCCESS)]
+
+
 def register_recording_component_hooks(dispatcher, container, key, calls):
     def before_generate(context, strategy):
         calls.append(f"before_generate_{container}")
