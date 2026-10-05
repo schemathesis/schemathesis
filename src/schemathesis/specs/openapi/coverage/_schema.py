@@ -3186,7 +3186,9 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
     seen = HashSet()
 
-    def _within_adjusted_bounds(value: int | float) -> bool:
+    def _within_adjusted_bounds(value: object) -> bool:
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return False
         # Read in decimal, the way the validator reads both the value and the bound: past 2**53 a
         # multiple that fits the bound's text can still compare outside the float that spells it.
         exact = _exact(value)

@@ -672,6 +672,12 @@ def test_default_wrong_type_is_not_used(ctx):
     )
 
 
+def test_non_numeric_default_of_integer_does_not_crash(ctx):
+    parameters = [{"name": "q", "in": "query", "schema": {"type": "integer", "default": b"y"}}]
+    operation = load_schema(ctx, parameters)["/foo"]["post"]
+    assert collect_cases(operation, GenerationMode.POSITIVE)
+
+
 BINARY_KEYWORDS_SCHEMA = """
 openapi: 3.0.2
 info: {title: t, version: "1"}
