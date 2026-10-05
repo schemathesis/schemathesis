@@ -477,18 +477,23 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
                 # This is an additional property, not a schema-defined parameter
                 continue
 
+            # Get the parameter definition
+            param = container.get(param_name)
+            if param is None:
+                continue
+            assert isinstance(param, OpenApiParameter)
+
+            # An optional parameter that was not sent at all can't make the request invalid.
+            if sent_query is not None and param_name not in sent_query and not param.is_required:
+                neutralized.add((location, param_name))
+                continue
+
             elements = param_value if isinstance(param_value, list) else []
             sent_texts = sent_query.get(param_name, []) if sent_query is not None else []
             if not elements and not sent_texts:
                 continue
 
-            # Get the parameter definition
-            param = container.get(param_name)
-            if param is None:
-                continue
-
             # Get the parameter schema from definition
-            assert isinstance(param, OpenApiParameter)
             schema = param.definition.get("schema", {})
 
             # Get the expected type(s) from the schema

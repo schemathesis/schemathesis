@@ -6,6 +6,7 @@
 
 - False `negative_data_rejection` failures for nested values sent as repeated scalar query parameters.
 - False `negative_data_rejection` failures for boolean spellings such as `0`, `yes`, or `True`.
+- False `negative_data_rejection` failures for omitted optional query parameters beside other serialized values.
 
 ## [4.29.2](https://github.com/schemathesis/schemathesis/compare/v4.29.1...v4.29.2) - 2026-10-04
 

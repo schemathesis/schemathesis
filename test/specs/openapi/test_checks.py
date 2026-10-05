@@ -1042,6 +1042,78 @@ def test_negative_data_rejection_validates_scalar_query_by_sent_values(
 
 
 @pytest.mark.parametrize(
+    ("license_required", "license", "collection", "path", "url", "accepted"),
+    [
+        (False, [], "", "/audio", "http://127.0.0.1/audio?collection=", True),
+        (False, None, "", "/audio", "http://127.0.0.1/audio?collection=", True),
+        (True, [], "", "/audio", "http://127.0.0.1/audio?collection=", False),
+        (False, [], "bogus", "/audio", "http://127.0.0.1/audio?collection=bogus", False),
+        (False, [], "", "/other", "http://127.0.0.1/other?collection=", False),
+        (False, [], ["bogus", ""], "/audio", "http://127.0.0.1/audio?collection=bogus&collection=", True),
+        (False, [], {"tag": None}, "/audio", "http://127.0.0.1/audio?collection=tag", True),
+        (False, None, ["bogus", "worse"], "/audio", "http://127.0.0.1/audio?collection=bogus&collection=worse", False),
+    ],
+    ids=[
+        "empty-list",
+        "none",
+        "required",
+        "invalid-sibling",
+        "other-path",
+        "repeated-sibling",
+        "object-sibling",
+        "repeated-invalid-sibling",
+    ],
+)
+def test_negative_data_rejection_validates_optional_query_omitted_on_the_wire(
+    ctx, response_factory, license_required, license, collection, path, url, accepted
+):
+    schema = ctx.openapi.load_schema(
+        {
+            "/audio": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "license",
+                            "required": license_required,
+                            "allowEmptyValue": True,
+                            "schema": {"type": "string"},
+                        },
+                        {
+                            "in": "query",
+                            "name": "collection",
+                            "allowEmptyValue": True,
+                            "schema": {"type": "string", "enum": ["tag", "source", "creator"]},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/audio"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=(
+                _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("enum",), parameter="license"),
+                _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("enum",), parameter="collection"),
+            ),
+        ),
+        query={"license": license, "collection": collection},
+    )
+    response = response_factory.requests()
+    response.request.prepare_url(f"http://127.0.0.1{path}", case.as_transport_kwargs()["params"])
+
+    assert response.request.url == url
+    if accepted:
+        assert negative_data_rejection(check_context(), response, case) is None
+    else:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+
+
+@pytest.mark.parametrize(
     ("authority", "accepted"),
     [("0", True), (0, True), ("yes", True), ("enabled", False)],
     ids=["zero-text", "zero-integer", "yes", "unknown-spelling"],
