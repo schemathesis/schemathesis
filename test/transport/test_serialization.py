@@ -615,8 +615,30 @@ def _received_part(part):
             {"x": "1", "y": True},
             [["f", "application/x-yaml", "x: '1'\ny: true\n"]],
         ),
+        (
+            "application/xml",
+            {"type": "object", "xml": {"name": "item"}},
+            {"x": "1"},
+            [["f", "application/xml", "<item><x>1</x></item>"]],
+        ),
+        ("application/xml", {"type": "object"}, {"x": "1"}, [["f", "application/xml", "<f><x>1</x></f>"]]),
+        (
+            "application/xml",
+            {"$ref": "#/components/schemas/Item"},
+            {"x": "1"},
+            [["f", "application/xml", "<item><x>1</x></item>"]],
+        ),
     ],
-    ids=["nested-multipart", "urlencoded", "text-list-with-number", "text-object", "yaml"],
+    ids=[
+        "nested-multipart",
+        "urlencoded",
+        "text-list-with-number",
+        "text-object",
+        "yaml",
+        "xml-name",
+        "xml-property-name",
+        "xml-ref",
+    ],
 )
 def test_multipart_part_encoded_with_its_content_type(
     ctx, app_runner, transport, content_type, schema, value, expected
@@ -637,7 +659,8 @@ def test_multipart_part_encoded_with_its_content_type(
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        components={"schemas": {"Item": {"type": "object", "xml": {"name": "item"}}}},
     )
 
     @app.route("/upload", methods=["POST"])
@@ -652,6 +675,35 @@ def test_multipart_part_encoded_with_its_content_type(
         loaded = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     case = loaded["/upload"]["POST"].Case(body={"f": value}, media_type="multipart/form-data")
     assert case.call().json() == expected
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [True, {"type": "object"}, {"type": "object", "properties": {"other": {"type": "string"}}}],
+    ids=["boolean-schema", "no-properties", "undeclared-part"],
+)
+def test_multipart_xml_part_without_declared_schema_uses_part_name(ctx, schema):
+    loaded = ctx.openapi.load_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": schema,
+                                "encoding": {"f": {"contentType": "application/xml"}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = loaded["/upload"]["POST"].Case(body={"f": {"x": "1"}}, media_type="multipart/form-data")
+    assert case.as_transport_kwargs(base_url="http://h")["files"] == [
+        ("f", (None, b"<f><x>1</x></f>", "application/xml"))
+    ]
 
 
 def test_multipart_nested_object_serializes_as_json(ctx, case_factory):
