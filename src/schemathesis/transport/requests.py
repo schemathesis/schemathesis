@@ -27,7 +27,14 @@ from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
 from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import get_exclude_headers, prepare_body, prepare_headers, prepare_url
-from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
+from schemathesis.transport.serialization import (
+    Binary,
+    _serialize_xml,
+    serialize_binary,
+    serialize_json,
+    serialize_xml,
+    serialize_yaml,
+)
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -444,7 +451,17 @@ def _is_already_serialized(value: object) -> bool:
     return False
 
 
-def _serialize_part_value(ctx: SerializationContext, value: Any, content_type: str) -> tuple[object, str]:
+def _property_schema(ctx: SerializationContext, name: str) -> dict[str, Any]:
+    """Return the schema of a multipart property, with `$ref` resolved."""
+    body = next(iter(ctx.case.operation.get_bodies_for_media_type(ctx.case.media_type or "multipart/form-data")))
+    schema_node = body.definition.get("schema")
+    properties = schema_node.get("properties", {}) if isinstance(schema_node, dict) else {}
+    if isinstance(properties.get(name), dict):
+        return _resolve_property(properties[name], schema_node)
+    return {}
+
+
+def _serialize_part_value(ctx: SerializationContext, value: Any, name: str, content_type: str) -> tuple[object, str]:
     """Serialize a multipart field value for its content-type, returning the part content and its content-type."""
     if _is_already_serialized(value) or media_types.is_plain_text(content_type):
         # Plain text parts are rendered like fields without an explicit content-type.
@@ -464,7 +481,11 @@ def _serialize_part_value(ctx: SerializationContext, value: Any, content_type: s
     if pair is None:
         raise SerializationNotPossible.for_media_type(content_type)
     _, serializer = pair
-    result = serializer(ctx, value)
+    if serializer is xml_serializer:
+        # The part is its own XML document, so its root comes from the part schema.
+        result = _serialize_xml(value, _property_schema(ctx, name), resource_name=name)
+    else:
+        result = serializer(ctx, value)
     if "json" in result:
         return json.dumps(result["json"]).encode(), content_type
     data = result.get("data", value)
@@ -483,7 +504,7 @@ def prepare_multipart_parts(
     encoded_fields = _collect_encoded_fields(ctx)
     for name, content_type in encoded_fields.items():
         if name in value:
-            value[name], encoded_fields[name] = _serialize_part_value(ctx, value[name], content_type)
+            value[name], encoded_fields[name] = _serialize_part_value(ctx, value[name], name, content_type)
     multipart = _prepare_form_data(value)
     # Surface auto-discovered per-part content types on the wire; case-level overrides still win.
     selected = {**encoded_fields, **(ctx.case.multipart_content_types or {})}

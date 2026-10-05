@@ -6,6 +6,7 @@
 
 - Use the file name as the discriminator value for whole-file `$ref` branches.
 - Show a single `Coverage` block in `st run` output under `--max-time`.
+- Use the part's own schema for the root element of XML-encoded multipart parts.
 - Report GraphQL errors with multiple source locations without crashing.
 - False `negative_data_rejection` failures for form body fields that become valid strings when sent.
 - Crash when serializing an XML body for an operation that does not declare XML.
