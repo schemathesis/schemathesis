@@ -139,6 +139,11 @@ def test_schema_not_available(cli, workers, snapshot_cli):
     assert cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_workers_out_of_range_lists_compact_choices(cli, snapshot_cli):
+    assert cli.run("http://127.0.0.1:1/schema.yaml", "--workers=999") == snapshot_cli
+
+
 @pytest.mark.snapshot_suffix(platform.python_implementation().lower())
 def test_empty_schema_file(testdir, cli, snapshot_cli):
     # When the schema file is empty

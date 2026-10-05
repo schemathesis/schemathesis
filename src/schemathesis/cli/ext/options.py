@@ -18,6 +18,9 @@ class CustomHelpMessageChoice(click.Choice):
     def get_metavar(self, param: click.Parameter) -> str:
         return self.choices_repr
 
+    def get_invalid_choice_message(self, value: Any, ctx: click.Context | None) -> str:
+        return f"{value!r} is not one of {self.choices_repr}."
+
 
 class BaseCsvChoice(click.Choice):
     def parse_value(self, value: str) -> tuple[list[str], set[str]]:
