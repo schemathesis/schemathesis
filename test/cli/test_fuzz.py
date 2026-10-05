@@ -43,6 +43,19 @@ def test_fuzz_basic(cli, app_runner, ctx, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_filter_case_rejects_all(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def filter_case(context, case):
+    return False
+"""
+    )
+    assert cli.main("fuzz", api.schema_url, "--max-time=1", hooks=module) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_after_run_check_failure(cli, app_runner, ctx, snapshot_cli, restore_checks):
     url = _make_fuzz_app(ctx, app_runner)
     module = ctx.write_pymodule(

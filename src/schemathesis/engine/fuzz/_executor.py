@@ -26,6 +26,7 @@ from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error
 
 if TYPE_CHECKING:
     import hypothesis
@@ -99,9 +100,11 @@ def _preflight_operations(
                     operation.as_strategy(generation_mode=mode, **strategy_kwargs_by_label[operation.label])
                 )
                 viable_modes.append(mode)
-            except Unsatisfiable as exc:
+            except Unsatisfiable:
                 # Schema constraints make this mode impossible — try the next mode.
-                last_exc = exc
+                last_exc = build_unsatisfiable_error(
+                    operation, with_tip=False, filter_tracker=operation.filter_case_tracker
+                )
             except Exception as exc:
                 # Real generation errors should exclude the operation entirely.
                 last_exc = exc
