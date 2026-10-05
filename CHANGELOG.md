@@ -7,6 +7,7 @@
 - Show a single `Coverage` block in `st run` output under `--max-time`.
 - False `negative_data_rejection` failures for form body fields that become valid strings when sent.
 - Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
+- Keep test runs successful when crash recording cannot write to the cache directory.
 - Send non-file multipart fields as plain form fields instead of file uploads.
 - Encode multipart parts with nested multipart or form-urlencoded content types.
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.

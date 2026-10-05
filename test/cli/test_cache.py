@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import socket
+import sys
 from pathlib import Path
 
 import pytest
@@ -33,6 +35,27 @@ def test_no_cache_row_when_cache_empty(ctx, cli, snapshot_cli, tmp_path):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="Needs non-root POSIX permissions")
+def test_unwritable_cache_directory(ctx, cli, snapshot_cli, tmp_path):
+    api = ctx.openapi.apps.success()
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    cache_dir.chmod(0o555)
+    try:
+        result = cli.run(
+            api.schema_url,
+            "--max-examples=1",
+            "--phases=fuzzing",
+            config={"cache": {"directory": str(cache_dir)}},
+        )
+    finally:
+        cache_dir.chmod(0o755)
+
+    assert "CLI Handler Error" not in result.stdout
+    assert result == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

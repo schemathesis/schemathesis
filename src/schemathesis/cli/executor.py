@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import click
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.commands.run.handlers.crashes import CrashHandler
 from schemathesis.cli.commands.run.handlers.har import HarHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
@@ -52,6 +53,7 @@ try:
         NdjsonHandler,
         WfcReportHandler,
         OutputHandler,
+        CrashHandler,
         AllureHandler,
     )
 except ImportError:
@@ -63,7 +65,15 @@ except ImportError:
         JsonReportHandler: ReportFormat.JSON,
         WfcReportHandler: ReportFormat.WFC,
     }
-    _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, WfcReportHandler, OutputHandler)
+    _BUILT_IN_HANDLERS = (
+        VcrHandler,
+        HarHandler,
+        JunitXMLHandler,
+        NdjsonHandler,
+        WfcReportHandler,
+        OutputHandler,
+        CrashHandler,
+    )
 
 
 _REPORT_NAMES = {
@@ -124,8 +134,6 @@ def initialize_report_handlers(
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
 
     if config.cache.enabled:
-        from schemathesis.cli.commands.run.handlers.crashes import CrashHandler
-
         handlers.append(
             CrashHandler(
                 cache_directory=config.cache.directory,
