@@ -15,6 +15,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from typing_extensions import override
 from urllib3.exceptions import ProtocolError
+from urllib3.filepost import encode_multipart_formdata
 
 from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
@@ -445,20 +446,34 @@ def _is_already_serialized(value: object) -> bool:
     return False
 
 
-def _serialize_part_value(ctx: SerializationContext, value: Any, content_type: str) -> Any:
-    """Serialize a multipart field value using the registered serializer for its content-type."""
-    if _is_already_serialized(value):
-        return value
+def _serialize_part_value(ctx: SerializationContext, value: Any, content_type: str) -> tuple[object, str]:
+    """Serialize a multipart field value for its content-type, returning the part content and its content-type."""
+    if _is_already_serialized(value) or media_types.is_plain_text(content_type):
+        # Plain text parts are rendered like fields without an explicit content-type.
+        return value, content_type
+    main, sub = media_types.parse(content_type)
+    if main == "multipart" and isinstance(value, Mapping):
+        # A nested multipart document needs its own boundary, which the part content-type carries.
+        boundary = choose_boundary()
+        fields = [
+            (name, item)
+            for name, field in _prepare_form_data(dict(value)).items()
+            for item in (field if isinstance(field, list) else [field])
+        ]
+        content, _ = encode_multipart_formdata(fields, boundary=boundary)
+        return content, f"{main}/{sub}; boundary={boundary}"
     pair = REQUESTS_TRANSPORT.get_first_matching_media_type(content_type)
     if pair is None:
         raise SerializationNotPossible.for_media_type(content_type)
     _, serializer = pair
     result = serializer(ctx, value)
-    if "data" in result:
-        return result["data"]
     if "json" in result:
-        return json.dumps(result["json"]).encode()
-    return value
+        return json.dumps(result["json"]).encode(), content_type
+    data = result.get("data", value)
+    if isinstance(data, Mapping):
+        # Requests form-encodes a mapping body itself, while a part needs the encoded text.
+        return urlencode(_prepare_form_data(dict(data)), doseq=True), content_type
+    return data, content_type
 
 
 def prepare_multipart_parts(
@@ -470,7 +485,7 @@ def prepare_multipart_parts(
     encoded_fields = _collect_encoded_fields(ctx)
     for name, content_type in encoded_fields.items():
         if name in value:
-            value[name] = _serialize_part_value(ctx, value[name], content_type)
+            value[name], encoded_fields[name] = _serialize_part_value(ctx, value[name], content_type)
     multipart = _prepare_form_data(value)
     # Surface auto-discovered per-part content types on the wire; case-level overrides still win.
     selected = {**encoded_fields, **(ctx.case.multipart_content_types or {})}
