@@ -1639,6 +1639,21 @@ def test_serialize_xml_with_boolean_schema(ctx):
     test()
 
 
+def test_serialize_xml_for_undeclared_media_type(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/data"]["POST"].Case(body={"a": 1}, media_type="application/xml")
+    assert case.as_transport_kwargs(base_url="http://127.0.0.1")["data"] == b"<data><a>1</a></data>"
+
+
 @pytest.mark.parametrize(
     ("path", "expected"),
     [

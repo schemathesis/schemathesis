@@ -138,14 +138,13 @@ def serialize_xml(case: Case, value: Body) -> dict[str, Any]:
 
     assert media_type is not None
 
-    schema = None
+    schema: JsonSchema = {}
     resource_name = None
 
     for body in case.operation.get_bodies_for_media_type(media_type):
         schema = body.optimized_schema
         resource_name = body.resource_name
         break
-    assert schema is not None, (case.operation.body, media_type)
 
     return _serialize_xml(value, schema, resource_name=resource_name)
 
