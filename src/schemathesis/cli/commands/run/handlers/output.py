@@ -411,11 +411,17 @@ class UnitTestProgressManager:
         """Fold this pass into the phase's running time."""
         self.elapsed_ms += self.started_at.elapsed_ms
 
-    def restart_pass(self) -> None:
+    def restart_pass(self, total: int | None = None) -> None:
         """A repeat under a budget walks the operations again; the totals keep counting."""
         self.current = 0
         self.current_operations.clear()
         self.started_at = Instant()
+        if total is not None:
+            self.total = total
+            assert self.title_task_id is not None
+            assert self.progress_task_id is not None
+            self.title_progress.update(self.title_task_id, description=self.title, total=total, completed=0)
+            self.progress_bar.update(self.progress_task_id, total=total, completed=0)
 
     def start_operation(self, label: str) -> None:
         """Start tracking new operation."""
@@ -672,6 +678,10 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
     repeat_managers: dict[PhaseName, UnitTestProgressManager | StatefulProgressManager] = field(default_factory=dict)
     repeat_statuses: dict[PhaseName, Status] = field(default_factory=dict)
     cycle_context: ExecutionContext | None = None
+    # Under a budget, coverage passes that run back to back report as one block, printed once another phase starts.
+    pending_coverage: UnitTestProgressManager | None = None
+    # Phase the cycle line showed before a coverage pass took it over.
+    cycle_phase_before_coverage: PhaseName | None = None
     # When the run last found a failure it had not seen before.
     last_failure_at: Instant | None = None
     seen_failures: int = 0
@@ -851,6 +861,12 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             elif manager is not None:
                 self._print_unit_completion(manager, status)
 
+    def _flush_coverage(self) -> None:
+        manager = self.pending_coverage
+        if manager is not None:
+            self.pending_coverage = None
+            self._print_unit_completion(manager, self.repeat_statuses.pop(PhaseName.COVERAGE))
+
     def _start_probing(self) -> None:
         self.probing_manager = ProbingProgressManager(console=self.console)
         self.probing_manager.start()
@@ -859,6 +875,10 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         assert ctx.api_statistic is not None
         assert self.unit_tests_manager is None
         phase = event.phase.name
+        if phase == PhaseName.COVERAGE and event.operations is not None:
+            self._start_coverage_repeat(len(event.operations))
+            return
+        self._flush_coverage()
         retained = self.repeat_managers.get(phase)
         if isinstance(retained, UnitTestProgressManager):
             self.unit_tests_manager = retained
@@ -875,7 +895,26 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             self._start_cycle_line()
         self.unit_tests_manager.start(show_live=not in_cycle and self.cycle_live is None)
 
+    def _start_coverage_repeat(self, total: int) -> None:
+        pending = self.pending_coverage
+        if pending is not None:
+            # Nothing ran since the previous coverage pass, so this one continues its block.
+            self.pending_coverage = None
+            self.unit_tests_manager = pending
+            pending.restart_pass(total)
+            if pending.live is not None:
+                pending.live.start()
+            return
+        # Its block was already printed; while the cycle runs, the pass only shows on the cycle line.
+        self.cycle_phase_before_coverage = self.cycle_phase
+        self.cycle_phase = PhaseName.COVERAGE
+        self.unit_tests_manager = UnitTestProgressManager(
+            console=self.console, title=PhaseName.COVERAGE.display, total=total
+        )
+        self.unit_tests_manager.start(show_live=False)
+
     def _start_stateful_tests(self, event: events.PhaseStarted) -> None:
+        self._flush_coverage()
         payload = event.payload
         assert isinstance(payload, events.StatefulPhasePayload)
         retained = self.repeat_managers.get(PhaseName.STATEFUL_TESTING)
@@ -969,6 +1008,16 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             if self._retain(phase.name, event.status):
                 self.cycle_context = ctx
                 return
+            if phase.name == PhaseName.COVERAGE and self.cycle_phase_before_coverage is not None:
+                self.cycle_phase = self.cycle_phase_before_coverage
+                self.cycle_phase_before_coverage = None
+                return
+            if phase.name == PhaseName.COVERAGE and self.config.max_time is not None:
+                unit_manager.stop()
+                unit_manager.end_pass()
+                self._merge_status(phase.name, event.status)
+                self.pending_coverage = unit_manager
+                return
             unit_manager.stop()
             unit_manager.end_pass()
             self._print_unit_completion(unit_manager, event.status)
@@ -978,10 +1027,13 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         if phase not in self.repeat_managers:
             return False
         self.repeat_managers[phase].end_pass()
+        self._merge_status(phase, status)
+        return True
+
+    def _merge_status(self, phase: PhaseName, status: Status) -> None:
         current = self.repeat_statuses.get(phase)
         if current is None or PHASE_STATUS_PRIORITY[status] >= PHASE_STATUS_PRIORITY[current]:
             self.repeat_statuses[phase] = status
-        return True
 
     def _print_unit_completion(self, manager: UnitTestProgressManager, status: Status) -> None:
         from rich.padding import Padding
@@ -1592,6 +1644,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         display_seed(self.config)
 
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
+        self._flush_coverage()
         self._stop_cycle_line()
         assert self.loading_manager is None
         assert self.probing_manager is None

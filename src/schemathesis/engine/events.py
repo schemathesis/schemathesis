@@ -65,14 +65,19 @@ class PhaseStarted(PhaseEvent):
     """Start of an execution phase."""
 
     payload: StatefulPhasePayload | None
+    # Labels of the operations this pass is limited to; `None` means every selected operation.
+    operations: frozenset[str] | None
 
-    __slots__ = ("id", "timestamp", "phase", "payload")
+    __slots__ = ("id", "timestamp", "phase", "payload", "operations")
 
-    def __init__(self, *, phase: Phase, payload: StatefulPhasePayload | None) -> None:
+    def __init__(
+        self, *, phase: Phase, payload: StatefulPhasePayload | None, operations: frozenset[str] | None = None
+    ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
         self.payload = payload
+        self.operations = operations
 
 
 @dataclass

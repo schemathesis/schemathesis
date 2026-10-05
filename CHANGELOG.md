@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Show a single `Coverage` block in `st run` output under `--max-time`.
 - False `negative_data_rejection` failures for form body fields that become valid strings when sent.
 - Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
 - Encode multipart parts with nested multipart or form-urlencoded content types.
