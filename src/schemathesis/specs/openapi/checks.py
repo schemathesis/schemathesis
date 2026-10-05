@@ -1269,8 +1269,7 @@ def _negates_declared_parameter(mutation: Mutation, location: ParameterLocation,
     """Whether `mutation` invalidates a declared parameter in a way that survives wire serialization."""
     if mutation.parameter_location != location or mutation.parameter is None:
         return False
-    types = get_type(schema.get("properties", {}).get(mutation.parameter, {}))
-    if "array" not in types and "object" not in types:
+    if not _allows_container_type(schema.get("properties", {}).get(mutation.parameter, {})):
         return True
     # Other types arrive as a string that reads as a one-element array, and an empty value is sent as no value.
     return mutation.operator != OperatorKind.CHANGE_TYPE and "required" not in mutation.keywords
@@ -1296,12 +1295,23 @@ def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameter
     A better approach would be to apply serialization later on in the process.
     """
     properties = schema.get("properties", {})
-    for prop_name, prop_schema in properties.items():
-        if prop_name in container:
-            types = get_type(prop_schema)
-            if "array" in types or "object" in types:
-                return True
-    return False
+    return any(
+        _allows_container_type(prop_schema) for prop_name, prop_schema in properties.items() if prop_name in container
+    )
+
+
+def _allows_container_type(schema: JsonSchema) -> bool:
+    """Whether a parameter schema admits arrays or objects, reading `nullable` and `allowEmptyValue` wrappers through."""
+    if isinstance(schema, dict) and "type" not in schema:
+        if "enum" in schema:
+            return any(isinstance(value, (list, dict)) for value in schema["enum"])
+        if "const" in schema:
+            return isinstance(schema["const"], (list, dict))
+        branches = [*schema.get("anyOf", []), *schema.get("oneOf", [])]
+        if branches:
+            return any(_allows_container_type(branch) for branch in branches)
+    types = get_type(schema)
+    return "array" in types or "object" in types
 
 
 # Methods that cannot re-create a resource — reading, modifying-in-place, or removing.

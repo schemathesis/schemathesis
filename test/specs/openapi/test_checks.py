@@ -832,6 +832,90 @@ def _path_and_query_case(schema, path_parameters, query, headers, mutations):
     )
 
 
+NULLABLE_BOOLEAN = {"type": "boolean", "nullable": True}
+
+
+@pytest.mark.parametrize(
+    ("version", "parameters", "query", "reported"),
+    [
+        ("3.0.2", {"flag": {"schema": NULLABLE_BOOLEAN, "allowEmptyValue": True}}, {"flag": "abc"}, True),
+        ("3.0.2", {"flag": {"schema": NULLABLE_BOOLEAN}}, {"flag": "abc"}, True),
+        ("3.0.2", {"flag": {"schema": {"type": "boolean"}, "allowEmptyValue": True}}, {"flag": "abc"}, True),
+        ("3.1.0", {"flag": {"schema": {"type": ["boolean", "null"]}, "allowEmptyValue": True}}, {"flag": "abc"}, True),
+        ("3.0.2", {"flag": {"schema": {"type": "boolean"}}}, {"flag": "abc"}, True),
+        (
+            "3.0.2",
+            {
+                "compressed": {"schema": NULLABLE_BOOLEAN, "allowEmptyValue": True},
+                "full_size": {"schema": {**NULLABLE_BOOLEAN, "default": False}, "allowEmptyValue": True},
+            },
+            {"compressed": "abc", "full_size": "xyz"},
+            True,
+        ),
+        ("3.0.2", {"flag": {"schema": NULLABLE_BOOLEAN, "allowEmptyValue": True}}, {"flag": "true"}, False),
+        ("3.0.2", {"ids": {"schema": {"type": "array", "items": {"type": "integer"}}}}, {"ids": "5"}, False),
+        (
+            "3.0.2",
+            {
+                "ids": {"schema": {"type": "array", "items": {"type": "integer"}}},
+                "flag": {"schema": NULLABLE_BOOLEAN, "allowEmptyValue": True},
+            },
+            {"ids": "5", "flag": "abc"},
+            True,
+        ),
+        ("3.1.0", {"mode": {"schema": {"const": "on"}}}, {"mode": "abc"}, True),
+        ("3.0.2", {"anything": {"schema": {}}}, {"anything": "abc"}, False),
+    ],
+    ids=[
+        "nullable-with-empty-value",
+        "nullable",
+        "empty-value",
+        "openapi-31-type-list",
+        "plain",
+        "two-parameters",
+        "valid-on-the-wire",
+        "array",
+        "beside-array",
+        "const",
+        "untyped",
+    ],
+)
+def test_negative_data_rejection_reports_type_mutations_of_wrapped_scalar_query(
+    ctx, app_runner, version, parameters, query, reported
+):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/thumb": {
+                "get": {
+                    "parameters": [{"in": "query", "name": name, **extra} for name, extra in parameters.items()],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+
+    @app.route("/thumb")
+    def thumb():
+        return jsonify({})
+
+    operation = schemathesis.openapi.from_url(app_runner.openapi_url(app))["/thumb"]["GET"]
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            mutations=tuple(_mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter=name) for name in query),
+        ),
+        query=query,
+    )
+    response = case.call()
+    if reported:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+    else:
+        assert negative_data_rejection(check_context(), response, case) is None
+
+
 _PATH_TYPE_MUTATION = _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="id", location=ParameterLocation.PATH)
 _HEADER_TYPE_MUTATION = _mutation(
     OperatorKind.CHANGE_TYPE, ("type",), parameter="X-Key", location=ParameterLocation.HEADER
