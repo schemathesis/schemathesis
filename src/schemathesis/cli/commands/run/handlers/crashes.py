@@ -85,30 +85,33 @@ def _run(
     sanitization: SanitizationConfig,
     queue: Queue[_Process | None],
 ) -> None:
-    writer = CrashWriter(directory=directory)
-    writer.open(schema_location=schema_location, base_url=base_url)
+    try:
+        writer = CrashWriter(directory=directory)
+        writer.open(schema_location=schema_location, base_url=base_url)
 
-    failed: set[str] = set()
-    succeeded: set[str] = set()
-    while True:
-        item = queue.get()
-        if item is None:
-            break
-        if not item.success:
-            failing_case_ids = _find_failing_case_ids(item.recorder)
-            failed |= _operation_labels(item.recorder, failing_case_ids)
-            for failing_case_id in failing_case_ids:
-                for crash in build_crashes_from_recorder(
-                    recorder=item.recorder,
-                    failing_case_id=failing_case_id,
-                    sanitization=sanitization,
-                ):
-                    writer.write(crash)
-        else:
-            succeeded |= _operation_labels(item.recorder, item.recorder.cases.keys())
+        failed: set[str] = set()
+        succeeded: set[str] = set()
+        while True:
+            item = queue.get()
+            if item is None:
+                break
+            if not item.success:
+                failing_case_ids = _find_failing_case_ids(item.recorder)
+                failed |= _operation_labels(item.recorder, failing_case_ids)
+                for failing_case_id in failing_case_ids:
+                    for crash in build_crashes_from_recorder(
+                        recorder=item.recorder,
+                        failing_case_id=failing_case_id,
+                        sanitization=sanitization,
+                    ):
+                        writer.write(crash)
+            else:
+                succeeded |= _operation_labels(item.recorder, item.recorder.cases.keys())
 
-    for operation in succeeded - failed:
-        writer.remove_by_operation(operation)
+        for operation in succeeded - failed:
+            writer.remove_by_operation(operation)
+    except OSError:
+        pass
 
 
 def _find_failing_case_ids(recorder: RecordedScenario) -> list[str]:
