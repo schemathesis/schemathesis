@@ -136,11 +136,13 @@ def _classify_suite_error(
         # When a check fails, the state machine is stopped
         # The failure is already sent to the queue by the state machine
         # Here we need to either exit or re-run the state machine with this failure marked as known
+        stored = state.take_unrecoverable_network_error()
+        network_events: list[events.EngineEvent] = [_network_nonfatal_error(stored)] if stored is not None else []
         if engine.has_reached_the_failure_limit:
-            return Status.FAILURE, False, []
+            return Status.FAILURE, False, network_events
         for failure in exc.exceptions:
             ctx.mark_as_seen_in_run(failure)
-        return Status.FAILURE, True, []
+        return Status.FAILURE, True, network_events
     if isinstance(exc, Flaky):
         # A replay that cannot reproduce the failure does not unreport it: the suite already showed it.
         found = Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS

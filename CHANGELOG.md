@@ -11,6 +11,7 @@
 - Crash when serializing an XML body for an operation that does not declare XML.
 - Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
 - Keep test runs successful when crash recording cannot write to the cache directory.
+- Missing `Network Error` details in stateful runs that also report a failure.
 - Send non-file multipart fields as plain form fields instead of file uploads.
 - Crash in the coverage phase on non-numeric `default` values of numeric schemas.
 - Encode multipart parts with nested multipart or form-urlencoded content types.
