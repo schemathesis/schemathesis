@@ -6,6 +6,7 @@
 
 - False `negative_data_rejection` failures for form body fields that become valid strings when sent.
 - Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
+- False `negative_data_rejection` failures for `null` sent to nullable query parameters.
 
 ## [4.29.3](https://github.com/schemathesis/schemathesis/compare/v4.29.2...v4.29.3) - 2026-10-05
 

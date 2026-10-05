@@ -1156,6 +1156,145 @@ def test_negative_data_rejection_validates_boolean_spelling_beside_another_mutat
             negative_data_rejection(check_context(), response, case)
 
 
+_NULLABLE_FLAG = {"schema": {"type": "boolean", "nullable": True}, "allowEmptyValue": True}
+_NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), parameter="compressed")
+
+
+@pytest.mark.parametrize(
+    ("version", "parameters", "query", "mutations", "path", "url", "accepted"),
+    [
+        (
+            "3.0.2",
+            [
+                {
+                    "in": "query",
+                    "name": "full_size",
+                    "schema": {"type": "boolean", "nullable": True, "default": False},
+                    "allowEmptyValue": True,
+                },
+                {"in": "query", "name": "compressed", **_NULLABLE_FLAG},
+            ],
+            {"compressed": "null", "full_size": "null"},
+            (
+                _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), parameter="full_size"),
+                _mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="compressed"),
+            ),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=null&full_size=null",
+            True,
+        ),
+        (
+            "3.1.0",
+            [{"in": "query", "name": "compressed", "schema": {"type": ["boolean", "null"]}}],
+            {"compressed": "null"},
+            (_mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="compressed"),),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=null",
+            True,
+        ),
+        (
+            "2.0",
+            [{"in": "query", "name": "compressed", "type": "boolean", "x-nullable": True}],
+            {"compressed": "null"},
+            (_NEGATED_NULLABLE_FLAG,),
+            "/api/thumb",
+            "http://127.0.0.1/api/thumb?compressed=null",
+            True,
+        ),
+        (
+            "3.0.2",
+            [{"in": "query", "name": "compressed", **_NULLABLE_FLAG}],
+            {"compressed": "NULL"},
+            (_NEGATED_NULLABLE_FLAG,),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=NULL",
+            True,
+        ),
+        (
+            "3.0.2",
+            [{"in": "query", "name": "compressed", **_NULLABLE_FLAG}],
+            {"compressed": "Null"},
+            (_NEGATED_NULLABLE_FLAG,),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=Null",
+            True,
+        ),
+        (
+            "3.0.2",
+            [{"in": "query", "name": "compressed", **_NULLABLE_FLAG}],
+            {"compressed": ["bogus", "null"]},
+            (_NEGATED_NULLABLE_FLAG,),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=bogus&compressed=null",
+            True,
+        ),
+        (
+            "3.0.2",
+            [{"in": "query", "name": "compressed", "schema": {"type": "boolean"}}],
+            {"compressed": "null"},
+            (_mutation(OperatorKind.CHANGE_TYPE, ("type",), parameter="compressed"),),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=null",
+            False,
+        ),
+        (
+            "3.0.2",
+            [
+                {"in": "query", "name": "compressed", **_NULLABLE_FLAG},
+                {"in": "query", "name": "collection", "schema": {"type": "string", "enum": ["tag"]}},
+            ],
+            {"compressed": "null", "collection": "bogus"},
+            (_NEGATED_NULLABLE_FLAG, _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("enum",), parameter="collection")),
+            "/thumb",
+            "http://127.0.0.1/thumb?compressed=null&collection=bogus",
+            False,
+        ),
+        (
+            "3.0.2",
+            [{"in": "query", "name": "compressed", **_NULLABLE_FLAG}],
+            {"compressed": "null"},
+            (_NEGATED_NULLABLE_FLAG,),
+            "/other",
+            "http://127.0.0.1/other?compressed=null",
+            False,
+        ),
+    ],
+    ids=[
+        "openapi-30-nullable",
+        "openapi-31-type-list",
+        "swagger-20-x-nullable",
+        "uppercase",
+        "capitalized",
+        "repeated",
+        "not-nullable",
+        "another-invalid-parameter",
+        "other-path",
+    ],
+)
+def test_negative_data_rejection_validates_null_text_for_nullable_query(
+    ctx, response_factory, version, parameters, query, mutations, path, url, accepted
+):
+    schema = ctx.openapi.load_schema(
+        {"/thumb": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}},
+        version=version,
+    )
+    case = schema["/thumb"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE], mutations=mutations
+        ),
+        query=query,
+    )
+    response = response_factory.requests()
+    response.request.prepare_url(f"http://127.0.0.1{path}", case.as_transport_kwargs()["params"])
+
+    assert response.request.url == url
+    if accepted:
+        assert negative_data_rejection(check_context(), response, case) is None
+    else:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), response, case)
+
+
 @pytest.mark.parametrize("location", [ParameterLocation.HEADER, ParameterLocation.COOKIE], ids=["header", "cookie"])
 @pytest.mark.parametrize(
     ("value", "accepted"),
