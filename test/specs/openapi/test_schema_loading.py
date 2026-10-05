@@ -578,6 +578,15 @@ def test_find_operation_by_id_in_referenced_path(ctx):
     assert operation.method.upper() == "GET"
 
 
+def test_find_operation_by_reference_outside_paths(ctx):
+    schema = ctx.openapi.load_schema(
+        {"/foo": {"$ref": "#/components/x-paths/Path"}},
+        components={"x-paths": {"Path": {"get": {"operationId": "getFoo", **RESPONSES}}}},
+    )
+    with pytest.raises(OperationNotFound, match="Operation '#/components/x-paths/Path/get' not found"):
+        schema.find_operation_by_reference("#/components/x-paths/Path/get")
+
+
 def test_find_operation_by_id_in_referenced_path_shared_parameters(ctx):
     # When a path entry is behind a reference
     # and it shares parameters with the parent path

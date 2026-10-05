@@ -1,3 +1,4 @@
+import datetime
 import json
 
 import pytest
@@ -207,6 +208,13 @@ def test_spec_version_with_suffix(ctx, spec_version):
     schema.validate()
     assert schema.specification.version == spec_version
     assert schema["/users"]["GET"].label == "GET /users"
+
+
+def test_validate_skipped_for_non_json_values(ctx):
+    raw_schema = ctx.openapi.build_schema({"/a": {"get": {"responses": []}}})
+    raw_schema["info"]["version"] = datetime.date(2020, 1, 1)
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    assert schema.validate() is None
 
 
 @pytest.mark.parametrize("spec_version", ["3.1.0-custom", "3.1.0-rc1"])

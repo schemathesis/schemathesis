@@ -106,6 +106,13 @@ def test_fuzz_fatal_error_loader(cli, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_rejects_conflicting_color_flags(cli, snapshot_cli):
+    assert_cli_snapshot(
+        cli.main("fuzz", "http://127.0.0.1:1/openapi.json", "--no-color", "--force-color"), snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_schema_file_with_malformed_server_asks_for_url(cli, ctx, snapshot_cli):
     # A server URL that cannot be read gives no target to suggest.
     schema_path = ctx.openapi.write_schema(USERS_OK_PATHS, servers=[{"url": 5}])

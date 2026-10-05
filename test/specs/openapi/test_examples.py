@@ -2362,6 +2362,34 @@ def test_find_in_responses_only_in_2xx(ctx):
     assert list(operation.responses.iter_examples()) == []
 
 
+def test_response_examples_skip_non_container_examples(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object"},
+                                    "examples": "invalid",
+                                    "example": {"id": "123456"},
+                                },
+                                "application/xml": {"schema": {"type": "object"}, "examples": [{"id": "654321"}]},
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    assert list(schema["/items"]["GET"].responses.iter_examples()) == [
+        ("200/application/json", {"id": "123456"}),
+        ("200/application/xml", {"id": "654321"}),
+    ]
+
+
 @pytest.mark.parametrize(
     ("examples", "name", "expected"),
     [

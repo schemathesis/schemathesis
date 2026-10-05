@@ -26,7 +26,12 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
-from schemathesis.graphql.checks import GraphQLClientError, GraphQLSchemaViolation, GraphQLServerError
+from schemathesis.graphql.checks import (
+    GraphQLClientError,
+    GraphQLSchemaViolation,
+    GraphQLServerError,
+    UnexpectedGraphQLResponse,
+)
 from schemathesis.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
 from schemathesis.specs.openapi.checks import (
@@ -72,6 +77,10 @@ def test_operation_id_filter_selects_nothing(ctx):
 
 def test_no_strategies_from_examples(ctx):
     assert _books_schema(ctx)["Query"]["getBooks"].get_strategies_from_examples() == []
+
+
+def test_validate_is_noop(ctx):
+    assert _books_schema(ctx).validate() is None
 
 
 @pytest.mark.hypothesis_nested
@@ -398,6 +407,16 @@ def test_error_identity_with_multiple_locations(ctx):
     assert first.value == second.value
 
 
+def test_non_object_responses_of_different_types_are_distinct(ctx):
+    case = _books_schema(ctx)["Query"]["getBooks"].Case()
+    failures = []
+    for payload in ([], 42):
+        with pytest.raises(UnexpectedGraphQLResponse, match="GraphQL response is not a JSON object") as exc:
+            validate_graphql_response(case, payload)
+        failures.append(exc.value)
+    assert failures[0] != failures[1]
+
+
 GRAPHQL_CORE_NON_NULL_ERROR = "Cannot return null for non-nullable field Query.getBooks."
 GRAPHQL_JAVA_NON_NULL_ERROR = (
     "The field at path '/getBooks' was declared as a non null type, but the code involved in retrieving data has "
@@ -478,6 +497,16 @@ def test_not_a_schema_violation(ctx, payload, expected):
     case = _books_schema(ctx)["Query"]["getBooks"].Case()
     with pytest.raises(expected):
         validate_graphql_response(case, payload)
+
+
+def test_server_errors_differing_in_locations_are_distinct(ctx):
+    case = _books_schema(ctx)["Query"]["getBooks"].Case()
+    failures = []
+    for error in ({"message": "Boom", "locations": [{"line": 1, "column": 2}]}, {"message": "Boom"}):
+        with pytest.raises(GraphQLServerError) as exc:
+            validate_graphql_response(case, {"data": {"getBooks": []}, "errors": [error]})
+        failures.append(exc.value)
+    assert failures[0] != failures[1]
 
 
 def test_schema_violation_on_real_server(ctx):

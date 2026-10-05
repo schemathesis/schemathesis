@@ -53,6 +53,41 @@ def test_request_body_schema_reference_to_plain_name_anchor(ctx):
     test()
 
 
+@pytest.mark.hypothesis_nested
+def test_request_body_reference_into_fragment_of_declared_id(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"$ref": "https://example.invalid/text.json#/$defs/Code"}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Text": {
+                    "$id": "https://example.invalid/text.json",
+                    "$defs": {"Code": {"type": "string", "enum": ["alpha"]}},
+                }
+            }
+        },
+    )
+
+    @given(case=schema["/items"]["POST"].as_strategy())
+    @settings(max_examples=3)
+    def test(case):
+        assert case.body == "alpha"
+
+    test()
+
+
 def build_schema_with_recursion(schema, definition):
     schema["paths"]["/users"] = {
         "post": {

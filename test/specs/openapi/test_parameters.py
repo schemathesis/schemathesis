@@ -1034,6 +1034,23 @@ def test_non_string_path_parameter_name_recovered_from_template(ctx):
     test()
 
 
+def test_non_string_path_parameter_name_kept_when_placeholders_are_ambiguous(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/foo/{on}/{off}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": True, "required": True, "schema": {"type": "string", "enum": ["ALPHA"]}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/foo/{on}/{off}"]["GET"]
+    assert sorted(parameter.name for parameter in operation.path_parameters) == ["off", "on", "true"]
+
+
 @pytest.mark.parametrize(
     ("version", "path_item_parameter", "operation_parameter"),
     [
@@ -1194,6 +1211,39 @@ def test_query_parameter_allow_empty_value(ctx, parameter_schema, allow_empty_va
     query = schema["/items"]["GET"].query[0]
 
     assert query.is_valid("") is (allow_empty_value is True)
+
+
+def test_query_parameter_allow_empty_value_with_recursive_reference(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "filter",
+                            "in": "query",
+                            "required": True,
+                            "allowEmptyValue": True,
+                            "schema": {"$ref": "#/components/schemas/Node"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "properties": {"child": {"$ref": "#/components/schemas/Node"}},
+                    "additionalProperties": False,
+                }
+            }
+        },
+    )
+    query = schema["/items"]["GET"].query[0]
+
+    assert [query.is_valid(value) for value in ("", {}, {"child": {"child": {}}}, "x")] == [True, True, True, False]
 
 
 @pytest.mark.parametrize("location", ["query", "formData"])

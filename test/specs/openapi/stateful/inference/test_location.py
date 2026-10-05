@@ -770,6 +770,58 @@ def test_location_points_to_nonexistent_endpoint(cli, snapshot_cli, ctx):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_location_link_inferred_when_every_response_has_location(cli, snapshot_cli, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string", "maxLength": 5}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+            "/users/{user_id}": {
+                "get": {
+                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({}), 201, {"Location": "/users/1"}
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        if user_id == 1:
+            return jsonify({"id": 1})
+        return jsonify({}), 404
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=coverage,fuzzing,stateful",
+            "--max-examples=10",
+            "--seed=1",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
 def test_inject_links_location_normalization_returns_none(ctx):
     schema = ctx.openapi.load_schema(
         {

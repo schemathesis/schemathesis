@@ -259,6 +259,39 @@ def test_api(case):
     assert all("phase" in i for i in interactions)
 
 
+def test_lazy_vcr_report_via_xdist_skips_tests_without_calls(testdir, ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    testdir.makepyfile(
+        f"""
+import pytest
+import schemathesis
+from hypothesis import Phase, settings
+
+@pytest.fixture
+def api_schema():
+    schema = schemathesis.openapi.from_url("{api.schema_url}")
+    schema.config.reports.update(vcr_path=r"{cassette_path}")
+    return schema
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    assert case.path != "/api/failure"
+    case.call()
+"""
+    )
+    result = testdir.runpytest("-n", "2")
+    result.assert_outcomes(failed=1, passed=1)
+
+    cassette = load_yaml_or_fail(cassette_path)
+    assert [interaction["request"]["uri"] for interaction in cassette["http_interactions"]] == [
+        f"{api.base_url}/api/success"
+    ]
+
+
 def test_har_report_written_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
     cassette_path = str(testdir.tmpdir.join("cassette.har"))

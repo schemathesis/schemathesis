@@ -473,6 +473,35 @@ def test_negative_data_rejection_ignores_extras_next_to_array_query_parameter(ct
     assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
+def test_negative_data_rejection_reports_scalar_query_mutation_beside_array_parameter(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/tags": {
+                "get": {
+                    "parameters": [
+                        {"in": "query", "name": "tag", "schema": {"type": "array", "items": {"type": "string"}}},
+                        {"in": "query", "name": "limit", "schema": {"type": "integer"}},
+                    ]
+                }
+            }
+        }
+    )
+    case = schema["/tags"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            parameter="limit",
+            parameter_location=ParameterLocation.QUERY,
+            mutations=(_mutation(OperatorKind.CHANGE_TYPE, ("type",), "limit"),),
+        ),
+        query={"tag": ["a"], "limit": "abc"},
+    )
+    with pytest.raises(
+        AcceptedNegativeData, match=r"parameter `limit` in query - violates `type` at /properties/limit"
+    ):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
 def _opaque_rejection(response_factory):
     # A rejection with nothing to attribute, so the hint falls back to its schema-side reasoning.
     return Response.from_requests(response_factory.requests(status_code=400), verify=True)
@@ -781,6 +810,31 @@ def test_negative_data_rejection_keeps_checking_when_another_location_has_an_unr
         negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
+def test_negative_data_rejection_ignores_repeated_query_value_with_unreadable_schema(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "id", "required": True, "schema": {"type": "string"}},
+                        {"in": "query", "name": "key", "schema": {"type": "integer", "multipleOf": 0}},
+                    ]
+                }
+            }
+        }
+    )
+    case = schema["/items/{id}"]["GET"].Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+        ),
+        path_parameters={"id": "abc"},
+        query={"key": [7, 8]},
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
 def test_negative_data_rejection_names_no_parameters_when_several_locations_are_negated(
     response_factory, sample_schema
 ):
@@ -800,6 +854,26 @@ def test_negative_data_rejection_names_no_parameters_when_several_locations_are_
     assert "- query: violates `type` at /properties/key" in exc.value.message
     assert "- header: violates `minimum` at /properties/X-Key" in exc.value.message
     assert "parameters" not in exc.value.message
+
+
+def test_negative_data_rejection_ignores_headers_on_operation_without_header_parameters(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "get": {"parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "string"}}]}
+            }
+        }
+    )
+    case = schema["/items/{id}"]["GET"].Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            headers=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+        ),
+        path_parameters={"id": "abc"},
+        headers={"X-Extra": "1"},
+    )
+    assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
 @pytest.fixture
@@ -1585,6 +1659,26 @@ def test_negative_data_rejection_ignores_huge_integer_wire_value(ctx, response_f
     meta.components = {ParameterLocation.PATH: ComponentInfo(mode=GenerationMode.NEGATIVE)}
     case = schema["/items/{id}"]["GET"].Case(_meta=meta, path_parameters={"id": "9" * 400})
     assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
+
+
+def test_negative_data_rejection_reports_non_string_path_value(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "id", "required": True, "schema": {"type": "string", "minLength": 3}}
+                    ]
+                }
+            }
+        }
+    )
+    case = schema["/items/{id}"]["GET"].Case(
+        _meta=build_metadata(path_parameters=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        path_parameters={"id": 5},
+    )
+    with pytest.raises(AcceptedNegativeData, match="Invalid data should have been rejected"):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
 
 
 def test_negative_data_rejection_ignores_non_finite_element_in_query_array(ctx, response_factory):

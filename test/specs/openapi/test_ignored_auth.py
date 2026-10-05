@@ -364,6 +364,27 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth, expected):
     assert str(exc.value.exceptions[0]).startswith(expected)
 
 
+def test_ignored_auth_with_cookie_jar_kwarg():
+    app = FastAPI()
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
+    async def root(credentials: str | None = Security(APIKeyHeader(name="x-api-key", auto_error=False))):
+        return {"message": "Hello world"}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    case = schema["/"]["GET"].Case()
+    with pytest.raises(FailureGroup) as exc:
+        case.call_and_validate(
+            session=ASGIClient(app),
+            headers={"x-api-key": "INCORRECT"},
+            cookies=requests.cookies.cookiejar_from_dict({"theme": "dark"}),
+            checks=[ignored_auth],
+        )
+    assert [str(error) for error in exc.value.exceptions] == [
+        "API accepts requests without authentication\n\nExpected 401 or 403, got `200 OK` for `GET /`"
+    ]
+
+
 # Frameworks whose first authentication scheme offers no challenge answer 403 instead of 401.
 def test_forbidden_response_counts_as_enforced_auth():
     app = FastAPI()
