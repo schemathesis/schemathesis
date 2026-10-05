@@ -747,6 +747,29 @@ def test_b(v):
     assert has_hypothesis_failure_header(stdout, "test_b(")
 
 
+def test_verbose_hypothesis_output_is_hidden_for_schemathesis_tests(testdir):
+    testdir.make_test(
+        """
+from hypothesis import Verbosity
+
+@schema.parametrize()
+@settings(max_examples=1, verbosity=Verbosity.verbose)
+def test_a(case):
+    pass
+
+@given(st.integers())
+@settings(max_examples=1, verbosity=Verbosity.verbose)
+def test_b(v):
+    pass
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=2)
+    stdout = result.stdout.str()
+    assert "Test case: test_a(" not in stdout
+    assert "Test case: test_b(" in stdout
+
+
 def test_stateful_missing_links_hide_hypothesis_block(testdir):
     testdir.make_test(
         """

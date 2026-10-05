@@ -158,6 +158,21 @@ def test_as_curl_command_sanitizes_raw_query_with_empty_segments(ctx):
     assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&flag'"
 
 
+def test_as_curl_command_keeps_non_sensitive_raw_query_pairs(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/q": {
+                "get": {
+                    "parameters": [{"name": "token", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/q"]["GET"].Case(query={RAW_QUERY_STRING_KEY: RawQueryString("token=secret&page=2")})
+    assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&page=2'"
+
+
 def test_cli_output(ctx, cli, curl):
     api = ctx.openapi.apps.failure()
     result = cli.run_and_assert(api.schema_url, exit_code=ExitCode.TESTS_FAILED)

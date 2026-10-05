@@ -65,6 +65,18 @@ async def set_cookie_app(scope, receive, send):
     await send({"type": "http.response.body", "body": b""})
 
 
+async def trailers_app(scope, receive, send):
+    start = {
+        "type": "http.response.start",
+        "status": 200,
+        "headers": [(b"content-type", b"text/plain")],
+        "trailers": True,
+    }
+    await send(start)
+    await send({"type": "http.response.body", "body": b"payload"})
+    await send({"type": "http.response.trailers", "headers": [(b"x-checksum", b"abc")], "more_trailers": False})
+
+
 def test_streaming_response():
     assert ASGIClient(streaming_app).get("/stream").text == "first-second"
 
@@ -91,6 +103,10 @@ def test_unknown_status_code_has_no_reason():
 
 def test_multiple_set_cookie_headers():
     assert ASGIClient(set_cookie_app).get("/cookies").cookies.get_dict() == {"a": "1", "b": "2"}
+
+
+def test_response_trailers_are_ignored():
+    assert ASGIClient(trailers_app).get("/trailers").text == "payload"
 
 
 @pytest.mark.parametrize(
@@ -340,6 +356,24 @@ def test_failure_after_shutdown_complete_is_reported():
         pass
     with pytest.raises(RuntimeError, match="post-complete cleanup failure"):
         shutdown_lifespans()
+
+
+def test_lifespan_ending_on_shutdown_without_reply_is_silent():
+    shutdowns = []
+
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            await receive()
+            await send({"type": "lifespan.startup.complete"})
+            shutdowns.append((await receive())["type"])
+            return
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    with ASGIClient(app) as client:
+        assert client.get("/x").text == "ok"
+    shutdown_lifespans()
+    assert shutdowns == ["lifespan.shutdown"]
 
 
 @pytest.mark.parametrize("base_url", ["http://[::1]:8000", "http://user:pass@testserver"], ids=["ipv6", "userinfo"])

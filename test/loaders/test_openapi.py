@@ -252,6 +252,17 @@ def test_unknown_content_type_retry_yaml(app_runner):
     schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/schema")
 
 
+def test_malformed_content_type_falls_back_to_parsing(ctx, app_runner):
+    raw_schema = ctx.openapi.build_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    app = Flask("test_app")
+
+    @app.route("/openapi.json")
+    def schema():
+        return Response(json.dumps(raw_schema), content_type="json")
+
+    assert schemathesis.openapi.from_url(app_runner.openapi_url(app)).raw_schema == raw_schema
+
+
 @pytest.mark.parametrize(
     ("schema_path", "payload", "expected"),
     [

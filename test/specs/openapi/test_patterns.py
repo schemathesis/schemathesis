@@ -1466,6 +1466,49 @@ def test_named_group_pattern_is_kept(ctx, pattern):
     assert examples.generate_one(operation.as_strategy()).query["q"].isdigit()
 
 
+LETTERS = r"^[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+$"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        (r"^[\p{L}]+$", LETTERS),
+        (r"^[\p{L]+$", None),
+        (r"^[\pL]+$", LETTERS),
+        (r"^[\pQ]\pL$", None),
+        (r"^[[:alpha:]]+$", LETTERS),
+        (r"^[[:digit:]]x[[:alpha]$", None),
+        (r"^(?<name>[a-z])+$", r"^([a-z])+$"),
+        (r"^(?<name[a-z]+$", None),
+    ],
+    ids=[
+        "braced-property",
+        "unclosed-braced-property",
+        "shorthand-property",
+        "unknown-shorthand-property",
+        "posix-class",
+        "unclosed-posix-class",
+        "named-group",
+        "unclosed-named-group",
+    ],
+)
+def test_pcre_class_syntax_is_translated_or_dropped(ctx, pattern, expected):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "pattern": pattern}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schemathesis.openapi.from_dict(schema)["/items"]["GET"]
+    assert next(iter(operation.query)).optimized_schema.get("pattern") == expected
+
+
 def test_quantifier_rewrite_the_validator_cannot_compile_is_not_taken():
     # Folding a bound this large into the pattern makes a quantifier the regex engine refuses; the
     # pattern and the bound both stay as they were.

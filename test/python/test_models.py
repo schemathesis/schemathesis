@@ -337,6 +337,20 @@ def test_call_and_validate_for_asgi():
     test()
 
 
+def test_call_without_base_url_ignores_malformed_swagger_schemes():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "swagger": "2.0",
+            "info": {"title": "Test", "version": "1"},
+            "host": "example.org",
+            "schemes": "http",
+            "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        }
+    )
+    with pytest.raises(IncorrectUsage, match=r'schema\.config\.update\(base_url="https://api\.example\.com"\)'):
+        schema["/users"]["GET"].Case().call()
+
+
 def test_validate_response(testdir):
     testdir.make_test(
         r"""
@@ -389,6 +403,23 @@ def test_(case):
     )
     result = testdir.runpytest("--tb=long", "-sv")
     result.assert_outcomes(passed=1)
+
+
+def test_validate_response_custom_check_raising_while_handling_error(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/x": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    case = schema["/x"]["GET"].Case()
+
+    def has_id(ctx, response, case):
+        try:
+            response.json()["id"]
+        except KeyError:
+            raise AssertionError("Missing `id`") from None
+
+    with pytest.raises(FailureGroup) as exc:
+        case.validate_response(response_factory.requests(content=b"{}"), checks=[has_id])
+    assert [(failure.title, failure.message) for failure in exc.value.exceptions] == [
+        ("Custom check failed: `has_id`", "Missing `id`")
+    ]
 
 
 @pytest.mark.parametrize("factory_type", ["httpx", "httpx2", "requests", "wsgi"])

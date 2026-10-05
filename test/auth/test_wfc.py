@@ -13,7 +13,7 @@ from schemathesis.auths import AuthContext
 from schemathesis.core.cache import Manifest, write
 from schemathesis.core.cache.models import FORMAT_VERSION
 from schemathesis.wfc.converter import wfc_to_auth_provider
-from schemathesis.wfc.errors import WFCLoginError
+from schemathesis.wfc.errors import WFCLoginError, WFCValidationError
 from schemathesis.wfc.loader import load_from_dict
 from test.apps.catalog.openapi import wfc as wfc_apps
 from test.apps.catalog.openapi.wfc import WFC_PASSWORD, WFC_SESSION, WFC_TOKEN, WFC_USERNAME
@@ -1014,6 +1014,16 @@ def test_auth_entry_wins_over_the_template():
 
     assert entry.login_endpoint_auth.endpoint == "/own"
     assert entry.login_endpoint_auth.verb == "POST"
+
+
+def test_auth_template_rejects_non_object_entry():
+    doc = {
+        "auth": ["admin"],
+        "authTemplate": {"loginEndpointAuth": {"endpoint": "/shared", "verb": "POST", "expectCookies": True}},
+    }
+
+    with pytest.raises(WFCValidationError, match='"admin" is not of type "object"'):
+        load_from_dict(doc)
 
 
 ROLE_AUTH = {

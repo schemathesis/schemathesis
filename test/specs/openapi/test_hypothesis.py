@@ -1150,6 +1150,38 @@ def test_custom_format_path_value_with_slash_is_accepted_when_explicit(ctx):
 
 
 @pytest.mark.hypothesis_nested
+def test_custom_format_path_value_that_cannot_be_url_encoded_is_rejected(ctx):
+    format_name = "lone-surrogate-path"
+    schemathesis.openapi.format(format_name, st.just("a\ud800"))
+    schema = ctx.openapi.load_schema(
+        {
+            "/blocks/{block}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "block",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": format_name},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/blocks/{block}"]["GET"]
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=1, deadline=None)
+    def inner(case):
+        pass
+
+    with pytest.raises(Unsatisfiable):
+        inner()
+
+
+@pytest.mark.hypothesis_nested
 def test_path_example_without_slash_does_not_allow_encoded_slash(ctx):
     schema = ctx.openapi.load_schema(
         {

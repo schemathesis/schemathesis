@@ -499,6 +499,23 @@ def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_dynamic_auth_unsupported_scheme_type_reported(ctx, cli, app_runner, snapshot_cli):
+    app = _protected_app(ctx, "MutualTLS", {"type": "mutualTLS"})
+    assert (
+        _run_cli(
+            cli,
+            app_runner,
+            app,
+            "--phases=fuzzing",
+            "--mode=positive",
+            "-n 1",
+            config={"auth": _dynamic_auth("MutualTLS")},
+        )
+        == snapshot_cli
+    )
+
+
 def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
     app = _protected_app(ctx, "BearerAuth", {"type": "http", "scheme": "bearer"})
 

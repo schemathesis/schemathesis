@@ -53,6 +53,22 @@ def test_create_state_machine_returns_a_subclass(ctx):
     assert issubclass(cls, RuleBasedStateMachine)
 
 
+def test_repeated_as_state_machine_builds_same_rules(ctx):
+    schema = ctx.graphql.load_sdl("""
+        type Book { id: ID! }
+        type Query { book(id: ID!): Book }
+        type Mutation { addBook(title: String!): Book! }
+    """)
+    first = schema.as_state_machine()
+    second = schema.as_state_machine()
+    rules = [
+        sorted(name for name, value in machine.__dict__.items() if hasattr(value, "hypothesis_stateful_rule"))
+        for machine in (first, second)
+    ]
+    assert first is not second
+    assert rules == [["Mutation_addBook", "Query_book"], ["Mutation_addBook", "Query_book"]]
+
+
 @pytest.mark.parametrize(
     "bundle_name",
     ["Book_ids", "Author_ids", "deleted_Book_ids", "deleted_Author_ids"],

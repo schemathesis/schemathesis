@@ -7,7 +7,7 @@ from django.core.wsgi import get_wsgi_application
 from django.http import HttpResponse
 from django.test import override_settings
 from django.urls import path
-from flask import Flask, jsonify
+from flask import Flask, jsonify, redirect
 
 import schemathesis
 from schemathesis.core.errors import LoaderError
@@ -71,6 +71,18 @@ def test_auth_loader_options(ctx):
     api = ctx.openapi.apps.success()
     schemathesis.openapi.from_url(api.schema_url, auth=("test", "test"))
     assert api.schema_requests[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
+
+
+def test_redirect_loop_reported_as_loader_error(app_runner):
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        return redirect("/openapi.json")
+
+    url = app_runner.openapi_url(app)
+    with pytest.raises(LoaderError, match="Exceeded 30 redirects"):
+        schemathesis.openapi.from_url(url)
 
 
 def test_wait_for_schema_retries_on_read_timeout(ctx, app_runner):

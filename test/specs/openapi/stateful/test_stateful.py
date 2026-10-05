@@ -424,12 +424,83 @@ def test_inferred_body_link_picks_from_every_listed_resource():
     assert {"first", "second"} <= project_ids
 
 
+def test_link_sends_parameter_undeclared_on_target():
+    spec = {
+        "openapi": "3.0.2",
+        "info": {"title": "Items", "version": "1"},
+        "paths": {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "links": {
+                                "GetItem": {
+                                    "operationId": "getItem",
+                                    "parameters": {"id": "$response.body#/id", "query.trace": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+    }
+    app = FastAPI(openapi_url=None)
+
+    @app.get("/openapi.json")
+    def openapi():
+        return spec
+
+    @app.post("/items", status_code=201)
+    def create_item():
+        return {"id": "item-1"}
+
+    @app.get("/items/{id}")
+    def get_item(id: str):
+        return {}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    queries = []
+
+    class Workflow(schema.as_state_machine()):
+        def validate_response(self, response, case, additional_checks=None, **kwargs):
+            if case.operation.label == "GET /items/{id}":
+                queries.append(case.query)
+
+    Workflow.run(
+        settings=settings(
+            max_examples=10,
+            deadline=None,
+            database=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+            stateful_step_count=3,
+        )
+    )
+    assert {"trace": "item-1"} in queries
+
+
 def test_custom_config_in_test_case(ctx):
     api = ctx.openapi.apps.stateful_users()
     schema = schemathesis.openapi.from_wsgi("/openapi.json", app=api.wsgi_app)
     settings = schema.as_state_machine().TestCase.settings
     for key, value in DEFAULT_STATE_MACHINE_SETTINGS.__dict__.items():
         assert getattr(settings, key) == value
+
+
+def test_state_machine_is_public_api_state_machine(ctx):
+    schema = ctx.openapi.load_schema({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    assert issubclass(schema.as_state_machine(), schemathesis.stateful.APIStateMachine)
 
 
 def test_passing_transport_kwargs(ctx, mocker):

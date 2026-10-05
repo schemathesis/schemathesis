@@ -1655,6 +1655,41 @@ def test_boolean_header_schema(ctx, subschema):
     assert cases
 
 
+def test_negative_multipart_boolean_property_with_content_type(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file": True, "name": {"type": "string", "minLength": 2}},
+                                    "required": ["name"],
+                                },
+                                "encoding": {"file": {"contentType": "text/plain"}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    cases = []
+
+    @given(case=schema["/items"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck))
+    def test(case):
+        cases.append(case)
+
+    test()
+    assert cases
+
+
 def test_unnegatable_path_falls_back_to_positive(ctx):
     operation = _operation_with_parameters(ctx, [PLAIN_STRING_PARAMETER, ANNOTATED_HEADER])
     modes = []

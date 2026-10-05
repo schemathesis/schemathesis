@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import socket
 import sys
 from pathlib import Path
@@ -134,6 +135,38 @@ def test_cache_row_shows_unavailable_when_corrupt(ctx, cli, snapshot_cli, tmp_pa
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.skipif(platform.system() == "Windows", reason="chmod does not make a directory read-only on Windows")
+def test_run_succeeds_when_cache_directory_is_read_only(ctx, cli, snapshot_cli, tmp_path):
+    api = ctx.openapi.apps.success()
+    cache_dir = tmp_path / "cache"
+    _seed(
+        cache_dir,
+        [
+            Entry(
+                id=1,
+                kind=Kind.METHOD_NOT_ALLOWED,
+                operation="POST /vanished",
+                request=Request(method="POST"),
+            )
+        ],
+    )
+    # Crash records go to a subdirectory; keep it writable so only the cache write fails.
+    (cache_dir / "crashes").mkdir()
+    cache_dir.chmod(0o555)
+    try:
+        result = cli.run(
+            api.schema_url,
+            "--max-examples=1",
+            "--phases=fuzzing",
+            config={"cache": {"directory": str(cache_dir)}},
+        )
+    finally:
+        cache_dir.chmod(0o755)
+    assert result == snapshot_cli
+    assert [entry.operation for entry in load(cache_dir)[1]] == ["POST /vanished"]
 
 
 @pytest.mark.parametrize("kind", [Kind.ERROR_FEEDBACK, Kind.AUTH_REQUIRED])

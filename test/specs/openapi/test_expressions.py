@@ -29,6 +29,7 @@ DOCUMENT = {
     " ": 7,
     "m~n": 8,
     "bool-value": True,
+    "null-value": None,
 }
 
 
@@ -140,6 +141,7 @@ def test_evaluate(output, expr, expected):
         ({"$response.body#/foo/unknown": "value"}, UNRESOLVABLE),
         ({"$response.body#/a~1b": "value"}, {"1": "value"}),
         ({"$response.body#/bool-value": "value"}, {"true": "value"}),
+        ({"$response.body#/null-value": "value"}, {"null": "value"}),
         (["$response.body#/foo/unknown"], UNRESOLVABLE),
         (
             {"key": "$response.body#/foo/0", "items": ["$response.body#/foo/1", "literal", 42]},

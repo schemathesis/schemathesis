@@ -530,6 +530,35 @@ def test_failures_without_wfc_category_are_left_out(ctx, cli, tmp_path, unmapped
     assert (tmp_path / "report.sh").read_text(encoding="utf-8") == "#!/usr/bin/env bash\n"
 
 
+def test_run_level_check_failures_are_left_out(ctx, cli, tmp_path, restore_checks):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.check
+class AfterRunFails:
+    def after_run(self, ctx):
+        raise AssertionError("after_run fired")
+        """
+    )
+    path = tmp_path / "report.json"
+
+    result = cli.main(
+        "run",
+        api.schema_url,
+        f"--report-wfc-path={path}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        "-c",
+        "AfterRunFails",
+        hooks=module,
+    )
+
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    report = load_report(path)
+    assert (report["faults"], report["testCases"]) == ({"totalNumber": 0, "foundFaults": []}, [])
+    assert (tmp_path / "report.sh").read_text(encoding="utf-8") == "#!/usr/bin/env bash\n"
+
+
 def test_path_extensions_are_not_endpoints(ctx, cli, tmp_path):
     raw = ctx.openapi.build_schema({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
     raw["paths"]["x-internal"] = "Not an operation"

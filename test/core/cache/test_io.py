@@ -133,6 +133,15 @@ def test_load_skips_entries_with_unknown_kind(tmp_path):
     assert [entry.id for entry in entries] == [1]
 
 
+def test_load_skips_blank_lines(tmp_path):
+    manifest = _manifest()
+    entries = [_entry(id=1), _entry(id=2)]
+    write(tmp_path, manifest, entries)
+    path = tmp_path / ENTRIES_FILENAME
+    path.write_text("\n\n".join(path.read_text().splitlines()) + "\n  \n")
+    assert load(tmp_path) == (manifest, entries)
+
+
 @pytest.mark.parametrize(
     ("request_in", "expected"),
     [

@@ -86,6 +86,11 @@ def test_run_output(cli, args, snapshot_cli):
     assert cli.run(*args) == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_run_rejects_unknown_phase(cli, snapshot_cli):
+    assert cli.run("http://127.0.0.1:1/openapi.json", "--phases=examples,foo") == snapshot_cli
+
+
 def test_hooks_module_not_found(cli, snapshot_cli):
     # When an unknown hook module is passed to CLI
     assert cli.main("run", "http://127.0.0.1:1", hooks="hook") == snapshot_cli
