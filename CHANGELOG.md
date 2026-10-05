@@ -11,6 +11,7 @@
 - Encode multipart parts with nested multipart or form-urlencoded content types.
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.
 - Sanitize credentials in recorded test cases in NDJSON reports.
+- Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
 - False `negative_data_rejection` failures for DRF validation errors wrapped in `detail`.
 
 ## [4.29.3](https://github.com/schemathesis/schemathesis/compare/v4.29.2...v4.29.3) - 2026-10-05
