@@ -22,7 +22,7 @@ from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
 from schemathesis.core.jsonschema import maybe_resolve_bundled, schema_with_bundle
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
-from schemathesis.core.transforms import merge_at, to_wire_string
+from schemathesis.core.transforms import merge_at, to_wire_text
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
 from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
@@ -359,10 +359,8 @@ def _prepare_form_data(data: dict[str, Any]) -> dict[str, Any]:
 
 def _prepare_form_value(item: Body) -> object:
     # Plain fields are text, so non-string values use their JSON spelling rather than Python's, e.g. `true`.
-    if isinstance(item, bool) or item is None:
-        return to_wire_string(item)
-    if isinstance(item, (dict, list)):
-        return json.dumps(item)
+    if isinstance(item, (bool, dict, list)) or item is None:
+        return to_wire_text(item)
     if _should_coerce_to_bytes(item):
         return serialize_binary(item)
     return item
@@ -533,7 +531,7 @@ def urlencoded_serializer(ctx: SerializationContext, value: Body) -> dict[str, A
 def text_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
-    return {"data": to_wire_string(value).encode("utf8")}
+    return {"data": to_wire_text(value).encode("utf8")}
 
 
 @REQUESTS_TRANSPORT.serializer("application/octet-stream")

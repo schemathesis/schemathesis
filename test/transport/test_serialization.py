@@ -1617,6 +1617,43 @@ def test_get_matching_serializers(media_type, expected):
     assert {media_type for media_type, _ in TRANSPORT.get_matching_media_types(media_type)} == expected
 
 
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"a": 1, "b": None}, b'{"a": 1, "b": null}'),
+        ([1, "x", None], b'[1, "x", null]'),
+        ({"outer": {"inner": None}}, b'{"outer": {"inner": null}}'),
+        (True, b"true"),
+        (None, b"null"),
+        ("x", b"x"),
+    ],
+    ids=["object", "array", "nested-object", "true", "null", "string"],
+)
+@pytest.mark.parametrize("transport", ["http", "wsgi"])
+def test_text_plain_body_spelled_as_json(ctx, app_runner, transport, body, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/echo": {
+                "post": {
+                    "requestBody": {"content": {"text/plain": {"schema": {}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/echo", methods=["POST"])
+    def echo():
+        return request.get_data()
+
+    if transport == "http":
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    else:
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    case = schema["/echo"]["POST"].Case(body=body, media_type="text/plain")
+    assert case.call().content == expected
+
+
 def test_serialize_xml_with_boolean_schema(ctx):
     # Open API 3.1 lets a body be written as `true`, which carries no XML metadata.
     schema = ctx.openapi.load_schema(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import string
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import lru_cache
@@ -34,6 +35,13 @@ def to_wire_string(value: object) -> str:
     if value is None:
         return "null"
     return str(value)
+
+
+def to_wire_text(value: object) -> str:
+    """Render a whole value as text on the wire: containers as JSON, scalars as their JSON spelling."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value)
+    return to_wire_string(value)
 
 
 def stringify_keys(document: object) -> None:
