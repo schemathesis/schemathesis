@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Show a single `Coverage` block in `st run` output under `--max-time`.
+- Report GraphQL errors with multiple source locations without crashing.
 - False `negative_data_rejection` failures for form body fields that become valid strings when sent.
 - Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
 - Keep test runs successful when crash recording cannot write to the cache directory.
