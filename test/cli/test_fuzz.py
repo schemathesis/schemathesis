@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 from io import StringIO
@@ -99,6 +100,14 @@ def test_fuzz_final_line_with_error(cli, app_runner, ctx, snapshot_cli):
         cli.main("fuzz", url, "--max-time=3", "--request-timeout=0.001"),
         snapshot_cli,
     )
+
+
+def test_fuzz_connection_error_cases_are_not_reported_as_skipped(cli, ctx):
+    api = ctx.openapi.apps.success()
+
+    result = cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=1")
+
+    assert re.search(r"Test cases:\n  (\d+) generated, \1 errored\n", result.stdout), result.stdout
 
 
 def test_fuzz_budget_too_small_for_startup_still_runs_a_scenario(cli, app_runner, ctx):

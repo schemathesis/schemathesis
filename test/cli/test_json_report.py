@@ -57,7 +57,7 @@ def test_report_shape(ctx, cli, json_path):
             "fuzzing": {"status": "success", "skip_reason": None},
             "stateful": {"status": "skip", "skip_reason": "disabled"},
         },
-        "test_cases": {"with_failures": 0, "unique_failures": 0, "without_checks": 0},
+        "test_cases": {"with_failures": 0, "unique_failures": 0, "without_checks": 0, "errored": 0},
         "failures": [],
         "errors": [],
         "warnings": {

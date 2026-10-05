@@ -375,6 +375,15 @@ def display_baseline_summary(baseline: BaselineSummary) -> None:
     click.echo()
 
 
+def _unchecked_parts(test_cases: TestCasesSummary) -> list[str]:
+    parts = []
+    if test_cases.errored > 0:
+        parts.append(f"{click.style(str(test_cases.errored), bold=True)} errored")
+    if test_cases.without_checks > 0:
+        parts.append(f"{click.style(str(test_cases.without_checks), bold=True)} skipped")
+    return parts
+
+
 def display_test_cases(test_cases: TestCasesSummary) -> None:
     if test_cases.generated == 0:
         click.echo(_style("Test cases:", bold=True))
@@ -384,9 +393,7 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
     click.echo(_style("Test cases:", bold=True))
     parts = [f"  {click.style(str(test_cases.generated), bold=True)} generated"]
 
-    if test_cases.without_checks == test_cases.generated:
-        parts.append(f"{click.style(str(test_cases.without_checks), bold=True)} skipped")
-    else:
+    if test_cases.without_checks + test_cases.errored != test_cases.generated:
         if test_cases.unique_failures > 0:
             parts.append(
                 f"{click.style(str(test_cases.with_failures), bold=True)} found "
@@ -394,8 +401,7 @@ def display_test_cases(test_cases: TestCasesSummary) -> None:
             )
         else:
             parts.append(f"{click.style(str(test_cases.generated), bold=True)} passed")
-        if test_cases.without_checks > 0:
-            parts.append(f"{click.style(str(test_cases.without_checks), bold=True)} skipped")
+    parts.extend(_unchecked_parts(test_cases))
 
     click.echo(_style(", ".join(parts) + "\n"))
 

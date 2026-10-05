@@ -174,6 +174,7 @@ class TestCasesSummary:
     with_failures: int
     unique_failures: int
     without_checks: int
+    errored: int
 
 
 @dataclass(slots=True)
@@ -363,6 +364,7 @@ def reduce_test_cases(statistic: Statistic) -> TestCasesSummary:
         with_failures=statistic.cases_with_failures,
         unique_failures=unique_failures,
         without_checks=statistic.cases_without_checks,
+        errored=statistic.errored_cases,
     )
 
 

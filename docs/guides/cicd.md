@@ -146,7 +146,7 @@ An excerpt from a run that found failures:
   "exit_code": 1,
   "stop_reason": "completed",
   "operations": {"total": 4, "selected": 4, "tested": 4, "errored": 0, "skipped": 0, "skip_reasons": []},
-  "test_cases": {"generated": 439, "with_failures": 3, "unique_failures": 5, "without_checks": 0},
+  "test_cases": {"generated": 439, "with_failures": 3, "unique_failures": 5, "without_checks": 0, "errored": 0},
   "phases": {
     "examples": {"status": "skip", "skip_reason": null},
     "coverage": {"status": "failure", "skip_reason": null},
