@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.engine import events, from_schema
@@ -157,6 +158,37 @@ def _collect_query_tokens(schema, *, phase) -> list[str]:
                 if isinstance(query, dict) and isinstance(query.get("token"), str):
                     values.append(query["token"])
     return values
+
+
+def test_drf_detail_envelope_does_not_add_detail_query_parameter(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/audio": {
+                "get": {
+                    "parameters": [{"name": "tags", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/api/audio")
+    def audio():
+        if request.args.get("tags") == "":
+            return jsonify({"detail": {"tags": ["This field may not be blank."]}}), 400
+        return jsonify([])
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["coverage", "fuzzing"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE], max_examples=30)
+
+    query_keys = set()
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.FUZZING:
+            for case_node in event.recorder.cases.values():
+                query_keys.update(case_node.value.query or {})
+    assert "detail" not in query_keys
 
 
 def test_stale_example_evicted_after_format_inference(ctx):
