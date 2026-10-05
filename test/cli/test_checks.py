@@ -1343,6 +1343,64 @@ def test_negative_data_rejection_form_fields_sent_as_text(ctx, cli, app_runner, 
     )
 
 
+_BOOLEAN_QUERY_SPELLINGS = ("", "null", "y", "yes", "t", "true", "on", "1", "n", "no", "f", "false", "off", "0")
+
+
+@pytest.mark.parametrize(
+    ("server_checks_full_size", "exit_code"),
+    [(True, ExitCode.OK), (False, ExitCode.TESTS_FAILED)],
+    ids=["no-false-positive", "accepted-invalid-value-reported"],
+)
+def test_negative_data_rejection_nullable_query_values_sent_as_text(
+    ctx, cli, app_runner, server_checks_full_size, exit_code
+):
+    # Query values arrive as text, so `null` and empty values are valid for nullable flags; 300 examples reach them.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/thumb": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "full_size",
+                            "schema": {"type": "boolean", "nullable": True, "default": False},
+                            "allowEmptyValue": True,
+                        },
+                        {
+                            "in": "query",
+                            "name": "compressed",
+                            "schema": {"type": "boolean", "nullable": True},
+                            "allowEmptyValue": True,
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/thumb")
+    def thumb():
+        if any(name not in ("full_size", "compressed") for name in request.args):
+            return jsonify({"error": "unknown parameter"}), 400
+        for name in ("full_size", "compressed"):
+            if name == "full_size" and not server_checks_full_size:
+                continue
+            value = request.args.get(name)
+            if value is not None and value.lower() not in _BOOLEAN_QUERY_SPELLINGS:
+                return jsonify({"error": f"invalid {name}"}), 400
+        return jsonify({"ok": True}), 200
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=fuzzing",
+        "--max-examples=300",
+        exit_code=exit_code,
+    )
+
+
 def test_negative_data_rejection_fuzzing_phase_metadata(ctx, cli, app_runner):
     # Use a simple schema with single property to avoid multiple mutation conflicts
     app, raw_schema = ctx.openapi.make_flask_app(

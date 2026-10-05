@@ -16,6 +16,7 @@
 - Sanitize credentials in recorded test cases in NDJSON reports.
 - Name the config section and key when a list or string is too short.
 - Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
+- False `negative_data_rejection` failures for `null` in query parameters alongside unsent extra parameters.
 - Show the compact `[auto, 1-64]` range when `--workers` gets an out-of-range value.
 - False `negative_data_rejection` failures for DRF validation errors wrapped in `detail`.
 - Resolve external `$ref` pointers in `response_schema_conformance` failure schemas.
