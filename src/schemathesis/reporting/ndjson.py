@@ -160,6 +160,10 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
             value = serialize(getattr(obj, field.name), sanitization=sanitization)
             if value is not None and value != {} and value != []:
                 dc_data[public_name] = value
+        # A recorded case carries the same credentials as the request sent from it.
+        if sanitization is not None and cls_name == "Case":
+            for name in ("headers", "cookies", "query"):
+                sanitize_value(dc_data.get(name), config=sanitization)
         return dc_data
     return str(obj)
 

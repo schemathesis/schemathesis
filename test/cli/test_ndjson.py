@@ -426,6 +426,54 @@ def test_sanitization_disabled(cli, ctx, ndjson_path):
     assert len(phase_started) >= 1
 
 
+@pytest.mark.parametrize(
+    ("parameters", "args", "config", "expected"),
+    [
+        ([], ["-H", "Authorization: Bearer secret-token"], None, {"headers": {"Authorization": "[Filtered]"}}),
+        (
+            [{"name": "api_key", "in": "query", "required": True, "schema": {"type": "string"}}],
+            [],
+            {"parameters": {"api_key": "secret-token"}},
+            {"query": {"api_key": "[Filtered]"}},
+        ),
+        (
+            [{"name": "session", "in": "cookie", "required": True, "schema": {"type": "string"}}],
+            [],
+            {"parameters": {"session": "secret-token"}},
+            {"cookies": {"session": "[Filtered]"}},
+        ),
+    ],
+    ids=["header", "query", "cookie"],
+)
+def test_recorded_cases_sanitized(cli, ctx, ndjson_path, parameters, args, config, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/foo": {"get": {"parameters": parameters, "responses": {"200": {"description": "OK"}}}}}
+    )
+
+    @app.route("/foo")
+    def foo():
+        return jsonify({})
+
+    cli.run_openapi_app(
+        app,
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=1",
+        "--phases=fuzzing",
+        *args,
+        config=config,
+    )
+    assert "secret-token" not in ndjson_path.read_text()
+    cases = [
+        node["value"]
+        for event in load_ndjson(ndjson_path)
+        if get_event_type(event) == "ScenarioFinished"
+        for node in get_event_data(event)["recorder"]["cases"].values()
+    ]
+    assert cases
+    for case in cases:
+        assert {key: case[key] for key in expected} == expected
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
 def test_credentials_sanitized_in_command(ctx, testdir, ndjson_path):
     api = ctx.openapi.apps.success()
