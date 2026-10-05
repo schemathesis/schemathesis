@@ -2,6 +2,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, assume, given, settings
 
 import schemathesis
+from schemathesis.core.transforms import to_wire_string
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import PayloadAlternatives
 
@@ -698,7 +699,7 @@ def test_optional_form_parameters(ctx):
         response = case.call()
         assert response.status_code == 200
         # Then they still should be possible to generate
-        assert response.json()["maybe"] == str(case.body["maybe"])
+        assert response.json()["maybe"] == to_wire_string(case.body["maybe"])
 
     test()
 

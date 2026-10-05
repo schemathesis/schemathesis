@@ -350,10 +350,21 @@ def _prepare_form_data(data: dict[str, Any]) -> dict[str, Any]:
     """
     for name, value in data.items():
         if isinstance(value, list):
-            data[name] = [serialize_binary(item) if _should_coerce_to_bytes(item) else item for item in value]
-        elif _should_coerce_to_bytes(value):
-            data[name] = serialize_binary(value)
+            data[name] = [_prepare_form_value(item) for item in value]
+        else:
+            data[name] = _prepare_form_value(value)
     return data
+
+
+def _prepare_form_value(item: Body) -> object:
+    # Plain fields are text, so non-string values use their JSON spelling rather than Python's, e.g. `true`.
+    if isinstance(item, bool) or item is None:
+        return to_wire_string(item)
+    if isinstance(item, (dict, list)):
+        return json.dumps(item)
+    if _should_coerce_to_bytes(item):
+        return serialize_binary(item)
+    return item
 
 
 def choose_boundary() -> str:

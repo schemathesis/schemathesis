@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import enum
 import http.client
+import json
 import math
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from email.parser import BytesParser
+from email.policy import HTTP
 from functools import wraps
 from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING, Any, NoReturn, cast
@@ -16,7 +19,7 @@ from schemathesis.core import NOT_SET, media_types, string_to_boolean
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, make_validator
-from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.mutations import Mutation, OperatorKind, render_mutations
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA, Response, expand_status_code
@@ -328,7 +331,7 @@ def _has_other_negated_location(case: Case, *locations: ParameterLocation) -> bo
     return False
 
 
-def _body_negation_becomes_valid_after_serialization(case: Case) -> bool:
+def _body_negation_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
     """Check if body negation becomes valid after serialization.
 
     For media types like text/plain, any value gets stringified during serialization,
@@ -351,67 +354,92 @@ def _body_negation_becomes_valid_after_serialization(case: Case) -> bool:
     if media_type is None:
         return False
 
-    if not _is_stringifying_media_type(media_type) and not _form_body_is_valid_as_sent(case, media_type):
+    if not _is_stringifying_media_type(media_type) and not _form_body_is_valid_as_sent(response, case, media_type):
         return False
 
     # Only the body is negative and it becomes valid once serialized
     return not _has_other_negated_location(case, ParameterLocation.BODY)
 
 
-def _form_body_is_valid_as_sent(case: Case, media_type: str) -> bool:
-    """Whether a form body satisfies its schema once scalar fields are replaced with the text actually sent."""
+def _form_body_is_valid_as_sent(response: Response, case: Case, media_type: str) -> bool:
+    """Whether a form body satisfies its schema as the server reads the fields actually sent."""
     body = case.body
     if not isinstance(body, dict):
         return False
-    sent = _form_body_as_sent(case, body, media_type)
-    if sent is None or sent == body:
+    fields = _sent_form_fields(response, media_type)
+    if fields is None:
         return False
-    validator_cls = _get_openapi_schema(case).adapter.jsonschema_validator_cls
-    for alternative in case.operation.body:
-        if alternative.media_type != media_type:
-            continue
-        try:
-            return make_validator(alternative.optimized_schema, validator_cls).is_valid(sent)
-        except Exception:
-            # Schemas the validator cannot read - can't tell whether the sent body is valid
-            return False
-    return False
+    alternative = next((item for item in case.operation.body if item.media_type == media_type), None)
+    if alternative is None:
+        return False
+    # Urlencoded names round-trip exactly, while multipart escapes some characters in part names.
+    names_are_exact = media_types.is_form_urlencoded(media_type)
+    try:
+        validator = make_validator(
+            alternative.optimized_schema, _get_openapi_schema(case).adapter.jsonschema_validator_cls
+        )
+        # A field missing from the wire was never received; empty lists and objects send nothing at all.
+        sent: dict[str, object] = {
+            name: value
+            for name, value in body.items()
+            if name not in fields and not names_are_exact and value not in ([], {})
+        }
+        for name, texts in fields.items():
+            if None in texts:
+                # Typed or file parts are not plain text, so they keep the generated value.
+                if name in body:
+                    sent[name] = body[name]
+                continue
+            readings = [reading for text in texts for reading in _form_text_readings(cast(str, text))]
+            # Servers read one of the repeated values and may parse it into the declared type.
+            sent[name] = next(
+                (reading for reading in readings if not _has_errors_at(validator, {**sent, name: reading}, name)),
+                readings[0],
+            )
+        return validator.is_valid(sent)
+    except Exception:
+        # Schemas the validator cannot read - can't tell whether the sent body is valid
+        return False
 
 
-def _form_body_as_sent(case: Case, body: dict[str, JsonValue], media_type: str) -> dict[str, JsonValue] | None:
-    from schemathesis.core.errors import SerializationNotPossible
-    from schemathesis.transport import SerializationContext
-    from schemathesis.transport.requests import prepare_multipart_parts
+def _form_text_readings(text: str) -> list[object]:
+    """The ways a server may read a form field: as text, or parsed as JSON into a number, boolean, or null."""
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        return [text]
+    return [text, parsed]
 
-    sent = dict(body)
-    # Only standalone scalars are replaced; lists become repeated fields and objects keep their own encoding.
-    scalars = [name for name, value in body.items() if value is None or isinstance(value, (bool, int, float))]
+
+def _has_errors_at(validator: jsonschema_rs.Validator, instance: dict[str, object], name: str) -> bool:
+    return any(error.instance_path[:1] == [name] for error in validator.iter_errors(instance))
+
+
+def _sent_form_fields(response: Response, media_type: str) -> Mapping[str, Sequence[str | None]] | None:
+    """Field values in the sent form body; `None` marks a value not sent as plain text."""
+    content = response.request.body
+    if isinstance(content, str):
+        content = content.encode()
+    if not isinstance(content, bytes):
+        return None
     if media_types.is_form_urlencoded(media_type):
-        prepared = case.operation.schema.prepare_request_body(case)
-        if not isinstance(prepared, dict):
-            return None
-        for name in scalars:
-            value = prepared.get(name)
-            if isinstance(value, (str, int, float)):
-                sent[name] = str(value)
-        return sent
+        return parse_qs(content.decode("ascii", errors="replace"), keep_blank_values=True)
     if media_types.parse(media_type) != ("multipart", "form-data"):
         return None
-    try:
-        files, _ = prepare_multipart_parts(SerializationContext(case=case), body)
-    except SerializationNotPossible:
-        return None
-    parts: dict[str, list[object]] = {}
-    for name, part in files or []:
-        parts.setdefault(name, []).append(part)
-    for name in scalars:
-        # A part without a filename or its own content type is read as plain text, e.g. `True` for a boolean.
-        match parts.get(name):
-            case [(None, bytes() as content)]:
-                sent[name] = content.decode()
-            case [(None, content)]:
-                sent[name] = str(content)
-    return sent
+    content_type = response.request.headers.get("Content-Type", "")
+    message = BytesParser(policy=HTTP).parsebytes(f"Content-Type: {content_type}\r\n\r\n".encode() + content)
+    fields: dict[str, list[str | None]] = {}
+    for part in message.iter_parts():
+        # The encoder names every part.
+        name = cast(str, part.get_param("name", header="content-disposition"))
+        text = None
+        payload = part.get_payload(decode=True)
+        # Parts with a filename or their own content type are files or typed values, not plain text.
+        if isinstance(payload, bytes) and part.get_filename() is None and "content-type" not in part:
+            # Servers decode form text leniently, replacing bytes that are not valid UTF-8.
+            text = payload.decode(errors="replace")
+        fields.setdefault(name, []).append(text)
+    return fields
 
 
 def _body_negation_is_only_forbidden_property(case: Case) -> bool:
@@ -837,7 +865,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         meta.generation.mode.is_negative
         and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
-        and not _body_negation_becomes_valid_after_serialization(case)
+        and not _body_negation_becomes_valid_after_serialization(response, case)
         and not _body_negation_is_only_forbidden_property(case)
         and not _single_element_array_becomes_valid_after_serialization(response, case)
         and not _type_mutations_become_valid_after_serialization(case)

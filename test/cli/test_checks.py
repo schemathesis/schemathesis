@@ -1284,6 +1284,65 @@ def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, cli,
     )
 
 
+@pytest.mark.parametrize(
+    ("server_checks_reason", "exit_code"),
+    [(True, ExitCode.OK), (False, ExitCode.TESTS_FAILED)],
+    ids=["no-false-positive", "accepted-invalid-reason-reported"],
+)
+def test_negative_data_rejection_form_fields_sent_as_text(ctx, cli, app_runner, server_checks_reason, exit_code):
+    # Form fields arrive as text, so non-string values for a string field are valid; 300 examples reliably reach them.
+    schema = {
+        "type": "object",
+        "properties": {
+            "reason": {"type": "string", "enum": ["dmca", "mature", "other"]},
+            "description": {"type": "string", "nullable": True},
+        },
+        "required": ["reason"],
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/reports": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": schema},
+                            "multipart/form-data": {"schema": schema},
+                            "application/x-www-form-urlencoded": {"schema": schema},
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/reports", methods=["POST"])
+    def reports():
+        if request.is_json:
+            body = request.get_json(silent=True)
+            if not isinstance(body, dict):
+                return jsonify({"error": "invalid body"}), 400
+            description = body.get("description")
+            if description is not None and not isinstance(description, str):
+                return jsonify({"error": "invalid description"}), 400
+            reason = body.get("reason")
+        else:
+            reason = request.form.get("reason")
+        if reason is None or (server_checks_reason and reason not in ("dmca", "mature", "other")):
+            return jsonify({"error": "invalid reason"}), 400
+        return jsonify({"ok": True}), 201
+
+    cli.run_and_assert(
+        app_runner.openapi_url(app),
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=fuzzing",
+        "--max-examples=300",
+        exit_code=exit_code,
+    )
+
+
 def test_negative_data_rejection_fuzzing_phase_metadata(ctx, cli, app_runner):
     # Use a simple schema with single property to avoid multiple mutation conflicts
     app, raw_schema = ctx.openapi.make_flask_app(
