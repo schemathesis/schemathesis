@@ -26,7 +26,7 @@ from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
-from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error
+from schemathesis.generation.hypothesis.reporting import FILTER_CASE_EXHAUSTED_MESSAGE, build_unsatisfiable_error
 
 if TYPE_CHECKING:
     import hypothesis
@@ -480,9 +480,13 @@ def _run_forever_thread(
             )
         )
     except Unsatisfiable as exc:
+        rejecting_hook = any(
+            operation.filter_case_tracker is not None and operation.filter_case_tracker.rejected > 0
+            for operation in plan.operations
+        )
         event_queue.put(
             events.NonFatalError(
-                error=exc,
+                error=Unsatisfiable(FILTER_CASE_EXHAUSTED_MESSAGE) if rejecting_hook else exc,
                 phase=None,
                 label=FUZZ_TESTS_LABEL,
                 related_to_operation=False,

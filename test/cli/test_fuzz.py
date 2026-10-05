@@ -56,6 +56,23 @@ def filter_case(context, case):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_filter_case_rejects_after_first_accepted(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    module = ctx.write_pymodule(
+        """
+CALLS = []
+
+@schemathesis.hook
+def filter_case(context, case):
+    CALLS.append(1)
+    return len(CALLS) <= 1
+"""
+    )
+    # The run completes once the hook stops accepting; the time limit only bounds slow runners.
+    assert cli.main("fuzz", api.schema_url, "--max-time=30", hooks=module) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_after_run_check_failure(cli, app_runner, ctx, snapshot_cli, restore_checks):
     url = _make_fuzz_app(ctx, app_runner)
     module = ctx.write_pymodule(
