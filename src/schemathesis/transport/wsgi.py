@@ -12,7 +12,7 @@ from schemathesis.core import Body, NotSet, media_types
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import merge_at, to_wire_string
+from schemathesis.core.transforms import merge_at, to_wire_text
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.overrides import Override
@@ -289,7 +289,7 @@ def urlencoded_serializer(ctx: SerializationContext, value: Body) -> dict[str, A
 def text_serializer(ctx: SerializationContext, value: Body) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
-    return {"data": to_wire_string(value)}
+    return {"data": to_wire_text(value)}
 
 
 @WSGI_TRANSPORT.serializer("application/octet-stream")

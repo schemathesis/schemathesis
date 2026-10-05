@@ -18,6 +18,7 @@
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.
 - Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
 - Sanitize credentials in recorded test cases in NDJSON reports.
+- Send `text/plain` object and array bodies as JSON instead of Python text.
 - Name the config section and key when a list or string is too short.
 - Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
 - Show the compact `[auto, 1-64]` range when `--workers` gets an out-of-range value.
