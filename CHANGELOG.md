@@ -11,6 +11,7 @@
 - Send non-file multipart fields as plain form fields instead of file uploads.
 - Encode multipart parts with nested multipart or form-urlencoded content types.
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.
+- Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
 - Sanitize credentials in recorded test cases in NDJSON reports.
 - Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
 - False `negative_data_rejection` failures for DRF validation errors wrapped in `detail`.
