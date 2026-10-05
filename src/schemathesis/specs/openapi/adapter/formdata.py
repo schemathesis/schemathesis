@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
 from schemathesis.core.file_samples import file_extension
-from schemathesis.specs.openapi.adapter.parameters import COMBINED_FORM_DATA_MARKER
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -21,31 +20,29 @@ def prepare_multipart_v2(
 
     known_fields: dict[str, dict[str, Any]] = {}
     for parameter in operation.body:
-        if COMBINED_FORM_DATA_MARKER in parameter.definition:
-            known_fields.update(parameter.definition["schema"].get("properties", {}))
+        schema = parameter.definition.get("schema")
+        if isinstance(schema, dict):
+            known_fields.update(schema.get("properties", {}))
 
-    def add_file(name: str, value: Any) -> None:
+    def add_part(name: str, value: Any, is_file: bool) -> None:
         content_type = selected.get(name)
-        if isinstance(value, list):
-            for item in value:
-                if content_type:
-                    files.append((name, (None, item, content_type)))
-                else:
-                    files.append((name, (None, item)))
-        elif content_type:
-            files.append((name, (None, value, content_type)))
-        else:
-            files.append((name, value))
+        for item in value if isinstance(value, list) else [value]:
+            # Only file fields carry a filename; servers read parts without one as plain form fields.
+            filename = _filename(name, item) if is_file else None
+            if content_type:
+                files.append((name, (filename, item, content_type)))
+            else:
+                files.append((name, (filename, item)))
 
     for name, value in form_data.items():
         parameter_schema = known_fields.get(name)
-        if parameter_schema:
-            if parameter_schema.get("type") == "file" or is_multipart:
-                add_file(name, value)
-            else:
-                data[name] = value
+        is_file = isinstance(parameter_schema, dict) and (
+            parameter_schema.get("type") == "file" or _is_file_part(parameter_schema)
+        )
+        if is_file or is_multipart or parameter_schema is None:
+            add_part(name, value, is_file)
         else:
-            add_file(name, value)
+            data[name] = value
     return files or None, data or None
 
 
@@ -120,7 +117,7 @@ def prepare_multipart_v3(
             if content_type:
                 files.extend((name, (None, item, content_type)) for item in value)
             else:
-                files.extend((name, item) for item in value)
+                files.extend((name, (None, item)) for item in value)
         elif content_type:
             files.append((name, (None, value, content_type)))
         else:
