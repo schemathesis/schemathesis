@@ -260,13 +260,17 @@ def _iter_group_errors(
 ) -> Iterator[events.NonFatalError]:
     unexplained = []
     reported = False
+    seen_schema_errors: set[tuple[str, str, str]] = set()
     for sub_exc in exc.exceptions:
         if is_regex_validation_error(sub_exc):
             reported = True
             yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(sub_exc))
         elif isinstance(sub_exc, InvalidSchema):
             reported = True
-            yield non_fatal_error(sub_exc)
+            identity = (sub_exc.message, sub_exc.method or operation.method, sub_exc.path or operation.path)
+            if identity not in seen_schema_errors:
+                seen_schema_errors.add(identity)
+                yield non_fatal_error(sub_exc)
         else:
             code_sample = state.get_code_sample_for(sub_exc)
             if code_sample is not None:

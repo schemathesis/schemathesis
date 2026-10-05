@@ -1383,6 +1383,36 @@ def test_malformed_keyword(ctx, cli, snapshot_cli, operation, phase):
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", f"--phases={phase}") == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    "operation",
+    [
+        {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"a": {"type": "integer", "minimum": "5"}},
+                        }
+                    }
+                },
+            }
+        },
+        {"parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "integer", "minimum": "5"}}]},
+    ],
+    ids=["body", "query"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_mode_malformed_keyword(ctx, cli, snapshot_cli, operation):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/items": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}}
+    )
+    result = cli.run_openapi_app(app, "--max-examples=5", "--phases=fuzzing", "--mode=negative")
+    assert "Schema Error" in result.stdout
+    assert result == snapshot_cli
+
+
 def test_nested_binary_in_yaml(ctx, cli, app_runner, snapshot_cli):
     paths = {
         "/property": {

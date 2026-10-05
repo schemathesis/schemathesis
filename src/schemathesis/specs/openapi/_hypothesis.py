@@ -1393,17 +1393,19 @@ def make_negative_strategy(
     target_descriptors: tuple | None = None,
 ) -> st.SearchStrategy:
     custom_formats = _build_custom_formats(generation_config, GenerationMode.NEGATIVE)
-    return negative_schema(
-        schema,
-        operation_name=operation_name,
-        location=location,
-        media_type=media_type,
-        custom_formats=custom_formats,
-        generation_config=generation_config,
-        validator_cls=validator_cls,
-        validation_schema=validation_schema,
-        name_to_uri=name_to_uri,
-        target_descriptors=target_descriptors,
+    return st.deferred(
+        lambda: negative_schema(
+            schema,
+            operation_name=operation_name,
+            location=location,
+            media_type=media_type,
+            custom_formats=custom_formats,
+            generation_config=generation_config,
+            validator_cls=validator_cls,
+            validation_schema=validation_schema,
+            name_to_uri=name_to_uri,
+            target_descriptors=target_descriptors,
+        )
     )
 
 

@@ -783,6 +783,38 @@ def test_malformed_server_url_template(ctx):
     assert "'servers[0].url' is not a valid URL template" in str(stream.find(events.NonFatalError).info)
 
 
+def test_identical_schema_errors_across_generation_modes_reported_once(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "maximum": "x"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    stream = EventStream(schema, max_examples=1, phases=[PhaseName.FUZZING]).execute()
+
+    assert [(event.info.title, event.label, str(event.value)) for event in stream.find_all(events.NonFatalError)] == [
+        (
+            "Schema Error",
+            "GET /items",
+            "Invalid `maximum` definition\n\nLocation:\n    properties -> q -> maximum\n\nProblematic definition:\n"
+            '    "x"\n\nError details:\n    "x" is not of type "number"\n\nEnsure that the definition complies '
+            "with the OpenAPI specification",
+        )
+    ]
+
+
 def test_max_failures(ctx):
     api = ctx.openapi.apps.failure_multiple_failures_unsatisfiable()
     schema = schemathesis.openapi.from_url(api.schema_url)
