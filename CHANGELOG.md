@@ -20,6 +20,7 @@
 - Binary `default` of a non-string parameter sent as the default positive value in coverage.
 - Report invalid schema keywords in negative mode as schema errors.
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.
+- Missed `negative_data_rejection` failure when a nullable query value is sent beside an invalid header.
 - Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
 - Sanitize credentials in recorded test cases in NDJSON reports.
 - Report `filter_case` hooks that start rejecting mid-run during fuzzing as hook errors.
