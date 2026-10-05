@@ -100,16 +100,17 @@ class CliSnapshotConfig:
             return data
         if self.replace_test_cases:
             # All-skipped case
-            data = re.sub(r"Test cases:\n  (\d+) generated, \1 skipped", "Test cases:\n  N generated", data)
+            data = re.sub(r"Test cases:\n  (\d+) generated, \1 (?:skipped|errored)", "Test cases:\n  N generated", data)
+            data = re.sub(r"Test cases:\n  \d+ generated, \d+ errored, \d+ skipped", "Test cases:\n  N generated", data)
             # Cases with failures (skip count optional — non-deterministic, so not snapshot-tested)
             data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures(?:, \d+ skipped)?",
+                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures(?:, \d+ errored)?(?:, \d+ skipped)?",
                 "Test cases:\n  N generated, N found N unique failures",
                 data,
             )
             # Cases with passed (skip count optional)
             data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) passed(?:, \d+ skipped)?",
+                r"Test cases:\n  (\d+) generated, (\d+) passed(?:, \d+ errored)?(?:, \d+ skipped)?",
                 "Test cases:\n  N generated, N passed",
                 data,
             )

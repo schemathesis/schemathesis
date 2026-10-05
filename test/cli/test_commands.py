@@ -611,6 +611,12 @@ def test_connection_error(ctx, cli, workers, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_test_cases=False)
+def test_connection_error_cases_are_not_reported_as_skipped(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", "--phases=fuzzing", "-n", "5") == snapshot_cli
+
+
 def test_chunked_encoding_error(ctx, mocker, cli, snapshot_cli):
     api = ctx.openapi.apps.chunked_success()
 

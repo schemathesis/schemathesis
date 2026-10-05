@@ -10,6 +10,7 @@
 - False `negative_data_rejection` failures for form body fields that become valid strings when sent.
 - Crash when serializing an XML body for an operation that does not declare XML.
 - Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
+- Report test cases that hit network errors as errored instead of skipped.
 - Keep test runs successful when crash recording cannot write to the cache directory.
 - Send non-file multipart fields as plain form fields instead of file uploads.
 - Crash in the coverage phase on non-numeric `default` values of numeric schemas.

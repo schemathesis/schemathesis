@@ -58,6 +58,7 @@ class Statistic:
     total_cases: int
     cases_with_failures: int
     cases_without_checks: int
+    errored_cases: int
 
     def __init__(self) -> None:
         self.failures = {}
@@ -72,6 +73,7 @@ class Statistic:
         self.total_cases = 0
         self.cases_with_failures = 0
         self.cases_without_checks = 0
+        self.errored_cases = 0
 
     def on_scenario_finished(
         self, recorder: RecordedScenario, *, failure_label: Callable[[Case], str] | None = None
@@ -102,7 +104,11 @@ class Statistic:
             checks = recorder.checks.get(case_id, [])
 
             if not checks:
-                self.cases_without_checks += 1
+                interaction = recorder.interactions.get(case_id)
+                if interaction is None or interaction.response is None:
+                    self.errored_cases += 1
+                else:
+                    self.cases_without_checks += 1
                 self.operations_without_checks.add(case.value.operation.label)
                 continue
 

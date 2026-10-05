@@ -92,6 +92,7 @@ def build_document(
             "with_failures": summary.test_cases.with_failures,
             "unique_failures": summary.test_cases.unique_failures,
             "without_checks": summary.test_cases.without_checks,
+            "errored": summary.test_cases.errored,
         },
         "failures": [
             {
