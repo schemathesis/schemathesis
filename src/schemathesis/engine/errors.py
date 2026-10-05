@@ -547,6 +547,12 @@ class TestingState:
         error = self._unrecoverable_network_errors.get(id(exc))
         return error.code_sample if error is not None else None
 
+    def take_unrecoverable_network_error(self) -> UnrecoverableNetworkError | None:
+        """Return the stored unrecoverable network error and forget it, so it is reported once."""
+        error = self.unrecoverable_network_error
+        self._unrecoverable_network_errors.clear()
+        return error
+
     @property
     def unrecoverable_network_error(self) -> UnrecoverableNetworkError | None:
         """Return any stored unrecoverable network error (for backward compatibility)."""

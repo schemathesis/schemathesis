@@ -4204,6 +4204,38 @@ def test_link_extraction_from_binary_json_response(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_network_error_reported_when_suite_ends_with_failure(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(LINKED_USERS_PATHS)
+    counter = count()
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        return jsonify({"id": 1}), 201
+
+    @app.route("/users/<int:user_id>")
+    def get_user(user_id):
+        if next(counter) == 0:
+
+            def broken_body():
+                yield '{"id": '
+                raise RuntimeError("broken body")
+
+            return Response(broken_body())
+        return "", 404
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=stateful",
+            "--max-examples=10",
+            "--seed=4",
+            "--checks=status_code_conformance",
+        )
+        == snapshot_cli
+    )
+
+
 # Every repeated stateful pass folds into the single block reported at the end.
 @pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
 def test_max_time_repeats_stateful_phase(ctx, cli, snapshot_cli):
