@@ -2,6 +2,61 @@ import pytest
 from flask import jsonify, request
 
 
+@pytest.mark.parametrize(
+    ["reference", "component"],
+    [
+        (
+            "https://example.invalid/text.json",
+            {"$id": "https://example.invalid/text.json", "type": "string"},
+        ),
+        (
+            "https://example.invalid/text.json#/foo",
+            {"$id": "https://example.invalid/text.json", "foo": {"type": "string"}},
+        ),
+    ],
+    ids=["whole-document", "non-component-fragment"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_external_ref_in_failure_schema_resolves(ctx, cli, snapshot_cli, reference, component):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["a"],
+                                        "properties": {"a": {"$ref": reference}},
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+        version="3.1.0",
+        components={"schemas": {"Text": component}},
+    )
+
+    @app.route("/data", methods=["GET"])
+    def data():
+        return jsonify({})
+
+    result = cli.run_openapi_app(
+        app,
+        "--max-examples=1",
+        "--checks=response_schema_conformance",
+        "--phases=examples,fuzzing",
+    )
+    assert '"$ref": "#/components/schemas/schema000001"' in result.stdout
+    assert result == snapshot_cli
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_bundled_ref_schema_path_display(ctx, cli, snapshot_cli):
     # When response validation fails inside a $ref-ed component, the "Schema at" path
