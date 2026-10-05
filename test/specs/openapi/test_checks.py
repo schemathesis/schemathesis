@@ -2,6 +2,7 @@ import json
 import re
 
 import pytest
+import requests
 import yaml
 
 import schemathesis
@@ -1591,6 +1592,128 @@ def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_m
         media_type=media_type,
     )
     assert _body_negation_becomes_valid_after_serialization(case) is expected
+
+
+MULTIPART = "multipart/form-data"
+URLENCODED = "application/x-www-form-urlencoded"
+
+
+def _load_form_operation(ctx, media_type, properties=None, encoding=None, version="3.0.2"):
+    definition = {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "reason": {"type": "string", "enum": ["dmca", "mature", "other"]},
+                "description": {"type": "string", "nullable": True},
+                **(properties or {}),
+            },
+            "required": ["reason"],
+        }
+    }
+    if encoding is not None:
+        definition["encoding"] = encoding
+    schema = ctx.openapi.load_schema(
+        {
+            "/post": {
+                "post": {
+                    "parameters": [{"in": "query", "name": "limit", "schema": {"type": "integer"}}],
+                    "requestBody": {"required": True, "content": {media_type: definition}},
+                    "responses": {"201": {"description": "Created"}},
+                }
+            }
+        },
+        version=version,
+    )
+    return schema["/post"]["POST"]
+
+
+def _sent_body(case):
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
+    body = (
+        requests.Request(**{key: kwargs.get(key) for key in ("method", "url", "headers", "data", "files")})
+        .prepare()
+        .body
+    )
+    return body.encode() if isinstance(body, str) else body
+
+
+@pytest.mark.parametrize(
+    ("media_type", "properties", "value", "wire"),
+    [
+        (MULTIPART, None, True, b'name="description"\r\n\r\nTrue\r\n'),
+        (URLENCODED, None, True, b"description=true"),
+        (MULTIPART, {"count": {"type": "string", "pattern": "^[0-9]+$"}}, 42, b'name="count"\r\n\r\n42\r\n'),
+        (MULTIPART, None, 1.5, b'name="description"\r\n\r\n1.5\r\n'),
+        (URLENCODED, None, 1.5, b"description=1.5"),
+    ],
+    ids=["multipart-boolean", "urlencoded-boolean", "multipart-integer", "multipart-float", "urlencoded-float"],
+)
+def test_negative_data_rejection_accepts_form_scalars_sent_as_valid_strings(
+    ctx, response_factory, media_type, properties, value, wire
+):
+    operation = _load_form_operation(ctx, media_type, properties)
+    name = "count" if properties else "description"
+    case = operation.Case(
+        _meta=build_metadata(body=GenerationMode.NEGATIVE, generation_modes=[GenerationMode.NEGATIVE]),
+        body={"reason": "dmca", name: value},
+        media_type=media_type,
+    )
+    assert wire in _sent_body(case)
+    assert negative_data_rejection(check_context(), response_factory.requests(status_code=201), case) is None
+
+
+@pytest.mark.parametrize(
+    ("media_type", "properties", "encoding", "version", "body", "query"),
+    [
+        (MULTIPART, {"description": {"type": "string", "maxLength": 3}}, None, "3.0.2", {"description": True}, None),
+        (MULTIPART, None, None, "3.0.2", {"reason": True}, None),
+        (URLENCODED, None, None, "3.0.2", {"reason": True}, None),
+        (MULTIPART, None, None, "3.0.2", {"reason": True, "description": True}, None),
+        (MULTIPART, None, None, "3.0.2", {"description": True}, {"limit": "bad"}),
+        ("application/json", None, None, "3.0.2", {"description": True}, None),
+        (MULTIPART, None, {"description": {"contentType": "application/json"}}, "3.0.2", {"description": True}, None),
+        (MULTIPART, {"meta": {"type": ["object", "string"]}}, None, "3.1.0", {"meta": True}, None),
+        (
+            MULTIPART,
+            {"tags": {"type": ["array", "string"], "items": {"type": "object"}}},
+            None,
+            "3.1.0",
+            {"tags": True},
+            None,
+        ),
+        (MULTIPART, {"file": {"type": "string", "format": "binary"}}, None, "3.0.2", {"file": True}, None),
+        (MULTIPART, None, None, "3.0.2", {"description": [True, 1]}, None),
+    ],
+    ids=[
+        "max-length",
+        "enum",
+        "urlencoded-enum",
+        "one-of-two-fields-still-invalid",
+        "invalid-query",
+        "json",
+        "json-encoded-part",
+        "object-field",
+        "array-field",
+        "binary-field",
+        "repeated-field",
+    ],
+)
+def test_negative_data_rejection_reports_form_scalars_invalid_when_sent(
+    ctx, response_factory, media_type, properties, encoding, version, body, query
+):
+    operation = _load_form_operation(ctx, media_type, properties, encoding, version)
+    case = operation.Case(
+        _meta=build_metadata(
+            body=GenerationMode.NEGATIVE,
+            query=GenerationMode.NEGATIVE if query else None,
+            generation_modes=[GenerationMode.NEGATIVE],
+        ),
+        query=query or {},
+        body={"reason": "dmca", **body},
+        media_type=media_type,
+    )
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(status_code=201), case)
 
 
 def test_response_schema_conformance_with_unspecified_method(response_factory, sample_raw_schema):
