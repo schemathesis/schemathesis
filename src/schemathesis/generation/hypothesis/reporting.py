@@ -53,6 +53,10 @@ FILTER_CASE_UNSATISFIABLE_MESSAGE = """Your `filter_case` hook rejected all gene
 
 Schemathesis generated test data, but every case was rejected by your hook."""
 
+FILTER_CASE_EXHAUSTED_MESSAGE = """Your `filter_case` hook stopped accepting generated test cases
+
+Schemathesis could not generate more cases that your hook accepts."""
+
 
 @dataclass(slots=True)
 class FilterCaseTracker:
