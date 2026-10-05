@@ -1342,6 +1342,18 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
             "http://127.0.0.1/other?compressed=null",
             False,
         ),
+        (
+            "3.0.2",
+            [
+                {"in": "query", "name": "full_size", **_NULLABLE_FLAG},
+                {"in": "query", "name": "compressed", **_NULLABLE_FLAG},
+            ],
+            {"full_size": "true", "compressed": "null", "x": []},
+            (_ADDITIONAL_PROPERTIES_MUTATION,),
+            "/thumb",
+            "http://127.0.0.1/thumb?full_size=true&compressed=null",
+            True,
+        ),
     ],
     ids=[
         "openapi-30-nullable",
@@ -1353,6 +1365,7 @@ _NEGATED_NULLABLE_FLAG = _mutation(OperatorKind.NEGATE_CONSTRAINTS, ("anyOf",), 
         "not-nullable",
         "another-invalid-parameter",
         "other-path",
+        "unsent-extra-parameter",
     ],
 )
 def test_negative_data_rejection_validates_null_text_for_nullable_query(

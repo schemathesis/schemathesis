@@ -615,11 +615,13 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
     )
 
 
+def _reads_as_null(text: str, validator: jsonschema_rs.Validator) -> bool:
+    """Frameworks read the text `null` into a nullable parameter as null."""
+    return text.lower() == "null" and validator.is_valid(None)
+
+
 def _sent_text_is_valid(text: str, validator: jsonschema_rs.Validator, expected_types: list[str]) -> bool:
-    if validator.is_valid(text):
-        return True
-    # Frameworks read the text `null` into a nullable parameter as null.
-    if text.lower() == "null" and validator.is_valid(None):
+    if validator.is_valid(text) or _reads_as_null(text, validator):
         return True
     # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
     if not text.isascii() or "_" in text or text != text.strip():
@@ -1253,6 +1255,20 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 k: _boolean_from_wire_spelling(v, properties.get(k, {})) for k, v in value.items() if k in container
             }
             try:
+                if isinstance(phase_data, FuzzingPhaseData):
+                    # Generated nulls are sent as the text `null`, but in a mutated parameter it may be a negated string.
+                    mutated = {
+                        mutation.parameter
+                        for mutation in phase_data.mutations
+                        if mutation.parameter_location == location
+                    }
+                    for name, item in value_without_additional_properties.items():
+                        if (
+                            name not in mutated
+                            and isinstance(item, str)
+                            and _reads_as_null(item, make_validator(properties.get(name, {}), validator_cls))
+                        ):
+                            value_without_additional_properties[name] = None
                 is_valid = make_validator(schema, validator_cls).is_valid(value_without_additional_properties)
             except Exception:
                 # Schema has an invalid pattern (e.g., valid Python regex but invalid ECMA 262)
