@@ -240,7 +240,7 @@ class ExecutionPlan:
             )
             yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
             return
-        yield events.PhaseStarted(phase=phase, payload=payload)
+        yield events.PhaseStarted(phase=phase, payload=payload, operations=only)
         engine.reserve_time(self._time_to_reserve_after(phase, engine))
         if phase.should_execute(engine):
             yield from run.execute(engine, phase, only=only)

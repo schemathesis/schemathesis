@@ -1716,6 +1716,65 @@ def test_max_time_reports_a_failure_found_in_a_repeat(ctx, cli, snapshot_cli):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_max_time_reports_coverage_once_with_its_repeats(ctx, cli, snapshot_cli):
+    # Coverage repeats for operations whose error responses taught something; it still reads as one phase.
+    api = ctx.openapi.apps.planted_bug()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-time=30",
+            "--generation-database=none",
+            "--phases=coverage",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_cycle_metrics=True, replace_reproduce_with=True)
+def test_max_time_reports_coverage_once_beside_fuzzing(ctx, cli, snapshot_cli):
+    # Rejections only start teaching after the first coverage pass, so coverage repeats between fuzzing passes.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+    counter = count()
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        current = next(counter)
+        if current < 20:
+            return jsonify({}), 201
+        return jsonify({"messages": [f"field{current} - must not be blank"]}), 400
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-time=5",
+            "--max-examples=5",
+            "--generation-database=none",
+            "--phases=coverage,fuzzing",
+            "--checks=not_a_server_error",
+            "--warnings=off",
+        )
+        == snapshot_cli
+    )
+
+
 def test_long_operation_output(ctx, cli, app_runner, snapshot_cli):
     # See GH-990
     # When there is a narrow screen
