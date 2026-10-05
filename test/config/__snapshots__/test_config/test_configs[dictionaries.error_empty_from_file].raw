@@ -1,0 +1,2 @@
+Error in [dictionaries.names] section:
+  'from-file' must contain at least 1 character, but got ''.

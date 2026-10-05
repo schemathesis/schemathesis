@@ -1,0 +1,2 @@
+Error in [dictionaries.names] section:
+  'values' must contain at least 1 item, but got [].

@@ -13,6 +13,7 @@
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.
 - Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
 - Sanitize credentials in recorded test cases in NDJSON reports.
+- Name the config section and key when a list or string is too short.
 - Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
 - False `negative_data_rejection` failures for DRF validation errors wrapped in `detail`.
 - Resolve external `$ref` pointers in `response_schema_conformance` failure schemas.
