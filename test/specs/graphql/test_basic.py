@@ -380,6 +380,24 @@ def test_multiple_server_error(ctx):
     assert exc.value.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
 
 
+def test_error_identity_with_multiple_locations(ctx):
+    case = _books_schema(ctx)["Mutation"]["addBook"].Case()
+    locations = [{"line": 2, "column": 3}, {"line": 1, "column": 4}]
+
+    with pytest.raises(GraphQLServerError) as first:
+        validate_graphql_response(
+            case,
+            {"data": None, "errors": [{"message": "Boom", "locations": locations, "path": ["addBook"]}]},
+        )
+    with pytest.raises(GraphQLServerError) as second:
+        validate_graphql_response(
+            case,
+            {"data": None, "errors": [{"message": "Boom", "locations": locations[::-1], "path": ["addBook"]}]},
+        )
+
+    assert first.value == second.value
+
+
 GRAPHQL_CORE_NON_NULL_ERROR = "Cannot return null for non-nullable field Query.getBooks."
 GRAPHQL_JAVA_NON_NULL_ERROR = (
     "The field at path '/getBooks' was declared as a non null type, but the code involved in retrieving data has "

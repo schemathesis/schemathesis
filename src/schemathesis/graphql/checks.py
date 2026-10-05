@@ -127,7 +127,7 @@ def _group_graphql_errors(errors: list[GraphQLFormattedError]) -> str:
         message = error["message"]
         if "locations" in error:
             message += ";locations:"
-            for location in sorted(error["locations"]):
+            for location in sorted(error["locations"], key=lambda location: (location["line"], location["column"])):
                 message += f"({location['line'], location['column']})"
         if "path" in error:
             message += ";path:"
