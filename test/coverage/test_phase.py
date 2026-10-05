@@ -672,10 +672,13 @@ def test_default_wrong_type_is_not_used(ctx):
     )
 
 
-def test_non_numeric_default_of_integer_does_not_crash(ctx):
-    parameters = [{"name": "q", "in": "query", "schema": {"type": "integer", "default": b"y"}}]
+@pytest.mark.parametrize("declared_type", ["integer", ["integer", "null"]], ids=["single", "list"])
+def test_non_numeric_default_of_integer_is_not_sent(ctx, declared_type):
+    parameters = [{"name": "q", "in": "query", "schema": {"type": declared_type, "default": b"y"}}]
     operation = load_schema(ctx, parameters)["/foo"]["post"]
-    assert collect_cases(operation, GenerationMode.POSITIVE)
+    cases = collect_cases(operation, GenerationMode.POSITIVE)
+    assert cases
+    assert all(case.query.get("q") != b"y" for case in cases)
 
 
 BINARY_KEYWORDS_SCHEMA = """

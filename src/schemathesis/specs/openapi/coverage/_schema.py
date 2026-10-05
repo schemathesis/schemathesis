@@ -213,6 +213,10 @@ def _extra_property_schema(schema: JsonSchemaObject) -> JsonSchema:
 def _is_strictly_valid(value: Any, schema: dict[str, Any], ctx: CoverageContext) -> bool:
     # Binary payloads cannot be validated and pass, as elsewhere in this module. Anything else fails closed,
     # so a value nothing can check is dropped rather than shipped as a valid positive.
+    declared_type = schema.get("type")
+    # Bytes go out as strings, so a schema whose `type` rules strings out cannot take them.
+    if isinstance(value, bytes) and declared_type is not None:
+        return "string" in (declared_type if isinstance(declared_type, list) else [declared_type])
     return contains_binary(value) or _admitted(value, schema, ctx, unjudged=False)
 
 

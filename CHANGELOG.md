@@ -14,6 +14,7 @@
 - Send non-file multipart fields as plain form fields instead of file uploads.
 - Crash in the coverage phase on non-numeric `default` values of numeric schemas.
 - Encode multipart parts with nested multipart or form-urlencoded content types.
+- Binary `default` of a non-string parameter sent as the default positive value in coverage.
 - Report invalid schema keywords in negative mode as schema errors.
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.
 - Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
