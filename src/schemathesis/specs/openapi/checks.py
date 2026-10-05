@@ -618,6 +618,9 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
 def _sent_text_is_valid(text: str, validator: jsonschema_rs.Validator, expected_types: list[str]) -> bool:
     if validator.is_valid(text):
         return True
+    # Frameworks read the text `null` into a nullable parameter as null.
+    if text.lower() == "null" and validator.is_valid(None):
+        return True
     # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
     if not text.isascii() or "_" in text or text != text.strip():
         return False
