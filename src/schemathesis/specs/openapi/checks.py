@@ -588,10 +588,17 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
         if any(_sent_text_is_valid(text, validator, expected_types) for text in sent_texts):
             neutralized.add((location, param_name))
 
+    if not neutralized:
+        return False
+    mutations = meta.phase.data.mutations
+    if not mutations:
+        # Without mutation records, any negative component outside the query still makes the request invalid.
+        return all(
+            component_location == location or not component.mode.is_negative
+            for component_location, component in meta.components.items()
+        )
     # Any other mutated parameter or location still makes the request invalid.
-    return bool(neutralized) and all(
-        (mutation.parameter_location, mutation.parameter) in neutralized for mutation in meta.phase.data.mutations
-    )
+    return all((mutation.parameter_location, mutation.parameter) in neutralized for mutation in mutations)
 
 
 def _reads_as_null(text: str, validator: jsonschema_rs.Validator) -> bool:

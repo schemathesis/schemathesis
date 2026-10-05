@@ -16,6 +16,7 @@
 - Encode multipart parts with nested multipart or form-urlencoded content types.
 - Report invalid schema keywords in negative mode as schema errors.
 - False `negative_data_rejection` failures for `null` sent to nullable query parameters.
+- Missed `negative_data_rejection` failure when a nullable query value is sent beside an invalid header.
 - Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
 - Sanitize credentials in recorded test cases in NDJSON reports.
 - Send `text/plain` object and array bodies as JSON instead of Python text.

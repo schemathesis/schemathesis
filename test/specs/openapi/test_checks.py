@@ -6,7 +6,7 @@ import yaml
 from flask import jsonify
 
 import schemathesis
-from schemathesis.config import SchemathesisConfig
+from schemathesis.config import GenerationConfig, SchemathesisConfig
 from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup, MalformedJson
@@ -2494,6 +2494,50 @@ def test_negative_data_rejection_valid_array_element_beside_invalid_parameter(
             negative_data_rejection(check_context(), response, case)
     else:
         assert negative_data_rejection(check_context(), response, case) is None
+
+
+def test_negative_data_rejection_coverage_nullable_query_beside_invalid_header(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "page",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 1, "nullable": True},
+                        },
+                        {
+                            "name": "X-Token",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "minLength": 1},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    operation = schema["/items"]["GET"]
+    cases = [
+        case
+        for case in schema.iter_coverage_cases(
+            operation=operation, generation_modes=[GenerationMode.NEGATIVE], generation_config=GenerationConfig()
+        )
+        if case.query.get("page") in ("null", ["null", "null"])
+    ]
+    assert len(cases) == 2
+    for case in cases:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(check_context(), case.call(), case)
 
 
 def test_negative_data_rejection_multiple_mutations_name_parameters(ctx, response_factory):
