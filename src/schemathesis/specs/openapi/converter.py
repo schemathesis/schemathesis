@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import PurePosixPath
 from typing import Any, TypeGuard, overload
+from urllib.parse import urlsplit
 
 from schemathesis.core.jsonschema import DRAFT_03_DIALECT, is_unsatisfiable
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
@@ -314,6 +316,9 @@ def _pin_discriminator_property(
                 original_uri = name_to_uri.get(bundled_name, "")
                 if "#" in original_uri:
                     resolved_ref = "#" + original_uri.split("#", 1)[1]
+                elif original_uri:
+                    # A whole-file reference is named after its file: `cat.json` -> `cat`.
+                    resolved_ref = PurePosixPath(urlsplit(original_uri).path).stem
             allowed = _branch_tag_values(ref, property_name, bundle)
             # Without an explicit mapping, prefer the branch's own const/enum so the literal
             # tag (`"function"`) wins over the schema name (`FunctionTool`).
