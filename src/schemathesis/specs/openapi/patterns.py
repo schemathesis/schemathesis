@@ -311,6 +311,26 @@ def _has_set_algebra(body: str) -> bool:
     return False
 
 
+def has_class_set_algebra(pattern: str) -> bool:
+    """Whether any `[...]` in the pattern leans on constructs Python `re` reads differently, if at all."""
+    i = 0
+    n = len(pattern)
+    while i < n:
+        if pattern[i] == "\\":
+            i += 2
+            continue
+        if pattern[i] == "[":
+            end = _class_extent(pattern, i)
+            if end is None:
+                return False
+            if _has_set_algebra(pattern[i + 1 : end - 1]):
+                return True
+            i = end
+            continue
+        i += 1
+    return False
+
+
 def _split_class_operands(body: str) -> tuple[list[str], list[str]]:
     """The class body cut at its set operators, and the operators themselves."""
     operands: list[str] = []
@@ -368,7 +388,9 @@ def _operand_intervals(operand: str) -> list[_Interval] | None:
         chunk.append(ch)
         i += 1
     if chunk:
-        flat = _inline_unicode_in_classes(f"[{''.join(chunk)}]")
+        # An operand carries no negation of its own, so a leading `^` is a member.
+        members = "\\" + "".join(chunk) if chunk[0] == "^" else "".join(chunk)
+        flat = _inline_unicode_in_classes(f"[{members}]")
         if flat is None:
             return None
         own = _class_intervals(flat)

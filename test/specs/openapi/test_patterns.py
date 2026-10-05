@@ -16,7 +16,7 @@ except ImportError:
     import sre_parse  # type: ignore[no-redef]
 
 import schemathesis
-from schemathesis.core.errors import InternalError
+from schemathesis.core.errors import InternalError, UnsupportedRegexPattern
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.engine import from_schema
 from schemathesis.generation import GenerationMode
@@ -26,6 +26,7 @@ from schemathesis.specs.openapi.patterns import (
     _PARTIAL_SCRIPT_CLASSES,
     _UNICODE_PROPERTY_RAW_MAP,
     _serialize,
+    has_class_set_algebra,
     is_valid_jsonschema_rs_regex,
     is_valid_python_regex,
     matches_every_string,
@@ -1685,6 +1686,62 @@ def test_length_bounds_beside_a_pattern(ctx, parameter_schema, expected):
         assert validator.is_valid(case.query["q"]), case.query
 
     check()
+
+
+def _query_pattern_operation(ctx, pattern):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string", "pattern": pattern}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    return schema["/items"]["GET"]
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    ["^[a-z&&^b]+$", "^[a-z&&c-e]+$", "^[a-z&&[^b]]+$"],
+    ids=["caret-operand", "range-operand", "nested-negation"],
+)
+def test_set_algebra_pattern_generates_valid_values(ctx, pattern):
+    operation = _query_pattern_operation(ctx, pattern)
+    validator = jsonschema_rs.validator_for({"type": "string", "pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS)
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=50, database=None, suppress_health_check=list(HealthCheck))
+    def check(case):
+        assert validator.is_valid(case.query["q"]), case.query
+
+    check()
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("^[a-z&&c]$", True),
+        (r"^\[[a&&b]$", True),
+        (r"^\[a&&b\]$", False),
+        ("^[[:alpha]$", False),
+        ("^a&&b[cd]$", False),
+    ],
+    ids=["operator", "escaped-bracket-then-class", "escaped-brackets", "unclosed-posix", "operator-outside-class"],
+)
+def test_has_class_set_algebra(pattern, expected):
+    assert has_class_set_algebra(pattern) is expected
+
+
+@pytest.mark.parametrize("pattern", [r"^[a-z&&\w]+$", r"^[\w&&a-c]+$"], ids=["shorthand-right", "shorthand-left"])
+def test_untranslatable_set_algebra_pattern_is_declined(ctx, pattern):
+    operation = _query_pattern_operation(ctx, pattern)
+
+    with pytest.raises(UnsupportedRegexPattern, match="unsupported regular expression"):
+        examples.generate_one(operation.as_strategy())
 
 
 @pytest.mark.parametrize("pattern", ["[^ab]x", "[[:alpha:]]+"], ids=["negated-class", "posix-class"])

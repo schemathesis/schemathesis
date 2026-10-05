@@ -35,7 +35,7 @@ from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_leading_whitespace
 from schemathesis.generation.jsonschema.context import Alphabet, StrategyContext
-from schemathesis.specs.openapi.patterns import normalize_regex, pattern_length_bounds
+from schemathesis.specs.openapi.patterns import has_class_set_algebra, normalize_regex, pattern_length_bounds
 from schemathesis.transport.serialization import Binary, contains_binary
 
 if TYPE_CHECKING:
@@ -62,7 +62,8 @@ _VALIDATOR_BY_CANONICALIZE_DRAFT = {draft: cls for cls, draft in CANONICALIZE_DR
 def _compiled_pattern(pattern: str) -> re.Pattern[str] | None:
     """The pattern as Python reads it, translating property escapes the validator alone understands."""
     compiled = compile_ecma_pattern(pattern)
-    if compiled is not None:
+    # Python reads class set operators and nested classes as literal characters.
+    if compiled is not None and not has_class_set_algebra(pattern):
         return compiled
     translated = normalize_regex(pattern)
     if translated is None:
