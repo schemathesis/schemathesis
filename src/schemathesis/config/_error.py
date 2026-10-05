@@ -66,6 +66,10 @@ def _format_validation_error(error: ValidationError, replaced: dict[InstancePath
         return _format_pattern_error(error)
     if error.kind.name == "minProperties":
         return _format_min_properties_error(error)
+    if error.kind.name == "minItems":
+        return _format_min_length_error(error, "item")
+    if error.kind.name == "minLength":
+        return _format_min_length_error(error, "character")
     if error.kind.name == "additionalProperties":
         return _format_additional_properties_error(error)
     if error.kind.name == "anyOf":
@@ -91,6 +95,19 @@ def _format_bound_error(error: ValidationError, predicate: str) -> str:
     return (
         f"Error in {section} section:\n  Value out of range:\n\n"
         f"  - '{prop_name}' -> {predicate} {error.kind.value}, but got {error.instance}."
+    )
+
+
+def _format_min_length_error(error: ValidationError, noun: str) -> str:
+    assert error.instance_path
+    section = path_to_section_name(error.instance_path[:-1])
+    prop_name = error.instance_path[-1]
+    limit = error.kind.limit
+    if limit != 1:
+        noun += "s"
+    return (
+        f"Error in {section} section:\n"
+        f"  '{prop_name}' must contain at least {limit} {noun}, but got {error.instance!r}."
     )
 
 
