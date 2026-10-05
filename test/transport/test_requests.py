@@ -6,6 +6,7 @@ from http.client import RemoteDisconnected
 
 import pytest
 import requests
+from flask import Flask, redirect
 from urllib3.exceptions import ProtocolError
 
 import schemathesis
@@ -47,6 +48,21 @@ def test_request_after_crash_on_same_connection(ctx):
     case = schema["/api/crash"]["POST"].Case(body={})
     with requests.Session() as session:
         assert [case.call(session=session).status_code for _ in range(3)] == [500, 500, 500]
+
+
+def test_call_respects_max_redirects(ctx, app_runner):
+    app = Flask(__name__)
+
+    @app.route("/foo")
+    def foo():
+        return redirect("/foo")
+
+    port = app_runner.run_flask_app(app)
+    case = ctx.openapi.load_schema({"/foo": {"get": {"responses": {"200": {"description": "OK"}}}}})["/foo"][
+        "GET"
+    ].Case()
+    with pytest.raises(requests.TooManyRedirects, match="Exceeded 2 redirects"):
+        case.call(base_url=f"http://127.0.0.1:{port}", max_redirects=2)
 
 
 def test_request_dropped_on_fresh_connection_is_not_resent(post_case):
