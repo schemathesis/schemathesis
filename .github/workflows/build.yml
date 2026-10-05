@@ -99,11 +99,12 @@ jobs:
       # Runs on failure too: a red job is exactly the sample flake detection needs.
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: junit.xml
           disable_search: true
           flags: pytest8
+          report_type: test_results
           token: ${{ secrets.CODECOV_TOKEN }}
 
   tests:
@@ -145,9 +146,10 @@ jobs:
       # Runs on failure too: a red job is exactly the sample flake detection needs.
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: junit.xml
           disable_search: true
           flags: ${{ matrix.os }}-${{ matrix.python }}
+          report_type: test_results
           token: ${{ secrets.CODECOV_TOKEN }}
