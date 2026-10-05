@@ -1368,6 +1368,90 @@ def test_multipart_binary_list_filename(ctx, encoding, expected_filename):
     ]
 
 
+@pytest.mark.parametrize("transport", ["wsgi", "http"])
+@pytest.mark.parametrize(
+    ("version", "operation", "body", "expected"),
+    [
+        (
+            "2.0",
+            {
+                "consumes": ["multipart/form-data"],
+                "parameters": [
+                    {"in": "formData", "name": "description", "type": "string"},
+                    {"in": "formData", "name": "tags", "type": "array", "items": {"type": "string"}},
+                    {"in": "formData", "name": "upload", "type": "file"},
+                ],
+            },
+            {"description": "hello", "tags": ["a", "b"], "upload": b"x", "unknown": "seen"},
+            {
+                "form": {"description": ["hello"], "tags": ["a", "b"], "unknown": ["seen"]},
+                "files": {"upload": ["upload"]},
+            },
+        ),
+        (
+            "2.0",
+            {
+                "consumes": ["multipart/form-data"],
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "schema": {
+                            "type": "object",
+                            "properties": {"data": {"type": "string", "format": "binary"}, "note": {"type": "string"}},
+                        },
+                    }
+                ],
+            },
+            {"data": b"x", "note": "foo"},
+            {"form": {"note": ["foo"]}, "files": {"data": ["data"]}},
+        ),
+        (
+            "2.0",
+            {"consumes": ["multipart/form-data"], "parameters": [{"in": "body", "name": "body"}]},
+            {"note": "foo"},
+            {"form": {"note": ["foo"]}, "files": {}},
+        ),
+        (
+            "3.0.2",
+            {
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {"type": "object", "properties": {"note": {"type": "string"}}}
+                        }
+                    }
+                }
+            },
+            {"note": "foo", "unknown": ["a", "b"]},
+            {"form": {"note": ["foo"], "unknown": ["a", "b"]}, "files": {}},
+        ),
+    ],
+    ids=["swagger-form-data", "swagger-body-schema", "swagger-body-without-schema", "openapi3-undeclared-list"],
+)
+def test_multipart_plain_fields_are_not_sent_as_files(ctx, app_runner, transport, version, operation, body, expected):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/upload": {"post": {**operation, "responses": {"200": {"description": "OK"}}}}}, version=version
+    )
+    prefix = "/api" if version == "2.0" else ""
+
+    @app.route(f"{prefix}/upload", methods=["POST"])
+    def upload():
+        return jsonify(
+            {
+                "form": request.form.to_dict(flat=False),
+                "files": {name: [part.filename for part in request.files.getlist(name)] for name in request.files},
+            }
+        )
+
+    if transport == "wsgi":
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    else:
+        schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/upload"]["POST"].Case(body=body, media_type="multipart/form-data")
+    assert case.call().json() == expected
+
+
 def test_unknown_multipart_fields_openapi2(ctx):
     schema = ctx.openapi.load_schema(
         {
@@ -1400,11 +1484,10 @@ def test_unknown_multipart_fields_openapi2(ctx):
         body={"data": b"\x92\x42", "note": "foo", "unknown": "seen"}, media_type="multipart/form-data"
     )
     serialized = REQUESTS_TRANSPORT.serialize_case(case)
-    assert serialized["files"] == [
-        ("data", b"\x92B"),
-        ("note", "foo"),
-        ("unknown", "seen"),
-    ]
+    assert (serialized["files"], serialized["data"]) == (
+        [("data", ("data", b"\x92B")), ("unknown", (None, "seen"))],
+        {"note": "foo"},
+    )
 
 
 def test_internal_raw_query_marker_does_not_consume_user_query_parameter(ctx):
