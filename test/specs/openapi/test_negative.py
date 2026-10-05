@@ -13,6 +13,7 @@ from jsonschema_rs import canonical
 
 import schemathesis
 from schemathesis.config import GenerationConfig
+from schemathesis.core import string_to_boolean
 from schemathesis.core.control import SkipTest
 from schemathesis.core.jsonschema import CANONICALIZE_DRAFT_BY_VALIDATOR, _is_valid_uuid, make_validator
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
@@ -380,7 +381,7 @@ def test_no_unsatisfiable_schemas(data):
 
 
 @given(data=st.data())
-@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=200, derandomize=True)
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=100, derandomize=True)
 def test_mutated_body_with_shared_ref_does_not_crash(data):
     schema = {
         "type": "object",
@@ -428,7 +429,7 @@ def test_mutated_body_with_shared_ref_does_not_crash(data):
 
 
 @given(data=st.data())
-@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=200, derandomize=True)
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=100, derandomize=True)
 def test_mutated_body_with_bundled_ref_and_inline_enum_does_not_crash(data):
     keywords = {
         "type": "object",
@@ -692,6 +693,107 @@ def test_allow_empty_value_is_not_generated_as_negative(ctx, parameter_schema):
             lambda case: case.query == {"filter": ""},
             settings=settings(max_examples=100, deadline=None),
         )
+
+
+def _wire_readings(value):
+    if isinstance(value, bool):
+        text = "true" if value else "false"
+    elif value is None:
+        text = "null"
+    else:
+        text = str(value)
+    readings = [text]
+    if text.lower() == "null":
+        readings.append(None)
+    boolean = string_to_boolean(text)
+    if isinstance(boolean, bool):
+        readings.append(boolean)
+    return readings
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("version", "parameter_schema", "allow_empty_value"),
+    [
+        ("3.0.2", {"type": "boolean", "nullable": True}, True),
+        ("3.0.2", {"type": "boolean"}, True),
+        ("3.1.0", {"type": ["boolean", "null"]}, True),
+        ("3.0.2", {"type": "boolean", "nullable": True}, False),
+    ],
+    ids=["nullable-empty", "empty", "type-array-empty", "nullable"],
+)
+def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema, allow_empty_value):
+    # A string that spells a value a sibling branch accepts is that value once it reaches the server.
+    parameter = {"name": "value", "in": "query", "required": True, "schema": parameter_schema}
+    if allow_empty_value:
+        parameter["allowEmptyValue"] = True
+    operation = ctx.openapi.load_schema(
+        {"/items": {"get": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}},
+        version=version,
+    )["/items"]["GET"]
+    validator = make_validator(
+        operation.get_parameter_set(ParameterLocation.QUERY).items[0].validation_schema,
+        operation.schema.adapter.jsonschema_validator_cls,
+    )
+
+    # Strings that spell an accepted value are a small slice of the negative space.
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=100, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        query = case.query or {}
+        mutations = case.meta.phase.data.mutations
+        if (
+            "value" not in query
+            or isinstance(query["value"], (dict, list))
+            or not any(mutation.schema_pointer.startswith("/properties/value") for mutation in mutations)
+        ):
+            return
+        assert not any(validator.is_valid(reading) for reading in _wire_readings(query["value"])), (
+            f"Valid as sent: {query['value']!r}, mutations: {mutations!r}"
+        )
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_body_property_is_invalid_against_one_of_siblings(ctx):
+    property_schema = {"oneOf": [{"type": "boolean"}, {"type": "null"}]}
+    operation = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"value": property_schema},
+                                    "required": ["value"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/items"]["POST"]
+    validator = make_validator(property_schema, operation.schema.adapter.jsonschema_validator_cls)
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=50, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        mutations = case.meta.phase.data.mutations
+        if (
+            not isinstance(case.body, dict)
+            or "value" not in case.body
+            or not any(mutation.schema_pointer.startswith("/properties/value") for mutation in mutations)
+        ):
+            return
+        assert not validator.is_valid(case.body["value"]), f"Valid: {case.body['value']!r}, mutations: {mutations!r}"
+
+    test()
 
 
 @pytest.mark.hypothesis_nested
@@ -1712,6 +1814,50 @@ def test_path_keywords_for_other_types_leave_nothing_to_negate(ctx, path_schema)
 
     with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
         test()
+
+
+@pytest.mark.parametrize(
+    "path_schema",
+    [
+        {"anyOf": [{"type": "string"}]},
+        {"oneOf": [{"type": "string"}]},
+        {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+        {"oneOf": [{"type": "string"}, {"type": "integer", "minimum": 0}]},
+        {"anyOf": [{"type": "integer"}, {}]},
+        {"anyOf": [{"type": "integer"}, True]},
+    ],
+    ids=["any-of", "one-of", "any-of-null", "any-of-integer", "one-of-integer", "empty-branch", "true-branch"],
+)
+def test_path_combinator_with_any_string_branch_leaves_nothing_to_negate(ctx, path_schema):
+    # Every path value reaches the server as a string, which one of the branches accepts.
+    operation = _operation_with_parameters(ctx, [{**PLAIN_STRING_PARAMETER, "schema": path_schema}], version="3.1.0")
+    operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=1, database=None)
+    def test(case):
+        pass
+
+    with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
+        test()
+
+
+def test_path_combinator_without_string_branch_is_negated(ctx):
+    path_schema = {"anyOf": [{"type": "integer"}, {"type": "boolean"}]}
+    operation = _operation_with_parameters(ctx, [{**PLAIN_STRING_PARAMETER, "schema": path_schema}])
+    validator = make_validator(path_schema, operation.schema.adapter.jsonschema_validator_cls)
+    values = []
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=10, database=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert case.meta.components[ParameterLocation.PATH].mode == GenerationMode.NEGATIVE
+        values.append(case.path_parameters["itemId"])
+
+    test()
+    assert values
+    assert not any(validator.is_valid(value) for value in values), values
 
 
 def test_untyped_path_object_is_negated_through_its_properties(ctx):

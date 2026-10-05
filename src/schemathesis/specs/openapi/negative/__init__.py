@@ -39,6 +39,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     compute_mutation_targets,
 )
 from schemathesis.specs.openapi.negative.value_channel import apply_value_channel, collect_value_targets
+from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
 from schemathesis.transport.serialization import Binary, contains_binary
 
 SYNTAX_FUZZING_PROBABILITY = 0.05
@@ -306,6 +307,45 @@ def negative_schema(
         def filter_values(value: Any, validator: jsonschema_rs.Validator) -> bool:
             return skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
 
+    # Parameters reach the server as text, so a mutated one that spells an accepted value is not negative.
+    is_sent_as_text = location != ParameterLocation.BODY
+    if is_sent_as_text:
+        container = validation_schema if validation_schema is not None else schema
+        assert isinstance(container, dict)
+        # Without `required`, a single parameter is checked against its own schema.
+        parameter_cache_key = CacheKey(
+            operation_name,
+            location,
+            {key: value for key, value in container.items() if key != "required"},
+            validator_cls,
+            frozenset(custom_formats),
+        )
+        types_by_parameter = {
+            name: parameter_types(subschema) for name, subschema in container.get("properties", {}).items()
+        }
+
+    def parameter_reads_as_valid(name: str | int, item: object, validator: jsonschema_rs.Validator) -> bool:
+        if isinstance(item, bool):
+            text = "true" if item else "false"
+        elif item is None:
+            text = "null"
+        elif isinstance(item, (str, int, float)):
+            text = str(item)
+        else:
+            return False
+        return sent_text_is_valid(
+            text, lambda reading: validator.is_valid({name: reading}), types_by_parameter.get(str(name), [])
+        )
+
+    def mutated_parameter_reads_as_valid(
+        value: dict[str, Any], metadata: MutationMetadata, validator: jsonschema_rs.Validator
+    ) -> bool:
+        return any(
+            parameter_reads_as_valid(mutation.path[0], value[mutation.path[0]], validator)
+            for mutation in metadata.mutations
+            if mutation.path and mutation.path[0] in value
+        )
+
     if location.is_in_header:
         # Header names and values answer to the same character rules whoever asks for them.
         alphabet = header_alphabet(generation_config)
@@ -330,10 +370,21 @@ def negative_schema(
             return st.nothing()
         # Failing every format on principle only speaks for a negated `format`; elsewhere it hides
         # that the mutation left the value conforming.
-        chosen = validator if _negates_format(metadata) else get_real_validator(validator_cache_key)
-        return strategy.filter(lambda value: filter_values(value, chosen)).map(
-            lambda value: GeneratedValue(value, metadata)
-        )
+        negates_format = _negates_format(metadata)
+        chosen = validator if negates_format else get_real_validator(validator_cache_key)
+        if is_sent_as_text:
+            parameter_validator = (
+                get_validator(parameter_cache_key) if negates_format else get_real_validator(parameter_cache_key)
+            )
+            strategy = strategy.filter(
+                lambda value: (
+                    filter_values(value, chosen)
+                    and not mutated_parameter_reads_as_valid(value, metadata, parameter_validator)
+                )
+            )
+        else:
+            strategy = strategy.filter(lambda value: filter_values(value, chosen))
+        return strategy.map(lambda value: GeneratedValue(value, metadata))
 
     if target_descriptors is None:
         target_descriptors = compute_mutation_targets(schema)

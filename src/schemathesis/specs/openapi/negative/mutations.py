@@ -14,7 +14,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureFlags, FeatureStrategy
 
 from schemathesis.core.error_feedback.store import ParameterPath
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
+from schemathesis.core.jsonschema import ALL_KEYWORDS, BUNDLE_STORAGE_KEY, get_type
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject, JsonValue
 from schemathesis.core.media_types import is_xml
@@ -851,6 +851,16 @@ def drop_not_type_specific_keywords(schema: Schema, new_type: str) -> None:
             schema.pop(keyword, None)
 
 
+def _accepts_every_string(schema: JsonValue) -> bool:
+    if schema is True:
+        return True
+    return (
+        isinstance(schema, dict)
+        and {keyword for keyword in schema if keyword in ALL_KEYWORDS} <= {"type"}
+        and "string" in get_type(schema)
+    )
+
+
 def is_negatable_keyword(key: str, value: Any, *, location: ParameterLocation, allow_extra_parameters: bool) -> bool:
     """Whether barring this keyword changes what reaches the server."""
     if key == "required":
@@ -862,6 +872,14 @@ def is_negatable_keyword(key: str, value: Any, *, location: ParameterLocation, a
         return False
     if location == ParameterLocation.PATH and key == "minLength" and value == 1:
         # Negating `minLength: 1` produces empty paths that the transport drops anyway.
+        return False
+    if (
+        location != ParameterLocation.BODY
+        and key in ("anyOf", "oneOf")
+        and isinstance(value, list)
+        and any(_accepts_every_string(branch) for branch in value)
+    ):
+        # Every value reaches the server as a string, which one of the branches accepts.
         return False
     if (
         not allow_extra_parameters
@@ -914,10 +932,6 @@ def has_negatable_target(
     for keyword in ("items", "additionalProperties"):
         if applies(keyword):
             nested.append(schema.get(keyword))
-    for keyword in ("oneOf", "anyOf", "allOf"):
-        value = schema.get(keyword)
-        if isinstance(value, list):
-            nested.extend(value)
     return any(
         has_negatable_target(child, location=location, allow_extra_parameters=allow_extra_parameters, depth=depth + 1)
         for child in nested

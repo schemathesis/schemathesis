@@ -3,7 +3,6 @@ from __future__ import annotations
 import enum
 import http.client
 import json
-import math
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from email.parser import BytesParser
@@ -53,7 +52,14 @@ from schemathesis.specs.openapi._auth_retry import (
     remove_auth,
     set_auth_for_case,
 )
-from schemathesis.specs.openapi.utils import expand_status_codes
+from schemathesis.specs.openapi.utils import (
+    coerce_wire_string,
+    expand_status_codes,
+    numeric_wire_value_is_valid,
+    parameter_types,
+    reads_as_null,
+    sent_text_is_valid,
+)
 from schemathesis.transport.prepare import prepare_path
 from schemathesis.transport.serialization import contains_binary
 
@@ -481,37 +487,6 @@ def _body_negation_is_only_forbidden_property(case: Case) -> bool:
     return False
 
 
-def _coerce_wire_string(value: str, expected_types: list[str]) -> int | float | bool | None:
-    """Try to coerce `value` to one of the numeric or boolean types in `expected_types`.
-
-    Returns the coerced value, or `None` if the string is not parseable as any expected type.
-    Used to bridge wire-level string transmission (query/header/cookie/path) and
-    the JSON-typed schema constraints those parameters declare.
-    """
-    if "integer" in expected_types:
-        try:
-            return int(value)
-        except (ValueError, TypeError):
-            pass
-    if "number" in expected_types:
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            pass
-    if "boolean" in expected_types:
-        # Spellings such as `0`, `yes`, or `True` are read as booleans by most frameworks.
-        coerced = string_to_boolean(value)
-        if isinstance(coerced, bool):
-            return coerced
-    return None
-
-
-def _numeric_wire_value_is_valid(coerced: int | float | list[int | float], validator: jsonschema_rs.Validator) -> bool:
-    # Values like `nan` or `1e400` parse as non-finite floats that servers may read as numbers.
-    values = coerced if isinstance(coerced, list) else [coerced]
-    return any(isinstance(value, float) and not math.isfinite(value) for value in values) or validator.is_valid(coerced)
-
-
 def _single_element_array_becomes_valid_after_serialization(response: Response, case: Case) -> bool:
     """Check if an array value for a scalar query parameter becomes valid after serialization.
 
@@ -580,12 +555,12 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
             # Query values are transmitted as strings, so a string element like "44" produces the same wire
             # form as int 44. Frameworks that coerce the raw query value to integer/number/boolean will accept it.
             if isinstance(element, str):
-                coerced = _coerce_wire_string(element, expected_types)
-                if coerced is not None and _numeric_wire_value_is_valid(coerced, validator):
+                coerced = coerce_wire_string(element, expected_types)
+                if coerced is not None and numeric_wire_value_is_valid(coerced, validator.is_valid):
                     neutralized.add((location, param_name))
                     break
         # Nested lists and objects reach the server as repeated keys or their string representation.
-        if any(_sent_text_is_valid(text, validator, expected_types) for text in sent_texts):
+        if any(sent_text_is_valid(text, validator.is_valid, expected_types) for text in sent_texts):
             neutralized.add((location, param_name))
 
     # Any other mutated parameter or location still makes the request invalid.
@@ -594,31 +569,16 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
     )
 
 
-def _reads_as_null(text: str, validator: jsonschema_rs.Validator) -> bool:
-    """Frameworks read the text `null` into a nullable parameter as null."""
-    return text.lower() == "null" and validator.is_valid(None)
-
-
-def _sent_text_is_valid(text: str, validator: jsonschema_rs.Validator, expected_types: list[str]) -> bool:
-    if validator.is_valid(text) or _reads_as_null(text, validator):
-        return True
-    # Python's number parsing also accepts `1_0`, ` 5`, or non-ASCII digits, which servers do not.
-    if not text.isascii() or "_" in text or text != text.strip():
-        return False
-    coerced = _coerce_wire_string(text, expected_types)
-    return coerced is not None and _numeric_wire_value_is_valid(coerced, validator)
-
-
 def _wire_value_matches_parameter(parameter: OpenApiParameter, expected_types: list[str], wire_value: str) -> bool:
     """Check whether the text actually sent for `parameter` satisfies its original schema."""
-    coerced = _coerce_wire_string(wire_value, expected_types)
+    coerced = coerce_wire_string(wire_value, expected_types)
     try:
         validator = make_validator(parameter.validation_schema, parameter.adapter.jsonschema_validator_cls)
     except Exception:
         # Schema rejected by jsonschema_rs - validity is unknown, so don't report a failure.
         return True
     if coerced is not None:
-        return _numeric_wire_value_is_valid(coerced, validator)
+        return numeric_wire_value_is_valid(coerced, validator.is_valid)
     return validator.is_valid(wire_value)
 
 
@@ -731,9 +691,9 @@ def _path_array_becomes_valid_after_serialization(case: Case) -> bool:
             return True
         # Items arrive as text, so `18` is the wire form of `[18]` for an integer array.
         item_types = get_type(schema.get("items", {}))
-        coerced = [_coerce_wire_string(item, item_types) for item in items]
+        coerced = [coerce_wire_string(item, item_types) for item in items]
         numbers = [value for value in coerced if value is not None]
-        if len(numbers) == len(coerced) and _numeric_wire_value_is_valid(numbers, validator):
+        if len(numbers) == len(coerced) and numeric_wire_value_is_valid(numbers, validator.is_valid):
             return True
 
     return False
@@ -1245,7 +1205,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                         if (
                             name not in mutated
                             and isinstance(item, str)
-                            and _reads_as_null(item, make_validator(properties.get(name, {}), validator_cls))
+                            and reads_as_null(item, make_validator(properties.get(name, {}), validator_cls).is_valid)
                         ):
                             value_without_additional_properties[name] = None
                 is_valid = make_validator(schema, validator_cls).is_valid(value_without_additional_properties)
@@ -1296,16 +1256,8 @@ def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameter
 
 
 def _allows_container_type(schema: JsonSchema) -> bool:
-    """Whether a parameter schema admits arrays or objects, reading `nullable` and `allowEmptyValue` wrappers through."""
-    if isinstance(schema, dict) and "type" not in schema:
-        if "enum" in schema:
-            return any(isinstance(value, (list, dict)) for value in schema["enum"])
-        if "const" in schema:
-            return isinstance(schema["const"], (list, dict))
-        branches = [*schema.get("anyOf", []), *schema.get("oneOf", [])]
-        if branches:
-            return any(_allows_container_type(branch) for branch in branches)
-    types = get_type(schema)
+    """Whether a parameter schema admits arrays or objects."""
+    types = parameter_types(schema)
     return "array" in types or "object" in types
 
 
