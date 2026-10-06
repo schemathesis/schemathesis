@@ -274,11 +274,7 @@ def _with_defaults(
 
 def _iter_parameter_defaults(operation: OpenApiOperation) -> Generator[tuple[OpenApiParameter, Any], None, None]:
     for parameter in operation.iter_parameters():
-        try:
-            schema = parameter.validation_schema
-        except TypeError:
-            # Invalid schema (e.g., non-string pattern value)
-            continue
+        schema = parameter.validation_schema
         # A recursive schema stays behind a `$ref`, so its default goes unseen and a value is generated instead.
         if (
             isinstance(schema, dict)
@@ -695,11 +691,7 @@ def extract_from_schemas(
     """Extract examples from parameters' schema definitions."""
     merge_ref_siblings = operation.schema.adapter.ref_siblings
     for parameter in operation.iter_parameters():
-        try:
-            schema = parameter.validation_schema
-        except TypeError:
-            # Invalid schema (e.g., non-string pattern value)
-            continue
+        schema = parameter.validation_schema
         if isinstance(schema, bool):
             continue
         # A value assembled from examples declared deeper in the schema still goes on the wire as the whole
@@ -734,11 +726,7 @@ def _extract_body_examples_from_schemas(
     merge_ref_siblings = operation.schema.adapter.ref_siblings
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
-        try:
-            schema = body.validation_schema
-        except TypeError:
-            # Invalid schema (e.g., non-string pattern value)
-            continue
+        schema = body.validation_schema
         if isinstance(schema, bool):
             continue
         body_validator: jsonschema_rs.Validator | None = _make_example_validator(schema, snap_float32=False)
