@@ -10,6 +10,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
+from schemathesis.engine import Status
 from schemathesis.engine.recorder import CaseNode, RecordedScenario
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
@@ -52,6 +53,7 @@ class Statistic:
     extraction_failures: set[ExtractionFailure]
 
     tested_operations: set[str]
+    errored_operations: set[str]
     # Operations whose cases ran but had no applicable checks.
     operations_without_checks: set[str]
 
@@ -69,6 +71,7 @@ class Statistic:
         self.filtered_failures = 0
         self.extraction_failures = set()
         self.tested_operations = set()
+        self.errored_operations = set()
         self.operations_without_checks = set()
         self.total_cases = 0
         self.cases_with_failures = 0
@@ -88,6 +91,7 @@ class Statistic:
         self.filtered_failures += sum(recorder.filtered_failures.values())
 
         extraction_failures = set()
+        scenario_errored = any(check.status == Status.ERROR for checks in recorder.checks.values() for check in checks)
 
         def collect_history(node: CaseNode, response: Response) -> list[tuple[Case, Response]]:
             history = [(node.value, response)]
@@ -103,9 +107,14 @@ class Statistic:
         for case_id, case in recorder.cases.items():
             checks = recorder.checks.get(case_id, [])
 
+            if any(check.status == Status.ERROR for check in checks):
+                self.errored_cases += 1
+                self.errored_operations.add(case.value.operation.label)
+                continue
+
             if not checks:
                 interaction = recorder.interactions.get(case_id)
-                if interaction is None or interaction.response is None:
+                if scenario_errored or interaction is None or interaction.response is None:
                     self.errored_cases += 1
                 else:
                     self.cases_without_checks += 1

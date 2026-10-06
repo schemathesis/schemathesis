@@ -530,6 +530,12 @@ def run_checks(
             # Every failure was dropped, so the check ran and raised nothing the run cares about.
             if not kept and on_success:
                 on_success(name, case)
+        except Exception as exc:
+            import requests
+
+            if ctx._recorder is not None and not isinstance(exc, requests.RequestException):
+                ctx._recorder.record_check_error(name=name, case_id=case.id)
+            raise
         else:
             if not skip_check and on_success:
                 on_success(name, case)

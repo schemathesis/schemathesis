@@ -1,0 +1,38 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ 🚫  Fuzzing (in 0.00s)
+
+     ✅ N scenarios  🚫 N errors
+
+==================================== ERRORS ====================================
+__________________________________ Fuzz tests __________________________________
+Runtime Error
+
+boom
+
+    <TRACEBACK>
+    ZeroDivisionError: boom
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+  Errored: 1
+
+Stop reason: Completed
+
+Errors:
+  🚫 Runtime Error: 1
+
+Test cases:
+  12 generated, 12 errored
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

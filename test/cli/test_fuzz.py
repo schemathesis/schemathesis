@@ -110,6 +110,19 @@ def test_fuzz_connection_error_cases_are_not_reported_as_skipped(cli, ctx):
     assert re.search(r"Test cases:\n  (\d+) generated, \1 errored\n", result.stdout), result.stdout
 
 
+@pytest.mark.snapshot(replace_test_cases=False, replace_traceback=True)
+def test_fuzz_crashed_check_cases_are_reported_as_errored(cli, ctx, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    with ctx.check(
+        """
+@schemathesis.check
+def broken_check(ctx, response, case):
+    raise ZeroDivisionError("boom")
+"""
+    ) as module:
+        assert cli.main("fuzz", api.schema_url, "--checks=broken_check", hooks=module) == snapshot_cli
+
+
 def test_fuzz_budget_too_small_for_startup_still_runs_a_scenario(cli, app_runner, ctx):
     # A budget already spent by the time fuzzing starts should still buy one scenario, not an empty run.
     url = _make_fuzz_app(ctx, app_runner)
