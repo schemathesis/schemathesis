@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from collections import deque
 from dataclasses import dataclass
 
 # Below this many observations, the success/failure ratio is too noisy to act on.
@@ -10,7 +11,10 @@ DEFAULT_USE_PROBABILITY = 1.0
 MIN_USE_PROBABILITY = 0.05
 TIGHTEN_AFTER_FAILURES = 2
 TIGHTENED_TIMEOUT_SECONDS = 1.0
-PHASE_FATAL_DISTINCT_OPERATIONS = 3
+ADAPTIVE_TIMEOUT_MULTIPLIER = 4.0
+PHASE_FATAL_FAILURES = 3
+UNRESPONSIVE_MIN_FAILURES = 10
+UNRESPONSIVE_FAILURE_RATIO = 0.75
 PHASE_FATAL_WINDOW_SECONDS = 30.0
 
 
@@ -24,8 +28,10 @@ class OperationHealth:
 
     completed: int = 0
     transport_failures: int = 0
-    consecutive_failures: int = 0
-    last_failure_time: float | None = None
+    # Slowest answered request, in seconds; `None` until a request with known duration is answered.
+    slowest_completion: float | None = None
+    first_failure_time: float | None = None
+    unresponsive: bool = False
 
     @property
     def use_probability(self) -> float:
@@ -36,16 +42,27 @@ class OperationHealth:
 
 
 class HealthState:
-    """Per-operation transport-failure tracking for stateful-phase recovery.
+    """Per-operation answers and transport failures, shared by every phase.
 
     Mutations are lock-guarded; reads run lock-free on the scheduler hot path
     and may observe slightly stale snapshots but never torn state.
     """
 
-    __slots__ = ("operations", "_frozen_use_probability", "_lock")
+    __slots__ = (
+        "operations",
+        "_last_answer_time",
+        "_first_failure_time",
+        "_recent_failures",
+        "_frozen_use_probability",
+        "_lock",
+    )
 
     def __init__(self) -> None:
         self.operations: dict[str, OperationHealth] = {}
+        self._last_answer_time: float | None = None
+        self._first_failure_time: float | None = None
+        # Transport failures as `(operation label, time)`, oldest first; pruned to the abort window.
+        self._recent_failures: deque[tuple[str, float]] = deque()
         # Per-run snapshot of use-probabilities; stays stable across a Hypothesis replay so generation
         # is reproducible. Refreshed at suite boundaries by `begin_iteration`; `operations` stays live.
         self._frozen_use_probability: dict[str, float] = {}
@@ -56,45 +73,81 @@ class HealthState:
         with self._lock:
             self._frozen_use_probability = {label: h.use_probability for label, h in self.operations.items()}
 
-    def record_completion(self, *, operation_label: str) -> None:
+    def record_completion(self, *, operation_label: str, now: float, elapsed: float | None = None) -> None:
         with self._lock:
             health = self.operations.setdefault(operation_label, OperationHealth())
             health.completed += 1
-            health.consecutive_failures = 0
-            health.last_failure_time = None
+            if elapsed is not None and (health.slowest_completion is None or elapsed > health.slowest_completion):
+                health.slowest_completion = elapsed
+            self._last_answer_time = now
 
     def record_transport_failure(self, *, operation_label: str, now: float) -> None:
         with self._lock:
             health = self.operations.setdefault(operation_label, OperationHealth())
             health.transport_failures += 1
-            health.consecutive_failures += 1
-            health.last_failure_time = now
+            if health.first_failure_time is None:
+                health.first_failure_time = now
+            if self._first_failure_time is None:
+                self._first_failure_time = now
+            self._recent_failures.append((operation_label, now))
+            self._prune(now)
 
     def frozen_use_probability(self, operation_label: str) -> float:
         return self._frozen_use_probability.get(operation_label, DEFAULT_USE_PROBABILITY)
 
     def timeout_override(self, operation_label: str) -> float | None:
         health = self.operations.get(operation_label)
-        if health is None or health.consecutive_failures < TIGHTEN_AFTER_FAILURES:
+        if health is None or health.transport_failures < TIGHTEN_AFTER_FAILURES:
             return None
+        # Once an operation keeps hanging, wait only as long as its answers ever took; hanging inputs stay cheap.
+        if health.slowest_completion is not None:
+            return max(TIGHTENED_TIMEOUT_SECONDS, ADAPTIVE_TIMEOUT_MULTIPLIER * health.slowest_completion)
         return TIGHTENED_TIMEOUT_SECONDS
 
-    def abort_reason(self, *, now: float) -> str | None:
+    def mark_unresponsive(self, operation_label: str) -> bool:
+        """Flag an operation whose requests mostly hang while the API keeps answering; `True` only the first time."""
         with self._lock:
-            offending: list[tuple[str, float]] = []
-            for label, health in self.operations.items():
-                last_failure_time = health.last_failure_time
-                if last_failure_time is None:
-                    continue
-                seconds_ago = now - last_failure_time
-                if seconds_ago < PHASE_FATAL_WINDOW_SECONDS:
-                    offending.append((label, seconds_ago))
-        if len(offending) < PHASE_FATAL_DISTINCT_OPERATIONS:
-            return None
+            health = self.operations.get(operation_label)
+            if health is None or health.unresponsive or health.first_failure_time is None:
+                return False
+            total = health.completed + health.transport_failures
+            if (
+                health.transport_failures < UNRESPONSIVE_MIN_FAILURES
+                or health.transport_failures / total < UNRESPONSIVE_FAILURE_RATIO
+                or self._last_answer_time is None
+                or self._last_answer_time <= health.first_failure_time
+            ):
+                return False
+            health.unresponsive = True
+            return True
+
+    def is_unresponsive(self, operation_label: str) -> bool:
+        health = self.operations.get(operation_label)
+        return health is not None and health.unresponsive
+
+    def _prune(self, now: float) -> None:
+        while self._recent_failures and now - self._recent_failures[0][1] >= PHASE_FATAL_WINDOW_SECONDS:
+            self._recent_failures.popleft()
+
+    def abort_reason(self, *, now: float) -> str | None:
+        """Why the API counts as no longer responding, or `None` while it still answers something."""
+        with self._lock:
+            silent_since = self._last_answer_time if self._last_answer_time is not None else self._first_failure_time
+            if silent_since is None or now - silent_since < PHASE_FATAL_WINDOW_SECONDS:
+                return None
+            self._prune(now)
+            if len(self._recent_failures) < PHASE_FATAL_FAILURES:
+                return None
+            silence = now - silent_since
+            failures = len(self._recent_failures)
+            per_operation: dict[str, tuple[int, float]] = {}
+            for label, failed_at in self._recent_failures:
+                count, _ = per_operation.get(label, (0, failed_at))
+                per_operation[label] = (count + 1, failed_at)
         lines = [
-            f"API appears unhealthy: {len(offending)} operations had transport failures "
-            f"within the last {PHASE_FATAL_WINDOW_SECONDS:.0f}s"
+            f"API stopped responding: no answers for {silence:.1f}s, "
+            f"{failures} requests failed in the last {PHASE_FATAL_WINDOW_SECONDS:.0f}s"
         ]
-        for label, seconds_ago in offending:
-            lines.append(f"  - {label} (last failure {seconds_ago:.1f}s ago)")
+        for label, (count, failed_at) in per_operation.items():
+            lines.append(f"  - {label} ({count} failed, last {now - failed_at:.1f}s ago)")
         return "\n".join(lines)

@@ -7,6 +7,7 @@ import requests
 
 import schemathesis
 from schemathesis.core.transport import Response
+from schemathesis.engine.health import HealthState
 from schemathesis.engine.outage import CONFIRMATION_INTERVAL, REPORTED_REQUESTS, SERVER_LABEL, ServerMonitor
 from schemathesis.engine.run import PhaseName
 
@@ -22,9 +23,13 @@ def operation(ctx, app_runner):
     return schema["/users"]["get"]
 
 
-def answer(case):
+def answer(case, elapsed=0.1):
     request = requests.Request("GET", f"{case.operation.base_url}/users")
-    return Response(status_code=200, headers={}, content=b"", request=request, elapsed=0.1, verify=True)
+    return Response(status_code=200, headers={}, content=b"", request=request, elapsed=elapsed, verify=True)
+
+
+def time_out(case):
+    raise requests.ReadTimeout("Read timed out", request=requests.Request("GET", f"{case.operation.base_url}/users"))
 
 
 def refusal(base_url):
@@ -153,3 +158,15 @@ def test_a_request_that_never_reached_the_server_does_not_prove_it_was_up(operat
         monitor.track(case, send, transport_kwargs={})
 
     assert not monitor.is_down(refusal(operation.base_url))
+
+
+def test_tracked_answers_and_timeouts_set_the_operation_timeout(operation):
+    health = HealthState()
+    monitor = ServerMonitor(health=health)
+    case = operation.Case()
+    monitor.track(case, lambda: answer(case, elapsed=0.5), transport_kwargs={})
+    for _ in range(2):
+        with pytest.raises(requests.ReadTimeout):
+            monitor.track(case, lambda: time_out(case), transport_kwargs={})
+
+    assert health.timeout_override(operation.label) == 2.0

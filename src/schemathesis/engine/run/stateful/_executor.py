@@ -26,6 +26,7 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.errors import (
     TestingState,
     UnhealthyAPIError,
+    UnresponsiveOperationError,
     UnrecoverableNetworkError,
     build_code_sample,
     clear_hypothesis_notes,
@@ -181,15 +182,32 @@ def _classify_suite_error(
     )
 
 
+def _unresponsive_operation_error(
+    exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
+) -> events.NonFatalError:
+    health = engine.health.operations[case.operation.label]
+    total = health.completed + health.transport_failures
+    error = UnresponsiveOperationError(
+        f"{health.transport_failures} of {total} requests failed while other operations answered; "
+        "no further requests are sent to this operation"
+    )
+    transport_kwargs = engine.get_transport_kwargs(operation=case.operation)
+    return events.NonFatalError(
+        error=error,
+        phase=PhaseName.STATEFUL_TESTING,
+        label=case.operation.label,
+        related_to_operation=True,
+        code_sample=build_code_sample(case, exc.request, transport_kwargs),
+    )
+
+
 def _unrecoverable_network_error(
     exc: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, *, case: Case, engine: EngineContext
 ) -> UnrecoverableNetworkError | None:
     """Describe a fatal transport failure, or `None` when the health monitor absorbs it."""
-    now = time.monotonic()
-    engine.health.record_transport_failure(operation_label=case.operation.label, now=now)
     reason: str | None = None
     if isinstance(exc, requests.Timeout):
-        reason = engine.health.abort_reason(now=now)
+        reason = engine.health.abort_reason(now=time.monotonic())
         if reason is None:
             return None
     transport_kwargs = engine.get_transport_kwargs(operation=case.operation)
@@ -269,6 +287,8 @@ def execute_state_machine_loop(
             # Always draw — keeps data-tree topology stable across replays as `use_probability` transitions from 1.0 to <1.0.
             if not current_build_context().data.draw_boolean(p=use_probability):
                 reject()
+            if engine.health.is_unresponsive(operation_label):
+                reject()
 
             try:
                 if generation.unique_inputs:
@@ -302,11 +322,9 @@ def execute_state_machine_loop(
                 )
                 result = StepOutput(final_response, input.case)
                 ctx.step_succeeded()
-                engine.health.record_completion(operation_label=operation_label)
             except UnsatisfiedAssumption:
                 raise
             except FailureGroup as exc:
-                engine.health.record_completion(operation_label=operation_label)
                 for failure in exc.exceptions:
                     remember_step_outcome(input.case, failure)
                 ctx.step_failed()
@@ -322,6 +340,8 @@ def execute_state_machine_loop(
                 ) and is_unrecoverable_network_error(exc):
                     network_error = _unrecoverable_network_error(exc, case=input.case, engine=engine)
                     if network_error is None:
+                        if engine.health.mark_unresponsive(operation_label):
+                            event_queue.put(_unresponsive_operation_error(exc, case=input.case, engine=engine))
                         raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
                     state.store_unrecoverable_network_error(network_error)
 

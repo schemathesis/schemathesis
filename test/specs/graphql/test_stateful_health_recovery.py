@@ -18,6 +18,6 @@ def test_one_slow_resolver_does_not_abort_stateful_phase(ctx, cli):
         "-c",
         "not_a_server_error",
     )
-    assert "API appears unhealthy" not in result.stdout
+    assert "Unhealthy API" not in result.stdout
     assert "UnhealthyAPIError" not in result.stdout
     assert "Stateful" in result.stdout
