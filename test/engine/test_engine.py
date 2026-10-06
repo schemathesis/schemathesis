@@ -3,6 +3,7 @@ from __future__ import annotations
 import _thread
 import gc
 import json
+import math
 import platform
 import sys
 import threading
@@ -842,7 +843,11 @@ def test_max_time_reaches_every_operation(ctx, workers):
     # never dispatched, which makes the tested set depend on schema order.
     api = ctx.openapi.apps.users_crud()
     schema = schemathesis.openapi.from_url(api.schema_url)
-    stream = execute(schema, max_time=3, max_examples=2000, workers=workers, phases=[PhaseName.FUZZING])
+    # Work before an operation's first case cannot be interrupted, so scale the budget to the runner's speed.
+    started = time.monotonic()
+    execute(schema, max_examples=1, workers=workers, phases=[PhaseName.FUZZING])
+    max_time = max(3, math.ceil(3 * (time.monotonic() - started)))
+    stream = execute(schema, max_time=max_time, max_examples=2000, workers=workers, phases=[PhaseName.FUZZING])
     tested = {event.label for event in stream.find_all(events.ScenarioFinished)}
     assert tested == {"POST /users/", "GET /users/{user_id}", "PATCH /users/{user_id}"}
 

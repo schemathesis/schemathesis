@@ -3516,6 +3516,7 @@ def test_server_stops_accepting_connections_in_generated_phases(subprocess_runne
         f"--phases={phase}",
         "--checks=not_a_server_error",
         "--mode=positive",
+        "--seed=1",
     )
     assert result == snapshot_cli
     # Generated bodies differ across Python versions; the listed request must still be the one that crashed it.

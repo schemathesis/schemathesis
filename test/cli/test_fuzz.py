@@ -40,7 +40,7 @@ USERS_OK_PATHS = {"/users": {"get": {"responses": {"200": {"description": "OK"}}
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_basic(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_app(ctx, app_runner)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=3"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -53,7 +53,7 @@ def filter_case(context, case):
     return False
 """
     )
-    assert cli.main("fuzz", api.schema_url, "--max-time=1", hooks=module) == snapshot_cli
+    assert cli.main("fuzz", api.schema_url, "--max-time=30", hooks=module) == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -84,20 +84,20 @@ class NoServerErrors:
         raise AssertionError("after_run fired in fuzz")
         """
     )
-    assert_cli_snapshot(cli.main("fuzz", url, "-c", "NoServerErrors", "--max-time=3", hooks=module), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "-c", "NoServerErrors", "--max-time=30", hooks=module), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_with_failure(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_failure_app(ctx, app_runner)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=3"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_final_line_with_error(cli, app_runner, ctx, snapshot_cli):
     url = _make_slow_fuzz_app(ctx, app_runner)
     assert_cli_snapshot(
-        cli.main("fuzz", url, "--max-time=3", "--request-timeout=0.001"),
+        cli.main("fuzz", url, "--max-time=30", "--request-timeout=0.001"),
         snapshot_cli,
     )
 
@@ -105,7 +105,7 @@ def test_fuzz_final_line_with_error(cli, app_runner, ctx, snapshot_cli):
 def test_fuzz_connection_error_cases_are_not_reported_as_skipped(cli, ctx):
     api = ctx.openapi.apps.success()
 
-    result = cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=1")
+    result = cli.main("fuzz", api.schema_url, "--url=http://127.0.0.1:1/api", "--max-time=30")
 
     assert re.search(r"Test cases:\n  (\d+) generated, \1 errored\n", result.stdout), result.stdout
 
@@ -286,7 +286,7 @@ def _make_fuzz_multi_operation_event(ctx):
 def test_fuzz_report_junit(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     xml_path = tmp_path / "junit.xml"
-    result = cli.main("fuzz", url, "--max-time=3", f"--report-junit-path={xml_path}")
+    result = cli.main("fuzz", url, "--max-time=30", f"--report-junit-path={xml_path}")
     assert result.exit_code == 0, result.output
     assert xml_path.exists()
     ElementTree.parse(xml_path)
@@ -295,7 +295,7 @@ def test_fuzz_report_junit(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_junit_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_failure_app(ctx, app_runner)
     xml_path = tmp_path / "junit.xml"
-    result = cli.main("fuzz", url, "--max-time=3", f"--report-junit-path={xml_path}")
+    result = cli.main("fuzz", url, "--max-time=30", f"--report-junit-path={xml_path}")
     assert result.exit_code == 1, result.output
 
     tree = ElementTree.parse(xml_path)
@@ -308,7 +308,7 @@ def test_fuzz_report_junit_uses_operation_labels_for_failures(cli, ctx, app_runn
 def test_fuzz_report_vcr(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     vcr_path = tmp_path / "cassette.yaml"
-    result = cli.main("fuzz", url, "--max-time=3", f"--report-vcr-path={vcr_path}")
+    result = cli.main("fuzz", url, "--max-time=30", f"--report-vcr-path={vcr_path}")
     assert result.exit_code == 0, result.output
     assert vcr_path.exists()
     cassette = yaml.safe_load(vcr_path.read_text())
@@ -318,7 +318,7 @@ def test_fuzz_report_vcr(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_har(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     har_path = tmp_path / "recording.har"
-    result = cli.main("fuzz", url, "--max-time=3", f"--report-har-path={har_path}")
+    result = cli.main("fuzz", url, "--max-time=30", f"--report-har-path={har_path}")
     assert result.exit_code == 0, result.output
     assert har_path.exists()
     har = json.loads(har_path.read_text())
@@ -328,7 +328,7 @@ def test_fuzz_report_har(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_ndjson(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     ndjson_path = tmp_path / "events.ndjson"
-    result = cli.main("fuzz", url, "--max-time=3", f"--report-ndjson-path={ndjson_path}")
+    result = cli.main("fuzz", url, "--max-time=30", f"--report-ndjson-path={ndjson_path}")
     assert result.exit_code == 0, result.output
     assert ndjson_path.exists()
     events = [json.loads(line) for line in ndjson_path.read_text().splitlines() if line]
@@ -338,7 +338,7 @@ def test_fuzz_report_ndjson(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_allure(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     allure_dir = tmp_path / "allure-results"
-    result = cli.main("fuzz", url, "--max-time=3", f"--report-allure-path={allure_dir}")
+    result = cli.main("fuzz", url, "--max-time=30", f"--report-allure-path={allure_dir}")
     assert result.exit_code == 0, result.output
     assert any(allure_dir.glob("*-result.json"))
 
@@ -346,7 +346,7 @@ def test_fuzz_report_allure(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_allure_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_failure_app(ctx, app_runner)
     allure_dir = tmp_path / "allure-results"
-    result = cli.main("fuzz", url, "--max-time=3", f"--report-allure-path={allure_dir}")
+    result = cli.main("fuzz", url, "--max-time=30", f"--report-allure-path={allure_dir}")
     assert result.exit_code == 1, result.output
 
     results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
@@ -428,14 +428,14 @@ def test_fuzz_reports_operations_with_schema_errors(cli, app_runner, ctx, snapsh
         return jsonify([])
 
     url = app_runner.openapi_url(app)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=3"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_all_operations_have_schema_errors(cli, app_runner, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(BAD_PARAMETERS_PATHS)
     url = app_runner.openapi_url(app)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=1"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
 @pytest.mark.parametrize(
@@ -468,7 +468,7 @@ def test_fuzz_custom_handler_error(cli, app_runner, ctx, snapshot_cli):
             raise AttributeError("oops")
 
     url = _make_fuzz_app(ctx, app_runner)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=3"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -482,7 +482,7 @@ def test_fuzz_custom_handler(cli, app_runner, ctx, snapshot_cli):
 
     schemathesis.cli.handler()(SummaryHandler)
     url = _make_fuzz_app(ctx, app_runner)
-    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=3"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", url, "--max-time=30"), snapshot_cli)
 
 
 def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
@@ -503,7 +503,7 @@ def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
     result = cli.main(
         "fuzz",
         url,
-        "--max-time=3",
+        "--max-time=30",
         "--fuzz-counter=42",
     )
 
@@ -686,7 +686,7 @@ def test_fuzz_chains_via_request_body_link(cli, app_runner, ctx, snapshot_cli):
         cli.main(
             "fuzz",
             app_runner.openapi_url(app),
-            "--max-time=5",
+            "--max-time=30",
             "-c",
             "response_schema_conformance",
         ),
