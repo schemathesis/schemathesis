@@ -514,11 +514,14 @@ def _single_element_array_becomes_valid_after_serialization(response: Response, 
     component = meta.components.get(location)
     if component is None or not component.mode.is_negative:
         return False
+    query: object = case.query
+    if not isinstance(query, Mapping):
+        return False
 
     neutralized: set[tuple[ParameterLocation, str]] = set()
     sent_query = _sent_query_values(response, case)
 
-    for param_name, param_value in (case.query or {}).items():
+    for param_name, param_value in query.items():
         param = case.operation.query.get(param_name)
         if param is None:
             # This is an additional property, not a schema-defined parameter

@@ -2548,6 +2548,43 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
     assert result is None
 
 
+def test_negative_data_rejection_non_mapping_query_with_another_invalid_location(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "a", "in": "query", "schema": {"type": "integer"}},
+                        {"name": "X-Id", "in": "header", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            headers=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            parameter="X-Id",
+            parameter_location=ParameterLocation.HEADER,
+            mutations=(
+                _mutation(
+                    OperatorKind.CHANGE_TYPE,
+                    ("type",),
+                    parameter="X-Id",
+                    location=ParameterLocation.HEADER,
+                ),
+            ),
+        ),
+        query="a=1",
+        headers={"X-Id": "abc"},
+    )
+    with pytest.raises(AcceptedNegativeData):
+        negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
 @pytest.mark.parametrize(
     ("value", "is_accepted_negative"),
     [(["false"], True), ([-1], True), (["5"], False), ([5], False)],
