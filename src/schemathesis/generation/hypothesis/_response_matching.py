@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-NOT_FOUND = object()
-
 
 def find_matching_in_responses(examples: list[tuple[str, object]], param: str) -> Iterator[Any]:
     """Find matching parameter examples."""
@@ -24,17 +22,11 @@ def find_matching_in_responses(examples: list[tuple[str, object]], param: str) -
             if isinstance(inner, list):
                 for sub_example in inner:
                     if isinstance(sub_example, dict):
-                        for found in _find_matching_in_responses(
-                            sub_example, schema_name, param, normalized, is_id_param
-                        ):
-                            if found is not NOT_FOUND:
-                                yield found
+                        yield from _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param)
                 continue
             if isinstance(inner, dict):
                 example = inner
-        for found in _find_matching_in_responses(example, schema_name, param, normalized, is_id_param):
-            if found is not NOT_FOUND:
-                yield found
+        yield from _find_matching_in_responses(example, schema_name, param, normalized, is_id_param)
 
 
 def _find_matching_in_responses(
@@ -48,9 +40,7 @@ def _find_matching_in_responses(
         value = example[param[:-2]]
         if isinstance(value, list):
             for sub_example in value:
-                for found in _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param):
-                    if found is not NOT_FOUND:
-                        yield found
+                yield from _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param)
             return
         else:
             yield value

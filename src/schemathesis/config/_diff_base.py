@@ -81,14 +81,6 @@ class DiffBase:
             # If the nested object is a dataclass, recursively show its diff.
             return repr(value)
         if isinstance(value, list) and isinstance(default, list):
-            diff_items = []
-            # Compare items pairwise.
-            for v, d in zip(value, default, strict=False):
-                if self._has_diff(v, d):
-                    diff_items.append(self._diff_repr(v, d))
-            # Include any extra items in value.
-            if len(value) > len(default):
-                diff_items.extend(_repr(item) for item in value[len(default) :])
             return f"[{', '.join(_repr(item) for item in value)}]"
         if isinstance(value, dict) and isinstance(default, dict):
             diff_items = []

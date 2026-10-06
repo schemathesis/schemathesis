@@ -1170,7 +1170,6 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
             event,
             wait_for_schema=self.config.wait_for_schema,
         )
-        self.loading_manager = None
 
     def _print_warning_header(self, title: str, count: int, entity_name: str, suffix_text: str) -> None:
         """Print warning block header."""
@@ -1244,19 +1243,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         entity_name: str,
         suffix_text: str,
         tips: list[str],
-        show_entity_label: bool = True,
     ) -> None:
         """Display warnings with detailed messages per entity."""
         self._print_warning_header(title, len(warnings), entity_name, suffix_text)
 
         for idx, (entity_label, messages) in enumerate(sorted(warnings.items())):
-            if show_entity_label:
-                click.echo(_style(f"  - {entity_label}", fg="yellow"))
-                for message in sorted(messages):
-                    click.echo(_style(f"    {message}", fg="yellow"))
-            else:
-                for message in sorted(messages):
-                    click.echo(_style(f"  {message}", fg="yellow"))
+            click.echo(_style(f"  - {entity_label}", fg="yellow"))
+            for message in sorted(messages):
+                click.echo(_style(f"    {message}", fg="yellow"))
 
             # Add spacing between entities (but not after the last one)
             if idx < len(warnings) - 1:

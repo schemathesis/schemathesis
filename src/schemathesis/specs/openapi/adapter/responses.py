@@ -369,26 +369,6 @@ def _prepare_schema(
     return Bundle(schema=converted, name_to_uri=bundled.name_to_uri)
 
 
-def prepare_response_media_type_schema(
-    schema: JsonSchema,
-    resolver: Resolver,
-    scope: str,
-    nullable_keyword: str,
-    *,
-    upgrade_legacy_exclusive_bounds: bool = False,
-    merge_ref_siblings: bool = False,
-) -> Bundle:
-    """Prepare schema for a specific media type entry."""
-    return _prepare_schema(
-        schema,
-        resolver,
-        scope,
-        nullable_keyword,
-        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
-        merge_ref_siblings=merge_ref_siblings,
-    )
-
-
 def get_default_response_media_type_v2(response: Mapping[str, Any]) -> str | None:
     """Swagger 2.0 has no default media type in response definition."""
     return None

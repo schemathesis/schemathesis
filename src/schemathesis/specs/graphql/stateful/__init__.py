@@ -67,11 +67,6 @@ class GraphQLStateMachine(APIStateMachine):
             recorder=self.recorder,
         )
 
-    def _get_target_for_result(self, result: StepOutput) -> str | None:
-        # Routing is driven by each rule's declared `target=` Bundle, applied via the
-        # `_add_result_to_targets` override below. The base-class lookup is unused.
-        return None
-
     def _add_result_to_targets(self, targets: tuple[str, ...], result: Any) -> None:
         RuleBasedStateMachine._add_result_to_targets(self, targets, result)
 
