@@ -26,6 +26,7 @@ from schemathesis.core.jsonschema import (
     make_validator,
     make_validator_for,
     make_validator_with_seed,
+    matches_pattern,
 )
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
@@ -420,7 +421,7 @@ def _pattern_strategy(
     if compiled is None:
         session.pattern_strategies[key] = None
         return None
-    strategy = st.from_regex(compiled, fullmatch=True)
+    strategy = st.from_regex(compiled, fullmatch=True).filter(matches_pattern(pattern))
     if min_length is not None and max_length is not None:
         strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
     elif min_length is not None:
@@ -779,7 +780,7 @@ class CoverageContext:
             raise Unsatisfiable
         without_pattern = {key: value for key, value in schema.items() if key != "pattern"}
         candidate = self.generate_from_schema({**without_pattern, "minLength": length, "maxLength": length})
-        if not isinstance(candidate, str) or not compiled.search(candidate):
+        if not isinstance(candidate, str) or not matches_pattern(schema["pattern"])(candidate):
             raise Unsatisfiable
         return candidate
 
@@ -3759,7 +3760,7 @@ def _negative_pattern_properties(
         compiled = compile_ecma_pattern(pattern)
         if compiled is None:
             continue
-        key = ctx.generate_from(st.from_regex(compiled))
+        key = ctx.generate_from(st.from_regex(compiled).filter(matches_pattern(pattern)))
         with nctx.at(pattern):
             for value in cover_schema_iter(nctx, sub_schema):
                 yield NegativeValue(
