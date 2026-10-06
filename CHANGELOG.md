@@ -35,6 +35,7 @@
 - False `negative_data_rejection` failures for path parameters whose `anyOf` / `oneOf` accepts any string.
 - Resolve external `$ref` pointers in `response_schema_conformance` failure schemas.
 - Invalid values generated for `\S` patterns, e.g. non-breaking spaces.
+- Crash in `negative_data_rejection` when cases use string query values.
 
 ## [4.29.3](https://github.com/schemathesis/schemathesis/compare/v4.29.2...v4.29.3) - 2026-10-05
 
