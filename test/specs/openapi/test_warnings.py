@@ -5,6 +5,8 @@ from schemathesis.config import SchemathesisWarning
 from schemathesis.specs.openapi.warnings import (
     MissingDeserializerWarning,
     UnresolvableReferenceWarning,
+    UnsupportedRegexWarning,
+    UnusedOpenAPIAuthWarning,
     detect_missing_deserializers,
     detect_unresolvable_references,
     detect_unsupported_regex,
@@ -21,6 +23,16 @@ def test_missing_deserializer_warning_properties():
     assert warning.kind == SchemathesisWarning.MISSING_DESERIALIZER
     assert warning.message == "200"
     assert warning.group == "application/msgpack"
+
+
+def test_warnings_other_than_missing_deserializer_have_no_group():
+    warnings = [
+        UnusedOpenAPIAuthWarning(operation_label=None, scheme_name="bearer", suggestion=None),
+        UnsupportedRegexWarning(operation_label="GET /users", pattern="^a{1,2097152}", dropped=True),
+        UnresolvableReferenceWarning(operation_label="GET /users", subject="`body`", reference="#/Missing"),
+    ]
+
+    assert [warning.group for warning in warnings] == [None, None, None]
 
 
 def test_detect_missing_deserializers_with_custom_media_type(ctx):

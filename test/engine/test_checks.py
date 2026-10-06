@@ -1478,6 +1478,19 @@ def test_use_after_free_no_false_positive_on_collection_delete(ctx, response_fac
     assert use_after_free(check_ctx, get_response, current_get) is None
 
 
+@pytest.mark.parametrize(("deleted_case_id", "expected"), [(None, ()), ("abc", ("abc",))], ids=["unknown", "known"])
+def test_use_after_free_related_case_ids(deleted_case_id, expected):
+    failure = UseAfterFree(
+        operation="GET /users/{id}",
+        message="Used after delete",
+        free="DELETE /users/{id}",
+        usage="GET /users/{id}",
+        deleted_case_id=deleted_case_id,
+    )
+
+    assert failure.related_case_ids() == expected
+
+
 def test_iter_chain_cases_includes_referenced_sibling(ctx, response_factory):
     schema = ctx.openapi.load_schema(
         {

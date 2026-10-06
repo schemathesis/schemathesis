@@ -7692,6 +7692,37 @@ def test_path_keyed_producer_feeds_array_body(ctx):
     ]
 
 
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        ({"title": {"type": "string"}}, False),
+        ({"title": {"type": "string"}, "id": {"type": "string"}}, True),
+    ],
+    ids=["no-id-field", "id-field"],
+)
+@pytest.mark.parametrize("name", ["pk", "identifier"])
+def test_bare_pk_or_identifier_parameter_links_to_id_field(ctx, name, fields, expected):
+    paths = {
+        **operation("post", "/items", "201", {"type": "object", "properties": fields}, operation_id="createItem"),
+        **operation("get", f"/items/{{{name}}}", "200", None, parameters=[path_param(name)], operation_id="getItem"),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths)
+
+    links = [
+        [
+            "#/paths/~1items/post",
+            "201",
+            {
+                "operationRef": f"#/paths/~1items~1{{{name}}}/get",
+                "parameters": {f"path.{name}": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+    assert inferred_links(graph) == (links if expected else [])
+
+
 PRODUCT_NAME_BODY = {"type": "object", "properties": {"productName": {"type": "string"}}, "required": ["productName"]}
 
 

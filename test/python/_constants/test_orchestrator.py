@@ -317,6 +317,31 @@ def test_orchestrator_follows_handler_module_local_imports():
     assert "zx9secreta3f9c1e7" in pool_values(result, "string")
 
 
+def test_constants_extracted_from_a_list_of_apps(tmp_path):
+    class HandlerWithoutModule:
+        __module__ = None
+
+        def __call__(self):
+            return "ok"
+
+    (tmp_path / "namespace_pkg").mkdir()
+    sys.path.insert(0, str(tmp_path))
+    try:
+        registry = SourceRegistry()
+
+        @registry.register
+        def from_apps():
+            namespace_app = Flask("namespace_pkg")
+            namespace_app.add_url_rule("/x", "x", HandlerWithoutModule())
+            return [namespace_app, flask_app.app]
+
+        result = extract_all(registry=registry, adapters=[FlaskAdapter()])
+    finally:
+        sys.path.remove(str(tmp_path))
+    assert "zx9secreta3f9c1e7" in pool_values(result, "string")
+    assert result.failures == ()
+
+
 def test_orchestrator_does_not_walk_package_named_by_flask_import_name():
     # Walking the app's whole package imports modules the app never touches, firing their import side effects.
     modules, _ = orchestrator._resolve_with_adapters(

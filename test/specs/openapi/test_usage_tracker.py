@@ -158,6 +158,14 @@ def test_weighted_select_respects_weights():
     assert counts[0] < counts[2], "Recently used should be selected less than never used"
 
 
+def test_weighted_select_picks_first_shuffled_index_when_every_weight_is_zero():
+    tracker = VariantUsageTracker()
+    tracker.record_draw("recent")
+
+    assert tracker.weighted_select(["recent"], Random(0)) == 0
+    assert tracker.weighted_select(["fresh", "other"], Random(0)) in (0, 1)
+
+
 def test_successful_delete_weight_decays_exponentially():
     tracker = VariantUsageTracker()
     key = "variant_a"

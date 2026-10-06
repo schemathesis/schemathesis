@@ -73,6 +73,17 @@ def test_auth_loader_options(ctx):
     assert api.schema_requests[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
 
 
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [({}, USER_AGENT), ({"user-agent": "custom/1.0"}, "custom/1.0")],
+    ids=["default", "custom"],
+)
+def test_loader_user_agent(ctx, headers, expected):
+    api = ctx.openapi.apps.success()
+    schemathesis.openapi.from_url(api.schema_url, headers=headers)
+    assert api.schema_requests[0].headers["User-Agent"] == expected
+
+
 def test_redirect_loop_reported_as_loader_error(app_runner):
     app = Flask(__name__)
 

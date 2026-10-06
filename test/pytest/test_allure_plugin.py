@@ -382,6 +382,21 @@ def test_api(case):
     assert any("curl" in m.lower() for m in step_messages)
 
 
+def test_allure_report_written_for_stateful_test(ctx, testdir, tmp_path):
+    api = ctx.openapi.apps.users_crud()
+    allure_dir = tmp_path / "allure-results"
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.update(base_url="{api.base_url}")
+schema.config.reports.update(allure_path=r"{allure_dir}")
+TestCase = schema.as_state_machine().TestCase
+""",
+    )
+    testdir.runpytest("-s").assert_outcomes(failed=1)
+    assert _allure_outcomes(allure_dir) == {"Stateful tests": ("failed", "")}
+
+
 def test_allure_attachment_via_forwarder(testdir, tmp_path, ctx):
     api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"

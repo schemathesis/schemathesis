@@ -721,6 +721,12 @@ def test_operation_and_case_never_equal_foreign_objects(ctx):
     assert operation.Case() != "GET /data"
 
 
+def test_operation_reference_escapes_path_for_json_pointer(ctx):
+    schema = ctx.openapi.load_schema({"/users/{id}/a~b": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    assert schema["/users/{id}/a~b"]["GET"].operation_reference == "#/paths/~1users~1{id}~1a~0b/get"
+
+
 def test_hypothesis_reports_omit_schema_and_parameter_sets(ctx):
     # Falsifying-example reports would otherwise dump whole schemas into the output.
     schema = ctx.openapi.load_schema({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
