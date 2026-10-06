@@ -1,5 +1,6 @@
 import json
 
+import jsonschema_rs
 import pytest
 from hypothesis import given, settings
 
@@ -647,6 +648,14 @@ def test_pattern_the_validator_enforces_is_kept(pattern):
     schema = {"type": "string", "pattern": pattern}
     result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
     assert result["pattern"] == pattern
+
+
+def test_posix_class_keeps_its_posix_meaning_for_the_validator():
+    # ECMA reads `[[:alnum:]]` as literal characters, but authors mean the POSIX class their server enforces.
+    schema = {"type": "string", "pattern": "^[[:alnum:]]+$"}
+    result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
+    validator = jsonschema_rs.validator_for(result)
+    assert [validator.is_valid(value) for value in ("abc1", ":]")] == [True, False]
 
 
 def test_nested_object_required_array_not_duplicated():

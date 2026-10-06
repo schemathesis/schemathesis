@@ -27,6 +27,7 @@
 - Binary `default` of a non-string parameter sent as the default positive value in coverage.
 - Report invalid schema keywords in negative mode as schema errors.
 - Invalid values generated for `\S` patterns, e.g. non-breaking spaces.
+- Generate ECMA-literal `&&`, `~~` and `[` inside character classes in `pattern`.
 
 #### Request serialization
 
