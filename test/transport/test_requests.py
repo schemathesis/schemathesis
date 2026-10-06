@@ -9,6 +9,7 @@ import requests
 from urllib3.exceptions import ProtocolError
 
 import schemathesis
+from schemathesis.transport.requests import _is_dropped_before_response
 
 pytestmark = pytest.mark.skipif(
     platform.system() == "Windows", reason="conn.close() on Windows does not raise ConnectionError on the client side"
@@ -84,3 +85,13 @@ def test_session_with_non_http_adapter_mount_still_sends_request(ctx):
         session.mount("custom://", requests.adapters.BaseAdapter())
         assert case.call(session=session).status_code == 200
         session.adapters.pop("custom://")
+
+
+@pytest.mark.parametrize(
+    "reason_type",
+    [RemoteDisconnected, ConnectionResetError, BrokenPipeError, ConnectionAbortedError],
+    ids=["remote_disconnected", "connection_reset", "broken_pipe", "connection_aborted"],
+)
+def test_dropped_before_response(reason_type):
+    error = requests.ConnectionError(ProtocolError("Connection aborted.", reason_type("Connection dropped")))
+    assert _is_dropped_before_response(error)
