@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -8,7 +9,7 @@ import pytest
 
 from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.reporting import HarWriter, JunitXmlWriter, NdjsonWriter, VcrWriter
+from schemathesis.reporting import HarWriter, JunitXmlWriter, NdjsonWriter, VcrWriter, get_command_representation
 from schemathesis.reporting._command import sanitize_args
 
 
@@ -103,3 +104,36 @@ def test_writer_context_manager_no_error_without_open(writer_cls, kwargs):
 )
 def test_sanitize_args(args, expected):
     assert sanitize_args(args, config=SanitizationConfig()) == expected
+
+
+@pytest.mark.parametrize(
+    "entrypoint, expected",
+    [
+        ("/venv/bin/pytest", "pytest -x"),
+        ("/venv/bin/py.test", "pytest -x"),
+        ("pytest.exe", "pytest -x"),
+        ("st", "st -x"),
+        ("/venv/bin/st", "st -x"),
+        ("st.exe", "st -x"),
+        ("schemathesis", "st -x"),
+        ("/venv/bin/schemathesis", "st -x"),
+        ("schemathesis.exe", "st -x"),
+        ("/venv/lib/python/site-packages/schemathesis/__main__.py", "<unknown entrypoint>"),
+    ],
+    ids=[
+        "pytest",
+        "py.test",
+        "pytest-exe",
+        "st",
+        "st-path",
+        "st-exe",
+        "schemathesis",
+        "schemathesis-path",
+        "schemathesis-exe",
+        "python-m-schemathesis",
+    ],
+)
+def test_command_representation(monkeypatch, entrypoint, expected):
+    monkeypatch.setattr(sys, "argv", [entrypoint, "-x"])
+
+    assert get_command_representation() == expected

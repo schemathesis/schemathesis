@@ -71,10 +71,11 @@ def sanitize_args(args: Sequence[str], *, config: SanitizationConfig) -> list[st
 def get_command_representation(sanitization: SanitizationConfig | None = None) -> str:
     """Get how the current process was invoked."""
     basename = os.path.basename(sys.argv[0])
+    executable = basename.removesuffix(".exe")
     raw = sys.argv[1:]
     args = " ".join(sanitize_args(raw, config=sanitization) if sanitization is not None else raw)
-    if basename in ("schemathesis", "st") or sys.argv[0].endswith(("schemathesis", "st")):
+    if executable in ("schemathesis", "st"):
         return f"st {args}"
-    if "pytest" in basename:
+    if "pytest" in basename or executable == "py.test":
         return f"pytest {args}"
     return "<unknown entrypoint>"
