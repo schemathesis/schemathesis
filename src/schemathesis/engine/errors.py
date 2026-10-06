@@ -89,6 +89,9 @@ class EngineErrorInfo:
         if isinstance(self._error, UnhealthyAPIError):
             return "Unhealthy API"
 
+        if isinstance(self._error, UnresponsiveOperationError):
+            return "Unresponsive Operation"
+
         if isinstance(self._error, requests.RequestException):
             return "Network Error"
 
@@ -474,6 +477,10 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
 
 class UnhealthyAPIError(Exception):
     """The API is unhealthy enough that the stateful phase cannot continue."""
+
+
+class UnresponsiveOperationError(Exception):
+    """Most requests to one operation time out while the rest of the API answers."""
 
 
 def build_code_sample(

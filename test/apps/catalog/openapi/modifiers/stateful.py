@@ -159,7 +159,13 @@ class Slowdown:
     priority: int = 0
 
     def apply(self, app: Flask, store: UserStore) -> None:
-        store.config.slowdown = self.seconds
+        seconds = self.seconds
+
+        # Every API request, including the router's own 404 and 405 answers; capability probes stay fast.
+        @app.before_request
+        def delay_request() -> None:
+            if request.path != "/openapi.json" and "X-Schemathesis-Probe" not in request.headers:
+                time.sleep(seconds)
 
 
 @dataclass(slots=True)

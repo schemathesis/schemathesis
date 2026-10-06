@@ -2200,3 +2200,42 @@ def test_planted_bug_behind_a_vocabulary_path_parameter(ctx):
     )
 
     assert stream.find(events.ScenarioFinished, status=Status.FAILURE) is not None
+
+
+def test_operation_that_hung_in_earlier_phases_gets_a_shorter_timeout(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/hang": {
+                "get": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 1}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/hang")
+    def hang():
+        time.sleep(2)
+        return flask.jsonify({})
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    stream = EventStream(
+        schema,
+        max_examples=1,
+        request_timeout=1.4,
+        phases=[PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING],
+    ).execute()
+
+    assert [(event.phase, str(event.value)) for event in stream.find_all(events.NonFatalError)] == [
+        (PhaseName.EXAMPLES, ANY),
+        (PhaseName.COVERAGE, ANY),
+        (PhaseName.FUZZING, ANY),
+    ]
+    assert [event.info.message for event in stream.find_all(events.NonFatalError)] == [
+        "Read timed out after 1.4 seconds",
+        "Read timed out after 1.4 seconds",
+        "Read timed out after 1.0 seconds",
+    ]

@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Stateful testing aborting when a few operations hang instead of skipping them.
 - Crash on non-string `pattern` definitions during test case generation.
 - Negative mode skipping operations when `--header` sets only some required headers.
 - Record pytest invocations correctly in generated reports.

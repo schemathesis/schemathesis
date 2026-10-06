@@ -61,14 +61,12 @@ def test_get_transport_kwargs_skips_override_for_no_operation(ctx):
     assert engine.get_transport_kwargs()["timeout"] == 5.0
 
 
-def test_get_transport_kwargs_override_reverts_after_completion(ctx):
+def test_get_transport_kwargs_override_never_exceeds_configured_timeout(ctx):
     schema, operation = _build_schema_and_operation(ctx)
     schema.config.update(request_timeout=5.0)
     engine = EngineContext(schema=schema, stop_event=threading.Event())
-    engine.health.record_transport_failure(operation_label=operation.label, now=10.0)
+    engine.health.record_completion(operation_label=operation.label, now=10.0, elapsed=4.0)
     engine.health.record_transport_failure(operation_label=operation.label, now=11.0)
-    assert engine.get_transport_kwargs(operation=operation)["timeout"] == TIGHTENED_TIMEOUT_SECONDS
-    engine.health.record_completion(operation_label=operation.label)
     assert engine.get_transport_kwargs(operation=operation)["timeout"] == 5.0
 
 

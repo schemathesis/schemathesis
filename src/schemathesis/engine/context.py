@@ -122,7 +122,7 @@ class EngineContext:
         )
         self.outcome_cache = {}
         self.health = HealthState()
-        self.server = ServerMonitor()
+        self.server = ServerMonitor(health=self.health)
         self.link_calibration = LinkCalibrationState() if schema.config.phases.stateful.link_calibration else None
         self.observations = observations
         self._thread_local = threading.local()

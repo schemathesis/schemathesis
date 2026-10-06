@@ -19,6 +19,7 @@ from schemathesis.engine.errors import (
     is_connection_refused,
     is_unrecoverable_network_error,
 )
+from schemathesis.engine.health import HealthState
 
 if TYPE_CHECKING:
     import requests
@@ -55,9 +56,10 @@ class SentRequest:
 class ServerMonitor:
     """Tracks recently sent requests, to tell a dead server from a single refused request."""
 
-    __slots__ = ("_recent", "_lock", "_confirmation_lock", "_message")
+    __slots__ = ("_recent", "_lock", "_confirmation_lock", "_message", "_health")
 
-    def __init__(self) -> None:
+    def __init__(self, health: HealthState | None = None) -> None:
+        self._health = health if health is not None else HealthState()
         # In send order, so the newest entries are the last ones a dying server saw.
         self._recent: deque[SentRequest] = deque(maxlen=RECENT_LIMIT)
         self._lock = threading.Lock()
@@ -73,9 +75,15 @@ class ServerMonitor:
             response = send()
         except requests.RequestException as exc:
             # Breaking after connecting still proves the server was there.
-            self._finish(sent, exc.request, reached_server=is_unrecoverable_network_error(exc))
+            reached_server = is_unrecoverable_network_error(exc)
+            self._finish(sent, exc.request, reached_server=reached_server)
+            if reached_server:
+                self._health.record_transport_failure(operation_label=case.operation.label, now=time.monotonic())
             raise
         self._finish(sent, response.request, reached_server=True)
+        self._health.record_completion(
+            operation_label=case.operation.label, now=time.monotonic(), elapsed=response.elapsed
+        )
         return response
 
     def _start(self, case: Case, *, transport_kwargs: dict[str, Any]) -> SentRequest | None:
