@@ -4726,6 +4726,65 @@ def test_externally_tagged_items_behind_one_of_keep_their_fields(ctx):
     assert output.resource.fields == ["album_id", "id", "name"]
 
 
+def test_nested_list_wrapper_without_resource_items_is_not_descended_into(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/things": {
+                "get": {
+                    "operationId": "listThings",
+                    "responses": {"200": {"content": {"application/json": {"schema": component_ref("ThingEnvelope")}}}},
+                }
+            },
+            "/gadgets": {
+                "get": {
+                    "operationId": "listGadgets",
+                    "responses": {
+                        "200": {"content": {"application/json": {"schema": component_ref("GadgetEnvelope")}}}
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "ThingEnvelope": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "response": component_ref("ThingBody")},
+                },
+                "ThingBody": {
+                    "type": "object",
+                    "properties": {"content": component_ref("Matrix"), "total": {"type": "integer"}},
+                },
+                "Matrix": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+                "GadgetEnvelope": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "response": component_ref("GadgetBody")},
+                },
+                "GadgetBody": {
+                    "type": "object",
+                    "properties": {
+                        "content": {
+                            "type": "array",
+                            "items": {"type": "object", "properties": {"id": {"type": "string"}}},
+                        },
+                        "total": {"type": "integer"},
+                    },
+                },
+            }
+        },
+    )
+
+    assert [(output.resource.name, output.pointer) for output in graph.operations["GET /things"].outputs] == [
+        ("ThingEnvelope", "/"),
+        ("ThingBody", "/response"),
+    ]
+    assert [(output.resource.name, output.pointer) for output in graph.operations["GET /gadgets"].outputs] == [
+        ("GadgetEnvelope", "/"),
+        ("GadgetBody", "/response"),
+        ("GadgetBody", "/response/content"),
+    ]
+
+
 def test_all_of_branches_merge_same_named_object_property(ctx):
     # When `allOf` branches each define the same object property, the merged property must union
     # both branches' sub-fields so a FK hidden in the overriding branch is still discovered.

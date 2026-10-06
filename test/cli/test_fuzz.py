@@ -37,6 +37,27 @@ class _RaisingEngine:
 USERS_OK_PATHS = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
 
 
+def _make_fuzz_failure_app(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
+
+    @app.route("/users")
+    def users():
+        return jsonify({}), 500
+
+    return app_runner.openapi_url(app)
+
+
+def _make_slow_fuzz_app(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
+
+    @app.route("/users")
+    def users():
+        time.sleep(0.1)
+        return jsonify([])
+
+    return app_runner.openapi_url(app)
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_basic(cli, app_runner, ctx, snapshot_cli):
     url = _make_fuzz_app(ctx, app_runner)
@@ -100,6 +121,28 @@ def test_fuzz_final_line_with_error(cli, app_runner, ctx, snapshot_cli):
         cli.main("fuzz", url, "--max-time=30", "--request-timeout=0.001"),
         snapshot_cli,
     )
+
+
+@pytest.mark.parametrize(
+    ("make_app", "args", "expected"),
+    [
+        (
+            _make_fuzz_failure_app,
+            [],
+            r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios\n\n    ❌ [1-9]\d* unique failures\n    Last new failure: \d+\.\d{2}s ago\n",
+        ),
+        (
+            _make_slow_fuzz_app,
+            ["--request-timeout=0.001"],
+            r"\d+:\d{2}:\d{2} \* [\d.]+/s \* \d+ scenarios\n\n    🚫 1 errors\n    Last new failure: none yet\n",
+        ),
+    ],
+    ids=["failures", "errors"],
+)
+def test_fuzz_live_progress_on_terminal(cli, app_runner, ctx, make_app, args, expected):
+    url = make_app(ctx, app_runner)
+    result = cli.main("fuzz", url, "--max-time=30", *args, env={"PYTEST_VERSION": None, "FORCE_COLOR": "1"})
+    assert re.search(expected, result.stdout)
 
 
 def test_fuzz_connection_error_cases_are_not_reported_as_skipped(cli, ctx):
@@ -171,27 +214,6 @@ def _make_fuzz_app(ctx, app_runner):
 
     @app.route("/users")
     def users():
-        return jsonify([])
-
-    return app_runner.openapi_url(app)
-
-
-def _make_fuzz_failure_app(ctx, app_runner):
-    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
-
-    @app.route("/users")
-    def users():
-        return jsonify({}), 500
-
-    return app_runner.openapi_url(app)
-
-
-def _make_slow_fuzz_app(ctx, app_runner):
-    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
-
-    @app.route("/users")
-    def users():
-        time.sleep(0.1)
         return jsonify([])
 
     return app_runner.openapi_url(app)
