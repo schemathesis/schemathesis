@@ -187,6 +187,27 @@ def test_identifier_argument_bound_to_producer_field(ctx, sdl, expected):
     assert sorted(name for name in cls.__dict__ if not name.startswith("_") and name not in common) == expected
 
 
+def test_operation_returning_other_type_does_not_produce_foreign_handle(ctx):
+    sdl = """
+    type Book { id: ID! slug: String! title: String! }
+    type Author { id: ID! name: String! }
+    type Query { books: [Book!]! authors: [Author!]! book(slug: String!): Book }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    cls = ctx.graphql.load_sdl(sdl).as_state_machine()
+    common = {"Book_ids", "deleted_Book_ids", "schema"}
+    assert sorted(name for name in cls.__dict__ if not name.startswith("_") and name not in common) == [
+        "Author_ids",
+        "Book__slug",
+        "Mutation_addBook",
+        "Mutation_addBook__slug",
+        "Query_book",
+        "Query_book__slug",
+        "Query_books__slug",
+        "deleted_Author_ids",
+    ]
+
+
 def test_init_raises_NoProducers_when_no_rules(ctx):
     cls = create_state_machine(
         ctx.graphql.load_sdl("""

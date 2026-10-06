@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import schemathesis
 from schemathesis.core.errors import (
     AuthenticationError,
@@ -122,6 +124,33 @@ def test_reference_errors_are_titled_as_schema_errors():
         "Schema Error\n\nSchema `#/components/schemas/Node` has a required reference to itself",
         "Schema Error\n\nReference `#/components/schemas/Missing` cannot be resolved",
     ]
+
+
+@pytest.mark.parametrize(
+    ("cycle", "expected"),
+    [
+        (
+            ["#/components/schemas/Node"],
+            "Schema `#/components/schemas/Node` has a required reference to itself",
+        ),
+        (
+            [
+                "#/components/schemas/Node",
+                "other.json#/components/schemas/Leaf",
+                "other.json",
+                "#/components/schemas/Node",
+            ],
+            "Schema `#/components/schemas/Node` has required references forming a cycle:\n\n"
+            "  #/components/schemas/Node ->\n"
+            "  #/components/schemas/Leaf ->\n"
+            "  other.json ->\n"
+            "  #/components/schemas/Node",
+        ),
+    ],
+    ids=["self-reference", "multi-step-cycle"],
+)
+def test_infinite_recursive_reference_message(cycle, expected):
+    assert str(InfiniteRecursiveReference("#/components/schemas/Node", cycle)) == expected
 
 
 def test_invalid_regex_example_generation_error(ctx):

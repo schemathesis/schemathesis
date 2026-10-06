@@ -11,7 +11,9 @@ django.setup()
 
 from django.core.handlers.wsgi import WSGIHandler  # noqa: E402
 from django.http import HttpResponse  # noqa: E402
-from django.urls import path  # noqa: E402
+from django.urls import include, path  # noqa: E402
+
+from .dep_pkg import flask_app  # noqa: E402
 
 DJANGO_UNLOCK_CODE = "dj7a3f9c1e7b5d24"
 
@@ -26,7 +28,7 @@ def unlock(request):
     return HttpResponse("ok")
 
 
-urlpatterns = [path("unlock", unlock)]
+urlpatterns = [path("unlock", unlock), path("nested/", include([path("token", flask_app.unlock)]))]
 
 
 def make_app():
