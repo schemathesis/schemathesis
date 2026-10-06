@@ -285,6 +285,35 @@ def test(case, data):
     assert "Solution: Create separate test functions" in stdout
 
 
+def test_given_with_dangling_example_reference(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize()
+@schema.given(data=st.data())
+def test(case, data):
+    pass
+        """,
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "schema": {"type": "string"},
+                            "examples": {"a": {"$ref": "#/components/examples/Nope"}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(errors=1)
+    assert "RefResolutionError: Pointer '/components/examples/Nope' does not exist" in result.stdout.str()
+
+
 def test_given_with_explicit_hypothesis_example(testdir):
     # When user explicitly adds @hypothesis.example() decorator with @schema.given()
     testdir.make_test(
@@ -1992,6 +2021,44 @@ def test_api(case):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([r".*some header examples are invalid:", r".*- 'X-Token'='a\\nb'"])
+
+
+def test_examples_only_with_invalid_regex_pattern(testdir):
+    testdir.make_test(
+        """
+import jsonschema_rs
+
+schema.config.phases.fuzzing.enabled = False
+schema.config.phases.coverage.enabled = False
+
+@schema.hook
+def before_generate_query(context, strategy):
+    jsonschema_rs.validator_for({"type": "string", "pattern": "[invalid"})
+    return strategy
+
+@schema.include(path="/items").parametrize()
+def test_api(case):
+    pass
+""",
+        paths={
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}, "example": "a"}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines(
+        [
+            r".*InvalidRegexPattern: Failed to generate test cases for this API operation because of unsupported regular expression `\[invalid`"
+        ]
+    )
 
 
 def test_undeclared_path_parameter(testdir):

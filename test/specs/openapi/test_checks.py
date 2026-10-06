@@ -1009,6 +1009,31 @@ def test_negative_data_rejection_ignores_type_mutations_wire_identical_in_every_
     assert negative_data_rejection(check_context(), response_factory.requests(), case) is None
 
 
+def test_negative_data_rejection_reports_type_mutation_of_parameter_missing_from_query(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="Invalid type string (expected integer)",
+            parameter="id",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={"other": "5"},
+    )
+    with pytest.raises(AcceptedNegativeData, match="parameter `id` in query - invalid type string"):
+        negative_data_rejection(check_context(), response_factory.requests(status_code=200), case)
+
+
 @pytest.mark.parametrize(
     ("query", "headers", "mutations"),
     [
@@ -1023,6 +1048,31 @@ def test_negative_data_rejection_reports_when_one_location_stays_invalid_on_the_
     case = _path_and_query_case(path_and_query_schema, {"id": "7"}, query, headers, mutations)
     with pytest.raises(AcceptedNegativeData):
         negative_data_rejection(check_context(), response_factory.requests(), case)
+
+
+def test_negative_data_rejection_reports_type_mutation_of_undeclared_query_parameter(ctx, response_factory):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/items"]["GET"].Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_modes=[GenerationMode.NEGATIVE],
+            description="Invalid type string (expected integer)",
+            parameter="ghost",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={"ghost": "5"},
+    )
+    with pytest.raises(AcceptedNegativeData, match="parameter `ghost` in query - invalid type string"):
+        negative_data_rejection(check_context(), response_factory.requests(status_code=200), case)
 
 
 @pytest.mark.parametrize(("value", "is_accepted"), [("-1", True), ("5", False)], ids=["below-minimum", "valid"])
@@ -2855,6 +2905,35 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     assert failure.colno == 2
 
 
+def test_response_validation_reports_surrogate_returned_by_deserializer(ctx, response_factory):
+    @schemathesis.deserializer("application/vnd.surrogate")
+    def deserialize(_ctx, response):
+        return "\udcf3"
+
+    schema = ctx.openapi.load_schema(
+        {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/vnd.surrogate": {"schema": {"type": "string"}}},
+                        }
+                    }
+                }
+            }
+        }
+    )
+    operation = schema["/test"]["GET"]
+    response = Response.from_requests(
+        response_factory.requests(content=b"x", content_type="application/vnd.surrogate"), True
+    )
+    with pytest.raises(MalformedJson) as exc_info:
+        operation.validate_response(response)
+    failure = exc_info.value
+    assert (failure.document, failure.position, failure.lineno, failure.colno) == ("x", 0, 1, 1)
+
+
 def test_response_schema_conformance_reports_malformed_response_media_type(response_factory, ctx):
     schema = ctx.openapi.load_schema(
         {
@@ -3273,6 +3352,48 @@ def test_response_schema_conformance_discriminator_inline_branch(ctx, response_f
     with pytest.raises(Failure) as exc_info:
         response_schema_conformance(_CHECK_CTX, invalid, case)
     assert exc_info.value.title == "Discriminator value not in schema mapping"
+
+
+def test_response_schema_conformance_discriminator_with_file_branches(tmp_path, response_factory):
+    pet = json.dumps({"type": "object", "properties": {"petType": {"type": "string"}}})
+    (tmp_path / "cat.json").write_text(pet)
+    (tmp_path / "bird.json").write_text(pet)
+    schema_path = tmp_path / "openapi.json"
+    schema_path.write_text(
+        json.dumps(
+            {
+                "openapi": "3.0.2",
+                "info": {"title": "Test", "version": "1"},
+                "paths": {
+                    "/pets": {
+                        "get": {
+                            "responses": {
+                                "200": {
+                                    "description": "OK",
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "anyOf": [
+                                                    {"$ref": "cat.json"},
+                                                    {"$ref": "bird.json#"},
+                                                    {"$ref": "#/components/schemas/Dog"},
+                                                ],
+                                                "discriminator": {"propertyName": "petType"},
+                                            }
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    }
+                },
+                "components": {"schemas": {"Dog": {"type": "object", "properties": {"petType": {"type": "string"}}}}},
+            }
+        )
+    )
+    operation = schemathesis.openapi.from_path(str(schema_path))["/pets"]["GET"]
+    response = Response.from_requests(response_factory.requests(content=b'{"petType": "Dog"}'), True)
+    assert operation.validate_response(response) is None
 
 
 _USER_PROFILE_SCHEMA = {

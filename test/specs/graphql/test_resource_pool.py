@@ -262,6 +262,17 @@ def test_capture_response_skips_unusable_payloads(pool, rng, body):
     assert pool.draw(handle=Handle("Book", "id"), random=rng) is None
 
 
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [(b'{"data": {"addBook": {"id": "abc-1"}}}', "abc-1"), (b"not-json", None)],
+    ids=["successful-response", "malformed-json"],
+)
+def test_capture_response_stores_ids_only_from_usable_payloads(pool, rng, body, expected):
+    operation = _parse('mutation { addBook(title: "x", authorId: "1") { id } }')
+    pool.capture_response(response_body=body, operation_node=operation)
+    assert pool.draw(handle=Handle("Book", "id"), random=rng) == expected
+
+
 def test_capture_skips_subscription_operations(rng):
     sdl = """
     type Query { _: Int }

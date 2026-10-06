@@ -337,6 +337,19 @@ def test_call_and_validate_for_asgi():
     test()
 
 
+def test_asgi_call_with_and_without_explicit_base_url():
+    app = FastAPI()
+
+    @app.get("/items")
+    def items():
+        return {"ok": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    case = schema["/items"]["GET"].Case()
+    assert case.call().status_code == 200
+    assert case.call(base_url="http://testserver").status_code == 200
+
+
 def test_call_without_base_url_ignores_malformed_swagger_schemes():
     schema = schemathesis.openapi.from_dict(
         {

@@ -992,6 +992,23 @@ def test_substitution_reverted_when_it_breaks_container_validation(data):
     assert blob == "placeholder"
 
 
+@given(data=st.data())
+@settings(max_examples=5)
+def test_substitution_reverted_when_container_not_constraint_rejects_it(data):
+    container = {
+        "type": "object",
+        "properties": {"blob": {"type": "string"}},
+        "not": {"required": ["blob"], "properties": {"blob": {"enum": ["FORBIDDEN"]}}},
+    }
+    blob = _draw(
+        data,
+        _source("string", "FORBIDDEN"),
+        schema_properties={"blob": {"type": "string"}},
+        container_schema=container,
+    )
+    assert blob == "placeholder"
+
+
 def _nested_body_schema(depth):
     schema = {
         "type": "object",

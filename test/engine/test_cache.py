@@ -266,6 +266,24 @@ def test_entry_without_media_type_is_skipped_when_several_are_declared(ctx, tmp_
     assert _engine_for(schema).cache.run() == cache.CacheReport(replayed=0, dropped=0, skipped=1)
 
 
+def test_auth_required_entry_without_media_type_is_skipped_when_several_are_declared(ctx, tmp_path, app_runner):
+    schema = _multi_media_type_schema(ctx, app_runner)
+    _point_cache_at(schema, tmp_path)
+    _seed(
+        tmp_path,
+        [
+            Entry(
+                id=1,
+                kind=Kind.AUTH_REQUIRED,
+                operation="POST /w",
+                request=Request(method="POST", body={"name": ""}),
+            )
+        ],
+    )
+
+    assert _engine_for(schema).cache.run() == cache.CacheReport(replayed=0, dropped=0, skipped=1)
+
+
 def test_auth_required_confirmed_with_valid_credentials(ctx, tmp_path):
     api = ctx.openapi.apps.under_declared_security()
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -285,6 +303,20 @@ def test_auth_required_confirmed_with_valid_credentials(ctx, tmp_path):
         for obs in engine.error_feedback.observations(operation_label="GET /protected", location=ParameterLocation.PATH)
     )
     assert "GET /protected" in schema._inferred_security
+
+
+def test_auth_required_replay_uses_configured_client_certificate(ctx, tmp_path):
+    api = ctx.openapi.apps.under_declared_security()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.auth.openapi.schemes["BearerAuth"] = HttpBearerAuthConfig(bearer="real-token")
+    schema.config.request_cert = str(Path(__file__).parent.parent / "cli" / "cert.pem")
+    _point_cache_at(schema, tmp_path)
+    _seed(
+        tmp_path,
+        [Entry(id=1, kind=Kind.AUTH_REQUIRED, operation="GET /protected", request=Request(method="GET"))],
+    )
+
+    assert _engine_for(schema).cache.run() == cache.CacheReport(replayed=1, dropped=0, skipped=0)
 
 
 def test_auth_required_contradicted_when_unauth_response_succeeds(ctx, tmp_path, app_runner):
@@ -638,6 +670,23 @@ def test_flush_caps_entries_per_operation(ctx, tmp_path):
         assert seen.isdisjoint(entry.observation_keys)
         seen.update(entry.observation_keys)
     assert len(surviving) <= len(seen)
+
+
+def test_flush_does_not_duplicate_known_observations(ctx, tmp_path):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    _point_cache_at(schema, tmp_path)
+    request = Request(method="POST", headers={"content-type": "application/json"}, body={"x": 1})
+    _seed(
+        tmp_path,
+        [Entry(id=1, kind=Kind.ERROR_FEEDBACK, operation="POST /users", request=request, observation_keys=["key"])],
+    )
+    engine = _engine_for(schema)
+    engine.cache.record(Kind.ERROR_FEEDBACK, "POST /users", request, observation_keys=["key"])
+    engine.cache.flush()
+
+    _, surviving = load(tmp_path)
+    assert [entry.id for entry in surviving] == [1]
 
 
 def test_cache_metrics_serialize_in_ndjson(ctx, cli, tmp_path):

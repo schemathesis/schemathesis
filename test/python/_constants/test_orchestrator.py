@@ -130,6 +130,17 @@ def test_pool_failures_convert_to_schema_warnings():
     assert "boom" in warnings[0].message
 
 
+def test_constants_extraction_warning_is_not_grouped():
+    registry = SourceRegistry()
+
+    @registry.register
+    def boom():
+        raise RuntimeError("bad")
+
+    pool = extract_all(registry=registry, adapters=[])
+    assert iter_constants_warnings(pool)[0].group is None
+
+
 def test_orchestrator_falls_back_to_app_module():
     # Niche framework: no adapter matches. The module defining the app still gets harvested.
     class NicheApp:
@@ -144,6 +155,20 @@ def test_orchestrator_falls_back_to_app_module():
         return NicheApp()
 
     assert "active" in pool_values(extract_all(registry=registry, adapters=[]), "string")
+
+
+def test_adapter_failing_to_list_handlers_is_recorded():
+    app = Flask("test.python._constants.fixtures.dep_pkg")
+    app.view_functions = None
+    registry = SourceRegistry()
+
+    @registry.register
+    def from_app():
+        return app
+
+    result = extract_all(registry=registry, adapters=[FlaskAdapter()])
+    assert result.is_empty()
+    assert [f.source for f in result.failures] == ["from_app"]
 
 
 def test_orchestrator_fallback_does_not_walk_the_apps_package():
