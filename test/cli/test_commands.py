@@ -1762,6 +1762,20 @@ def test_max_time_reports_the_first_cycle_in_full(ctx, cli, snapshot_cli):
     )
 
 
+def test_max_time_live_cycle_line_counts_errors(ctx, cli):
+    api = ctx.openapi.apps.slow()
+    result = cli.main(
+        "run",
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-time=30",
+        "--max-failures=1",
+        "--request-timeout=0.001",
+        env={"PYTEST_VERSION": None, "FORCE_COLOR": "1"},
+    )
+    assert re.search(r"\d+ cases  🚫 1 error  ⏳ \S+ left", result.stdout)
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_max_time_counts_every_operation_once(ctx, cli, snapshot_cli):
     # A phase repeats until the budget is gone; its block still counts operations, not passes over them.
@@ -1790,6 +1804,14 @@ def test_max_time_counts_every_operation_once(ctx, cli, snapshot_cli):
             "--checks=not_a_server_error",
         )
         == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+def test_coverage_stops_at_failure_limit(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success_and_failure()
+    assert (
+        cli.run(api.schema_url, "--phases=coverage", "--max-examples=5", "--max-failures=1", "--seed=1") == snapshot_cli
     )
 
 

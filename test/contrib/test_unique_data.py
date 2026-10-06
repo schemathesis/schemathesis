@@ -134,6 +134,17 @@ def test_cli_failure(ctx, unique_hook, cli, hypothesis_max_examples, snapshot_cl
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+def test_unique_inputs_replays_cached_failure_in_later_phase(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.failure()
+    assert (
+        cli.run(
+            api.schema_url, "--phases=coverage,fuzzing", "--generation-unique-inputs", "--max-examples=10", "--seed=1"
+        )
+        == snapshot_cli
+    )
+
+
 def test_graphql_url(ctx, cli, unique_hook, snapshot_cli):
     api = ctx.graphql.apps.books()
     assert (
