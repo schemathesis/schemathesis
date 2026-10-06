@@ -25,6 +25,7 @@
 - Report `filter_case` hooks that start rejecting mid-run during fuzzing as hook errors.
 - Send `text/plain` object and array bodies as JSON instead of Python text.
 - Name the config section and key when a list or string is too short.
+- Accept response discriminator values derived from whole-file reference names.
 - Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
 - False `negative_data_rejection` failures for `null` in query parameters alongside unsent extra parameters.
 - Show the compact `[auto, 1-64]` range when `--workers` gets an out-of-range value.

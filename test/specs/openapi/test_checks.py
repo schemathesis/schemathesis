@@ -3178,6 +3178,102 @@ def test_response_schema_conformance_discriminator(ctx, response_factory, body, 
         assert response_schema_conformance(_CHECK_CTX, response, case) is None
 
 
+def test_response_schema_conformance_discriminator_whole_file_ref(tmp_path, response_factory):
+    (tmp_path / "cat.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "properties": {"petType": {"type": "string"}, "name": {"type": "string"}},
+                "required": ["petType", "name"],
+            }
+        )
+    )
+    (tmp_path / "openapi.json").write_text(
+        json.dumps(
+            {
+                "openapi": "3.0.2",
+                "info": {"title": "Pets", "version": "1.0"},
+                "paths": {
+                    "/pets": {
+                        "get": {
+                            "responses": {
+                                "200": {
+                                    "description": "OK",
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "anyOf": [
+                                                    {"$ref": "cat.json"},
+                                                    {"$ref": "#/components/schemas/Dog"},
+                                                ],
+                                                "discriminator": {"propertyName": "petType"},
+                                            }
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    }
+                },
+                "components": {
+                    "schemas": {
+                        "Dog": {
+                            "type": "object",
+                            "properties": {"petType": {"type": "string"}, "bark": {"type": "boolean"}},
+                            "required": ["petType", "bark"],
+                        }
+                    }
+                },
+            }
+        )
+    )
+    operation = schemathesis.openapi.from_path(tmp_path / "openapi.json")["/pets"]["GET"]
+
+    assert (
+        operation.validate_response(response_factory.requests(content=b'{"petType": "cat", "name": "Misty"}')) is None
+    )
+    with pytest.raises(Failure, match="known schema values: 'Dog', 'cat'"):
+        operation.validate_response(response_factory.requests(content=b'{"petType": "cow", "name": "Misty"}'))
+
+
+def test_response_schema_conformance_discriminator_ignores_nameless_reference(ctx, response_factory):
+    # A reference to an `$id` ending in `/` carries no implicit name, so it adds no known value.
+    schema = ctx.openapi.load_schema(
+        {
+            "/pets": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "anyOf": [
+                                            {"$ref": "https://example.invalid/"},
+                                            {"$ref": "#/components/schemas/Dog"},
+                                        ],
+                                        "discriminator": {"propertyName": "petType"},
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Root": {"$id": "https://example.invalid/", "type": "object"},
+                "Dog": {"type": "object"},
+            }
+        },
+    )
+    operation = schema["/pets"]["GET"]
+    with pytest.raises(Failure, match="known schema values: 'Dog'$"):
+        operation.validate_response(response_factory.requests(content=b'{"petType": ""}'))
+
+
 def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_factory):
     # Boolean schemas (true/false) in anyOf/oneOf are valid in OpenAPI 3.1.
     # The boolean item is skipped during implicit mapping extraction; only $ref items contribute.

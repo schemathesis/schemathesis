@@ -13,6 +13,7 @@ from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
+from schemathesis.specs.openapi.discriminator import get_implicit_discriminator_value
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -254,12 +255,9 @@ def _check_discriminator(
             if not isinstance(ref, str) or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
                 continue
             bundled_name = ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
-            original_uri = resolved.name_to_uri.get(bundled_name)
-            if original_uri and "#" in original_uri:
-                fragment = original_uri.split("#", 1)[1]
-                schema_name = fragment.rstrip("/").rsplit("/", 1)[-1]
-                if schema_name:
-                    known_values.add(schema_name)
+            schema_name = get_implicit_discriminator_value(resolved.name_to_uri.get(bundled_name, ""))
+            if schema_name:
+                known_values.add(schema_name)
 
     if not known_values or value in known_values:
         return None
