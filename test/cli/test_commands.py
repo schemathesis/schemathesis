@@ -1081,6 +1081,39 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", "--mode=positive") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_mode_with_unsupported_regex_in_body(cli, ctx, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string", "pattern": "(?<=a+)b"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        return jsonify({}), 400
+
+    assert (
+        cli.run_openapi_app(app, "--phases=fuzzing", "--mode=negative", "--max-examples=5", "--seed=1") == snapshot_cli
+    )
+
+
 def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli, ctx):
     api = ctx.openapi.apps.success()
     schema = yaml.dump(simple_openapi)

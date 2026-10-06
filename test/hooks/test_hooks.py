@@ -651,6 +651,29 @@ def test_graphql_body(ctx):
     test()
 
 
+def test_flatmap_query_hook_applies_to_openapi_and_graphql(ctx):
+    openapi_schema = schemathesis.openapi.from_url(ctx.openapi.apps.success().schema_url)
+    graphql_schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    seen = []
+
+    for schema in (openapi_schema, graphql_schema):
+
+        @schema.hook
+        def flatmap_query(context, query):
+            return st.just({"q": "1"})
+
+    for operation in (openapi_schema["/api/success"]["GET"], graphql_schema["Query"]["getBooks"]):
+
+        @given(case=operation.as_strategy())
+        @settings(max_examples=1, phases=[Phase.generate], suppress_health_check=list(HealthCheck), deadline=None)
+        def test(case):
+            seen.append(case.query)
+
+        test()
+
+    assert seen == [{"q": "1"}, {"q": "1"}]
+
+
 def test_graphql_query(ctx):
     api = ctx.graphql.apps.books()
     schema = schemathesis.graphql.from_url(api.schema_url)

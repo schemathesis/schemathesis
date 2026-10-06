@@ -7442,6 +7442,41 @@ def test_body_field_without_resource_prefix_is_not_linked(ctx):
     ]
 
 
+def test_all_of_response_with_boolean_schema_keywords(ctx):
+    base = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    user = {
+        "allOf": [
+            component_ref("Base"),
+            {
+                "type": "object",
+                "properties": {
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "flags": {"type": "array", "items": True},
+                },
+                "additionalProperties": False,
+            },
+        ]
+    }
+    paths = {
+        **operation("post", "/users", "201", component_ref("User"), operation_id="createUser"),
+        **operation("get", "/users/{id}", "200", None, parameters=[path_param("id")], operation_id="getUser"),
+    }
+
+    _, graph = analyze_dependencies(ctx, paths, components={"schemas": {"User": user, "Base": base}})
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1users/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1users~1{id}/get",
+                "parameters": {"path.id": "$response.body#/id"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
 def test_body_field_does_not_link_when_multiple_responses_produce_it(ctx):
     credential = {
         "type": "object",
@@ -7621,6 +7656,37 @@ def test_unresolvable_response_ref_keeps_path_keyed_link(ctx):
                 "operationRef": "#/paths/~1triggers~1{name}/get",
                 "parameters": {"path.name": "$request.path.name"},
                 "x-schemathesis": {"is_inferred": True},
+            },
+        ]
+    ]
+
+
+def test_path_keyed_producer_feeds_array_body(ctx):
+    trigger = {"content": {"application/json": {"schema": component_ref("Missing")}}}
+    paths = {
+        "/triggers/{name}": {"post": {"parameters": [path_param("name")], "responses": {"201": trigger}}},
+        "/triggers": {
+            "put": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"type": "array", "items": component_ref("Trigger")}}},
+                },
+                "responses": {"204": {"description": "OK"}},
+            }
+        },
+    }
+    components = {"schemas": {"Trigger": {"type": "object", "properties": {"name": {"type": "string"}}}}}
+
+    _, graph = analyze_dependencies(ctx, paths, components=components)
+
+    assert inferred_links(graph) == [
+        [
+            "#/paths/~1triggers~1{name}/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1triggers/put",
+                "requestBody": ["$request.path.name"],
+                "x-schemathesis": {"is_inferred": True, "merge_body": True},
             },
         ]
     ]

@@ -264,6 +264,23 @@ def test_unknown_text_subtype_sent_as_plain_text(ctx, media_type):
     test()
 
 
+def test_unknown_text_subtype_needs_a_plain_text_serializer(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"text/html": {"schema": {"type": "string"}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/data"]["POST"].Case(body="hello", media_type="text/html")
+    with pytest.raises(SerializationNotPossible, match=r"Cannot serialize to 'text/html' \(unsupported media type\)"):
+        RequestsTransport().serialize_case(case)
+    assert REQUESTS_TRANSPORT.serialize_case(case)["data"] == b"hello"
+
+
 def test_multipart_content_type_left_to_requests(ctx):
     schema = ctx.openapi.load_schema(
         {
@@ -1568,6 +1585,23 @@ def test_internal_raw_query_marker_does_not_consume_user_query_parameter(ctx):
 
     serialized_wsgi = WSGI_TRANSPORT.serialize_case(case)
     assert serialized_wsgi["query_string"] == {RAW_QUERY_STRING_KEY: "visible"}
+
+
+def test_string_query_reaches_the_server_over_requests_and_wsgi(ctx):
+    api = ctx.openapi.apps.success()
+    for schema in (
+        schemathesis.openapi.from_url(api.schema_url),
+        schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app),
+    ):
+        operation = schema["/api/success"]["GET"]
+        operation.Case(query={"a": "1"}).call()
+        operation.Case(query="b=2").call()
+    assert [request.query for request in api.requests if request.path == "/api/success"] == [
+        {"a": "1"},
+        {"b": "2"},
+        {"a": "1"},
+        {"b": "2"},
+    ]
 
 
 @pytest.mark.filterwarnings("error")

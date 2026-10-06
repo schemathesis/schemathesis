@@ -50,6 +50,12 @@ def test_transition_edges(ctx, sdl, expected_edges):
     assert sorted(edges) == sorted(expected_edges)
 
 
+def test_transition_count_is_stable_across_reads(ctx):
+    analysis = ctx.graphql.load_sdl(_PRODUCER_TO_READER).analysis
+
+    assert [analysis.transition_count, analysis.transition_count] == [1, 1]
+
+
 def test_outgoing_and_incoming_are_consistent(ctx):
     # For each outgoing edge from operation A, operation B should list it as incoming.
     transitions = ctx.graphql.load_sdl(_PRODUCER_TO_READER).analysis.transitions

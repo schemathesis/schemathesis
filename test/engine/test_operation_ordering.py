@@ -620,6 +620,42 @@ def test_cycle_detection_inferred_dependencies(ctx, operations, expected_layers)
         assert set(layers[i]) == expected_layer
 
 
+def test_dependent_of_two_cycles_waits_for_both(ctx):
+    items_response = {
+        "200": {
+            "description": "OK",
+            "content": {
+                "application/json": {"schema": {"type": "object", "properties": {"itemId": {"type": "string"}}}}
+            },
+        }
+    }
+    users_response = {
+        "200": {
+            "description": "OK",
+            "content": {
+                "application/json": {"schema": {"type": "object", "properties": {"userId": {"type": "string"}}}}
+            },
+        }
+    }
+    item_query = {"name": "itemId", "in": "query", "schema": {"type": "string"}}
+    user_query = {"name": "userId", "in": "query", "schema": {"type": "string"}}
+    id_path = {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}
+    loaded = ctx.openapi.load_schema(
+        {
+            "/items": {"get": {"parameters": [item_query], "responses": items_response}},
+            "/items/{id}": {"get": {"parameters": [id_path, item_query], "responses": items_response}},
+            "/users": {"get": {"parameters": [user_query], "responses": users_response}},
+            "/users/{id}": {"get": {"parameters": [id_path, user_query], "responses": users_response}},
+            "/report": {"get": {"parameters": [item_query, user_query], "responses": {"204": {"description": "OK"}}}},
+        }
+    )
+
+    assert compute_dependency_layers(loaded.analysis.dependency_graph) == [
+        ["GET /items", "GET /items/{id}", "GET /users", "GET /users/{id}"],
+        ["GET /report"],
+    ]
+
+
 def test_create_scheduler_respects_layer_order_for_single_layer(ctx):
     # Methods listed GET-first to demonstrate that schema-iteration order does
     # not happen to match the desired RESTful order. The scheduler should

@@ -84,3 +84,16 @@ def test_no_attribution(case_factory, case_kwargs, rejected_value):
 def test_attributes_matching_slot(case_factory, case_kwargs, rejected_value, expected):
     case = case_factory(**case_kwargs)
     assert infer_path_from_request(case=case, rejected_value=rejected_value) == expected
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (["filler"] * 10_000, None),
+        (["filler"], (ParameterLocation.QUERY, ("name",))),
+    ],
+    ids=["body-exhausts-walk-budget", "small-body"],
+)
+def test_query_attribution_depends_on_remaining_walk_budget(case_factory, body, expected):
+    case = case_factory(body=body, query={"name": "QUERY-VALUE-2026"})
+    assert infer_path_from_request(case=case, rejected_value="QUERY-VALUE-2026") == expected

@@ -696,6 +696,29 @@ def test_spring_parser_recognizes_positive_negative_keyword_variants(
 
 
 @pytest.mark.parametrize(
+    "body",
+    [
+        {
+            "errors": [
+                {"field": "name", "defaultMessage": "must not be blank"},
+                {"field": 5, "defaultMessage": "must not be blank"},
+            ]
+        },
+        {
+            "fieldErrors": [
+                {"property": "name", "message": "must not be blank"},
+                {"property": 5, "message": "must not be blank"},
+            ]
+        },
+    ],
+    ids=["errors", "field-errors"],
+)
+def test_spring_parser_ignores_non_string_field_names(make_operation, case_factory, body):
+    observations = parse_observations(SpringParser(), body, make_operation, case_factory)
+    assert [(o.parameter_path, o.kind) for o in observations] == [(("name",), ObservationKind.MUST_NOT_BE_BLANK)]
+
+
+@pytest.mark.parametrize(
     "body, expected",
     [
         pytest.param(
@@ -1480,6 +1503,20 @@ def test_drf_parser_unwraps_detail_envelope_around_query_errors(ctx, case_factor
             raw_message="This field may not be blank.",
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_paths"),
+    [
+        ({"detail": "Invalid input."}, []),
+        ({"detail": {"tags": ["This field may not be blank."]}}, [("tags",)]),
+    ],
+    ids=["detail-message", "detail-envelope"],
+)
+def test_drf_parser_detail_message_is_not_an_envelope(ctx, case_factory, body, expected_paths):
+    operation = _drf_query_operation(ctx, [{"name": "tags", "in": "query", "schema": {"type": "string"}}])
+    observations = DRFParser().parse(operation=operation, body=body, case=case_factory(operation=operation))
+    assert [observation.parameter_path for observation in observations] == expected_paths
 
 
 def test_drf_parser_keeps_nested_detail_body_field(make_operation, case_factory):
@@ -3616,6 +3653,17 @@ def test_zod_parser_parse_multi_field(make_operation, case_factory):
     )
 
 
+def test_zod_parser_skips_issue_with_non_list_path(make_operation, case_factory):
+    body = _zod_envelope(
+        {"validation": "email", "code": "invalid_string", "message": "Invalid email", "path": ["email"]},
+        {"validation": "url", "code": "invalid_string", "message": "Invalid url", "path": "url"},
+    )
+
+    observations = parse_observations(ZodParser(), body, make_operation, case_factory)
+
+    assert _zod_signatures(observations) == [(("email",), ObservationKind.FORMAT, FormatPayload(name="email"))]
+
+
 def test_zod_parser_parse_returns_empty_for_non_envelope(make_operation, case_factory):
     assert parse_observations(ZodParser(), {"detail": "nope"}, make_operation, case_factory) == ()
 
@@ -4282,6 +4330,17 @@ def test_ajv_parser_drops_root_type_error_when_body_was_present(make_operation, 
         case=case_factory(body=[]),
     )
     assert actual == ()
+
+
+@pytest.mark.parametrize(
+    ("method", "expected"),
+    [("post", (((), ObservationKind.MUST_NOT_BE_BLANK, None),)), ("get", ())],
+    ids=["request-body", "query"],
+)
+def test_ajv_parser_root_type_error_only_applies_to_request_body(make_operation, case_factory, method, expected):
+    operation = make_operation(method=method, path="/api/users")
+    actual = AjvParser().parse(operation=operation, body=_AJV_ROOT_TYPE_OBJECT, case=case_factory(body=NOT_SET))
+    assert tuple((o.parameter_path, o.kind, o.payload) for o in actual) == expected
 
 
 def test_ajv_parser_parse_multi_field(make_operation, case_factory):
