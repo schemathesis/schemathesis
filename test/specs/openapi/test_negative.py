@@ -1895,6 +1895,36 @@ def test_path_combinator_without_string_branch_is_negated(ctx):
     assert not any(validator.is_valid(value) for value in values), values
 
 
+def test_omitting_required_header_next_to_explicit_one_is_negative(ctx):
+    # Dropping the only generated header leaves exactly the explicit headers, which is still a negative case.
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "post": {
+                    "parameters": [
+                        {"name": "X-Tenant", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object", "required": ["kind"]}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    operation = schema["/items"]["POST"]
+    operation.schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
+    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE, headers={"X-Tenant": "t"})
+
+    find(
+        strategy,
+        lambda case: "X-Token" not in case.headers and isinstance(case.body, dict) and "kind" in case.body,
+        settings=settings(max_examples=100, database=None, suppress_health_check=list(HealthCheck)),
+    )
+
+
 def test_untyped_path_object_is_negated_through_its_properties(ctx):
     # Without a `type` the path value may be an object, so a property constraint is something to violate.
     operation = _operation_with_parameters(

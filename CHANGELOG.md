@@ -4,9 +4,8 @@
 
 ### :bug: Fixed
 
-#### Data generation
-
 - Crash on non-string `pattern` definitions during test case generation.
+- Negative mode skipping operations when `--header` sets only some required headers.
 
 ## [4.29.4](https://github.com/schemathesis/schemathesis/compare/v4.29.3...v4.29.4) - 2026-10-06
 
