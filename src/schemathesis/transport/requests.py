@@ -294,7 +294,9 @@ def _is_dropped_before_response(exc: requests.exceptions.ConnectionError) -> boo
     return (
         isinstance(reason, ProtocolError)
         and len(reason.args) == 2
-        and isinstance(reason.args[1], RemoteDisconnected | ConnectionResetError | BrokenPipeError)
+        and isinstance(
+            reason.args[1], (RemoteDisconnected, ConnectionResetError, BrokenPipeError, ConnectionAbortedError)
+        )
     )
 
 
