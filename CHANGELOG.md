@@ -4,39 +4,59 @@
 
 ### :bug: Fixed
 
-- Use the file name as the discriminator value for whole-file `$ref` branches.
+#### `st run`
+
 - Show a single `Coverage` block in `st run` output under `--max-time`.
-- Use the part's own schema for the root element of XML-encoded multipart parts.
-- Report GraphQL errors with multiple source locations without crashing.
-- False `negative_data_rejection` failures for form body fields that become valid strings when sent.
-- Crash when serializing an XML body for an operation that does not declare XML.
-- Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
 - Report test cases that hit network errors as errored instead of skipped.
-- Keep test runs successful when crash recording cannot write to the cache directory.
+- Report test cases interrupted by crashed checks as errored.
 - Missing `Network Error` details in stateful runs that also report a failure.
-- Send non-file multipart fields as plain form fields instead of file uploads.
+- Keep test runs successful when crash recording cannot write to the cache directory.
+- Sanitize credentials in recorded test cases in NDJSON reports.
+- Name the config section and key when a list or string is too short.
+- Show the compact `[auto, 1-64]` range when `--workers` gets an out-of-range value.
+
+#### Hooks
+
+- Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
+- Report `filter_case` hooks that start rejecting mid-run during fuzzing as hook errors.
+- Report `SystemExit` raised in hooks as an error instead of skipped operations or success.
+
+#### Data generation
+
 - Crash in the coverage phase on non-numeric `default` values of numeric schemas.
-- Encode multipart parts with nested multipart or form-urlencoded content types.
 - Binary `default` of a non-string parameter sent as the default positive value in coverage.
 - Report invalid schema keywords in negative mode as schema errors.
-- False `negative_data_rejection` failures for `null` sent to nullable query parameters.
-- Missed `negative_data_rejection` failure when a nullable query value is sent beside an invalid header.
-- Report all-rejecting `filter_case` hooks as hook errors during fuzzing.
-- Sanitize credentials in recorded test cases in NDJSON reports.
-- Report `filter_case` hooks that start rejecting mid-run during fuzzing as hook errors.
-- Send `text/plain` object and array bodies as JSON instead of Python text.
-- Name the config section and key when a list or string is too short.
-- Accept response discriminator values derived from whole-file reference names.
-- Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
-- False `negative_data_rejection` failures for `null` in query parameters alongside unsent extra parameters.
-- Show the compact `[auto, 1-64]` range when `--workers` gets an out-of-range value.
-- Report test cases interrupted by crashed checks as errored.
-- False `negative_data_rejection` failures for DRF validation errors wrapped in `detail`.
-- False `negative_data_rejection` failures for path parameters whose `anyOf` / `oneOf` accepts any string.
-- Resolve external `$ref` pointers in `response_schema_conformance` failure schemas.
 - Invalid values generated for `\S` patterns, e.g. non-breaking spaces.
-- Crash in `negative_data_rejection` when cases use string query values.
-- Report `SystemExit` raised in hooks as an error instead of skipped operations or success.
+
+#### Request serialization
+
+- Send multipart form booleans, nulls, and objects as `true` / `false` / `null` and JSON.
+- Send non-file multipart fields as plain form fields instead of file uploads.
+- Encode multipart parts with nested multipart or form-urlencoded content types.
+- Use the part's own schema for the root element of XML-encoded multipart parts.
+- Crash when serializing an XML body for an operation that does not declare XML.
+- Send `text/plain` object and array bodies as JSON instead of Python text.
+
+#### Schema handling
+
+- Use the file name as the discriminator value for whole-file `$ref` branches.
+- Accept response discriminator values derived from whole-file reference names.
+- Resolve external `$ref` pointers in `response_schema_conformance` failure schemas.
+
+#### `negative_data_rejection`
+
+- False positive for form body fields that become valid strings when sent.
+- False positive for `null` sent to nullable query parameters.
+- False positive for `null` in query parameters alongside unsent extra parameters.
+- False positive for DRF validation errors wrapped in `detail`.
+- False positive for path parameters whose `anyOf` / `oneOf` accepts any string.
+- Missed failure when a nullable query value is sent beside an invalid header.
+- Missed failures for type mutations of nullable or `allowEmptyValue` parameters.
+- Crash when cases use string query values.
+
+#### Others
+
+- Report GraphQL errors with multiple source locations without crashing.
 - False "Network Error" on Windows when servers close reused keep-alive connections.
 
 ## [4.29.3](https://github.com/schemathesis/schemathesis/compare/v4.29.2...v4.29.3) - 2026-10-05
