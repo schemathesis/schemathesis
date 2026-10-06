@@ -50,7 +50,7 @@ jobs:
           cache-suffix: bench-3.12-v1
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+        uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
         with:
           mode: "simulation"
           run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
@@ -75,12 +75,16 @@ jobs:
           cache-dependency-glob: "**/pyproject.toml"
           cache-suffix: bench-memory-3.14-v1
 
+      # Debug symbols let CodSpeed resolve libc frames in memory flamegraphs.
+      - name: Install libc debug symbols
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libc6-dbg
+
       # Whole-engine runs, too slow for the Valgrind job above but the only shape that catches
       # memory blowups in the engine rather than in a single generator. They sit under
       # `benches/memory/` so the job above collects nothing from them: it globs `benches/*`, and a
       # directory is walked with the default `test_*.py` filter these modules deliberately fail.
       - name: Run memory benchmarks
-        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
+        uses: CodSpeedHQ/action@c4fd08a3a159bd0cc208da1e0edf32b8c47d75e5 # v5.4.0
         with:
           mode: "memory"
           run: uvx --from=pytest --with=".[bench]" pytest benches/memory/engine_run.py --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
