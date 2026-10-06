@@ -161,6 +161,7 @@ class OpenAPIAnalysis:
                         operation=operation.label,
                         status_code=status_code,
                         payload=example_value,
+                        from_example=True,
                     )
 
     @property

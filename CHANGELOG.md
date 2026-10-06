@@ -12,6 +12,7 @@
 
 - Follow redirects only within the requested host; return redirects elsewhere as the response.
 - `positive_data_acceptance` accepts 3xx responses by default.
+- Coverage phase leads with values from earlier responses over declared parameter examples.
 
 ### :bug: Fixed
 

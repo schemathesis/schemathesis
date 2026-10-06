@@ -682,3 +682,131 @@ def test_coverage_pool_draws_survive_numeric_id_serialization(ctx):
             source_status=201,
         ),
     )
+
+
+def _album_schema(ctx, parameter_schema):
+    return ctx.openapi.load_schema(
+        {
+            "/albums": {
+                "post": {
+                    "operationId": "createAlbum",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/albums/{albumId}": {
+                "get": {
+                    "operationId": "getAlbum",
+                    "parameters": [_path_parameter("albumId", parameter_schema)],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+
+# A declared value is often a placeholder the API does not know; the captured id is what reaches real logic.
+@pytest.mark.parametrize("keyword", ["example", "default"])
+def test_coverage_prefers_captured_value_over_declared_value(ctx, keyword):
+    schema = _album_schema(ctx, {"type": "string", keyword: "album-1"})
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /albums", status_code=201, payload={"id": "alb-42"})
+
+    cases = iter_cases(schema["/albums/{albumId}"]["GET"], GenerationMode.POSITIVE, extra_data_source=data_source)
+
+    values = [case.path_parameters["albumId"] for case in cases]
+    assert values[0] == "alb-42"
+    assert "album-1" in values
+
+
+@pytest.mark.parametrize(
+    ("captured", "expected"),
+    [("b", "b"), ("not-listed", "a")],
+    ids=["allowed", "outside-enum"],
+)
+def test_coverage_uses_captured_value_only_when_schema_allows_it(ctx, captured, expected):
+    schema = _album_schema(ctx, {"type": "string", "enum": ["a", "b"]})
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /albums", status_code=201, payload={"id": captured})
+
+    cases = iter_cases(schema["/albums/{albumId}"]["GET"], GenerationMode.POSITIVE, extra_data_source=data_source)
+
+    assert cases[0].path_parameters["albumId"] == expected
+
+
+def _album_with_response_example(ctx):
+    return ctx.openapi.load_schema(
+        {
+            "/albums": {
+                "post": {
+                    "operationId": "createAlbum",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    },
+                                    "example": {"id": "album-from-example"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/albums/{albumId}": {
+                "get": {
+                    "operationId": "getAlbum",
+                    "parameters": [_path_parameter("albumId")],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+
+# Values from the spec's response examples only stand in until the API returns real ones.
+def test_pool_prefers_live_values_over_response_examples(ctx):
+    schema = _album_with_response_example(ctx)
+    data_source = schema.create_extra_data_source()
+    consumer = schema["/albums/{albumId}"]["GET"]
+    assert data_source.pick_correlated_values(operation=consumer).values == {
+        (ParameterLocation.PATH, "albumId"): "album-from-example"
+    }
+
+    data_source.repository.record_response(operation="POST /albums", status_code=201, payload={"id": "alb-42"})
+
+    picks = [
+        data_source.pick_correlated_values(operation=consumer).values[(ParameterLocation.PATH, "albumId")]
+        for _ in range(20)
+    ]
+    assert picks.count("alb-42") > picks.count("album-from-example")
+
+
+# A plausible id the API never issued still finds bugs, so spec examples keep coming up now and then.
+def test_pool_keeps_drawing_response_examples_after_live_values(ctx):
+    schema = _album_with_response_example(ctx)
+    data_source = schema.create_extra_data_source()
+    consumer = schema["/albums/{albumId}"]["GET"]
+    data_source.repository.record_response(operation="POST /albums", status_code=201, payload={"id": "alb-42"})
+
+    picks = {
+        data_source.pick_correlated_values(operation=consumer).values[(ParameterLocation.PATH, "albumId")]
+        for _ in range(20)
+    }
+    assert picks == {"alb-42", "album-from-example"}
