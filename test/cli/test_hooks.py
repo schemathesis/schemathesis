@@ -31,6 +31,33 @@ def before_call(context, case, kwargs):
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
+@pytest.mark.parametrize("phase", ["fuzzing", "stateful"])
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+def test_before_call_system_exit(ctx, cli, snapshot_cli, phase):
+    api = ctx.openapi.apps.users_crud()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    raise SystemExit(1)
+        """
+    )
+    assert cli.main("run", api.schema_url, f"--phases={phase}", "--max-examples=1", hooks=module) == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
+def test_before_call_error_in_stateful_phase(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud()
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    raise ValueError("boom")
+        """
+    )
+    assert cli.main("run", api.schema_url, "--phases=stateful", "--max-examples=1", hooks=module) == snapshot_cli
+
+
 def test_after_call(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # When the `after_call` hook is registered

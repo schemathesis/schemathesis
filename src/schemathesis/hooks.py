@@ -299,7 +299,7 @@ def _dispatch_to_all(
                 continue
             try:
                 hook(context, *args)
-            except Exception as exc:
+            except (Exception, SystemExit) as exc:
                 raise HookExecutionError(name, exc) from exc
 
 
@@ -396,7 +396,7 @@ def dispatch_before_call(
                     hook(context, case, **kwargs)
                 else:
                     hook(context, case, kwargs)
-            except Exception as exc:
+            except (Exception, SystemExit) as exc:
                 raise HookExecutionError(name, exc) from exc
 
 
@@ -424,7 +424,7 @@ def should_keep_failure(failure: Failure, case: Case, response: Response) -> boo
             try:
                 if not hook(context, failure, case, response):
                     return False
-            except Exception as exc:
+            except (Exception, SystemExit) as exc:
                 raise HookExecutionError(name, exc) from exc
     return True
 

@@ -245,11 +245,11 @@ class HookExecutionError(SchemathesisError):
     """Raised when a user-defined hook raises an exception during execution."""
 
     hook_name: str
-    original_error: Exception
+    original_error: Exception | SystemExit
 
     __slots__ = ("hook_name", "original_error")
 
-    def __init__(self, hook_name: str, original_error: Exception) -> None:
+    def __init__(self, hook_name: str, original_error: Exception | SystemExit) -> None:
         self.hook_name = hook_name
         self.original_error = original_error
 
