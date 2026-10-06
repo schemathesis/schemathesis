@@ -20,10 +20,6 @@ class PhaseName(str, enum.Enum):
     FUZZING = "fuzzing"
     STATEFUL_TESTING = "stateful"
 
-    @classmethod
-    def defaults(cls) -> list[PhaseName]:
-        return [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
-
     @property
     def display(self) -> str:
         """Title-cased label for terminal output."""

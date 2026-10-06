@@ -42,7 +42,6 @@ class BaseOutputHandler(EventHandler[T]):
     def _on_fatal_error(self, ctx: T, event: events.FatalError) -> None:
         self.shutdown(ctx)
         display_fatal_error(self.console, self.loading_manager, event)
-        self.loading_manager = None
 
 
 TextOutput = IO[str] | StringIO | Path

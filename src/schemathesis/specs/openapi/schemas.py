@@ -516,9 +516,6 @@ class OpenApiSchema(BaseSchema):
             message += f". Did you mean `{matches[0]}`?"
         raise OperationNotFound(message=message, item=item) from exc
 
-    def _should_skip(self, path: str, method: str, definition: OperationObject) -> bool:
-        return self._operations._should_skip(path, method, definition)
-
     @override
     def _measure_statistic(self) -> ApiStatistic:
         return self._operations.measure_statistic()

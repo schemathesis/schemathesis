@@ -130,7 +130,6 @@ def serialize_yaml(value: Body) -> dict[str, Any]:
 
 Primitive = str | int | float | bool | None
 DEFAULT_TAG_NAME = "data"
-NAMESPACE_URL = "http://example.com/schema"
 
 
 def serialize_xml(case: Case, value: Body) -> dict[str, Any]:
