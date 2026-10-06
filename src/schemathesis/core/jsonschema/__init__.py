@@ -1,6 +1,7 @@
 import re
 import uuid
 from collections.abc import Callable
+from functools import lru_cache
 from itertools import count
 from typing import Any, cast
 
@@ -30,12 +31,22 @@ DRAFT_03_DIALECT = "http://json-schema.org/draft-03/schema#"
 
 def compile_ecma_pattern(pattern: str) -> re.Pattern[str] | None:
     """The pattern under the validator's reading of it, or `None` when Python `re` rejects it."""
-    # `re.ASCII`: the validator's engine expands `\d`, `\w`, `\s` and `\b` over ASCII, Python over the
-    # whole of Unicode, so the default reading draws values the schema rejects.
+    # `re.ASCII`: the validator's engine expands `\d`, `\w` and `\b` over ASCII, Python over the whole
+    # of Unicode, so the default reading draws values the schema rejects. `\s` follows neither reading.
     try:
         return re.compile(pattern, re.ASCII)
     except (re.error, ValueError):
         return None
+
+
+@lru_cache(maxsize=256)
+def matches_pattern(pattern: str) -> Callable[[str], bool]:
+    """The validator's own `pattern` check, for the places where Python `re` reads the pattern differently."""
+    try:
+        return jsonschema_rs.Draft202012Validator({"pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS).is_valid
+    except jsonschema_rs.ValidationError:
+        # A pattern the validator cannot compile is not enforced by it either.
+        return lambda _: True
 
 
 def _is_valid_uuid(value: object) -> bool:

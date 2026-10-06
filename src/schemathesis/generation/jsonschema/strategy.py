@@ -30,6 +30,7 @@ from schemathesis.core.jsonschema import (
     compile_ecma_pattern,
     make_validator,
     make_validator_for,
+    matches_pattern,
 )
 from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import deepclone
@@ -1153,7 +1154,7 @@ def _free_names(view: jsonschema_rs.canonical.ObjectView, ctx: StrategyContext) 
     for pattern in view.pattern_properties:
         compiled = _compiled_pattern(pattern)
         if compiled is not None:
-            drawn = _from_pattern(compiled, ctx)
+            drawn = _from_pattern(compiled, ctx).filter(matches_pattern(pattern))
             sources.append(drawn if not minimum else drawn.filter(lambda name: len(name) >= minimum))
     return st.one_of(sources)
 
@@ -1645,11 +1646,8 @@ def _pattern_driven(
     """Values drawn from one pattern and filtered by the remaining ones."""
     compiled = _compiled_pattern(pattern)
     assert compiled is not None
-    strategy = _from_pattern(compiled, ctx)
-    if compiled.pattern != pattern:
-        # Property escapes were spelled out to drive the draw, and that reading is only an
-        # approximation of the validator's - so it decides what the draw is worth.
-        strategy = strategy.filter(_facet_check("pattern", pattern))
+    # Python `re` reads the pattern differently from the validator, so the validator decides what the draw is worth.
+    strategy = _from_pattern(compiled, ctx).filter(_facet_check("pattern", pattern))
     if "$" in pattern:
         # Python also matches `$` before a trailing newline, where the validator means end of string;
         # telling literal `$`s apart costs more than dropping the newline-terminated values.

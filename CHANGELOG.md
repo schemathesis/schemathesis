@@ -34,6 +34,7 @@
 - False `negative_data_rejection` failures for DRF validation errors wrapped in `detail`.
 - False `negative_data_rejection` failures for path parameters whose `anyOf` / `oneOf` accepts any string.
 - Resolve external `$ref` pointers in `response_schema_conformance` failure schemas.
+- Invalid values generated for `\S` patterns, e.g. non-breaking spaces.
 
 ## [4.29.3](https://github.com/schemathesis/schemathesis/compare/v4.29.2...v4.29.3) - 2026-10-05
 
