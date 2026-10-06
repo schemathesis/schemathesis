@@ -98,6 +98,15 @@ def _discover(sdl: str) -> set[Handle]:
             Handle("Project", "description"),
             False,
         ),
+        (
+            """
+            type Book { id: ID! slug: String! }
+            type Query { books(first: Int): [Book!]! book(slug: String!): Book }
+            type Mutation { _: Boolean }
+            """,
+            Handle("Book", "slug"),
+            True,
+        ),
     ],
     ids=[
         "seedable-via-token-arg",
@@ -109,6 +118,7 @@ def _discover(sdl: str) -> set[Handle]:
         "dropped-produced-but-never-consumed",
         "dropped-no-producer-returns-type",
         "dropped-free-text-field",
+        "seedable-with-unrelated-producer-argument",
     ],
 )
 def test_discover_handles(sdl, handle, present):

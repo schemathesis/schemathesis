@@ -54,6 +54,25 @@ def test_orchestrator_survives_subpackage_that_exits_during_walk():
     assert "exitpkg_ok" in pool_values(result, "string")
 
 
+def test_orchestrator_extracts_from_packages_with_and_without_submodules(tmp_path, monkeypatch):
+    bare = tmp_path / "bare_pkg"
+    bare.mkdir()
+    (bare / "__init__.py").write_text('GREETING = "bare_value"\n')
+    nested = tmp_path / "nested_pkg"
+    nested.mkdir()
+    (nested / "__init__.py").write_text("")
+    (nested / "child.py").write_text('GREETING = "child_value"\n')
+    monkeypatch.syspath_prepend(str(tmp_path))
+    registry = SourceRegistry()
+
+    @registry.register
+    def from_packages():
+        return ["bare_pkg", "nested_pkg"]
+
+    result = extract_all(registry=registry, adapters=[])
+    assert sorted(pool_values(result, "string")) == ["bare_value", "child_value"]
+
+
 def test_orchestrator_runs_sources_and_builds_pool():
     registry = SourceRegistry()
 

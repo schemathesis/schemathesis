@@ -74,3 +74,13 @@ def test_failed_resend_raises_the_original_error(post_case):
     reason = exc_info.value.args[0]
     assert isinstance(reason, ProtocolError)
     assert isinstance(reason.args[1], RemoteDisconnected)
+
+
+def test_session_with_non_http_adapter_mount_still_sends_request(ctx):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    case = schema["/api/success"]["GET"].Case()
+    with requests.Session() as session:
+        session.mount("custom://", requests.adapters.BaseAdapter())
+        assert case.call(session=session).status_code == 200
+        session.adapters.pop("custom://")

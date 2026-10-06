@@ -77,6 +77,11 @@ def test_escaped_placeholder_is_resolved_once(monkeypatch):
     assert repr(config.projects.default.auth.wfc) == "WFCAuthConfig(path='${TEST_STRING_1}.yaml')"
 
 
+def test_config_repr_omits_parameters_set_to_none():
+    config = SchemathesisConfig.from_dict({"parameters": {"id": None, "b": 1}})
+    assert repr(config.projects.default) == "ProjectConfig(parameters={'b': 1})"
+
+
 def test_warnings_for_without_operations():
     config = SchemathesisConfig.from_dict({"warnings": False})
     assert config.projects.default.warnings_for(operation=None).display == []
@@ -262,6 +267,22 @@ def test_unknown_warning_name_is_reported_with_a_suggestion(source, section, des
         f"Error in {section} section:\n  Invalid value:\n\n"
         f"  - {description} -> 'mising_auth' is not a valid value. Did you mean 'missing_auth'?\n\n"
         f"Valid values are: {', '.join(repr(name) for name in sorted(WARNING_NAMES))}."
+    )
+
+
+@pytest.mark.parametrize(
+    ("method", "suggestion"),
+    [("FETCH", " Did you mean 'PATCH'?"), ("zzzzzzzz", "")],
+    ids=["close-match", "no-match"],
+)
+def test_unexpected_method_error_suggests_only_a_close_match(method, suggestion):
+    with pytest.raises(ConfigError) as exc:
+        SchemathesisConfig.from_str(f'[phases.coverage]\nunexpected-methods = ["{method}"]')
+
+    assert str(exc.value) == (
+        "Error in [phases.coverage] section:\n  Invalid value:\n\n"
+        f"  - Item #0 in the 'unexpected-methods' array -> '{method}' is not a valid value.{suggestion}\n\n"
+        "Valid values are: 'DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT', 'QUERY', 'TRACE'."
     )
 
 

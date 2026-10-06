@@ -1331,3 +1331,28 @@ def test_body_binding_skipped_when_descending_past_boolean_leaf(ctx):
 
     collect()
     assert leaks == 0
+
+
+@pytest.mark.hypothesis_nested
+def test_body_binding_skipped_for_self_referencing_schema(ctx):
+    schema = _load_schema_with_dictionaries(
+        ctx,
+        {
+            "dictionaries": {"vals": {"values": ["X"]}},
+            "parameters": {"body.a": {"dictionary": "vals"}},
+        },
+        _path_with_body({"$ref": "#/components/schemas/A"}),
+        components={"schemas": {"A": {"allOf": [{"$ref": "#/components/schemas/A"}]}}},
+    )
+    operation = schema["/items"]["POST"]
+    leaks = 0
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5, derandomize=True, database=None, suppress_health_check=list(HealthCheck))
+    def collect(case):
+        nonlocal leaks
+        if isinstance(case.body, dict) and case.body.get("a") == "X":
+            leaks += 1
+
+    collect()
+    assert leaks == 0
