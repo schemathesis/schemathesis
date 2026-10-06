@@ -984,9 +984,9 @@ def generate_parameter(
             value = _strip_path_decoder_unsafe(value)
 
     used_generator: GenerationMode | None = generator
-    if value == explicit:
-        # When we pass `explicit`, then its parts are excluded from generation of the final value
-        # If the final value is the same, then other parameters were generated at all
+    # When we pass `explicit`, then its parts are excluded from generation of the final value
+    # If the final value is the same, then other parameters were not generated, unless a mutation removed them
+    if value == explicit and generated.meta is None:
         used_generator = None
     return ValueContainer(
         value=value,
