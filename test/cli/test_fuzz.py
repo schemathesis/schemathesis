@@ -355,6 +355,39 @@ def test_fuzz_report_allure_uses_operation_labels_for_failures(cli, ctx, app_run
     assert any("Server error" in step["statusDetails"]["message"] for step in failure.get("steps", []))
 
 
+def test_fuzz_reports_record_erroring_scenario(cli, ctx, app_runner, tmp_path, restore_checks):
+    app, _ = ctx.openapi.make_flask_app(USERS_OK_PATHS)
+
+    @app.route("/users")
+    def users():
+        return jsonify([])
+
+    module = ctx.write_pymodule(
+        """
+@schemathesis.check
+def broken_check(ctx, response, case):
+    raise ZeroDivisionError("division by zero")
+        """
+    )
+    xml_path = tmp_path / "junit.xml"
+    allure_dir = tmp_path / "allure-results"
+    result = cli.main(
+        "fuzz",
+        app_runner.openapi_url(app),
+        "--max-time=30",
+        "-c",
+        "broken_check",
+        f"--report-junit-path={xml_path}",
+        f"--report-allure-path={allure_dir}",
+        hooks=module,
+    )
+    assert result.exit_code == 1, result.output
+    testcases = list(ElementTree.parse(xml_path).getroot()[0])
+    assert [(testcase.attrib["name"], testcase[0].tag) for testcase in testcases] == [("Fuzz tests", "error")]
+    results = [json.loads(path.read_text()) for path in allure_dir.glob("*-result.json")]
+    assert [(item["name"], item["status"]) for item in results] == [("Fuzz tests", "broken")]
+
+
 def test_fuzz_junit_report_does_not_duplicate_old_failures(ctx, response_factory):
     schema = ctx.openapi.load_schema(USERS_OK_PATHS)
     operation = schema["/users"]["GET"]

@@ -472,6 +472,23 @@ def test_pipe_delimited_query_parameters_revalidate_after_edit(ctx):
     assert case.meta.components[ParameterLocation.QUERY].mode == GenerationMode.NEGATIVE
 
 
+@pytest.mark.parametrize("query", [None, {"id": "abc"}], ids=["none", "wrong-type"])
+def test_replacing_query_container_revalidates_as_negative(ctx, query):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = find(schema["/items"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE), lambda case: True)
+    case.query = query
+    assert case.meta.components[ParameterLocation.QUERY].mode == GenerationMode.NEGATIVE
+
+
 def test_header_case_insensitive_dict_hash(ctx):
     schema = ctx.openapi.load_schema(
         {

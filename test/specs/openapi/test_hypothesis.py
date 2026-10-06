@@ -413,6 +413,38 @@ def test_contains_contradicting_items_leaves_only_other_branch(ctx):
 
 
 @pytest.mark.hypothesis_nested
+def test_contains_over_recursive_reference_keeps_items_valid(ctx):
+    body = {
+        "type": "array",
+        "contains": {"$ref": "#/components/schemas/L"},
+        "minContains": 1,
+        "maxContains": 2,
+        "items": {"not": {"type": "null"}},
+    }
+    components = {"schemas": {"L": {"type": "array", "items": {"$ref": "#/components/schemas/L"}}}}
+    schema = ctx.openapi.load_schema(
+        {
+            "/tags": {
+                "post": {
+                    "requestBody": {"required": True, "content": {"application/json": {"schema": body}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components=components,
+    )
+    validator = jsonschema_rs.validator_for({**body, "components": components})
+
+    @given(case=schema["/tags"]["POST"].as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(max_examples=10, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        assert validator.is_valid(case.body), case.body
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
 def test_valid_headers():
     # When headers are generated
     # And there is no other keywords than "type"

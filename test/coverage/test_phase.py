@@ -9677,6 +9677,17 @@ def test_positive_body_string_longer_than_a_pattern_can_draw(ctx):
     assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
 
 
+def test_positive_body_string_longer_than_a_unicode_flag_pattern_can_draw(ctx):
+    body = {
+        "type": "object",
+        "properties": {"a": {"type": "string", "pattern": "(?u)^a+$", "minLength": 9000}},
+        "required": ["a"],
+    }
+    operation = body_operation(ctx, body, version="3.1.0")
+    assert [len(body["a"]) for body in coverage_bodies(operation, GenerationMode.POSITIVE)] == [9000]
+    assert_bodies(operation, GenerationMode.POSITIVE, valid=True, source=collect_cases)
+
+
 def test_negative_body_below_min_properties_past_the_drawn_limit(ctx):
     operation = body_operation(ctx, {"type": "object", "minProperties": 300, "properties": {"x0": {"type": "integer"}}})
     below = [
