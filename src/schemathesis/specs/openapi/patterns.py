@@ -171,11 +171,6 @@ _POSIX_CLASS_RAW_MAP: dict[str, str] = {
     "ascii": _ASCII_CLASS,
 }
 
-
-# `||` is absent here on purpose: the engine behind validation has no such operator, so the two
-# characters name a literal `|` and Python reads them the same way.
-_PCRE_CLASS_SET_OPERATORS = ("&&", "~~")
-
 _MAX_CODEPOINT = sys.maxunicode
 _SURROGATES = (0xD800, 0xDFFF)
 
@@ -204,22 +199,6 @@ def _complemented(intervals: list[_Interval]) -> list[_Interval]:
     if cursor <= _MAX_CODEPOINT:
         out.append((cursor, _MAX_CODEPOINT))
     return out
-
-
-def _intersected(left: list[_Interval], right: list[_Interval]) -> list[_Interval]:
-    out: list[_Interval] = []
-    for low, high in _merged(left):
-        for other_low, other_high in _merged(right):
-            start, end = max(low, other_low), min(high, other_high)
-            if start <= end:
-                out.append((start, end))
-    return _merged(out)
-
-
-def _symmetric_difference(left: list[_Interval], right: list[_Interval]) -> list[_Interval]:
-    only_left = _intersected(left, _complemented(right))
-    only_right = _intersected(right, _complemented(left))
-    return _merged([*only_left, *only_right])
 
 
 def _serialize_intervals(intervals: list[_Interval]) -> str:
@@ -264,147 +243,11 @@ def _serialize_range(low: int, high: int) -> str:
     return f"{_serialize_literal_in_class(low)}-{_serialize_literal_in_class(high)}"
 
 
-def _class_extent(pattern: str, start: int) -> int | None:
-    """Index just past the `]` closing the class opened at `start`, or `None` when it never closes."""
-    i = start + 1
-    if pattern[i : i + 1] == "^":
-        i += 1
-    # A `]` opening the contents is a member, not the close.
-    if pattern[i : i + 1] == "]":
-        i += 1
-    depth = 0
-    n = len(pattern)
-    while i < n:
-        ch = pattern[i]
-        if ch == "\\":
-            i += 2
-            continue
-        if ch == "[":
-            if pattern[i + 1 : i + 2] == ":":
-                end = pattern.find(":]", i + 2)
-                if end == -1:
-                    return None
-                i = end + 2
-                continue
-            depth += 1
-        elif ch == "]":
-            if depth == 0:
-                return i + 1
-            depth -= 1
-        i += 1
-    return None
-
-
-def _has_set_algebra(body: str) -> bool:
-    """Whether the class body leans on constructs Python `re` reads differently, if at all."""
-    i = 0
-    n = len(body)
-    while i < n:
-        if body[i] == "\\":
-            i += 2
-            continue
-        if body[i : i + 2] in _PCRE_CLASS_SET_OPERATORS:
-            return True
-        if body[i] == "[" and body[i + 1 : i + 2] != ":":
-            return True
-        i += 1
-    return False
-
-
-def _split_class_operands(body: str) -> tuple[list[str], list[str]]:
-    """The class body cut at its set operators, and the operators themselves."""
-    operands: list[str] = []
-    operators: list[str] = []
-    start = 0
-    i = 0
-    n = len(body)
-    while i < n:
-        ch = body[i]
-        if ch == "\\":
-            i += 2
-            continue
-        if ch == "[":
-            end = body.find(":]", i + 2) + 2 if body[i + 1 : i + 2] == ":" else _class_extent(body, i)
-            if end is None or end <= i:
-                return [body], []
-            i = end
-            continue
-        if body[i : i + 2] in _PCRE_CLASS_SET_OPERATORS:
-            operands.append(body[start:i])
-            operators.append(body[i : i + 2])
-            i += 2
-            start = i
-            continue
-        i += 1
-    operands.append(body[start:])
-    return operands, operators
-
-
-def _operand_intervals(operand: str) -> list[_Interval] | None:
-    """The codepoints one side of a set operator admits; its members add up."""
-    intervals: list[_Interval] = []
-    chunk: list[str] = []
-    i = 0
-    n = len(operand)
-    while i < n:
-        ch = operand[i]
-        if ch == "\\":
-            chunk.append(operand[i : i + 2])
-            i += 2
-            continue
-        if ch == "[" and operand[i + 1 : i + 2] != ":":
-            end = _class_extent(operand, i)
-            if end is None:
-                return None
-            nested = _resolved_class(operand[i + 1 : end - 1])
-            if nested is None:
-                return None
-            nested_intervals = _class_intervals(nested)
-            if nested_intervals is None:
-                return None
-            intervals.extend(nested_intervals)
-            i = end
-            continue
-        chunk.append(ch)
-        i += 1
-    if chunk:
-        flat = _inline_unicode_in_classes(f"[{''.join(chunk)}]")
-        if flat is None:
-            return None
-        own = _class_intervals(flat)
-        if own is None:
-            return None
-        intervals.extend(own)
-    return _merged(intervals)
-
-
-def _resolved_class(body: str) -> str | None:
-    """A class body with set operators and nested classes worked out, spelled as a flat `[...]`."""
-    negated = body.startswith("^")
-    if negated:
-        body = body[1:]
-    operands, operators = _split_class_operands(body)
-    intervals = _operand_intervals(operands[0])
-    if intervals is None:
-        return None
-    for operator, operand in zip(operators, operands[1:], strict=True):
-        current = _operand_intervals(operand)
-        if current is None:
-            return None
-        intervals = _intersected(intervals, current) if operator == "&&" else _symmetric_difference(intervals, current)
-    if negated:
-        intervals = _complemented(intervals)
-    if not intervals:
-        # Python has no spelling for a class admitting nothing.
-        return None
-    return f"[{_serialize_intervals(intervals)}]"
-
-
 _BRACE_HEX_DIGITS = re.compile(r"[0-9A-Fa-f]{1,6}\Z")
 
 
 def _inline_unicode_in_classes(pattern: str) -> str | None:
-    r"""Inline `\p{X}`, `\P{X}` and `[:X:]` class contents inside `[...]`; bail out on `[:^X:]` (uncomposable)."""
+    r"""Inline `\p{X}` and `\P{X}` contents inside `[...]` and escape ECMA class literals for Python."""
     out: list[str] = []
     i = 0
     in_class = False
@@ -458,18 +301,14 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
             out.append(pattern[i : i + 2])
             i += 2
             continue
-        # PCRE/Java class-set operators have no Python `re` equivalent — silent translation
-        # would change semantics (`||` becomes a literal `|`, `&&` a literal `&`, etc.).
-        if in_class and pattern[i : i + 2] in _PCRE_CLASS_SET_OPERATORS:
-            return None
-        # A run of pipes names one literal `|` here, but Python reserves the spelling for a set
-        # operator it does not have yet and warns about it.
-        if in_class and ch == "|" and pattern[i + 1 : i + 2] == "|":
-            while i < n and pattern[i] == "|":
+        # These doubled characters are literals in ECMA classes, but Python warns that they may
+        # become set operators. Escaping each member preserves the class while keeping compilation quiet.
+        if in_class and ch in "&~|" and pattern[i + 1 : i + 2] == ch:
+            while i < n and pattern[i] == ch:
+                out.append(f"\\{ch}")
                 i += 1
-            out.append("\\|")
             continue
-        # POSIX character class `[:name:]` nested inside `[...]`.
+        # POSIX character class `[:name:]` nested inside `[...]`: ECMA reads it literally, but authors mean the class.
         if in_class and ch == "[" and i + 1 < n and pattern[i + 1] == ":":
             end = pattern.find(":]", i + 2)
             if end != -1:
@@ -484,19 +323,15 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
                 out.append(raw)
                 i = end + 2
                 continue
-        # Nested `[...]` inside an outer class is a PCRE/Java extension; Python `re` has no
-        # equivalent and silently treats `[` as a literal, drifting from the source semantics.
         if in_class and ch == "[":
-            return None
+            out.append(r"\[")
+            i += 1
+            continue
+        if ch == "]" and not in_class:
+            out.append(r"\]")
+            i += 1
+            continue
         if ch == "[" and not in_class:
-            class_end = _class_extent(pattern, i)
-            if class_end is not None and _has_set_algebra(pattern[i + 1 : class_end - 1]):
-                resolved = _resolved_class(pattern[i + 1 : class_end - 1])
-                if resolved is None:
-                    return None
-                out.append(resolved)
-                i = class_end
-                continue
             in_class = True
         elif ch == "]" and in_class:
             in_class = False
@@ -549,6 +384,7 @@ def normalize_regex(pattern: object) -> str | None:
     Handles:
     - PCRE Unicode property escapes (\p{L}, \pL, etc.) -> Python equivalents
     - POSIX character classes ([:alnum:], [:digit:], etc.) -> Python equivalents
+    - ECMA character-class literals -> escaped Python equivalents
     - Python anchors (\A, \Z) -> Rust-compatible equivalents (^, $)
     - Named groups ((?<name>...), (?P<name>...)) -> plain groups
 
@@ -559,28 +395,24 @@ def normalize_regex(pattern: object) -> str | None:
         return None
     stripped = _strip_group_names(pattern)
     has_named_group = stripped != pattern
+    translated = _inline_unicode_in_classes(stripped)
+    if translated is None:
+        return None
+    has_class_literals = translated != stripped
     # Check for both braced (\p{L}) and shorthand (\pL) forms
     has_braced = r"\p{" in pattern or r"\P{" in pattern
     has_shorthand = any(
         esc in pattern
         for esc in (r"\pL", r"\pN", r"\pP", r"\pM", r"\pS", r"\pC", r"\pZ", r"\PL", r"\PN", r"\PC", r"\PM")
     )
-    # Check for POSIX character classes like `[:alnum:]` (only valid inside `[...]`)
-    has_posix = "[:" in pattern and ":]" in pattern
-    # PCRE class-set operators and brace hex escapes, neither of which Python `re` reads
-    has_class_algebra = any(operator in pattern for operator in _PCRE_CLASS_SET_OPERATORS)
+    # PCRE brace hex escapes are not read by Python `re`.
     has_brace_hex = r"\x{" in pattern
     # Check for Python-specific anchors that need Rust translation
     has_python_anchors = pattern.startswith(r"\A") or pattern.endswith(r"\Z")
 
-    if not any(
-        (has_braced, has_shorthand, has_posix, has_python_anchors, has_class_algebra, has_brace_hex, has_named_group)
-    ):
+    if not any((has_braced, has_shorthand, has_class_literals, has_python_anchors, has_brace_hex, has_named_group)):
         return None  # No translation needed
 
-    translated = _inline_unicode_in_classes(stripped)
-    if translated is None:
-        return None
     for pcre_escape, python_equiv in _UNICODE_PROPERTY_MAP:
         translated = translated.replace(pcre_escape, python_equiv)
 
