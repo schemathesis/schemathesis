@@ -24,6 +24,9 @@ PER_CONTEXT_CAPACITY = 500
 # Maximum number of unique contexts to track per resource type.
 MAX_CONTEXTS_PER_TYPE = 20
 
+# Once real values exist, one draw in this many still offers the spec's example values.
+EXAMPLE_DRAW_PERIOD = 5
+
 
 @dataclass(slots=True)
 class ResourceInstance:
@@ -33,6 +36,8 @@ class ResourceInstance:
     source_operation: str
     status_code: int
     context: dict[str, Any]
+    # Taken from a response example in the spec rather than from the API itself.
+    from_example: bool = False
 
 
 class ResourceRepository:
@@ -46,6 +51,7 @@ class ResourceRepository:
     __slots__ = (
         "_descriptors_by_operation",
         "_resource_buckets",
+        "_example_turns",
         "_context_order",
         "_lock",
     )
@@ -54,6 +60,7 @@ class ResourceRepository:
         self._descriptors_by_operation: dict[str, list[ResourceDescriptor]] = defaultdict(list)
         # Nested structure: resource_name -> context_key -> deque of instances
         self._resource_buckets: dict[str, dict[str, deque[ResourceInstance]]] = {}
+        self._example_turns: dict[str, int] = {}
         # Track context insertion order for FIFO eviction of contexts
         self._context_order: dict[str, deque[str]] = {}
         self._lock = threading.Lock()
@@ -81,7 +88,16 @@ class ResourceRepository:
             instances: list[ResourceInstance] = []
             for bucket in context_buckets.values():
                 instances.extend(bucket)
-            return tuple(instances)
+            # Spec examples stand in until the API returns real values, then still come up every few draws:
+            # a plausible id the API never issued reaches error paths that real ones do not.
+            live = tuple(instance for instance in instances if not instance.from_example)
+            if not live or len(live) == len(instances):
+                return tuple(instances)
+            turn = self._example_turns.get(resource_name, 0) + 1
+            self._example_turns[resource_name] = turn
+            if turn % EXAMPLE_DRAW_PERIOD == 0:
+                return tuple(instances)
+            return live
 
     def remove_by_value(self, resource_name: str, value: object) -> int:
         """Drop instances whose data carries the given value; returns the number removed.
@@ -104,7 +120,13 @@ class ResourceRepository:
         return removed
 
     def record_response(
-        self, *, operation: str, status_code: int, payload: Any, context: dict[str, Any] | None = None
+        self,
+        *,
+        operation: str,
+        status_code: int,
+        payload: Any,
+        context: dict[str, Any] | None = None,
+        from_example: bool = False,
     ) -> None:
         """Capture resources from an API response based on configured descriptors."""
         descriptors = self._descriptors_by_operation.get(operation, [])
@@ -123,6 +145,7 @@ class ResourceRepository:
                     source_operation=operation,
                     status_code=status_code,
                     context=context or {},
+                    from_example=from_example,
                 )
 
     def seed_input_values(self, by_resource: dict[str, dict[str, Any]], *, source: str) -> None:
@@ -216,6 +239,7 @@ class ResourceRepository:
         source_operation: str,
         status_code: int,
         context: dict[str, Any],
+        from_example: bool = False,
     ) -> None:
         """Store a resource instance with context-aware eviction.
 
@@ -229,7 +253,11 @@ class ResourceRepository:
         context_key = jsonschema_rs.canonical.json.to_string(context) if context else ""
 
         instance = ResourceInstance(
-            data=data, source_operation=source_operation, status_code=status_code, context=context
+            data=data,
+            source_operation=source_operation,
+            status_code=status_code,
+            context=context,
+            from_example=from_example,
         )
 
         with self._lock:

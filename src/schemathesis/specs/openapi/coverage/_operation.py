@@ -413,6 +413,24 @@ def _is_pool_eligible(schema: object) -> TypeGuard[dict[str, Any]]:
     return isinstance(schema, dict) and not (_GATING_KEYS & schema.keys())
 
 
+def _with_captured_value_first(
+    schema: dict[str, Any], value: object, validator_cls: type[jsonschema_rs.Validator]
+) -> dict[str, Any]:
+    """Lead with a value the API returned earlier; declared values stay as their own cases."""
+    if _is_pool_eligible(schema):
+        return {**schema, "examples": [value]}
+    # Declared values are often placeholders the API does not know, so only the constraints decide.
+    constraints = {key: item for key, item in schema.items() if key not in ("example", "examples", "default")}
+    if not make_validator(constraints, validator_cls).is_valid(value):
+        return schema
+    if "enum" in schema:
+        return {**schema, "enum": [value, *(member for member in schema["enum"] if member != value)]}
+    declared = [*schema.get("examples", []), *([schema["example"]] if "example" in schema else [])]
+    updated = {key: item for key, item in schema.items() if key != "example"}
+    updated["examples"] = [value, *(item for item in declared if item != value)]
+    return updated
+
+
 class _NestedOverlay:
     """Sentinel distinguishing per-leaf sub-field overlays from raw pool object values."""
 
@@ -738,10 +756,9 @@ def _seed_parameters(run: CoverageRun) -> None:
                 schema = dict(schema)
                 schema_is_clone = True
             schema.setdefault("examples", []).append(value)
-        if _is_pool_eligible(schema):
-            pool_value = correlated.get((location, name))
-            if pool_value is not None:
-                schema = {**schema, "examples": [pool_value]}
+        pool_value = correlated.get((location, name))
+        if pool_value is not None:
+            schema = _with_captured_value_first(schema, pool_value, validator_cls)
         gen = cover_schema_iter(
             CoverageContext(
                 session=session,
