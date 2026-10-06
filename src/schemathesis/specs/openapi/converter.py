@@ -142,18 +142,17 @@ def _to_json_schema(
 
     # Handle unsupported regex patterns - try translation first, remove if that fails
     pattern = schema.get("pattern")
-    if pattern is not None:
+    if isinstance(pattern, str):
         # One the validator compiles is kept even where Python cannot read it - the API enforces it,
         # so dropping it would draw values the API turns down.
-        enforced = (
-            pattern
-            if is_negated and isinstance(pattern, str) and is_valid_jsonschema_rs_regex(pattern)
-            else enforced_pattern(pattern)
-        )
+        enforced = pattern if is_negated and is_valid_jsonschema_rs_regex(pattern) else enforced_pattern(pattern)
         if enforced is None:
             del schema["pattern"]
         else:
             schema["pattern"] = enforced
+    elif pattern is not None:
+        # E.g. YAML reads an unquoted `00:00:00.00` as a float; no regex is left to enforce.
+        del schema["pattern"]
     if update_quantifiers:
         update_pattern_in_schema(schema)
     # Sometimes `required` is incorrectly has a boolean value

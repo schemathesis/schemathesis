@@ -1449,6 +1449,37 @@ def test_malformed_keyword(ctx, cli, snapshot_cli, operation, phase):
     assert cli.run(str(schema_path), f"--url={api.base_url}/api", f"--phases={phase}") == snapshot_cli
 
 
+@pytest.mark.parametrize("phase", ["examples", "coverage", "fuzzing"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_non_string_pattern(ctx, cli, snapshot_cli, phase):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"a": {"type": "string", "pattern": ["x"]}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/data", methods=["POST"])
+    def data():
+        return jsonify({})
+
+    assert cli.run_openapi_app(app, f"--phases={phase}", "--checks=not_a_server_error") == snapshot_cli
+
+
 @pytest.mark.parametrize(
     "operation",
     [
