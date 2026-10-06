@@ -28,6 +28,7 @@
 - Missing `negative_data_rejection` failures for type mutations of nullable or `allowEmptyValue` parameters.
 - False `negative_data_rejection` failures for `null` in query parameters alongside unsent extra parameters.
 - Show the compact `[auto, 1-64]` range when `--workers` gets an out-of-range value.
+- Report test cases interrupted by crashed checks as errored.
 - False `negative_data_rejection` failures for DRF validation errors wrapped in `detail`.
 - False `negative_data_rejection` failures for path parameters whose `anyOf` / `oneOf` accepts any string.
 - Resolve external `$ref` pointers in `response_schema_conformance` failure schemas.

@@ -150,6 +150,10 @@ class ScenarioRecorder:
         """Record a successful pass of a check for a given test case."""
         self.checks.setdefault(case_id, []).append(CheckNode(name=name, status=Status.SUCCESS, failure_info=None))
 
+    def record_check_error(self, *, name: str, case_id: str) -> None:
+        """Record a check that crashed for a given test case."""
+        self.checks.setdefault(case_id, []).append(CheckNode(name=name, status=Status.ERROR, failure_info=None))
+
     def record_interaction(self, case_id: str, interaction: Interaction) -> None:
         """Record a pre-built `Interaction` (used for serialization round-trips, e.g. xdist worker IPC)."""
         self.interactions[case_id] = interaction

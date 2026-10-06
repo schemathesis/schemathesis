@@ -622,6 +622,28 @@ def test_connection_error_cases_are_not_reported_as_skipped(ctx, cli, snapshot_c
     assert cli.run(api.schema_url, "--url=http://127.0.0.1:1/api", "--phases=fuzzing", "-n", "5") == snapshot_cli
 
 
+@pytest.mark.snapshot(replace_test_cases=False, replace_traceback=True)
+def test_crashed_check_cases_are_reported_as_errored(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    with ctx.check(
+        """
+@schemathesis.check
+def broken_check(ctx, response, case):
+    raise ZeroDivisionError("boom")
+"""
+    ) as module:
+        assert (
+            cli.run(
+                api.schema_url,
+                "--max-examples=5",
+                "--phases=fuzzing",
+                "--checks=broken_check",
+                hooks=module,
+            )
+            == snapshot_cli
+        )
+
+
 def test_chunked_encoding_error(ctx, mocker, cli, snapshot_cli):
     api = ctx.openapi.apps.chunked_success()
 
