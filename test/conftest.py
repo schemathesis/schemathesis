@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import datetime
 import logging
+
+# Import eagerly: `pytester` can drop it from `sys.modules` while `requests` is importing it.
+import netrc  # noqa: F401
 from collections.abc import Callable
 from dataclasses import dataclass
 from io import BytesIO
