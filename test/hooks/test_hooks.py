@@ -119,6 +119,22 @@ def test_before_call_dispatch_preserves_kwargs_styles():
     ]
 
 
+@pytest.mark.parametrize(
+    ("outcome", "expected"),
+    [(pytest.skip, pytest.skip.Exception), (pytest.fail, pytest.fail.Exception)],
+    ids=["skip", "fail"],
+)
+def test_before_call_propagates_pytest_outcomes(outcome, expected):
+    dispatcher = HookDispatcher(scope=HookScope.GLOBAL)
+
+    @dispatcher.hook
+    def before_call(context, case, kwargs):
+        outcome("from hook")
+
+    with pytest.raises(expected, match="from hook"):
+        dispatch_before_call(dispatcher, context=HookContext(), case=object(), kwargs={})
+
+
 @pytest.mark.hypothesis_nested
 @pytest.mark.usefixtures("global_hook")
 def test_global_query_hook(ctx):

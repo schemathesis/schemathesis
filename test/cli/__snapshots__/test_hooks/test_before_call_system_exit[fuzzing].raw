@@ -1,0 +1,82 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       3 selected / 3 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+_____________________________ GET /users/{user_id} _____________________________
+Hook Error
+
+Error in `before_call` hook: SystemExit: 1
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in dispatch_before_call
+        hook(context, case, kwargs)
+      File "/tmp/module.py", line XXX, in before_call
+        raise SystemExit(1)
+    SystemExit: 1
+____________________________ PATCH /users/{user_id} ____________________________
+Hook Error
+
+Error in `before_call` hook: SystemExit: 1
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in dispatch_before_call
+        hook(context, case, kwargs)
+      File "/tmp/module.py", line XXX, in before_call
+        raise SystemExit(1)
+    SystemExit: 1
+_________________________________ POST /users/ _________________________________
+Hook Error
+
+Error in `before_call` hook: SystemExit: 1
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in dispatch_before_call
+        hook(context, case, kwargs)
+      File "/tmp/module.py", line XXX, in before_call
+        raise SystemExit(1)
+    SystemExit: 1
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 0
+  Errored: 3
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  🚫 Fuzzing
+  ⏭  Stateful (disabled)
+
+Errors:
+  🚫 Hook Error: 3
+
+Test cases:
+  N generated
+
+Seed: 42
+
+============================== 3 errors in 1.00s ===============================
