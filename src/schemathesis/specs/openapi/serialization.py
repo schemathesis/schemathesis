@@ -508,7 +508,8 @@ def deep_object(item: Generated, name: str) -> None:
     id={"role": "admin", "firstName": "Alex"} => id[role]=admin&id[firstName]=Alex
     """
     generated = item.pop(name)
-    if generated:
+    # An empty object expands to nothing, so the parameter is omitted.
+    if generated or isinstance(generated, dict):
         item.update({f"{name}[{key}]": value for key, value in force_dict(generated).items()})
     else:
         item[name] = ""
@@ -528,7 +529,8 @@ def delimited_object(item: Generated, name: str) -> None:
 def extracted_object(item: Generated, name: str) -> None:
     """Merge a child node to the parent one."""
     generated = item.pop(name)
-    if generated and isinstance(generated, dict):
+    # An empty object expands to nothing, so the parameter is omitted.
+    if isinstance(generated, dict):
         item.update(generated)
     else:
         item[name] = ""
@@ -541,6 +543,9 @@ def nested_object(item: Generated, name: str) -> None:
     {"pagination": {"pageNumber": 1}} => request[pagination][pageNumber]=1
     """
     generated = item.pop(name)
+    # An empty object expands to nothing, so the parameter is omitted.
+    if generated == {}:
+        return
     if not generated:
         item[name] = ""
         return

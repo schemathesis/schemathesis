@@ -386,6 +386,9 @@ def _dedup_key(kwargs: dict[str, Any]) -> dict[str, Any]:
             if len(value) == 1:
                 value = value[0]
         normalized[key] = value
+    if not normalized:
+        # An empty query sends the same request as no query at all.
+        return {key: value for key, value in kwargs.items() if key != "query"}
     return {**kwargs, "query": normalized}
 
 

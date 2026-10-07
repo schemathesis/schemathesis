@@ -1611,6 +1611,56 @@ def test_positive_data_acceptance_float_format_exclusive_minimum_no_false_positi
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    ("serialization", "allowed_keys"),
+    [({}, {"kind"}), ({"style": "deepObject", "explode": True}, {"p[kind]"})],
+    ids=["form-explode", "deep-object"],
+)
+def test_positive_data_acceptance_empty_exploded_object_query_no_false_positive(
+    ctx, cli, snapshot_cli, serialization, allowed_keys
+):
+    # An empty exploded object expands to nothing, so no `p` key may reach the server.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/secrets": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "p",
+                            "in": "query",
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {"kind": {"type": "string", "enum": ["a", "b"]}},
+                            },
+                            **serialization,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/secrets")
+    def secrets():
+        unknown = set(request.args) - allowed_keys
+        if unknown:
+            return jsonify({"error": f"Unknown query parameters: {sorted(unknown)}"}), 400
+        return jsonify([]), 200
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=positive_data_acceptance",
+            "--mode=positive",
+            "--max-examples=10",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_positive_data_acceptance_additional_properties_hint(ctx, cli, snapshot_cli):
     # When Hypothesis adds extra properties to a schema without `additionalProperties: false`,
     # the failure message should include a hint explaining the likely cause.
