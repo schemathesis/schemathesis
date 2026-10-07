@@ -482,3 +482,35 @@ def test_curl_command_names_the_host_the_request_used():
         assert case.as_curl_command() == f"curl -X GET {response.request.url}"
 
     test()
+
+
+def test_lifespan_shutdown_leaves_no_unclosed_streams(testdir):
+    testdir.makeini(
+        """
+[pytest]
+filterwarnings = error
+"""
+    )
+    testdir.makepyfile(
+        """
+import gc
+
+import schemathesis
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/ping")
+def ping():
+    return {"ok": "yes"}
+
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+def test_first():
+    pass
+
+def test_second():
+    gc.collect()
+"""
+    )
+    testdir.runpytest_subprocess("-v").assert_outcomes(passed=2)

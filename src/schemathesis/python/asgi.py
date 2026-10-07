@@ -116,15 +116,20 @@ class _Lifespan:
         self.portal.call(self._wait_startup)
 
     def stop(self) -> None:
-        # An application that stopped handling lifespan messages will never reply to a shutdown.
-        if self.task is None or not self.task.done():
-            self.portal.call(self._wait_shutdown)
-        if self.task is not None:
-            try:
-                # Re-raises a failure the application hit after startup or after reporting shutdown
-                self.task.result(timeout=_TASK_RESULT_TIMEOUT)
-            except FutureTimeoutError:
-                pass
+        try:
+            # An application that stopped handling lifespan messages will never reply to a shutdown.
+            if self.task is None or not self.task.done():
+                self.portal.call(self._wait_shutdown)
+            if self.task is not None:
+                try:
+                    # Re-raises a failure the application hit after startup or after reporting shutdown
+                    self.task.result(timeout=_TASK_RESULT_TIMEOUT)
+                except FutureTimeoutError:
+                    pass
+        finally:
+            for stream in (self.receive_stream, self.send_stream):
+                stream.send_stream.close()
+                stream.receive_stream.close()
 
     async def _app_receive(self) -> Message:
         self.asked_for_message = True
