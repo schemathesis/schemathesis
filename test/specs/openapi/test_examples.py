@@ -2390,6 +2390,25 @@ def test_response_examples_skip_non_container_examples(ctx):
     ]
 
 
+def test_response_examples_with_boolean_schema(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": True, "example": {"id": "123456"}}},
+                        }
+                    }
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    assert list(schema["/items"]["GET"].responses.iter_examples()) == [("200/application/json", {"id": "123456"})]
+
+
 @pytest.mark.parametrize(
     ("examples", "name", "expected"),
     [

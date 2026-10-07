@@ -639,7 +639,8 @@ def iter_response_examples_v2(response: Mapping[str, Any], status_code: str) -> 
 def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> Iterator[tuple[str, object]]:
     for media_type, definition in response.get("content", {}).items():
         # Try to get a more descriptive example name from the `$ref` value
-        schema_ref = definition.get("schema", {}).get("$ref")
+        schema = definition.get("schema")
+        schema_ref = schema.get("$ref") if isinstance(schema, dict) else None
         if schema_ref:
             name = schema_ref.split("/")[-1]
         else:
