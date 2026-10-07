@@ -29,6 +29,7 @@ from schemathesis.transport.requests import REQUESTS_TRANSPORT, _merge_query_com
 from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
+    import requests
     import werkzeug
 
 
@@ -106,7 +107,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         self,
         case: Case,
         *,
-        session: werkzeug.Client | None = None,
+        session: werkzeug.Client | requests.Session | None = None,
         **kwargs: Any,
     ) -> Response:
         import requests
@@ -114,6 +115,16 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         headers = kwargs.pop("headers", None)
         params = kwargs.pop("params", None)
         cookies = kwargs.pop("cookies", None)
+        auth = None
+        if isinstance(session, requests.Session):
+            # A network session still configures the call, but the application is reached in-process.
+            headers = {**session.headers, **(headers or {})}
+            cookies = {**session.cookies.get_dict(), **(cookies or {})}
+            auth = session.auth
+            session = None
+            # Socket-level settings have no in-process equivalent.
+            for name in ("max_redirects", "timeout", "verify", "cert", "proxies"):
+                kwargs.pop(name, None)
         application = kwargs.pop("app")
         base_url = normalize_base_url(kwargs.pop("base_url", None), host=wsgi.HOST)
 
@@ -123,6 +134,8 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         excluded_headers = get_exclude_headers(case)
         for name in excluded_headers:
             data["headers"].pop(name, None)
+        if auth is not None and "Authorization" not in excluded_headers:
+            data["auth"] = auth
 
         client = session or wsgi.get_client(application)
         cookies = {**(case.cookies or {}), **(cookies or {})}

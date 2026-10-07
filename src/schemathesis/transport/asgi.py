@@ -22,10 +22,15 @@ class ASGITransport(RequestsTransport):
             kwargs["base_url"] = normalize_base_url(case.operation.base_url, host=asgi.HOST)
         application = kwargs.pop("app", case.operation.app)
 
-        if session is not None:
+        if isinstance(session, asgi.ASGIClient):
             return super().send(case, session=session, **kwargs)
 
         with asgi.get_client(application) as client:
+            if session is not None:
+                # A network session still configures the call, but the application is reached in-process.
+                client.headers.update(session.headers)
+                client.auth = session.auth
+                client.cookies.update(session.cookies)
             return super().send(case, session=client, **kwargs)
 
 
