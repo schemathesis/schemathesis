@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -9,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.core.failures import FailureGroup
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, ParameterLocation, RawQueryString
 from schemathesis.core.shell import MAX_SHELL_SCAN_BYTES, ShellType
 from schemathesis.generation.meta import (
@@ -192,6 +194,30 @@ def test_cli_output_includes_insecure(ctx, cli, curl):
     assert line in lines
     command = line.strip()
     curl.assert_valid(command)
+
+
+def _call_and_validate(case, base_url):
+    case.call_and_validate(base_url=base_url)
+
+
+def _call_then_validate(case, base_url):
+    response = case.call(base_url=base_url)
+    case.validate_response(response, transport_kwargs={"base_url": base_url})
+
+
+@pytest.mark.parametrize("validate", [_call_and_validate, _call_then_validate])
+def test_reproduce_with_overridden_base_url(ctx, tmp_path, validate):
+    api = ctx.openapi.apps.failure()
+    path = tmp_path / "openapi.json"
+    path.write_text(json.dumps(api.spec))
+    schema = schemathesis.openapi.from_path(path)
+    case = schema["/api/failure"]["GET"].Case()
+    with pytest.raises(FailureGroup) as exc_info:
+        validate(case, api.base_url)
+    assert exc_info.value.message == (
+        "Schemathesis found 1 distinct failure\n\n- Server error\n\n[500] Internal Server Error:\n\n"
+        f"    `500: Internal Server Error`\n\nReproduce with:\n\n    curl -X GET {api.base_url}/api/failure\n\n"
+    )
 
 
 def test_pytest_subtests_output(ctx, testdir):
