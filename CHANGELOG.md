@@ -25,6 +25,7 @@
 - Record pytest invocations correctly in generated reports.
 - Engine runs against ASGI apps sending requests over the network, and crashing on WSGI apps.
 - `ResourceWarning` about unclosed streams after ASGI lifespan shutdown. [#5085](https://github.com/schemathesis/schemathesis/issues/5085)
+- Crash in stateful testing on paths with segments like `{id}:cancel`.
 
 ## [4.29.4](https://github.com/schemathesis/schemathesis/compare/v4.29.3...v4.29.4) - 2026-10-06
 
