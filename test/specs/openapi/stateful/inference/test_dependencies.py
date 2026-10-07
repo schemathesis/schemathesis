@@ -6076,6 +6076,246 @@ def test_schemathesis_stateful_finds_checksum_match_bug(ctx, cli, snapshot_cli):
     )
 
 
+VERSIONED_ITEM = {
+    "type": "object",
+    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "version": {"type": "string"}},
+}
+
+
+def versioned_item_paths(*, create=True, read=VERSIONED_ITEM, version=None, label=None):
+    update_properties = {"name": {"type": "string"}, "version": {"type": "string"} if version is None else version}
+    if label is not None:
+        update_properties["label"] = label
+    item = {
+        "parameters": [path_param("itemId", "integer")],
+        "put": {
+            "requestBody": {
+                "content": {"application/json": {"schema": {"type": "object", "properties": update_properties}}}
+            },
+            "responses": {"204": {"description": "Updated"}},
+        },
+    }
+    if read is not None:
+        item["get"] = json_response("200", read)
+    paths = {"/items/{itemId}": item}
+    if create:
+        paths["/items"] = {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"name": {"type": "string"}}}}
+                    }
+                },
+                **json_response(
+                    "201", {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
+                ),
+            }
+        }
+    return paths
+
+
+READ_TO_UPDATE = [
+    "#/paths/~1items~1{itemId}/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1items~1{itemId}/put",
+        "parameters": {"path.itemId": "$response.body#/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+READ_TO_UPDATE_ECHOING_VERSION = [
+    "#/paths/~1items~1{itemId}/get",
+    "200",
+    {
+        "operationRef": "#/paths/~1items~1{itemId}/put",
+        "parameters": {"path.itemId": "$request.path.itemId"},
+        "requestBody": {"version": "$response.body#/version"},
+        "x-schemathesis": {"is_inferred": True, "merge_body": True},
+    },
+]
+CREATE_TO_UPDATE = [
+    "#/paths/~1items/post",
+    "201",
+    {
+        "operationRef": "#/paths/~1items~1{itemId}/put",
+        "parameters": {"path.itemId": "$response.body#/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+CREATE_TO_READ = [
+    "#/paths/~1items/post",
+    "201",
+    {
+        "operationRef": "#/paths/~1items~1{itemId}/get",
+        "parameters": {"path.itemId": "$response.body#/id"},
+        "x-schemathesis": {"is_inferred": True},
+    },
+]
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        ({}, [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ]),
+        ({"version": {"type": "string", "readOnly": True}}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
+        ({"version": {}}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
+        ({"read": None}, [CREATE_TO_UPDATE]),
+        ({"read": {"type": "object"}}, [READ_TO_UPDATE, CREATE_TO_UPDATE, CREATE_TO_READ]),
+        (
+            {
+                "label": {"type": "string"},
+                "read": {
+                    "type": "object",
+                    "properties": {
+                        **VERSIONED_ITEM["properties"],
+                        "tags": {"type": "array", "items": component_ref("Tag")},
+                    },
+                },
+            },
+            [READ_TO_UPDATE, READ_TO_UPDATE_ECHOING_VERSION, CREATE_TO_UPDATE, CREATE_TO_READ],
+        ),
+        (
+            {"create": False},
+            [
+                [
+                    "#/paths/~1items~1{itemId}/put",
+                    "204",
+                    {
+                        "operationRef": "#/paths/~1items~1{itemId}/get",
+                        "parameters": {"path.itemId": "$request.path.itemId"},
+                        "x-schemathesis": {"is_inferred": True},
+                    },
+                ],
+                READ_TO_UPDATE,
+            ],
+        ),
+    ],
+    ids=[
+        "echoed",
+        "read-only-in-update",
+        "untyped-in-update",
+        "no-item-read",
+        "item-read-declares-no-fields",
+        "nested-list-field-not-echoed",
+        "no-create",
+    ],
+)
+def test_update_echoes_values_only_item_read_returns(ctx, kwargs, expected):
+    _, graph = analyze_dependencies(
+        ctx,
+        versioned_item_paths(**kwargs),
+        components={
+            "schemas": {
+                "Tag": {"type": "object", "properties": {"id": {"type": "integer"}, "label": {"type": "string"}}}
+            }
+        },
+    )
+    assert inferred_links(graph) == expected
+
+
+def test_echoed_update_field_in_dependency_graph(ctx, snapshot_json):
+    _, graph = analyze_dependencies(ctx, versioned_item_paths())
+    assert graph.serialize() == snapshot_json
+
+
+# Only the item GET returns the version, under a different model than creation returns.
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_echoes_version_returned_only_by_item_get(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewItem"}}},
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewItem"}}},
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                        },
+                        "404": {"description": "Not found"},
+                    }
+                },
+                "put": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                        "required": True,
+                    },
+                    "responses": {"204": {"description": "Updated"}, "404": {"description": "Not found"}},
+                },
+            },
+        },
+        components={
+            "schemas": {
+                "NewItem": {
+                    "type": "object",
+                    "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                    "required": ["name"],
+                },
+                "Item": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "version": {"type": "string"},
+                    },
+                    "required": ["name"],
+                },
+            }
+        },
+    )
+    items = {}
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        data = request.get_json()
+        if not isinstance(data, dict) or not isinstance(data.get("name"), str):
+            return jsonify({"detail": "invalid"}), 400
+        item_id = len(items) + 1
+        items[item_id] = {"id": item_id, "name": data["name"], "version": "v-3f9a1"}
+        return jsonify({"id": item_id, "name": data["name"]}), 201
+
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id not in items:
+            return jsonify({"detail": "not found"}), 404
+        return jsonify(items[item_id]), 200
+
+    @app.route("/items/<int:item_id>", methods=["PUT"])
+    def update_item(item_id):
+        if item_id not in items:
+            return jsonify({"detail": "not found"}), 404
+        data = request.get_json()
+        if not isinstance(data, dict) or not isinstance(data.get("name"), str):
+            return jsonify({"detail": "invalid"}), 400
+        if data.get("version") == items[item_id]["version"]:
+            return jsonify({"detail": "conflict handling crashed"}), 500
+        return "", 204
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--max-examples=10",
+            "--mode=positive",
+            "-c not_a_server_error",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_bug_when_link_always_used(cli, snapshot_cli, ctx):
     item_schema = {

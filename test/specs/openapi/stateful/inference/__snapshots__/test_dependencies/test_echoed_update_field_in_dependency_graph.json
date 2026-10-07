@@ -1,0 +1,78 @@
+{
+  "operations": {
+    "GET /items/{itemId}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "itemId",
+          "resource": "Item",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Item",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /items": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Item",
+          "status_code": "201"
+        }
+      ]
+    },
+    "PUT /items/{itemId}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "itemId",
+          "resource": "Item",
+          "resource_field": "id"
+        },
+        {
+          "echoes_response": true,
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "version",
+          "resource": "Item",
+          "resource_field": "version"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Item": {
+      "fields": [
+        "id",
+        "name",
+        "version"
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "version": [
+          "string"
+        ]
+      }
+    }
+  }
+}

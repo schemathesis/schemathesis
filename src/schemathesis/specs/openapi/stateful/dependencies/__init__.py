@@ -17,6 +17,7 @@ from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_res
 from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
+    bind_echoed_body_fields,
     bind_item_parameters_to_collections,
     disambiguate_module_variants,
     disambiguate_path_suffix_matches,
@@ -76,6 +77,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     deferred_named_scalars: dict[str, list[tuple[str, str, JsonSchema]]] = {}
     deferred_body_fields: dict[str, list[tuple[str, JsonSchema]]] = {}
     deferred_field_named_path_parameters: dict[str, list[tuple[str, str]]] = {}
+    writable_body_fields: dict[str, dict[str, JsonSchema]] = {}
 
     # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
     candidate_resource_names = naming.collect_candidate_resource_names(schema.raw_schema)
@@ -87,6 +89,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
             pending_named_scalars: list[tuple[str, str, JsonSchema]] = []
             pending_body_fields: list[tuple[str, JsonSchema]] = []
             pending_field_named_path_parameters: list[tuple[str, str]] = []
+            pending_writable_body_fields: dict[str, JsonSchema] = {}
             inputs = list(
                 extract_inputs(
                     operation=operation,
@@ -99,6 +102,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     deferred_named_scalars=pending_named_scalars,
                     deferred_body_fields=pending_body_fields,
                     deferred_field_named_path_parameters=pending_field_named_path_parameters,
+                    deferred_writable_body_fields=pending_writable_body_fields,
                     candidate_resource_names=candidate_resource_names,
                 )
             )
@@ -125,6 +129,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 deferred_body_fields[operation.label] = pending_body_fields
             if pending_field_named_path_parameters:
                 deferred_field_named_path_parameters[operation.label] = pending_field_named_path_parameters
+            if pending_writable_body_fields:
+                writable_body_fields[operation.label] = pending_writable_body_fields
 
     # Replay nested-FK lookups whose target resource was registered later in the scan -
     # producer paths can sort after their consumers (e.g. /departments alphabetises before
@@ -227,6 +233,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Bind `/things/{id}` to what `GET /things` lists when nothing else can supply the id (`partition_id`, `{name}`).
     bind_item_parameters_to_collections(operations)
+
+    # Bind update body fields to values only the item `GET` returns (`version`, `checksum`).
+    bind_echoed_body_fields(operations, writable_body_fields)
 
     # Clean up orphaned resources
     remove_unused_resources(operations, resources)
