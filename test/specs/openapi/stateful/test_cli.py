@@ -951,3 +951,95 @@ def test_known_stateful_failure_does_not_fail_the_run(ctx, cli, snapshot_cli, tm
         )
         == snapshot_cli
     )
+
+
+def test_before_call_body_mutation_does_not_leak_into_later_links(ctx, cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/catalogs": {
+                "post": {
+                    "operationId": "createCatalog",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "meta": {"type": "object", "properties": {"name": {"type": "string"}}}
+                                        },
+                                    }
+                                }
+                            },
+                            "links": {
+                                "ReplaceItem": {
+                                    "operationId": "replaceItem",
+                                    "parameters": {"name": "$response.body#/meta/name"},
+                                    "requestBody": {"meta": "$response.body#/meta"},
+                                },
+                                "GetStatus": {
+                                    "operationId": "getStatus",
+                                    "parameters": {"name": "$response.body#/meta/name"},
+                                },
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{name}": {
+                "put": {
+                    "operationId": "replaceItem",
+                    "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/catalogs/{name}/status": {
+                "get": {
+                    "operationId": "getStatus",
+                    "parameters": [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    created = []
+    status_names = []
+
+    @app.route("/catalogs", methods=["POST"])
+    def create_catalog():
+        created.append(f"catalog-{len(created)}")
+        return jsonify({"meta": {"name": created[-1]}}), 201
+
+    @app.route("/items/<name>", methods=["PUT"])
+    def replace_item(name):
+        return jsonify({}), 200
+
+    @app.route("/catalogs/<name>/status", methods=["GET"])
+    def get_status(name):
+        status_names.append(name)
+        return jsonify({}), 200 if name in created else 404
+
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    if case.operation.path == "/items/{name}" and isinstance(case.body, dict) and isinstance(case.body.get("meta"), dict):
+        case.body["meta"]["name"] = "renamed-by-hook"
+"""
+    )
+    cli.run_openapi_app(
+        app,
+        "--phases=stateful",
+        "--mode=positive",
+        "-c not_a_server_error",
+        "--max-examples=10",
+        "--seed=1",
+        hooks=module,
+    )
+    assert "renamed-by-hook" not in status_names
+    assert set(status_names) & set(created)
