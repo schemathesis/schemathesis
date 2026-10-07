@@ -1,3 +1,4 @@
+import re
 import uuid
 import xml.etree.ElementTree as ET
 
@@ -455,6 +456,60 @@ def test_negative_data_rejection_number_body_field_accepts_integer_no_false_posi
         "--max-examples=200",
         exit_code=ExitCode.OK,
     )
+
+
+def test_negative_data_rejection_body_override_restoring_mutated_field(ctx, cli):
+    # Only `/rename` is buggy (ignores the type of `name`); `/confirm` validates its body correctly.
+    body_schema = {
+        "type": "object",
+        "properties": {"token": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["token", "name"],
+        "additionalProperties": False,
+    }
+    operation = {
+        "requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}},
+        "responses": {"200": {"description": "OK"}, "422": {"description": "Invalid"}},
+    }
+    app, _ = ctx.openapi.make_flask_app({"/confirm": {"patch": operation}, "/rename": {"patch": operation}})
+
+    def is_valid_body(body, *, check_name):
+        return (
+            isinstance(body, dict)
+            and set(body) == {"token", "name"}
+            and isinstance(body["token"], str)
+            and (not check_name or isinstance(body["name"], str))
+        )
+
+    @app.route("/confirm", methods=["PATCH"])
+    def confirm():
+        if not is_valid_body(request.get_json(silent=True, force=True), check_name=True):
+            return jsonify({"error": "invalid body"}), 422
+        return jsonify({"ok": True}), 200
+
+    @app.route("/rename", methods=["PATCH"])
+    def rename():
+        if not is_valid_body(request.get_json(silent=True, force=True), check_name=False):
+            return jsonify({"error": "invalid body"}), 422
+        return jsonify({"ok": True}), 200
+
+    result = cli.run_openapi_app(
+        app,
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=fuzzing",
+        "--max-examples=50",
+        config={
+            "operations": [
+                {"include-name": name, "parameters": {"body.token": "confirm-token"}}
+                for name in ("PATCH /confirm", "PATCH /rename")
+            ]
+        },
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert re.findall(r"_ (PATCH /\w+) _", result.stdout) == ["PATCH /rename"], result.stdout
+    assert re.findall(r"Invalid component: in body - violates `(\w+)` at (\S+)", result.stdout) == [
+        ("type", "/properties/name")
+    ], result.stdout
 
 
 def test_negative_data_rejection_query_integer_param_accepts_numeric_string_no_false_positive(ctx, cli, app_runner):

@@ -1214,6 +1214,7 @@ def test_body_override_removes_overridden_constant_provenance():
             )
         ),
         overrides={"/payload/code": "OVERRIDE"},
+        validator=None,
     )
 
     produced = find(strategy, lambda value: True)

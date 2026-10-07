@@ -1616,7 +1616,11 @@ class OpenApiBody(OpenApiComponent):
 
         body_overrides = resolve_body_overrides(operation=operation, body_schema=schema)
         if body_overrides:
-            strategy = build_body_override_overlay_strategy(strategy, overrides=body_overrides)
+            strategy = build_body_override_overlay_strategy(
+                strategy,
+                overrides=body_overrides,
+                validator=self._get_validator() if generation_mode.is_negative else None,
+            )
 
         # Cache the strategy keyed by feedback generation, semantic-index identity, and constants-source identity
         if use_cache:
