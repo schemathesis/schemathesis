@@ -67,6 +67,11 @@ class Engine:
                 requires_transitions=False,
             ),
             self.get_phase_config(
+                PhaseName.AUTH_BOOTSTRAP,
+                is_supported=self.schema.specification.supports_feature(SpecificationFeature.AUTH_BOOTSTRAP),
+                requires_transitions=False,
+            ),
+            self.get_phase_config(
                 PhaseName.EXAMPLES,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.EXAMPLES),
                 requires_transitions=False,

@@ -39,6 +39,7 @@ class SpecificationFeature(str, enum.Enum):
     STATEFUL_TESTING = "stateful_testing"
     COVERAGE = "coverage_tests"
     EXAMPLES = "example_tests"
+    AUTH_BOOTSTRAP = "auth_bootstrap"
 
 
 @dataclass(slots=True)
@@ -67,6 +68,7 @@ class Specification:
                 SpecificationFeature.STATEFUL_TESTING,
                 SpecificationFeature.COVERAGE,
                 SpecificationFeature.EXAMPLES,
+                SpecificationFeature.AUTH_BOOTSTRAP,
             }
         return feature == SpecificationFeature.STATEFUL_TESTING
 

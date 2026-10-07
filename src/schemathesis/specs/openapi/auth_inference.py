@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 def _intersect_configured_schemes(schema: OpenApiSchema) -> list[str]:
     """Return scheme names declared in the spec that also have configured credentials."""
-    configured = schema.config.auth.all_openapi_schemes
+    configured = schema.auth_schemes
     if not configured:
         return []
     declared = schema.security.security_definitions
@@ -72,7 +72,7 @@ def _send_with_scheme(
     or any other unexpected exception. The caller treats `None` as "skip this scheme".
     """
     schema = case.operation.schema
-    config = schema.config.auth.all_openapi_schemes[scheme_name]
+    config = schema.auth_schemes[scheme_name]
 
     retry_case = clone_case(case)
     recorder.record_case(parent_id=case.id, case=retry_case, transition=None, is_transition_applied=False)

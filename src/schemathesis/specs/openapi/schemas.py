@@ -12,9 +12,13 @@ from requests.structures import CaseInsensitiveDict
 from typing_extensions import override
 
 from schemathesis.config import (
+    ApiKeyAuthConfig,
     CoveragePhaseConfig,
+    DynamicTokenAuthConfig,
     ExamplesPhaseConfig,
     FuzzingPhaseConfig,
+    HttpBasicAuthConfig,
+    HttpBearerAuthConfig,
     OperationOrdering,
 )
 from schemathesis.core import NOT_SET, Body, Specification, media_types
@@ -115,6 +119,8 @@ class OpenApiSchema(BaseSchema):
         # never enforces auth on a declared-public operation; otherwise generations consult this
         # instead of mutating the parsed spec.
         self._inferred_security: dict[str, SecurityRequirements] = {}
+        # Credentials from automatic sign-up, keyed by security scheme.
+        self.bootstrapped_auth: dict[str, HttpBearerAuthConfig | ApiKeyAuthConfig] = {}
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
@@ -154,13 +160,20 @@ class OpenApiSchema(BaseSchema):
     def _security_auth_providers(self) -> Iterator[AuthProvider]:
         return iter(self.security._auth_provider_cache.values())
 
+    @property
+    def auth_schemes(
+        self,
+    ) -> dict[str, ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig | DynamicTokenAuthConfig]:
+        """Credentials per security scheme: configured ones, plus a token from automatic sign-up."""
+        return {**self.config.auth.all_openapi_schemes, **self.bootstrapped_auth}
+
     @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         """Apply OpenAPI-aware authentication to a test case.
 
         Returns True if authentication was applied, False otherwise.
         """
-        all_schemes = self.config.auth.all_openapi_schemes
+        all_schemes = self.auth_schemes
         if not all_schemes:
             return False
         return self.security.apply_auth(case, context, all_schemes)

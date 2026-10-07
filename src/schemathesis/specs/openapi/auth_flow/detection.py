@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from schemathesis import auths
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.adapter.security import get_security_requirements
@@ -156,3 +157,14 @@ def detect_auth_flow(schema: OpenApiSchema) -> AuthFlowSpec | None:
             target_scheme=target,
         )
     return None
+
+
+def has_supplied_auth(schema: OpenApiSchema, scheme: str) -> bool:
+    """Whether the user already authenticates requests, so a sign-up flow is not needed."""
+    config = schema.config
+    if config.auth.all_openapi_schemes or config.auth_for() is not None:
+        return True
+    if auths.GLOBAL_AUTH_STORAGE.is_defined or schema.auth.is_defined:
+        return True
+    header = schema.security.security_definitions.get(scheme, {}).get("name", "Authorization")
+    return any(name.lower() in ("authorization", str(header).lower()) for name in config.headers_for())
