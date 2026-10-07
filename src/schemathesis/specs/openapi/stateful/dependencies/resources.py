@@ -189,6 +189,12 @@ def iter_resources_from_response(
     ):
         pointer = f"/{wrapper_field}"
         resolved = properties[wrapper_field]
+        # A created id wrapped next to status fields: `{httpStatus: ..., response: "<id>"}`
+        if method == "post" and resolved.get("type") in ("string", "integer"):
+            primitive_resource = _resource_from_primitive_response(path=path, resources=resources, pointer=pointer)
+            if primitive_resource is not None:
+                yield primitive_resource
+            return None
         if len(properties) > 1 and "$ref" in resolved:
             # The wrapped schema names the resource and may hold a nested page (`{response: Page, status}`),
             # which the steps below only see once resolved.
@@ -316,7 +322,21 @@ ENVELOPE_WRAPPER_FIELDS = frozenset({"data", "result", "response", "payload", "c
 # Siblings a wrapper may carry without them describing the wrapped resource. Matched by name
 # only: an `id` next to `result` identifies the response itself, so it must block unwrapping.
 ENVELOPE_METADATA_FIELDS = frozenset(
-    {"status", "time", "usage", "message", "messages", "success", "error", "errors", "warnings", "meta", "metadata"}
+    {
+        "status",
+        "httpstatus",
+        "time",
+        "usage",
+        "message",
+        "messages",
+        "success",
+        "issuccess",
+        "error",
+        "errors",
+        "warnings",
+        "meta",
+        "metadata",
+    }
 )
 
 
@@ -382,7 +402,9 @@ def _resource_from_boolean_schema(*, path: str, resources: ResourceMap) -> Extra
     return ExtractedResource(resource=resource, cardinality=Cardinality.ONE, pointer=ROOT_POINTER)
 
 
-def _resource_from_primitive_response(*, path: str, resources: ResourceMap) -> ExtractedResource | None:
+def _resource_from_primitive_response(
+    *, path: str, resources: ResourceMap, pointer: str = ROOT_POINTER
+) -> ExtractedResource | None:
     """Handle POST/PUT returning a bare primitive identifier (e.g., slug string or integer ID)."""
     name = from_path(path)
     if name is None:
@@ -398,7 +420,7 @@ def _resource_from_primitive_response(*, path: str, resources: ResourceMap) -> E
     return ExtractedResource(
         resource=resource,
         cardinality=Cardinality.ONE,
-        pointer=ROOT_POINTER,
+        pointer=pointer,
         is_primitive_identifier=True,
     )
 

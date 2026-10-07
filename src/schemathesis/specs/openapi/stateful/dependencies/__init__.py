@@ -17,7 +17,9 @@ from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_res
 from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
+    align_created_identifiers,
     bind_echoed_body_fields,
+    bind_id_fields_to_returned_resources,
     bind_item_parameters_to_collections,
     disambiguate_module_variants,
     disambiguate_path_suffix_matches,
@@ -233,6 +235,12 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Bind `/things/{id}` to what `GET /things` lists when nothing else can supply the id (`partition_id`, `{name}`).
     bind_item_parameters_to_collections(operations)
+
+    # A bare id `POST /things` returns is what `/things/{id}` takes, whatever each response names its schema.
+    align_created_identifiers(operations)
+
+    # `fromAirportId` names what responses return under `fromAirport` (`AirportResponse.id`).
+    bind_id_fields_to_returned_resources(operations)
 
     # Bind update body fields to values only the item `GET` returns (`version`, `checksum`).
     bind_echoed_body_fields(operations, writable_body_fields)

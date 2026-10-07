@@ -99,6 +99,12 @@ class DependencyGraph:
                     consumers_by_resource[resource_id][consumer_id] = (consumer, [])
                 consumers_by_resource[resource_id][consumer_id][1].append(input_slot)
 
+        path_identifiers: dict[str, set[str]] = {}
+        for operation in self.operations.values():
+            for input_slot in operation.inputs:
+                if input_slot.parameter_location == ParameterLocation.PATH and input_slot.resource_field is not None:
+                    path_identifiers.setdefault(input_slot.resource.name, set()).add(input_slot.resource_field)
+
         for producer in self.operations.values():
             producer_path = encoded_paths[id(producer)]
             producer_id = id(producer)
@@ -149,8 +155,16 @@ class DependencyGraph:
                             # request body (e.g. POST /sessions with body {sessionId: ...}).
                             value_expr = f"$request.body#/{output_slot.body_field}"
                         elif output_slot.is_primitive_identifier:
-                            # Primitive identifier (e.g., string response from POST,
-                            # or an array of identifier strings from GET /collection).
+                            # A bare id (POST's created slug, GET's list of ids) fills only identifier fields.
+                            identifiers = path_identifiers.get(output_slot.resource.name)
+                            field = input_slot.resource_field
+                            if (
+                                identifiers
+                                and field is not None
+                                and field not in identifiers
+                                and key_kind(field) != KeyKind.IDENTIFIER
+                            ):
+                                continue
                             pointer = output_slot.pointer
                             if output_slot.cardinality == Cardinality.MANY:
                                 pointer = pointer.rstrip("/") + "/*"

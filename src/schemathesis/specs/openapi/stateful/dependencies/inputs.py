@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any
@@ -997,6 +998,63 @@ def bind_item_parameters_to_collections(operations: OperationMap) -> None:
                     for existing in producer.outputs
                 ):
                     producer.outputs.append(replace(output, resource=candidate))
+
+
+def align_created_identifiers(operations: OperationMap) -> None:
+    """Give a bare id created by `POST /things` the resource `/things/{id}` takes, so the two link up."""
+    item_resources: dict[str, dict[str, ResourceDefinition]] = {}
+    for operation in operations.values():
+        segments = operation.path.rstrip("/").split("/")
+        if not segments[-1].startswith("{"):
+            continue
+        parameter_name = segments[-1][1:-1]
+        for input_slot in operation.inputs:
+            if input_slot.parameter_location == ParameterLocation.PATH and input_slot.parameter_name == parameter_name:
+                item_resources.setdefault("/".join(segments[:-1]), {})[input_slot.resource.name] = input_slot.resource
+    for operation in operations.values():
+        if operation.method not in ("post", "put"):
+            continue
+        targets = item_resources.get(operation.path.rstrip("/"), {})
+        if len(targets) != 1:
+            continue
+        (target,) = targets.values()
+        operation.outputs += [
+            replace(output, resource=target)
+            for output in operation.outputs
+            if output.is_primitive_identifier
+            and output.cardinality == Cardinality.ONE
+            and output.resource is not target
+        ]
+
+
+def bind_id_fields_to_returned_resources(operations: OperationMap) -> None:
+    """Bind a placeholder `fromAirportId` to the resource responses return under `fromAirport`, by its `id`."""
+    returned: dict[str, dict[str, ResourceDefinition]] = {}
+    for operation in operations.values():
+        for output in operation.outputs:
+            segment = output.pointer.rstrip("/").rsplit("/", 1)[-1]
+            if segment and not segment.startswith("*"):
+                returned.setdefault(segment, {})[output.resource.name] = output.resource
+    for operation in operations.values():
+        for input_slot in operation.inputs:
+            parameter_name = input_slot.parameter_name
+            if input_slot.resource.source != DefinitionSource.PARAMETER_INFERENCE or not isinstance(
+                parameter_name, str
+            ):
+                continue
+            match = re.fullmatch(r"(.+?)_?(?:Id|ID|id)", parameter_name)
+            if match is None:
+                continue
+            candidates = list(returned.get(match.group(1), {}).values())
+            if len(candidates) != 1 or "id" not in candidates[0].fields:
+                continue
+            # The prefix must name the resource, or one generic association schema would take every `*Id` field.
+            stem = naming.normalize_for_matching(candidates[0].name).removesuffix("response")
+            if not naming.normalize_for_matching(match.group(1)).endswith(stem):
+                continue
+            input_slot.resource = candidates[0]
+            input_slot.resource_field = "id"
+            input_slot.is_suffix_matched = False
 
 
 def _module_of(path: str) -> str:
