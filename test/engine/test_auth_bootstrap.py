@@ -53,6 +53,14 @@ def test_sign_up_sends_every_profile_field(ctx):
     )
 
 
+# Operations an ordinary account may not touch open up only to the most privileged role the sign-up offers.
+def test_sign_up_registers_the_most_privileged_role(ctx):
+    api = ctx.openapi.apps.sign_up_and_login("admin-only")
+    stream = _run(schemathesis.openapi.from_url(api.schema_url))
+    sign_up = next(request.json() for request in api.requests if request.path == "/auth/register")
+    assert (sign_up["role"], 200 in _statuses(stream, "GET /orders")) == ("ADMIN", True)
+
+
 def test_register_and_login_are_reported_as_scenarios(ctx):
     api = ctx.openapi.apps.sign_up_and_login()
     stream = _run(schemathesis.openapi.from_url(api.schema_url))

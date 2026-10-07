@@ -9,7 +9,13 @@ from test.apps.builders import build_schema, make_flask_app_from_schema
 from test.apps.runtime import OpenAPIApp
 
 SignUpBehavior = Literal[
-    "ok", "undeclared-security", "register-rejects", "login-rejects", "no-token", "unsatisfiable-password"
+    "ok",
+    "undeclared-security",
+    "register-rejects",
+    "login-rejects",
+    "no-token",
+    "unsatisfiable-password",
+    "admin-only",
 ]
 
 
@@ -117,6 +123,8 @@ def sign_up_and_login(behavior: SignUpBehavior = "ok") -> OpenAPIApp:
         token = flask.request.headers.get("Authorization", "").removeprefix("Bearer ")
         if tokens.get(token) is None:
             return jsonify({"error": "unauthorized"}), 401
+        if behavior == "admin-only" and tokens[token] != "ADMIN":
+            return jsonify({"error": "forbidden"}), 403
         return jsonify([])
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")

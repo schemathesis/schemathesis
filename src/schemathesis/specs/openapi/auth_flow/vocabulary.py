@@ -13,6 +13,7 @@ _IDENTIFIER = frozenset(
     }
 )
 _EMAIL = frozenset({"email", "mail", "emailaddress"})
+_PRIVILEGED = frozenset({"admin", "administrator", "superadmin", "superuser", "root", "owner"})
 
 
 def normalize(name: str) -> str:
@@ -31,3 +32,8 @@ def is_email(name: str) -> bool:
 def is_credential(name: str) -> bool:
     normalized = normalize(name)
     return normalized in _SECRET or normalized in _IDENTIFIER or normalized in _EMAIL
+
+
+def privileged_value(values: list[object]) -> object | None:
+    """The value granting the most access, such as `ADMIN` among the roles a sign-up offers."""
+    return next((value for value in values if isinstance(value, str) and normalize(value) in _PRIVILEGED), None)
