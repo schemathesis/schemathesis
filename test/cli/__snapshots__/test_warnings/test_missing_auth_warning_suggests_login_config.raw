@@ -1,0 +1,63 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       4 selected / 4 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✓
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  4 skipped
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 4 passed
+
+=================================== WARNINGS ===================================
+
+Authentication failed: 2 operations returned authentication errors
+
+401 Unauthorized (2 operations):
+  - GET /orders
+  - GET /profile
+
+💡 POST /auth/register and POST /auth/login look like a sign-up and login flow. Register an account, then add to schemathesis.toml:
+
+    [auth.dynamic.openapi.bearerAuth]
+    path = "/auth/login"
+    payload = { email = "${LOGIN_EMAIL}", password = "${LOGIN_PASSWORD}" }
+    extract_selector = "/response/accessToken"
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 4/4
+  Tested: 4
+
+Test Phases:
+  ⏭  Examples
+  ⏭  Coverage (disabled)
+  ✅ Fuzzing
+  ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Missing authentication: 2 operations returned only 401/403 responses
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+============================== 1 warning in 1.00s ==============================

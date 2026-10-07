@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.29.4...HEAD) - TBD
 
+### :rocket: Added
+
+- Suggest a dynamic auth config when authentication fails on schemas with sign-up and login operations.
+
 ### :bug: Fixed
 
 - Stateful testing aborting when a few operations hang instead of skipping them.

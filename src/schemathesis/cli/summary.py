@@ -27,6 +27,7 @@ class WarningData:
     missing_test_data: set[str]
     base_url_mismatch: set[str]
     base_url_suggestion: str | None
+    auth_flow_suggestion: str | None
     validation_mismatch: set[str]
     missing_deserializer: dict[str, dict[str, set[str]]]
     unused_openapi_auth: set[str]
@@ -54,6 +55,7 @@ class WarningData:
         missing_test_data: set[str] | None = None,
         base_url_mismatch: set[str] | None = None,
         base_url_suggestion: str | None = None,
+        auth_flow_suggestion: str | None = None,
         validation_mismatch: set[str] | None = None,
         missing_deserializer: dict[str, dict[str, set[str]]] | None = None,
         unused_openapi_auth: set[str] | None = None,
@@ -73,6 +75,7 @@ class WarningData:
         self.missing_test_data = missing_test_data or set()
         self.base_url_mismatch = base_url_mismatch or set()
         self.base_url_suggestion = base_url_suggestion
+        self.auth_flow_suggestion = auth_flow_suggestion
         self.validation_mismatch = validation_mismatch or set()
         self.missing_deserializer = missing_deserializer or {}
         self.unused_openapi_auth = unused_openapi_auth or set()

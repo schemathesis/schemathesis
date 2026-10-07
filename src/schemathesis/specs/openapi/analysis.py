@@ -9,6 +9,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.resources import ExtraDataSource, ResourceRepository
+from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
 from schemathesis.specs.openapi.auth_jwt import seed_pool_from_basic_auth, seed_pool_from_headers
 from schemathesis.specs.openapi.extra_data_source import (
     OpenApiExtraDataSource,
@@ -62,6 +63,7 @@ class OpenAPIAnalysis:
         "_inferencer",
         "_warnings_cache",
         "_schema_warnings_cache",
+        "_auth_flow",
     )
 
     def __init__(self, schema: OpenApiSchema) -> None:
@@ -74,6 +76,7 @@ class OpenAPIAnalysis:
         self._inferencer: LinkInferencer | None = None
         self._warnings_cache: Mapping[str, Sequence[SchemaWarning]] | None = None
         self._schema_warnings_cache: Sequence[SchemaWarning] | None = None
+        self._auth_flow: AuthFlowSpec | None | NotSet = NOT_SET
 
     @property
     def dependency_graph(self) -> dependencies.DependencyGraph:
@@ -159,6 +162,15 @@ class OpenAPIAnalysis:
                         status_code=status_code,
                         payload=example_value,
                     )
+
+    @property
+    def auth_flow(self) -> AuthFlowSpec | None:
+        """Detected sign-up and login flow, or `None` when no flow matches."""
+        if isinstance(self._auth_flow, NotSet):
+            from schemathesis.specs.openapi.auth_flow.detection import detect_auth_flow
+
+            self._auth_flow = detect_auth_flow(self.schema)
+        return self._auth_flow
 
     @property
     def inferencer(self) -> LinkInferencer:

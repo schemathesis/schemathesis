@@ -6,6 +6,8 @@ from _pytest.main import ExitCode
 from flask import Flask, Response, jsonify, request
 
 import schemathesis
+from schemathesis.cli.commands.run.warnings import auth_flow_suggestion
+from schemathesis.core.transforms import deepclone
 
 
 def _serve_schema(ctx, cli, app_runner, schema: dict, routes):
@@ -918,3 +920,153 @@ def test_low_valid_rate_lists_only_phases_below_threshold(ctx, cli, snapshot_cli
         )
         == snapshot_cli
     )
+
+
+SIGN_UP_THEN_LOG_IN = {
+    "/auth/register": {
+        "post": {
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["email", "password"],
+                            "properties": {"email": {"type": "string"}, "password": {"type": "string"}},
+                        }
+                    }
+                }
+            },
+            "responses": {"200": {"description": "OK"}},
+        }
+    },
+    "/auth/login": {
+        "post": {
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "required": ["email", "password"],
+                            "properties": {"email": {"type": "string"}, "password": {"type": "string"}},
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "response": {"type": "object", "properties": {"accessToken": {"type": "string"}}}
+                                },
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    },
+    "/orders": {"get": {"security": [{"bearerAuth": []}], "responses": {"200": {"description": "OK"}}}},
+    "/profile": {"get": {"security": [{"bearerAuth": []}], "responses": {"200": {"description": "OK"}}}},
+}
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_auth_warning_suggests_login_config(ctx, cli, app_runner, snapshot_cli):
+    schema = ctx.openapi.build_schema(
+        SIGN_UP_THEN_LOG_IN,
+        components={"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}}},
+    )
+    schema_url = _serve_schema(
+        ctx,
+        cli,
+        app_runner,
+        schema,
+        [
+            ("POST", "/auth/register", lambda: jsonify({})),
+            ("POST", "/auth/login", lambda: jsonify({})),
+            ("GET", "/orders", lambda: (jsonify({}), 401)),
+            ("GET", "/profile", lambda: (jsonify({}), 401)),
+        ],
+    )
+    assert (
+        cli.run(schema_url, "--max-examples=5", "--phases=examples,fuzzing", "-c not_a_server_error", "--seed=1")
+        == snapshot_cli
+    )
+
+
+def _sign_up_then_log_in(ctx, *, login_media_type="application/json", credential="email"):
+    paths = deepclone(SIGN_UP_THEN_LOG_IN)
+    for path in ("/auth/register", "/auth/login"):
+        content = paths[path]["post"]["requestBody"]["content"]
+        schema = content.pop("application/json")["schema"]
+        schema["properties"] = {credential: {"type": "string"}, "password": {"type": "string"}}
+        schema["required"] = [credential, "password"]
+        content[login_media_type if path == "/auth/login" else "application/json"] = {"schema": schema}
+    return ctx.openapi.load_schema(
+        paths, components={"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}}}
+    )
+
+
+def test_auth_flow_suggestion_for_form_login(ctx):
+    assert auth_flow_suggestion(_sign_up_then_log_in(ctx, login_media_type="application/x-www-form-urlencoded")) == (
+        "💡 POST /auth/register and POST /auth/login look like a sign-up and login flow. "
+        "Register an account, then add to schemathesis.toml:\n\n"
+        "    [auth.dynamic.openapi.bearerAuth]\n"
+        '    path = "/auth/login"\n'
+        '    payload = { email = "${LOGIN_EMAIL}", password = "${LOGIN_PASSWORD}" }\n'
+        '    payload_content_type = "application/x-www-form-urlencoded"\n'
+        '    extract_selector = "/response/accessToken"'
+    )
+
+
+@pytest.mark.parametrize(
+    ("credential", "payload"),
+    [
+        ("e-mail", 'e-mail = "${LOGIN_E_MAIL}", password = "${LOGIN_PASSWORD}"'),
+        ("user", 'password = "${LOGIN_PASSWORD}", user = "${LOGIN_USER}"'),
+    ],
+    ids=["hyphenated", "shadows-os-variable"],
+)
+def test_auth_flow_suggestion_placeholders(ctx, credential, payload):
+    assert f"    payload = {{ {payload} }}\n" in auth_flow_suggestion(_sign_up_then_log_in(ctx, credential=credential))
+
+
+@pytest.mark.parametrize(
+    "credentials", [("-H", "Authorization: Bearer expired"), ("--auth", "user:pass")], ids=["header", "basic-auth"]
+)
+def test_missing_auth_warning_keeps_generic_tip_when_credentials_are_supplied(ctx, cli, app_runner, credentials):
+    schema = ctx.openapi.build_schema(
+        SIGN_UP_THEN_LOG_IN,
+        components={"securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer"}}},
+    )
+    schema_url = _serve_schema(
+        ctx,
+        cli,
+        app_runner,
+        schema,
+        [
+            ("POST", "/auth/register", lambda: jsonify({})),
+            ("POST", "/auth/login", lambda: jsonify({})),
+            ("GET", "/orders", lambda: (jsonify({}), 401)),
+            ("GET", "/profile", lambda: (jsonify({}), 401)),
+        ],
+    )
+    stdout = cli.run(
+        schema_url,
+        "--max-examples=5",
+        "--phases=examples,fuzzing",
+        "-c not_a_server_error",
+        *credentials,
+    ).stdout
+    assert ("💡 Ensure valid authentication credentials are set via --auth or -H" in stdout, "sign-up" in stdout) == (
+        True,
+        False,
+    )
+
+
+def test_auth_flow_suggestion_skips_graphql(ctx):
+    assert auth_flow_suggestion(ctx.graphql.load_sdl("type Query { ping: Int }")) is None
