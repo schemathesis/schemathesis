@@ -40,6 +40,8 @@ Schemathesis recognizes the pair when:
 
 Each run signs up with new credentials and fills every field of the sign-up body, optional ones included. Schemathesis sends the token to every operation that requires the security scheme. If an operation declares no security but answers 401 or 403, Schemathesis retries it with the token and keeps sending it when that works.
 
+When testing the login operation itself, about half of the valid requests use the new account's credentials. These logins succeed, so the operations that consume their tokens, such as token refresh and logout, get tested too.
+
 Logins that set a session cookie are not detected; configure them with [Declarative Dynamic Authentication](#declarative-dynamic-authentication).
 
 Credentials you supply turn sign-up off: credentials in the `[auth]` section of `schemathesis.toml`, `--auth`, an `Authorization` or API key header, or an auth provider registered in Python. Other headers don't affect it.

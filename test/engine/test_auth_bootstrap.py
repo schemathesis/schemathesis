@@ -4,6 +4,7 @@ import schemathesis
 from schemathesis.config import HttpBearerAuthConfig
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import PhaseName
+from schemathesis.generation import GenerationMode
 from test.utils import EventStream
 
 
@@ -34,6 +35,12 @@ def test_signed_up_session_authenticates_protected_operations(ctx, transport):
     stream = _run(schema)
     assert (_bootstrap(stream).status, _bootstrap(stream).payload.failure_stage) == (Status.SUCCESS, None)
     assert 200 in _statuses(stream, "GET /orders")
+
+
+def test_fuzzed_login_reuses_signed_up_credentials(ctx):
+    api = ctx.openapi.apps.sign_up_and_login()
+    stream = _run(schemathesis.openapi.from_url(api.schema_url), modes=[GenerationMode.POSITIVE], seed=1)
+    assert 200 in _statuses(stream, "POST /auth/login")
 
 
 def test_sign_up_sends_every_profile_field(ctx):
