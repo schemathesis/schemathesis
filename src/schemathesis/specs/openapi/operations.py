@@ -12,7 +12,6 @@ from schemathesis.core.adapter import OperationParameter, ParsedParameters
 from schemathesis.core.errors import (
     SCHEMA_ERROR_SUGGESTION,
     HookExecutionError,
-    InfiniteRecursiveReference,
     InvalidSchema,
     RefResolutionError,
     SchemaLocation,
@@ -38,7 +37,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiSchema
     from schemathesis.specs.openapi.types import OperationObject
 
-SCHEMA_PARSING_ERRORS = (KeyError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
+SCHEMA_PARSING_ERRORS = (KeyError, RefResolutionError, InvalidSchema)
 
 _V3_1 = version.parse("3.1")
 
@@ -485,8 +484,6 @@ class OperationLoader:
     ) -> NoReturn:
         __tracebackhide__ = True
         schema = self.schema
-        if isinstance(error, InfiniteRecursiveReference):
-            raise InvalidSchema(str(error), path=path, method=method) from None
         if isinstance(error, RefResolutionError):
             raise InvalidSchema.from_reference_resolution_error(error, path=path, method=method) from None
         try:

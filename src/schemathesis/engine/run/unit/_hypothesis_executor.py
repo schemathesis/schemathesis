@@ -12,7 +12,6 @@ from schemathesis.checks import CheckContext
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE
 from schemathesis.core.timing import Instant
 from schemathesis.engine import Status, StopReason, events
 from schemathesis.engine._baseline import has_new_failures
@@ -155,8 +154,6 @@ def run_test(
     for event in iter_mark_error_events(
         test_function=test_function,
         non_fatal_error=non_fatal_error,
-        current_status=status,
-        serializers_suggestion=SERIALIZERS_SUGGESTION_MESSAGE,
     ):
         status = Status.ERROR
         yield event

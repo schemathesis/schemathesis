@@ -18,7 +18,6 @@ from schemathesis.config import ConfigError
 from schemathesis.core.errors import (
     AuthenticationError,
     HookExecutionError,
-    InfiniteRecursiveReference,
     InvalidTransition,
     SerializationNotPossible,
     UnresolvableReference,
@@ -106,7 +105,6 @@ class EngineErrorInfo:
         if self._kind in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION,
-            RuntimeErrorKind.SCHEMA_INVALID_INFINITE_RECURSION,
             RuntimeErrorKind.SCHEMA_INVALID_UNRESOLVABLE_REFERENCE,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
@@ -170,7 +168,6 @@ class EngineErrorInfo:
             RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE,
             RuntimeErrorKind.SCHEMA_INVALID_UNRESOLVABLE_REFERENCE,
-            RuntimeErrorKind.SCHEMA_INVALID_INFINITE_RECURSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND,
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE,
@@ -304,7 +301,6 @@ class RuntimeErrorKind(str, enum.Enum):
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
     SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION = "schema_unsupported_regular_expression"
     SCHEMA_INVALID_STATE_MACHINE = "schema_invalid_state_machine"
-    SCHEMA_INVALID_INFINITE_RECURSION = "schema_invalid_infinite_recursion"
     SCHEMA_INVALID_UNRESOLVABLE_REFERENCE = "schema_invalid_unresolvable_reference"
     SCHEMA_NO_LINKS_FOUND = "schema_no_links_found"
     SCHEMA_GENERIC = "schema_generic"
@@ -381,8 +377,6 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
         return RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE
     if isinstance(error, errors.NoLinksFound):
         return RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND
-    if isinstance(error, InfiniteRecursiveReference):
-        return RuntimeErrorKind.SCHEMA_INVALID_INFINITE_RECURSION
     if isinstance(error, UnresolvableReference):
         return RuntimeErrorKind.SCHEMA_INVALID_UNRESOLVABLE_REFERENCE
     if isinstance(error, errors.SerializationError):
