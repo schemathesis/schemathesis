@@ -4,7 +4,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
-from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, RefResolutionError
+from schemathesis.core.errors import InvalidSchema, RefResolutionError
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
@@ -213,7 +213,7 @@ def iter_resources_from_response(
                     current_resolver,
                     nullable_keyword=response.adapter.nullable_keyword,
                 )
-            except (InfiniteRecursiveReference, BundleError):
+            except BundleError:
                 canonicalized = resolved
             if parent_ref is not None:
                 canonicalization_cache[parent_ref] = canonicalized

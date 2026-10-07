@@ -11,7 +11,6 @@ from jsonschema_rs import ValidationError
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.errors import (
     AuthenticationError,
-    InfiniteRecursiveReference,
     InternalError,
     InvalidHeadersExample,
     InvalidRegexPattern,
@@ -26,15 +25,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.engine import Status, events
 from schemathesis.engine.errors import DeadlineExceeded, TestingState, UnexpectedError, clear_hypothesis_notes
-from schemathesis.generation.hypothesis.builder import (
-    InfiniteRecursiveReferenceMark,
-    InvalidHeadersExampleMark,
-    InvalidRegexMark,
-    MissingPathParameters,
-    NonSerializableMark,
-    UnresolvableReferenceMark,
-    UnsatisfiableExampleMark,
-)
+from schemathesis.generation.hypothesis.builder import MissingPathParameters
 from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
     build_unsatisfiable_error,
@@ -56,43 +47,11 @@ def iter_mark_error_events(
     *,
     test_function: Callable,
     non_fatal_error: NonFatalErrorFactory,
-    current_status: Status | None,
-    serializers_suggestion: str,
 ) -> Iterator[events.NonFatalError]:
     """Yield events for errors stashed on a Hypothesis test function via `*Mark` slots."""
-    status = current_status
-    if UnsatisfiableExampleMark.is_set(test_function):
-        status = Status.ERROR
-        yield non_fatal_error(
-            hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
-        )
-    non_serializable = NonSerializableMark.get(test_function)
-    if non_serializable is not None and status != Status.ERROR:
-        status = Status.ERROR
-        media_types = ", ".join(non_serializable.media_types)
-        yield non_fatal_error(
-            SerializationNotPossible(
-                "Failed to generate test cases from examples for this API operation because of"
-                f" unsupported payload media types: {media_types}\n{serializers_suggestion}",
-                media_types=non_serializable.media_types,
-            )
-        )
-    invalid_regex = InvalidRegexMark.get(test_function)
-    if invalid_regex is not None and status != Status.ERROR:
-        status = Status.ERROR
-        yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(invalid_regex))
-    invalid_headers = InvalidHeadersExampleMark.get(test_function)
-    if invalid_headers:
-        yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
     missing = MissingPathParameters.get(test_function)
     if missing:
         yield non_fatal_error(missing)
-    infinite = InfiniteRecursiveReferenceMark.get(test_function)
-    if infinite:
-        yield non_fatal_error(infinite)
-    unresolvable = UnresolvableReferenceMark.get(test_function)
-    if unresolvable:
-        yield non_fatal_error(unresolvable)
 
 
 def iter_controller_error_events(
@@ -143,11 +102,7 @@ def translate_iteration_exception(
         return non_fatal_error(exc, code_sample=code_sample)
     if isinstance(
         exc,
-        InvalidSchema
-        | SerializationNotPossible
-        | InfiniteRecursiveReference
-        | UnresolvableReference
-        | InvalidHeadersExample,
+        InvalidSchema | SerializationNotPossible | UnresolvableReference | InvalidHeadersExample,
     ):
         return non_fatal_error(prefer_spec_error(exc, operation))
     clear_hypothesis_notes(exc)

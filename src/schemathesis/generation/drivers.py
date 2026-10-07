@@ -13,7 +13,6 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
-    InfiniteRecursiveReference,
     InvalidHeadersExample,
     InvalidRegexPattern,
     InvalidSchema,
@@ -249,7 +248,6 @@ class ExamplesGenerator:
             ]
         except (
             InvalidSchema,
-            InfiniteRecursiveReference,
             Unsatisfiable,
             UnresolvableReference,
             SerializationNotPossible,
@@ -274,7 +272,6 @@ class ExamplesGenerator:
                 add_single_example(operation.as_strategy(**self._as_strategy_kwargs), cases)
             except (
                 InvalidSchema,
-                InfiniteRecursiveReference,
                 Unsatisfiable,
                 UnresolvableReference,
                 SerializationNotPossible,
@@ -318,6 +315,6 @@ def _translate_examples_materialization_error(exc: Exception, operation: APIOper
         )
     if is_regex_validation_error(exc):
         return InvalidRegexPattern.from_jsonschema_rs_error(exc)
-    if isinstance(exc, (InfiniteRecursiveReference, UnresolvableReference)):
+    if isinstance(exc, UnresolvableReference):
         return exc
     return None

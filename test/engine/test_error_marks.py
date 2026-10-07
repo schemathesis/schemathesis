@@ -115,15 +115,11 @@ def test_invalid_headers_example_mark(ctx):
     ]
 
 
-def test_reference_errors_are_titled_as_schema_errors():
-    errors = [
-        InfiniteRecursiveReference("#/components/schemas/Node", ["#/components/schemas/Node"]),
-        UnresolvableReference("#/components/schemas/Missing"),
-    ]
-    assert [EngineErrorInfo(error).format() for error in errors] == [
-        "Schema Error\n\nSchema `#/components/schemas/Node` has a required reference to itself",
-        "Schema Error\n\nReference `#/components/schemas/Missing` cannot be resolved",
-    ]
+def test_unresolvable_reference_is_titled_as_schema_error():
+    error = UnresolvableReference("#/components/schemas/Missing")
+    assert EngineErrorInfo(error).format() == (
+        "Schema Error\n\nReference `#/components/schemas/Missing` cannot be resolved"
+    )
 
 
 @pytest.mark.parametrize(
@@ -172,34 +168,6 @@ def test_invalid_regex_example_generation_error(ctx):
     assert any(isinstance(event.value, InvalidRegexPattern) for event in errors), [
         type(e.value).__name__ for e in errors
     ]
-    finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
-    assert any(event.status == Status.ERROR for event in finished), [event.status for event in finished]
-
-
-def test_infinite_recursive_reference_example_generation_error(ctx):
-    schema = _schema_with_query_and_body_example(ctx)
-    loaded = schemathesis.openapi.from_dict(schema)
-
-    @loaded.hook
-    def before_generate_query(context, strategy):
-        def fail(value):
-            raise InfiniteRecursiveReference(
-                "#/components/schemas/Node", ["#/components/schemas/Node", "#/components/schemas/Node"]
-            )
-
-        return strategy.map(fail)
-
-    stream = examples_only(loaded)
-
-    errors = stream.find_all(events.NonFatalError, phase=PhaseName.EXAMPLES)
-    assert any(isinstance(event.value, InfiniteRecursiveReference) for event in errors), [
-        type(e.value).__name__ for e in errors
-    ]
-    assert [
-        (event.info.message, event.info.has_useful_traceback)
-        for event in errors
-        if isinstance(event.value, InfiniteRecursiveReference)
-    ] == [("Schema `#/components/schemas/Node` has a required reference to itself", False)]
     finished = stream.find_all(events.ScenarioFinished, phase=PhaseName.EXAMPLES)
     assert any(event.status == Status.ERROR for event in finished), [event.status for event in finished]
 

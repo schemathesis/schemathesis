@@ -21,7 +21,6 @@ from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, SpecificationFeature
 from schemathesis.core.errors import (
     IncorrectUsage,
-    InfiniteRecursiveReference,
     InvalidSchema,
     SerializationNotPossible,
     UnresolvableReference,
@@ -292,7 +291,6 @@ def generate_example_cases(
         ]
     except (
         InvalidSchema,
-        InfiniteRecursiveReference,
         Unsatisfiable,
         UnresolvableReference,
         SerializationNotPossible,
@@ -305,10 +303,6 @@ def generate_example_cases(
             NonSerializableMark.set(test, exc)
         if is_regex_validation_error(exc):
             InvalidRegexMark.set(test, exc)
-        if isinstance(exc, InfiniteRecursiveReference):
-            InfiniteRecursiveReferenceMark.set(test, exc)
-        if isinstance(exc, UnresolvableReference):
-            UnresolvableReferenceMark.set(test, exc)
 
     if fill_missing and not result:
         strategy = operation.as_strategy()
@@ -377,6 +371,4 @@ UnserializablePayloadMark = Mark[list[str]](attr_name="unserializable_payload")
 InvalidRegexMark = Mark[ValidationError](attr_name="invalid_regex")
 InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_header")
 MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")
-InfiniteRecursiveReferenceMark = Mark[InfiniteRecursiveReference](attr_name="infinite_recursive_reference")
-UnresolvableReferenceMark = Mark[UnresolvableReference](attr_name="unresolvable_reference")
 ApiOperationMark = Mark[APIOperation](attr_name="api_operation")
