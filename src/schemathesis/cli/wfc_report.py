@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.statistic import Statistic
     from schemathesis.generation.case import Case
 
-SCHEMA_VERSION = "0.7.0"
+SCHEMA_VERSION = "0.8.0"
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 VALIDATION_FAILURES = (
     JsonSchemaError,
@@ -62,6 +62,25 @@ DESTRUCTIVE_METHODS = frozenset({"DELETE", "PUT", "PATCH"})
 # Codes 904-905 are Schemathesis-specific: WFC has no category for these oracles yet.
 INVALID_INPUT_ACCEPTED = 904
 UNMAPPED_METHOD = 905
+FAULT_CATEGORY_IDS = {
+    100: "HTTP_STATUS_500",
+    110: "HTTP_STATUS_NO_405_IF_NO_ALLOW",
+    113: "HTTP_NONWORKING_DELETE",
+    121: "HTTP_OTHER_STATUS_5XX",
+    122: "HTTP_CREATED_RESOURCE_NOT_FOUND",
+    200: "SCHEMA_INVALID_RESPONSE",
+    201: "SCHEMA_INVALID_ALLOW",
+    204: "SCHEMA_STATUS_HAS_406_IF_ACCEPT",
+    205: "SCHEMA_STATUS_NO_501_IF_IMPLEMENTED",
+    206: "SCHEMA_VALIDATION_BYPASS",
+    207: "SCHEMA_VALID_INPUT_REJECTED",
+    308: "SECURITY_ANONYMOUS_MODIFICATIONS",
+    310: "SECURITY_HIDDEN_ACCESSIBLE_ENDPOINT",
+    311: "SECURITY_DECLARED_AUTH_NOT_ENFORCED",
+    312: "SECURITY_CALL_TIMEOUT",
+    INVALID_INPUT_ACCEPTED: "SCHEMATHESIS_INVALID_INPUT_ACCEPTED",
+    UNMAPPED_METHOD: "SCHEMATHESIS_UNSUPPORTED_METHOD_RESPONSE",
+}
 
 
 def operation_id(method: str, path: str) -> str:
@@ -128,7 +147,7 @@ def _case_faults(
                 {
                     "operationId": endpoint,
                     "testCaseId": case_id,
-                    "faultCategories": [{"code": code, "context": context}],
+                    "faultCategories": [{"id": FAULT_CATEGORY_IDS[code], "code": code, "context": context}],
                 },
             )
         )
