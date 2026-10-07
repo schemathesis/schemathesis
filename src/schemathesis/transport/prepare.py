@@ -96,6 +96,14 @@ def prepare_url(case: Case, base_url: str | None) -> str:
     return case.operation.schema.build_request_url(case, base_url)
 
 
+def base_url_from_request_url(case: Case, url: str) -> str:
+    """Base URL that `case` was sent to as `url`, i.e. `url` without the operation path and query."""
+    parts = urlsplit(url)
+    path_segments = prepare_path(case.path, case.path_parameters).lstrip("/").split("/")
+    base_path = "/".join(parts.path.split("/")[: -len(path_segments)])
+    return urlunsplit((parts.scheme, parts.netloc, base_path, "", ""))
+
+
 def prepare_body(case: Case) -> Body:
     """Prepare body via the schema's spec-aware override."""
     return case.operation.schema.prepare_request_body(case)
