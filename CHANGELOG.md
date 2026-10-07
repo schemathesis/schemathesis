@@ -21,6 +21,7 @@
 - Stateful testing aborting when a few operations hang instead of skipping them.
 - Dependency inference missing links from collection listings to item path parameters like `{partition_id}`.
 - Stateful testing failing with invalid inferred links when operations share a response definition.
+- `ignored_auth` crash in `Case.validate_response` on schemas without an absolute base URL.
 - Crash on non-string `pattern` definitions during test case generation.
 - Negative mode skipping operations when `--header` sets only some required headers.
 - Record pytest invocations correctly in generated reports.

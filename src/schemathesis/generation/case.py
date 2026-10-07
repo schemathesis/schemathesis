@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from urllib.parse import urlsplit
 
 import jsonschema_rs
 from jsonschema_rs import Validator
@@ -40,7 +41,7 @@ from schemathesis.hooks import (
     dispatch_before_call,
     schema_hook_dispatchers,
 )
-from schemathesis.transport.prepare import prepare_path, prepare_request
+from schemathesis.transport.prepare import base_url_from_request_url, prepare_path, prepare_request
 from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
@@ -507,6 +508,18 @@ class Case(Generic[OperationT]):
             operation=self.operation, phase=phase.value if phase is not None else None
         )
         response_checks = run_checks_for(self.operation.schema).for_responses()
+        # Checks that re-send the request must reach the server that answered, even when the schema names none.
+        request_url = response.request.url
+        if (
+            request_url is not None
+            and self.operation.app is None
+            and not urlsplit(self.operation.base_url or "").netloc
+            and not (transport_kwargs and ("base_url" in transport_kwargs or "app" in transport_kwargs))
+        ):
+            transport_kwargs = {
+                **(transport_kwargs or {}),
+                "base_url": base_url_from_request_url(self, request_url),
+            }
         ctx = CheckContext(
             override=self._override,
             auth=transport_kwargs.get("auth") if transport_kwargs else None,

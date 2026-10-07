@@ -122,6 +122,44 @@ def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
     assert any(isinstance(failure, IgnoredAuth) for failure in exc_info.value.exceptions)
 
 
+@pytest.mark.parametrize("enforces_auth", [True, False], ids=["enforces-auth", "ignores-auth"])
+def test_validate_response_probes_the_server_that_answered(ctx, app_runner, enforces_auth):
+    app, raw_schema = ctx.openapi.make_flask_app(
+        {
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "security": [{"basicAuth": []}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        servers=[{"url": "/v1"}],
+        components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
+    )
+
+    @app.route("/v1/items/<int:item_id>")
+    def item(item_id):
+        if enforces_auth and request.headers.get("Authorization") != "Basic dGVzdDp0ZXN0":
+            return jsonify({"detail": "Unauthorized"}), 401
+        return jsonify({"id": item_id})
+
+    base_url = app_runner.openapi_url(app, path="/v1")
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
+    case = schema["/items/{item_id}"]["GET"].Case(path_parameters={"item_id": 42})
+    response = case.call(base_url=base_url, headers=headers)
+    if enforces_auth:
+        case.validate_response(response, checks=[ignored_auth], headers=headers, transport_kwargs={"headers": headers})
+    else:
+        with pytest.raises(FailureGroup) as exc_info:
+            case.validate_response(
+                response, checks=[ignored_auth], headers=headers, transport_kwargs={"headers": headers}
+            )
+        assert [type(failure) for failure in exc_info.value.exceptions] == [IgnoredAuth]
+        assert str(exc_info.value.exceptions[0]).startswith("API accepts requests without authentication")
+
+
 @pytest.mark.parametrize(
     ("check_context", "request_kwargs", "parameters", "expected"),
     [
