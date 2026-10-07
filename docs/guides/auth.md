@@ -38,7 +38,7 @@ Schemathesis recognizes the pair when:
 - a `POST` path ends in a login word such as `login`, `token` or `auth`, and its body shares at least two credential fields with the sign-up body, one of them a password,
 - the login response declares a token field such as `access_token` or `accessToken`, and the schema has a bearer or API key security scheme.
 
-Each run signs up with new credentials and fills every field of the sign-up body, optional ones included. Schemathesis sends the token to every operation that requires the security scheme. If an operation declares no security but answers 401 or 403, Schemathesis retries it with the token and keeps sending it when that works.
+Each run signs up with new credentials and fills every field of the sign-up body, optional ones included. If a field offers an administrator value such as `ADMIN`, Schemathesis picks it, so operations reserved for administrators get tested too. Schemathesis sends the token to every operation that requires the security scheme. If an operation declares no security but answers 401 or 403, Schemathesis retries it with the token and keeps sending it when that works.
 
 When testing the login operation itself, about half of the valid requests use the new account's credentials. These logins succeed, so the operations that consume their tokens, such as token refresh and logout, get tested too.
 

@@ -104,6 +104,7 @@ def _sign_up_body(operation: APIOperation, credentials: tuple[str, ...]) -> tupl
 
     from schemathesis.generation.hypothesis.examples import generate_one
     from schemathesis.specs.openapi._hypothesis import make_positive_strategy
+    from schemathesis.specs.openapi.auth_flow.vocabulary import privileged_value
 
     # Use the body the flow came from: the first one that declares properties.
     body = next(
@@ -129,6 +130,12 @@ def _sign_up_body(operation: APIOperation, credentials: tuple[str, ...]) -> tupl
         value = cast("dict[str, JsonValue]", generate_one(strategy))
     except (Unsatisfiable, InvalidArgument, InvalidSchema):
         return None
+    # Accounts with an ordinary role get only part of the API, so take the most privileged one on offer.
+    for name, subschema in schema["properties"].items():
+        if isinstance(subschema, dict) and isinstance(subschema.get("enum"), list):
+            privileged = privileged_value(subschema["enum"])
+            if privileged is not None:
+                value[name] = cast("JsonValue", privileged)
     # Servers often enforce password and email rules the schema omits; realistic values pass them.
     minted = {**value, **{name: _mint(name) for name in credentials}}
     validator = make_validator(schema, operation.schema.adapter.jsonschema_validator_cls)
