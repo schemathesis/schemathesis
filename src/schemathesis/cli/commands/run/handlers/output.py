@@ -1350,7 +1350,10 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 title="Authentication failed",
                 operations=ctx.warnings.missing_auth,
                 suffix_text=" returned authentication errors",
-                tips=["💡 Ensure valid authentication credentials are set via --auth or -H"],
+                tips=[
+                    ctx.warnings.auth_flow_suggestion
+                    or "💡 Ensure valid authentication credentials are set via --auth or -H"
+                ],
             )
 
         if ctx.warnings.base_url_mismatch:
