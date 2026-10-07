@@ -1,13 +1,15 @@
 import json
+from importlib import resources
 
 import jsonschema_rs
 import pytest
+import yaml
 from _pytest.main import ExitCode
 from flask import jsonify, request
 
 import schemathesis
 from schemathesis.checks import CHECKS
-from schemathesis.cli.wfc_report import fault_category
+from schemathesis.cli.wfc_report import FAULT_CATEGORY_IDS, fault_category
 from schemathesis.core.failures import AcceptedNegativeData, MalformedJson, ResponseTimeExceeded, ServerError
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.openapi.checks import (
@@ -21,103 +23,9 @@ from schemathesis.openapi.checks import (
     UseAfterFree,
 )
 
-# WFC Report 0.7.0 (WebFuzzing/Commons e133b21) with its two known defects fixed: `FoundFault` requires
-# `operationId` (upstream lists the undeclared `endpointId`) and codes 105-120 / 300-310 are allowed.
-FAULT_CATEGORY = {
-    "type": "object",
-    "properties": {
-        "code": {
-            "anyOf": [
-                {"type": "integer", "minimum": 100, "maximum": 122},
-                {"type": "integer", "minimum": 200, "maximum": 207},
-                {"type": "integer", "minimum": 300, "maximum": 312},
-                {"type": "integer", "minimum": 900, "maximum": 999},
-            ]
-        },
-        "context": {"type": ["string", "null"]},
-    },
-    "required": ["code"],
-}
-WFC_REPORT_SCHEMA = {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "schemaVersion": {"type": "string"},
-        "toolName": {"type": "string"},
-        "toolVersion": {"type": "string"},
-        "creationTime": {"type": "string", "format": "date-time"},
-        "faults": {
-            "type": "object",
-            "properties": {
-                "totalNumber": {"type": "integer", "minimum": 0},
-                "foundFaults": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "operationId": {"type": "string"},
-                            "testCaseId": {"type": "string"},
-                            "faultCategories": {
-                                "type": "array",
-                                "items": FAULT_CATEGORY,
-                                "minItems": 1,
-                                "uniqueItems": True,
-                            },
-                        },
-                        "required": ["operationId", "testCaseId", "faultCategories"],
-                    },
-                },
-            },
-            "required": ["totalNumber", "foundFaults"],
-        },
-        "problemDetails": {
-            "type": "object",
-            "properties": {
-                "rest": {
-                    "type": "object",
-                    "properties": {
-                        "outputHttpCalls": {"type": "integer", "minimum": 0},
-                        "evaluatedHttpCalls": {"type": "integer", "minimum": 0},
-                        "endpointIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": True},
-                        "coveredHttpStatus": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "endpointId": {"type": "string"},
-                                    "testCaseId": {"type": "string"},
-                                    "httpStatus": {
-                                        "type": ["array", "null"],
-                                        "items": {"type": ["integer", "null"], "minimum": 0, "maximum": 599},
-                                        "uniqueItems": True,
-                                    },
-                                },
-                                "required": ["endpointId", "testCaseId", "httpStatus"],
-                            },
-                        },
-                    },
-                    "required": ["outputHttpCalls", "evaluatedHttpCalls", "endpointIds", "coveredHttpStatus"],
-                }
-            },
-        },
-        "totalTests": {"type": "integer", "minimum": 0},
-        "testFilePaths": {"type": "array", "items": {"type": "string"}, "uniqueItems": True},
-        "testCases": {"type": "array", "items": {"type": "object"}},
-        "executionTimeInSeconds": {"type": "integer", "minimum": 0},
-    },
-    "required": [
-        "schemaVersion",
-        "toolName",
-        "toolVersion",
-        "creationTime",
-        "faults",
-        "problemDetails",
-        "totalTests",
-        "testFilePaths",
-        "testCases",
-        "executionTimeInSeconds",
-    ],
-}
+WFC_DATA = resources.files("webfuzzing_commons").joinpath("data")
+WFC_REPORT_SCHEMA = yaml.safe_load(WFC_DATA.joinpath("report.yaml").read_text(encoding="utf-8"))
+WFC_FAULT_CATEGORIES = json.loads(WFC_DATA.joinpath("fault_categories.json").read_text(encoding="utf-8"))
 
 
 def load_report(path):
@@ -143,7 +51,13 @@ def test_server_error_report(ctx, cli, tmp_path):
     assert fault == {
         "operationId": "GET:/api/failure",
         "testCaseId": fault["testCaseId"],
-        "faultCategories": [{"code": 100, "context": "GET:/api/failure -> ServerError: Server error (status 500)"}],
+        "faultCategories": [
+            {
+                "id": "HTTP_STATUS_500",
+                "code": 100,
+                "context": "GET:/api/failure -> ServerError: Server error (status 500)",
+            }
+        ],
     }
     assert report["faults"]["totalNumber"] == 1
     assert report["testFilePaths"] == ["report.sh"]
@@ -498,7 +412,11 @@ def test_schema_violations_in_one_response_are_one_fault(ctx, cli, tmp_path):
 
     [fault] = load_report(path)["faults"]["foundFaults"]
     assert fault["faultCategories"] == [
-        {"code": 200, "context": "GET:/items -> JsonSchemaError: Response violates schema"}
+        {
+            "id": "SCHEMA_INVALID_RESPONSE",
+            "code": 200,
+            "context": "GET:/items -> JsonSchemaError: Response violates schema",
+        }
     ]
 
 
@@ -690,3 +608,9 @@ def test_declared_auth_not_enforced_context_names_the_scenario():
         operation=OPERATION, message="", scenario=AuthScenario.INVALID_AUTH, title="API accepts invalid authentication"
     )
     assert fault_category(failure) == (311, "IgnoredAuth: API accepts invalid authentication (invalid_auth)")
+
+
+def test_fault_category_ids_match_wfc():
+    assert {code: id for code, id in FAULT_CATEGORY_IDS.items() if code < 900} == {
+        category["code"]: category["id"] for category in WFC_FAULT_CATEGORIES if category["code"] in FAULT_CATEGORY_IDS
+    }

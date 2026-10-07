@@ -24,6 +24,7 @@
 - Crash on non-string `pattern` definitions during test case generation.
 - Negative mode skipping operations when `--header` sets only some required headers.
 - Record pytest invocations correctly in generated reports.
+- WFC report fault categories missing the `id` required by WFC Report 0.8.0.
 - Engine runs against ASGI apps sending requests over the network, and crashing on WSGI apps.
 - `ResourceWarning` about unclosed streams after ASGI lifespan shutdown. [#5085](https://github.com/schemathesis/schemathesis/issues/5085)
 - Report server outages behind port proxies like `docker run -p` once, not per operation.
