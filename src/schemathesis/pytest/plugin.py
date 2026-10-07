@@ -9,7 +9,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
@@ -364,9 +363,12 @@ class SchemathesisMultiCase(PyCollector):
 
 
 @hookimpl(hookwrapper=True)  # type: ignore[untyped-decorator]
-def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
+def pytest_pycollect_makeitem(collector: Module | Class, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
+    # Respect pytest's naming rules, e.g. a marked test imported under a non-test name is not collected again
+    if not collector.istestfunction(obj, name):
+        return
     try:
         schemas = MultiSchemaHandleMark.get(obj)
         if schemas is not None:
