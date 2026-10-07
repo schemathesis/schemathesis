@@ -36,6 +36,7 @@ from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.fixtures.app_runner import wait_for_port
 from test.utils import HERE, SIMPLE_PATH, flaky
 
 
@@ -3549,7 +3550,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(201, {"id": 1})
             return
         KILLED = True
-        if MODE != "reset":
+        if MODE not in ("reset", "proxy"):
             # Stop listening before answering: the next request is refused, never queued.
             stop_listening(self.server)
         self.send_json(201, {"id": 1})
@@ -3557,6 +3558,17 @@ class Handler(BaseHTTPRequestHandler):
             os._exit(1)
         if MODE == "flap":
             threading.Thread(target=self.server.shutdown).start()
+
+    def handle(self):
+        if KILLED and MODE == "proxy":
+            # A port proxy in front of a dead process accepts every connection, reads the request, then resets it.
+            while self.rfile.readline() not in (b"\\r\\n", b"\\n", b""):
+                pass
+            self.rfile.close()
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            self.connection.close()
+            return
+        super().handle()
 
     def reset_after_crash(self):
         # The process dies while this connection is queued: the client sees a reset, then refusals.
@@ -3592,7 +3604,9 @@ ThreadingHTTPServer(ADDRESS, Handler).serve_forever()
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
 @pytest.mark.parametrize(
-    "mode", ["refuse", "reset", "flap"], ids=["refused", "reset-then-refused", "back-after-refusal"]
+    "mode",
+    ["refuse", "reset", "flap", "proxy"],
+    ids=["refused", "reset-then-refused", "back-after-refusal", "reset-by-proxy"],
 )
 def test_server_stops_accepting_connections(subprocess_runner, cli, snapshot_cli, mode):
     port = subprocess_runner.run_app(CRASHING_SERVER, env={"CRASH_MODE": mode})
@@ -3724,11 +3738,13 @@ SLOW_AND_DYING_SERVER = (
     + """
 import json
 import os
+import struct
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ADDRESS = ("127.0.0.1", int(os.environ["PORT"]))
+PROXY = os.environ.get("PROXY") == "1"
 PARAMETER = {"name": "q", "in": "query", "required": True, "schema": {"type": "integer"}}
 SCHEMA = {
     "openapi": "3.0.0",
@@ -3746,6 +3762,17 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def handle(self):
+        if PROXY and killed.is_set():
+            # A port proxy in front of a dead process may also read the request and close without a response.
+            while self.rfile.readline() not in (b"\\r\\n", b"\\n", b""):
+                pass
+            return
+        super().handle()
+
+    def reset(self):
+        self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+
     def do_GET(self):
         if self.path == "/openapi.json":
             self.send_json(SCHEMA)
@@ -3754,6 +3781,11 @@ class Handler(BaseHTTPRequestHandler):
             # Hold this worker's request open until well past the outage and its confirmation probe.
             slow_started.set()
             killed.wait(timeout=10)
+            if PROXY:
+                # The proxy drops this connection too, but only once the outage is already confirmed.
+                time.sleep(2)
+                self.reset()
+                return
             time.sleep(3)
             self.send_json({"ok": True})
             return
@@ -3761,8 +3793,9 @@ class Handler(BaseHTTPRequestHandler):
             # Stop listening before answering: the next request is refused, never queued. The slow request
             # is served by then, so the outage cannot reset it while it still waits to be accepted.
             slow_started.wait(timeout=10)
-            stop_listening(self.server)
-            threading.Thread(target=self.server.shutdown).start()
+            if not PROXY:
+                stop_listening(self.server)
+                threading.Thread(target=self.server.shutdown).start()
             killed.set()
         self.send_json({"ok": True})
 
@@ -3810,6 +3843,197 @@ def test_workers_share_one_outage_verdict(subprocess_runner, cli, snapshot_cli, 
     # Generated queries differ across Python versions; the request still in flight must still lead the list.
     reported = result.stdout.split("before it went away:")[1]
     assert reported.index("/slow") < reported.index("/kill")
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_workers_reset_after_the_outage_report_no_error_of_their_own(subprocess_runner, cli, snapshot_cli):
+    port = subprocess_runner.run_app(SLOW_AND_DYING_SERVER, env={"PROXY": "1"})
+    assert (
+        cli.main(
+            "run",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "--checks=not_a_server_error",
+            "--workers=2",
+            "--mode=positive",
+            "--max-examples=5",
+        )
+        == snapshot_cli
+    )
+
+
+RESETTING_SERVER = """
+import json
+import os
+import socket
+import ssl
+import struct
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from urllib.parse import urlsplit
+
+MODE = os.environ["RESET_MODE"]
+# Killed by its very first request, the server never answers one that could prove it was up.
+PATHS = ["/reset"] if MODE == "kill" else ["/ok", "/reset"]
+SCHEMA = {
+    "openapi": "3.0.0",
+    "info": {"title": "Resetting server", "version": "1.0.0"},
+    "paths": {path: {"get": {"responses": {"200": {"description": "OK"}}}} for path in PATHS},
+}
+RESETS = 0
+
+
+def reset(connection):
+    connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+    connection.close()
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        global RESETS
+        # A proxy receives the absolute URL of the target.
+        path = urlsplit(self.path).path
+        # Twice, since a request dropped on a reused connection is sent once more.
+        if path == "/reset" and RESETS < 2:
+            RESETS += 1
+            if MODE == "kill":
+                # The process dies mid-request: this connection is reset, every later one is refused.
+                self.server.socket.close()
+                self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+                os._exit(1)
+            # The socket is only released once the handler's reader lets go of it.
+            self.rfile.close()
+            if MODE == "tls":
+                # TLS reports a reset as a reset or as a closed connection depending on timing; a clean close does not.
+                self.connection.close()
+            else:
+                reset(self.connection)
+            if MODE == "busy" and RESETS == 2:
+                # Single-threaded: new connections wait in the backlog, unanswered, while the worker restarts.
+                time.sleep(5)
+            return
+        body = json.dumps(SCHEMA if path == "/openapi.json" else {}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def finish(self):
+        try:
+            super().finish()
+        except OSError:
+            pass
+
+
+class TlsServer(ThreadingHTTPServer):
+    def get_request(self):
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        context.load_cert_chain(os.environ["CERT_PATH"])
+        while True:
+            connection, address = self.socket.accept()
+            # Anything but a TLS handshake is dropped without a word.
+            if connection.recv(1, socket.MSG_PEEK) == b"\\x16":
+                return context.wrap_socket(connection, server_side=True), address
+            connection.close()
+
+
+ADDRESS = ("127.0.0.1", int(os.environ["PORT"]))
+if MODE == "never-started":
+    # A port proxy with nothing behind it: every connection is accepted, then reset.
+    listener = socket.create_server(ADDRESS)
+    while True:
+        connection = listener.accept()[0]
+        # After the request, so the reset never lands while the connection is still being set up.
+        connection.recv(65536)
+        reset(connection)
+server_class = {"busy": HTTPServer, "tls": TlsServer}.get(MODE, ThreadingHTTPServer)
+server_class(ADDRESS, Handler).serve_forever()
+"""
+
+
+def run_resetting_server(subprocess_runner, mode, **env):
+    port = subprocess_runner.run_app(RESETTING_SERVER, env={"RESET_MODE": mode, **env}, wait_for_server=False)
+    wait_for_port(port)
+    return port
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_reset_by_a_server_still_answering_is_not_an_outage(subprocess_runner, cli, snapshot_cli):
+    port = run_resetting_server(subprocess_runner, "alive")
+    assert cli.main("run", f"http://127.0.0.1:{port}/openapi.json", "--phases=examples,fuzzing") == snapshot_cli
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_reset_by_a_server_still_holding_connections_is_not_an_outage(subprocess_runner, cli, snapshot_cli):
+    port = run_resetting_server(subprocess_runner, "busy")
+    assert cli.main("run", f"http://127.0.0.1:{port}/openapi.json", "--phases=examples,fuzzing") == snapshot_cli
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_reset_by_a_tls_server_dropping_plaintext_is_not_an_outage(subprocess_runner, cli, snapshot_cli, tmp_path):
+    cert_path = tmp_path / "server.pem"
+    trustme.CA().issue_cert("127.0.0.1").private_key_and_cert_chain_pem.write_to_path(str(cert_path))
+    port = run_resetting_server(subprocess_runner, "tls", CERT_PATH=str(cert_path))
+    assert (
+        cli.main("run", f"https://127.0.0.1:{port}/openapi.json", "--phases=examples,fuzzing", "--tls-verify=false")
+        == snapshot_cli
+    )
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_reset_by_a_configured_proxy_is_not_an_outage(ctx, subprocess_runner, cli, snapshot_cli):
+    # The API is reachable only through the proxy, so a direct probe cannot tell anything about it.
+    port = run_resetting_server(subprocess_runner, "proxy")
+    schema_path = ctx.openapi.write_schema(
+        {path: {"get": {"responses": {"200": {"description": "OK"}}}} for path in ("/ok", "/reset")}
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_path),
+            "--url=http://api.invalid",
+            f"--proxy=http://127.0.0.1:{port}",
+            "--phases=examples,fuzzing",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_app_never_started_behind_a_port_proxy_is_not_an_outage(ctx, subprocess_runner, cli, snapshot_cli):
+    port = run_resetting_server(subprocess_runner, "never-started")
+    schema_path = ctx.openapi.write_schema(
+        {path: {"get": {"responses": {"200": {"description": "OK"}}}} for path in ("/ok", "/reset")}
+    )
+    assert (
+        cli.main("run", str(schema_path), f"--url=http://127.0.0.1:{port}", "--phases=examples,fuzzing") == snapshot_cli
+    )
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_server_killed_by_its_first_request_is_an_outage(subprocess_runner, cli, snapshot_cli):
+    port = run_resetting_server(subprocess_runner, "kill")
+    result = cli.main("run", f"http://127.0.0.1:{port}/openapi.json", "--phases=examples,fuzzing")
+    assert result == snapshot_cli
+    assert "/reset" in result.stdout.split("before it went away:")[1]
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")

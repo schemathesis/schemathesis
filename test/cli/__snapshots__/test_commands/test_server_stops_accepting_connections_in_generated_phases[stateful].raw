@@ -27,7 +27,7 @@ Schemathesis dev
 ____________________________________ Server ____________________________________
 Server Unavailable
 
-http://127.0.0.1 stopped accepting connections. Last requests before it went away:
+http://127.0.0.1 stopped responding. Last requests before it went away:
 
     <PLACEHOLDER>
 
@@ -50,7 +50,7 @@ API Operations:
   Selected: 4/4
   Tested: 2
   Skipped: 2
-    - Server stopped accepting connections
+    - Server stopped responding
 
 Test Phases:
   ⏭  Examples (disabled)

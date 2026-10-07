@@ -49,7 +49,7 @@ class BudgetExpired(KeyboardInterrupt):
 
 
 class ServerWentAway(KeyboardInterrupt):
-    """Raised once the server stopped accepting connections, so no refusal is reported per operation."""
+    """Raised once the server stopped responding, so no refusal is reported per operation."""
 
 
 def run_one_case(
@@ -125,18 +125,25 @@ def run_one_case(
             exc = InvalidSchema.from_malformed_media_type(
                 exc, case.media_type, path=case.operation.path, method=case.operation.method
             )
-        if isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc):
+        network_error = None
+        if isinstance(
+            exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)
+        ) and is_unrecoverable_network_error(exc):
+            code_sample = build_code_sample(case, exc.request, transport_kwargs)
+            network_error = UnrecoverableNetworkError(error=exc, code_sample=code_sample)
+        outage = isinstance(exc, requests.ConnectionError) and ctx.detect_server_outage(exc)
+        # Only the reset that revealed the outage may have caused it; later ones just hit the dead server.
+        if outage and not (network_error is not None and ctx.server.confirmed_by(exc)):
             # A check's own request may be the refused one; the case itself was answered then.
             if recorder.find_response(case_id=case.id) is None:
                 recorder.forget_case(case_id=case.id)
             raise ServerWentAway from None
-        if isinstance(
-            exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
-        ) and is_unrecoverable_network_error(exc):
+        if network_error is not None:
             # Server likely has crashed and does not accept any connections at all
             # Don't report these error - only the original crash should be reported
-            code_sample = build_code_sample(case, exc.request, transport_kwargs)
-            state.store_unrecoverable_network_error(UnrecoverableNetworkError(error=exc, code_sample=code_sample))
+            state.store_unrecoverable_network_error(network_error)
+            if outage:
+                raise ServerWentAway from None
             raise
         errors.append(exc)
         raise UnexpectedError from None

@@ -32,6 +32,23 @@ Connection failed
 Reproduce with:
 
     curl -X GET --insecure http://127.0.0.1/crash
+____________________________________ Server ____________________________________
+Server Unavailable
+
+http://127.0.0.1 stopped responding. Last requests before it went away:
+
+    curl -X GET --insecure http://127.0.0.1/crash
+
+    curl -X DELETE --insecure http://127.0.0.1/crash
+
+    curl -X OPTIONS --insecure http://127.0.0.1/crash
+
+    curl -X PATCH --insecure http://127.0.0.1/crash
+
+    curl -X POST --insecure http://127.0.0.1/crash
+
+Tip: If the server crashed, the request that caused it may be older than these.
+Record every request sent with `--report=har`.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -49,10 +66,11 @@ Test Phases:
 
 Errors:
   🚫 Network Error: 1
+  🚫 Server Unavailable: 1
 
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+============================== 2 errors in 1.00s ===============================

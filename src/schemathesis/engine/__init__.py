@@ -42,7 +42,7 @@ class StopReason(str, Enum):
             case StopReason.MAX_TIME:
                 return "Time limit reached"
             case StopReason.SERVER_UNAVAILABLE:
-                return "Server stopped accepting connections"
+                return "Server stopped responding"
             case StopReason.COMPLETED:
                 return None
 

@@ -1,0 +1,73 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✘
+     Accepts backslash and control characters in URL paths:    ✘
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  2 skipped
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 2 errors
+
+==================================== ERRORS ====================================
+___________________________________ GET /ok ____________________________________
+Network Error
+
+Connection failed
+
+    Connection aborted. [Error NUM] Connection reset by peer
+
+Reproduce with:
+
+    <PLACEHOLDER>
+__________________________________ GET /reset __________________________________
+Network Error
+
+Connection failed
+
+    Connection aborted. [Error NUM] Connection reset by peer
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 0
+  Errored: 2
+
+Test Phases:
+  ⏭  Examples
+  ⏭  Coverage (disabled)
+  🚫 Fuzzing
+  ⏭  Stateful (disabled)
+
+Errors:
+  🚫 Network Error: 2
+
+Test cases:
+  N generated
+
+Seed: 42
+
+============================== 2 errors in 1.00s ===============================
