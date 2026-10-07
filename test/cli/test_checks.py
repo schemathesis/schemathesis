@@ -1670,6 +1670,95 @@ def test_positive_data_acceptance_additional_properties_hint(ctx, cli, snapshot_
     )
 
 
+_NAME_BODY = {"type": "object", "properties": {"name": {"type": "string"}}}
+
+
+def _things_operation(schema):
+    return {
+        "post": {
+            "operationId": "createThing",
+            "requestBody": {"required": True, "content": {"application/json": {"schema": schema}}},
+            "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+        }
+    }
+
+
+_NUL_PRODUCER = {
+    "/items": {
+        "post": {
+            "responses": {
+                "201": {
+                    "description": "Created",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                                "required": ["id", "name"],
+                            }
+                        }
+                    },
+                    "links": {"CreateThing": {"operationId": "createThing", "requestBody": "$response.body"}},
+                }
+            }
+        }
+    }
+}
+
+
+def _has_nul(value):
+    if isinstance(value, str):
+        return "\x00" in value
+    if isinstance(value, dict):
+        return any(_has_nul(key) or _has_nul(item) for key, item in value.items())
+    if isinstance(value, list):
+        return any(_has_nul(item) for item in value)
+    return False
+
+
+@pytest.mark.parametrize("allow_x00", [True, False], ids=["allow-x00", "deny-x00"])
+@pytest.mark.parametrize(
+    ("paths", "phases"),
+    [
+        pytest.param(
+            {"/things": _things_operation({**_NAME_BODY, "example": {"name": "a\x00b", "extra": "yes"}})},
+            "examples",
+            id="schema-example",
+        ),
+        pytest.param({"/things": _things_operation(_NAME_BODY)}, "fuzzing", id="generated-fuzzing"),
+        # The link sends the whole producer response, so its undeclared `id` arrives as an extra beside the NUL.
+        pytest.param({**_NUL_PRODUCER, "/things": _things_operation(_NAME_BODY)}, "stateful", id="stateful-link"),
+    ],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_positive_data_acceptance_no_additional_properties_hint_for_nul(
+    ctx, cli, snapshot_cli, paths, phases, allow_x00
+):
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        return jsonify({"id": "1", "name": "a\x00b"}), 201
+
+    @app.route("/things", methods=["POST"])
+    def create_thing():
+        if _has_nul(request.get_json(silent=True)):
+            return jsonify({"error": "Invalid string"}), 400
+        return jsonify({"ok": True}), 200
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--checks=positive_data_acceptance",
+            f"--phases={phases}",
+            "--max-examples=10",
+            "--seed=3",
+            config={"generation": {"allow-x00": allow_x00}},
+        )
+        == snapshot_cli
+    )
+
+
 def test_positive_data_acceptance_body_list_examples_verbatim(ctx, cli, app_runner):
     app, raw_schema = ctx.openapi.make_flask_app(
         {

@@ -911,6 +911,22 @@ def _blamed_body_properties(case: Case, response: Response) -> set[str]:
     return names
 
 
+def _contains_nul(value: object) -> bool:
+    """Whether any string key or value in a JSON-shaped value holds a NUL character."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, str):
+            if "\x00" in item:
+                return True
+        elif isinstance(item, dict):
+            stack.extend(item.keys())
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
+
+
 def _additional_properties_hint(case: Case, response: Response) -> str | None:
     """Return a hint if extra body properties are the likely cause of server rejection."""
     if not isinstance(case.body, dict):
@@ -935,6 +951,9 @@ def _additional_properties_hint(case: Case, response: Response) -> str | None:
 
         extra = set(case.body.keys()) - declared
         if not extra:
+            return None
+        # Many servers reject any string with a NUL character, so the extras are not the only plausible cause.
+        if _contains_nul(case.body):
             return None
 
         stripped = {k: v for k, v in case.body.items() if k not in extra}

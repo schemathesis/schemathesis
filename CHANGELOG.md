@@ -28,6 +28,7 @@
 - `ResourceWarning` about unclosed streams after ASGI lifespan shutdown. [#5085](https://github.com/schemathesis/schemathesis/issues/5085)
 - Report server outages behind port proxies like `docker run -p` once, not per operation.
 - Crash in stateful testing on paths with segments like `{id}:cancel`.
+- Misleading `additionalProperties` hint when the server rejects a body for its NUL characters.
 
 ## [4.29.4](https://github.com/schemathesis/schemathesis/compare/v4.29.3...v4.29.4) - 2026-10-06
 
