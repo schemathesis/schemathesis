@@ -7,10 +7,13 @@ from hypothesis import strategies as st
 
 from schemathesis.config._dictionaries import BODY_PREFIX, ParameterDictionaryBinding, parse_body_path
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue
+from schemathesis.generation.case import _contains_bytes
 from schemathesis.generation.dictionaries import _path_matches_pattern, _resolve_body_leaf_schema, _walk_substitute
 from schemathesis.generation.value import GeneratedValue
 
 if TYPE_CHECKING:
+    import jsonschema_rs
+
     from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 
@@ -39,6 +42,7 @@ def build_body_override_overlay_strategy(
     inner: st.SearchStrategy,
     *,
     overrides: dict[str, JsonValue],
+    validator: jsonschema_rs.Validator | None,
 ) -> st.SearchStrategy:
     items = tuple(overrides.items())
     override_segments = [pointer[1:].split("/") for pointer in overrides]
@@ -55,9 +59,13 @@ def build_body_override_overlay_strategy(
     def overlay(draw: st.DrawFn) -> GeneratedValue | JsonValue:
         produced = draw(inner)
         if isinstance(produced, GeneratedValue):
+            value = apply(produced.value)
             meta = produced.meta
             if meta is not None:
                 kept = tuple(m for m in meta.mutations if not is_overridden_path(m.path))
+                # Overriding a field also undoes mutations of its parents, e.g. a removed required field or a changed type.
+                if kept and validator is not None and not _contains_bytes(value) and validator.is_valid(value):
+                    kept = ()
                 if not kept:
                     meta = None
                 elif len(kept) != len(meta.mutations):
@@ -73,7 +81,7 @@ def build_body_override_overlay_strategy(
                 if d.body_path is None or not is_overridden_path(tuple(d.body_path[1:].split("/")))
             )
             return GeneratedValue(
-                value=apply(produced.value),
+                value=value,
                 meta=meta,
                 pool_draws=produced.pool_draws,
                 semantic_draws=produced.semantic_draws,

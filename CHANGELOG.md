@@ -16,6 +16,7 @@
 
 ### :bug: Fixed
 
+- False positive `negative_data_rejection` when a `body.*` parameter override restores the mutated field.
 - pytest plugin collecting `@schema.parametrize()` tests imported under names pytest would not collect.
 - Crash on response examples whose media type declares a boolean `schema`.
 - Network error on the first redirect with `max-redirects = 0`.
