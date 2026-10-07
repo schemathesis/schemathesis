@@ -28,8 +28,11 @@ Real-world defects uncovered by Schemathesis’ property-based testing engine.
 
 | Project | Type | What Schemathesis found |
 | --- | --- | --- |
+| [Formance Ledger](https://github.com/formancehq/ledger/pull/1606) | 💥 Server Crashes | Reading numscripts or prepared queries of a missing ledger returned 500 instead of 404. |
 | [vLLM](https://github.com/vllm-project/vllm/issues/52088) | 💥 Server Crashes | `POST /v1/messages` returned 500 when `stop_sequences` carried more than four items. |
-| [vLLM](https://github.com/vllm-project/vllm/pull/54402) | 💥 Server Crashes | An empty trace-replay token list returned 500 instead of a client error. |
+| [vLLM](https://github.com/vllm-project/vllm/pull/53433) | 💥 Server Crashes | A control character in `bad_words` that tokenized to nothing returned 500 instead of a validation error. |
+| [vLLM](https://github.com/vllm-project/vllm/issues/54116) | 💥 Server Crashes | `POST /inference/v1/generate` returned 500 for unserializable `ec_transfer_params`. |
+| [Formbricks](https://github.com/formbricks/formbricks/pull/9501) | 💥 Server Crashes | A NULL byte in v3 list filters or page cursors returned 500 instead of 400. |
 | [Qdrant](https://github.com/qdrant/qdrant/pull/8762) | 💥 Server Crashes | Validation panicked when two sibling items failed at once, dropping the connection without a response. |
 | [Qdrant](https://github.com/qdrant/qdrant/issues/9869) | 🚪 Validation Bypass | Write operations accepted `timeout=0` although the schema declares `minimum: 1`. |
 | [OpenObserve](https://github.com/openobserve/openobserve/pull/14089) | 💥 Server Crashes | Two handler panics reachable from query parameters — a divide by zero on `?limit=0` and an `unwrap()` on `?query=`. |
