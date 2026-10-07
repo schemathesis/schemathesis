@@ -27,6 +27,7 @@ from test.apps.catalog.openapi import marshmallow as openapi_marshmallow
 from test.apps.catalog.openapi import nested as openapi_nested
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import restler as openapi_restler
+from test.apps.catalog.openapi import sign_up as openapi_sign_up
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
 from test.apps.catalog.openapi import swagger_v2 as openapi_swagger_v2
@@ -251,6 +252,9 @@ class OpenAPIApps:
         self, *modifiers: Modifier[openapi_under_declared_security.UnderDeclaredSecurityStore]
     ) -> OpenAPIServer:
         return _start(self.parent, openapi_under_declared_security.under_declared_security(*modifiers))
+
+    def sign_up_and_login(self, behavior: openapi_sign_up.SignUpBehavior = "ok") -> OpenAPIServer:
+        return _start(self.parent, openapi_sign_up.sign_up_and_login(behavior))
 
     def zod_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_zod.planted_bug())

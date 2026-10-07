@@ -17,6 +17,8 @@ Schemathesis dev
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
 
+ 🚫  Auth: no token at /response/accessToken in the POST /auth/login response; continuing without authentication
+
  ⏭   Examples (in 0.00s)
 
      ⏭  4 skipped

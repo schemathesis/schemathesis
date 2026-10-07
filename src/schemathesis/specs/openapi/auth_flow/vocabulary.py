@@ -10,11 +10,9 @@ _IDENTIFIER = frozenset(
         "accountname",
         "phone",
         "phonenumber",
-        "email",
-        "mail",
-        "emailaddress",
     }
 )
+_EMAIL = frozenset({"email", "mail", "emailaddress"})
 
 
 def normalize(name: str) -> str:
@@ -26,6 +24,10 @@ def is_secret(name: str) -> bool:
     return normalize(name) in _SECRET
 
 
+def is_email(name: str) -> bool:
+    return normalize(name) in _EMAIL
+
+
 def is_credential(name: str) -> bool:
     normalized = normalize(name)
-    return normalized in _SECRET or normalized in _IDENTIFIER
+    return normalized in _SECRET or normalized in _IDENTIFIER or normalized in _EMAIL

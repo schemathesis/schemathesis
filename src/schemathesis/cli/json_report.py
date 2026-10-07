@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from schemathesis.engine import events
 
 # Internal phases are not part of the reported test phases, matching the terminal.
-INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS)
+INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS, PhaseName.AUTH_BOOTSTRAP)
 
 
 def _running_time(started_at: float | None, finished: events.EngineFinished | None) -> float | None:

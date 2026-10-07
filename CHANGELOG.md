@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Sign up and log in automatically when the schema declares sign-up and login operations.
 - Suggest a dynamic auth config when authentication fails on schemas with sign-up and login operations.
 
 ### :bug: Fixed

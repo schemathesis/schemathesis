@@ -42,6 +42,7 @@ from schemathesis.core.timing import Instant
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import ELASTIC_PHASES, PhaseName
+from schemathesis.engine.run.auth_bootstrap import AuthBootstrapPayload
 from schemathesis.engine.run.probes import ProbeOutcome
 
 if TYPE_CHECKING:
@@ -53,8 +54,30 @@ if TYPE_CHECKING:
     from schemathesis.cli.commands.run.context import ExecutionContext
     from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
+    from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
 
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
+
+
+def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSpec) -> Text:
+    from rich.style import Style
+    from rich.text import Text
+
+    if payload.status == Status.SUCCESS:
+        icon, color, text = "✅  ", "green", f"signed up via {spec.register_operation} and logged in"
+    else:
+        icon, color = "🚫  ", "red"
+        detail = " ".join(f"{payload.status_code or ''} {payload.message or ''}".split())[:100]
+        text = {
+            "sign-up": f"no valid body could be generated for {spec.register_operation}",
+            "register": f"{spec.register_operation} failed: {detail}",
+            "login": f"{spec.login_operation} failed: {detail}",
+            "extract": f"no token at {spec.token_pointer} in the {spec.login_operation} response",
+        }[payload.failure_stage or ""]
+        text += "; continuing without authentication"
+    return Text.assemble(
+        (icon, Style(color=color)), ("Auth: ", Style(color="bright_white", bold=True)), (text, Style(color=color))
+    )
 
 
 def _format_cache_row(report: CacheReport | None) -> Text | None:
@@ -989,6 +1012,14 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
 
                 self.console.print(Padding(table, BLOCK_PADDING))
                 self.console.print()
+        elif (
+            isinstance(event.payload, AuthBootstrapPayload)
+            and event.payload.spec is not None
+            # Users who supply credentials gain nothing from hearing that sign-up was skipped.
+            and event.status != Status.SKIP
+        ):
+            self.console.print(Padding(_auth_bootstrap_line(event.payload, event.payload.spec), BLOCK_PADDING))
+            self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             manager = self.stateful_tests_manager
             self.stateful_tests_manager = None
@@ -1496,7 +1527,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         click.echo(_style("Test Phases:", bold=True))
 
         for phase in PhaseName:
-            if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS):
+            if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS, PhaseName.AUTH_BOOTSTRAP):
                 # Internal phases are not part of the test phase summary
                 continue
             status, skip_reason = ctx.phases[phase]

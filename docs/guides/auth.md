@@ -24,6 +24,32 @@ Authentication failed: 4 operations returned authentication errors
 
 Once authentication works, the operations you authenticated disappear from that list.
 
+## Automatic Sign-Up
+
+If the schema declares a sign-up operation and a login operation that returns a bearer token or API key, Schemathesis creates a fresh account and logs in before testing. You don't configure anything:
+
+```
+ ✅  Auth: signed up via POST /auth/register and logged in
+```
+
+Schemathesis recognizes the pair when:
+
+- a `POST` path ends in a sign-up word such as `register`, `signup` or `users`,
+- a `POST` path ends in a login word such as `login`, `token` or `auth`, and its body shares at least two credential fields with the sign-up body, one of them a password,
+- the login response declares a token field such as `access_token` or `accessToken`, and the schema has a bearer or API key security scheme.
+
+Each run signs up with new credentials and fills every field of the sign-up body, optional ones included. Schemathesis sends the token to every operation that requires the security scheme. If an operation declares no security but answers 401 or 403, Schemathesis retries it with the token and keeps sending it when that works.
+
+Logins that set a session cookie are not detected; configure them with [Declarative Dynamic Authentication](#declarative-dynamic-authentication).
+
+Credentials you supply turn sign-up off: credentials in the `[auth]` section of `schemathesis.toml`, `--auth`, an `Authorization` or API key header, or an auth provider registered in Python. Other headers don't affect it.
+
+If sign-up or login fails, Schemathesis reports why and tests without authentication. The failure alone doesn't fail the run. If the server keeps rejecting the generated account, supply credentials with one of the methods below:
+
+```
+ 🚫  Auth: POST /auth/register failed: 400 {"error": "phone can't be blank"}; continuing without authentication
+```
+
 ## Static Authentication
 
 For simple cases pass credentials on the command line:
