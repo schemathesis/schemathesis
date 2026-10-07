@@ -2074,3 +2074,36 @@ def test_api(case):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([r".*InvalidSchema: Path parameter 'item_id' is not defined"])
+
+
+@pytest.mark.parametrize(
+    ("ini", "expected"),
+    [
+        (
+            "",
+            ["test_schema_marked_function_respects_name_filter.py::test_api[GET /users]"],
+        ),
+        (
+            "[pytest]\npython_functions = verify_*\n",
+            ["test_reuse.py::verify_api[GET /users]"],
+        ),
+    ],
+    ids=["default", "custom-python-functions"],
+)
+def test_schema_marked_function_respects_name_filter(testdir, ini, expected):
+    module = testdir.make_test(
+        """
+@schema.parametrize()
+def test_api(case):
+    pass
+"""
+    )
+    testdir.makepyfile(
+        test_reuse=f"""
+from {module.purebasename} import test_api as _private_helper, test_api as renamed_helper, test_api as verify_api
+"""
+    )
+    if ini:
+        testdir.makeini(ini)
+    result = testdir.runpytest("--collect-only", "-q")
+    assert result.outlines[: result.outlines.index("")] == expected

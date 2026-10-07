@@ -16,6 +16,7 @@
 
 ### :bug: Fixed
 
+- pytest plugin collecting `@schema.parametrize()` tests imported under names pytest would not collect.
 - Crash on response examples whose media type declares a boolean `schema`.
 - Network error on the first redirect with `max-redirects = 0`.
 - Stateful testing aborting when a few operations hang instead of skipping them.
