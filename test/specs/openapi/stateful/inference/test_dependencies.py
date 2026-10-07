@@ -8460,3 +8460,268 @@ LINK_INFERENCE_CASES = [
 def test_inferred_links_for_schema_shapes(ctx, paths, components, expected):
     kwargs = {"components": components} if components is not None else {}
     assert injected_links(ctx.openapi.load_schema(paths, **kwargs)) == expected
+
+
+def data_envelope(schema_name):
+    return {
+        "type": "object",
+        "properties": {"data": {"type": "array", "items": component_ref(schema_name)}},
+        "required": ["data"],
+    }
+
+
+def input_bindings(graph, label):
+    return {slot.parameter_name: slot.resource.name for slot in graph.operations[label].inputs}
+
+
+PARTITION = {
+    "type": "object",
+    "properties": {"topic_name": {"type": "string"}, "partition_id": {"type": "integer"}},
+    "required": ["topic_name", "partition_id"],
+}
+PARTITION_WITH_OFFSETS = {
+    "type": "object",
+    "properties": {
+        "topic_name": {"type": "string"},
+        "partition_id": {"type": "integer"},
+        "latest_offset": {"type": "integer"},
+    },
+    "required": ["topic_name", "partition_id"],
+}
+BROKER_CONFIG = {
+    "type": "object",
+    "properties": {"broker_id": {"type": "integer"}, "name": {"type": "string"}, "value": {"type": "string"}},
+    "required": ["name"],
+}
+CONFIG_UPDATE = {
+    "requestBody": {
+        "content": {"application/json": {"schema": {"type": "object", "properties": {"value": {"type": "string"}}}}}
+    }
+}
+
+
+# A sibling response that repeats the item id (`PartitionWithOffsetsData`) must not win over the collection listing it.
+@pytest.mark.parametrize("statuses", [("200",), ("200", "206")], ids=["single", "repeated"])
+def test_item_path_parameter_binds_to_resource_listed_by_its_collection(ctx, statuses):
+    item_parameters = [path_param("topic_name"), path_param("partition_id", "integer")]
+    listing = json_response("200", data_envelope("PartitionData"))
+    for status in statuses[1:]:
+        listing["responses"][status] = listing["responses"]["200"]
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/topics/{topic_name}/partitions/{partition_id}/offset": {
+                "get": {
+                    "parameters": item_parameters,
+                    **json_response("200", component_ref("PartitionWithOffsetsData")),
+                }
+            },
+            "/topics/{topic_name}/partitions": {"get": {"parameters": [path_param("topic_name")], **listing}},
+            "/topics/{topic_name}/partitions/{partition_id}": {
+                "get": {"parameters": item_parameters, **json_response("200", component_ref("PartitionData"))}
+            },
+        },
+        components={"schemas": {"PartitionData": PARTITION, "PartitionWithOffsetsData": PARTITION_WITH_OFFSETS}},
+    )
+    for label in (
+        "GET /topics/{topic_name}/partitions/{partition_id}/offset",
+        "GET /topics/{topic_name}/partitions/{partition_id}",
+    ):
+        assert input_bindings(graph, label)["partition_id"] == "PartitionData", label
+
+
+# `{name}` alone names nothing; the collection it sits under (`/configs`) says which resource it is.
+def test_generic_item_path_parameter_binds_to_resource_listed_by_its_collection(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/brokers/{broker_id}/configs": {
+                "get": {
+                    "parameters": [path_param("broker_id", "integer")],
+                    **json_response("200", data_envelope("BrokerConfigData")),
+                }
+            },
+            "/brokers/{broker_id}/configs/{name}": {
+                "parameters": [path_param("broker_id", "integer"), path_param("name")],
+                "get": json_response("200", component_ref("BrokerConfigData")),
+                "put": {**CONFIG_UPDATE, **response("204")},
+            },
+        },
+        components={"schemas": {"BrokerConfigData": BROKER_CONFIG}},
+    )
+    for label in ("GET /brokers/{broker_id}/configs/{name}", "PUT /brokers/{broker_id}/configs/{name}"):
+        assert input_bindings(graph, label)["name"] == "BrokerConfigData", label
+
+
+# Nothing produces `{name}`, so the collection listing it is its only source.
+def test_item_path_parameter_without_producers_binds_to_resource_listed_by_its_collection(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/brokers/{broker_id}/configs": {
+                "get": {
+                    "parameters": [path_param("broker_id", "integer")],
+                    **json_response("200", data_envelope("BrokerConfigData")),
+                }
+            },
+            "/brokers/{broker_id}/configs/{name}": {
+                "get": {
+                    "parameters": [path_param("broker_id", "integer"), path_param("name")],
+                    **json_response("200", component_ref("BrokerConfigData")),
+                }
+            },
+        },
+        components={"schemas": {"BrokerConfigData": BROKER_CONFIG}},
+    )
+    assert input_bindings(graph, "GET /brokers/{broker_id}/configs/{name}")["name"] == "BrokerConfigData"
+
+
+# `POST /configs/{name}` creates the config, so it keeps feeding the read next to the listing.
+def test_item_path_parameter_bound_to_collection_keeps_path_keyed_creator(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/configs": {"get": json_response("200", data_envelope("BrokerConfigData"))},
+            "/configs/{name}": {
+                "parameters": [path_param("name")],
+                "get": json_response("200", component_ref("BrokerConfigData")),
+                "post": {**CONFIG_UPDATE, **response("201")},
+            },
+        },
+        components={"schemas": {"BrokerConfigData": BROKER_CONFIG}},
+    )
+    assert [link for link in inferred_links(graph) if link[2]["operationRef"] == "#/paths/~1configs~1{name}/get"] == [
+        [
+            "#/paths/~1configs/get",
+            "200",
+            {
+                "operationRef": "#/paths/~1configs~1{name}/get",
+                "parameters": {"path.name": "$response.body#/data/*/name"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+        [
+            "#/paths/~1configs~1{name}/post",
+            "201",
+            {
+                "operationRef": "#/paths/~1configs~1{name}/get",
+                "parameters": {"path.name": "$request.path.name"},
+                "x-schemathesis": {"is_inferred": True},
+            },
+        ],
+    ]
+
+
+# The create operation already supplies the id; the listing must not take it over.
+def test_item_path_parameter_keeps_binding_to_creating_operation(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/workflows/{workflowName}/jobs": {
+                "get": {
+                    "parameters": [path_param("workflowName")],
+                    **json_response("200", data_envelope("JobSummary")),
+                },
+                "post": {
+                    "parameters": [path_param("workflowName")],
+                    **json_response("200", component_ref("StartMatchingJob")),
+                },
+            },
+            "/workflows/{workflowName}/jobs/{jobId}": {
+                "get": {"parameters": [path_param("workflowName"), path_param("jobId")], **response("200")}
+            },
+        },
+        components={
+            "schemas": {
+                "JobSummary": {
+                    "type": "object",
+                    "properties": {"jobId": {"type": "string"}, "status": {"type": "string"}},
+                    "required": ["jobId"],
+                },
+                "StartMatchingJob": {
+                    "type": "object",
+                    "properties": {"jobId": {"type": "string"}},
+                    "required": ["jobId"],
+                },
+            }
+        },
+    )
+    assert input_bindings(graph, "GET /workflows/{workflowName}/jobs/{jobId}")["jobId"] == "StartMatchingJob"
+
+
+# A shape every collection lists (`{id, uri}`) says nothing about which collection an id belongs to.
+def test_item_path_parameter_not_bound_to_resource_other_collections_list(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/groups": {"get": json_response("200", data_envelope("EntityUri"))},
+            "/domains": {"get": json_response("200", data_envelope("EntityUri"))},
+            "/groups/{id}/summary": {
+                "get": {"parameters": [path_param("id")], **json_response("200", component_ref("Group"))}
+            },
+            "/groups/{id}/aggregated/list": {"get": {"parameters": [path_param("id")], **response("200")}},
+        },
+        components={
+            "schemas": {
+                "EntityUri": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "uri": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "Group": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                    "required": ["id"],
+                },
+            }
+        },
+    )
+    assert input_bindings(graph, "GET /groups/{id}/aggregated/list")["id"] == "Group"
+
+
+STREAM_TARGET_INDEX = {
+    "type": "object",
+    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+    "required": ["id"],
+}
+GEOBLOCK = {
+    "type": "object",
+    "properties": {"stream_target_id": {"type": "string"}, "countries": {"type": "string"}},
+    "required": ["stream_target_id"],
+}
+
+
+# `Geoblock.stream_target_id` already feeds `{id}`, so the placeholder keeps its binding.
+def test_item_path_parameter_keeps_placeholder_fed_by_id_fields(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/stream_targets": {"get": json_response("200", data_envelope("index_stream_target"))},
+            "/geoblocks": {"get": json_response("200", data_envelope("Geoblock"))},
+            "/stream_targets/{id}": {
+                "get": {"parameters": [path_param("id")], **json_response("200", component_ref("StreamTarget"))}
+            },
+            "/stream_targets/{id}/metrics": {"get": {"parameters": [path_param("id")], **response("200")}},
+        },
+        components={
+            "schemas": {
+                "index_stream_target": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "StreamTarget": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "region": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "Geoblock": {
+                    "type": "object",
+                    "properties": {"stream_target_id": {"type": "string"}, "countries": {"type": "string"}},
+                    "required": ["stream_target_id"],
+                },
+            }
+        },
+    )
+    for label in ("GET /stream_targets/{id}", "GET /stream_targets/{id}/metrics"):
+        assert input_bindings(graph, label)["id"] == "StreamTarget", label
