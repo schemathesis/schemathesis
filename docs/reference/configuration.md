@@ -1093,7 +1093,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     **Default:** Depends on check:
 
       - `not_a_server_error`: `["2xx", "3xx", "4xx"]`
-      - `positive_data_acceptance`: `["2xx", "401", "403", "404", "409", "429", "5xx"]`
+      - `positive_data_acceptance`: `["2xx", "3xx", "401", "403", "404", "409", "429", "5xx"]`
       - `negative_data_rejection`: `["400", "401", "403", "404", "405", "406", "409", "415", "422", "428", "429", "5xx"]`
       - `missing_required_header`: `["400", "401", "403", "406", "415", "422"]`
 
@@ -1236,13 +1236,16 @@ The following settings control how Schemathesis makes network requests to the AP
 
     Maximum number of redirects to follow for each network request during tests.
 
+    Redirects are followed only within the host of the redirected request. A redirect to another hostname, port, or
+    scheme is not followed: the 3xx response is the test case's response and goes through checks as usual.
+
     Allow up to 5 redirects:
 
     ```toml
     max-redirects = 5
     ```
 
-    Disable redirect following entirely:
+    Disable redirect following entirely and check the 3xx response itself:
 
     ```toml
     max-redirects = 0

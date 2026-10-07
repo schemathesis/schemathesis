@@ -9,7 +9,7 @@ from collections.abc import Mapping, MutableMapping
 from http.client import RemoteDisconnected
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -40,7 +40,22 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-class ManagedCookiesSession(requests.Session):
+class SameHostRedirectsSession(requests.Session):
+    """`requests.Session` that follows redirects only within the host of the redirected request."""
+
+    @override
+    def get_redirect_target(self, resp: requests.Response) -> str | None:
+        target = super().get_redirect_target(resp)
+        if target is None:
+            return None
+        # Same rule `requests` uses to decide whether credentials may follow a redirect.
+        # The `requests` stubs leave this method unannotated.
+        if self.should_strip_auth(resp.url, urljoin(resp.url, target)):  # type: ignore[no-untyped-call]
+            return None
+        return target
+
+
+class ManagedCookiesSession(SameHostRedirectsSession):
     """`requests.Session` whose response cookies are dropped between generated requests."""
 
 
@@ -185,7 +200,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         config = case.operation.schema.config
 
-        max_redirects = kwargs.pop("max_redirects", None) or config.max_redirects_for(operation=case.operation)
+        max_redirects = kwargs.pop("max_redirects", None)
+        if max_redirects is None:
+            max_redirects = config.max_redirects_for(operation=case.operation)
 
         if session is not None and session.headers:
             # These headers are explicitly provided via config or CLI args.
@@ -196,13 +213,15 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             kwargs["headers"] = headers
 
         data = self._build_request_data(case, kwargs)
+        if max_redirects == 0:
+            data.setdefault("allow_redirects", False)
 
         current_session_headers: MutableMapping[str, Any] = {}
         current_session_auth = None
 
         if session is None:
             validate_vanilla_requests_kwargs(data, case.operation.schema.declared_base_url)
-            session = requests.Session()
+            session = SameHostRedirectsSession()
             close_session = True
         else:
             current_session_headers = session.headers
@@ -212,7 +231,8 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                     current_session_auth = session.auth
                     session.auth = None
             close_session = False
-        if max_redirects is not None:
+        # `requests` raises on any redirect when `max_redirects` is 0, even with redirect following disabled.
+        if max_redirects:
             session.max_redirects = max_redirects
         session.headers = {}
 

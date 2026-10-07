@@ -198,10 +198,10 @@ Verifies the API accepts valid request data. When Schemathesis generates schema-
 - API rejected schema-compliant request
 
 Valid data should have been accepted
-Expected: 2xx, 401, 403, 404, 409, 429, 5xx
+Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
 ```
 
-By default, `expected-statuses` includes `401/403/404/409/429/5xx` to account for authentication requirements, missing resources, conflicts (e.g., duplicate entries), rate limiting, and downstream failures.
+By default, `expected-statuses` includes `3xx/401/403/404/409/429/5xx` to account for redirects (e.g., to a sign-in page or an OAuth provider), authentication requirements, missing resources, conflicts (e.g., duplicate entries), rate limiting, and downstream failures.
 
 !!! note "Test mode"
     Requires `--mode positive` or `--mode all` (default)

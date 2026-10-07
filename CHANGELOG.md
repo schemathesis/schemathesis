@@ -6,8 +6,14 @@
 
 - Suggest a dynamic auth config when authentication fails on schemas with sign-up and login operations.
 
+### :wrench: Changed
+
+- Follow redirects only within the requested host; return redirects elsewhere as the response.
+- `positive_data_acceptance` accepts 3xx responses by default.
+
 ### :bug: Fixed
 
+- Network error on the first redirect with `max-redirects = 0`.
 - Stateful testing aborting when a few operations hang instead of skipping them.
 - Dependency inference missing links from collection listings to item path parameters like `{partition_id}`.
 - Stateful testing failing with invalid inferred links when operations share a response definition.

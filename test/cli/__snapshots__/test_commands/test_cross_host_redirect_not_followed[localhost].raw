@@ -22,17 +22,17 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-_________________________________ POST /items __________________________________
+________________________________ GET /redirect _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API rejected schema-compliant request
+- Undocumented HTTP status code
 
-    Valid data should have been accepted
-    Expected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx
+    Received: 303
+    Documented: 200
 
-[400] Bad Request:
+[303] See Other:
 
-    `{}`
+    <EMPTY>
 
 Reproduce with:
 
@@ -53,7 +53,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ API rejected schema-compliant request: 1
+  ❌ Undocumented HTTP status code: 1
 
 Test cases:
   N generated, N found N unique failures

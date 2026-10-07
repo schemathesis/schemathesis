@@ -350,8 +350,10 @@ def _replay(ctx: EngineContext, entry: Entry, operation: APIOperation) -> tuple[
 
 def _send_without_auth(ctx: EngineContext, case: Case, operation: APIOperation) -> Response | None:
     """Send `case` via a fresh auth-less session so the inference path can fire on 401/403."""
+    from schemathesis.transport.requests import SameHostRedirectsSession
+
     kwargs = ctx.get_transport_kwargs(operation=operation).copy()
-    unauth_session = requests.Session()
+    unauth_session = SameHostRedirectsSession()
     if "verify" in kwargs:
         unauth_session.verify = kwargs["verify"]
     if kwargs.get("cert") is not None:

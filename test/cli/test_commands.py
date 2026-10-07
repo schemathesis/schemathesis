@@ -2948,6 +2948,10 @@ def test_parameter_overrides(ctx, cli, verify_overrides):
             (),
             {"max-redirects": 5},
         ),
+        (
+            ("--max-redirects=0",),
+            {},
+        ),
     ),
 )
 def test_max_redirects(cli, app_runner, ctx, snapshot_cli, args, config):
@@ -2986,6 +2990,54 @@ def test_max_redirects(cli, app_runner, ctx, snapshot_cli, args, config):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "localhost"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_cross_host_redirect_not_followed(cli, app_runner, ctx, snapshot_cli, host):
+    third_party = Flask("third_party")
+    third_party_requests = []
+
+    @third_party.route("/authorize")
+    def authorize():
+        third_party_requests.append(request.url)
+        return jsonify({})
+
+    third_party_port = app_runner.run_flask_app(third_party)
+    app, _ = ctx.openapi.make_flask_app(
+        {"/redirect": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+
+    @app.route("/redirect")
+    def redirect_endpoint():
+        return Response(status=303, headers={"Location": f"http://{host}:{third_party_port}/authorize"})
+
+    assert (
+        cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=1", "--checks=status_code_conformance")
+        == snapshot_cli
+    )
+    assert third_party_requests == []
+
+
+@pytest.mark.parametrize("location", ["absolute", "relative"])
+def test_same_host_redirect_followed(cli, ctx, location):
+    target_requests = []
+    app, _ = ctx.openapi.make_flask_app(
+        {"/redirect": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+
+    @app.route("/redirect")
+    def redirect_endpoint():
+        return redirect(url_for("target", _external=location == "absolute"), code=303)
+
+    @app.route("/target")
+    def target():
+        target_requests.append(request.method)
+        return jsonify({})
+
+    result = cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=1", "--checks=status_code_conformance")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert target_requests == ["GET"]
 
 
 @pytest.fixture

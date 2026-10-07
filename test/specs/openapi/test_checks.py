@@ -679,7 +679,8 @@ def test_additional_properties_hint_follows_response_attribution(ctx, response_f
     with pytest.raises(RejectedPositiveData) as exc:
         positive_data_acceptance(check_context(), response, case)
     assert (
-        exc.value.message == f"Valid data should have been accepted\nExpected: 2xx, 401, 403, 404, 409, 429, 5xx{hint}"
+        exc.value.message
+        == f"Valid data should have been accepted\nExpected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx{hint}"
     )
 
 
@@ -4349,7 +4350,8 @@ def test_positive_data_acceptance_additional_properties_hint(
     with pytest.raises(RejectedPositiveData) as exc:
         positive_data_acceptance(check_context(), _opaque_rejection(response_factory), case)
     assert (
-        exc.value.message == f"Valid data should have been accepted\nExpected: 2xx, 401, 403, 404, 409, 429, 5xx{hint}"
+        exc.value.message
+        == f"Valid data should have been accepted\nExpected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx{hint}"
     )
 
 
@@ -4378,7 +4380,7 @@ def test_additional_properties_hint_ignores_blame_on_query_parameter(ctx, respon
     with pytest.raises(RejectedPositiveData) as exc:
         positive_data_acceptance(check_context(), response, case)
     assert exc.value.message == (
-        f"Valid data should have been accepted\nExpected: 2xx, 401, 403, 404, 409, 429, 5xx{_EXTRA_PROPERTY_HINT}"
+        f"Valid data should have been accepted\nExpected: 2xx, 3xx, 401, 403, 404, 409, 429, 5xx{_EXTRA_PROPERTY_HINT}"
     )
 
 
