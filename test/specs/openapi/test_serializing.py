@@ -1190,6 +1190,13 @@ def test_nullable_parameters(
 
 
 @pytest.mark.parametrize(
+    "func", [deep_object, extracted_object, nested_object], ids=["deep-object", "extracted-object", "nested-object"]
+)
+def test_empty_exploded_object_expands_to_nothing(func):
+    assert func("foo")({"foo": {}, "bar": "x"}) == {"bar": "x"}
+
+
+@pytest.mark.parametrize(
     ("func", "kwargs", "value", "expected"),
     [
         (comma_delimited_object, {}, {"a": True, "b": None}, "a,true,b,null"),
@@ -1448,7 +1455,6 @@ def test_query_parameter_serialization(definition, input_value, expected):
             {"request[items][0]": 1, "request[items][1]": 2, "request[items][2]": 3},
             id="list-property",
         ),
-        pytest.param({}, {"request": ""}, id="empty"),
     ],
 )
 def test_nested_object_recursive_brackets(value, expected):

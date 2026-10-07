@@ -7376,13 +7376,13 @@ def test_required_string_with_max_length_beyond_generation_buffer(ctx, max_lengt
 
 
 def test_object_query_parameter_yields_no_duplicate_requests(ctx):
-    # Non-dict values collapse to `name=` on the wire, so every type violation repeats the positive request.
+    # Non-dict values collapse to `name=` on the wire, so every type violation repeats one request.
     operation = load_schema(
         ctx,
         parameters=[{"in": "query", "name": "filter", "required": False, "schema": {"type": "object"}}],
         method="get",
     )["/foo"]["GET"]
-    assert [case.query for case in iter_cases(operation, *GenerationMode)] == [{"filter": ""}]
+    assert [case.query for case in iter_cases(operation, *GenerationMode)] == [{}, {"filter": ""}]
 
 
 def test_two_object_query_parameters_yield_no_duplicate_requests(ctx):
@@ -7395,11 +7395,10 @@ def test_two_object_query_parameters_yield_no_duplicate_requests(ctx):
         method="get",
     )["/foo"]["GET"]
     assert [case.query for case in iter_cases(operation, *GenerationMode)] == [
-        {"sort_by": "", "filter": ""},
+        {},
         {"filter": ""},
-        {"x-schemathesis-unknown-property": "42", "filter": ""},
         {"sort_by": ""},
-        {"x-schemathesis-unknown-property": "42", "sort_by": ""},
+        {"x-schemathesis-unknown-property": "42"},
     ]
 
 
