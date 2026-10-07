@@ -28,6 +28,7 @@
 - WFC report fault categories missing the `id` required by WFC Report 0.8.0.
 - Engine runs against ASGI apps sending requests over the network, and crashing on WSGI apps.
 - `ResourceWarning` about unclosed streams after ASGI lifespan shutdown. [#5085](https://github.com/schemathesis/schemathesis/issues/5085)
+- Reproduction commands showing the schema's base URL instead of the requested one.
 - Report server outages behind port proxies like `docker run -p` once, not per operation.
 - Crash in stateful testing on paths with segments like `{id}:cancel`.
 - Misleading `additionalProperties` hint when the server rejects a body for its NUL characters.

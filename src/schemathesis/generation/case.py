@@ -113,6 +113,8 @@ class Case(Generic[OperationT]):
     _has_explicit_auth: bool
     # WFC auth entry this case ran under, when several are in play.
     _auth_identity: str | None
+    # Base URL the latest `call` sent this case to; `None` means the operation's own.
+    _base_url: str | None
     _components: dict
     _freeze_metadata: bool
 
@@ -132,6 +134,7 @@ class Case(Generic[OperationT]):
         "_auth",
         "_has_explicit_auth",
         "_auth_identity",
+        "_base_url",
         "_components",
         "_freeze_metadata",
     )
@@ -170,6 +173,7 @@ class Case(Generic[OperationT]):
         object.__setattr__(self, "_auth", _auth)
         object.__setattr__(self, "_has_explicit_auth", _has_explicit_auth)
         object.__setattr__(self, "_auth_identity", None)
+        object.__setattr__(self, "_base_url", None)
         object.__setattr__(self, "_components", store_components(self))
         object.__setattr__(self, "_freeze_metadata", False)
 
@@ -420,6 +424,7 @@ class Case(Generic[OperationT]):
 
         # Freeze metadata to prevent revalidation after request preparation transforms the body
         object.__setattr__(self, "_freeze_metadata", True)
+        object.__setattr__(self, "_base_url", base_url)
 
         if self.operation.app is not None:
             kwargs.setdefault("app", self.operation.app)
