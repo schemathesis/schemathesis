@@ -330,7 +330,9 @@ def execute_state_machine_loop(
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                if isinstance(exc, requests.ConnectionError) and engine.detect_server_outage(exc):
+                outage = isinstance(exc, requests.ConnectionError) and engine.detect_server_outage(exc)
+                # Only the reset that revealed the outage may have caused it; later ones just hit the dead server.
+                if outage and not (is_unrecoverable_network_error(exc) and engine.server.confirmed_by(exc)):
                     raise ServerWentAway from None
                 # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level
                 # failures (reset, chunked-encoding break) usually mean the server crashed; surface
@@ -347,6 +349,8 @@ def execute_state_machine_loop(
 
                 remember_step_outcome(input.case, exc)
                 ctx.step_errored()
+                if outage:
+                    raise ServerWentAway from None
                 raise
             except KeyboardInterrupt:
                 ctx.step_interrupted()

@@ -41,7 +41,7 @@ def refusal(base_url):
 def expected_message(operation, cases):
     noun = "request" if len(cases) == 1 else "requests"
     commands = "\n\n".join(f"    {case.as_curl_command(headers={}, verify=True)}" for case in cases)
-    return f"{operation.base_url} stopped accepting connections. Last {noun} before it went away:\n\n{commands}"
+    return f"{operation.base_url} stopped responding. Last {noun} before it went away:\n\n{commands}"
 
 
 def hang(monitor, case, release):

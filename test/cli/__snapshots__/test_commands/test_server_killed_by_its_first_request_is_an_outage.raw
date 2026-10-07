@@ -21,39 +21,27 @@ Schemathesis dev
 
      ⏭  1 skipped
 
- 🚫  Coverage (in 0.00s)
+ 🚫  Fuzzing (in 0.00s)
 
      🚫 1 error
 
- 🚫  Fuzzing (in 0.00s)
-
-     ⏭  1 skipped
-
 ==================================== ERRORS ====================================
-__________________________________ GET /crash __________________________________
+__________________________________ GET /reset __________________________________
 Network Error
 
-Connection broken. The server declared chunked encoding but sent an invalid chunk
+Connection failed
 
-    Response ended prematurely
+    Connection aborted. [Error NUM] Connection reset by peer
 
 Reproduce with:
 
-    curl -X GET --insecure http://127.0.0.1/crash
+    <PLACEHOLDER>
 ____________________________________ Server ____________________________________
 Server Unavailable
 
-http://127.0.0.1 stopped responding. Last requests before it went away:
+http://127.0.0.1 stopped responding. Last request before it went away:
 
-    curl -X GET --insecure http://127.0.0.1/crash
-
-    curl -X DELETE --insecure http://127.0.0.1/crash
-
-    curl -X OPTIONS --insecure http://127.0.0.1/crash
-
-    curl -X PATCH --insecure http://127.0.0.1/crash
-
-    curl -X POST --insecure http://127.0.0.1/crash
+    <PLACEHOLDER>
 
 Tip: If the server crashed, the request that caused it may be older than these.
 Record every request sent with `--report=har`.
@@ -64,20 +52,21 @@ Need more help?
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Errored: 1
 
 Test Phases:
   ⏭  Examples
-  🚫 Coverage
+  ⏭  Coverage (disabled)
   🚫 Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Errors:
   🚫 Network Error: 1
   🚫 Server Unavailable: 1
 
 Test cases:
-  N generated, N passed
+  N generated
 
 Seed: 42
 

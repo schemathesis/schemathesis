@@ -495,7 +495,7 @@ def build_code_sample(
 
 
 class ServerUnavailable(Exception):
-    """The server stopped accepting connections in the middle of the run."""
+    """The server stopped responding in the middle of the run."""
 
 
 def is_connection_refused(exc: requests.ConnectionError) -> bool:

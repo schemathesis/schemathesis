@@ -225,7 +225,7 @@ class EngineContext:
         self.control.stop()
 
     def detect_server_outage(self, exc: requests.ConnectionError) -> bool:
-        """Stop the run when a refused connection means the server went away."""
+        """Stop the run when a refused or reset connection means the server went away."""
         if not self.server.is_down(exc):
             return False
         self.control.is_server_unavailable = True

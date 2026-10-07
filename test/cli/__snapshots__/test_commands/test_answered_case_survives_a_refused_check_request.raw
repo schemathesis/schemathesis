@@ -25,7 +25,7 @@ Schemathesis dev
 ____________________________________ Server ____________________________________
 Server Unavailable
 
-http://127.0.0.1 stopped accepting connections. Last request before it went away:
+http://127.0.0.1 stopped responding. Last request before it went away:
 
     curl -X GET -H 'Authorization: [Filtered]' http://127.0.0.1/data
 

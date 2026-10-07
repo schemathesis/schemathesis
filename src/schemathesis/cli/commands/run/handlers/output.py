@@ -1039,7 +1039,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
         from rich.padding import Padding
         from rich.text import Text
 
-        # A phase errors without any operation erroring once the server stops accepting connections.
+        # A phase errors without any operation erroring once the server stops responding.
         icon = "🚫" if status == Status.ERROR else None
         self.console.print(Padding(Text(manager.get_completion_message(icon), style="white"), BLOCK_PADDING))
         self.console.print()

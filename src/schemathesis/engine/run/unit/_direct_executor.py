@@ -146,6 +146,11 @@ def run_driver(
         budget_expired = True
     except ServerWentAway:
         server_went_away = True
+        stored = state.unrecoverable_network_error
+        if stored is not None:
+            # A crash caught before the outage was confirmed is still this operation's own finding.
+            status = Status.ERROR
+            yield non_fatal_error(stored.error, code_sample=stored.code_sample)
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
