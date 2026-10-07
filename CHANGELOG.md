@@ -13,6 +13,7 @@
 
 ### :bug: Fixed
 
+- Crash on response examples whose media type declares a boolean `schema`.
 - Network error on the first redirect with `max-redirects = 0`.
 - Stateful testing aborting when a few operations hang instead of skipping them.
 - Dependency inference missing links from collection listings to item path parameters like `{partition_id}`.
