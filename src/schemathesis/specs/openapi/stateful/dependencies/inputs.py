@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
@@ -13,6 +14,7 @@ from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
+    Cardinality,
     DefinitionSource,
     InputSlot,
     OperationMap,
@@ -882,6 +884,69 @@ def disambiguate_path_suffix_matches(operations: OperationMap, resources: Resour
                 continue
             input_slot.resource = new_resource
             input_slot.resource_field = input_slot.parameter_name
+
+
+def bind_item_parameters_to_collections(operations: OperationMap) -> None:
+    """Bind `/things/{id}` path parameters to the resource `GET /things` lists when nothing else can supply the id."""
+    listed: dict[str, dict[str, ResourceDefinition]] = {}
+    # Collection names each resource is listed under; a shape listed by `/groups` and `/domains` alike is generic.
+    listed_under: dict[str, set[str]] = {}
+    producers: dict[str, list[tuple[OperationNode, OutputSlot]]] = {}
+    # `(resource, field)` pairs that `*_id` fields of produced resources point to
+    fed: set[tuple[str, str]] = set()
+    for operation in operations.values():
+        for output in operation.outputs:
+            producers.setdefault(output.resource.name, []).append((operation, output))
+            fed.update((fk.target_resource, fk.target_field) for fk in output.resource.fk_fields)
+            fed.update((fk.target_resource, fk.target_field) for fk in output.resource.nested_fk_fields)
+            if operation.method == "get" and output.cardinality == Cardinality.MANY:
+                collection = operation.path.rstrip("/")
+                listed.setdefault(collection, {})[output.resource.name] = output.resource
+                listed_under.setdefault(output.resource.name, set()).add(collection.rsplit("/", 1)[-1])
+
+    for operation in operations.values():
+        segments = operation.path.split("/")
+        for input_slot in operation.inputs:
+            parameter_name = input_slot.parameter_name
+            if input_slot.parameter_location != ParameterLocation.PATH or not isinstance(parameter_name, str):
+                continue
+            placeholder = "{" + parameter_name + "}"
+            if placeholder not in segments:
+                continue
+            index = segments.index(placeholder)
+            if index < 2 or segments[index - 1].startswith("{"):
+                continue
+            candidates = [
+                resource
+                for resource in listed.get("/".join(segments[:index]), {}).values()
+                if parameter_name in resource.fields and len(listed_under[resource.name]) == 1
+            ]
+            if len(candidates) != 1 or candidates[0].name == input_slot.resource.name:
+                continue
+            current = input_slot.resource.name
+            if input_slot.resource_field is not None and (current, input_slot.resource_field) in fed:
+                continue
+            # Only a binding whose every producer needs this very value is replaced; others may get values elsewhere.
+            current_producers = producers.get(current, [])
+            if not all(
+                any(
+                    slot.parameter_name == parameter_name and slot.parameter_location == ParameterLocation.PATH
+                    for slot in producer.inputs
+                )
+                for producer, _ in current_producers
+            ):
+                continue
+            candidate = candidates[0]
+            input_slot.resource = candidate
+            input_slot.resource_field = parameter_name
+            input_slot.is_suffix_matched = False
+            # `POST /things/{id}` still creates what the listing lists
+            for producer, output in current_producers:
+                if output.path_parameter == parameter_name and not any(
+                    existing.resource is candidate and existing.path_parameter == parameter_name
+                    for existing in producer.outputs
+                ):
+                    producer.outputs.append(replace(output, resource=candidate))
 
 
 def _module_of(path: str) -> str:

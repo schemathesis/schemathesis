@@ -42,6 +42,9 @@ class OperationLookup:
         self._operations_by_id: dict[str, OperationLookupEntry] | None = None
         self._operations_by_reference: dict[str, OperationLookupEntry] | None = None
 
+    def entries(self) -> Collection[OperationLookupEntry]:
+        return self._get_operations_by_reference().values()
+
     def find_by_id(self, operation_id: str) -> APIOperation:
         entry = self._get_operations_by_id().get(operation_id)
         if entry is None:
