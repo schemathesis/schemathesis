@@ -76,6 +76,7 @@ if TYPE_CHECKING:
     from schemathesis.core.adapter import ParsedParameters
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.core.jsonschema.types import JsonValue
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema, Scheduler
     from schemathesis.engine.observations import Observations
@@ -121,6 +122,8 @@ class OpenApiSchema(BaseSchema):
         self._inferred_security: dict[str, SecurityRequirements] = {}
         # Credentials from automatic sign-up, keyed by security scheme.
         self.bootstrapped_auth: dict[str, HttpBearerAuthConfig | ApiKeyAuthConfig] = {}
+        # Credentials of the signed-up account, keyed by the login operation label.
+        self.bootstrapped_credentials: dict[str, dict[str, JsonValue]] = {}
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")

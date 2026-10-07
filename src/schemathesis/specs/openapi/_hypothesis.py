@@ -331,6 +331,15 @@ def openapi_cases(
                 body_dictionary_draws = body_result.dictionary_draws
                 body_constants_draws = body_result.constants_draws
                 body_result = body_result.value
+            credentials = operation.schema.bootstrapped_credentials.get(operation.label)
+            # Generated credentials never match an account, so logins and the session operations behind them stay untested.
+            if (
+                credentials is not None
+                and body_generator.is_positive
+                and isinstance(body_result, dict)
+                and draw(st.booleans())
+            ):
+                body_result = {**body_result, **credentials}
             body_ = ValueContainer(
                 value=body_result,
                 location="body",

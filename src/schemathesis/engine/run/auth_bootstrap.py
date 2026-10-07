@@ -88,6 +88,7 @@ def _bootstrap(
     if token is None:
         return _failure(spec, "extract")
     definition = schema.security.security_definitions[spec.target_scheme]
+    schema.bootstrapped_credentials = {spec.login_operation: credentials}
     # Flows only target bearer and API key schemes.
     schema.bootstrapped_auth = {
         spec.target_scheme: HttpBearerAuthConfig(bearer=token)
