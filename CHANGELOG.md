@@ -7,6 +7,7 @@
 - Sign up and log in automatically when the schema declares sign-up and login operations.
 - Suggest a dynamic auth config when authentication fails on schemas with sign-up and login operations.
 - Dependency inference links values only an item `GET` returns, like `version`, into update bodies.
+- Dependency inference links ids created inside response envelopes, and `fromAirportId`-style fields to `fromAirport` objects.
 
 ### :wrench: Changed
 

@@ -8965,3 +8965,383 @@ def test_item_path_parameter_keeps_placeholder_fed_by_id_fields(ctx):
     )
     for label in ("GET /stream_targets/{id}", "GET /stream_targets/{id}/metrics"):
         assert input_bindings(graph, label)["id"] == "StreamTarget", label
+
+
+# Spring-style envelopes wrap a created id next to status fields: `{time, httpStatus, isSuccess, response: "<id>"}`.
+def test_created_id_inside_status_envelope_links_to_item_operations(ctx):
+    envelope = {
+        "type": "object",
+        "properties": {
+            "time": {"type": "string", "format": "date-time"},
+            "httpStatus": {"type": "string"},
+            "isSuccess": {"type": "boolean"},
+            "response": {"type": "string"},
+        },
+    }
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/airports": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK", "content": {"*/*": {"schema": envelope}}}},
+                }
+            },
+            "/airports/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+    )
+    links = {
+        (response_links.producer_operation_ref, link.to_openapi()["operationRef"]): link.to_openapi()["parameters"]
+        for response_links in graph.iter_links()
+        for link in response_links.links.values()
+    }
+    assert links.get(("#/paths/~1airports/post", "#/paths/~1airports~1{id}/get")) == {
+        "path.id": "$response.body#/response"
+    }
+
+
+# The item operation names its resource after its own response schema (`AirportResponse`), not the path.
+def test_created_id_links_to_item_operation_returning_named_schema(ctx):
+    def envelope(inner):
+        return {
+            "type": "object",
+            "properties": {"httpStatus": {"type": "string"}, "isSuccess": {"type": "boolean"}, "response": inner},
+        }
+
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/airports": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        }
+                    },
+                    "responses": {
+                        "200": {"description": "OK", "content": {"*/*": {"schema": envelope({"type": "string"})}}}
+                    },
+                }
+            },
+            "/airports/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"*/*": {"schema": envelope({"$ref": "#/components/schemas/AirportResponse"})}},
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "AirportResponse": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                }
+            }
+        },
+    )
+    links = {
+        (response_links.producer_operation_ref, link.to_openapi()["operationRef"]): link.to_openapi()["parameters"]
+        for response_links in graph.iter_links()
+        for link in response_links.links.values()
+    }
+    assert links.get(("#/paths/~1airports/post", "#/paths/~1airports~1{id}/get")) == {
+        "path.id": "$response.body#/response"
+    }
+
+
+# `fromAirportId` in a request is the `id` of what responses return under `fromAirport`.
+def test_prefixed_id_field_binds_to_resource_returned_under_its_name(ctx):
+    airport_reference = {"$ref": "#/components/schemas/AirportResponse"}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/flights": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "fromAirportId": {"type": "string"},
+                                        "toAirportId": {"type": "string"},
+                                    },
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+            "/flights/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {"schema": {"$ref": "#/components/schemas/FlightResponse"}}
+                            },
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "AirportResponse": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                },
+                "FlightResponse": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "fromAirport": airport_reference,
+                        "toAirport": airport_reference,
+                    },
+                },
+            }
+        },
+    )
+    bindings = {
+        slot.parameter_name: (slot.resource.name, slot.resource_field)
+        for slot in graph.operations["POST /flights"].inputs
+    }
+    assert bindings == {"fromAirportId": ("AirportResponse", "id"), "toAirportId": ("AirportResponse", "id")}
+
+
+# A created id fills only the identifier; other fields of the same resource must not receive it.
+def test_created_id_fills_only_the_identifier(ctx):
+    envelope = {"type": "object", "properties": {"httpStatus": {"type": "string"}, "response": {"type": "string"}}}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/airports": {
+                "post": {"responses": {"200": {"description": "OK", "content": {"*/*": {"schema": envelope}}}}}
+            },
+            "/airports/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {"schema": {"$ref": "#/components/schemas/AirportResponse"}}
+                            },
+                        }
+                    },
+                },
+                "put": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        components={
+            "schemas": {
+                "AirportResponse": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                }
+            }
+        },
+    )
+    links = {
+        link.to_openapi()["operationRef"]: link.to_openapi()
+        for response_links in graph.iter_links()
+        if response_links.producer_operation_ref == "#/paths/~1airports/post"
+        for link in response_links.links.values()
+    }
+    put = links["#/paths/~1airports~1{id}/put"]
+    assert (put["parameters"], put.get("requestBody")) == ({"path.id": "$response.body#/response"}, None)
+
+
+# One generic `{id, _href}` schema behind every association says nothing about which entity an id names.
+def test_prefixed_id_field_ignores_generic_association_schema(ctx):
+    association = {"$ref": "#/components/schemas/EmbeddedResource"}
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/accounts": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"company_stage_id": {"type": "integer"}}}
+                            }
+                        }
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+            "/cadences/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "integer"},
+                                            "company_stage": association,
+                                            "owner": association,
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "EmbeddedResource": {
+                    "type": "object",
+                    "properties": {"id": {"type": "integer"}, "_href": {"type": "string"}},
+                }
+            }
+        },
+    )
+    assert [(slot.resource.name, slot.resource_field) for slot in graph.operations["POST /accounts"].inputs] == [
+        ("CompanyStage", "company_stage_id")
+    ]
+
+
+# An update answers `{result: "..."}` with a status message, not the id of anything it created.
+def test_update_result_message_is_not_an_identifier(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/strategies/{strategyid}": {
+                "put": {
+                    "parameters": [
+                        {"name": "strategyid", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"result": {"type": "string"}}}
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/strategies/{strategyid}/signals": {
+                "get": {
+                    "parameters": [
+                        {"name": "strategyid", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+    )
+    assert [
+        link.to_openapi()["parameters"]
+        for response_links in graph.iter_links()
+        if response_links.producer_operation_ref == "#/paths/~1strategies~1{strategyid}/put"
+        for link in response_links.links.values()
+    ] == [{"path.strategyid": "$request.path.strategyid"}]
+
+
+# Created ids keep feeding operations that name the resource after the path, next to the item operations.
+def test_created_id_links_to_both_item_and_path_named_consumers(ctx):
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/entity": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {"schema": {"$ref": "#/components/schemas/EntityResponse"}}
+                            },
+                        }
+                    }
+                },
+                "post": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "string"}}},
+                        }
+                    }
+                },
+                "put": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["id"],
+                                    "properties": {"id": {"type": "string"}},
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+            "/entity/{id}": {
+                "delete": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"204": {"description": "Deleted"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "EntityResponse": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                }
+            }
+        },
+    )
+    assert {
+        link.to_openapi()["operationRef"]: (link.to_openapi().get("parameters"), link.to_openapi().get("requestBody"))
+        for response_links in graph.iter_links()
+        if response_links.producer_operation_ref == "#/paths/~1entity/post"
+        for link in response_links.links.values()
+    } == {
+        "#/paths/~1entity/put": (None, {"id": "$response.body#/"}),
+        "#/paths/~1entity~1{id}/delete": ({"path.id": "$response.body#/"}, None),
+    }
