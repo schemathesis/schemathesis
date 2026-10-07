@@ -443,7 +443,7 @@ The following options control how Schemathesis makes network requests to the API
     **Default**: `30`  
     **Range**: `>=0`  
 
-    Maximum number of redirects to follow for each network request during tests. Set to `0` to disable redirect following entirely.
+    Maximum number of redirects to follow for each network request during tests. Set to `0` to disable redirect following entirely. Redirects to another host are never followed.
 
     ```console
     $ st run openapi.yaml --max-redirects 5

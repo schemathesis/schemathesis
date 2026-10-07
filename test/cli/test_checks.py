@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 from _pytest.main import ExitCode
-from flask import jsonify, redirect, request
+from flask import Response, jsonify, redirect, request
 
 import schemathesis
 from schemathesis.checks import CHECKS
@@ -887,6 +887,22 @@ def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, expected_statu
             "--checks=positive_data_acceptance",
             **kwargs,
         )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_positive_data_acceptance_accepts_redirect_to_another_host(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {"/authorize": {"get": {"responses": {"303": {"description": "Redirect to the provider"}}}}},
+    )
+
+    @app.route("/authorize")
+    def authorize():
+        return Response(status=303, headers={"Location": "https://provider.invalid/oauth"})
+
+    assert (
+        cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=1", "--checks=positive_data_acceptance")
         == snapshot_cli
     )
 
