@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import http.client
 import json
+import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from email.parser import BytesParser
@@ -1671,8 +1672,12 @@ class ResourcePath:
 
     __slots__ = ("value", "variables")
 
-    def get(self, key: str) -> str:
-        return self.variables[key.lstrip("{").rstrip("}")]
+    def render(self, segment: str) -> str:
+        # Segments may mix variables with literal text, like `{id}:cancel` or `{name}.{ext}`.
+        return _PATH_VARIABLE.sub(lambda match: str(self.variables[match.group(1)]), segment)
+
+
+_PATH_VARIABLE = re.compile(r"\{([^{}]+)\}")
 
 
 def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
@@ -1684,8 +1689,11 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
         return False
 
     for left, right in zip(lhs_parts, rhs_parts, strict=False):
-        if left.startswith("{") and right.startswith("{"):
-            if str(lhs.get(left)) != str(rhs.get(right)):
+        if "{" in left and "{" in right:
+            resource = lhs.render(left)
+            target = rhs.render(right)
+            # A custom method like `{id}:cancel` acts on the resource named before the colon.
+            if target != resource and not target.startswith(f"{resource}:"):
                 return False
         elif left != right and left.rstrip("s") != right.rstrip("s"):
             # Parts don't match, not a prefix

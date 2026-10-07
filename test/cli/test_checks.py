@@ -1156,6 +1156,64 @@ def test_use_after_free_does_not_trigger_on_error(cli, snapshot_cli, app):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_custom_method_path_segments(ctx, cli, snapshot_cli):
+    job = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    job_id = [{"name": "job_id", "in": "path", "required": True, "schema": {"type": "string"}}]
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/jobs": {
+                "post": {
+                    "responses": {"201": {"description": "Created", "content": {"application/json": {"schema": job}}}}
+                }
+            },
+            "/jobs/{job_id}": {
+                "parameters": job_id,
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": job}}},
+                        "404": {"description": "Not found"},
+                    }
+                },
+                "delete": {"responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}}},
+            },
+            "/jobs/{job_id}:cancel": {
+                "parameters": job_id,
+                "post": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": job}}},
+                        "404": {"description": "Not found"},
+                    }
+                },
+            },
+        }
+    )
+    jobs = set()
+
+    @app.route("/jobs", methods=["POST"])
+    def create_job():
+        job_id = uuid.uuid4().hex
+        jobs.add(job_id)
+        return jsonify({"id": job_id}), 201
+
+    @app.route("/jobs/<job_id>", methods=["GET", "DELETE"])
+    def job_item(job_id):
+        if job_id not in jobs:
+            return jsonify({"detail": "Not found"}), 404
+        if request.method == "DELETE":
+            jobs.discard(job_id)
+            return "", 204
+        return jsonify({"id": job_id})
+
+    @app.route("/jobs/<job_id>:cancel", methods=["POST"])
+    def cancel_job(job_id):
+        if job_id not in jobs:
+            return jsonify({"detail": "Not found"}), 404
+        return jsonify({"id": job_id})
+
+    assert cli.run_openapi_app(app, "--phases=stateful", "--max-examples=10") == snapshot_cli
+
+
 def test_negative_data_rejection_array_min_items_zero_no_false_positive(ctx, cli, snapshot_cli):
     # See GH-3056
     raw_schema = {
