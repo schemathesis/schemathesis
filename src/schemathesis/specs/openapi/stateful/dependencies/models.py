@@ -38,6 +38,8 @@ class DependencyGraph:
             del operation["path"]
             for input in operation["inputs"]:
                 input["resource"] = input["resource"]["name"]
+                if not input["echoes_response"]:
+                    del input["echoes_response"]
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
                 del output["response_fields"]
@@ -173,6 +175,9 @@ class DependencyGraph:
                             # No resource field means use the whole resource
                             value_expr = f"$response.body#{output_slot.pointer}"
                         link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
+                        # A separate link, so other links keep generating these fields.
+                        if input_slot.echoes_response:
+                            link_name += "Echo"
                         parameters = {}
                         request_body: dict[str, Any] | list = {}
                         # Data is extracted from response body
@@ -574,6 +579,8 @@ def _confirmed_input(producer: OperationNode, output_slot: OutputSlot) -> InputS
 
 def _takes_confirmed_value(input_slot: InputSlot, confirmed: InputSlot) -> bool:
     # The confirmed request value is a single scalar key, and a name never stands in for an identifier.
+    if input_slot.echoes_response:
+        return False
     field = input_slot.resource_field
     if field is not None and input_slot.resource.types.get(field) == {"array"}:
         return False
@@ -746,6 +753,8 @@ class InputSlot:
     # Whether this input was matched via suffix matching (e.g., "file_name" -> "BackupFile")
     # Suffix-matched inputs can be upgraded by merge_related_resources if a producer exists
     is_suffix_matched: bool = False
+    # Whether this input sends back a value a response returned, e.g. a `version` token for an update
+    echoes_response: bool = False
 
 
 @dataclass(slots=True)

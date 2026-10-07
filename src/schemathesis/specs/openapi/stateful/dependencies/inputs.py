@@ -46,6 +46,7 @@ def extract_inputs(
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
     deferred_field_named_path_parameters: list[tuple[str, str]] | None = None,
+    deferred_writable_body_fields: dict[str, JsonSchema] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
@@ -115,6 +116,7 @@ def extract_inputs(
             deferred_nested_fks=deferred_nested_fks,
             deferred_named_scalars=deferred_named_scalars,
             deferred_body_fields=deferred_body_fields,
+            deferred_writable_body_fields=deferred_writable_body_fields,
             candidate_resource_names=candidate_resource_names,
         )
 
@@ -344,6 +346,7 @@ def _resolve_body_dependencies(
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
     deferred_named_scalars: list[tuple[str, str, JsonSchema]] | None = None,
     deferred_body_fields: list[tuple[str, JsonSchema]] | None = None,
+    deferred_writable_body_fields: dict[str, JsonSchema] | None = None,
     candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
@@ -383,6 +386,11 @@ def _resolve_body_dependencies(
         return
     path = operation.path
     for property_name, subschema in properties.items():
+        # Generation never sends `readOnly` fields, so a link must not either.
+        if deferred_writable_body_fields is not None and not (
+            isinstance(subschema, dict) and subschema.get("readOnly")
+        ):
+            deferred_writable_body_fields[property_name] = subschema
         if deferred_body_fields is not None and property_name in required and _is_scalar(subschema):
             deferred_body_fields.append((property_name, subschema))
         resource_name = naming.from_parameter(property_name, path, body_field=True)
@@ -730,6 +738,48 @@ def rebind_body_fields_to_unique_producers(
                         parameter_location=ParameterLocation.BODY,
                     )
                 )
+
+
+def bind_echoed_body_fields(operations: OperationMap, writable_body_fields: dict[str, dict[str, JsonSchema]]) -> None:
+    """Bind update body fields to what the item `GET` returns but creation cannot set, e.g. a `version` token."""
+    labels = {(node.method.lower(), node.path): label for label, node in operations.items()}
+    for label, fields in writable_body_fields.items():
+        update = operations[label]
+        if update.method.lower() not in ("put", "patch") or naming.trailing_path_parameter(update.path) is None:
+            continue
+        reader = operations.get(labels.get(("get", update.path), ""))
+        if reader is None:
+            continue
+        # Only creation tells client-set fields apart from server-set ones; client-set fields keep generated values.
+        settable = writable_body_fields.get(labels.get(("post", update.path.rstrip("/").rsplit("/", 1)[0]), ""))
+        if settable is None:
+            continue
+        bound = {slot.parameter_name for slot in update.inputs if slot.parameter_location == ParameterLocation.BODY}
+        for output in reader.outputs:
+            # Only a single object that declares its fields can promise a value to send back.
+            if output.cardinality != Cardinality.ONE or output.response_fields is None:
+                continue
+            for field, field_schema in fields.items():
+                if (
+                    field in bound
+                    or field in settable
+                    or not isinstance(field_schema, dict)
+                    or "type" not in field_schema
+                    or not _is_scalar(field_schema)
+                    or field not in output.response_fields
+                    or not output.resource.types.get(field, set()) & set(get_type(field_schema))
+                ):
+                    continue
+                update.inputs.append(
+                    InputSlot(
+                        resource=output.resource,
+                        resource_field=field,
+                        parameter_name=field,
+                        parameter_location=ParameterLocation.BODY,
+                        echoes_response=True,
+                    )
+                )
+                bound.add(field)
 
 
 def _has_resource_prefix(field: str, resource_name: str) -> bool:
