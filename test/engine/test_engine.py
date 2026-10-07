@@ -9,11 +9,12 @@ import sys
 import threading
 import time
 from dataclasses import asdict
+from typing import Annotated
 from unittest.mock import ANY
 
 import flask
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
@@ -150,15 +151,38 @@ def test_interactions(ctx, workers):
 
 def test_asgi_interactions():
     app = FastAPI()
+    received = []
 
     @app.get("/users")
-    async def users():
+    async def users(
+        authorization: Annotated[str | None, Header()] = None, x_custom: Annotated[str | None, Header()] = None
+    ):
+        received.append((authorization, x_custom))
         return {"success": True}
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app)
-    stream = EventStream(schema).execute()
+    stream = EventStream(schema, max_examples=5, auth=("user", "pass"), headers={"X-Custom": "value"}).execute()
     interactions = stream.find_all_interactions()
     assert interactions[0].request.uri == "http://testserver/users"
+    assert [interaction.response is not None for interaction in interactions] == [True] * len(interactions)
+    assert set(received) == {("Basic dXNlcjpwYXNz", "value")}
+
+
+def test_wsgi_interactions(ctx):
+    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    received = []
+
+    @app.route("/users")
+    def users():
+        received.append((flask.request.headers.get("authorization"), flask.request.headers.get("x-custom")))
+        return flask.jsonify({"success": True})
+
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    stream = EventStream(schema, max_examples=5, auth=("user", "pass"), headers={"X-Custom": "value"}).execute()
+    stream.assert_no_errors()
+    interactions = stream.find_all_interactions()
+    assert [interaction.response is not None for interaction in interactions] == [True] * len(interactions)
+    assert set(received) == {("Basic dXNlcjpwYXNz", "value")}
 
 
 def test_empty_response_interaction(ctx):
