@@ -30,6 +30,7 @@ from schemathesis.engine.errors import (
     UnrecoverableNetworkError,
     build_code_sample,
     clear_hypothesis_notes,
+    is_inconsistent_replay,
     is_unrecoverable_network_error,
 )
 from schemathesis.engine.run import PhaseName
@@ -144,7 +145,7 @@ def _classify_suite_error(
         for failure in exc.exceptions:
             ctx.mark_as_seen_in_run(failure)
         return Status.FAILURE, True, network_events
-    if isinstance(exc, Flaky):
+    if isinstance(exc, Flaky) or is_inconsistent_replay(exc):
         # A replay that cannot reproduce the failure does not unreport it: the suite already showed it.
         found = Status.FAILURE if ctx.has_new_failures_in_suite else Status.SUCCESS
         if engine.has_reached_the_failure_limit:
