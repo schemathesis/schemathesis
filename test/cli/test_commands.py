@@ -2630,6 +2630,53 @@ def test_required_body_with_unresolvable_reference(ctx, cli, snapshot_cli):
     assert cli.run_openapi_app(app, "--max-examples=1") == snapshot_cli
 
 
+@pytest.mark.parametrize("version", ["2.0", "3.0.2", "3.1.0"])
+def test_array_form_items_tuple_in_request_body(ctx, cli, version):
+    # Pydantic v1 spells tuples as `items: [...]` even in Open API 3.1 schemas.
+    prefix = "#/definitions" if version == "2.0" else "#/components/schemas"
+    definitions = {
+        "Config": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]},
+        "Update": {
+            "type": "object",
+            "properties": {
+                "callbacks": {
+                    "type": "array",
+                    "items": [{"type": "string"}, {"$ref": f"{prefix}/Config"}],
+                    "minItems": 2,
+                    "maxItems": 2,
+                }
+            },
+            "required": ["callbacks"],
+        },
+    }
+    body_schema = {"$ref": f"{prefix}/Update"}
+    if version == "2.0":
+        route = "/api/update"
+        operation = {"parameters": [{"in": "body", "name": "body", "required": True, "schema": body_schema}]}
+        extra = {"definitions": definitions}
+    else:
+        route = "/update"
+        operation = {"requestBody": {"required": True, "content": {"application/json": {"schema": body_schema}}}}
+        extra = {"components": {"schemas": definitions}}
+    operation["responses"] = {"200": {"description": "OK"}}
+    app, _ = ctx.openapi.make_flask_app({"/update": {"post": operation}}, version=version, **extra)
+    bodies = []
+
+    @app.route(route, methods=["POST"])
+    def update():
+        bodies.append(request.get_json())
+        return jsonify({})
+
+    result = cli.run_openapi_app(app, "--max-examples=10", "--mode=positive", "--phases=coverage,fuzzing")
+    assert "Schema Error" not in result.stdout
+    assert bodies
+    for body in bodies:
+        first, second = body["callbacks"]
+        assert isinstance(first, str), body
+        assert isinstance(second, dict), body
+        assert isinstance(second["url"], str), body
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_required_body_with_one_unresolvable_media_type(ctx, cli, snapshot_cli):
     # A sibling media type that resolves keeps the operation in every phase

@@ -419,6 +419,37 @@ def test_upgrade_legacy_exclusive_bounds():
     }
 
 
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (
+            {"type": "array", "items": [{"type": "string"}, {"type": "integer"}]},
+            {"type": "array", "prefixItems": [{"type": "string"}, {"type": "integer"}]},
+        ),
+        (
+            {"type": "array", "items": [{"type": "string"}], "additionalItems": {"type": "boolean"}},
+            {"type": "array", "prefixItems": [{"type": "string"}], "items": {"type": "boolean"}},
+        ),
+        (
+            {"type": "array", "items": {"type": "string"}, "additionalItems": False},
+            {"type": "array", "items": {"type": "string"}, "additionalItems": False},
+        ),
+    ],
+    ids=["tuple", "tuple-with-additional-items", "single-items-schema"],
+)
+def test_upgrade_legacy_tuple_items(schema, expected):
+    assert (
+        transform(
+            schema,
+            converter.to_json_schema,
+            nullable_keyword="nullable",
+            upgrade_legacy_exclusive_bounds=True,
+            convert_prefix_items=False,
+        )
+        == expected
+    )
+
+
 def test_does_not_upgrade_legacy_exclusive_bounds_by_default():
     schema = {"type": "number", "minimum": 0, "exclusiveMinimum": True}
 

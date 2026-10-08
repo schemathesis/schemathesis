@@ -116,6 +116,7 @@ def _to_json_schema(
 
     if upgrade_legacy_exclusive_bounds:
         _upgrade_legacy_exclusive_bounds(schema)
+        _upgrade_legacy_tuple_items(schema)
 
     if schema.get(nullable_keyword):
         del schema[nullable_keyword]
@@ -540,6 +541,18 @@ def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
             continue
         schema[exclusive_key] = bound
         schema.pop(bound_key, None)
+
+
+def _upgrade_legacy_tuple_items(schema: dict[str, Any]) -> None:
+    # Draft 2020-12 spells a tuple as `prefixItems` and the schema for the rest as `items`.
+    items = schema.get("items")
+    if not isinstance(items, list) or "prefixItems" in schema:
+        return
+    schema["prefixItems"] = items
+    if "additionalItems" in schema:
+        schema["items"] = schema.pop("additionalItems")
+    else:
+        del schema["items"]
 
 
 def ensure_required_properties(schema: dict[str, Any]) -> None:
