@@ -1,9 +1,14 @@
+import asyncio
 import datetime
+import time
 
 import pytest
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from flask import Flask, Response, jsonify, stream_with_context
 from hypothesis import HealthCheck, given, settings
 from requests import Request
+from requests.exceptions import ChunkedEncodingError, ContentDecodingError
 
 import schemathesis
 from schemathesis.core.deserialization import _deserialize_sse, _parse_sse_events
@@ -1263,3 +1268,118 @@ def test_deserialize_sse_uses_utf8_ignoring_response_encoding():
     )
 
     assert _deserialize_sse(None, response) == [{"event": "message", "data": "café"}]
+
+
+# Bytes keep flowing, so only a total deadline ends the read; the cap bounds runs where it does not.
+ENDLESS_STREAM_CAP = 3
+FIRST_EVENT = b'data: {"value": 1}\n\n'
+
+
+def _endless_stream_chunks():
+    # The second event never ends
+    yield FIRST_EVENT
+    yield b'data: {"va'
+    for _ in range(int(ENDLESS_STREAM_CAP / 0.05)):
+        yield b"lue"
+
+
+def _endless_stream():
+    for chunk in _endless_stream_chunks():
+        yield chunk
+        time.sleep(0.05)
+
+
+async def _endless_stream_async():
+    for chunk in _endless_stream_chunks():
+        yield chunk
+        await asyncio.sleep(0.05)
+
+
+def _endless_flask_app(ctx):
+    app, _ = ctx.openapi.make_flask_app(_sse_paths(SSE_VALUE_ITEM_SCHEMA), version="3.2.0")
+
+    @app.route("/sse")
+    def _sse():
+        return Response(_endless_stream(), mimetype="text/event-stream")
+
+    return app
+
+
+def _endless_asgi_app():
+    app = FastAPI()
+
+    @app.get("/sse")
+    async def _sse():
+        return StreamingResponse(_endless_stream_async(), media_type="text/event-stream")
+
+    return app
+
+
+def _assert_cut_at_deadline(case, call):
+    started = time.monotonic()
+    response = call()
+    assert time.monotonic() - started < ENDLESS_STREAM_CAP
+    assert response.content == FIRST_EVENT
+    case.validate_response(response, checks=[response_schema_conformance])
+
+
+@pytest.mark.parametrize("timeout", [0.5, (5, 0.5)], ids=["total", "connect-and-read"])
+def test_endless_sse_stream_over_http(ctx, app_runner, timeout):
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(_endless_flask_app(ctx)))
+    case = schema["/sse"]["GET"].Case()
+    _assert_cut_at_deadline(case, lambda: case.call(timeout=timeout))
+
+
+def test_silent_sse_stream_over_http(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app(_sse_paths(SSE_VALUE_ITEM_SCHEMA), version="3.2.0")
+
+    @app.route("/sse")
+    def _sse():
+        def stream():
+            yield FIRST_EVENT
+            yield b'data: {"va'
+            time.sleep(ENDLESS_STREAM_CAP)
+
+        return Response(stream(), mimetype="text/event-stream")
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    case = schema["/sse"]["GET"].Case()
+    _assert_cut_at_deadline(case, lambda: case.call(timeout=0.5))
+
+
+def test_endless_sse_stream_over_wsgi(ctx):
+    app = _endless_flask_app(ctx)
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+    case = schema["/sse"]["GET"].Case()
+    _assert_cut_at_deadline(case, lambda: case.call(timeout=0.5))
+
+
+def test_endless_sse_stream_over_asgi():
+    schema = schemathesis.openapi.from_dict(_sse_schema(SSE_VALUE_ITEM_SCHEMA))
+    app = _endless_asgi_app()
+    case = schema["/sse"]["GET"].Case()
+    _assert_cut_at_deadline(case, lambda: case.call(app=app, timeout=0.5))
+
+
+def _dropped_sse_stream():
+    yield FIRST_EVENT
+    raise RuntimeError("Connection dropped mid-stream")
+
+
+@pytest.mark.parametrize(
+    ("respond", "error"),
+    [
+        (lambda: Response(_dropped_sse_stream(), mimetype="text/event-stream"), ChunkedEncodingError),
+        (
+            lambda: Response(b"not gzip", mimetype="text/event-stream", headers={"Content-Encoding": "gzip"}),
+            ContentDecodingError,
+        ),
+    ],
+    ids=["dropped-connection", "undecodable-body"],
+)
+def test_broken_sse_stream_over_http(ctx, app_runner, respond, error):
+    app, _ = ctx.openapi.make_flask_app(_sse_paths(SSE_VALUE_ITEM_SCHEMA), version="3.2.0")
+    app.add_url_rule("/sse", "sse", respond)
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    with pytest.raises(error):
+        schema["/sse"]["GET"].Case().call(timeout=5)
