@@ -306,7 +306,7 @@ The API returned `404 Not Found` for a resource that was just created.
 
 Verifies authentication is properly enforced. When an operation declares authentication, Schemathesis tests whether the API accepts requests without credentials or with invalid credentials.
 
-Either `401` or `403` counts as enforcement.
+`401`, `403`, or a redirect to another page, such as a sign-in page, counts as enforcement. Test cases with invalid path parameters are not judged, as they may miss the operation's route entirely.
 
 ```text
 - API accepts requests without authentication
