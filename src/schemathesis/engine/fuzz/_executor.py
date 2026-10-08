@@ -391,8 +391,12 @@ def _run_forever_thread(
         scenario_cell.value = ActiveScenario(scenario_id=started.id, started_at=scenario_started_at)
         return recorder
 
-    @hypothesis.seed(ctx.config.seed)  # type: ignore[untyped-decorator]
+    # Any seed takes precedence over `derandomize`, so deterministic mode skips a generated one.
+    seed = ctx.config.seed if not hypothesis_settings.derandomize or ctx.config.has_explicit_seed else None
+
+    # Settings go on top: seeding resets the example database, and the configured one must win.
     @hypothesis.settings(hypothesis_settings)  # type: ignore[untyped-decorator]
+    @hypothesis.seed(seed)  # type: ignore[untyped-decorator]
     @hypothesis.given(scheduler())  # type: ignore[untyped-decorator]
     def fuzz_test(recorder: ScenarioRecorder) -> None:
         """Validate all responses in the drawn scenario and emit FuzzScenarioFinished."""

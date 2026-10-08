@@ -126,6 +126,8 @@ class SchemathesisConfig(DiffBase):
         self.color = color
         self.suppress_health_check = suppress_health_check or []
         self._seed = seed
+        if seed is not None:
+            self._mark_source_keys(("seed",))
         self._config_path = None
         self.wait_for_schema = wait_for_schema
         self.max_failures = max_failures
@@ -142,6 +144,11 @@ class SchemathesisConfig(DiffBase):
         if self._seed is None:
             self._seed = Random().getrandbits(128)
         return self._seed
+
+    @property
+    def has_explicit_seed(self) -> bool:
+        """Whether the user provided the seed, as opposed to one generated for this run."""
+        return "seed" in self._source_keys
 
     @property
     def config_path(self) -> str | None:
@@ -196,6 +203,7 @@ class SchemathesisConfig(DiffBase):
         """Set top-level configuration options."""
         if seed is not None:
             self._seed = seed
+            self._mark_source_keys(("seed",))
         self._apply(
             color=color,
             suppress_health_check=suppress_health_check,

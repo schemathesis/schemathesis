@@ -238,7 +238,8 @@ class EventStream:
         schema.config.update(headers=headers, workers=workers, request_timeout=request_timeout, tls_verify=tls_verify)
         if auth is not None:
             schema.config.auth.update(basic=auth)
-        schema.config.seed = seed
+        if seed is not None:
+            schema.config.seed = seed
         schema.config.max_failures = max_failures
         schema.config.max_time = max_time
         if max_steps is not None:

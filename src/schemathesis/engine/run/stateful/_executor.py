@@ -469,8 +469,14 @@ def execute_state_machine_loop(
                 break
             suite_status = Status.SUCCESS
             retry = False
-            # A fresh seed per suite: a retry or a later cycle must not replay what an earlier suite did.
-            InstrumentedStateMachine = hypothesis.seed(engine.next_stateful_seed())(_InstrumentedStateMachine)
+            # A fresh seed per suite: a retry or a later cycle must not replay an earlier suite.
+            # Deterministic mode skips a generated seed, since any seed takes precedence over `derandomize`.
+            seed = (
+                engine.next_stateful_seed()
+                if not hypothesis_settings.derandomize or engine.config.has_explicit_seed
+                else None
+            )
+            InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
             try:
                 with catch_warnings(), ignore_hypothesis_output():
                     filterwarnings("ignore", category=HypothesisWarning, message="Generating overly large repr")

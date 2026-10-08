@@ -10,7 +10,7 @@ from xml.etree import ElementTree
 import pytest
 import requests
 import yaml
-from flask import jsonify
+from flask import jsonify, request
 
 import schemathesis
 import schemathesis.cli
@@ -866,6 +866,41 @@ def test_fuzz_stop_reason_after_failure(cli, ctx, args, config, expected):
     result = cli.main("fuzz", api.schema_url, *args, config=config)
 
     assert expected in result.stdout, result.stdout
+
+
+def test_fuzz_generation_database_replays_failure(cli, app_runner, ctx, tmp_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    received = []
+    failing = []
+
+    @app.route("/items")
+    def items():
+        value = request.args.get("id", type=int)
+        received.append(value)
+        if value is not None and value > 10_000:
+            failing.append(value)
+            return jsonify({}), 500
+        return jsonify({})
+
+    url = app_runner.openapi_url(app)
+    args = ("--max-time=10", "--checks=not_a_server_error", f"--generation-database={tmp_path / 'examples'}")
+    # The run cache replays failures on its own; disabling it leaves the example database as the only source.
+    config = {"cache": {"enabled": False}}
+    cli.main("fuzz", url, *args, config=config)
+    stored_failure = failing[-1]
+    received.clear()
+    cli.main("fuzz", url, *args, config=config)
+    # The replayed scenario may send other steps before the one that failed.
+    assert stored_failure in received
 
 
 def test_fuzz_first_failure_stops_every_worker(cli, ctx, restore_checks):
