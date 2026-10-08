@@ -146,7 +146,7 @@ def _classify_suite_error(
         return Status.FAILURE, True, network_events
     if isinstance(exc, Flaky):
         # A replay that cannot reproduce the failure does not unreport it: the suite already showed it.
-        found = Status.FAILURE if ctx.seen_in_suite else Status.SUCCESS
+        found = Status.FAILURE if ctx.has_new_failures_in_suite else Status.SUCCESS
         if engine.has_reached_the_failure_limit:
             return found, False, []
         stored = state.unrecoverable_network_error
@@ -546,6 +546,7 @@ def validate_response(
         # Known failures are accepted debt, so they must not spend the `--max-failures` budget.
         if not is_known(failure, name, baseline):
             control.count_failure(failure)
+            stateful_ctx.has_new_failures_in_suite = True
         stateful_ctx.mark_as_seen_in_suite(failure)
         collected.add(failure)
 

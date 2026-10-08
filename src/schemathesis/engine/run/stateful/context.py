@@ -18,6 +18,8 @@ class StatefulContext:
     seen_in_run: set[Failure] = field(default_factory=set)
     # Failures keys seen in the current suite
     seen_in_suite: set[Failure] = field(default_factory=set)
+    # Whether the current suite saw a failure outside the baseline
+    has_new_failures_in_suite: bool = False
     # Status of the current step
     current_step_status: Status | None = None
     # The currently processed response
@@ -75,6 +77,7 @@ class StatefulContext:
 
     def reset(self) -> None:
         self.seen_in_suite.clear()
+        self.has_new_failures_in_suite = False
         self.reset_scenario()
         self.metric_collector.reset()
 
