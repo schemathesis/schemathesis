@@ -1228,10 +1228,12 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 continue
 
             properties = schema.get("properties", {})
-            value_without_additional_properties = {
-                k: _boolean_from_wire_spelling(v, properties.get(k, {})) for k, v in value.items() if k in container
-            }
             try:
+                value_without_additional_properties = {
+                    k: _boolean_from_wire_spelling(v, properties.get(k, {}), validator_cls)
+                    for k, v in value.items()
+                    if k in container
+                }
                 if isinstance(phase_data, FuzzingPhaseData):
                     # Generated nulls are sent as the text `null`, but in a mutated parameter it may be a negated string.
                     mutated = {
@@ -1268,9 +1270,16 @@ def _negates_declared_parameter(mutation: Mutation, location: ParameterLocation,
     return mutation.operator != OperatorKind.CHANGE_TYPE and "required" not in mutation.keywords
 
 
-def _boolean_from_wire_spelling(value: object, schema: JsonSchema) -> object:
+def _boolean_from_wire_spelling(
+    value: object, schema: JsonSchema, validator_cls: type[jsonschema_rs.Validator]
+) -> object:
     """Booleans reach the check spelled as the wire sends them, so read spellings like `true`, `0`, or `yes` back."""
-    if isinstance(value, str) and "boolean" in get_type(schema):
+    # A schema that admits strings may also admit booleans, e.g. through `allowEmptyValue`; a valid string stays one.
+    if (
+        isinstance(value, str)
+        and "boolean" in get_type(schema)
+        and not make_validator(schema, validator_cls).is_valid(value)
+    ):
         return string_to_boolean(value)
     return value
 
