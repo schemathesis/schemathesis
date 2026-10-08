@@ -1,0 +1,82 @@
+:root {
+  /* No web fonts: opening a report must not reach the network. Matches the other pages where the fonts are installed. */
+  --font-family-default: Poppins, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family-monospace: "JetBrains Mono", ui-monospace, "SF Mono", "Fira Code", Consolas, monospace;
+
+  --color-background: #1a1a1a;
+  --color-border-subtle: #404040;
+
+  --color-text-primary: #eaebef;
+  --color-text-secondary: #b6b6b6;
+  /* Dimmest tone still above 4.5:1 on the card surface; used for eyebrows and key labels. */
+  --color-text-muted: #8a8a8a;
+
+  --font-size-xs: 0.75rem;
+  --font-size-base: 1rem;
+
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-default);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+.container { max-width: 1300px; margin: 0 auto; padding: 0 30px var(--space-lg); }
+
+.report-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo { display: flex; color: var(--color-text-primary); }
+.logo svg { height: 22px; width: auto; }
+.brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; color: var(--color-text-secondary); }
+
+.version-chip {
+  font-family: var(--font-family-monospace);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.top-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.top-meta b {
+  font-family: var(--font-family-monospace);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.tm-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}

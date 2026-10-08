@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 import click
@@ -11,6 +13,7 @@ import click
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.crashes import CrashHandler
 from schemathesis.cli.commands.run.handlers.har import HarHandler
+from schemathesis.cli.commands.run.handlers.html import HtmlReportHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
@@ -26,6 +29,9 @@ from schemathesis.core.errors import format_exception
 if TYPE_CHECKING:
     from schemathesis.config import ProjectConfig
     from schemathesis.engine.events import EngineEvent, EventGenerator
+
+# Private until the HTML report is complete.
+HTML_REPORT_DIR_ENV_VAR = "SCHEMATHESIS_HTML_REPORT_DIR"
 
 
 class ExecutionContext(Protocol):
@@ -54,6 +60,7 @@ try:
         WfcReportHandler,
         OutputHandler,
         CrashHandler,
+        HtmlReportHandler,
         AllureHandler,
     )
 except ImportError:
@@ -73,6 +80,7 @@ except ImportError:
         WfcReportHandler,
         OutputHandler,
         CrashHandler,
+        HtmlReportHandler,
     )
 
 
@@ -132,6 +140,9 @@ def initialize_report_handlers(
         allure_path = config.reports.get_path(ReportFormat.ALLURE)
         prepare_directory(allure_path)
         handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
+    html_report_dir = os.environ.get(HTML_REPORT_DIR_ENV_VAR)
+    if html_report_dir:
+        handlers.append(HtmlReportHandler(Path(html_report_dir)))
 
     if config.cache.enabled:
         handlers.append(

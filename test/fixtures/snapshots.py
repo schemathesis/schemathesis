@@ -471,3 +471,17 @@ def snapshot_cli(request, snapshot):
 
     snapshot.__class__ = SnapshotAssertion
     return snapshot.rebuild()
+
+
+@pytest.fixture
+def snapshot_html(snapshot):
+    class HtmlSnapshotExtension(SingleFileSnapshotExtension):
+        _write_mode = WriteMode.TEXT
+        file_extension = "html"
+
+        def serialize(self, data, *, exclude=None, include=None, matcher=None):
+            data = data.replace(f"v{SCHEMATHESIS_VERSION}", "v<VERSION>")
+            data = re.sub(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC", "<GENERATED-AT>", data)
+            return data.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n") + "\n"
+
+    return snapshot.use_extension(extension_class=HtmlSnapshotExtension)
