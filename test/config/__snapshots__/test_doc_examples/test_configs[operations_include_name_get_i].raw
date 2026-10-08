@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='GET /integrations/slack']>}, _excludes=set()), checks=ChecksConfig(not_a_server_error=NotAServerErrorConfig(expected_statuses=['2xx', '3xx', '4xx', '503'])))])))
