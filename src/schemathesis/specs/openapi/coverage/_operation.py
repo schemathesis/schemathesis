@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from enum import Enum, auto
 from itertools import combinations
 from typing import TYPE_CHECKING, Any, TypeGuard, cast
+from urllib.parse import unquote
 
 import jsonschema_rs
 
@@ -22,6 +23,7 @@ from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_stra
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
 from schemathesis.core.transforms import deepclone, to_wire_string
+from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.coverage import GenerationSession
@@ -44,6 +46,8 @@ from schemathesis.specs.openapi.coverage._schema import (
     drop_negatives_any_draft_admits,
 )
 from schemathesis.specs.openapi.error_feedback import apply_adjustments
+from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
+from schemathesis.transport.prepare import prepare_path
 from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
@@ -1131,14 +1135,53 @@ def _parameter_mutations(run: CoverageRun) -> Generator[Case, None, None]:
                 yield case
 
 
+def _declared_methods(operation: APIOperation, sent_path: str) -> set[str]:
+    """Methods the schema routes to the sent URL, including through templated sibling paths."""
+    schema = operation.schema
+    methods = set(schema[operation.path])
+    for template in schema.path_templates:
+        if template.path == operation.path:
+            continue
+        match = template.pattern.fullmatch(sent_path)
+        if match is None:
+            continue
+        # Routers decode path segments before handing them to the handler.
+        values = {name: unquote(value) for name, value in zip(template.names, match.groups(), strict=True)}
+        path_item = schema[template.path]
+        for method in path_item:
+            if method in methods or method not in HTTP_METHODS_SCHEMA:
+                continue
+            try:
+                sibling = path_item[method]
+            except InvalidSchema:
+                continue
+            if _segments_fit_parameters(sibling, values):
+                methods.add(method)
+    return methods
+
+
+def _segments_fit_parameters(operation: APIOperation, values: dict[str, str]) -> bool:
+    # A segment the parameter schema rejects may still be routed elsewhere, so the method stays undeclared.
+    for parameter in operation.path_parameters:
+        value = values.get(parameter.name)
+        if value is None:
+            continue
+        schema = parameter.validation_schema
+        validator = make_validator(schema, parameter.adapter.jsonschema_validator_cls)
+        if not sent_text_is_valid(value, validator.is_valid, parameter_types(schema)):
+            return False
+    return True
+
+
 def _unexpected_methods(
     run: CoverageRun, unexpected_methods: set[str], unexpected_methods_seen: set[tuple[str, str]] | None
 ) -> Generator[Case, None, None]:
     operation = run.operation
     template = run.template
     emitter = run.emitter
+    sent_path = prepare_path(operation.path, template.unmodified().kwargs.get("path_parameters"))
     # Path-level: each `(path, method)` pair runs once across declared operations.
-    methods = sorted(unexpected_methods - set(operation.schema[operation.path]))
+    methods = sorted(unexpected_methods - _declared_methods(operation, sent_path))
     filter_set = operation.schema.filter_set
     for method in methods:
         # Excluding an operation means "never send this request", even when the schema does not declare it.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from itertools import chain
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import StatusCodePattern
 
 _NUMERIC_PREFIX = re.compile(r"\d+(?:\.\d+)*")
+_PATH_PARAMETER = re.compile(r"\{([^{}]+)\}")
 # Sorts below every known spec version, so unrecognized values fall back to the oldest handling.
 _UNKNOWN_VERSION = version.parse("0")
 
@@ -90,3 +92,19 @@ def sent_text_is_valid(text: str, is_valid: Callable[[object], bool], expected_t
         return False
     coerced = coerce_wire_string(text, expected_types)
     return coerced is not None and numeric_wire_value_is_valid(coerced, is_valid)
+
+
+@dataclass(frozen=True)
+class PathTemplate:
+    """A templated path and a pattern that matches the concrete paths it routes."""
+
+    path: str
+    pattern: re.Pattern[str]
+    names: tuple[str, ...]
+
+
+def compile_path_template(path: str) -> PathTemplate:
+    # `re.split` with a capturing group alternates literal text and parameter names.
+    parts = _PATH_PARAMETER.split(path)
+    pattern = "".join(re.escape(part) if index % 2 == 0 else "([^/]+)" for index, part in enumerate(parts))
+    return PathTemplate(path=path, pattern=re.compile(pattern), names=tuple(parts[1::2]))
