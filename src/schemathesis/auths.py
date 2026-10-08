@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation, BaseSchema
 
 DEFAULT_REFRESH_INTERVAL = 300
-# Consecutive non-recovering reauth attempts before the breaker trips and disables reauth for the run. Not configurable.
+# Consecutive failed re-logins before the breaker trips and disables reauth for the run. Not configurable.
 REAUTH_BREAKER_THRESHOLD = 3
 # Consecutive failed token fetches before a caching provider stops hammering the login endpoint. Not configurable.
 TOKEN_FETCH_BREAKER_THRESHOLD = 3
@@ -628,33 +628,30 @@ class ReauthState:
     reauth_count: int = 0
     # Breaker tripped: gate that stops further reauth attempts.
     disabled: bool = False
-    # Breaker tripped at least once (for reporting).
+    # A re-login failed at least once (for reporting).
     broke: bool = False
     _consecutive_failures: int = 0
+    # Operations whose retry status survived a successful re-login, so the status is not about the token.
+    _token_independent: set[str] = field(default_factory=set)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def should_retry(self, status_code: int) -> bool:
-        return status_code in self.retry_on_statuses and not self.disabled
+    def should_retry(self, status_code: int, label: str) -> bool:
+        return status_code in self.retry_on_statuses and not self.disabled and label not in self._token_independent
 
     def note_refresh_failure(self) -> None:
         with self._lock:
-            self._record_failure()
+            self.broke = True
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= REAUTH_BREAKER_THRESHOLD:
+                self.disabled = True
 
-    def note_replay(self, status_code: int) -> None:
+    def note_replay(self, status_code: int, label: str) -> None:
         with self._lock:
+            self._consecutive_failures = 0
             if 200 <= status_code < 300:
-                self._consecutive_failures = 0
                 self.reauth_count += 1
             elif status_code in self.retry_on_statuses:
-                self._record_failure()
-            # A non-2xx, non-retry status (e.g. 403, 500) is neither recovery nor reauth failure: leave the streak.
-
-    def _record_failure(self) -> None:
-        # Caller holds `_lock`.
-        self._consecutive_failures += 1
-        if self._consecutive_failures >= REAUTH_BREAKER_THRESHOLD:
-            self.disabled = True
-            self.broke = True
+                self._token_independent.add(label)
 
 
 def compute_retry_on_statuses(schema: BaseSchema) -> frozenset[int]:
@@ -674,7 +671,7 @@ def reauth_and_replay(case: Case, response: Response, state: ReauthState, recall
     performs one fresh request. Negated-security cases keep their expected 401 and are skipped.
     """
     if not (
-        state.should_retry(response.status_code)
+        state.should_retry(response.status_code, case.operation.label)
         and case._has_explicit_auth
         and not case.operation.schema.is_security_param_negated(case)
     ):
@@ -689,7 +686,7 @@ def reauth_and_replay(case: Case, response: Response, state: ReauthState, recall
     except Exception:
         # Replay could not complete (e.g. transport error); keep the response we already have.
         return response
-    state.note_replay(replay.status_code)
+    state.note_replay(replay.status_code, case.operation.label)
     return replay
 
 

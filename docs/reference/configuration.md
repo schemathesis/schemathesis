@@ -989,7 +989,7 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
         `auth.dynamic.openapi.*` and `auth.openapi.*` schemes cannot share the same name in the same config.
 
     !!! note
-        When a response's status is in `retry_on`, Schemathesis fetches a fresh token and replays the request once. If re-authentication fails 3 times in a row, further token refreshes are disabled for the rest of the run.
+        When a response's status is in `retry_on`, Schemathesis fetches a fresh token and replays the request once. If the token fetch fails, the run ends with a "credentials likely invalidated" warning, and after 3 failed fetches in a row further token refreshes are disabled for the rest of the run. If the replay still returns a `retry_on` status, the status is not about the token: Schemathesis stops refreshing tokens for that operation's responses.
 
     !!! note
         Reactive refresh applies to `schemathesis run` and to `case.call_and_validate()` (the pytest plugin). A raw `case.call()` does not replay, since it performs no validation.
