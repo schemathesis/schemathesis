@@ -44,6 +44,7 @@ extract_raw_response_schema: ExtractRawResponseSchema = responses.extract_raw_re
 get_default_response_media_type: GetDefaultResponseMediaType = responses.get_default_response_media_type_v3
 resolve_response_media_type: ResolveResponseMediaType = responses.resolve_response_media_type_v3
 extract_schema_for_media_type: ExtractSchemaForMediaType = responses.extract_schema_for_media_type_v3
+extract_stream_schema: ExtractSchemaForMediaType = responses.extract_stream_schema_v3
 extract_header_schema: ExtractHeaderSchema = responses.extract_header_schema_v3
 iter_parameters: IterParameters = parameters.iter_parameters_v3
 build_path_parameter: BuildPathParameter = parameters.build_path_parameter_v3_0

@@ -48,6 +48,9 @@ resolve_response_media_type: ResolveResponseMediaType = responses.resolve_respon
 extract_schema_for_media_type: ExtractSchemaForMediaType = partial(
     responses.extract_schema_for_media_type_v3, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
 )
+extract_stream_schema: ExtractSchemaForMediaType = partial(
+    responses.extract_stream_schema_v3, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
+)
 extract_header_schema: ExtractHeaderSchema = partial(
     responses.extract_header_schema_v3, upgrade_legacy_exclusive_bounds=True, merge_ref_siblings=True
 )

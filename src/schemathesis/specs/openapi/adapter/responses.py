@@ -65,6 +65,8 @@ class OpenApiResponse:
         "adapter",
         "_validation_cache",
         "_sse_validator",
+        "_stream_schemas",
+        "_sse_stream_validator",
         "_headers",
         "_default_media_type",
     )
@@ -72,6 +74,8 @@ class OpenApiResponse:
     def __post_init__(self) -> None:
         self._validation_cache: dict[str, CachedValidation] = {}
         self._sse_validator: SseValidator | NotSet = NOT_SET
+        self._stream_schemas: dict[str, ResolvedSchema] = {}
+        self._sse_stream_validator: SseValidator | NotSet = NOT_SET
         self._headers: OpenApiResponseHeaders | NotSet = NOT_SET
         self._default_media_type = self._detect_default_media_type()
 
@@ -118,6 +122,31 @@ class OpenApiResponse:
             unresolvable_reference=cached.unresolvable_reference,
         )
 
+    def get_stream_schema(self, media_type: str | None) -> ResolvedSchema:
+        """Return the schema covering a whole event stream, with its events read as an array."""
+        cache_key = self._get_cache_key(media_type)
+        resolved = self._stream_schemas.get(cache_key)
+        if resolved is None:
+            try:
+                bundled = self.adapter.extract_stream_schema(
+                    self.definition, media_type, self.resolver, self.scope, self.adapter.nullable_keyword
+                )
+            except RefResolutionError as exc:
+                resolved = ResolvedSchema(
+                    schema=None,
+                    media_type=media_type,
+                    name_to_uri={},
+                    unresolvable_reference=unresolvable_reference(exc),
+                )
+            else:
+                resolved = ResolvedSchema(
+                    schema=bundled.schema if bundled is not None else None,
+                    media_type=media_type,
+                    name_to_uri=bundled.name_to_uri if bundled is not None else {},
+                )
+            self._stream_schemas[cache_key] = resolved
+        return resolved
+
     def _build_validator(self, schema: JsonSchema, validate_formats: bool) -> jsonschema_rs.Validator:
         return self.adapter.jsonschema_validator_cls(
             schema, validate_formats=validate_formats, pattern_options=FANCY_REGEX_OPTIONS
@@ -150,6 +179,14 @@ class OpenApiResponse:
         self._sse_validator = _SseValidator(schema, self.adapter.jsonschema_validator_cls)
         return self._sse_validator
 
+    def get_sse_stream_validator(self, schema: JsonSchema) -> SseValidator:
+        """Get or build a cached validator for the schema covering a whole event stream."""
+        if isinstance(self._sse_stream_validator, NotSet):
+            from schemathesis.specs.openapi.content_keywords import SseValidator as _SseValidator
+
+            self._sse_stream_validator = _SseValidator(schema, self.adapter.jsonschema_validator_cls)
+        return self._sse_stream_validator
+
     def iter_documented_schemas(self) -> Iterator[JsonSchema]:
         """Every schema this response documents, as written and one per media type."""
         content = self.definition.get("content")
@@ -161,9 +198,10 @@ class OpenApiResponse:
         for media_type, media_type_object in content.items():
             if not isinstance(media_type_object, dict):
                 continue
-            schema = _media_type_schema(media_type, media_type_object)
-            if schema is not None:
-                yield schema
+            schemas = [media_type_object.get("schema")]
+            if _is_sse_media_type(media_type):
+                schemas.append(media_type_object.get("itemSchema"))
+            yield from (schema for schema in schemas if schema is not None)
 
     def get_raw_schema(self) -> JsonSchema | None:
         """Raw and unresolved response schema.
@@ -334,12 +372,14 @@ def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | 
     return response.get("schema")
 
 
-def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | None:
+def extract_raw_response_schema_v3(
+    response: Mapping[str, Any], *, schema_covers_stream: bool = False
+) -> JsonSchema | None:
     content = response.get("content", {})
     first_schema = None
     for media_type, media_type_object in content.items():
         if _is_sse_media_type(media_type):
-            return _media_type_schema(media_type, media_type_object)
+            return _media_type_schema(media_type, media_type_object, schema_covers_stream=schema_covers_stream)
         if first_schema is None:
             first_schema = media_type_object.get("schema")
     return first_schema
@@ -448,19 +488,16 @@ def extract_schema_for_media_type_v3(
     scope: str,
     nullable_keyword: str,
     *,
+    schema_covers_stream: bool = False,
     upgrade_legacy_exclusive_bounds: bool = False,
     merge_ref_siblings: bool = False,
 ) -> Bundle | None:
-    """Extract schema for specific media type from OpenAPI 3.x response."""
-    content = response.get("content")
-    if media_type is None or not isinstance(content, dict) or not content:
+    """Extract schema for specific media type from OpenAPI 3.x response; one event's schema for event streams."""
+    media_type_object = _media_type_object(response, media_type)
+    if media_type is None or media_type_object is None:
         return None
 
-    media_type_object = content.get(media_type)
-    if not isinstance(media_type_object, dict):
-        return None
-
-    schema = _media_type_schema(media_type, media_type_object)
+    schema = _media_type_schema(media_type, media_type_object, schema_covers_stream=schema_covers_stream)
     if schema is None:
         return None
 
@@ -474,17 +511,62 @@ def extract_schema_for_media_type_v3(
     )
 
 
-def _media_type_schema(media_type: str, media_type_object: Mapping[str, Any]) -> JsonSchema | None:
-    """The schema a media type entry documents, combining `itemSchema` with a sibling `schema` for event streams."""
+def extract_stream_schema_v3(
+    response: Mapping[str, Any],
+    media_type: str | None,
+    resolver: Resolver,
+    scope: str,
+    nullable_keyword: str,
+    *,
+    schema_covers_stream: bool = False,
+    upgrade_legacy_exclusive_bounds: bool = False,
+    merge_ref_siblings: bool = False,
+) -> Bundle | None:
+    """Extract the schema an event stream documents for all of its events, read as an array."""
+    media_type_object = _media_type_object(response, media_type)
+    if media_type is None or media_type_object is None or not _is_sse_media_type(media_type):
+        return None
+    # Without `itemSchema`, Open API before 3.2 has `schema` describe each event instead
+    if not schema_covers_stream and "itemSchema" not in media_type_object:
+        return None
+    schema = media_type_object.get("schema")
+    if schema is None:
+        return None
+    return _prepare_schema(
+        schema,
+        resolver,
+        scope,
+        nullable_keyword,
+        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        merge_ref_siblings=merge_ref_siblings,
+    )
+
+
+def extract_stream_schema_v2(
+    response: Mapping[str, Any], media_type: str | None, resolver: Resolver, scope: str, nullable_keyword: str
+) -> Bundle | None:
+    return None
+
+
+def _media_type_object(response: Mapping[str, Any], media_type: str | None) -> Mapping[str, Any] | None:
+    content = response.get("content")
+    if media_type is None or not isinstance(content, dict):
+        return None
+    media_type_object = content.get(media_type)
+    return media_type_object if isinstance(media_type_object, dict) else None
+
+
+def _media_type_schema(
+    media_type: str, media_type_object: Mapping[str, Any], *, schema_covers_stream: bool = False
+) -> JsonSchema | None:
+    """The schema a media type entry documents for one value - a single event for event streams."""
     schema = media_type_object.get("schema")
     if _is_sse_media_type(media_type):
         item_schema = media_type_object.get("itemSchema")
-        if item_schema is None:
-            return schema
-        if schema is None:
+        if item_schema is not None:
             return item_schema
-        # Both documented: every event must satisfy each of them.
-        return {"allOf": [item_schema, schema]}
+        if schema_covers_stream:
+            return None
     return schema
 
 

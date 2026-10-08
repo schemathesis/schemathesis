@@ -27,6 +27,29 @@ paths:
 
 On OpenAPI 3.0 and 3.1, use `schema` in place of `itemSchema` - Schemathesis treats it as the per-event schema.
 
+## Constraining the whole stream
+
+In OpenAPI 3.2, `schema` describes the whole stream, with its events read as an array in arrival order. Use it for constraints that span events, alongside `itemSchema` for the shape of each one:
+
+```yaml
+text/event-stream:
+  itemSchema:
+    $ref: "#/components/schemas/Event"
+  schema:
+    type: array
+    maxItems: 100
+```
+
+A violation is reported once for the response:
+
+```
+- SSE stream violates schema
+
+  [...] has more than 100 items
+```
+
+The same applies on OpenAPI 3.0 and 3.1 when `itemSchema` is present next to `schema`.
+
 ## Parsed fields
 
 | Field | Notes |
