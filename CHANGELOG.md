@@ -40,6 +40,7 @@
 - WFC report fault categories missing the `id` required by WFC Report 0.8.0.
 - Engine runs against ASGI apps sending requests over the network, and crashing on WSGI apps.
 - `--generation-deterministic` producing different test cases per run, and `st fuzz` ignoring `--generation-database`.
+- Links with percent-encoded `operationRef` (e.g. `%7Bid%7D`) resolving to the wrong operation.
 - `ResourceWarning` about unclosed streams after ASGI lifespan shutdown. [#5085](https://github.com/schemathesis/schemathesis/issues/5085)
 - Reproduction commands showing the schema's base URL instead of the requested one.
 - Report server outages behind port proxies like `docker run -p` once, not per operation.

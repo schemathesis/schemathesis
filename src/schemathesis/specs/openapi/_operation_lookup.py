@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.errors import OperationNotFound, RefResolutionError
 from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
-from schemathesis.core.transforms import decode_pointer, encode_pointer
-from schemathesis.specs.openapi.operations import is_parsable_operation
+from schemathesis.core.transforms import encode_pointer
+from schemathesis.specs.openapi.operations import is_parsable_operation, parse_operation_reference
 
 if TYPE_CHECKING:
     from schemathesis.core.transport import HttpMethodSchema
@@ -123,7 +123,7 @@ class OperationLookup:
         except RefResolutionError:
             raise OperationNotFound(f"Operation '{reference}' not found", reference) from None
         scope = resolved_resolver.base_uri
-        path, method = _parse_reference_path_method(reference)
+        path, method = parse_operation_reference(reference)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, path_item = resolve_reference(self.schema.root_resolver, parent_ref)
         shared_parameters = tuple(path_item.get("parameters", []))
@@ -161,12 +161,3 @@ class OperationLookup:
     @staticmethod
     def _canonical_operation_reference(path: str, method: str) -> str:
         return f"#/paths/{encode_pointer(path)}/{method}"
-
-
-def _parse_reference_path_method(reference: str) -> tuple[str, str]:
-    marker = "#/paths/"
-    _, separator, suffix = reference.partition(marker)
-    if not separator:
-        raise OperationNotFound(f"Operation '{reference}' not found", reference)
-    encoded_path, method = suffix.rsplit("/", maxsplit=1)
-    return decode_pointer(encoded_path), method

@@ -565,6 +565,69 @@ def test_stateful_link_coverage_with_no_parameters_or_body(cli, snapshot_cli, ct
     )
 
 
+@pytest.mark.parametrize(
+    "operation_ref",
+    ["#/paths/~1items~1%7Bitem_id%7D/get", "#/paths/~1items~1{item_id}/get"],
+    ids=["percent-encoded", "unencoded"],
+)
+def test_link_operation_ref_with_path_template(ctx, cli, operation_ref):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "GetItem": {
+                                    "operationRef": operation_ref,
+                                    "parameters": {"item_id": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        },
+        version="3.1.0",
+    )
+    created = []
+    fetched = []
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        created.append(f"item-{len(created)}")
+        return jsonify({"id": created[-1]}), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        fetched.append(item_id)
+        return jsonify({}), 200 if item_id in created else 404
+
+    result = cli.run_openapi_app(
+        app,
+        "--phases=stateful",
+        "--mode=positive",
+        "-c not_a_server_error",
+        "--max-examples=10",
+        "--seed=1",
+        config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert set(fetched) & set(created)
+
+
 def test_nested_link_refs(cli, snapshot_cli, ctx):
     # GH-3394: Links with nested $refs should be fully resolved
     app, _ = ctx.openapi.make_flask_app(
