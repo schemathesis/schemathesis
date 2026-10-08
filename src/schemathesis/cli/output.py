@@ -372,6 +372,8 @@ def display_baseline_summary(baseline: BaselineSummary) -> None:
     if baseline.expired_ids:
         click.echo(_style(f"  Expired entries: {len(baseline.expired_ids)}", fg="yellow"))
         click.echo(_style(f"    {', '.join(baseline.expired_ids)}", fg="yellow"))
+    if baseline.write_error is not None:
+        click.echo(_style(f"  {baseline.write_error}", fg="red"))
     click.echo()
 
 

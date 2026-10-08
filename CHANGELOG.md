@@ -48,6 +48,7 @@
 - Misleading `additionalProperties` hint when the server rejects a body for its NUL characters.
 - False positive `unsupported_method` for methods a templated path declares on the same URL.
 - Hang or timeout error on endless Server-Sent Events streams. [#3633](https://github.com/schemathesis/schemathesis/issues/3633)
+- Crash at the end of `st run` when the baseline file cannot be written.
 
 ## [4.29.4](https://github.com/schemathesis/schemathesis/compare/v4.29.3...v4.29.4) - 2026-10-06
 

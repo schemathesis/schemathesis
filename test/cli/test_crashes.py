@@ -257,5 +257,9 @@ def test_random_config(cli, config, schema_url, tmp_path):
         reports["directory"] = str(tmp_path / reports["directory"])
     elif report_enabled:
         reports["directory"] = str(tmp_path / "report")
+    # Random baseline paths would land in the working directory.
+    for section in (config, *config.get("project", [])):
+        if "baseline" in section:
+            section["baseline"] = str(tmp_path / "baseline.json")
     result = cli.main("run", schema_url, "-n 1", "--phases=examples", config=config)
     check_result(result)

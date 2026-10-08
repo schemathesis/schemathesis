@@ -9,6 +9,7 @@ from schemathesis.cli.commands.run.warnings import WarningCollector
 from schemathesis.cli.constants import ExitCode
 from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.events import LoadingFinished
+from schemathesis.cli.ext.fs import describe_path_error
 from schemathesis.cli.summary import SummaryData, WarningData
 from schemathesis.config import ConfigError
 from schemathesis.core.failures import RUN_CHECKS_LABEL, is_reproducible_failure
@@ -41,6 +42,7 @@ class ExecutionContext(BaseExecutionContext):
     baseline_prune: bool = False
     baseline_recorded: int | None = None
     baseline_pruned: list[str] | None = None
+    baseline_write_error: str | None = None
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -143,7 +145,15 @@ class ExecutionContext(BaseExecutionContext):
                     entries.append(entry)
                     seen.add(entry.identity)
                     self.baseline_recorded += 1
-        Baseline(entries=entries).save(path)
+        try:
+            Baseline(entries=entries).save(path)
+        except (OSError, ValueError) as exc:
+            self.baseline_write_error = (
+                f"Failed to write baseline file {self.config.baseline!r}: {describe_path_error(exc)}"
+            )
+            self.baseline_recorded = None
+            self.baseline_pruned = None
+            self.exit_code = ExitCode.ERROR
 
     @property
     def warnings(self) -> WarningData:
@@ -160,4 +170,5 @@ class ExecutionContext(BaseExecutionContext):
             warnings=self.warnings,
             baseline_recorded=self.baseline_recorded,
             baseline_pruned=self.baseline_pruned,
+            baseline_write_error=self.baseline_write_error,
         )
