@@ -29,6 +29,7 @@ import schemathesis
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.config import SchemathesisConfig
 from schemathesis.config._output import MAX_PAYLOAD_SIZE
+from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.shell import ShellType
 from schemathesis.engine import Status, events
 from schemathesis.engine.run import Phase, PhaseName
@@ -344,6 +345,26 @@ def test_cli_ignores_hypothesis_ci_profile(ctx, cli, settings_recorder, command,
     assert {line for line in result.stdout.splitlines() if line.startswith("SETTINGS ")} == {
         f"SETTINGS {deterministic} False {suppressed}"
     }
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
+def test_cli_ignores_hypothesis_ci_profile_detected_from_environment(ctx, testdir, settings_recorder):
+    api = ctx.openapi.apps.success()
+    result = subprocess.run(
+        [
+            str(pathlib.Path(sys.executable).with_name("st")),
+            "run",
+            api.schema_url,
+            "--phases=fuzzing",
+            "--max-examples=2",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=str(testdir.tmpdir),
+        env={**os.environ, "CI": "true", HOOKS_MODULE_ENV_VAR: settings_recorder, "PYTHONPATH": str(testdir.tmpdir)},
+    )
+    assert {line for line in result.stdout.splitlines() if line.startswith("SETTINGS ")} == {"SETTINGS False False []"}
 
 
 @pytest.mark.parametrize("workers", [1, 2])
