@@ -18,6 +18,7 @@
 
 ### :bug: Fixed
 
+- False positive `ignored_auth` on redirects to a login page and on invalid path parameters.
 - False positive `negative_data_rejection` on valid bodies after a `before_call` hook edits another part. [#5105](https://github.com/schemathesis/schemathesis/issues/5105)
 - False positive `negative_data_rejection` when a `body.*` parameter override restores the mutated field.
 - pytest plugin collecting `@schema.parametrize()` tests imported under names pytest would not collect.

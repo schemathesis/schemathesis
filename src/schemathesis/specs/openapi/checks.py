@@ -11,7 +11,7 @@ from email.policy import HTTP
 from functools import wraps
 from http.cookies import CookieError, SimpleCookie
 from typing import TYPE_CHECKING, Any, NoReturn, cast
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import ParseResult, parse_qs, unquote, urlparse
 
 import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
@@ -715,8 +715,8 @@ def _declares_type(schema: JsonSchema, name: str) -> bool:
     return declared == name or isinstance(declared, list) and name in declared
 
 
-def _sent_query_values(response: Response, case: Case) -> dict[str, list[str]] | None:
-    """Parse the query actually sent, or `None` if the request was not sent to this case's operation."""
+def _url_sent_to_operation(response: Response, case: Case) -> ParseResult | None:
+    """The URL the response came from, or `None` if it is not this case's operation, e.g. after a redirect."""
     request_url = urlparse(response.request.url)
     try:
         expected_path = _get_openapi_schema(case).get_full_path(prepare_path(case.path, case.path_parameters))
@@ -724,6 +724,14 @@ def _sent_query_values(response: Response, case: Case) -> dict[str, list[str]] |
         # Path parameters are missing, so the request could not have been sent to this operation.
         return None
     if request_url.path != expected_path:
+        return None
+    return request_url
+
+
+def _sent_query_values(response: Response, case: Case) -> dict[str, list[str]] | None:
+    """Parse the query actually sent, or `None` if the request was not sent to this case's operation."""
+    request_url = _url_sent_to_operation(response, case)
+    if request_url is None:
         return None
     return parse_qs(request_url.query, keep_blank_values=True)
 
@@ -1514,6 +1522,10 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
     operation = case.operation
     if has_effective_optional_auth(operation, operation.schema.raw_schema):
         return True
+    # An invalid path parameter can miss the operation's route entirely, so the response says nothing about its auth.
+    path_component = case.meta.components.get(ParameterLocation.PATH) if case.meta is not None else None
+    if path_component is not None and path_component.mode.is_negative:
+        return None
     security_parameters = get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful
     if security_parameters and 200 <= response.status_code < 300:
@@ -1521,6 +1533,9 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
         if _has_undeclared_explicit_authorization(ctx, response, security_parameters):
             return None
         auth = _contains_auth(ctx, case, response, security_parameters)
+        # Without valid credentials, a redirect elsewhere (e.g. to a sign-in page) is how the server refuses.
+        if auth != AuthKind.EXPLICIT and _url_sent_to_operation(response, case) is None:
+            return None
         if auth == AuthKind.EXPLICIT:
             enforced = ctx.auth_enforced_operations
             # Enforcement is a property of the operation, so one confirmation per run is enough.

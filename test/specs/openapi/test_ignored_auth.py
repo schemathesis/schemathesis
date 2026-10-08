@@ -755,3 +755,56 @@ def test_override(case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=4)
+
+
+ITEM_WITH_API_KEY = {
+    "/items/{item_id}": {
+        "get": {
+            "security": [{"apiKey": []}],
+            "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+            "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+        }
+    }
+}
+API_KEY_SCHEME = {"securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "X-API-Key"}}}
+
+
+@pytest.mark.parametrize("enforces_auth", [True, False], ids=["login-redirect", "ignores-auth"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_redirect_to_login_page_without_auth(ctx, cli, snapshot_cli, enforces_auth):
+    app, _ = ctx.openapi.make_flask_app(ITEM_WITH_API_KEY, components=API_KEY_SCHEME)
+
+    @app.route("/items/<int:item_id>")
+    def item(item_id):
+        if enforces_auth and request.headers.get("X-API-Key") != "secret":
+            return redirect(f"/login?next=/items/{item_id}")
+        return jsonify({"id": item_id})
+
+    @app.route("/login")
+    def login():
+        return "<!doctype html><title>Sign in</title>", 200, {"Content-Type": "text/html"}
+
+    assert (
+        cli.run_openapi_app(app, "-c", "ignored_auth", "--phases=fuzzing", "--mode=positive", "--max-examples=3")
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_invalid_path_parameter_missing_the_route(ctx, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(ITEM_WITH_API_KEY, components=API_KEY_SCHEME)
+
+    @app.route("/items/<int:item_id>")
+    def item(item_id):
+        if "X-API-Key" not in request.headers:
+            return jsonify({"error": "unauthorized"}), 401
+        return jsonify({"id": item_id})
+
+    @app.route("/items/<path:rest>")
+    def catch_all(rest):
+        return "<!doctype html><title>App</title>", 200, {"Content-Type": "text/html"}
+
+    assert (
+        cli.run_openapi_app(app, "-c", "ignored_auth", "--phases=coverage", "--mode=negative", "--max-examples=10")
+        == snapshot_cli
+    )
