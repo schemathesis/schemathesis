@@ -9011,6 +9011,35 @@ def test_created_id_inside_status_envelope_links_to_item_operations(ctx):
     }
 
 
+def test_created_id_inside_status_envelope_without_resource_path_is_ignored(ctx):
+    schema, _ = analyze_dependencies(
+        ctx,
+        {
+            "/": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "httpStatus": {"type": "integer"},
+                                            "response": {"type": "string"},
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    )
+    assert schema.analysis.resource_descriptors == ()
+
+
 # The item operation names its resource after its own response schema (`AirportResponse`), not the path.
 def test_created_id_links_to_item_operation_returning_named_schema(ctx):
     def envelope(inner):
