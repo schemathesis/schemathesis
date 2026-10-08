@@ -89,7 +89,7 @@ COPY src ./src
 RUN /opt/venv/bin/pip install --no-cache-dir --no-deps --force-reinstall ./
 
 RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir tracecov==0.25.1
+    /opt/venv/bin/pip install --no-cache-dir tracecov==0.25.2
 
 RUN find /opt/venv -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete && \
     find /opt/venv -type d -name __pycache__ -delete
