@@ -4,6 +4,7 @@ import hypothesis.errors
 import jsonschema_rs
 import pytest
 import requests
+from flask import jsonify, request
 from hypothesis import strategies as st
 
 import schemathesis
@@ -166,6 +167,41 @@ def test_assertion_error_in_hook_reports_schema_error_for_invalid_schema(ctx):
         )
     ]
     assert statuses == [Status.ERROR]
+
+
+def test_generation_changing_between_replays_is_not_reported_as_error(ctx, app_runner):
+    # Values learned from responses change what a replayed test case draws, like this filter does.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "n", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({}), 200 if request.args.get("n", type=int, default=0) % 2 == 0 else 400
+
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
+    calls = []
+
+    def rejects_first_value(value):
+        calls.append(value)
+        return len(calls) > 1
+
+    @schema.hook
+    def before_generate_case(context, strategy):
+        return st.tuples(st.booleans().filter(rejects_first_value), strategy).map(lambda drawn: drawn[1])
+
+    stream = EventStream(
+        schema, phases=[PhaseName.FUZZING], max_examples=20, seed=1, modes=[GenerationMode.POSITIVE]
+    ).execute()
+    assert [(type(event.value), str(event.value)) for event in stream.find_all(events.NonFatalError)] == []
+    assert [event.status for event in stream.find_all(events.ScenarioFinished)] == [Status.SUCCESS]
 
 
 def test_non_string_pattern_in_hook_reports_invalid_regex_type(ctx):

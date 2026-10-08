@@ -6,16 +6,20 @@ from queue import Queue
 from typing import Any
 
 import hypothesis
+import pytest
+from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.config import HealthCheck, SchemathesisConfig
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
+from schemathesis.engine.errors import TestingState
 from schemathesis.engine.run import Phase, PhaseName, stateful
 from schemathesis.engine.run.stateful._executor import (
     _classify_suite_error,
     _get_hypothesis_settings_kwargs_override,
 )
+from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS
 from test.engine._late_put import attach_late_put
 
@@ -75,3 +79,40 @@ def test_user_interrupt_after_the_deadline_is_not_a_clean_finish(ctx):
 
     assert status == Status.INTERRUPTED
     assert emitted
+
+
+def _inconsistent_replay_error() -> AssertionError:
+    calls = []
+
+    def rejects_first_value(value):
+        calls.append(value)
+        return len(calls) > 1
+
+    @hypothesis.given(st.tuples(st.booleans().filter(rejects_first_value), st.integers()))
+    @hypothesis.settings(
+        max_examples=10, derandomize=True, database=None, phases=[hypothesis.Phase.generate, hypothesis.Phase.shrink]
+    )
+    def always_fails(value):
+        raise ValueError(value)
+
+    try:
+        always_fails()
+    except AssertionError as exc:
+        return exc
+    raise AssertionError("Hypothesis replayed the shrunk example without diverging")
+
+
+@pytest.mark.hypothesis_nested
+def test_replay_drawing_differently_is_not_a_suite_error(ctx):
+    # Values learned from responses change what Hypothesis draws when it replays a scenario.
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    engine = EngineContext(schema=schema, stop_event=threading.Event())
+
+    assert _classify_suite_error(
+        _inconsistent_replay_error(),
+        ctx=StatefulContext(),
+        engine=engine,
+        state=TestingState(),
+        settings=DEFAULT_STATE_MACHINE_SETTINGS,
+    ) == (Status.SUCCESS, True, [])

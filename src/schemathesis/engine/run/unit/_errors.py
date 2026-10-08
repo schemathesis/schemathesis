@@ -24,7 +24,13 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.engine import Status, events
-from schemathesis.engine.errors import DeadlineExceeded, TestingState, UnexpectedError, clear_hypothesis_notes
+from schemathesis.engine.errors import (
+    DeadlineExceeded,
+    TestingState,
+    UnexpectedError,
+    clear_hypothesis_notes,
+    is_inconsistent_replay,
+)
 from schemathesis.generation.hypothesis.builder import MissingPathParameters
 from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
@@ -131,7 +137,7 @@ def classify_test_exception(
     if isinstance(exc, UnexpectedError):
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
         return Status.ERROR, []
-    if isinstance(exc, hypothesis.errors.Flaky):
+    if isinstance(exc, hypothesis.errors.Flaky) or is_inconsistent_replay(exc):
         return _classify_flaky(exc, state=state, errors=errors, non_fatal_error=non_fatal_error)
     if isinstance(exc, BaseExceptionGroup):
         return Status.ERROR, list(
@@ -181,7 +187,7 @@ def classify_test_exception(
 
 
 def _classify_flaky(
-    exc: hypothesis.errors.Flaky,
+    exc: hypothesis.errors.Flaky | AssertionError,
     *,
     state: TestingState,
     errors: list[Exception],

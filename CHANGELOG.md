@@ -35,6 +35,7 @@
 - Crash on non-string `pattern` definitions during test case generation.
 - False "credentials likely invalidated" warning when an endpoint returns 401 after a successful re-login.
 - Server-Sent Events: validate `schema` against the whole stream, as an array of events. [#3633](https://github.com/schemathesis/schemathesis/issues/3633)
+- Spurious internal or schema error when values learned from responses alter test case generation.
 - Negative mode skipping operations when `--header` sets only some required headers.
 - Stateful phase failing the run on baseline failures when Hypothesis reports the suite as flaky. [#5104](https://github.com/schemathesis/schemathesis/issues/5104)
 - Record pytest invocations correctly in generated reports.
