@@ -623,6 +623,11 @@ class ProjectConfig(DiffBase):
     def seed(self, value: int) -> None:
         parent = self._get_parent()
         parent._seed = value
+        parent._mark_source_keys(("seed",))
+
+    @property
+    def has_explicit_seed(self) -> bool:
+        return self._get_parent().has_explicit_seed
 
 
 def _validate_base_url(base_url: str) -> None:

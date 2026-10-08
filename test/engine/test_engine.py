@@ -663,6 +663,24 @@ def test_positive_data_acceptance_multipart_binary(ctx, app_runner):
     stream.assert_no_errors()
 
 
+@pytest.mark.parametrize(
+    ("make_api", "phase"),
+    [
+        (lambda ctx: ctx.openapi.apps.payload(), PhaseName.FUZZING),
+        (lambda ctx: ctx.openapi.apps.stateful_users(), PhaseName.STATEFUL_TESTING),
+    ],
+    ids=["fuzzing", "stateful"],
+)
+def test_deterministic_mode_sends_identical_requests_across_runs(ctx, make_api, phase):
+    runs = []
+    for _ in range(2):
+        api = make_api(ctx)
+        schema = schemathesis.openapi.from_url(api.schema_url)
+        EventStream(schema, phases=[phase], max_examples=10, max_steps=10, deterministic=True).execute()
+        runs.append([(request.method, request.path, request.body) for request in api.requests])
+    assert runs[0] == runs[1]
+
+
 def test_fuzzing_phase_failure_requires_a_surfaced_failure(ctx):
     # DELETE mutates server state that later feeds case generation, so Hypothesis reports
     # inconsistent data generation; the phase must not be marked failed without a real failure.

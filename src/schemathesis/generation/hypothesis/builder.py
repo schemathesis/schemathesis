@@ -100,9 +100,6 @@ def create_test(
 
     ApiOperationMark.set(hypothesis_test, operation)
 
-    if config.seed is not None and not hasattr(test_func, "_hypothesis_internal_use_seed"):
-        hypothesis_test = hypothesis.seed(config.seed)(hypothesis_test)
-
     # Get user's explicit settings from their @settings decorator (if present).
     # config.explicit_settings carries settings applied outside the lazy schema wrapper
     # (e.g. @settings applied after @lazy_schema.parametrize()).
@@ -241,6 +238,14 @@ def create_test(
         verb = "are" if len(injected_path_parameter_names) > 1 else "is"
         error = InvalidSchema(f"Path parameter{plural} {names} {verb} not defined")
         MissingPathParameters.set(hypothesis_test, error)
+
+    # A seed takes precedence over `derandomize`, so deterministic mode gets one only when the user provided it.
+    if (
+        config.seed is not None
+        and (not settings.derandomize or config.project.has_explicit_seed)
+        and not hasattr(test_func, "_hypothesis_internal_use_seed")
+    ):
+        hypothesis_test = hypothesis.seed(config.seed)(hypothesis_test)
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
 

@@ -217,6 +217,38 @@ def test_hypothesis_database_with_derandomize(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--generation-database=:memory:", "--generation-deterministic") == snapshot_cli
 
 
+def collect_fuzzed_query_values(ctx, cli, *args):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    received = []
+
+    @app.route("/items")
+    def items():
+        received.append(request.args.get("id"))
+        return jsonify({})
+
+    cli.run_openapi_app(app, "--phases=fuzzing", "--max-examples=10", *args)
+    return received
+
+
+def test_explicit_seed_repeats_requests(ctx, cli):
+    assert collect_fuzzed_query_values(ctx, cli, "--seed=1") == collect_fuzzed_query_values(ctx, cli, "--seed=1")
+
+
+def test_explicit_seed_takes_precedence_over_deterministic_mode(ctx, cli):
+    assert collect_fuzzed_query_values(ctx, cli, "--seed=1", "--generation-deterministic") != (
+        collect_fuzzed_query_values(ctx, cli, "--seed=2", "--generation-deterministic")
+    )
+
+
 def test_hypothesis_parameters(ctx, cli):
     # When Hypothesis options are passed via command line
     api = ctx.openapi.apps.success()
