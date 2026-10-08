@@ -1043,3 +1043,69 @@ def before_call(context, case, kwargs):
     )
     assert "renamed-by-hook" not in status_names
     assert set(status_names) & set(created)
+
+
+def test_inferred_link_to_templated_path_is_not_reported_as_schema_error(cli, ctx):
+    # A time budget infers links before fuzzing, so a failing operation is explained against the schema with them.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {"item_id": {"type": "string"}},
+                                            "required": ["item_id"],
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/upload": {
+                "post": {
+                    "parameters": [{"name": "q", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version="3.1.0",
+    )
+
+    @app.route("/items")
+    def list_items():
+        return jsonify([{"item_id": "a"}])
+
+    @app.route("/items/<item_id>")
+    def get_item(item_id):
+        return jsonify({})
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        return jsonify({})
+
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook.apply_to(path="/upload")
+def map_query(context, query):
+    raise AssertionError("Rejected by hook")
+"""
+    )
+    # Timing-dependent output rules out a snapshot.
+    result = cli.run_openapi_app(app, "--max-examples=1", "--max-time=1", hooks=module)
+    assert "Unexpected error during testing of this API operation: Rejected by hook" in result.stdout
+    assert "Invalid `operationRef` definition" not in result.stdout

@@ -29,6 +29,7 @@
 - Omit empty exploded-object query parameters from requests.
 - Dependency inference missing links from collection listings to item path parameters like `{partition_id}`.
 - Stateful testing failing with invalid inferred links when operations share a response definition.
+- Schema Error "Invalid `operationRef` definition" for inferred links to templated paths.
 - `ignored_auth` crash in `Case.validate_response` on schemas without an absolute base URL.
 - Crash on non-string `pattern` definitions during test case generation.
 - False "credentials likely invalidated" warning when an endpoint returns 401 after a successful re-login.
