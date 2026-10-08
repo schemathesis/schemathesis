@@ -1237,7 +1237,7 @@ def test_oauth2_case_without_explicit_auth_does_not_reauth(ctx, cli, app_runner)
     assert hits["auth"] <= 2
 
 
-# Dead credentials make every re-authentication fail; the breaker trips after 3 consecutive failures, bounding auth fetches.
+# Login works until it starts rejecting the credentials: the run warns and stops hitting the login endpoint.
 def test_breaker_bounds_login_attempts(ctx, cli, app_runner):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -1256,18 +1256,23 @@ def test_breaker_bounds_login_attempts(ctx, cli, app_runner):
             }
         },
     )
-    hits = {"auth": 0}
+    hits = {"auth": 0, "api": 0}
 
     @app.route("/api/auth", methods=["POST"])
     def auth_endpoint():
         hits["auth"] += 1
-        return jsonify({"access_token": "bad"})
+        if hits["auth"] == 1:
+            return jsonify({"access_token": "t"})
+        return jsonify({"error": "invalid credentials"}), 401
 
-    def _unauthorized():
+    def _expires_after_first_call():
+        hits["api"] += 1
+        if hits["api"] == 1 and request.headers.get("Authorization") == "Bearer t":
+            return jsonify({"result": "ok"})
         return jsonify({"error": "unauthorized"}), 401
 
     for i in range(6):
-        app.add_url_rule(f"/r{i}", f"r{i}", _unauthorized)
+        app.add_url_rule(f"/r{i}", f"r{i}", _expires_after_first_call)
 
     result = _run_cli(
         cli,
@@ -1280,6 +1285,49 @@ def test_breaker_bounds_login_attempts(ctx, cli, app_runner):
     )
     assert hits["auth"] <= 4
     assert result.stdout.count("⚠️ Authentication stopped working mid-run - credentials likely invalidated") == 1
+
+
+# An API that answers 401 for unknown ids keeps answering 401 after a successful re-login: credentials are fine.
+def test_401_after_successful_relogin_is_not_invalidated_credentials(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/tools/{id}": {
+                "get": {
+                    "operationId": "getTool",
+                    "security": [{"OAuth2": []}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "OAuth2": OAUTH2_SCHEME,
+            }
+        },
+    )
+    hits = {"auth": 0}
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        hits["auth"] += 1
+        return jsonify({"access_token": "t"})
+
+    @app.route("/tools/<id>")
+    def get_tool(id):
+        return jsonify({"detail": "We could not find what you're looking for :/"}), 401
+
+    result = _run_cli(
+        cli,
+        app_runner,
+        app,
+        "--phases=fuzzing",
+        "--mode=positive",
+        "-n 10",
+        config={"auth": _dynamic_auth("OAuth2", retry_on=[401])},
+    )
+    assert "credentials likely invalidated" not in result.stdout
+    assert hits["auth"] == 2
 
 
 # A dead login endpoint is hit a bounded number of times across the whole run, not once per generated case.
