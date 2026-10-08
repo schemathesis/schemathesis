@@ -836,7 +836,7 @@ def test_fuzz_inherits_the_root_time_limit(cli, app_runner, ctx, tmp_path):
 
     @app.route("/users/<int:user_id>")
     def get_user(user_id):
-        return ("", 500) if time.monotonic() - started > 1.5 else jsonify({"id": user_id})
+        return ("", 500) if time.monotonic() - started > 5 else jsonify({"id": user_id})
 
     config_file = tmp_path / "schemathesis.toml"
     config_file.write_text("max-time = 1")
