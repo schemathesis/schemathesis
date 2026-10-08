@@ -36,6 +36,13 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 DEFAULT_WORKERS = 1
+# Generation options and the Hypothesis setting each one controls.
+GENERATION_OPTION_TO_HYPOTHESIS_SETTING = {
+    "max_examples": "max_examples",
+    "deterministic": "derandomize",
+    "database": "database",
+    "no_shrink": "phases",
+}
 
 
 def get_workers_count() -> int:
@@ -486,13 +493,37 @@ class ProjectConfig(DiffBase):
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
 
+    def explicit_hypothesis_settings(
+        self,
+        *,
+        operation: APIOperation | None = None,
+        phase: str | None = None,
+    ) -> set[str]:
+        """Names of Hypothesis settings that a config file, CLI option or `update()` call set, whatever the value."""
+        generation = self.generation_for(operation=operation, phase=phase)
+        names = {
+            setting
+            for option, setting in GENERATION_OPTION_TO_HYPOTHESIS_SETTING.items()
+            if option in generation._source_keys
+        }
+        if "suppress_health_check" in self._get_parent()._source_keys:
+            names.add("suppress_health_check")
+        return names
+
     def get_hypothesis_settings(
         self,
         *,
         operation: APIOperation | None = None,
         phase: str | None = None,
+        apply_ci_profile: bool = True,
     ) -> hypothesis.settings:
+        """Hypothesis settings for this config.
+
+        With `apply_ci_profile=False`, the `ci` profile Hypothesis loads on its own in CI environments is skipped,
+        so the same command behaves the same locally and in CI.
+        """
         import hypothesis
+        from hypothesis._settings import CI
         from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
         config = self.generation_for(operation=operation, phase=phase)
@@ -513,7 +544,11 @@ class ProjectConfig(DiffBase):
             else:
                 kwargs["database"] = DirectoryBasedExampleDatabase(database)
 
+        parent = None
+        if not apply_ci_profile and hypothesis.settings.default is CI:
+            parent = hypothesis.settings.get_profile("default")
         return hypothesis.settings(
+            parent,
             derandomize=config.deterministic,
             print_blob=False,
             deadline=None,
@@ -578,6 +613,7 @@ class ProjectConfig(DiffBase):
     def suppress_health_check(self, value: list[HealthCheck]) -> None:
         parent = self._get_parent()
         parent.suppress_health_check = value
+        parent._mark_source_keys(("suppress_health_check",))
 
     @property
     def seed(self) -> int:

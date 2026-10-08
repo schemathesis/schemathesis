@@ -118,6 +118,8 @@ Then run with just:
 uvx schemathesis run http://localhost:8080/openapi.json
 ```
 
+The CLI does not apply the `ci` settings profile that Hypothesis loads when the `CI` environment variable is set, so a command behaves the same locally and in CI; use `--generation-deterministic` or `--seed` for identical runs. Tests run through the pytest plugin follow Hypothesis settings profiles, including the `ci` one.
+
 ## Exit Codes
 
 Fail the CI job on a non-zero exit code:

@@ -117,6 +117,8 @@ class DiffBase:
                     decides = option in source_keys if source_keys else current != default
                     if decides:
                         setattr(output, option, current)
+                        # Keep the decision visible to later merges and to readers of explicit options
+                        output._mark_source_keys((option,))
                         # As we go from the highest priority to the lowest one,
                         # we can stop at the first config that sets the option
                         break

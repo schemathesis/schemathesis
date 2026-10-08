@@ -23,6 +23,7 @@
 - Crash on response examples whose media type declares a boolean `schema`.
 - Network error on the first redirect with `max-redirects = 0`.
 - Stateful testing aborting when a few operations hang instead of skipping them.
+- `st run` applying Hypothesis's CI profile over explicit options when `CI` is set. [#4391](https://github.com/schemathesis/schemathesis/issues/4391)
 - Omit empty exploded-object query parameters from requests.
 - Dependency inference missing links from collection listings to item path parameters like `{partition_id}`.
 - Stateful testing failing with invalid inferred links when operations share a response definition.

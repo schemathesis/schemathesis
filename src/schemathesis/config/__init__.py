@@ -251,4 +251,4 @@ class SchemathesisConfig(DiffBase):
             output=OutputConfig.from_dict(data.get("output", {})),
             projects=projects,
             dictionaries=dictionaries,
-        )
+        )._mark_source_keys(data)

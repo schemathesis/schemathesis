@@ -1,5 +1,6 @@
 from operator import attrgetter
 
+import hypothesis
 import pytest
 
 from schemathesis.config import (
@@ -145,3 +146,38 @@ def test_first_matching_operation_block_wins(ctx):
     )
 
     assert config.projects.get_default().operations.get_for_operation(schema["/users"]["GET"]).enabled is True
+
+
+def test_hypothesis_settings_set_to_default_values_are_explicit():
+    config = SchemathesisConfig.from_dict({"suppress-health-check": [], "generation": {"deterministic": False}})
+    config.projects.override.generation.update(max_examples=100, no_shrink=False, database="none")
+
+    assert config.projects.get(SCHEMA).explicit_hypothesis_settings() == {
+        "suppress_health_check",
+        "derandomize",
+        "max_examples",
+        "phases",
+        "database",
+    }
+
+
+def test_hypothesis_settings_left_unset_are_not_explicit():
+    config = SchemathesisConfig.from_dict({"workers": 2})
+
+    assert config.projects.get(SCHEMA).explicit_hypothesis_settings() == set()
+
+
+@pytest.mark.usefixtures("hypothesis_ci_profile")
+@pytest.mark.parametrize("phase", [None, "stateful"])
+@pytest.mark.parametrize("deterministic", [False, True])
+def test_cli_hypothesis_settings_skip_ci_profile(phase, deterministic):
+    config = SchemathesisConfig.from_dict({"generation": {"deterministic": deterministic}}).projects.default
+    settings = config.get_hypothesis_settings(phase=phase, apply_ci_profile=False)
+
+    database = None if deterministic else hypothesis.settings.get_profile("default").database
+    assert (settings.derandomize, settings.database, settings.print_blob, settings.suppress_health_check) == (
+        deterministic,
+        database,
+        False,
+        (),
+    )

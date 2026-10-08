@@ -231,6 +231,89 @@ def test_hypothesis_parameters(ctx, cli):
     # Parameters are validated in `hypothesis.settings`
 
 
+@pytest.mark.usefixtures("hypothesis_ci_profile")
+@pytest.mark.parametrize("args", [("--suppress-health-check=all",), ()], ids=["suppressed", "not-suppressed"])
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_suppress_health_check_under_ci_profile(ctx, cli, snapshot_cli, args):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "minItems": 40,
+                                    "items": {
+                                        "type": "array",
+                                        "minItems": 20,
+                                        "items": {"type": "string", "pattern": "^[a-f]{20}$"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def items():
+        return jsonify({})
+
+    assert (
+        cli.run_openapi_app(app, "--max-examples=2", "--phases=fuzzing", "--checks=not_a_server_error", *args)
+        == snapshot_cli
+    )
+
+
+@pytest.fixture
+def settings_recorder(ctx):
+    return ctx.write_pymodule(
+        """
+import hypothesis
+
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    current = hypothesis.settings.default
+    checks = sorted(check.name for check in current.suppress_health_check)
+    note(f"SETTINGS {current.derandomize} {current.print_blob} {checks}")
+"""
+    )
+
+
+ALL_HEALTH_CHECKS = sorted(check.name for check in hypothesis.HealthCheck)
+
+
+@pytest.mark.usefixtures("hypothesis_ci_profile")
+@pytest.mark.parametrize("deterministic", [False, True])
+@pytest.mark.parametrize(
+    ("command", "app", "suppressed"),
+    [
+        (("run", "--phases=fuzzing", "--max-examples=2"), "success", []),
+        (("run", "--phases=stateful", "--max-examples=2"), "stateful_users", ALL_HEALTH_CHECKS),
+        (("fuzz", "--max-time=1"), "success", []),
+    ],
+    ids=["run-fuzzing", "run-stateful", "fuzz"],
+)
+def test_cli_ignores_hypothesis_ci_profile(ctx, cli, settings_recorder, command, app, suppressed, deterministic):
+    api = getattr(ctx.openapi.apps, app)()
+    result = cli.main(
+        command[0],
+        api.schema_url,
+        *command[1:],
+        config={"generation": {"deterministic": deterministic}},
+        hooks=settings_recorder,
+    )
+    assert {line for line in result.stdout.splitlines() if line.startswith("SETTINGS ")} == {
+        f"SETTINGS {deterministic} False {suppressed}"
+    }
+
+
 @pytest.mark.parametrize("workers", [1, 2])
 def test_cli_run_only_failure(ctx, cli, workers, snapshot_cli):
     api = ctx.openapi.apps.failure()

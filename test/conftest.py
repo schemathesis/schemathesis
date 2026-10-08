@@ -78,6 +78,15 @@ def hypothesis_max_examples():
     return None if value == 100 else value
 
 
+@pytest.fixture
+def hypothesis_ci_profile():
+    previous = settings.get_current_profile_name()
+    # The same profile Hypothesis loads on import when the `CI` environment variable is set.
+    settings.load_profile("ci")
+    yield
+    settings.load_profile(previous)
+
+
 @pytest.fixture(autouse=True)
 def _isolate_schemathesis_state(tmp_path, monkeypatch):
     """Redirect the per-project artifact root into `tmp_path` so xdist workers don't leak state."""
