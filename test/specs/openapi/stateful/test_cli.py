@@ -1169,6 +1169,8 @@ def map_query(context, query):
 """
     )
     # Timing-dependent output rules out a snapshot.
-    result = cli.run_openapi_app(app, "--max-examples=1", "--max-time=1", hooks=module)
+    result = cli.run_openapi_app(
+        app, "--max-examples=1", "--max-time=60", "--max-failures=1", "-c", "not_a_server_error", hooks=module
+    )
     assert "Unexpected error during testing of this API operation: Rejected by hook" in result.stdout
     assert "Invalid `operationRef` definition" not in result.stdout
