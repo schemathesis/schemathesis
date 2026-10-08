@@ -23,7 +23,13 @@ from schemathesis.core.jsonschema import maybe_resolve_bundled, schema_with_bund
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
-from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response, is_event_stream, read_event_stream
+from schemathesis.core.transport import (
+    DEFAULT_RESPONSE_TIMEOUT,
+    STREAM_CUT_SHORT_ATTRIBUTE,
+    Response,
+    is_event_stream,
+    read_event_stream,
+)
 from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import get_exclude_headers, prepare_body, prepare_headers, prepare_url
@@ -241,8 +247,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         try:
             rate_limit = config.rate_limit_for(operation=case.operation)
             retries = config.request_retries_for(operation=case.operation) or 0
+            max_stream_events = config.max_stream_events_for(operation=case.operation)
             with ratelimit(rate_limit, config.base_url):
-                response = _request_with_retries(session, data, retries)
+                response = _request_with_retries(session, data, retries, max_stream_events)
             return Response.from_requests(
                 response,
                 verify=verify,
@@ -264,12 +271,14 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 session.cookies.clear()
 
 
-def _request_with_retries(session: requests.Session, data: dict[str, Any], retries: int) -> requests.Response:
+def _request_with_retries(
+    session: requests.Session, data: dict[str, Any], retries: int, max_stream_events: int
+) -> requests.Response:
     # Retry transient network failures with exponential backoff capped at 10s.
     attempt = 0
     while True:
         try:
-            return _request_resending_on_dropped_connection(session, data)
+            return _request_resending_on_dropped_connection(session, data, max_stream_events)
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
             if attempt >= retries:
                 raise
@@ -277,18 +286,20 @@ def _request_with_retries(session: requests.Session, data: dict[str, Any], retri
             attempt += 1
 
 
-def _request_resending_on_dropped_connection(session: requests.Session, data: dict[str, Any]) -> requests.Response:
+def _request_resending_on_dropped_connection(
+    session: requests.Session, data: dict[str, Any], max_stream_events: int
+) -> requests.Response:
     # A server may close a keep-alive connection after a response without `Connection: close`, leaving a request
     # already sent on it unread. Like browsers and curl, send such a request once more on a fresh connection.
     opened = _count_opened_connections(session)
     try:
-        return _request(session, data)
+        return _request(session, data, max_stream_events)
     except requests.exceptions.ConnectionError as exc:
         if not _is_dropped_before_response(exc) or _count_opened_connections(session) != opened:
             raise
         dropped = exc
     try:
-        return _request(session, data)
+        return _request(session, data, max_stream_events)
     except requests.exceptions.RequestException:
         # The fresh connection failing too means the server itself is broken; report what the original request saw.
         pass
@@ -298,11 +309,16 @@ def _request_resending_on_dropped_connection(session: requests.Session, data: di
 EVENT_STREAM_CHUNK_SIZE = 64 * 1024
 
 
-def _request(session: requests.Session, data: dict[str, Any]) -> requests.Response:
+def _request(session: requests.Session, data: dict[str, Any], max_stream_events: int) -> requests.Response:
     response = session.request(**{**data, "stream": True})
     if is_event_stream(response.headers.get("Content-Type")):
         # An event stream may never end; stop reading once the request timeout passes in total.
-        response._content = read_event_stream(_iter_event_stream(response), data.get("timeout"))
+        response._content, cut_short = read_event_stream(
+            _iter_event_stream(response), data.get("timeout"), max_stream_events
+        )
+        # The ASGI client may have cut the stream short already
+        if cut_short:
+            setattr(response, STREAM_CUT_SHORT_ATTRIBUTE, True)
         response.close()
     else:
         # Read the body here, so network errors while reading it are retried like before.

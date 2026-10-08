@@ -26,6 +26,7 @@ from schemathesis.config._report import ReportsConfig
 from schemathesis.config._servers import ServersConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, NOT_SET, NotSet, hooks
+from schemathesis.core.transport import DEFAULT_MAX_STREAM_EVENTS
 from schemathesis.core.validation import validate_base_url, validate_origin
 
 if TYPE_CHECKING:
@@ -71,6 +72,7 @@ class ProjectConfig(DiffBase):
     tls_verify: bool | str | None
     rate_limit: Limiter | None
     max_redirects: int | None
+    max_stream_events: int | None
     request_timeout: float | int | None
     request_retries: int | None
     request_cert: str | None
@@ -101,6 +103,7 @@ class ProjectConfig(DiffBase):
         "rate_limit",
         "_rate_limit",
         "max_redirects",
+        "max_stream_events",
         "request_timeout",
         "request_retries",
         "request_cert",
@@ -132,6 +135,7 @@ class ProjectConfig(DiffBase):
         tls_verify: bool | str = True,
         rate_limit: str | None = None,
         max_redirects: int | None = None,
+        max_stream_events: int | None = None,
         request_timeout: float | int | None = None,
         request_retries: int | None = None,
         request_cert: str | None = None,
@@ -175,6 +179,7 @@ class ProjectConfig(DiffBase):
             self.rate_limit = rate_limit
         self._rate_limit = rate_limit
         self.max_redirects = max_redirects
+        self.max_stream_events = max_stream_events
         self.request_timeout = request_timeout
         self.request_retries = request_retries
         self.request_cert = request_cert
@@ -225,6 +230,7 @@ class ProjectConfig(DiffBase):
             tls_verify=resolve(data.get("tls-verify", True)),
             rate_limit=resolve(data.get("rate-limit")),
             max_redirects=data.get("max-redirects"),
+            max_stream_events=data.get("max-stream-events"),
             request_timeout=data.get("request-timeout"),
             request_retries=_parse_request_retries(data.get("request-retries")),
             request_cert=resolve(data.get("request-cert")),
@@ -369,6 +375,15 @@ class ProjectConfig(DiffBase):
         if self.max_redirects is not None:
             return self.max_redirects
         return None
+
+    def max_stream_events_for(self, *, operation: APIOperation | None = None) -> int:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.max_stream_events is not None:
+                return config.max_stream_events
+        if self.max_stream_events is not None:
+            return self.max_stream_events
+        return DEFAULT_MAX_STREAM_EVENTS
 
     def request_timeout_for(self, *, operation: APIOperation | None = None) -> float | int | None:
         if operation is not None:

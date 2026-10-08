@@ -170,12 +170,15 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
 
         if is_event_stream(response.content_type):
             # An event stream may never end; stop reading once the request timeout passes in total.
-            content = read_event_stream(
-                response.response, timeout or config.request_timeout_for(operation=case.operation)
+            content, stream_cut_short = read_event_stream(
+                response.response,
+                timeout or config.request_timeout_for(operation=case.operation),
+                config.max_stream_events_for(operation=case.operation),
             )
             response.close()
         else:
             content = response.get_data()
+            stream_cut_short = False
 
         return Response(
             status_code=response.status_code,
@@ -184,6 +187,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             request=requests.Request(**requests_kwargs).prepare(),
             elapsed=elapsed,
             verify=False,
+            stream_cut_short=stream_cut_short,
             _override=Override(
                 query=kwargs.get("params") or {},
                 headers=kwargs.get("headers") or {},

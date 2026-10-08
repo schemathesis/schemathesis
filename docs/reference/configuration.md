@@ -1251,6 +1251,23 @@ The following settings control how Schemathesis makes network requests to the AP
     max-redirects = 0
     ```
 
+#### `max-stream-events`
+
+!!! note ""
+
+    **Type:** `Integer`  
+    **Default:** `20`  
+
+    Maximum number of events to read from a Server-Sent Events (`text/event-stream`) response. Schemathesis stops reading once this many events have arrived, or the request timeout passes, and validates the events it received. Comments and blocks without `data` do not count.
+
+    Read up to 100 events from a single operation's stream:
+
+    ```toml
+    [[operations]]
+    include-path = "/events"
+    max-stream-events = 100
+    ```
+
 #### `request-timeout`
 
 !!! note ""

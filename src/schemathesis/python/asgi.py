@@ -21,7 +21,12 @@ from anyio.streams.stapled import StapledObjectStream
 from urllib3.exceptions import ReadTimeoutError
 
 from schemathesis.core.compat import BaseExceptionGroup
-from schemathesis.core.transport import complete_events, is_event_stream
+from schemathesis.core.transport import (
+    DEFAULT_MAX_STREAM_EVENTS,
+    STREAM_CUT_SHORT_ATTRIBUTE,
+    EventStreamBuffer,
+    is_event_stream,
+)
 
 if TYPE_CHECKING:
     from concurrent.futures import Future
@@ -248,9 +253,10 @@ class _OriginalResponse:
 
 
 class _ASGIAdapter(requests.adapters.HTTPAdapter):
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, max_stream_events: int) -> None:
         super().__init__()
         self.app = app
+        self.max_stream_events = max_stream_events
         self.entered = False
 
     def close(self) -> None:
@@ -298,6 +304,9 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
         request_complete = False
         response_started = False
         response_complete: anyio.Event
+        # Set for event streams, which may never end
+        event_stream: EventStreamBuffer | None = None
+        app_scope: anyio.CancelScope
         # `request_method` lets `urllib3` skip content-length enforcement for the empty HEAD body.
         raw_kwargs: dict[str, Any] = {"body": io.BytesIO(), "request_method": request.method}
 
@@ -330,7 +339,7 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
             return {"type": "http.request", "body": body_bytes}
 
         async def send(message: Message) -> None:
-            nonlocal response_started
+            nonlocal response_started, event_stream
 
             if message["type"] == "http.response.start":
                 assert not response_started, 'Received multiple "http.response.start" messages.'
@@ -343,54 +352,68 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
                 ]
                 raw_kwargs["preload_content"] = False
                 raw_kwargs["original_response"] = _OriginalResponse(raw_kwargs["headers"])
+                content_type = next(
+                    (value for name, value in raw_kwargs["headers"] if name.lower() == "content-type"), None
+                )
+                if is_event_stream(content_type):
+                    event_stream = EventStreamBuffer(self.max_stream_events)
                 response_started = True
             elif message["type"] == "http.response.body":
+                # The stream was cut at its event limit; the app has not noticed the cancellation yet
+                if app_scope.cancel_called:
+                    return
                 assert response_started, 'Received "http.response.body" without "http.response.start".'
                 assert not response_complete.is_set(), 'Received "http.response.body" after response completed.'
-                if request.method != "HEAD":
-                    raw_kwargs["body"].write(message.get("body", b""))
+                body = message.get("body", b"") if request.method != "HEAD" else b""
+                raw_kwargs["body"].write(body)
                 if not message.get("more_body", False):
                     raw_kwargs["body"].seek(0)
                     response_complete.set()
+                elif event_stream is not None and event_stream.feed(body):
+                    raw_kwargs["body"] = io.BytesIO(event_stream.complete_events)
+                    response_complete.set()
+                    app_scope.cancel()
 
         # `requests` uses a (connect, read) pair; only the read half means anything without a socket.
         read_timeout = timeout[1] if isinstance(timeout, tuple) else timeout
 
         async def run() -> None:
-            if read_timeout is None:
-                await self.app(scope, receive, send)
-                return
-            with anyio.fail_after(read_timeout):
+            nonlocal app_scope
+            with anyio.CancelScope() as app_scope, anyio.fail_after(read_timeout):
                 await self.app(scope, receive, send)
 
         portal = _get_portal()
         response_complete = portal.call(anyio.Event)
+        cut_at_deadline = False
         try:
             portal.call(run)
         except TimeoutError:
-            content_type = next(
-                (value for name, value in raw_kwargs.get("headers", ()) if name.lower() == "content-type"), None
-            )
             # An event stream may never end; keep what it sent before the deadline.
-            if not (response_started and is_event_stream(content_type)):
+            if event_stream is None:
                 error = ReadTimeoutError(
                     f"{scheme}://{host}:{port}",  # type: ignore[arg-type]
                     request.url,
                     f"Read timed out. (read timeout={read_timeout})",
                 )
                 raise requests.exceptions.ReadTimeout(error, request=request) from None
-            raw_kwargs["body"] = io.BytesIO(complete_events(raw_kwargs["body"].getvalue()))
+            raw_kwargs["body"] = io.BytesIO(event_stream.complete_events)
+            cut_at_deadline = True
 
         assert response_started, "The application did not return a response."
 
         raw = urllib3.HTTPResponse(**raw_kwargs)
-        return self.build_response(request, raw)
+        response = self.build_response(request, raw)
+        if cut_at_deadline:
+            setattr(response, STREAM_CUT_SHORT_ATTRIBUTE, True)
+        return response
 
 
 class ASGIClient(requests.Session):
-    def __init__(self, app: ASGIApp, base_url: str = f"http://{HOST}") -> None:
+    def __init__(
+        self, app: ASGIApp, base_url: str = f"http://{HOST}", *, max_stream_events: int = DEFAULT_MAX_STREAM_EVENTS
+    ) -> None:
         super().__init__()
-        self.adapter = _ASGIAdapter(app)
+        self.adapter = _ASGIAdapter(app, max_stream_events)
         self.mount("http://", self.adapter)
         self.mount("https://", self.adapter)
         self.headers.update({"user-agent": "testclient"})
@@ -412,5 +435,5 @@ class ASGIClient(requests.Session):
         super().__exit__(*args)
 
 
-def get_client(app: ASGIApp) -> ASGIClient:
-    return ASGIClient(app)
+def get_client(app: ASGIApp, *, max_stream_events: int = DEFAULT_MAX_STREAM_EVENTS) -> ASGIClient:
+    return ASGIClient(app, max_stream_events=max_stream_events)

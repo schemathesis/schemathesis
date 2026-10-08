@@ -58,7 +58,9 @@ class ResponseValidator:
 
         resolved = definition.get_schema(resolved_content_type)
         stream = definition.get_stream_schema(resolved.media_type)
-        if resolved.schema is None and stream.schema is None:
+        # A stream cut short holds only its first events, too few to judge constraints like `minItems`
+        stream_schema = None if response.stream_cut_short else stream.schema
+        if resolved.schema is None and stream_schema is None:
             return None
 
         sse_validator = None
@@ -67,8 +69,8 @@ class ResponseValidator:
         try:
             if resolved.schema is not None:
                 sse_validator = definition.get_sse_validator(resolved.media_type, resolved.schema)
-            if stream.schema is not None:
-                stream_validator = definition.get_sse_stream_validator(stream.schema)
+            if stream_schema is not None:
+                stream_validator = definition.get_sse_stream_validator(stream_schema)
         except jsonschema_rs.ValidationError as exc:
             raise InvalidSchema.from_jsonschema_error(
                 exc,
