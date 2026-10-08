@@ -2,11 +2,13 @@ import json
 import re
 
 import pytest
+import requests
 from _pytest.main import ExitCode
 from fastapi import FastAPI
-from flask import jsonify
+from flask import jsonify, redirect
 from hypothesis import HealthCheck, given, settings
 from pydantic import BaseModel, ConfigDict, Field
+from werkzeug.exceptions import InternalServerError
 
 import schemathesis
 from schemathesis import Case
@@ -205,7 +207,19 @@ def _call_then_validate(case, base_url):
     case.validate_response(response, transport_kwargs={"base_url": base_url})
 
 
-@pytest.mark.parametrize("validate", [_call_and_validate, _call_then_validate])
+def _send_then_validate(case, base_url):
+    response = requests.get(f"{base_url}{case.formatted_path}")
+    case.validate_response(response)
+
+
+def _send_then_validate_with_base_url(case, base_url):
+    response = requests.get(f"{base_url}{case.formatted_path}")
+    case.validate_response(response, transport_kwargs={"base_url": base_url})
+
+
+@pytest.mark.parametrize(
+    "validate", [_call_and_validate, _call_then_validate, _send_then_validate, _send_then_validate_with_base_url]
+)
 def test_reproduce_with_overridden_base_url(ctx, tmp_path, validate):
     api = ctx.openapi.apps.failure()
     path = tmp_path / "openapi.json"
@@ -217,6 +231,39 @@ def test_reproduce_with_overridden_base_url(ctx, tmp_path, validate):
     assert exc_info.value.message == (
         "Schemathesis found 1 distinct failure\n\n- Server error\n\n[500] Internal Server Error:\n\n"
         f"    `500: Internal Server Error`\n\nReproduce with:\n\n    curl -X GET {api.base_url}/api/failure\n\n"
+    )
+
+
+@pytest.mark.parametrize("validate", [_call_then_validate, _send_then_validate])
+def test_reproduce_after_same_host_redirect(ctx, app_runner, validate):
+    app, raw_schema = ctx.openapi.make_flask_app(
+        {
+            "/items/{item_id}": {
+                "get": {
+                    "parameters": [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"500": {"description": "Error"}},
+                }
+            }
+        },
+        servers=[{"url": "/v1"}],
+    )
+
+    @app.route("/v1/items/<int:item_id>")
+    def item(item_id):
+        return redirect(f"/v1/items/{item_id}/")
+
+    @app.route("/v1/items/<int:item_id>/")
+    def item_with_slash(item_id):
+        raise InternalServerError
+
+    base_url = app_runner.openapi_url(app, path="/v1")
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = schema["/items/{item_id}"]["GET"].Case(path_parameters={"item_id": 42})
+    with pytest.raises(FailureGroup) as exc_info:
+        validate(case, base_url)
+    assert exc_info.value.message == (
+        "Schemathesis found 1 distinct failure\n\n- Server error\n\n[500] Internal Server Error:\n\n"
+        f"    `500: Internal Server Error`\n\nReproduce with:\n\n    curl -X GET {base_url}/items/42\n\n"
     )
 
 
