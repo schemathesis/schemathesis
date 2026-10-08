@@ -7,6 +7,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 from urllib.parse import urljoin, urlsplit
 
+import jsonschema_rs
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 from typing_extensions import override
@@ -321,6 +322,7 @@ class OpenApiSchema(BaseSchema):
     ) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
+            _ = self._validation_error
             self.analysis.inject_links()
         return create_state_machine(
             self,
@@ -366,6 +368,7 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def apply_stateful_inference(self, observations: Observations | None) -> StatefulInference:
+        _ = self._validation_error
         injected = 0
         if observations is not None and observations.location_headers:
             for operation, entries in observations.location_headers.items():
@@ -572,13 +575,20 @@ class OpenApiSchema(BaseSchema):
 
     @override
     def validate(self) -> None:
+        error = self._validation_error
+        if error is not None:
+            raise error
+
+    @cached_property
+    def _validation_error(self) -> jsonschema_rs.ValidationError | None:
+        # Inferred links are written into the schema; this must run before them, as they are not the user's to fix.
         try:
-            self._validate()
+            self.adapter.validate_schema(self.raw_schema)
+        except jsonschema_rs.ValidationError as exc:
+            return exc
         except TypeError:
             pass
-
-    def _validate(self) -> None:
-        self.adapter.validate_schema(self.raw_schema)
+        return None
 
     def _iter_parameters(
         self,
