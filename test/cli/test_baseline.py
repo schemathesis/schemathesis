@@ -344,6 +344,23 @@ def test_unreadable_baseline_is_a_usage_error(ctx, cli, tmp_path, snapshot_cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_baseline_under_a_file_is_reported(ctx, cli, tmp_path, snapshot_cli):
+    (tmp_path / "file").touch()
+
+    assert run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", "--baseline=file/baseline.json") == snapshot_cli
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_baseline_in_read_only_directory_is_reported(ctx, cli, tmp_path, snapshot_cli):
+    (tmp_path / "read-only").mkdir(mode=0o555)
+
+    assert (
+        run(cli, ctx.openapi.apps.failure(), "--phases=fuzzing", "--baseline=read-only/baseline.json") == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_unusable_baseline_is_a_usage_error_in_fuzz(ctx, cli, tmp_path, snapshot_cli):
     (tmp_path / BASELINE).write_text("{", encoding="utf-8")
 

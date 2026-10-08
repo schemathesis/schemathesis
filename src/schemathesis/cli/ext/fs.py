@@ -15,18 +15,20 @@ def open_file(file: Path) -> None:
     try:
         ensure_parent(file, fail_silently=False)
     except (OSError, ValueError) as exc:
-        raise click.BadParameter(f"Could not create parent directory for {file.name!r}: {_describe(exc)}") from exc
+        raise click.BadParameter(
+            f"Could not create parent directory for {file.name!r}: {describe_path_error(exc)}"
+        ) from exc
     try:
         file.open("w", encoding="utf-8")
     except (OSError, ValueError) as exc:
-        raise click.BadParameter(f"Could not open file {file.name!r}: {_describe(exc)}") from exc
+        raise click.BadParameter(f"Could not open file {file.name!r}: {describe_path_error(exc)}") from exc
 
 
 def prepare_directory(directory: Path) -> None:
     try:
         directory.mkdir(parents=True, exist_ok=True)
     except (OSError, ValueError) as exc:
-        raise click.BadParameter(f"Could not create directory {directory.name!r}: {_describe(exc)}") from exc
+        raise click.BadParameter(f"Could not create directory {directory.name!r}: {describe_path_error(exc)}") from exc
 
 
 def load_baseline(config: ProjectConfig) -> None:
@@ -36,10 +38,15 @@ def load_baseline(config: ProjectConfig) -> None:
     try:
         config.load_baseline()
     except (OSError, ValueError) as exc:
-        raise click.BadParameter(f"Could not load baseline file {config.baseline!r}: {_describe(exc)}") from exc
+        raise click.BadParameter(
+            f"Could not load baseline file {config.baseline!r}: {describe_path_error(exc)}"
+        ) from exc
 
 
-def _describe(exc: OSError | ValueError) -> str:
+def describe_path_error(exc: OSError | ValueError) -> str:
+    # Creating the parent directories fails this way when part of the path is a file; the OS wording differs.
+    if isinstance(exc, FileExistsError):
+        return "Not a directory"
     if isinstance(exc, OSError) and exc.strerror:
         return exc.strerror
     message = str(exc)
