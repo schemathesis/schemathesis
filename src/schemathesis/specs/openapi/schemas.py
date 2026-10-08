@@ -62,7 +62,7 @@ from .examples import get_strategies_from_examples
 from .operations import SCHEMA_PARSING_ERRORS, OperationLoader
 from .serialization import _build_urlencoded_serializer
 from .stateful import collect_transitions, create_state_machine
-from .utils import parse_spec_version
+from .utils import PathTemplate, compile_path_template, parse_spec_version
 from .validation import ResponseValidator
 
 if TYPE_CHECKING:
@@ -460,6 +460,11 @@ class OpenApiSchema(BaseSchema):
         if paths is None:
             return iter(())
         return iter(paths)
+
+    @cached_property
+    def path_templates(self) -> list[PathTemplate]:
+        """Paths with parameters, compiled to match the concrete paths they route."""
+        return [compile_path_template(path) for path in self if "{" in path]
 
     @cached_property
     def default_media_types(self) -> list[str]:

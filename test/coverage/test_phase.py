@@ -2963,6 +2963,92 @@ def test_unexpected_methods_respect_disabled_operations(ctx, cli):
     }
 
 
+@pytest.mark.parametrize(
+    ("uid_type", "rule", "probed"),
+    [
+        ("string", "/items/<uid>", {"DELETE", "OPTIONS", "POST", "PUT", "TRACE", "QUERY"}),
+        ("integer", "/items/<int:uid>", {"DELETE", "OPTIONS", "PATCH", "POST", "PUT", "TRACE", "QUERY"}),
+    ],
+    ids=["segment-fits-parameter", "segment-violates-parameter"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unexpected_methods_skip_methods_declared_by_templated_sibling(ctx, cli, snapshot_cli, uid_type, rule, probed):
+    item = {
+        "get": {"responses": {"200": {"description": "OK"}}},
+        "patch": {"responses": {"200": {"description": "OK"}}},
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/headers": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/items/{uid}": {
+                "parameters": [{"name": "uid", "in": "path", "required": True, "schema": {"type": uid_type}}],
+                **item,
+            },
+        }
+    )
+
+    @app.route("/items/headers", methods=["GET"])
+    def headers():
+        return "", 200
+
+    @app.route(rule, methods=["GET", "PATCH"])
+    def item_by_uid(uid):
+        return "", 404
+
+    assert (
+        cli.run_openapi_app(app, "--phases=coverage", "--checks=unsupported_method", "--max-examples=5") == snapshot_cli
+    )
+    assert {request.method for request in app.config["captured_requests"] if request.path == "/items/headers"} == {
+        "GET",
+        *probed,
+    }
+
+
+@pytest.mark.parametrize(
+    ("sub_type", "rule", "probed"),
+    [
+        ("string", "/items/<id>/<sub>", {"DELETE", "OPTIONS", "POST", "PUT", "TRACE", "QUERY"}),
+        ("integer", "/items/<id>/<int:sub>", {"DELETE", "OPTIONS", "PATCH", "POST", "PUT", "TRACE", "QUERY"}),
+    ],
+    ids=["segment-fits-parameter", "segment-violates-parameter"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_unexpected_methods_skip_methods_declared_by_partly_templated_sibling(
+    ctx, cli, snapshot_cli, sub_type, rule, probed
+):
+    id_parameter = {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}
+    sub_parameter = {"name": "sub", "in": "path", "required": True, "schema": {"type": sub_type}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{id}/headers": {
+                "parameters": [id_parameter],
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+            "/items/{id}/{sub}": {
+                "parameters": [id_parameter, sub_parameter],
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "patch": {"responses": {"200": {"description": "OK"}}},
+            },
+        }
+    )
+
+    @app.route("/items/<id>/headers", methods=["GET"])
+    def headers(id):
+        return "", 200
+
+    @app.route(rule, methods=["GET", "PATCH"])
+    def item_part(id, sub):
+        return "", 404
+
+    assert (
+        cli.run_openapi_app(app, "--phases=coverage", "--checks=unsupported_method", "--max-examples=5") == snapshot_cli
+    )
+    assert {request.method for request in app.config["captured_requests"] if request.path.endswith("/headers")} == {
+        "GET",
+        *probed,
+    }
+
+
 def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # Regression test for GH-3322
