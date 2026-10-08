@@ -407,6 +407,17 @@ def test_bearer_auth_valid_header():
         find(strategy, lambda x: not is_valid_header({"x": x}))
 
 
+def test_positive_bearer_tokens_are_ascii(ctx):
+    schema = ctx.openapi.load_schema(
+        {"/x": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        components={"securitySchemes": {"bearer_auth": {"type": "http", "scheme": "bearer"}}},
+        security=[{"bearer_auth": []}],
+    )
+    strategy = schema["/x"]["GET"].as_strategy(generation_mode=GenerationMode.POSITIVE)
+    with pytest.raises(NoSuchExample):
+        find(strategy, lambda case: not case.headers["Authorization"].isascii())
+
+
 def test_unknown_data(testdir):
     # When parameter is specified for unknown "in"
     # And schema validation is disabled

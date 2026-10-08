@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.30.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
+
 ## [4.30.0](https://github.com/schemathesis/schemathesis/compare/v4.29.4...v4.30.0) - 2026-10-08
 
 ### :rocket: Added
