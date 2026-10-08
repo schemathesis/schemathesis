@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
 
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
+UNMATCHED_FILTER_TIP = "Check the filter for a typo, or update it if the operation was renamed"
 
 
 def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSpec) -> Text:
@@ -1429,7 +1430,7 @@ class OutputHandler(BaseOutputHandler["ExecutionContext"]):
                 title="Unmatched filters",
                 operations=ctx.warnings.unmatched_filter,
                 suffix_text=" matched no API operations",
-                tips=["💡 Check the filter for a typo, or update it if the operation was renamed"],
+                tips=[f"💡 {UNMATCHED_FILTER_TIP}"],
                 entity_name="filter",
             )
 

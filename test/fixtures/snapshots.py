@@ -196,18 +196,7 @@ class CliSnapshotConfig:
                         lines[idx] = line.replace("\\", "/")
             data = "\n".join(lines)
         if self.replace_error_codes:
-            data = (
-                data.replace("Errno 111", "Error NUM")
-                .replace("Errno 61", "Error NUM")
-                # Connection reset by peer.
-                .replace("Errno 104", "Error NUM")
-                .replace("Errno 54", "Error NUM")
-                .replace("WinError 10061", "Error NUM")
-                .replace("Cannot connect to proxy.", "Unable to connect to proxy")
-            )
-            data = data.replace(
-                "No connection could be made because the target machine actively refused it", "Connection refused"
-            )
+            data = normalize_connection_errors(data)
         if self.replace_duration:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
             data = re.sub(r"\(in [0-9]+\.[0-9]{2}s\)", "(in 0.00s)", data)
@@ -426,6 +415,21 @@ def clean_stateful_tests(lines):
     return lines
 
 
+def normalize_connection_errors(data: str) -> str:
+    data = (
+        data.replace("Errno 111", "Error NUM")
+        .replace("Errno 61", "Error NUM")
+        # Connection reset by peer.
+        .replace("Errno 104", "Error NUM")
+        .replace("Errno 54", "Error NUM")
+        .replace("WinError 10061", "Error NUM")
+        .replace("Cannot connect to proxy.", "Unable to connect to proxy")
+    )
+    return data.replace(
+        "No connection could be made because the target machine actively refused it", "Connection refused"
+    )
+
+
 @pytest.fixture
 def snapshot_cli(request, snapshot):
     config = CliSnapshotConfig.from_request(request)
@@ -481,7 +485,17 @@ def snapshot_html(snapshot):
 
         def serialize(self, data, *, exclude=None, include=None, matcher=None):
             data = data.replace(f"v{SCHEMATHESIS_VERSION}", "v<VERSION>")
+            data = normalize_connection_errors(data)
             data = re.sub(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC", "<GENERATED-AT>", data)
+            data = re.sub(r"127\.0\.0\.1:\d+", "127.0.0.1:<PORT>", data)
+            data = re.sub(r'(Duration</span><span class="m-value">)[^<]+', r"\1<DURATION>", data)
+            data = re.sub(r"(Finished in |Stopped by user after )[^<]+", r"\1<DURATION>", data)
+            # In-process runs report the pytest command line.
+            data = re.sub(
+                r'<span class="tk">Command</span>.*?aria-label="Copy command">Copy</button></span>',
+                '<span class="tk">Command</span><COMMAND>',
+                data,
+            )
             return data.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n") + "\n"
 
     return snapshot.use_extension(extension_class=HtmlSnapshotExtension)

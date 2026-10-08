@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -421,8 +422,8 @@ def _bold(text: str) -> str:
 
 
 LOADER_ERROR_SUGGESTIONS: dict[LoaderErrorKind, str] = {
-    LoaderErrorKind.CONNECTION_SSL: f"Bypass SSL verification with {_bold('`--tls-verify=false`')}.",
-    LoaderErrorKind.CONNECTION_OTHER: f"Use {_bold('`--wait-for-schema=NUM`')} to wait up to NUM seconds for schema availability.",
+    LoaderErrorKind.CONNECTION_SSL: "Bypass SSL verification with `--tls-verify=false`.",
+    LoaderErrorKind.CONNECTION_OTHER: "Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.",
     LoaderErrorKind.UNEXPECTED_CONTENT_TYPE: "Verify that the URL points directly to the Open API schema or GraphQL endpoint",
     LoaderErrorKind.HTTP_FORBIDDEN: "Verify your API keys or authentication headers.",
     LoaderErrorKind.HTTP_NOT_FOUND: "Verify that the URL points directly to the Open API schema or GraphQL endpoint",
@@ -475,6 +476,7 @@ def display_fatal_error(
         if not (event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and wait_for_schema is not None):
             suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
             if suggestion is not None:
+                suggestion = re.sub(r"`[^`]+`", lambda match: _bold(match.group()), suggestion)
                 click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
         raise click.Abort

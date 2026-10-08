@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING
@@ -414,3 +415,11 @@ def reduce_errors(errors: set[events.NonFatalError]) -> list[ErrorGroup]:
     for error in errors:
         counts[error.info.title] = counts.get(error.info.title, 0) + 1
     return [ErrorGroup(title=title, count=counts[title]) for title in sorted(counts)]
+
+
+def running_time(started_at: float | None, finished: events.EngineFinished | None) -> float | None:
+    if finished is not None:
+        return finished.running_time
+    if started_at is None:
+        return None
+    return time.time() - started_at

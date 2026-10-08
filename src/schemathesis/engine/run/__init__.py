@@ -33,6 +33,10 @@ class PhaseName(str, enum.Enum):
         return cls(value.lower())
 
 
+# Internal phases are not part of the reported test phases, matching the terminal.
+INTERNAL_PHASES = (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS, PhaseName.AUTH_BOOTSTRAP)
+
+
 # Phases worth repeating: their yield scales with the time given to them.
 ELASTIC_PHASES = (PhaseName.FUZZING, PhaseName.STATEFUL_TESTING)
 
