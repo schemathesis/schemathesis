@@ -1111,6 +1111,20 @@ def test_sse_stream_schema_violation(media_type_object):
     ]
 
 
+def test_sse_stream_schema_violation_on_every_response():
+    case, response = _call_sse(_sse_stream_schema({"schema": {"maxItems": 1}}), TWO_EVENTS)
+
+    for _ in range(2):
+        with pytest.raises(FailureGroup):
+            case.validate_response(response, checks=[response_schema_conformance])
+
+
+def test_sse_stream_schema_with_unresolvable_reference_is_skipped():
+    raw_schema = _sse_stream_schema({"schema": {"$ref": "#/components/schemas/Missing"}})
+    case, response = _call_sse(raw_schema, TWO_EVENTS)
+    case.validate_response(response, checks=[response_schema_conformance])
+
+
 def test_sse_schema_describes_each_event_before_openapi_32():
     case, response = _call_sse(_sse_stream_schema({"schema": {"maxItems": 1}}, version="3.1.0"), TWO_EVENTS)
     case.validate_response(response, checks=[response_schema_conformance])
@@ -1327,6 +1341,10 @@ def test_deserialize_sse_uses_utf8_ignoring_response_encoding():
 # Bytes keep flowing, so only a total deadline ends the read; the cap bounds runs where it does not.
 ENDLESS_STREAM_CAP = 3
 FIRST_EVENT = b'data: {"value": 1}\n\n'
+# Read only in part, an endless stream never reaches `minItems`
+ENDLESS_STREAM_PATHS = _sse_paths(SSE_VALUE_ITEM_SCHEMA)
+ENDLESS_STREAM_PATHS["/sse"]["get"]["responses"]["200"]["content"]["text/event-stream"]["schema"] = {"minItems": 1000}
+ENDLESS_STREAM_SCHEMA = {**_sse_schema(SSE_VALUE_ITEM_SCHEMA), "paths": ENDLESS_STREAM_PATHS}
 
 
 def _endless_stream_chunks():
@@ -1350,7 +1368,7 @@ async def _endless_stream_async():
 
 
 def _endless_flask_app(ctx):
-    app, _ = ctx.openapi.make_flask_app(_sse_paths(SSE_VALUE_ITEM_SCHEMA), version="3.2.0")
+    app, _ = ctx.openapi.make_flask_app(ENDLESS_STREAM_PATHS, version="3.2.0")
 
     @app.route("/sse")
     def _sse():
@@ -1385,7 +1403,7 @@ def test_endless_sse_stream_over_http(ctx, app_runner, timeout):
 
 
 def test_silent_sse_stream_over_http(ctx, app_runner):
-    app, _ = ctx.openapi.make_flask_app(_sse_paths(SSE_VALUE_ITEM_SCHEMA), version="3.2.0")
+    app, _ = ctx.openapi.make_flask_app(ENDLESS_STREAM_PATHS, version="3.2.0")
 
     @app.route("/sse")
     def _sse():
@@ -1409,7 +1427,7 @@ def test_endless_sse_stream_over_wsgi(ctx):
 
 
 def test_endless_sse_stream_over_asgi():
-    schema = schemathesis.openapi.from_dict(_sse_schema(SSE_VALUE_ITEM_SCHEMA))
+    schema = schemathesis.openapi.from_dict(ENDLESS_STREAM_SCHEMA)
     app = _endless_asgi_app()
     case = schema["/sse"]["GET"].Case()
     _assert_cut_at_deadline(case, lambda: case.call(app=app, timeout=0.5))
@@ -1437,3 +1455,89 @@ def test_broken_sse_stream_over_http(ctx, app_runner, respond, error):
     schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     with pytest.raises(error):
         schema["/sse"]["GET"].Case().call(timeout=5)
+
+
+def _heartbeat_and_event(index):
+    return b': ping\n\ndata: {"value": %d}\n\n' % index
+
+
+def _event_after_event():
+    for index in range(int(ENDLESS_STREAM_CAP / 0.01)):
+        yield _heartbeat_and_event(index)
+        time.sleep(0.01)
+
+
+async def _event_after_event_async():
+    for index in range(int(ENDLESS_STREAM_CAP / 0.01)):
+        yield _heartbeat_and_event(index)
+        await asyncio.sleep(0.01)
+
+
+def _event_after_event_flask_app(ctx):
+    app, _ = ctx.openapi.make_flask_app(ENDLESS_STREAM_PATHS, version="3.2.0")
+
+    @app.route("/sse")
+    def _sse():
+        return Response(_event_after_event(), mimetype="text/event-stream")
+
+    return app
+
+
+@pytest.mark.parametrize("transport", ["http", "wsgi", "asgi"])
+@pytest.mark.parametrize(
+    ("config", "expected_events"),
+    [
+        ({}, 20),
+        ({"max-stream-events": 2}, 2),
+        ({"operations": [{"include-path": "/sse", "max-stream-events": 3}]}, 3),
+    ],
+    ids=["default", "project", "operation"],
+)
+def test_sse_stream_stops_after_max_events(ctx, app_runner, transport, config, expected_events):
+    config = schemathesis.Config.from_dict({"request-timeout": 5, **config})
+    if transport == "http":
+        url = app_runner.openapi_url(_event_after_event_flask_app(ctx))
+        schema = schemathesis.openapi.from_url(url, config=config)
+        kwargs = {}
+    elif transport == "wsgi":
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", _event_after_event_flask_app(ctx), config=config)
+        kwargs = {}
+    else:
+        app = FastAPI()
+
+        @app.get("/sse")
+        async def _sse():
+            return StreamingResponse(_event_after_event_async(), media_type="text/event-stream")
+
+        schema = schemathesis.openapi.from_dict(ENDLESS_STREAM_SCHEMA, config=config)
+        kwargs = {"app": app}
+    case = schema["/sse"]["GET"].Case()
+
+    started = time.monotonic()
+    response = case.call(**kwargs)
+
+    assert time.monotonic() - started < 2
+    assert response.content == b"".join(_heartbeat_and_event(index) for index in range(expected_events))
+    case.validate_response(response, checks=[response_schema_conformance])
+
+
+async def _back_to_back_events_app(scope, receive, send):
+    if scope["type"] == "lifespan":
+        while (await receive())["type"] != "lifespan.shutdown":
+            await send({"type": "lifespan.startup.complete"})
+        await send({"type": "lifespan.shutdown.complete"})
+        return
+    await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"text/event-stream")]})
+    for index in range(100):
+        await send({"type": "http.response.body", "body": _heartbeat_and_event(index), "more_body": True})
+    await send({"type": "http.response.body", "body": b""})
+
+
+def test_sse_stream_limit_with_back_to_back_asgi_events():
+    config = schemathesis.Config.from_dict({"max-stream-events": 2})
+    schema = schemathesis.openapi.from_dict(_sse_schema(SSE_VALUE_ITEM_SCHEMA), config=config)
+    case = schema["/sse"]["GET"].Case()
+
+    response = case.call(app=_back_to_back_events_app)
+
+    assert response.content == _heartbeat_and_event(0) + _heartbeat_and_event(1)

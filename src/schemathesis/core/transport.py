@@ -47,8 +47,14 @@ if TYPE_CHECKING:
 
 USER_AGENT = f"schemathesis/{SCHEMATHESIS_VERSION}"
 DEFAULT_RESPONSE_TIMEOUT = 10
+# Enough events to check a stream's shape, without waiting out the timeout on endless ones
+DEFAULT_MAX_STREAM_EVENTS = 20
+_LINE_BREAK_RE = re.compile(rb"\r\n|\r|\n")
 # Two line breaks in a row end an event
 _EVENT_END_RE = re.compile(rb"(?:\r\n|\r|\n)(?:\r\n|\r|\n)")
+_UTF8_BOM = b"\xef\xbb\xbf"
+# Marks a `requests.Response` whose event stream was cut short, until it becomes a `Response`
+STREAM_CUT_SHORT_ATTRIBUTE = "_schemathesis_stream_cut_short"
 
 
 def is_event_stream(content_type: str | None) -> bool:
@@ -60,34 +66,60 @@ def is_event_stream(content_type: str | None) -> bool:
         return False
 
 
-def read_event_stream(chunks: Iterable[bytes], timeout: float | tuple[float, float] | None) -> bytes:
-    """Read an event stream until it ends or `timeout` seconds pass, keeping only complete events when cut short.
+def read_event_stream(
+    chunks: Iterable[bytes], timeout: float | tuple[float, float] | None, max_events: int = DEFAULT_MAX_STREAM_EVENTS
+) -> tuple[bytes, bool]:
+    """Read an event stream until it ends, sends `max_events` events or `timeout` seconds pass.
 
+    Returns the content and whether the stream was cut short.
     `chunks` raises `TimeoutError` when the stream goes silent for too long.
     """
     # A `(connect, read)` pair limits the stream by its read half
     if isinstance(timeout, tuple):
         timeout = timeout[1]
     deadline = time.monotonic() + (timeout or DEFAULT_RESPONSE_TIMEOUT)
-    content = bytearray()
+    buffer = EventStreamBuffer(max_events)
     try:
         for chunk in chunks:
-            content += chunk
-            if time.monotonic() >= deadline:
-                break
-        else:
-            return bytes(content)
+            if buffer.feed(chunk) or time.monotonic() >= deadline:
+                return buffer.complete_events, True
     except TimeoutError:
-        pass
-    return complete_events(bytes(content))
+        return buffer.complete_events, True
+    return bytes(buffer.content), False
 
 
-def complete_events(content: bytes) -> bytes:
-    """Drop the event a cut-short stream was still sending."""
-    end = 0
-    for match in _EVENT_END_RE.finditer(content):
-        end = match.end()
-    return content[:end]
+class EventStreamBuffer:
+    """Event stream bytes, with the end of the last complete event tracked as they arrive."""
+
+    __slots__ = ("content", "max_events", "_events", "_end")
+
+    def __init__(self, max_events: int) -> None:
+        self.content = bytearray()
+        self.max_events = max_events
+        # Events that carry data; comments and metadata-only blocks are not events
+        self._events = 0
+        self._end = 0
+
+    def feed(self, chunk: bytes) -> bool:
+        """Add a chunk; `True` once `max_events` events are complete."""
+        self.content += chunk
+        for match in _EVENT_END_RE.finditer(self.content, self._end):
+            block = self.content[self._end : match.start()]
+            self._end = match.end()
+            if _carries_data(block.removeprefix(_UTF8_BOM)):
+                self._events += 1
+                if self._events >= self.max_events:
+                    return True
+        return False
+
+    @property
+    def complete_events(self) -> bytes:
+        """Content without the event still arriving when the stream was cut short."""
+        return bytes(self.content[: self._end])
+
+
+def _carries_data(block: bytes | bytearray) -> bool:
+    return any(line == b"data" or line.startswith(b"data:") for line in _LINE_BREAK_RE.split(block))
 
 
 def decode_lossy(content: bytes, encoding: str | None) -> str:
@@ -171,6 +203,8 @@ class Response:
     """HTTP protocol version ("1.0" or "1.1")."""
     encoding: str | None
     """Character encoding for text content, if detected."""
+    stream_cut_short: bool
+    """Whether an event stream was read only up to `max-stream-events` or the request timeout."""
     _override: Override | None
 
     __slots__ = (
@@ -185,6 +219,7 @@ class Response:
         "message",
         "http_version",
         "encoding",
+        "stream_cut_short",
         "_encoded_body",
         "_override",
     )
@@ -201,6 +236,7 @@ class Response:
         http_version: str = "1.1",
         encoding: str | None = None,
         content_size: int | None = None,
+        stream_cut_short: bool = False,
         _override: Override | None = None,
     ):
         self.status_code = status_code
@@ -216,6 +252,7 @@ class Response:
         self.message = message
         self.http_version = http_version
         self.encoding = encoding
+        self.stream_cut_short = stream_cut_short
         self._override = _override
 
     @overload
@@ -274,6 +311,7 @@ class Response:
             encoding=response.encoding,
             http_version=http_version,
             verify=verify,
+            stream_cut_short=getattr(response, STREAM_CUT_SHORT_ATTRIBUTE, False),
             _override=_override,
         )
 
@@ -382,6 +420,7 @@ class Response:
             http_version=self.http_version,
             encoding=self.encoding,
             content_size=self.content_size,
+            stream_cut_short=self.stream_cut_short,
             _override=self._override,
         )
 

@@ -8,6 +8,7 @@
 - Suggest a dynamic auth config when authentication fails on schemas with sign-up and login operations.
 - Dependency inference links values only an item `GET` returns, like `version`, into update bodies.
 - Dependency inference links ids created inside response envelopes, and `fromAirportId`-style fields to `fromAirport` objects.
+- `max-stream-events` config option to stop reading Server-Sent Events streams after that many events. [#3633](https://github.com/schemathesis/schemathesis/issues/3633)
 
 ### :wrench: Changed
 

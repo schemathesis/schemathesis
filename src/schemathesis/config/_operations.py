@@ -242,6 +242,7 @@ class OperationConfig(DiffBase):
     tls_verify: bool | str | None
     rate_limit: Limiter | Literal["auto"] | None
     max_redirects: int | None
+    max_stream_events: int | None
     request_timeout: float | int | None
     request_retries: int | None
     request_cert: str | None
@@ -264,6 +265,7 @@ class OperationConfig(DiffBase):
         "rate_limit",
         "_rate_limit",
         "max_redirects",
+        "max_stream_events",
         "request_timeout",
         "request_retries",
         "request_cert",
@@ -288,6 +290,7 @@ class OperationConfig(DiffBase):
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
         max_redirects: int | None = None,
+        max_stream_events: int | None = None,
         request_timeout: float | int | None = None,
         request_retries: int | None = None,
         request_cert: str | None = None,
@@ -312,6 +315,7 @@ class OperationConfig(DiffBase):
             self.rate_limit = rate_limit
         self._rate_limit = rate_limit
         self.max_redirects = max_redirects
+        self.max_stream_events = max_stream_events
         self.request_timeout = request_timeout
         self.request_retries = request_retries
         self.request_cert = request_cert
@@ -376,6 +380,7 @@ class OperationConfig(DiffBase):
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
             max_redirects=data.get("max-redirects"),
+            max_stream_events=data.get("max-stream-events"),
             request_timeout=data.get("request-timeout"),
             request_retries=_parse_request_retries(data.get("request-retries")),
             request_cert=resolve(data.get("request-cert")),

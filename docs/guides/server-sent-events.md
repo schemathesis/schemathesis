@@ -50,6 +50,8 @@ A violation is reported once for the response:
 
 The same applies on OpenAPI 3.0 and 3.1 when `itemSchema` is present next to `schema`.
 
+A stream Schemathesis stops reading early is checked event by event only - see [Endless streams](#endless-streams).
+
 ## Parsed fields
 
 | Field | Notes |
@@ -129,9 +131,19 @@ For media types beyond `application/json`, register a custom deserializer - see 
 
 ## Endless streams
 
-Schemathesis reads a stream until the server closes it or the request timeout passes in total, counted from when the response starts. It then validates the events received so far and drops an event that was still arriving.
+Schemathesis reads a stream until one of these happens, then validates the events received so far:
 
-Every response from an endless stream takes the full timeout, so lower it for APIs with long-lived streams:
+- the server closes it
+- 20 events have arrived
+- the request timeout passes, counted from when the response starts
+
+When it stops early, an event that was still arriving is dropped, and the whole-stream `schema` is not checked: the events received are only the start of the stream. Change the event limit with [`max-stream-events`](../reference/configuration.md#max-stream-events):
+
+```toml
+max-stream-events = 100
+```
+
+A stream that sends events slower than that waits out the timeout, so lower it for such APIs:
 
 ```toml
 request-timeout = 5
