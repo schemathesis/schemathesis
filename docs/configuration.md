@@ -145,6 +145,18 @@ include-tag = "slow"
 request-timeout = 30.0
 ```
 
+### Operations that return a documented 5xx
+
+`not_a_server_error` fails on every 5xx response, even one the schema documents. Some operations return a 5xx by design, for example `503` when an integration is not configured. Allow that status for those operations only:
+
+```toml
+[[operations]]
+include-name = "GET /integrations/slack"
+checks.not_a_server_error.expected-statuses = ["2xx", "3xx", "4xx", "503"]
+```
+
+Other 5xx responses from these operations, and any 5xx from other operations, still fail.
+
 ### Environment-specific configuration
 
 Different base URLs per environment:

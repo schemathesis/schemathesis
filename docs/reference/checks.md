@@ -62,7 +62,7 @@ During negative coverage, this is the only response check applied to malformed o
 
 For GraphQL APIs, this check validates both transport-level errors and GraphQL semantics.
 
-Accepts `expected-statuses` (default `["2xx", "3xx", "4xx"]`) to define which status codes are not treated as server errors.
+Accepts `expected-statuses` (default `["2xx", "3xx", "4xx"]`) to define which status codes are not treated as server errors. To allow a 5xx that only some operations return by design, see [operations that return a documented 5xx](../configuration.md#operations-that-return-a-documented-5xx).
 
 ---
 

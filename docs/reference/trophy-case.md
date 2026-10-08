@@ -28,6 +28,7 @@ Real-world defects uncovered by Schemathesis’ property-based testing engine.
 
 | Project | Type | What Schemathesis found |
 | --- | --- | --- |
+| [OmniRoute](https://github.com/diegosouzapw/OmniRoute/pull/5925) | 💥 Server Crashes | `TRACE`, `TRACK` and `CONNECT` requests returned 500 on every route instead of 405. |
 | [Formance Ledger](https://github.com/formancehq/ledger/pull/1606) | 💥 Server Crashes | Reading numscripts or prepared queries of a missing ledger returned 500 instead of 404. |
 | [vLLM](https://github.com/vllm-project/vllm/issues/52088) | 💥 Server Crashes | `POST /v1/messages` returned 500 when `stop_sequences` carried more than four items. |
 | [vLLM](https://github.com/vllm-project/vllm/pull/53433) | 💥 Server Crashes | A control character in `bad_words` that tokenized to nothing returned 500 instead of a validation error. |
