@@ -216,6 +216,9 @@ class SchemathesisCase(PyCollector):
                         config=HypothesisTestConfig(
                             modes=modes,
                             settings=self.schema.config.get_hypothesis_settings(operation=operation, phase=phase),
+                            explicit_setting_names=self.schema.config.explicit_hypothesis_settings(
+                                operation=operation, phase=phase
+                            ),
                             given_kwargs=self.given_kwargs,
                             project=self.schema.config,
                             as_strategy_kwargs=as_strategy_kwargs,

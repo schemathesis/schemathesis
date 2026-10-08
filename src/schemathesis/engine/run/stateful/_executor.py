@@ -223,7 +223,7 @@ def execute_state_machine_loop(
     engine: EngineContext,
 ) -> None:
     """Execute the state machine testing loop."""
-    configured_hypothesis_settings = engine.config.get_hypothesis_settings(phase="stateful")
+    configured_hypothesis_settings = engine.config.get_hypothesis_settings(phase="stateful", apply_ci_profile=False)
     kwargs = _get_hypothesis_settings_kwargs_override(configured_hypothesis_settings)
     hypothesis_settings = hypothesis.settings(configured_hypothesis_settings, **kwargs)
     generation = engine.config.generation_for(phase="stateful")

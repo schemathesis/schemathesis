@@ -145,7 +145,7 @@ def build_fuzz_plan(ctx: EngineContext, *, operations: list[APIOperation]) -> Fu
     weights_by_label = ctx.schema.compute_fuzz_operation_weights(operations)
     return FuzzPlan(
         hypothesis_settings=hypothesis.settings(
-            ctx.config.get_hypothesis_settings(),
+            ctx.config.get_hypothesis_settings(apply_ci_profile=False),
             max_examples=FUZZ_MAX_EXAMPLES,
             phases=[Phase.generate, Phase.reuse],
             deadline=None,

@@ -330,7 +330,10 @@ def worker_task(
                                 test_func=run_one_case,
                                 config=HypothesisTestConfig(
                                     modes=[mode],
-                                    settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.value),
+                                    settings=ctx.config.get_hypothesis_settings(
+                                        operation=operation, phase=phase.value, apply_ci_profile=False
+                                    ),
+                                    apply_ci_profile=False,
                                     seed=ctx.operation_seed(operation),
                                     project=ctx.config,
                                     as_strategy_kwargs=as_strategy_kwargs,

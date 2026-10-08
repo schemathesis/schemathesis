@@ -80,6 +80,9 @@ def get_all_tests(
                     config=HypothesisTestConfig(
                         settings=schema.config.get_hypothesis_settings(operation=operation, phase=phase),
                         explicit_settings=settings,
+                        explicit_setting_names=schema.config.explicit_hypothesis_settings(
+                            operation=operation, phase=phase
+                        ),
                         modes=modes,
                         seed=derive_operation_seed(seed, operation.label),
                         project=schema.config,

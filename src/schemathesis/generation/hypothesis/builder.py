@@ -11,7 +11,7 @@ from typing import Any
 import hypothesis
 from hypothesis import Phase, Verbosity
 from hypothesis import strategies as st
-from hypothesis._settings import all_settings
+from hypothesis._settings import CI, all_settings
 from hypothesis.errors import Unsatisfiable
 from jsonschema_rs import ValidationError
 from requests.models import CaseInsensitiveDict
@@ -59,6 +59,10 @@ class HypothesisTestConfig:
     modes: list[HypothesisTestMode]
     settings: hypothesis.settings | None = None
     explicit_settings: hypothesis.settings | None = None
+    # Hypothesis settings the Schemathesis config sets explicitly, even to their default values.
+    explicit_setting_names: set[str] = field(default_factory=set)
+    # Whether the `ci` profile Hypothesis loads on its own in CI environments applies; the CLI skips it.
+    apply_ci_profile: bool = True
     seed: int | None = None
     as_strategy_kwargs: dict[str, Any] = field(default_factory=dict)
     feedback: FeedbackSources = field(default_factory=FeedbackSources)
@@ -124,16 +128,39 @@ def create_test(
         # Get hypothesis' built-in defaults (not affected by loaded profiles)
         hypothesis_defaults = hypothesis.settings.get_profile("default")
 
-        # Merge strategy:
-        # - Use schemathesis' config.settings as base (provides operational defaults)
-        # - Override with user's customizations (values that differ from hypothesis built-in defaults)
-        # This respects both @settings decorators and loaded profiles while allowing
-        # schemathesis to set its operational requirements (deadline, verbosity, etc.)
-        overrides = {
-            item: getattr(user_settings, item)
-            for item in all_settings
-            if getattr(user_settings, item) != getattr(hypothesis_defaults, item)
-        }
+        # Values are whatever each Hypothesis setting accepts.
+        overrides: dict[str, Any] = {}
+        if hypothesis.settings.default is not CI:
+            # Merge strategy:
+            # - Use schemathesis' config.settings as base (provides operational defaults)
+            # - Override with user's customizations (values that differ from hypothesis built-in defaults)
+            # This respects both @settings decorators and loaded profiles while allowing
+            # schemathesis to set its operational requirements (deadline, verbosity, etc.)
+            overrides = {
+                item: getattr(user_settings, item)
+                for item in all_settings
+                if getattr(user_settings, item) != getattr(hypothesis_defaults, item)
+            }
+        elif config.apply_ci_profile:
+            # Hypothesis loads its `ci` profile on its own when it detects a CI environment. Precedence:
+            # - User's @settings decorator: values that differ from the `ci` profile
+            # - Schemathesis config: options set via CLI, config file or `update()`, whatever the value,
+            #   and, for configs built in Python, values that differ from Hypothesis defaults
+            # - `ci` profile
+            for item in all_settings:
+                user_value = getattr(user_settings, item)
+                profile_value = getattr(CI, item)
+                default_value = getattr(hypothesis_defaults, item)
+                if user_value != profile_value:
+                    overrides[item] = user_value
+                    continue
+                configured = item in config.explicit_setting_names or getattr(config.settings, item) != default_value
+                # Derandomizing drops the example database, so a configured one keeps randomness
+                drops_database = item == "derandomize" and config.settings.database is not None
+                if not configured and not drops_database and profile_value != default_value:
+                    overrides[item] = profile_value
+        # Otherwise it is a CLI test under the skipped `ci` profile: without a @settings decorator,
+        # the @given settings carry nothing but that profile.
         settings = hypothesis.settings(config.settings, **overrides)
     else:
         settings = user_settings

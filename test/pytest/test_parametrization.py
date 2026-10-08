@@ -852,6 +852,118 @@ def verify_settings_after_collection(request):
     result.assert_outcomes(passed=1)
 
 
+LARGE_MINIMUM_BODY_PATHS = {
+    "/items": {
+        "post": {
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "array",
+                            "minItems": 40,
+                            "items": {
+                                "type": "array",
+                                "minItems": 20,
+                                "items": {"type": "string", "pattern": "^[a-f]{20}$"},
+                            },
+                        }
+                    }
+                },
+            },
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+}
+
+
+@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.parametrize(
+    "setup",
+    [
+        """
+@schema.parametrize()
+@settings(max_examples=1, suppress_health_check=list(HealthCheck))
+def test_(case):
+    pass
+""",
+        """
+schema = schemathesis.openapi.from_dict(
+    raw_schema, config=SchemathesisConfig.from_dict({"suppress-health-check": ["all"], "generation": {"max-examples": 1}})
+)
+
+@schema.parametrize()
+def test_(case):
+    pass
+""",
+    ],
+    ids=["settings-decorator", "schemathesis-config"],
+)
+def test_suppress_health_check_under_ci_profile(ctx, testdir, setup):
+    testdir.make_test(
+        # The same profile Hypothesis loads on import when the `CI` environment variable is set.
+        'settings.load_profile("ci")\n' + setup,
+        schema=ctx.openapi.build_schema(LARGE_MINIMUM_BODY_PATHS),
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+@pytest.mark.usefixtures("reload_profile")
+def test_configured_database_under_ci_profile(testdir):
+    testdir.make_test(
+        """
+settings.load_profile("ci")
+schema = schemathesis.openapi.from_dict(
+    raw_schema, config=SchemathesisConfig.from_dict({"generation": {"database": ":memory:", "max-examples": 1}})
+)
+
+@schema.parametrize()
+def test_(case):
+    pass
+
+@pytest.fixture(scope="session", autouse=True)
+def verify_settings_after_collection(request):
+    yield
+    (item,) = request.session.items
+    assert type(item.obj._hypothesis_internal_use_settings.database).__name__ == "InMemoryExampleDatabase"
+""",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+@pytest.mark.usefixtures("reload_profile")
+@pytest.mark.parametrize(
+    ("config", "setting", "expected"),
+    [
+        ({}, "derandomize", True),
+        ({"generation": {"deterministic": False}}, "derandomize", False),
+        ({"suppress-health-check": []}, "suppress_health_check", ()),
+    ],
+    ids=["no-config", "deterministic", "suppress-health-check"],
+)
+def test_applied_settings_under_ci_profile(testdir, config, setting, expected):
+    testdir.make_test(
+        f"""
+settings.load_profile("ci")
+schema = schemathesis.openapi.from_dict(raw_schema, config=SchemathesisConfig.from_dict({config!r}))
+
+@schema.parametrize()
+def test_(case):
+    pass
+
+@pytest.fixture(scope="session", autouse=True)
+def verify_settings_after_collection(request):
+    yield
+    (item,) = request.session.items
+    assert item.obj._hypothesis_internal_use_settings.{setting} == {expected!r}
+""",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def _queries_per_path(testdir, api, *, is_lazy):
     load = f"schemathesis.openapi.from_url('{api.schema_url}', config=SchemathesisConfig(seed=42))"
     if is_lazy:
