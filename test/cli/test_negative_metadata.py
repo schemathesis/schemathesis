@@ -1,4 +1,6 @@
 import json
+import re
+import uuid
 
 import pytest
 from _pytest.main import ExitCode
@@ -6,6 +8,8 @@ from flask import jsonify, request
 
 import schemathesis
 from schemathesis.engine import Status, events
+
+UUID_PATTERN = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -281,6 +285,100 @@ def before_call(context, case, **kwargs):
         "--checks=negative_data_rejection",
         "--phases=coverage",
         "--continue-on-failure",
+        hooks=module,
+    )
+    assert "API accepted schema-violating request" not in result.stdout, result.stdout
+    assert result.exit_code == ExitCode.OK, result.stdout
+
+
+def test_hook_editing_headers_keeps_captured_body_positive(ctx, cli):
+    # GH-5105: a negative-mode draw that reuses a captured id is a valid body; a header edit must not flip it.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/branches": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "additionalProperties": False,
+                                    "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 10}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["id"],
+                                        "additionalProperties": False,
+                                        "properties": {"id": {"type": "string", "format": "uuid"}},
+                                    }
+                                }
+                            },
+                        },
+                        "422": {"description": "Invalid"},
+                    },
+                }
+            },
+            "/sessions": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["branchId"],
+                                    "additionalProperties": False,
+                                    "properties": {"branchId": {"type": "string", "format": "uuid"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}, "422": {"description": "Invalid"}},
+                }
+            },
+        }
+    )
+
+    @app.route("/branches", methods=["POST"])
+    def create_branch():
+        body = request.get_json(silent=True)
+        name = body.get("name") if isinstance(body, dict) else None
+        if set(body or ()) == {"name"} and isinstance(name, str) and 1 <= len(name) <= 10:
+            return jsonify({"id": str(uuid.uuid4())}), 201
+        return jsonify({}), 422
+
+    @app.route("/sessions", methods=["POST"])
+    def create_session():
+        body = request.get_json(silent=True)
+        branch_id = body.get("branchId") if isinstance(body, dict) else None
+        if set(body or ()) == {"branchId"} and isinstance(branch_id, str) and UUID_PATTERN.match(branch_id):
+            return jsonify({}), 201
+        return jsonify({}), 422
+
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    if case.operation.label == "POST /sessions" and not case.meta.generation.mode.is_negative:
+        case.headers = {**(case.headers or {}), "X-Request-Id": "trace"}
+        """
+    )
+
+    result = cli.run_openapi_app(
+        app,
+        "--checks=negative_data_rejection",
+        "--generation-deterministic",
+        "--max-examples=50",
         hooks=module,
     )
     assert "API accepted schema-violating request" not in result.stdout, result.stdout

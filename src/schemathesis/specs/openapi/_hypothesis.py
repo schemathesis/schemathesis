@@ -541,7 +541,7 @@ def openapi_cases(
             ),
             phase=PhaseInfo(name=phase, data=phase_data),
             components={
-                kind: ComponentInfo(mode=value.generator)
+                kind: ComponentInfo(mode=value.mode)
                 for kind, value in [
                     (ParameterLocation.QUERY, query_),
                     (ParameterLocation.PATH, path_parameters_),
@@ -549,7 +549,7 @@ def openapi_cases(
                     (ParameterLocation.COOKIE, cookies_),
                     (ParameterLocation.BODY, body_),
                 ]
-                if value.generator is not None
+                if value.mode is not None
             },
             pool_draws=pool_draws,
             semantic_draws=semantic_draws,
@@ -909,6 +909,17 @@ class ValueContainer:
     def is_generated(self) -> bool:
         """If value was generated."""
         return self.generator is not None and (self.location == "body" or self.value is not None)
+
+    @property
+    def mode(self) -> GenerationMode | None:
+        """Mode of the drawn value: a negative strategy may still yield a valid, unmutated value."""
+        if (
+            self.generator == GenerationMode.NEGATIVE
+            and self.meta is None
+            and all(draw.matches_schema for draw in self.dictionary_draws)
+        ):
+            return GenerationMode.POSITIVE
+        return self.generator
 
 
 def _pin_content_type_header(
