@@ -267,6 +267,20 @@ def test_reproduce_after_same_host_redirect(ctx, app_runner, validate):
     )
 
 
+def test_reproduce_when_validated_response_has_no_request_url(ctx, response_factory):
+    schema = ctx.openapi.load_schema({"/items": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    case = schema["/items"]["GET"].Case()
+    response = response_factory.requests(status_code=500, content=b"Error", content_type="text/plain", method="GET")
+    response.request.url = None
+
+    with pytest.raises(FailureGroup) as exc_info:
+        case.validate_response(response)
+    assert (
+        exc_info.value.message.rstrip().splitlines()[-1]
+        == "    curl -X GET -H 'Content-Type: text/plain' http://localhost/items"
+    )
+
+
 def test_pytest_subtests_output(ctx, testdir):
     api = ctx.openapi.apps.failure()
     testdir.make_test(

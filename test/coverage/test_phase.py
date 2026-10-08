@@ -3049,6 +3049,53 @@ def test_unexpected_methods_skip_methods_declared_by_partly_templated_sibling(
     }
 
 
+def test_unexpected_methods_ignore_invalid_operation_on_templated_sibling(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/headers": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/items/{uid}": {"patch": None},
+        }
+    )
+    operation = schema["/items/headers"]["GET"]
+    assert [
+        case.method
+        for case in iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods={"patch"},
+            generation_config=schema.config.generation,
+        )
+        if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
+    ] == ["PATCH"]
+
+
+def test_unexpected_methods_skip_sibling_parameter_missing_from_template(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items/headers": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/items/{uid}": {
+                "patch": {
+                    "parameters": [{"name": "other", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    operation = schema["/items/headers"]["GET"]
+    assert [
+        case.method
+        for case in iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods={"patch"},
+            generation_config=schema.config.generation,
+        )
+        if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
+    ] == []
+
+
 def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # Regression test for GH-3322
@@ -9744,7 +9791,7 @@ def test_positive_body_drawn_past_a_double_negation(ctx):
     # The generator cannot follow `not: {not: ...}`, so it draws from the wider schema and keeps what the validator admits.
     body = {
         "type": "object",
-        "properties": {"a": {"type": "string", "maxLength": 3, "not": {"not": {"pattern": "\\p{Tibetan}"}}}},
+        "properties": {"a": {"type": "string", "maxLength": 3, "not": {"not": {"minLength": 2}}}},
         "required": ["a"],
     }
     operation = body_operation(ctx, body)

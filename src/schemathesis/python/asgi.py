@@ -7,7 +7,6 @@ import math
 import threading
 import types
 from collections.abc import Awaitable, Callable
-from concurrent.futures import TimeoutError as FutureTimeoutError
 from contextlib import ExitStack
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urljoin, urlsplit
@@ -33,9 +32,6 @@ Scope = dict[str, Any]
 Receive = Callable[[], Awaitable[Message]]
 Send = Callable[[Message], Awaitable[None]]
 ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
-
-# A lifespan task ends as soon as the application returns, so waiting on it is a formality.
-_TASK_RESULT_TIMEOUT = 5
 
 # `Host` header the test client sends, unless the request overrides it.
 HOST = "testserver"
@@ -122,11 +118,8 @@ class _Lifespan:
             if self.task is None or not self.task.done():
                 self.portal.call(self._wait_shutdown)
             if self.task is not None:
-                try:
-                    # Re-raises a failure the application hit after startup or after reporting shutdown
-                    self.task.result(timeout=_TASK_RESULT_TIMEOUT)
-                except FutureTimeoutError:
-                    pass
+                # Re-raises a failure the application hit after startup or after reporting shutdown
+                self.task.result()
         finally:
             for stream in (self.receive_stream, self.send_stream):
                 stream.send_stream.close()

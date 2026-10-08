@@ -16,6 +16,7 @@ SignUpBehavior = Literal[
     "no-token",
     "unsatisfiable-password",
     "admin-only",
+    "ordinary-role",
 ]
 
 
@@ -40,7 +41,10 @@ def sign_up_and_login(behavior: SignUpBehavior = "ok") -> OpenAPIApp:
                                     "properties": {
                                         **credentials,
                                         "firstName": {"type": "string"},
-                                        "role": {"type": "string", "enum": ["USER", "ADMIN"]},
+                                        "role": {
+                                            "type": "string",
+                                            "enum": ["MEMBER"] if behavior == "ordinary-role" else ["USER", "ADMIN"],
+                                        },
                                     },
                                 }
                             }
