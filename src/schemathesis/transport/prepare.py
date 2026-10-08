@@ -163,13 +163,17 @@ def prepare_path(path: str, parameters: dict[str, Any] | None) -> str:
     return result
 
 
-def prepare_request(case: Case, headers: Mapping[str, Any] | None, *, config: SanitizationConfig) -> PreparedRequest:
+def prepare_request(
+    case: Case, headers: Mapping[str, Any] | None, *, config: SanitizationConfig, base_url: str | None = None
+) -> PreparedRequest:
     import requests
 
     from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
     # The host the case was (or would be) sent to, so a rendered command reproduces the request that ran.
-    base_url = normalize_base_url(case._base_url or case.operation.base_url, host=_client_host(case.operation.app))
+    base_url = normalize_base_url(
+        base_url or case._base_url or case.operation.base_url, host=_client_host(case.operation.app)
+    )
     kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url, headers=headers)
     if config.enabled:
         kwargs["url"] = sanitize_url(kwargs["url"], config=config)
