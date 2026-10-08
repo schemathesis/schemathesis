@@ -155,7 +155,7 @@ Accepts [`validate-formats`](configuration.md#checksresponse_schema_conformancev
 
 #### Server-Sent Events
 
-For `text/event-stream` responses, Schemathesis validates each event individually against the `itemSchema` defined in the OpenAPI 3.2 response. Each failure is prefixed with its event index:
+For `text/event-stream` responses, Schemathesis validates each event individually against the `itemSchema` defined in the OpenAPI 3.2 response. A `schema` next to it is checked once against the whole stream, read as an array of events. Each failure is prefixed with its event index:
 
 ```text
 - SSE event payload violates content schema

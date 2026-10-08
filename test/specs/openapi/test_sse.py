@@ -1022,7 +1022,7 @@ def test_sse_item_schema_and_schema_resolve_refs():
                             "content": {
                                 "text/event-stream": {
                                     "itemSchema": {"type": "object", "required": ["data"]},
-                                    "schema": {"$ref": "#/components/schemas/SSEEvent"},
+                                    "schema": {"type": "array", "items": {"$ref": "#/components/schemas/SSEEvent"}},
                                 }
                             },
                         }
@@ -1055,6 +1055,60 @@ def test_sse_item_schema_and_schema_resolve_refs():
         case.validate_response(response, checks=[response_schema_conformance])
 
     assert any(isinstance(failure, JsonSchemaError) for failure in exc.value.exceptions)
+
+
+def _sse_stream_schema(media_type_object, *, version="3.2.0"):
+    return {
+        "openapi": version,
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/sse": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "SSE stream", "content": {"text/event-stream": media_type_object}}
+                    }
+                }
+            }
+        },
+    }
+
+
+TWO_EVENTS = "data: one\n\ndata: two\n\n"
+EVENT_LIST_SCHEMA = {"type": "array", "items": {"type": "object", "required": ["data"]}}
+
+
+@pytest.mark.parametrize(
+    "media_type_object",
+    [{"schema": EVENT_LIST_SCHEMA}, {"itemSchema": {"required": ["data"]}, "schema": EVENT_LIST_SCHEMA}],
+    ids=["schema", "schema-and-item-schema"],
+)
+def test_sse_schema_describes_the_whole_stream(media_type_object):
+    case, response = _call_sse(_sse_stream_schema(media_type_object), TWO_EVENTS)
+    case.validate_response(response, checks=[response_schema_conformance])
+
+
+@pytest.mark.parametrize(
+    "media_type_object",
+    [{"schema": {"maxItems": 1}}, {"itemSchema": {"required": ["data"]}, "schema": {"maxItems": 1}}],
+    ids=["schema", "schema-and-item-schema"],
+)
+def test_sse_stream_schema_violation(media_type_object):
+    case, response = _call_sse(_sse_stream_schema(media_type_object), TWO_EVENTS)
+
+    with pytest.raises(FailureGroup) as exc:
+        case.validate_response(response, checks=[response_schema_conformance])
+
+    assert [(failure.title, failure.validation_message) for failure in exc.value.exceptions] == [
+        (
+            "SSE stream violates schema",
+            '[{"data":"one","event":"message"},{"data":"two","event":"message"}] has more than 1 item',
+        )
+    ]
+
+
+def test_sse_schema_describes_each_event_before_openapi_32():
+    case, response = _call_sse(_sse_stream_schema({"schema": {"maxItems": 1}}, version="3.1.0"), TWO_EVENTS)
+    case.validate_response(response, checks=[response_schema_conformance])
 
 
 def test_sse_metadata_only_blocks_are_not_validated_as_events():

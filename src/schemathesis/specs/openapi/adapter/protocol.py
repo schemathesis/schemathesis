@@ -101,6 +101,8 @@ class ResponseAdapter(SchemaVocabulary, Protocol):
     get_default_response_media_type: GetDefaultResponseMediaType
     resolve_response_media_type: ResolveResponseMediaType
     extract_schema_for_media_type: ExtractSchemaForMediaType
+    # Schema of a sequential media type that covers the whole stream, read as an array
+    extract_stream_schema: ExtractSchemaForMediaType
     # Function to extract header schema from specification
     extract_header_schema: ExtractHeaderSchema
     # Function to extract examples from response definition

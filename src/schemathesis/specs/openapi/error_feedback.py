@@ -20,7 +20,7 @@ from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
 from schemathesis.core.transforms import deepclone
-from schemathesis.specs.openapi.adapter import v3_1
+from schemathesis.specs.openapi.adapter import v3_1, v3_2
 from schemathesis.specs.openapi.converter import INTEGER_FORMAT_BOUNDS
 from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex
 
@@ -357,7 +357,7 @@ class NumericBoundAdjustment:
         if not targets:
             return schema
 
-        is_2020_12 = operation.schema.adapter is v3_1
+        is_2020_12 = operation.schema.adapter in (v3_1, v3_2)
         for observation in observations:
             assert isinstance(observation.payload, NumericBoundPayload)
             for target in targets:
