@@ -21,6 +21,7 @@ from anyio.streams.stapled import StapledObjectStream
 from urllib3.exceptions import ReadTimeoutError
 
 from schemathesis.core.compat import BaseExceptionGroup
+from schemathesis.core.transport import complete_events, is_event_stream
 
 if TYPE_CHECKING:
     from concurrent.futures import Future
@@ -367,12 +368,18 @@ class _ASGIAdapter(requests.adapters.HTTPAdapter):
         try:
             portal.call(run)
         except TimeoutError:
-            error = ReadTimeoutError(
-                f"{scheme}://{host}:{port}",  # type: ignore[arg-type]
-                request.url,
-                f"Read timed out. (read timeout={read_timeout})",
+            content_type = next(
+                (value for name, value in raw_kwargs.get("headers", ()) if name.lower() == "content-type"), None
             )
-            raise requests.exceptions.ReadTimeout(error, request=request) from None
+            # An event stream may never end; keep what it sent before the deadline.
+            if not (response_started and is_event_stream(content_type)):
+                error = ReadTimeoutError(
+                    f"{scheme}://{host}:{port}",  # type: ignore[arg-type]
+                    request.url,
+                    f"Read timed out. (read timeout={read_timeout})",
+                )
+                raise requests.exceptions.ReadTimeout(error, request=request) from None
+            raw_kwargs["body"] = io.BytesIO(complete_events(raw_kwargs["body"].getvalue()))
 
         assert response_started, "The application did not return a response."
 

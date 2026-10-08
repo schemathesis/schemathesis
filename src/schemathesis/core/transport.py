@@ -3,12 +3,15 @@ from __future__ import annotations
 import base64
 import enum
 import json
+import re
 import string
-from collections.abc import Mapping
+import time
+from collections.abc import Iterable, Mapping
 from itertools import product
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
 
-from schemathesis.core import NOT_SET
+from schemathesis.core import NOT_SET, media_types
+from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 # HTTP headers in wire form: lowercased name -> list of values. The list shape
@@ -44,6 +47,47 @@ if TYPE_CHECKING:
 
 USER_AGENT = f"schemathesis/{SCHEMATHESIS_VERSION}"
 DEFAULT_RESPONSE_TIMEOUT = 10
+# Two line breaks in a row end an event
+_EVENT_END_RE = re.compile(rb"(?:\r\n|\r|\n)(?:\r\n|\r|\n)")
+
+
+def is_event_stream(content_type: str | None) -> bool:
+    if content_type is None:
+        return False
+    try:
+        return media_types.is_sse(content_type)
+    except MalformedMediaType:
+        return False
+
+
+def read_event_stream(chunks: Iterable[bytes], timeout: float | tuple[float, float] | None) -> bytes:
+    """Read an event stream until it ends or `timeout` seconds pass, keeping only complete events when cut short.
+
+    `chunks` raises `TimeoutError` when the stream goes silent for too long.
+    """
+    # A `(connect, read)` pair limits the stream by its read half
+    if isinstance(timeout, tuple):
+        timeout = timeout[1]
+    deadline = time.monotonic() + (timeout or DEFAULT_RESPONSE_TIMEOUT)
+    content = bytearray()
+    try:
+        for chunk in chunks:
+            content += chunk
+            if time.monotonic() >= deadline:
+                break
+        else:
+            return bytes(content)
+    except TimeoutError:
+        pass
+    return complete_events(bytes(content))
+
+
+def complete_events(content: bytes) -> bytes:
+    """Drop the event a cut-short stream was still sending."""
+    end = 0
+    for match in _EVENT_END_RE.finditer(content):
+        end = match.end()
+    return content[:end]
 
 
 def decode_lossy(content: bytes, encoding: str | None) -> str:

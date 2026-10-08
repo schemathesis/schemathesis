@@ -127,6 +127,12 @@ Schemathesis deserializes the `data` string using the registered deserializer fo
 
 For media types beyond `application/json`, register a custom deserializer - see [Custom Response Deserializers](custom-response-deserializers.md).
 
-## Current limitations
+## Endless streams
 
-Schemathesis reads the full response body before parsing. An infinite or long-lived SSE stream will block until the connection times out or the server closes it.
+Schemathesis reads a stream until the server closes it or the request timeout passes in total, counted from when the response starts. It then validates the events received so far and drops an event that was still arriving.
+
+Every response from an endless stream takes the full timeout, so lower it for APIs with long-lived streams:
+
+```toml
+request-timeout = 5
+```

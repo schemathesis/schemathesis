@@ -1402,6 +1402,7 @@ def noop(*args, **kwargs):
 @settings(suppress_health_check=list(HealthCheck))
 def test(case, mocker):
     spy = mocker.patch("requests.Session.request")
+    spy.return_value.headers = {{}}
     case.call_and_validate(checks=[noop], headers={{"X-Spam": "Explicit" }})
     kwargs = spy.call_args[1]
     assert kwargs["verify"] is False

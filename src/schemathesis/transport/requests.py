@@ -5,7 +5,7 @@ import inspect
 import json
 import os
 import time
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterator, Mapping, MutableMapping
 from http.client import RemoteDisconnected
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, cast
@@ -14,7 +14,7 @@ from urllib.parse import urlencode, urljoin, urlparse
 import requests
 from requests.adapters import HTTPAdapter
 from typing_extensions import override
-from urllib3.exceptions import ProtocolError
+from urllib3.exceptions import DecodeError, ProtocolError, ReadTimeoutError
 from urllib3.filepost import encode_multipart_formdata
 
 from schemathesis.core import Body, NotSet, media_types
@@ -23,7 +23,7 @@ from schemathesis.core.jsonschema import maybe_resolve_bundled, schema_with_bund
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString, split_delimited_query
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at, to_wire_text
-from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response, is_event_stream, read_event_stream
 from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import get_exclude_headers, prepare_body, prepare_headers, prepare_url
@@ -282,17 +282,45 @@ def _request_resending_on_dropped_connection(session: requests.Session, data: di
     # already sent on it unread. Like browsers and curl, send such a request once more on a fresh connection.
     opened = _count_opened_connections(session)
     try:
-        return session.request(**data)
+        return _request(session, data)
     except requests.exceptions.ConnectionError as exc:
         if not _is_dropped_before_response(exc) or _count_opened_connections(session) != opened:
             raise
         dropped = exc
     try:
-        return session.request(**data)
+        return _request(session, data)
     except requests.exceptions.RequestException:
         # The fresh connection failing too means the server itself is broken; report what the original request saw.
         pass
     raise dropped
+
+
+EVENT_STREAM_CHUNK_SIZE = 64 * 1024
+
+
+def _request(session: requests.Session, data: dict[str, Any]) -> requests.Response:
+    response = session.request(**{**data, "stream": True})
+    if is_event_stream(response.headers.get("Content-Type")):
+        # An event stream may never end; stop reading once the request timeout passes in total.
+        response._content = read_event_stream(_iter_event_stream(response), data.get("timeout"))
+        response.close()
+    else:
+        # Read the body here, so network errors while reading it are retried like before.
+        response.content  # noqa: B018
+    return response
+
+
+def _iter_event_stream(response: requests.Response) -> Iterator[bytes]:
+    # Yield bytes as they arrive; `iter_content` waits to fill a chunk or, without a chunk size, for the stream end.
+    try:
+        while chunk := response.raw.read1(EVENT_STREAM_CHUNK_SIZE, decode_content=True):
+            yield chunk
+    except ReadTimeoutError as exc:
+        raise TimeoutError from exc
+    except ProtocolError as exc:
+        raise requests.exceptions.ChunkedEncodingError(exc) from exc
+    except DecodeError as exc:
+        raise requests.exceptions.ContentDecodingError(exc) from exc
 
 
 def _count_opened_connections(session: requests.Session) -> int:
