@@ -531,7 +531,9 @@ def extracted_object(item: Generated, name: str) -> None:
     generated = item.pop(name)
     # An empty object expands to nothing, so the parameter is omitted.
     if isinstance(generated, dict):
-        item.update(generated)
+        # A declared parameter of the same name keeps its own value.
+        for key, value in generated.items():
+            item.setdefault(key, value)
     else:
         item[name] = ""
 
