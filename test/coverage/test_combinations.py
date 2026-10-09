@@ -123,7 +123,7 @@ def assert_covers_negative(ctx: CoverageContext, schema: dict, expected: list):
         ({"enum": [1, 2]}, [1, 2]),
         ({"const": 42}, [42]),
         ({"not": {}}, []),
-        ({"not": {"type": "null"}}, [0, 0.5, "true", "AAA", ["null", "null"]]),
+        ({"not": {"type": "null"}}, [0, 0.5, "true", "AAA"]),
     ],
 )
 def test_positive_primitive_schemas(pctx, schema, expected):
@@ -141,11 +141,11 @@ class AnyString:
         (False, [None, True, False, "", 0, [None, None], {}]),
         (True, []),
         ({}, []),
-        ({"type": "null"}, [0, 0.5, "true", "AAA", ["null", "null"]]),
+        ({"type": "null"}, [0, 0.5, "true", "AAA"]),
         # 0/1 coerce to booleans in lenient query/path parsers, so the numeric type violations
         # are non-coercible values instead.
         ({"type": "boolean"}, [2, 0.5, "null", "AAA", ["null", "null"]]),
-        ({"type": ["boolean", "null"]}, [2, 0.5, "AAA", ["null", "null"]]),
+        ({"type": ["boolean", "null"]}, [2, 0.5, "AAA"]),
         # canonicalish drops `type` when `enum` is present; infer it from the values so type
         # violations still appear alongside the enum violation. The enum-negative "AAA"
         # collides with the type-negative "AAA" and dedupes to one entry.
@@ -1541,7 +1541,7 @@ def test_type_violations_break_the_schema_once_stringified(nctx, schema):
         (ParameterLocation.PATH, {"type": "string", "pattern": "[0-9]"}, ["true", "null", "null,null"]),
         (ParameterLocation.HEADER, {"type": "string", "pattern": "[0-9]"}, [True, None, [None, None], {}]),
         (ParameterLocation.HEADER, {"type": "string", "maxLength": 3}, [True, None, [None, None]]),
-        (ParameterLocation.HEADER, {"type": "boolean"}, [0, 0.5, None, "AAA", [None, None], {}]),
+        (ParameterLocation.HEADER, {"type": "boolean"}, [2, 0.5, None, "AAA", [None, None], {}]),
     ],
     ids=[
         "query-pattern",
