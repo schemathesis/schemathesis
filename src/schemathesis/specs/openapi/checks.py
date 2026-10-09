@@ -983,8 +983,8 @@ def _additional_properties_hint(case: Case, response: Response) -> str | None:
         noun = "property" if count == 1 else "properties"
         return (
             f"\nHint: The request body contains {count} additional {noun} not defined in the schema "
-            f"({examples}). The server likely rejects unexpected fields. "
-            "Add `additionalProperties: false` to your schema to prevent this."
+            f"({examples}). The server appears to reject properties the schema allows. "
+            "Declare `additionalProperties: false` if extras are not accepted, or make the server ignore unknown fields."
         )
     return None
 
