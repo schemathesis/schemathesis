@@ -95,6 +95,7 @@ from schemathesis.specs.openapi.patterns import (
     pattern_requires_literal,
     pin_pattern_length,
 )
+from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
 from schemathesis.transport.serialization import contains_binary
 
 VALIDATED_FORMATS = frozenset(
@@ -2330,6 +2331,11 @@ def _negative_any_of(
     # back to their declared type before validation, so str() doesn't make them
     # valid for explicitly string-typed branches in that case.
     stringify_body_fields = ctx.wire.form_body()
+    types = parameter_types(schema)
+
+    def is_valid(instance: Any) -> bool:
+        return any(branch.is_valid(instance) for judge in validators for branch in judge)
+
     for idx, sub_schema in _branches_to_negate(value):
         with nctx.at(idx):
             for generated in cover_schema_iter(nctx, sub_schema, seen):
@@ -2338,6 +2344,9 @@ def _negative_any_of(
                     is_valid_for_others(generated.value, idx, judge, resolved_schemas, stringify_body_fields)
                     for judge in validators
                 ):
+                    continue
+                # A parameter value is judged as the server reads its text, e.g. `null` as null or `0.5` as a string.
+                if any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(generated.value)):
                     continue
                 yield generated
 

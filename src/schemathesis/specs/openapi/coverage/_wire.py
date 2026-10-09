@@ -158,6 +158,13 @@ class WireSemantics:
             return str(stringify_value(value, self.location))
         return str(value)
 
+    def sent_texts(self, value: Any) -> list[str]:
+        """The texts a server reads for a parameter value that travels as text, one per repeated query item."""
+        if self.location == ParameterLocation.BODY or not self.serializes_to_string():
+            return []
+        items = value if self.location == ParameterLocation.QUERY and isinstance(value, list) else [value]
+        return [to_wire_string(item) for item in items if not isinstance(item, (dict, list))]
+
     def serializes_to_string(self) -> bool:
         if self.location in ("query", "path", "header", "cookie"):
             return self.media_type is None
