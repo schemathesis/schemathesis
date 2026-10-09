@@ -162,6 +162,32 @@ def test_as_curl_command_sanitizes_raw_query_with_empty_segments(ctx):
     assert case.as_curl_command() == "curl -X GET 'http://localhost/q?token=%5BFiltered%5D&flag'"
 
 
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"email": "a@b.c", "password": "hunter2"}, '{"email": "a@b.c", "password": "[Filtered]"}'),
+        ([{"password": "hunter2"}], '[{"password": "[Filtered]"}]'),
+    ],
+    ids=["object", "array"],
+)
+def test_as_curl_command_sanitizes_json_body(ctx, body, expected):
+    schema = ctx.openapi.load_schema(
+        {
+            "/sign-in": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {}}}},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    case = schema["/sign-in"]["POST"].Case(body=body, media_type="application/json")
+    assert case.as_curl_command() == (
+        f"curl -X POST -H 'Content-Type: application/json' -d '{expected}' http://localhost/sign-in"
+    )
+    assert case.body == body
+
+
 def test_as_curl_command_keeps_non_sensitive_raw_query_pairs(ctx):
     schema = ctx.openapi.load_schema(
         {
