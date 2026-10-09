@@ -1374,6 +1374,74 @@ def test_dead_login_endpoint_does_not_storm(ctx, cli, app_runner):
 
 
 # A programmatic @schemathesis.auth provider with retry_on re-authenticates like a config-dynamic scheme in a full run.
+# The server checks the API key first, so a generated one would fail every replay after re-login.
+def test_custom_provider_reauth_recovers_with_alternative_security_scheme(ctx, cli, app_runner):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/protected": {
+                "get": {
+                    "security": [{"ApiKey": []}, {"Bearer": []}],
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "401": {"description": "Unauthorized"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "ApiKey": {"type": "apiKey", "name": "X-Api-Key", "in": "header"},
+                "Bearer": {"type": "http", "scheme": "bearer"},
+            }
+        },
+    )
+    state = {"issued": 0, "valid": None}
+
+    @app.route("/api/auth", methods=["POST"])
+    def auth_endpoint():
+        state["issued"] += 1
+        state["valid"] = f"tok{state['issued']}"
+        return jsonify({"access_token": state["valid"]})
+
+    @app.route("/protected")
+    def protected():
+        token = request.headers.get("Authorization", "").removeprefix("Bearer ")
+        if "X-Api-Key" in request.headers or token != state["valid"]:
+            return jsonify({"error": "unauthorized"}), 401
+        state["valid"] = None
+        return jsonify({"result": "ok"})
+
+    base_url = app_runner.openapi_url(app, path="")
+    module = ctx.write_pymodule(
+        f"""
+import requests
+
+@schemathesis.auth(retry_on=[401])
+class TokenAuth:
+    def get(self, case, context):
+        response = requests.post("{base_url}/api/auth")
+        return response.json()["access_token"]
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {{}}
+        case.headers["Authorization"] = f"Bearer {{data}}"
+"""
+    )
+    result = cli.main(
+        "run",
+        f"{base_url}/openapi.json",
+        "--include-path=/protected",
+        "--phases=fuzzing",
+        "--mode=positive",
+        "--max-examples=10",
+        config={
+            "base-url": base_url,
+            "checks": {"positive_data_acceptance": {"expected-statuses": ["2xx"]}},
+        },
+        hooks=module,
+    )
+    assert result.exit_code == 0, result.stdout
+    assert state["issued"] >= 2
+
+
 def test_custom_provider_reauth_recovers_expired_token(ctx, cli, app_runner):
     app, _ = ctx.openapi.make_flask_app(
         {

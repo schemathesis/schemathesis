@@ -78,6 +78,7 @@ if TYPE_CHECKING:
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.jsonschema.types import JsonValue
+    from schemathesis.core.parameters import ParameterLocation
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.core.spec import ApiSchema, Scheduler
     from schemathesis.engine.observations import Observations
@@ -159,6 +160,16 @@ class OpenApiSchema(BaseSchema):
     @override
     def is_security_param_negated(self, case: Case) -> bool:
         return self.security.is_security_param_negated(case)
+
+    @override
+    def alternative_credentials(self, operation: APIOperation) -> list[tuple[ParameterLocation, str]]:
+        from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
+
+        return [
+            (parameter.location, parameter.name)
+            for parameter in operation.iter_parameters()
+            if not parameter.is_required and ORIGINAL_SECURITY_TYPE_KEY in parameter.definition
+        ]
 
     @override
     def _security_auth_providers(self) -> Iterator[AuthProvider]:

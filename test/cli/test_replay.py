@@ -2494,6 +2494,61 @@ def test_replay_ignores_link_with_out_of_range_parent_index(cli, app_runner, ctx
     assert sent_ids == ["stale"]
 
 
+def test_replay_keeps_recorded_alternative_credentials(cli, app_runner, ctx, crash_factory, tmp_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "security": [{"ApiKey": []}, {"Bearer": []}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "ApiKey": {"type": "apiKey", "name": "X-Api-Key", "in": "header"},
+                "Bearer": {"type": "http", "scheme": "bearer"},
+            }
+        },
+    )
+    api_keys = []
+
+    @app.route("/items")
+    def items():
+        api_keys.append(request.headers.get("X-Api-Key"))
+        return jsonify({"error": "boom"}), 500
+
+    module = ctx.write_pymodule(
+        f"""
+import schemathesis
+
+
+@schemathesis.auth()
+class TokenAuth:
+    def get(self, case, context):
+        return "{VALID_TOKEN}"
+
+    def set(self, case, data, context):
+        case.headers = {{**(case.headers or {{}}), "Authorization": f"Bearer {{data}}"}}
+"""
+    )
+    schema_url = app_runner.openapi_url(app)
+    _write_crash(
+        tmp_path,
+        crash_factory,
+        url=f"{schema_url.rsplit('/', 1)[0]}/items",
+        schema_location=schema_url,
+        path_template="/items",
+        status=500,
+        body='{"error": "boom"}',
+        request_headers={"X-Api-Key": "recorded-key"},
+    )
+
+    cli.main("replay", str(tmp_path), hooks=module)
+
+    assert api_keys == ["recorded-key"]
+
+
 def test_replay_config_auth_disables_auth_providers_from_hooks(cli, app_runner, ctx, crash_factory, tmp_path):
     # As in a run, configured auth replaces hook providers, even for operations it does not cover.
     api = ctx.openapi.apps.under_declared_security(RespondWithStatus(500))

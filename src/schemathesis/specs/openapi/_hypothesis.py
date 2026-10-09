@@ -561,7 +561,20 @@ def openapi_cases(
         operation=operation,
         app=operation.app,
     )
-    auths.set_on_case(instance, auth_context, auth_storage)
+    # Values from links, explicit arguments or the resource pool are real; only freshly generated credentials are dropped.
+    supplied = frozenset(
+        [
+            (location, name)
+            for location, given in (
+                (ParameterLocation.HEADER, headers),
+                (ParameterLocation.QUERY, query),
+                (ParameterLocation.COOKIE, cookies),
+            )
+            for name in given or ()
+        ]
+        + [(ParameterLocation(draw.location), draw.parameter_name) for draw in pool_draws]
+    )
+    auths.set_on_generated_case(instance, auth_context, auth_storage, supplied)
     return instance
 
 

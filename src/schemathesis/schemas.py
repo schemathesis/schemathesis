@@ -113,6 +113,10 @@ class BaseSchema(Mapping):
     def is_security_param_negated(self, case: Case) -> bool:
         return False
 
+    def alternative_credentials(self, operation: APIOperation) -> list[tuple[ParameterLocation, str]]:
+        # Generated credentials that only some of the accepted security requirements need.
+        return []
+
     def _security_auth_providers(self) -> Iterator[AuthProvider]:
         # Auth providers bound to declared security schemes. Only OpenAPI has them.
         return iter(())
