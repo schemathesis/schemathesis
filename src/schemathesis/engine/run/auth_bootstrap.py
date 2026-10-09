@@ -43,7 +43,7 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             phase=phase, status=Status.SUCCESS, payload=AuthBootstrapPayload(spec=None, status=Status.SUCCESS)
         )
         return
-    if flow.is_supplied():
+    if not ctx.schema.config.auth.auto_signup or flow.is_supplied():
         yield events.PhaseFinished(
             phase=phase, status=Status.SKIP, payload=AuthBootstrapPayload(spec=flow.spec, status=Status.SKIP)
         )

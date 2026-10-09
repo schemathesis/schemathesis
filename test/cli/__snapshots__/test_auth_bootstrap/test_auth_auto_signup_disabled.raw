@@ -9,13 +9,12 @@ Schemathesis dev
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       3 selected / 3 total
+     Configuration:    /tmp/config.toml
 
  ✅  API capabilities:
 
      Supports NULL byte in headers:                            ✓
      Accepts backslash and control characters in URL paths:    ✓
-
- ✅  Auth: signed up via POST /auth/register and logged in; disable with [auth] auto-signup = false
 
  ⏭   Examples (in 0.00s)
 

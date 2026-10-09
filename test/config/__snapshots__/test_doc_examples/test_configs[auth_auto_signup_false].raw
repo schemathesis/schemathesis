@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(auto_signup=False))))

@@ -1041,6 +1041,20 @@ The negative coverage phase also sends `Content-Type: multipart/form-data` witho
     !!! note
         `[auth.wfc]`, `[auth.basic]`, and `[auth.openapi.*]` / `[auth.dynamic.openapi.*]` are mutually exclusive — configuring more than one is an error.
 
+#### `auth.auto-signup`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+    Sign up and log in through the sign-up and login operations the schema declares. See [Automatic Sign-Up](../guides/auth.md#automatic-sign-up).
+
+    ```toml
+    [auth]
+    auto-signup = false
+    ```
+
 ### Checks
 
 #### `checks.enabled`

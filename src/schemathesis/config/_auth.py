@@ -146,6 +146,7 @@ class AuthConfig(DiffBase):
     openapi: OpenAPIAuthConfig
     dynamic: OpenAPIDynamicAuthConfig
     wfc: WFCAuthConfig | None
+    auto_signup: bool
     # Set only from the CLI. `wfc` merges as a whole, so values named there would be dropped
     # when the file itself comes from the config.
     wfc_user: str | None
@@ -157,7 +158,9 @@ class AuthConfig(DiffBase):
         openapi: dict[str, dict[str, Any]] | None = None,
         dynamic: dict[str, Any] | None = None,
         wfc: dict[str, Any] | None = None,
+        auto_signup: bool = True,
     ) -> None:
+        self.auto_signup = auto_signup
         if basic is not None:
             assert "username" in basic
             username = resolve(basic["username"])
@@ -244,6 +247,7 @@ class AuthConfig(DiffBase):
             openapi=data.get("openapi"),
             dynamic=data.get("dynamic"),
             wfc=data.get("wfc"),
+            auto_signup=data.get("auto-signup", True),
         )._mark_source_keys(data)
 
     @property

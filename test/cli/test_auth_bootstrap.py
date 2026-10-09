@@ -28,3 +28,10 @@ def test_signed_up_token_reaches_protected_operations(ctx, cli, behavior):
         for request in api.requests
         if request.path == "/orders"
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_auth_auto_signup_disabled(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.sign_up_and_login()
+    assert cli.run(api.schema_url, "--phases=examples", config={"auth": {"auto-signup": False}}) == snapshot_cli
+    assert [request.path for request in api.requests if request.path.startswith("/auth/")] == []

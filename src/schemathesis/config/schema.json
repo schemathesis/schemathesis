@@ -298,6 +298,10 @@
         },
         "wfc": {
           "$ref": "#/$defs/WFCAuthConfig"
+        },
+        "auto-signup": {
+          "type": "boolean",
+          "description": "Sign up and log in through the sign-up and login operations the schema declares."
         }
       }
     },
