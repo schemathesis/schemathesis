@@ -24,6 +24,7 @@
 - False `negative_data_rejection` for unknown query parameters beside `allowEmptyValue` string values like `0`.
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
 - Error feedback ignoring Jackson `Unrecognized field "x"` rejections from Spring APIs.
+- Coverage phase crashing on header or cookie array/object examples with non-Latin-1 or newline characters.
 - Negative cases negating annotation keywords like `title` or `deprecated` instead of constraints.
 - Exploded object query parameters overwriting a declared query parameter of the same name.
 - Crash when the cache holds an entry for a method removed from a path still in the schema.
