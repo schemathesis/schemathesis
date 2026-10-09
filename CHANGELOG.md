@@ -24,6 +24,7 @@
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
 - Exploded object query parameters overwriting a declared query parameter of the same name.
 - Crash when the cache holds an entry for a method removed from a path still in the schema.
+- Pooled values paired with the wrong parent when names differ, like `id` and `project_id`.
 - `st replay` marking cases as fixed when the crash file has masked values like `password`. [#5141](https://github.com/schemathesis/schemathesis/issues/5141)
 - Unmasked request body fields like `password` in reproduction commands.
 

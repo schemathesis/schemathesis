@@ -810,3 +810,66 @@ def test_pool_keeps_drawing_response_examples_after_live_values(ctx):
         for _ in range(20)
     }
     assert picks == {"alb-42", "album-from-example"}
+
+
+def _array_response(item_schema):
+    return {
+        "200": {
+            "description": "OK",
+            "content": {"application/json": {"schema": {"type": "array", "items": item_schema}}},
+        },
+        "404": {"description": "Not found"},
+    }
+
+
+@pytest.mark.parametrize("phase", ["coverage", "fuzzing"])
+@pytest.mark.parametrize("producer_parameter", ["id", "project_id"])
+def test_pool_pairs_child_with_its_parent_across_parameter_names(cli, ctx, phase, producer_parameter):
+    # Commits are listed under `{id}` but fetched under `{project_id}`; both name the same project.
+    project = {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}}
+    commit = {"type": "object", "required": ["sha"], "properties": {"sha": {"type": "string"}}}
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/projects": {"get": {"operationId": "listProjects", "responses": _array_response(project)}},
+            f"/projects/{{{producer_parameter}}}/commits": {
+                "get": {
+                    "operationId": "listCommits",
+                    "parameters": [_path_parameter(producer_parameter)],
+                    "responses": _array_response(commit),
+                }
+            },
+            "/projects/{project_id}/commits/{sha}": {
+                "get": {
+                    "operationId": "getCommit",
+                    "parameters": [_path_parameter("project_id"), _path_parameter("sha")],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    commits = {str(project_id): [f"sha{project_id}x{index}" for index in range(3)] for project_id in range(1, 6)}
+    owners = {sha: project_id for project_id, shas in commits.items() for sha in shas}
+    pairs: list[tuple[str, str]] = []
+
+    @app.route("/projects", methods=["GET"])
+    def list_projects():
+        return jsonify([{"id": project_id} for project_id in commits])
+
+    @app.route("/projects/<project_id>/commits", methods=["GET"])
+    def list_commits(project_id):
+        if project_id not in commits:
+            return "", 404
+        return jsonify([{"sha": sha} for sha in commits[project_id]])
+
+    @app.route("/projects/<project_id>/commits/<sha>", methods=["GET"])
+    def get_commit(project_id, sha):
+        if project_id in commits and sha in owners:
+            pairs.append((project_id, sha))
+        return ("", 200) if owners.get(sha) == project_id else ("", 404)
+
+    cli.run_openapi_app(app, f"--phases={phase}", "--max-examples=10", "--seed=42", "-c not_a_server_error")
+    assert [pair for pair in pairs if owners[pair[1]] != pair[0]] == []
+    if phase == "fuzzing":
+        assert len(set(pairs)) > 1, pairs
+    else:
+        assert pairs
