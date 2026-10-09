@@ -117,7 +117,7 @@ _TYPE_COERCION = re.compile(
 
 # Jackson's `UnrecognizedPropertyException` (body) and Spring's strict-binding
 # rejection (query). Custom envelopes occasionally use single quotes.
-_UNRECOGNIZED_FIELD = re.compile(r"Unrecognized field:\s*['\"](?P<name>[^'\"]+)['\"]")
+_UNRECOGNIZED_FIELD = re.compile(r"Unrecognized field:?\s*['\"](?P<name>[^'\"]+)['\"]")
 _UNEXPECTED_PARAMETER = re.compile(r"parameter name [\"'](?P<name>[^\"']+)[\"'] is not allowed")
 
 
