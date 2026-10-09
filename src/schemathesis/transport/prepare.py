@@ -13,6 +13,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData, StatefulPhaseData
 
@@ -188,6 +189,10 @@ def prepare_request(
                 sanitize_value(kwargs["params"], config=config)
             elif isinstance(kwargs["params"], str):
                 kwargs["params"] = _sanitize_query_string(kwargs["params"], config=config)
+        # A JSON body can be rooted at a dict or a list; both may carry sensitive values.
+        if isinstance(kwargs.get("json"), (dict, list)):
+            kwargs["json"] = deepclone(kwargs["json"])
+            sanitize_value(kwargs["json"], config=config)
 
     request = requests.Request(**kwargs).prepare()
     _normalize_multipart_boundary(request)
