@@ -66,6 +66,24 @@ enabled = false
 !!! note "Applying filters"
     The config above will disable all operations matching the set of filters.
 
+### Test One Operation
+
+To keep only one operation enabled, disable every operation except it:
+
+```toml
+[[operations]]
+exclude-name = "GET /users/"
+enabled = false
+```
+
+An operation block matches when an operation matches any `include-*` filter (or when the block has no include
+filters) and none of its `exclude-*` filters. Across blocks, matches accumulate: an operation is disabled when it
+matches any block with `enabled = false`.
+
+Using `include-name = "GET /users/"` with `enabled = true` does not narrow the run: it enables the matching operation
+but leaves every other operation enabled. For a one-off run, use the
+[CLI operation filter](../tutorials/cli.md#confirming-the-fix).
+
 ## Parameter Overrides
 
 Parameters can be overridden at the global or operation level:
