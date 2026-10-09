@@ -7,7 +7,7 @@ import re
 import string
 import time
 from collections.abc import Iterable, Mapping
-from itertools import product
+from itertools import chain, product
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, TypeGuard, get_args, overload
 
 from schemathesis.core import NOT_SET, media_types
@@ -461,6 +461,10 @@ def expand_status_code(status_code: StatusCodePattern | int) -> list[int]:
         return []
     chars = [list(string.digits) if digit == "X" else [digit] for digit in pattern]
     return [int("".join(expanded)) for expanded in product(*chars)]
+
+
+def expand_status_codes(status_codes: list[StatusCodePattern]) -> set[int]:
+    return set(chain.from_iterable(expand_status_code(code) for code in status_codes))
 
 
 def status_code_matches(pattern: StatusCodePattern, response_code: int) -> bool:

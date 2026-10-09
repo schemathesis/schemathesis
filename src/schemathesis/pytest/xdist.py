@@ -278,7 +278,7 @@ def _serialize_writer_config(schema: SchemaMetadata) -> dict:
         "sanitization": dataclasses.asdict(sanitization),
         "directory": str(reports.directory),
         "paths": paths,
-        "api_title": schema.raw_schema.get("info", {}).get("title"),
+        "api_title": schema.title,
     }
 
 

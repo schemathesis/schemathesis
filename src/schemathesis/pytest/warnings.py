@@ -4,9 +4,9 @@ import warnings
 from typing import TYPE_CHECKING
 
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE
+from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.python._constants.orchestrator import build_constants_pool
 from schemathesis.python._constants.warnings import iter_constants_warnings
-from schemathesis.specs.openapi.warnings import UnusedOpenAPIAuthWarning
 
 if TYPE_CHECKING:
     from schemathesis.core.spec import SchemaWarnings
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def emit_openapi_auth_warnings(schema: SchemaWarnings) -> None:
     """Emit Python warnings for unused OpenAPI auth configuration."""
     for warning in schema.iter_schema_warnings():
-        if isinstance(warning, UnusedOpenAPIAuthWarning):
+        if warning.kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:
             warnings.warn(
                 f"Unused OpenAPI auth configuration: {warning.message}",
                 UserWarning,

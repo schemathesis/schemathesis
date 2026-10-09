@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
+from schemathesis.core.jsonschema.patterns import enforced_pattern, is_valid_python_regex, normalize_regex
 from schemathesis.core.jsonschema.resolver import find_unresolvable_reference
 from schemathesis.core.jsonschema.types import get_type
-from schemathesis.specs.openapi.patterns import enforced_pattern, is_valid_python_regex, normalize_regex
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation

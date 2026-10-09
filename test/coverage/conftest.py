@@ -3,11 +3,11 @@ from __future__ import annotations
 import jsonschema_rs
 import pytest
 
+from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.coverage._schema import CoverageContext
 from schemathesis.specs.openapi.formats import get_default_format_strategies
-from schemathesis.specs.openapi.patterns import update_quantifier
 
 
 @pytest.fixture

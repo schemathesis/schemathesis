@@ -16,13 +16,13 @@ from schemathesis.core.error_feedback.store import (
     TypeMismatchPayload,
 )
 from schemathesis.core.jsonschema import maybe_resolve_bundled
+from schemathesis.core.jsonschema.patterns import is_valid_python_regex, normalize_regex
 from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.adapter import v3_1, v3_2
 from schemathesis.specs.openapi.converter import INTEGER_FORMAT_BOUNDS
-from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiOperation

@@ -15,6 +15,7 @@ from hypothesis.errors import Unsatisfiable
 from schemathesis.core import MAX_GENERATED_PATTERN_LENGTH
 from schemathesis.core.cache import MISSING
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator_for
+from schemathesis.core.jsonschema.patterns import update_quantifier
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone, transform
 from schemathesis.generation import GenerationMode
@@ -34,7 +35,6 @@ from schemathesis.specs.openapi.coverage._schema import (
     _positive_string,
     cover_schema_iter,
 )
-from schemathesis.specs.openapi.patterns import update_quantifier
 from test.coverage.helpers import scenario_values
 from test.utils import to_float32
 

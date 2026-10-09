@@ -6,15 +6,15 @@ from typing import Any, TypeGuard, overload
 from schemathesis.core.jsonschema import DRAFT_03_DIALECT, is_unsatisfiable
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.numeric import is_numeric_bound
-from schemathesis.core.jsonschema.types import JsonSchema, get_type
-from schemathesis.core.transforms import deepclone
-from schemathesis.specs.openapi.discriminator import get_implicit_discriminator_value
-from schemathesis.specs.openapi.patterns import (
+from schemathesis.core.jsonschema.patterns import (
     enforced_pattern,
     is_valid_jsonschema_rs_regex,
     pattern_length_bounds,
     update_quantifier,
 )
+from schemathesis.core.jsonschema.types import JsonSchema, get_type
+from schemathesis.core.transforms import deepclone
+from schemathesis.specs.openapi.discriminator import get_implicit_discriminator_value
 
 
 @overload

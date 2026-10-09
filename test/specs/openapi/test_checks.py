@@ -10,7 +10,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.config._auth import DynamicTokenAuthConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup, MalformedJson
-from schemathesis.core.mutations import OperatorKind
+from schemathesis.core.mutations import MutationMetadata, OperatorKind
 from schemathesis.core.parameters import EncodedPath, ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -49,7 +49,7 @@ from schemathesis.specs.openapi.checks import (
     unsupported_method,
     use_after_free,
 )
-from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel, MutationMetadata
+from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
 from test.utils import check_context
 
 

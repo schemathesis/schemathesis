@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache, wraps
@@ -103,8 +104,13 @@ class BaseSchema(Mapping):
         self._probe_state = RuntimeProbeState()
 
     @property
+    @abstractmethod
     def specification(self) -> Specification:
         raise NotImplementedError
+
+    @property
+    def title(self) -> str | None:
+        return None
 
     @property
     def transport(self) -> transport.BaseTransport:
@@ -121,6 +127,7 @@ class BaseSchema(Mapping):
         # Auth providers bound to declared security schemes. Only OpenAPI has them.
         return iter(())
 
+    @abstractmethod
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         """Apply spec-specific authentication to a test case.
 
@@ -247,6 +254,7 @@ class BaseSchema(Mapping):
         )
         return self.clone(filter_set=filter_set)
 
+    @abstractmethod
     def __iter__(self) -> Iterator[str]:
         raise NotImplementedError
 
@@ -257,9 +265,11 @@ class BaseSchema(Mapping):
         except KeyError as exc:
             self.on_missing_operation(item, exc)
 
+    @abstractmethod
     def _get_operation_map(self, key: str) -> APIOperationMap:
         raise NotImplementedError
 
+    @abstractmethod
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raise NotImplementedError
 
@@ -291,6 +301,7 @@ class BaseSchema(Mapping):
             path += "/"
         return path
 
+    @abstractmethod
     def _get_base_path(self) -> str:
         raise NotImplementedError
 
@@ -315,6 +326,7 @@ class BaseSchema(Mapping):
         """Absolute base URL the schema itself advertises, if any."""
         return None
 
+    @abstractmethod
     def validate(self) -> None:
         raise NotImplementedError
 
@@ -322,12 +334,15 @@ class BaseSchema(Mapping):
     def statistic(self) -> ApiStatistic:
         return self._measure_statistic()
 
+    @abstractmethod
     def _measure_statistic(self) -> ApiStatistic:
         raise NotImplementedError
 
+    @abstractmethod
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
+    @abstractmethod
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         raise NotImplementedError
 
@@ -431,6 +446,7 @@ class BaseSchema(Mapping):
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
         raise NotImplementedError
 
+    @abstractmethod
     def make_case(
         self,
         *,
@@ -448,6 +464,7 @@ class BaseSchema(Mapping):
     ) -> Case:
         raise NotImplementedError
 
+    @abstractmethod
     def get_case_strategy(
         self,
         operation: APIOperation,
@@ -462,6 +479,7 @@ class BaseSchema(Mapping):
         """Labels of operations that another operation links to; empty when the spec has no links."""
         return set()
 
+    @abstractmethod
     def as_state_machine(self) -> type[APIStateMachine]:
         """Create a state machine class for stateful testing of linked API operations.
 
@@ -471,6 +489,7 @@ class BaseSchema(Mapping):
         """
         raise NotImplementedError
 
+    @abstractmethod
     def _build_state_machine(
         self,
         *,
@@ -482,12 +501,15 @@ class BaseSchema(Mapping):
         """Engine-internal variant of `as_state_machine` that wires per-run state."""
         raise NotImplementedError
 
+    @abstractmethod
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
+    @abstractmethod
     def get_operation_id(self, operation: APIOperation) -> str | None:
         raise NotImplementedError
 
+    @abstractmethod
     def create_extra_data_source(self) -> ExtraDataSource | None:
         """Create an extra data source for augmenting test generation with real data.
 
@@ -522,6 +544,7 @@ class BaseSchema(Mapping):
     ) -> None:
         """Spec-specific runtime observations from a response (e.g. auth inference). Default: no-op."""
 
+    @abstractmethod
     def iter_coverage_cases(
         self,
         operation: APIOperation,
@@ -654,6 +677,7 @@ class BaseSchema(Mapping):
         ]
         return st.one_of(_strategies)
 
+    @abstractmethod
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         raise NotImplementedError
 

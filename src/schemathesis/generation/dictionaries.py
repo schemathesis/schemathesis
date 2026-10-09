@@ -23,14 +23,13 @@ from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, make_validator, sch
 from schemathesis.core.jsonschema.types import JsonSchema, JsonValue, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.value import GeneratedValue
+from schemathesis.generation.value import GeneratedValue, prune_overwritten_constants
 from schemathesis.resources import PoolDraw, SemanticDraw
-from schemathesis.specs.openapi.adapter.parameters import _prune_overwritten_constants
 
 if TYPE_CHECKING:
     from schemathesis.config import GenerationConfig, ProjectConfig
+    from schemathesis.core.mutations import MutationMetadata
     from schemathesis.python._constants.pool import ConstantDraw
-    from schemathesis.specs.openapi.negative.mutations import MutationMetadata
     from schemathesis.specs.openapi.schemas import OpenApiOperation
 
 
@@ -255,7 +254,7 @@ def build_dictionary_overlay_strategy(
             pool_draws=existing_pool,
             semantic_draws=existing_semantic,
             dictionary_draws=combined_draws,
-            constants_draws=_prune_overwritten_constants(existing_constants, new_value),
+            constants_draws=prune_overwritten_constants(existing_constants, new_value),
         )
 
     return overlay()
@@ -442,7 +441,7 @@ def build_body_dictionary_overlay_strategy(
             pool_draws=existing_pool,
             semantic_draws=existing_semantic,
             dictionary_draws=combined_draws,
-            constants_draws=_prune_overwritten_constants(existing_constants, value),
+            constants_draws=prune_overwritten_constants(existing_constants, value),
         )
 
     return overlay()

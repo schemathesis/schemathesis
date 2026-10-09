@@ -2,10 +2,9 @@ import pytest
 from hypothesis import given, settings
 from hypothesis.database import InMemoryExampleDatabase
 
-from schemathesis.core.mutations import Mutation, MutationChannel, OperatorKind
+from schemathesis.core.mutations import Mutation, MutationChannel, MutationMetadata, OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.specs.openapi.negative.mutations import MutationMetadata
 
 
 def _mutation(

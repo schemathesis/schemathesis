@@ -570,8 +570,7 @@ def _open_writers(schema: SchemaMetadata) -> list[VcrWriter | HarWriter | JunitX
             raise pytest.UsageError(str(exc)) from exc
 
         path = reports.get_path(ReportFormat.ALLURE)
-        api_title = schema.raw_schema.get("info", {}).get("title")
-        writers.append(AllureWriter(output_dir=path, config=schema.config.output, api_title=api_title))
+        writers.append(AllureWriter(output_dir=path, config=schema.config.output, api_title=schema.title))
     return writers
 
 

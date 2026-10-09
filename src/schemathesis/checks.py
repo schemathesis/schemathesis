@@ -19,7 +19,7 @@ from schemathesis.core.failures import (
     ServerError,
 )
 from schemathesis.core.registries import Registry
-from schemathesis.core.transport import Response
+from schemathesis.core.transport import Response, expand_status_codes
 from schemathesis.engine import Status
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, CoverageScenario, coverage_scenario
 from schemathesis.generation.overrides import Override
@@ -457,8 +457,6 @@ def _check_content_type_probe(
 @check
 def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
-    from schemathesis.specs.openapi.utils import expand_status_codes
-
     expected_statuses = expand_status_codes(ctx.config.not_a_server_error.expected_statuses or [])
 
     status_code = response.status_code

@@ -18,11 +18,7 @@ except ImportError:
 import schemathesis
 from schemathesis.core.errors import InternalError
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
-from schemathesis.engine import from_schema
-from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis import examples
-from schemathesis.specs.openapi.converter import update_pattern_in_schema
-from schemathesis.specs.openapi.patterns import (
+from schemathesis.core.jsonschema.patterns import (
     _PARTIAL_SCRIPT_CLASSES,
     _UNICODE_PROPERTY_RAW_MAP,
     _serialize,
@@ -37,6 +33,10 @@ from schemathesis.specs.openapi.patterns import (
     pin_pattern_length,
     update_quantifier,
 )
+from schemathesis.engine import from_schema
+from schemathesis.generation import GenerationMode
+from schemathesis.generation.hypothesis import examples
+from schemathesis.specs.openapi.converter import update_pattern_in_schema
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="Possessive repeats and atomic groups are only available in Python 3.11+"
