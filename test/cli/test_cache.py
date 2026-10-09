@@ -119,6 +119,34 @@ def test_cache_row_shows_stale_removed(ctx, cli, snapshot_cli, tmp_path):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_cache_row_shows_stale_removed_method(ctx, cli, snapshot_cli, tmp_path):
+    # The path is still in the schema, but not with this method.
+    api = ctx.openapi.apps.success()
+    cache_dir = tmp_path / "cache"
+    _seed(
+        cache_dir,
+        [
+            Entry(
+                id=1,
+                kind=Kind.METHOD_NOT_ALLOWED,
+                operation="POST /api/success",
+                request=Request(method="POST"),
+            )
+        ],
+    )
+
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=1",
+            "--phases=fuzzing",
+            config={"cache": {"directory": str(cache_dir)}},
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_cache_row_shows_unavailable_when_corrupt(ctx, cli, snapshot_cli, tmp_path):
     api = ctx.openapi.apps.success()
     cache_dir = tmp_path / "cache"
