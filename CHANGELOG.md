@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
+- False `negative_data_rejection` for header and cookie enums like `"true"` in the coverage phase.
 - False `negative_data_rejection` for unknown query parameters beside string values like `0` of parameters with `allowEmptyValue: true`.
 - False `negative_data_rejection` for `minimum`/`maximum` on string parameters in the coverage phase.
 - Crash when the cache holds an entry for a method removed from a path still in the schema.

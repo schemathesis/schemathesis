@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from schemathesis.core.media_types import is_form_parts, is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import to_wire_string
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 
@@ -22,6 +23,23 @@ def jsonify(value: Any) -> Any:
     if isinstance(value, list):
         return [jsonify(item) for item in value]
     return value
+
+
+def stringify_value(val: Any, container_name: str) -> Any:
+    if val is None or isinstance(val, int | float | bool):
+        return to_wire_string(val)
+    if isinstance(val, list):
+        if container_name == "query":
+            # Having a list here ensures there will be multiple query parameters with the same name
+            return [stringify_value(item, container_name) for item in val]
+        # use comma-separated values style for arrays
+        return ",".join(str(stringify_value(sub, container_name)) for sub in val)
+    if isinstance(val, dict):
+        # Headers/cookies/query are typically all-string dicts; skip the per-value recursion.
+        if all(type(v) is str for v in val.values()):
+            return dict(val)
+        return {key: stringify_value(sub, container_name) for key, sub in val.items()}
+    return val
 
 
 def quote_path_parameter(value: Any) -> str:
@@ -136,6 +154,8 @@ class WireSemantics:
         # An XML null serializes to an empty element, which reads back as "".
         if self.media_type is not None and is_xml_parts(self.media_type) and value is None:
             return ""
+        if self.location in (ParameterLocation.HEADER, ParameterLocation.COOKIE):
+            return str(stringify_value(value, self.location))
         return str(value)
 
     def serializes_to_string(self) -> bool:

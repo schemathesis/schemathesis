@@ -1924,6 +1924,32 @@ def test_incorrect_headers_with_enum(ctx):
     )
 
 
+@pytest.mark.parametrize("location", ["header", "cookie"])
+def test_incorrect_type_is_not_spelled_as_enum_value_on_the_wire(ctx, location):
+    # Booleans, nulls and arrays travel as `true`, `null` and `null,null`, which these enums accept.
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "X-Flag",
+                "in": location,
+                "required": True,
+                "schema": {"type": "string", "enum": ["true", "false", "null", "null,null"]},
+            },
+        ],
+    )
+    container = "headers" if location == "header" else "cookies"
+    assert_negative_coverage(
+        schema,
+        [
+            {},
+            {container: {"X-Flag": "AAA"}},
+            {container: {"X-Flag": "{}"}},
+            {container: {"X-Flag": "0.5"}},
+        ],
+    )
+
+
 def test_generate_empty_headers_too(ctx):
     schema = build_schema(
         ctx,
