@@ -4296,11 +4296,18 @@ def _negative_type(
         # positive failure
         apply_validation = False
 
+    def _server_accepts(value: Any) -> bool:
+        text = ctx.wire.observed(value)
+        # Servers read parameter text into the declared type, so `0` sent for a boolean is a valid boolean.
+        if ctx.location != ParameterLocation.BODY:
+            return sent_text_is_valid(text, is_valid, types)
+        return is_valid(text)
+
     def _does_not_match_the_original_schema(value: Any) -> bool:
         # A query list travels as one repeated parameter per item, and the server may read any of them.
         if ctx.location == ParameterLocation.QUERY and isinstance(value, list):
-            return not any(is_valid(ctx.wire.observed(item)) for item in value)
-        return not is_valid(ctx.wire.observed(value))
+            return not any(_server_accepts(item) for item in value)
+        return not _server_accepts(value)
 
     if ctx.wire.url_part():
         for ty, strategy in strategies.items():

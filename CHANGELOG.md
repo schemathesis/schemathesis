@@ -11,6 +11,7 @@
 - False `negative_data_rejection` for `minimum`/`maximum` on string parameters in the coverage phase.
 - Crash when the cache holds an entry for a method removed from a path still in the schema.
 - Exploded object query parameters overwriting a declared query parameter of the same name.
+- False `negative_data_rejection` for `0` sent to boolean header and cookie parameters in the coverage phase.
 
 ## [4.30.0](https://github.com/schemathesis/schemathesis/compare/v4.29.4...v4.30.0) - 2026-10-08
 

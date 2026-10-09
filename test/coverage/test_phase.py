@@ -8002,6 +8002,29 @@ def test_boolean_parameter_schema(ctx, location, boolean_schema):
 
 
 @pytest.mark.parametrize(
+    ("location", "expected"),
+    [
+        ("query", [2, 0.5, "null", "AAA", ["null", "null"]]),
+        ("header", [2, 0.5, None, "AAA", [None, None], {}]),
+        ("cookie", [2, 0.5, None, "AAA", [None, None], {}]),
+    ],
+)
+def test_boolean_parameter_type_negatives_are_not_boolean_spellings(ctx, location, expected):
+    # Servers read text such as `0` or `true` sent for a boolean parameter as a valid boolean.
+    operation = load_schema(
+        ctx,
+        parameters=[{"name": "p", "in": location, "required": True, "schema": {"type": "boolean"}}],
+        path="/items",
+        method="get",
+    )["/items"]["get"]
+    assert [
+        case.meta.raw_containers[ParameterLocation(location)]["p"]
+        for case in iter_cases(operation, GenerationMode.POSITIVE, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.scenario == CoverageScenario.INCORRECT_TYPE
+    ] == expected
+
+
+@pytest.mark.parametrize(
     "schema",
     [
         {"type": "string"},
