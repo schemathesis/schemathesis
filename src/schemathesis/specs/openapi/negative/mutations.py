@@ -866,7 +866,7 @@ def is_negatable_keyword(key: str, value: Any, *, location: ParameterLocation, a
     """Whether barring this keyword changes what reaches the server."""
     if key == "required":
         return value != []
-    if key in ANNOTATION_KEYWORDS or key in ("default", BUNDLE_STORAGE_KEY):
+    if key in ANNOTATION_KEYWORDS or key == BUNDLE_STORAGE_KEY:
         return False
     if location.is_in_header and key == "format" and value in PLAIN_HEADER_FORMATS:
         # Any string satisfies the header schema, so a value outside the injected format is still valid.
