@@ -3798,7 +3798,16 @@ def _negative_array_for_conflicting_type(
     # Forcing `type: array` keeps an `example`/`default` describing the declared (non-array) type
     # from validating as a positive array value and leaking through unchanged below.
     array_schema = {**schema, "type": "array"}
+    judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
+    types = parameter_types(schema)
+
+    def is_valid(instance: Any) -> bool:
+        return any(judge.is_valid(instance) for judge in judges)
+
     for value in _cover_positive_for_type(ctx.with_positive(), array_schema, "array"):
+        # A parameter array travels as text the server may read as valid, e.g. `[""]` as an empty header.
+        if any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(value.value)):
+            continue
         if value.generation_mode == GenerationMode.POSITIVE:
             yield NegativeValue(
                 value.value,

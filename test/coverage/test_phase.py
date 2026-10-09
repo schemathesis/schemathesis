@@ -8160,6 +8160,20 @@ def test_nullable_string_parameter_has_no_negatives_valid_as_text(ctx, location)
     ] == [CoverageScenario.MISSING_PARAMETER]
 
 
+@pytest.mark.parametrize("location", ["header", "cookie"])
+def test_string_parameter_with_items_has_no_array_negatives_valid_as_text(ctx, location):
+    # Arrays of empty strings travel as empty text, which is a valid string.
+    schema = {"type": "string", "items": {"type": "string"}}
+    parameter = {"in": location, "name": "q", "required": True, "schema": schema}
+    operation = load_schema(ctx, parameters=[parameter], method="get")["/foo"]["GET"]
+
+    assert [
+        case.meta.raw_containers[ParameterLocation(location)]["q"]
+        for case in collect_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.parameter == "q" and case.meta.phase.data.scenario == CoverageScenario.INCORRECT_TYPE
+    ] == []
+
+
 @pytest.mark.parametrize(
     ("schema", "allow_empty_value", "expected"),
     [
