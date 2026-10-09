@@ -22,7 +22,7 @@ from schemathesis.core.jsonschema.types import JsonSchemaObject, as_object_schem
 from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.timing import Instant
-from schemathesis.core.transforms import deepclone, to_wire_string
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import HTTP_METHODS_SCHEMA
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -45,6 +45,7 @@ from schemathesis.specs.openapi.coverage._schema import (
     cover_schema_iter,
     drop_negatives_any_draft_admits,
 )
+from schemathesis.specs.openapi.coverage._wire import stringify_value
 from schemathesis.specs.openapi.error_feedback import apply_adjustments
 from schemathesis.specs.openapi.utils import parameter_types, sent_text_is_valid
 from schemathesis.transport.prepare import prepare_path
@@ -161,7 +162,7 @@ class Template:
                 value = {
                     name: item
                     if (container_name, name) in self._json_encoded
-                    else _stringify_value(item, container_name)
+                    else stringify_value(item, container_name)
                     for name, item in value.items()
                 }
             if serializer is not None:
@@ -178,10 +179,10 @@ class Template:
                         for name, item in value.items()
                         if item is not None or name not in self._optional_query
                     }
-                value = _stringify_value(value, container_name)
+                value = stringify_value(value, container_name)
             if container_name == "path_parameters" and isinstance(value, dict):
                 # dict() copy prevents quote_all from mutating self._template
-                value = _stringify_value(quote_all(dict(value)), container_name)
+                value = stringify_value(quote_all(dict(value)), container_name)
             output[container_name] = value
         return output
 
@@ -394,23 +395,6 @@ def _dedup_key(kwargs: dict[str, Any]) -> dict[str, Any]:
         # An empty query sends the same request as no query at all.
         return {key: value for key, value in kwargs.items() if key != "query"}
     return {**kwargs, "query": normalized}
-
-
-def _stringify_value(val: Any, container_name: str) -> Any:
-    if val is None or isinstance(val, int | float | bool):
-        return to_wire_string(val)
-    if isinstance(val, list):
-        if container_name == "query":
-            # Having a list here ensures there will be multiple query parameters with the same name
-            return [_stringify_value(item, container_name) for item in val]
-        # use comma-separated values style for arrays
-        return ",".join(str(_stringify_value(sub, container_name)) for sub in val)
-    if isinstance(val, dict):
-        # Headers/cookies/query are typically all-string dicts; skip the per-value recursion.
-        if all(type(v) is str for v in val.values()):
-            return dict(val)
-        return {key: _stringify_value(sub, container_name) for key, sub in val.items()}
-    return val
 
 
 _GATING_KEYS = frozenset({"example", "examples", "default", "enum", "const"})
