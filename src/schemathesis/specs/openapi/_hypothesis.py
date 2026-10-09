@@ -1114,7 +1114,7 @@ def _is_plain_header(schema: JsonSchema) -> bool:
     keywords = {
         key: value
         for key, value in schema.items()
-        if key not in ANNOTATION_KEYWORDS and key not in ("default", "nullable") and not key.startswith("x-")
+        if key not in ANNOTATION_KEYWORDS and key != "nullable" and not key.startswith("x-")
     }
     if len(keywords) == 1:
         branches = keywords.get("anyOf", keywords.get("oneOf"))

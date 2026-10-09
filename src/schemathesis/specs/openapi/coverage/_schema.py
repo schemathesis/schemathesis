@@ -250,7 +250,22 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
 
 
 # Keywords that describe a schema without restricting the values it accepts.
-ANNOTATION_KEYWORDS = frozenset(("description", "example", "examples", "title", "deprecated", "externalDocs", "xml"))
+ANNOTATION_KEYWORDS = frozenset(
+    {
+        "$comment",
+        "default",
+        "deprecated",
+        "description",
+        "discriminator",
+        "example",
+        "examples",
+        "externalDocs",
+        "readOnly",
+        "title",
+        "writeOnly",
+        "xml",
+    }
+)
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
 NEGATIVE_MODE_MAX_ITEMS = 15
 # How many levels of one object graph may merge the same base before the walk stops unfolding it.
@@ -796,7 +811,7 @@ class CoverageContext:
                 # Deep clone to avoid circular references in Python objects
                 resolved = deepclone(self.resolve_ref(reference))
                 rest = {key: value for key, value in schema.items() if key != "$ref"}
-                if isinstance(resolved, dict) and any(key not in _ANNOTATION_KEYWORDS for key in rest):
+                if isinstance(resolved, dict) and any(key not in ANNOTATION_KEYWORDS for key in rest):
                     # Keywords beside the reference constrain the value too.
                     return self._generate_from_resolved({"allOf": [resolved, rest]})
                 return self._generate_from_resolved(resolved)
@@ -1334,22 +1349,6 @@ def _without_conditionals(schema: JsonSchemaObject) -> JsonSchemaObject | None:
     return {"anyOf": branches}
 
 
-# Keywords that describe rather than constrain; a second, different one changes nothing.
-_ANNOTATION_KEYWORDS = frozenset(
-    {
-        "$comment",
-        "default",
-        "deprecated",
-        "description",
-        "discriminator",
-        "example",
-        "examples",
-        "readOnly",
-        "title",
-        "writeOnly",
-        "xml",
-    }
-)
 # Keywords holding one subschema; two of them on a node both apply to the same values.
 # `contains` is not one of them: two of them each want their own matching item, not one item
 # matching both, so folding them into a single subschema over-constrains the array.
@@ -1398,7 +1397,7 @@ def _merge_all_of(schema: JsonSchemaObject, *, judge_inherited_names: bool = Fal
     if _requires_an_impossible_name(merged):
         # Requiring a name whose merged schema admits nothing leaves no object to satisfy the fold.
         return {"not": {}}
-    if "$ref" in merged and any(key != "$ref" and key not in _ANNOTATION_KEYWORDS for key in merged):
+    if "$ref" in merged and any(key != "$ref" and key not in ANNOTATION_KEYWORDS for key in merged):
         # A reference that stays unresolved overrides everything folded in beside it, so those
         # constraints would silently vanish from the value.
         return None
@@ -1482,7 +1481,7 @@ def _merge_keyword(merged: dict[str, Any], key: str, value: Any) -> bool:
         merged[key] = properties
     elif key in _CHILD_SLOTS and isinstance(current, dict) and isinstance(value, dict):
         merged[key] = {"allOf": [current, value]}
-    elif current != value and key not in _ANNOTATION_KEYWORDS:
+    elif current != value and key not in ANNOTATION_KEYWORDS:
         # Two constraints on the same keyword, e.g. a pair of formats. Both hold, and folding
         # would keep only one of them.
         return False
@@ -1569,7 +1568,7 @@ def _branch_as_judged(ctx: CoverageContext, branch: JsonSchema) -> JsonSchema:
     if (
         isinstance(branch, dict)
         and "$ref" in branch
-        and any(key not in ("$ref", "properties", "required") and key not in _ANNOTATION_KEYWORDS for key in branch)
+        and any(key not in ("$ref", "properties", "required") and key not in ANNOTATION_KEYWORDS for key in branch)
     ):
         # The discriminator pin models server behavior and counts under every draft; any other keyword
         # beside `$ref` counts only under drafts that read it, so each judge gets the branch as written.
@@ -4146,7 +4145,7 @@ def _accepts_every_stringified_value(schema: dict[str, Any], types: list[str]) -
     if "string" not in types:
         return False
     for key, value in schema.items():
-        if key in _ANNOTATION_KEYWORDS or key in ("type", BUNDLE_STORAGE_KEY):
+        if key in ANNOTATION_KEYWORDS or key in ("type", BUNDLE_STORAGE_KEY):
             continue
         # The shortest violation is a single character, so only a longer minimum can reject one.
         if key == "minLength" and isinstance(value, int) and value <= 1:

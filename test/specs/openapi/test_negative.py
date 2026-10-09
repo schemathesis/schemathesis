@@ -757,7 +757,7 @@ def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema,
 
 @pytest.mark.hypothesis_nested
 def test_negative_query_does_not_negate_annotation_keywords(ctx):
-    annotation_keywords = {"default", "title", "description", "deprecated"}
+    annotation_keywords = {"default", "title", "description", "deprecated", "$comment", "readOnly", "writeOnly"}
     operation = ctx.openapi.load_schema(
         {
             "/items": {
@@ -775,13 +775,17 @@ def test_negative_query_does_not_negate_annotation_keywords(ctx):
                                 "title": "Value",
                                 "description": "An integer value",
                                 "deprecated": True,
+                                "$comment": "Internal note",
+                                "readOnly": False,
+                                "writeOnly": True,
                             },
                         }
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
             }
-        }
+        },
+        version="3.1.0",
     )["/items"]["GET"]
 
     # Annotation mutations are rare enough that a small sample can miss them.
