@@ -29,7 +29,7 @@ Once authentication works, the operations you authenticated disappear from that 
 If the schema declares a sign-up operation and a login operation that returns a bearer token or API key, Schemathesis creates a fresh account and logs in before testing. You don't configure anything:
 
 ```
- ✅  Auth: signed up via POST /auth/register and logged in
+ ✅  Auth: signed up via POST /auth/register and logged in; disable with [auth] auto-signup = false
 ```
 
 Schemathesis recognizes the pair when:
@@ -45,6 +45,13 @@ When testing the login operation itself, about half of the valid requests use th
 Logins that set a session cookie are not detected; configure them with [Declarative Dynamic Authentication](#declarative-dynamic-authentication).
 
 Credentials you supply turn sign-up off: credentials in the `[auth]` section of `schemathesis.toml`, `--auth`, an `Authorization` or API key header, or an auth provider registered in Python. Other headers don't affect it.
+
+To test only the public operations without creating accounts, turn sign-up off:
+
+```toml
+[auth]
+auto-signup = false
+```
 
 If sign-up or login fails, Schemathesis reports why and tests without authentication. The failure alone doesn't fail the run. If the server keeps rejecting the generated account, supply credentials with one of the methods below:
 
