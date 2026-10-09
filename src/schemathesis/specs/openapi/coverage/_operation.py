@@ -639,6 +639,29 @@ class CoverageRun:
     correlated: dict[tuple[ParameterLocation, str], Any]
 
 
+def _coverage_context(
+    run: CoverageRun,
+    schema: dict[str, Any],
+    location: ParameterLocation,
+    generation_modes: list[GenerationMode],
+    *,
+    is_required: bool,
+    media_type: tuple[str, str] | None = None,
+) -> CoverageContext:
+    return CoverageContext(
+        session=run.session,
+        root_schema=schema,
+        location=location,
+        media_type=media_type,
+        generation_modes=generation_modes,
+        is_required=is_required,
+        custom_formats=run.custom_formats,
+        validator_cls=run.validator_cls,
+        update_pattern=run.update_pattern,
+        allow_extra_parameters=run.generation_config.allow_extra_parameters,
+    )
+
+
 def _json_media_type(parameter: OpenApiParameter) -> tuple[str, str] | None:
     """The media type of a parameter that travels as JSON text rather than in its location's own style."""
     if next(iter(parameter.definition.get("content", {})), None) == "application/json":
@@ -649,17 +672,8 @@ def _json_media_type(parameter: OpenApiParameter) -> tuple[str, str] | None:
 def _positive_fallback(run: CoverageRun, parameter: OpenApiParameter, schema: dict[str, Any]) -> GeneratedValue | None:
     """The value a positive run would seed for this parameter, if any."""
     generator = cover_schema_iter(
-        CoverageContext(
-            session=run.session,
-            root_schema=schema,
-            location=parameter.location,
-            media_type=None,
-            generation_modes=[GenerationMode.POSITIVE],
-            is_required=parameter.is_required,
-            custom_formats=run.custom_formats,
-            validator_cls=run.validator_cls,
-            update_pattern=run.update_pattern,
-            allow_extra_parameters=run.generation_config.allow_extra_parameters,
+        _coverage_context(
+            run, schema, parameter.location, [GenerationMode.POSITIVE], is_required=parameter.is_required
         ),
         schema,
     )
@@ -686,11 +700,7 @@ def _seed_parameters(run: CoverageRun) -> None:
     template = run.template
     generators = run.generators
     generation_modes = run.generation_modes
-    generation_config = run.generation_config
-    custom_formats = run.custom_formats
     validator_cls = run.validator_cls
-    update_pattern = run.update_pattern
-    session = run.session
     error_feedback = run.error_feedback
     responses = run.responses
     correlated = run.correlated
@@ -744,17 +754,13 @@ def _seed_parameters(run: CoverageRun) -> None:
         if pool_value is not None:
             schema = _with_captured_value_first(schema, pool_value, validator_cls)
         gen = cover_schema_iter(
-            CoverageContext(
-                session=session,
-                root_schema=schema,
-                location=location,
-                media_type=_json_media_type(parameter),
-                generation_modes=generation_modes,
+            _coverage_context(
+                run,
+                schema,
+                location,
+                generation_modes,
                 is_required=parameter.is_required,
-                custom_formats=custom_formats,
-                validator_cls=validator_cls,
-                update_pattern=update_pattern,
-                allow_extra_parameters=generation_config.allow_extra_parameters,
+                media_type=_json_media_type(parameter),
             ),
             schema,
         )
@@ -862,11 +868,7 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
     template = run.template
     emitter = run.emitter
     generation_modes = run.generation_modes
-    generation_config = run.generation_config
-    custom_formats = run.custom_formats
     validator_cls = run.validator_cls
-    update_pattern = run.update_pattern
-    session = run.session
     error_feedback = run.error_feedback
     correlated = run.correlated
     for body in operation.body:
@@ -951,17 +953,8 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
             raise InvalidSchema.from_malformed_media_type(
                 exc, body.media_type, path=operation.path, method=operation.method
             ) from exc
-        body_ctx = CoverageContext(
-            session=session,
-            root_schema=schema,
-            location=ParameterLocation.BODY,
-            media_type=media_type,
-            generation_modes=generation_modes,
-            is_required=body.is_required,
-            custom_formats=custom_formats,
-            validator_cls=validator_cls,
-            update_pattern=update_pattern,
-            allow_extra_parameters=generation_config.allow_extra_parameters,
+        body_ctx = _coverage_context(
+            run, schema, ParameterLocation.BODY, generation_modes, is_required=body.is_required, media_type=media_type
         )
         gen = drop_negatives_any_draft_admits(body_ctx, schema, cover_schema_iter(body_ctx, schema))
         value = next(gen, NOT_SET)
@@ -981,17 +974,13 @@ def _body_cases(run: CoverageRun) -> Generator[Case, None, None]:
                 # a negative mutation (NEGATIVE-only mode), generate a positive value
                 # separately and prefer it for the template.
                 pos_gen = cover_schema_iter(
-                    CoverageContext(
-                        session=session,
-                        root_schema=schema,
-                        location=ParameterLocation.BODY,
-                        media_type=media_type,
-                        generation_modes=[GenerationMode.POSITIVE],
+                    _coverage_context(
+                        run,
+                        schema,
+                        ParameterLocation.BODY,
+                        [GenerationMode.POSITIVE],
                         is_required=body.is_required,
-                        custom_formats=custom_formats,
-                        validator_cls=validator_cls,
-                        update_pattern=update_pattern,
-                        allow_extra_parameters=generation_config.allow_extra_parameters,
+                        media_type=media_type,
                     ),
                     schema,
                 )
@@ -1338,11 +1327,7 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
     template = run.template
     emitter = run.emitter
     generation_modes = run.generation_modes
-    generation_config = run.generation_config
-    custom_formats = run.custom_formats
     validator_cls = run.validator_cls
-    update_pattern = run.update_pattern
-    session = run.session
     # Generate combinations for each location
     for location, parameter_set in [
         (ParameterLocation.QUERY, operation.query),
@@ -1416,18 +1401,7 @@ def _container_combinations(run: CoverageRun) -> Generator[Case, None, None]:
             _declared: JsonSchemaObject | None,
         ) -> Generator[Case, None, None]:
             iterator = cover_schema_iter(
-                CoverageContext(
-                    session=session,
-                    root_schema=subschema,
-                    location=_location,
-                    media_type=None,
-                    generation_modes=[GenerationMode.NEGATIVE],
-                    is_required=is_required,
-                    custom_formats=custom_formats,
-                    validator_cls=validator_cls,
-                    update_pattern=update_pattern,
-                    allow_extra_parameters=generation_config.allow_extra_parameters,
-                ),
+                _coverage_context(run, subschema, _location, [GenerationMode.NEGATIVE], is_required=is_required),
                 subschema,
             )
             if _declared is not None:

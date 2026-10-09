@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
@@ -56,7 +56,11 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.core.error_feedback import ErrorFeedbackStore
-    from schemathesis.specs.openapi.extra_data_source import CapturedVariant, VariantUsageTracker
+    from schemathesis.specs.openapi.extra_data_source import (
+        CapturedVariant,
+        OpenApiExtraDataSource,
+        VariantUsageTracker,
+    )
     from schemathesis.specs.openapi.negative.mutations import MutationTargetDescriptor
     from schemathesis.specs.openapi.schemas import OpenApiOperation
     from schemathesis.specs.openapi.semantic_pool import LeafDescriptor, SemanticValueIndex
@@ -97,6 +101,8 @@ CAPTURED_VALUES_PROBABILITY = 0.8
 # Probability of using negative strategy when captured values are available.
 # We want to mostly use captured values to test deeper application logic.
 NEGATIVE_STRATEGY_PROBABILITY = 0.03
+# Error-feedback generation, semantic index identity and constants source identity a built strategy closes over.
+StrategyCacheKey = tuple[int | None, int | None, int | None]
 
 # Probability of biasing path parameter integers toward positive values.
 # Most REST APIs use positive integers for resource IDs, so this improves
@@ -518,15 +524,270 @@ def _semantic_cache_key(extra_data_source: ExtraDataSource | None) -> int | None
     The overlay binds at build time, so a strategy cached for one source must not be reused for
     a different one (or for a call where the overlay is absent entirely).
     """
+    semantic_index = _semantic_index(extra_data_source)
+    return id(semantic_index) if semantic_index is not None else None
+
+
+def _semantic_index(extra_data_source: ExtraDataSource | None) -> SemanticValueIndex | None:
     if extra_data_source is None:
         return None
-    from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
+    # OpenAPI operations only receive OpenAPI data sources, and `isinstance` against a protocol subclass is slow.
+    return cast("OpenApiExtraDataSource", extra_data_source).semantic_index
 
-    if not isinstance(extra_data_source, OpenApiExtraDataSource):
+
+def _strategy_cache_key(
+    operation: APIOperation,
+    extra_data_source: ExtraDataSource | None,
+    mix_examples: bool,
+    error_feedback: ErrorFeedbackStore | None,
+    constants_value_source: ConstantsPool | None,
+) -> StrategyCacheKey | None:
+    """Identity of every live source a built strategy closes over, or None when it must not be cached."""
+    if not mix_examples or _captured_variants_active(extra_data_source, operation):
         return None
-    if extra_data_source.semantic_index is None:
+    return (
+        error_feedback.generation if error_feedback is not None else None,
+        _semantic_cache_key(extra_data_source),
+        id(constants_value_source) if constants_value_source is not None else None,
+    )
+
+
+def _adjusted_schema(
+    schema: JsonSchema,
+    operation: APIOperation,
+    location: ParameterLocation,
+    error_feedback: ErrorFeedbackStore | None,
+) -> JsonSchema:
+    """Apply constraints the API has demonstrated through its error responses."""
+    if error_feedback is None:
+        return schema
+    from schemathesis.specs.openapi.error_feedback import apply_adjustments
+
+    return apply_adjustments(operation=operation, location=location, schema=schema, store=error_feedback)
+
+
+def _captured_variants(
+    extra_data_source: ExtraDataSource | None,
+    operation: APIOperation,
+    location: ParameterLocation,
+    schema: JsonSchema,
+) -> tuple[list[CapturedVariant], VariantUsageTracker] | None:
+    """Values captured from earlier responses that fit this location, with the tracker that records their use."""
+    if extra_data_source is None:
         return None
-    return id(extra_data_source.semantic_index)
+    extra_data_source = cast("OpenApiExtraDataSource", extra_data_source)
+    variants = extra_data_source.get_captured_variants(operation=operation, location=location, schema=schema)
+    if not variants or extra_data_source.usage_tracker is None:
+        return None
+    return variants, extra_data_source.usage_tracker
+
+
+def _with_semantic_values(
+    strategy: st.SearchStrategy,
+    schema: JsonSchemaObject,
+    semantic_index: SemanticValueIndex | None,
+    validator_cls: type[jsonschema_rs.Validator],
+    *,
+    name_only: bool = False,
+) -> st.SearchStrategy:
+    if semantic_index is None:
+        return strategy
+    from schemathesis.specs.openapi.semantic_pool import iter_consumer_leaves
+
+    leaf_descriptors = iter_consumer_leaves(schema)
+    if not leaf_descriptors:
+        return strategy
+    return build_semantic_overlay(
+        strategy, leaf_descriptors, semantic_index, validator_cls, container_schema=schema, name_only=name_only
+    )
+
+
+def _as_generated_value(value: object) -> GeneratedValue:
+    return value if isinstance(value, GeneratedValue) else GeneratedValue(value, None)
+
+
+def _mix_negative_into_positive(
+    positive_strategy: st.SearchStrategy, negative_strategy: st.SearchStrategy
+) -> st.SearchStrategy:
+    from hypothesis import strategies as st
+
+    # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
+    # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.
+    positive_strategy = positive_strategy.map(_as_generated_value)
+
+    @st.composite  # type: ignore[untyped-decorator]
+    def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
+        random = draw(st.randoms())
+        if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
+            return draw(negative_strategy)
+        return draw(positive_strategy)
+
+    return choose_strategy()
+
+
+def _collect_parameter_examples(
+    items: Sequence[OpenApiParameter],
+    exclude_key: frozenset[str],
+    adjusted_properties: object,
+    validator_cls: type[jsonschema_rs.Validator],
+) -> tuple[dict[str, list[Any]], dict[str, dict[str, JsonValue]]]:
+    """Schema-valid examples per parameter, plus the named ones among them."""
+    parameter_examples: dict[str, list[Any]] = {}
+    named_examples: dict[str, dict[str, JsonValue]] = {}
+    for param in items:
+        if param.name in exclude_key or not param.examples:
+            continue
+        # Splice inferred constraints (format / min / max etc.) onto each parameter's
+        # validation schema so examples the API has demonstrated to be invalid get evicted.
+        validation_schema = param.validation_schema
+        if isinstance(adjusted_properties, dict) and isinstance(validation_schema, dict):
+            inferred = adjusted_properties.get(param.name)
+            if isinstance(inferred, dict):
+                validation_schema = {**validation_schema, **inferred}
+        valid = filter_schema_valid_examples(param.examples, validation_schema, validator_cls)
+        if valid:
+            parameter_examples[param.name] = valid
+            named = {
+                example_name: value
+                for example_name, value in param.named_examples.items()
+                if any(value is candidate for candidate in valid)
+            }
+            if named:
+                named_examples[param.name] = named
+    return parameter_examples, named_examples
+
+
+def _with_parameter_examples(
+    strategy: st.SearchStrategy,
+    items: Sequence[OpenApiParameter],
+    exclude_key: frozenset[str],
+    adjusted_properties: object,
+    validator_cls: type[jsonschema_rs.Validator],
+) -> st.SearchStrategy:
+    """Mix in schema examples (20% example, 80% generated per parameter)."""
+    parameter_examples, named_examples = _collect_parameter_examples(
+        items, exclude_key, adjusted_properties, validator_cls
+    )
+    if not parameter_examples:
+        return strategy
+    parameter_examples, correlated_examples = split_correlated_examples(parameter_examples, named_examples)
+    return build_parameter_example_aware_strategy(strategy, parameter_examples, correlated_examples)
+
+
+def _with_positive_path_integers(
+    strategy: st.SearchStrategy, schema: JsonSchemaObject, validator_cls: type[jsonschema_rs.Validator]
+) -> st.SearchStrategy:
+    integer_validators = _integer_property_validators(schema, validator_cls)
+    if not integer_validators:
+        return strategy
+    return build_positive_biased_path_strategy(strategy, integer_validators)
+
+
+def _with_dictionary_values(
+    strategy: st.SearchStrategy,
+    operation: APIOperation,
+    location: ParameterLocation,
+    properties: dict[str, Any],
+    generation_config: GenerationConfig,
+    generation_mode: GenerationMode,
+) -> st.SearchStrategy:
+    from schemathesis.generation.dictionaries import build_dictionary_overlay_strategy, resolve_parameter_bindings
+
+    bindings = resolve_parameter_bindings(
+        operation=operation, location=location, properties=properties, generation_config=generation_config
+    )
+    if not bindings:
+        return strategy
+    return build_dictionary_overlay_strategy(
+        strategy,
+        bindings=bindings,
+        operation_label=operation.label,
+        parameter_location=location,
+        schema_properties=properties,
+        validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+        generation_mode=generation_mode,
+    )
+
+
+def _quote_all_safe(value: dict[str, Any]) -> dict[str, Any]:
+    """Quote path parameter values, preserving invalid inputs for later filtering."""
+    quoted = dict(value)
+    try:
+        return quote_all(quoted)
+    except UnicodeEncodeError:
+        return value
+
+
+def _serialize_for_location(
+    strategy: st.SearchStrategy,
+    location: ParameterLocation,
+    is_negative: bool,
+    serialize: Callable[[Any], Any] | None,
+    schema: JsonSchemaObject,
+    items: Sequence[OpenApiParameter],
+) -> st.SearchStrategy:
+    """Shape generated values into what the transport sends for `location`, dropping values it can't carry.
+
+    Overlays may wrap values in `GeneratedValue`; every step unwraps before acting and re-wraps after.
+    """
+    from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query
+    from schemathesis.specs.openapi._hypothesis import (
+        _can_skip_header_filter,
+        jsonify_python_specific_types,
+        jsonify_query_parameters,
+    )
+    from schemathesis.specs.openapi.negative import (
+        wrap_filter_hook_for_generated_value,
+        wrap_map_hook_for_generated_value,
+    )
+
+    if serialize is not None:
+        strategy = strategy.map(wrap_map_hook_for_generated_value(serialize, prune_constants=False))
+
+    # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
+    # `True` / `False` / `None` improves chances of them passing validation in apps
+    # that expect boolean / null types and not aware of Python-specific representation of those types
+    match location:
+        case ParameterLocation.PATH:
+            if is_negative:
+                # Keep strict anti-misrouting defaults for negative generation.
+                # Explicit %2F allowances apply only to positive data.
+                strategy = strategy.map(
+                    wrap_map_hook_for_generated_value(
+                        lambda value: _quote_all_safe(jsonify_python_specific_types(value)), prune_constants=False
+                    )
+                )
+                return strategy.filter(wrap_filter_hook_for_generated_value(is_valid_path))
+            strategy = strategy.map(wrap_map_hook_for_generated_value(_quote_all_safe, prune_constants=False)).map(
+                wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False)
+            )
+            return strategy.filter(
+                wrap_filter_hook_for_generated_value(
+                    partial(is_valid_path, allow_encoded_slash_for=_get_explicit_intent_path_names(parameters=items))
+                )
+            )
+        case ParameterLocation.QUERY:
+            strategy = strategy.filter(wrap_filter_hook_for_generated_value(is_valid_query))
+            if is_negative:
+                return strategy.map(
+                    wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False)
+                )
+            optional = frozenset(schema.get("properties") or ()) - frozenset(schema.get("required") or ())
+            return strategy.map(
+                wrap_map_hook_for_generated_value(
+                    partial(jsonify_query_parameters, optional=optional), prune_constants=False
+                )
+            )
+        case ParameterLocation.HEADER | ParameterLocation.COOKIE:
+            # Headers with special format do not need filtration
+            if location.is_in_header and _can_skip_header_filter(schema):
+                return strategy
+            return strategy.filter(wrap_filter_hook_for_generated_value(is_valid_header))
+        case ParameterLocation.BODY | ParameterLocation.UNKNOWN:  # pragma: no cover
+            # Parameter sets are only built for path, query, header and cookie.
+            return strategy
+        case _:  # pragma: no cover
+            assert_never(location)
 
 
 def _set_at_path(target: dict[str, Any], path: tuple[str, ...], value: object) -> bool:
@@ -1287,8 +1548,7 @@ class OpenApiBody(OpenApiComponent):
         "_validator",
         "_examples",
         "_mutation_targets",
-        "_positive_strategy_cache",
-        "_negative_strategy_cache",
+        "_strategy_cache",
         "_is_negatable",
     )
 
@@ -1332,8 +1592,7 @@ class OpenApiBody(OpenApiComponent):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._positive_strategy_cache: tuple[st.SearchStrategy, int | None, int | None, int | None] | NotSet = NOT_SET
-        self._negative_strategy_cache: tuple[st.SearchStrategy, int | None, int | None, int | None] | NotSet = NOT_SET
+        self._strategy_cache: dict[GenerationMode, tuple[StrategyCacheKey, st.SearchStrategy]] = {}
         self._is_negatable: bool | NotSet = NOT_SET
 
     @property
@@ -1395,167 +1654,134 @@ class OpenApiBody(OpenApiComponent):
         # The captured-variant overlay binds resource values at build time, so caching it
         # would freeze stale variants. The semantic overlay closes over the live index and
         # remains correct under caching, so semantic-only data sources stay cache-eligible.
-        use_cache = mix_examples and not _captured_variants_active(extra_data_source, operation)
-        feedback_generation = error_feedback.generation if error_feedback is not None else None
-        semantic_id = _semantic_cache_key(extra_data_source)
-        constants_id = id(constants_value_source) if constants_value_source is not None else None
+        overlay_key = _strategy_cache_key(
+            operation, extra_data_source, mix_examples, error_feedback, constants_value_source
+        )
+        # Only the latest strategy per mode is kept; a new feedback generation replaces it.
+        cached = self._strategy_cache.get(generation_mode) if overlay_key is not None else None
+        if cached is not None and cached[0] == overlay_key:
+            return cached[1]
 
-        # Check cache based on generation mode (only when extra data sources are not used)
-        if use_cache:
-            if generation_mode == GenerationMode.POSITIVE:
-                cached = self._positive_strategy_cache
-                if cached is not NOT_SET and not isinstance(cached, NotSet):
-                    cached_strategy, cached_generation, cached_semantic, cached_constants = cached
-                    if (
-                        cached_generation == feedback_generation
-                        and cached_semantic == semantic_id
-                        and cached_constants == constants_id
-                    ):
-                        return cached_strategy
-            else:
-                cached = self._negative_strategy_cache
-                if cached is not NOT_SET and not isinstance(cached, NotSet):
-                    cached_strategy, cached_generation, cached_semantic, cached_constants = cached
-                    if (
-                        cached_generation == feedback_generation
-                        and cached_semantic == semantic_id
-                        and cached_constants == constants_id
-                    ):
-                        return cached_strategy
+        captured = _captured_variants(extra_data_source, operation, ParameterLocation.BODY, self.optimized_schema)
+        schema = _adjusted_schema(self.optimized_schema, operation, ParameterLocation.BODY, error_feedback)
+        if captured is not None and generation_mode.is_negative:
+            strategy = self._build_negative_aware_strategy(
+                operation,
+                generation_config,
+                *captured,
+                mix_examples=mix_examples,
+                error_feedback=error_feedback,
+                constants_value_source=constants_value_source,
+            )
+        else:
+            strategy = self._build_strategy(
+                operation,
+                schema,
+                generation_config,
+                generation_mode,
+                extra_data_source,
+                captured,
+                mix_examples=mix_examples,
+                error_feedback=error_feedback,
+                constants_value_source=constants_value_source,
+            )
+        if strategy is EMPTY_STRATEGY:
+            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
+            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+            return strategy
+        strategy = self._with_configured_values(strategy, operation, schema, generation_config, generation_mode)
 
-        # Import here to avoid circular dependency
+        if overlay_key is not None:
+            self._strategy_cache[generation_mode] = (overlay_key, strategy)
+        return strategy
+
+    def _build_strategy(
+        self,
+        operation: OpenApiOperation,
+        schema: JsonSchema,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+        extra_data_source: ExtraDataSource | None,
+        captured: tuple[list[CapturedVariant], VariantUsageTracker] | None,
+        *,
+        mix_examples: bool,
+        error_feedback: ErrorFeedbackStore | None,
+        constants_value_source: ConstantsPool | None,
+    ) -> st.SearchStrategy:
+        """Generate body values, then substitute values from other sources into positive ones.
+
+        The order is load-bearing: examples are mixed before any substitution; constants run before
+        semantic and captured values so live, response-derived values win over a random pool literal.
+        `build_semantic_overlay` and `build_hybrid_strategy` both unwrap an upstream `GeneratedValue`
+        and re-wrap with combined provenance, so constants substitutions that survive keep their attribution.
+        """
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
 
-        # Check for captured variants for hybrid approach
-        captured_variants: list[CapturedVariant] | None = None
-        usage_tracker = None
-        if extra_data_source is not None:
-            from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
-
-            if isinstance(extra_data_source, OpenApiExtraDataSource):
-                captured_variants = extra_data_source.get_captured_variants(
-                    operation=operation, location=ParameterLocation.BODY, schema=self.optimized_schema
-                )
-                usage_tracker = extra_data_source.usage_tracker
-
-        # Build the strategy
-        strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
-        schema = self.optimized_schema
-        if error_feedback is not None:
-            from schemathesis.specs.openapi.error_feedback import apply_adjustments
-
-            schema = apply_adjustments(
-                operation=operation,
-                location=ParameterLocation.BODY,
-                schema=schema,
-                store=error_feedback,
-            )
-        # Reuse the precomputed target walk recipes when the strategy is generating against
-        # `optimized_schema` directly (no error-feedback adjustment fired).
-        target_descriptors = (
-            self.mutation_targets if generation_mode.is_negative and schema is self.optimized_schema else None
-        )
-        # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
-        validation_schema = self.validation_schema if generation_mode.is_negative else None
-        strategy = strategy_factory(
+        is_negative = generation_mode.is_negative
+        validator_cls = operation.schema.adapter.jsonschema_validator_cls
+        strategy = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode](
             schema,
             operation.label,
             ParameterLocation.BODY,
             self.media_type,
             generation_config,
-            operation.schema.adapter.jsonschema_validator_cls,
+            validator_cls,
             self.name_to_uri,
-            validation_schema=validation_schema,
-            target_descriptors=target_descriptors,
+            # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
+            validation_schema=self.validation_schema if is_negative else None,
+            # Reuse the precomputed target walk recipes when the strategy is generating against
+            # `optimized_schema` directly (no error-feedback adjustment fired).
+            target_descriptors=self.mutation_targets if is_negative and schema is self.optimized_schema else None,
         )
-
-        if strategy is EMPTY_STRATEGY:
-            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
-            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+        if strategy is EMPTY_STRATEGY or is_negative:
             return strategy
 
-        # Mix in schema examples for positive mode (20% example, 80% generated)
-        # Skip during EXAMPLES phase since examples are handled separately there
-        if mix_examples and generation_mode == GenerationMode.POSITIVE:
-            # Filter against the adjustment-applied schema so spec examples that the API
-            # has demonstrated to be invalid (e.g. `"dd-MM-yyyy"` after format inference)
-            # don't leak into the mixer.
-            validation_schema = self.validation_schema
-            if error_feedback is not None:
-                from schemathesis.specs.openapi.error_feedback import apply_adjustments
-
-                validation_schema = apply_adjustments(
-                    operation=operation,
-                    location=ParameterLocation.BODY,
-                    schema=validation_schema,
-                    store=error_feedback,
-                )
-            strategy_examples = filter_schema_valid_examples(
-                self._get_strategy_examples(operation),
-                validation_schema,
-                self.adapter.jsonschema_validator_cls,
-            )
-            if strategy_examples:
-                strategy = build_example_aware_strategy(strategy, strategy_examples)
-
-        # Apply the constants overlay BEFORE the semantic and captured-variant overlays so
-        # live, response-derived values get priority: a semantic substitution or a captured
-        # productId must not be overwritten by a random pool literal while later attribution
-        # claims those sources were used. `build_semantic_overlay` and `build_hybrid_strategy`
-        # both unwrap an upstream `GeneratedValue` and re-wrap with combined provenance, so
-        # constants substitutions that survive remain attributed correctly.
-        body_schema_properties = schema.get("properties", {}) if isinstance(schema, dict) else {}
-        if constants_value_source is not None and generation_mode == GenerationMode.POSITIVE:
+        container_schema = schema if isinstance(schema, dict) else None
+        if mix_examples:
+            strategy = self._with_examples(strategy, operation, error_feedback)
+        if constants_value_source is not None:
             strategy = build_constants_overlay_strategy(
                 strategy,
                 source=constants_value_source,
-                schema_properties=body_schema_properties,
-                validator_cls=operation.schema.adapter.jsonschema_validator_cls,
+                schema_properties=container_schema.get("properties", {}) if container_schema is not None else {},
+                validator_cls=validator_cls,
                 location="body",
                 generation_config=generation_config,
-                container_schema=schema if isinstance(schema, dict) else None,
+                container_schema=container_schema,
             )
+        if container_schema is not None:
+            strategy = _with_semantic_values(
+                strategy, container_schema, _semantic_index(extra_data_source), validator_cls
+            )
+        if captured is not None:
+            strategy = build_hybrid_strategy(
+                strategy, *captured, container_schema=container_schema, validator_cls=validator_cls
+            )
+        return strategy
 
-        if (
-            extra_data_source is not None
-            and generation_mode == GenerationMode.POSITIVE
-            and isinstance(extra_data_source, OpenApiExtraDataSource)
-            and extra_data_source.semantic_index is not None
-            and isinstance(schema, dict)
-        ):
-            from schemathesis.specs.openapi.semantic_pool import iter_consumer_leaves
+    def _with_examples(
+        self, strategy: st.SearchStrategy, operation: OpenApiOperation, error_feedback: ErrorFeedbackStore | None
+    ) -> st.SearchStrategy:
+        """Mix in schema examples (20% example, 80% generated)."""
+        # Filter against the adjustment-applied schema so spec examples that the API has demonstrated
+        # to be invalid (e.g. `"dd-MM-yyyy"` after format inference) don't leak into the mixer.
+        validation_schema = _adjusted_schema(self.validation_schema, operation, ParameterLocation.BODY, error_feedback)
+        examples = filter_schema_valid_examples(
+            self._get_strategy_examples(operation), validation_schema, self.adapter.jsonschema_validator_cls
+        )
+        if not examples:
+            return strategy
+        return build_example_aware_strategy(strategy, examples)
 
-            leaf_descriptors = iter_consumer_leaves(schema)
-            if leaf_descriptors:
-                strategy = build_semantic_overlay(
-                    strategy,
-                    leaf_descriptors,
-                    extra_data_source.semantic_index,
-                    operation.schema.adapter.jsonschema_validator_cls,
-                    container_schema=schema,
-                )
-
-        # Apply hybrid approach when captured variants are available
-        if captured_variants and usage_tracker is not None:
-            if generation_mode.is_negative:
-                strategy = self._build_negative_aware_strategy(
-                    operation,
-                    generation_config,
-                    captured_variants,
-                    usage_tracker,
-                    mix_examples=mix_examples,
-                    error_feedback=error_feedback,
-                    constants_value_source=constants_value_source,
-                )
-            else:
-                strategy = build_hybrid_strategy(
-                    strategy,
-                    captured_variants,
-                    usage_tracker,
-                    container_schema=schema if isinstance(schema, dict) else None,
-                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
-                )
-
+    def _with_configured_values(
+        self,
+        strategy: st.SearchStrategy,
+        operation: OpenApiOperation,
+        schema: JsonSchema,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+    ) -> st.SearchStrategy:
+        """Apply user-configured dictionaries, then body overrides, on top of every other source."""
         from schemathesis.generation.body_overrides import (
             build_body_override_overlay_strategy,
             resolve_body_overrides,
@@ -1566,9 +1792,7 @@ class OpenApiBody(OpenApiComponent):
         )
 
         body_bindings = resolve_body_bindings(
-            operation=operation,
-            body_schema=schema,
-            generation_config=generation_config,
+            operation=operation, body_schema=schema, generation_config=generation_config
         )
         if body_bindings:
             strategy = build_body_dictionary_overlay_strategy(
@@ -1578,7 +1802,6 @@ class OpenApiBody(OpenApiComponent):
                 validator_cls=operation.schema.adapter.jsonschema_validator_cls,
                 generation_mode=generation_mode,
             )
-
         body_overrides = resolve_body_overrides(operation=operation, body_schema=schema)
         if body_overrides:
             strategy = build_body_override_overlay_strategy(
@@ -1586,15 +1809,6 @@ class OpenApiBody(OpenApiComponent):
                 overrides=body_overrides,
                 validator=self._get_validator() if generation_mode.is_negative else None,
             )
-
-        # Cache the strategy keyed by feedback generation, semantic-index identity, and constants-source identity
-        if use_cache:
-            slot = (strategy, feedback_generation, semantic_id, constants_id)
-            if generation_mode == GenerationMode.POSITIVE:
-                self._positive_strategy_cache = slot
-            else:
-                self._negative_strategy_cache = slot
-
         return strategy
 
     def _build_negative_aware_strategy(
@@ -1609,8 +1823,14 @@ class OpenApiBody(OpenApiComponent):
         constants_value_source: ConstantsPool | None = None,
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available."""
-        from hypothesis import strategies as st
-
+        negative_strategy = self.get_strategy(
+            operation,
+            generation_config,
+            GenerationMode.NEGATIVE,
+            extra_data_source=None,
+            mix_examples=mix_examples,
+            error_feedback=error_feedback,
+        )
         positive_strategy = self.get_strategy(
             operation,
             generation_config,
@@ -1621,29 +1841,7 @@ class OpenApiBody(OpenApiComponent):
             constants_value_source=constants_value_source,
         )
         positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
-        # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
-        # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.
-        positive_strategy = positive_strategy.map(
-            lambda x: x if isinstance(x, GeneratedValue) else GeneratedValue(x, None)
-        )
-
-        negative_strategy = self.get_strategy(
-            operation,
-            generation_config,
-            GenerationMode.NEGATIVE,
-            extra_data_source=None,
-            mix_examples=mix_examples,
-            error_feedback=error_feedback,
-        )
-
-        @st.composite  # type: ignore[untyped-decorator]
-        def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
-            random = draw(st.randoms())
-            if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
-                return draw(negative_strategy)
-            return draw(positive_strategy)
-
-        return choose_strategy()
+        return _mix_negative_into_positive(positive_strategy, negative_strategy)
 
 
 OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "description"])
@@ -2098,7 +2296,7 @@ class OpenApiParameterSet(ParameterSet):
         self._validation_schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
         self._strategy_cache: dict[
-            tuple[frozenset[str], GenerationMode, int | None, int | None, int | None], st.SearchStrategy
+            tuple[frozenset[str], GenerationMode, StrategyCacheKey | None], st.SearchStrategy
         ] = {}
         self._strict_validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
@@ -2206,316 +2404,17 @@ class OpenApiParameterSet(ParameterSet):
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
-        feedback_generation = error_feedback.generation if error_feedback is not None else None
-        semantic_id = _semantic_cache_key(extra_data_source)
-        constants_id = id(constants_value_source) if constants_value_source is not None else None
-        cache_key = (exclude_key, generation_mode, feedback_generation, semantic_id, constants_id)
-
-        use_cache = mix_examples and not _captured_variants_active(extra_data_source, operation)
-
-        if use_cache and cache_key in self._strategy_cache:
+        overlay_key = _strategy_cache_key(
+            operation, extra_data_source, mix_examples, error_feedback, constants_value_source
+        )
+        cache_key = (exclude_key, generation_mode, overlay_key)
+        if overlay_key is not None and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
 
-        # Import here to avoid circular dependency
-        from hypothesis import strategies as st
-
-        from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query
-        from schemathesis.specs.openapi._hypothesis import (
-            GENERATOR_MODE_TO_STRATEGY_FACTORY,
-            _can_skip_header_filter,
-            jsonify_python_specific_types,
-            jsonify_query_parameters,
-            make_negative_strategy,
-        )
-
-        def _quote_all_safe(value: dict[str, Any]) -> dict[str, Any]:
-            """Quote path parameter values, preserving invalid inputs for later filtering."""
-            quoted = dict(value)
-            try:
-                return quote_all(quoted)
-            except UnicodeEncodeError:
-                return value
-
-        # Get schema with exclusions
-        schema: JsonSchema = self.get_schema_with_exclusions(exclude)
-        if error_feedback is not None:
-            from schemathesis.specs.openapi.error_feedback import apply_adjustments
-
-            schema = apply_adjustments(
-                operation=operation,
-                location=self.location,
-                schema=schema,
-                store=error_feedback,
-            )
-
-        # Check for captured variants for hybrid approach
-        captured_variants: list[CapturedVariant] | None = None
-        usage_tracker = None
-        if extra_data_source is not None:
-            from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
-
-            if isinstance(extra_data_source, OpenApiExtraDataSource):
-                captured_variants = extra_data_source.get_captured_variants(
-                    operation=operation, location=self.location, schema=schema
-                )
-                usage_tracker = extra_data_source.usage_tracker
-
-        # A schema written as `true` / `false` needs the object spelling for downstream usage.
-        schema_obj: JsonSchemaObject = as_object_schema(schema)
-
-        strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
-
-        if not schema_obj.get("properties") and strategy_factory is make_negative_strategy:
-            # Nothing to negate - all properties were excluded
-            strategy = st.none()
-        else:
-            # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
-            validation_schema_obj: JsonSchema | None = None
-            if strategy_factory is make_negative_strategy:
-                validation_schema_obj = self._apply_exclusions(
-                    parameters_to_validation_schema(self.items, self.location), exclude_key
-                )
-            strategy = strategy_factory(
-                schema_obj,
-                operation.label,
-                self.location,
-                None,
-                generation_config,
-                operation.schema.adapter.jsonschema_validator_cls,
-                self.name_to_uri,
-                validation_schema=validation_schema_obj,
-            )
-
-            if strategy is EMPTY_STRATEGY:
-                # Every overlay below decorates a drawn value, so there is nothing for them to act on.
-                # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
-                return strategy
-
-            # For negative strategies, we need to handle GeneratedValue wrappers
-            is_negative = strategy_factory is make_negative_strategy
-
-            # Mix in schema examples for positive mode (20% example, 80% generated per parameter)
-            # Must be applied BEFORE serialization so examples go through the same transformations
-            # Skip during EXAMPLES phase since examples are handled separately there
-            if mix_examples and not is_negative:
-                validator_cls = operation.schema.adapter.jsonschema_validator_cls
-                # Splice inferred constraints (format / min / max etc.) onto each parameter's
-                # validation schema so examples the API has demonstrated to be invalid get evicted.
-                adjusted_properties = schema_obj.get("properties") if isinstance(schema_obj, dict) else None
-                parameter_examples: dict[str, list[Any]] = {}
-                named_examples: dict[str, dict[str, JsonValue]] = {}
-                for param in self.items:
-                    if param.name in exclude_key or not param.examples:
-                        continue
-                    validation_schema = param.validation_schema
-                    if isinstance(adjusted_properties, dict) and isinstance(validation_schema, dict):
-                        inferred = adjusted_properties.get(param.name)
-                        if isinstance(inferred, dict):
-                            validation_schema = {**validation_schema, **inferred}
-                    valid = filter_schema_valid_examples(param.examples, validation_schema, validator_cls)
-                    if valid:
-                        parameter_examples[param.name] = valid
-                        named = {
-                            example_name: value
-                            for example_name, value in param.named_examples.items()
-                            if any(value is candidate for candidate in valid)
-                        }
-                        if named:
-                            named_examples[param.name] = named
-                if parameter_examples:
-                    parameter_examples, correlated_examples = split_correlated_examples(
-                        parameter_examples, named_examples
-                    )
-                    strategy = build_parameter_example_aware_strategy(strategy, parameter_examples, correlated_examples)
-
-            # Bias path parameter integers toward positive values BEFORE the constants overlay, so a
-            # substituted literal (e.g. a negative sentinel id) is the final value and is never rewritten.
-            if self.location == ParameterLocation.PATH and not is_negative:
-                integer_validators = _integer_property_validators(
-                    schema_obj, operation.schema.adapter.jsonschema_validator_cls
-                )
-                if integer_validators:
-                    strategy = build_positive_biased_path_strategy(strategy, integer_validators)
-
-            # Apply the constants overlay BEFORE the semantic overlay so live, response-derived
-            # values can overwrite a random pool literal for the same field. `build_semantic_overlay`
-            # unwraps and re-wraps `GeneratedValue`, so any constant that survives keeps its provenance.
-            schema_properties = schema_obj.get("properties", {}) if isinstance(schema_obj, dict) else {}
-            if constants_value_source is not None and not is_negative:
-                strategy = build_constants_overlay_strategy(
-                    strategy,
-                    source=constants_value_source,
-                    schema_properties=_without_security_parameters(schema_properties, operation, self.location),
-                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
-                    location=self.location.value,
-                    generation_config=generation_config,
-                    container_schema=schema_obj if isinstance(schema_obj, dict) else None,
-                )
-
-            # A path segment takes a pooled value only when the producer named it identically; matching
-            # a bare `format` there would put any pooled identifier into any path.
-            # Runs before serialization and location-specific filters so substituted values pass through
-            # the same `_quote_all_safe` / `is_valid_query` / `is_valid_header` paths as generated ones.
-            if (
-                extra_data_source is not None
-                and not is_negative
-                and isinstance(extra_data_source, OpenApiExtraDataSource)
-                and extra_data_source.semantic_index is not None
-            ):
-                from schemathesis.specs.openapi.semantic_pool import iter_consumer_leaves
-
-                leaf_descriptors = iter_consumer_leaves(schema_obj)
-                if leaf_descriptors:
-                    strategy = build_semantic_overlay(
-                        strategy,
-                        leaf_descriptors,
-                        extra_data_source.semantic_index,
-                        operation.schema.adapter.jsonschema_validator_cls,
-                        container_schema=schema_obj,
-                        name_only=self.location == ParameterLocation.PATH,
-                    )
-
-            explicit_intent_path_names: frozenset[str] = frozenset()
-            if self.location == ParameterLocation.PATH:
-                explicit_intent_path_names = _get_explicit_intent_path_names(parameters=self.items)
-
-            from schemathesis.generation.dictionaries import (
-                build_dictionary_overlay_strategy,
-                resolve_parameter_bindings,
-            )
-
-            bindings = resolve_parameter_bindings(
-                operation=operation,
-                location=self.location,
-                properties=schema_properties,
-                generation_config=generation_config,
-            )
-            if bindings:
-                strategy = build_dictionary_overlay_strategy(
-                    strategy,
-                    bindings=bindings,
-                    operation_label=operation.label,
-                    parameter_location=self.location,
-                    schema_properties=schema_properties,
-                    validator_cls=operation.schema.adapter.jsonschema_validator_cls,
-                    generation_mode=generation_mode,
-                )
-
-            if captured_variants and usage_tracker is not None and not generation_mode.is_negative:
-                strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
-
-            serialize = operation.get_parameter_serializer(self.location)
-            if serialize is not None:
-                if is_negative:
-                    # Apply serialize only to the value part of GeneratedValue
-                    strategy = strategy.map(
-                        lambda x: GeneratedValue(
-                            serialize(x.value),
-                            x.meta,
-                            x.pool_draws,
-                            x.semantic_draws,
-                            x.dictionary_draws,
-                            x.constants_draws,
-                        )
-                    )
-                else:
-                    # Semantic overlay can wrap the value in `GeneratedValue` on substitution;
-                    # the wrapper preserves it (unwraps before `serialize`, re-wraps after).
-                    from schemathesis.specs.openapi.negative import wrap_map_hook_for_generated_value
-
-                    strategy = strategy.map(wrap_map_hook_for_generated_value(serialize, prune_constants=False))
-
-            # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
-            # `True` / `False` / `None` improves chances of them passing validation in apps
-            # that expect boolean / null types
-            # and not aware of Python-specific representation of those types
-            match self.location:
-                case ParameterLocation.PATH:
-                    if is_negative:
-                        strategy = strategy.map(
-                            lambda x: GeneratedValue(
-                                _quote_all_safe(jsonify_python_specific_types(x.value)),
-                                x.meta,
-                                x.pool_draws,
-                                x.semantic_draws,
-                                x.dictionary_draws,
-                                x.constants_draws,
-                            )
-                        )
-                        # Keep strict anti-misrouting defaults for negative generation.
-                        # Explicit %2F allowances apply only to positive data.
-                        strategy = strategy.filter(lambda x: is_valid_path(x.value))
-                    else:
-                        # Dictionary / semantic overlays can wrap the value in `GeneratedValue`
-                        # under positive mode; route both helpers through the unwrap-rewrap
-                        # adapters so substituted path values still serialize correctly.
-                        from schemathesis.specs.openapi.negative import (
-                            wrap_filter_hook_for_generated_value,
-                            wrap_map_hook_for_generated_value,
-                        )
-
-                        strategy = strategy.map(
-                            wrap_map_hook_for_generated_value(_quote_all_safe, prune_constants=False)
-                        ).map(wrap_map_hook_for_generated_value(jsonify_python_specific_types, prune_constants=False))
-                        strategy = strategy.filter(
-                            wrap_filter_hook_for_generated_value(
-                                lambda x, allow=explicit_intent_path_names: is_valid_path(
-                                    x, allow_encoded_slash_for=allow
-                                )
-                            )
-                        )
-                case ParameterLocation.QUERY:
-                    query_filter = is_valid_query
-                    if is_negative:
-                        strategy = strategy.filter(lambda x: query_filter(x.value))
-                    else:
-                        from schemathesis.specs.openapi.negative import (
-                            wrap_filter_hook_for_generated_value,
-                            wrap_map_hook_for_generated_value,
-                        )
-
-                        strategy = strategy.filter(wrap_filter_hook_for_generated_value(query_filter))
-                    if is_negative:
-                        strategy = strategy.map(
-                            lambda x: GeneratedValue(
-                                jsonify_python_specific_types(x.value),
-                                x.meta,
-                                x.pool_draws,
-                                x.semantic_draws,
-                                x.dictionary_draws,
-                                x.constants_draws,
-                            )
-                        )
-                    else:
-                        optional = frozenset(schema_obj.get("properties") or ()) - frozenset(
-                            schema_obj.get("required") or ()
-                        )
-                        strategy = strategy.map(
-                            wrap_map_hook_for_generated_value(
-                                partial(jsonify_query_parameters, optional=optional), prune_constants=False
-                            )
-                        )
-                case ParameterLocation.HEADER | ParameterLocation.COOKIE:
-                    header_filter = is_valid_header
-                    # Headers with special format do not need filtration
-                    if not (self.location.is_in_header and _can_skip_header_filter(schema_obj)):
-                        if is_negative:
-                            strategy = strategy.filter(lambda x: header_filter(x.value))
-                        else:
-                            from schemathesis.specs.openapi.negative import wrap_filter_hook_for_generated_value
-
-                            strategy = strategy.filter(wrap_filter_hook_for_generated_value(header_filter))
-                case ParameterLocation.BODY | ParameterLocation.UNKNOWN:
-                    # Parameter sets are only built for path, query, header and cookie.
-                    pass
-                case _:
-                    assert_never(self.location)
-
-        # Apply hybrid approach when captured variants are available
-        if captured_variants and usage_tracker is not None and generation_mode.is_negative:
-            assert extra_data_source is not None
-            # In negative mode with captured values, mostly use positive strategy
-            # to leverage valuable captured IDs for testing deeper application logic
+        schema = _adjusted_schema(self.get_schema_with_exclusions(exclude), operation, self.location, error_feedback)
+        captured = _captured_variants(extra_data_source, operation, self.location, schema)
+        if captured is not None and generation_mode.is_negative:
+            # Mostly reuse captured values to reach deeper application logic, with occasional negative cases.
             strategy = self._build_negative_aware_strategy(
                 operation,
                 generation_config,
@@ -2525,9 +2424,136 @@ class OpenApiParameterSet(ParameterSet):
                 error_feedback=error_feedback,
                 constants_value_source=constants_value_source,
             )
+        else:
+            # A schema written as `true` / `false` needs the object spelling for downstream usage.
+            strategy = self._build_strategy(
+                operation,
+                as_object_schema(schema),
+                generation_config,
+                generation_mode,
+                exclude_key,
+                extra_data_source,
+                captured,
+                mix_examples=mix_examples,
+                constants_value_source=constants_value_source,
+            )
 
-        if use_cache:
+        if overlay_key is not None:
             self._strategy_cache[cache_key] = strategy
+        return strategy
+
+    def _build_strategy(
+        self,
+        operation: OpenApiOperation,
+        schema: JsonSchemaObject,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+        exclude_key: frozenset[str],
+        extra_data_source: ExtraDataSource | None,
+        captured: tuple[list[CapturedVariant], VariantUsageTracker] | None,
+        *,
+        mix_examples: bool,
+        constants_value_source: ConstantsPool | None,
+    ) -> st.SearchStrategy:
+        from hypothesis import strategies as st
+
+        from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
+
+        if generation_mode.is_negative and not schema.get("properties"):
+            # Nothing to negate - all properties were excluded
+            return st.none()
+        # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
+        validation_schema = (
+            self._apply_exclusions(parameters_to_validation_schema(self.items, self.location), exclude_key)
+            if generation_mode.is_negative
+            else None
+        )
+        strategy = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode](
+            schema,
+            operation.label,
+            self.location,
+            None,
+            generation_config,
+            operation.schema.adapter.jsonschema_validator_cls,
+            self.name_to_uri,
+            validation_schema=validation_schema,
+        )
+        if strategy is EMPTY_STRATEGY:
+            # Every overlay below decorates a drawn value, so there is nothing for them to act on.
+            # Returning as-is keeps the schema recognizable as unsatisfiable to whoever draws from it.
+            return strategy
+        strategy = self._apply_overlays(
+            strategy,
+            operation,
+            schema,
+            generation_config,
+            generation_mode,
+            exclude_key,
+            extra_data_source,
+            captured,
+            mix_examples=mix_examples,
+            constants_value_source=constants_value_source,
+        )
+        return _serialize_for_location(
+            strategy,
+            self.location,
+            generation_mode.is_negative,
+            operation.get_parameter_serializer(self.location),
+            schema,
+            self.items,
+        )
+
+    def _apply_overlays(
+        self,
+        strategy: st.SearchStrategy,
+        operation: OpenApiOperation,
+        schema: JsonSchemaObject,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+        exclude_key: frozenset[str],
+        extra_data_source: ExtraDataSource | None,
+        captured: tuple[list[CapturedVariant], VariantUsageTracker] | None,
+        *,
+        mix_examples: bool,
+        constants_value_source: ConstantsPool | None,
+    ) -> st.SearchStrategy:
+        """Substitute values from other sources into generated ones, before location serialization.
+
+        The order is load-bearing: examples are mixed before any substitution so they go through the same
+        transformations; path integers are biased before constants so a substituted literal is final;
+        constants run before semantic values so live, response-derived values win over a random pool literal.
+        """
+        validator_cls = operation.schema.adapter.jsonschema_validator_cls
+        properties = schema.get("properties", {})
+        if generation_mode.is_positive:
+            if mix_examples:
+                strategy = _with_parameter_examples(strategy, self.items, exclude_key, properties, validator_cls)
+            if self.location == ParameterLocation.PATH:
+                strategy = _with_positive_path_integers(strategy, schema, validator_cls)
+            if constants_value_source is not None:
+                strategy = build_constants_overlay_strategy(
+                    strategy,
+                    source=constants_value_source,
+                    schema_properties=_without_security_parameters(properties, operation, self.location),
+                    validator_cls=validator_cls,
+                    location=self.location.value,
+                    generation_config=generation_config,
+                    container_schema=schema,
+                )
+            # A path segment takes a pooled value only when the producer named it identically; matching
+            # a bare `format` there would put any pooled identifier into any path.
+            strategy = _with_semantic_values(
+                strategy,
+                schema,
+                _semantic_index(extra_data_source),
+                validator_cls,
+                name_only=self.location == ParameterLocation.PATH,
+            )
+        strategy = _with_dictionary_values(
+            strategy, operation, self.location, properties, generation_config, generation_mode
+        )
+        if captured is not None:
+            strategy = build_hybrid_strategy(strategy, *captured)
         return strategy
 
     def _build_negative_aware_strategy(
@@ -2535,7 +2561,7 @@ class OpenApiParameterSet(ParameterSet):
         operation: APIOperation,
         generation_config: GenerationConfig,
         exclude: Iterable[str],
-        extra_data_source: ExtraDataSource,
+        extra_data_source: ExtraDataSource | None,
         *,
         mix_examples: bool = True,
         error_feedback: ErrorFeedbackStore | None = None,
@@ -2546,8 +2572,16 @@ class OpenApiParameterSet(ParameterSet):
         Mostly uses positive strategy with captured values (97%) to test deeper
         application logic, with occasional negative tests (3%).
         """
-        from hypothesis import strategies as st
-
+        # Get negative strategy without extra_data_source to avoid recursion
+        negative_strategy = self.get_strategy(
+            operation,
+            generation_config,
+            GenerationMode.NEGATIVE,
+            exclude,
+            extra_data_source=None,
+            mix_examples=mix_examples,
+            error_feedback=error_feedback,
+        )
         # Get positive strategy with hybrid approach
         positive_strategy = self.get_strategy(
             operation,
@@ -2559,32 +2593,7 @@ class OpenApiParameterSet(ParameterSet):
             error_feedback=error_feedback,
             constants_value_source=constants_value_source,
         )
-        # Wrap in GeneratedValue for consistent return type with negative strategy
-        # The hybrid strategy already wraps in `GeneratedValue` when it picks a captured pool
-        # variant (so pool-draw provenance survives). Wrap only the un-wrapped values here.
-        positive_strategy = positive_strategy.map(
-            lambda x: x if isinstance(x, GeneratedValue) else GeneratedValue(x, None)
-        )
-
-        # Get negative strategy without extra_data_source to avoid recursion
-        negative_strategy = self.get_strategy(
-            operation,
-            generation_config,
-            GenerationMode.NEGATIVE,
-            exclude,
-            extra_data_source=None,
-            mix_examples=mix_examples,
-            error_feedback=error_feedback,
-        )
-
-        @st.composite  # type: ignore[untyped-decorator]
-        def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
-            random = draw(st.randoms())
-            if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
-                return draw(negative_strategy)
-            return draw(positive_strategy)
-
-        return choose_strategy()
+        return _mix_negative_into_positive(positive_strategy, negative_strategy)
 
 
 COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"

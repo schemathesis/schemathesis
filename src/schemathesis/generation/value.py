@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +24,17 @@ class GeneratedValue:
     semantic_draws: tuple[SemanticDraw, ...] = ()
     dictionary_draws: tuple[DictionaryDraw, ...] = ()
     constants_draws: tuple[ConstantDraw, ...] = ()
+
+    def map_value(self, function: Callable[[Any], Any]) -> GeneratedValue:
+        """Apply `function` to the value, keeping all provenance."""
+        return GeneratedValue(
+            function(self.value),
+            self.meta,
+            self.pool_draws,
+            self.semantic_draws,
+            self.dictionary_draws,
+            self.constants_draws,
+        )
 
 
 MISSING: object = object()
