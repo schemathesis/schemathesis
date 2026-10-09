@@ -7,6 +7,7 @@
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
 - False `negative_data_rejection` for unknown query parameters beside string values like `0` of parameters with `allowEmptyValue: true`.
 - Crash when the cache holds an entry for a method removed from a path still in the schema.
+- Exploded object query parameters overwriting a declared query parameter of the same name.
 
 ## [4.30.0](https://github.com/schemathesis/schemathesis/compare/v4.29.4...v4.30.0) - 2026-10-08
 

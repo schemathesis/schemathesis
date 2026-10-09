@@ -1196,6 +1196,50 @@ def test_empty_exploded_object_expands_to_nothing(func):
     assert func("foo")({"foo": {}, "bar": "x"}) == {"bar": "x"}
 
 
+def test_exploded_object_key_does_not_overwrite_declared_query_parameter(ctx):
+    schema = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "Version",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["2016-11-15"]},
+                        },
+                        {
+                            "name": "LaunchTemplate",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "LaunchTemplateId": {"type": "string", "enum": ["lt-1"]},
+                                    "Version": {"type": "string", "enum": [""]},
+                                },
+                                "required": ["LaunchTemplateId", "Version"],
+                                "additionalProperties": False,
+                            },
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @given(case=schema["/items"]["GET"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        assert case.as_transport_kwargs(base_url="http://127.0.0.1:1")["params"] == {
+            "LaunchTemplateId": "lt-1",
+            "Version": "2016-11-15",
+        }
+
+    test()
+
+
 @pytest.mark.parametrize(
     ("func", "kwargs", "value", "expected"),
     [
