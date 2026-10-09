@@ -1995,9 +1995,17 @@ def _negative_format_for_declared_types(
         yield from _negative_format(ctx, schema, value)
 
 
+def _admits_number(schema: dict) -> bool:
+    types = get_type(schema)
+    return "number" in types or "integer" in types
+
+
 def _negative_maximum(
     ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
+    # Numeric bounds constrain nothing when the schema admits no number.
+    if not _admits_number(schema):
+        return
     # A bound the schema declares beyond the width of its integer format is still the bound to step past.
     value = schema.get(DECLARED_MAXIMUM_KEY, value)
     # Legacy draft-4 `exclusiveMaximum: true` makes `maximum` itself the excluded boundary.
@@ -2014,6 +2022,8 @@ def _negative_maximum(
 def _negative_minimum(
     ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
+    if not _admits_number(schema):
+        return
     # A bound the schema declares beyond the width of its integer format is still the bound to step past.
     value = schema.get(DECLARED_MINIMUM_KEY, value)
     # Legacy draft-4 `exclusiveMinimum: true` makes `minimum` itself the excluded boundary.
@@ -2030,7 +2040,7 @@ def _negative_minimum(
 def _negative_exclusive_maximum(
     ctx: CoverageContext, schema: dict, value: Any, seen: HashSet
 ) -> Generator[GeneratedValue, None, None]:
-    if isinstance(value, bool):
+    if isinstance(value, bool) or not _admits_number(schema):
         return
     yield NegativeValue(
         value,
@@ -2045,7 +2055,7 @@ def _negative_exclusive_minimum(
 ) -> Generator[GeneratedValue, None, None]:
     if not seen.insert(value):
         return
-    if isinstance(value, bool):
+    if isinstance(value, bool) or not _admits_number(schema):
         return
     yield NegativeValue(
         value,
