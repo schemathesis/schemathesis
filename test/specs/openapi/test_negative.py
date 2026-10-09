@@ -756,6 +756,47 @@ def test_negative_query_value_is_invalid_as_sent(ctx, version, parameter_schema,
 
 
 @pytest.mark.hypothesis_nested
+def test_negative_query_does_not_negate_annotation_keywords(ctx):
+    annotation_keywords = {"default", "title", "description", "deprecated"}
+    operation = ctx.openapi.load_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "value",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10,
+                                "default": 5,
+                                "title": "Value",
+                                "description": "An integer value",
+                                "deprecated": True,
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )["/items"]["GET"]
+
+    # Annotation mutations are rare enough that a small sample can miss them.
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=300, derandomize=True, database=None, deadline=None, suppress_health_check=list(HealthCheck))
+    def test(case):
+        mutations = case.meta.phase.data.mutations
+        assert all(annotation_keywords.isdisjoint(mutation.keywords) for mutation in mutations), mutations
+        description = case.meta.phase.data.description or ""
+        assert all(f"`{keyword}`" not in description for keyword in annotation_keywords), description
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
 def test_negative_body_property_is_invalid_against_one_of_siblings(ctx):
     property_schema = {"oneOf": [{"type": "boolean"}, {"type": "null"}]}
     operation = ctx.openapi.load_schema(
