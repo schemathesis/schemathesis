@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import partial
 from typing import TYPE_CHECKING, cast
+from urllib.parse import unquote
 
 import jsonschema_rs
 
@@ -10,10 +13,12 @@ from schemathesis.core import NotSet, media_types
 from schemathesis.core.jsonschema import make_validator, make_validator_for
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import ParameterLocation, plain_str_values
+from schemathesis.core.transforms import to_wire_string
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import CONTENT_TYPE_PROBES, FuzzingPhaseData, coverage_scenario
-from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.schemas import OpenApiSchema
+from schemathesis.specs.openapi.utils import coerce_wire_string, parameter_types, sent_text_is_valid
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -28,6 +33,8 @@ class ConformanceViolation:
     value: object
     expected_valid: bool
     errors: tuple[str, ...] = ()
+    # The value is what the server reads off the wire, not the generated one.
+    after_serialization: bool = False
 
 
 def evaluate_conformance(
@@ -144,14 +151,80 @@ def _check_container(
     value = meta.raw_containers.get(location)
     if not isinstance(value, Mapping):
         return None
-    return evaluate_conformance(
-        value=plain_str_values(dict(value)),
+    judge = partial(
+        evaluate_conformance,
         location=location,
         media_type=None,
         schema=parameters.validation_schema,
         validator_cls=validator_cls,
         is_negative=is_negative,
     )
+    generated = plain_str_values(dict(value))
+    violation = judge(value=generated)
+    if violation is not None:
+        return violation
+    violation = judge(value=_read_from_wire(case, location, parameters, generated))
+    return replace(violation, after_serialization=True) if violation is not None else None
+
+
+def _read_from_wire(
+    case: Case, location: ParameterLocation, parameters: OpenApiParameterSet, generated: dict[str, object]
+) -> dict[str, object]:
+    """The container a server reads back from the text each scalar parameter is sent as."""
+    sent = case.get_container(location)
+    if not isinstance(sent, Mapping):
+        return generated
+    result = dict(generated)
+    for parameter in parameters.items:
+        name = parameter.name
+        if name not in result or name not in sent:
+            continue
+        value = sent[name]
+        # Arrays and objects keep the generated value; their `style` spellings have no reader here.
+        if value is not None and not isinstance(value, (str, int, float)):
+            continue
+        if {"array", "object"} & set(parameter_types(parameter.validation_schema)):
+            continue
+        text = to_wire_string(value)
+        # A value sent as generated is spelled the way the schema declares it, even when that spelling is encoded.
+        if location == ParameterLocation.PATH and text != generated[name]:
+            text = unquote(text)
+        if next(iter(parameter.definition.get("content", {})), None) == "application/json":
+            result[name] = _read_json(text)
+        else:
+            result[name] = _read_text(text, parameter)
+    return result
+
+
+def _read_json(text: str) -> object:
+    try:
+        return json.loads(text)
+    except ValueError:
+        return text
+
+
+def _read_text(text: str, parameter: OpenApiParameter) -> object:
+    """The value a server reads from `text`: a reading the schema accepts if there is one, else the text itself."""
+    schema = parameter.validation_schema
+    try:
+        validator = make_validator(schema, parameter.adapter.jsonschema_validator_cls)
+    except jsonschema_rs.ValidationError:
+        return text
+    types = parameter_types(schema)
+    if not sent_text_is_valid(text, validator.is_valid, types):
+        return text
+    # A non-finite number counts as valid on the wire yet fails the schema, so it falls through to the text.
+    for reading in (text, _coerce(text, types), None):
+        if validator.is_valid(reading):
+            return reading
+    return text
+
+
+def _coerce(text: str, types: list[str]) -> object:
+    # An integer parser keeps every digit a float would round away.
+    if "number" in types and text.lstrip("-").isdigit():
+        return int(text)
+    return coerce_wire_string(text, types)
 
 
 def _parameter_set(operation: APIOperation, location: ParameterLocation) -> OpenApiParameterSet:
