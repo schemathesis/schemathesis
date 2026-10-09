@@ -396,6 +396,16 @@ class IncorrectUsage(SchemathesisError):
     """Indicates incorrect usage of Schemathesis' public API."""
 
 
+class UnsupportedType(SchemathesisError):
+    """A schema type Schemathesis has no data generation strategy for."""
+
+    # Each specification names the type in its own terms: headline, one-line summary, and how to add support.
+    title: str
+    summary: str
+    suggestion: str
+    name: str
+
+
 class AuthenticationError(SchemathesisError):
     """Error during authentication provider execution.
 

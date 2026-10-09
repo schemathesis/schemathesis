@@ -38,7 +38,6 @@ from schemathesis.core.transforms import deepclone, to_wire_string
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import custom_formats_cache
-from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_schema_error
 from schemathesis.generation.jsonschema.builder import EMPTY_STRATEGY, build
 from schemathesis.generation.jsonschema.context import Alphabet
 from schemathesis.generation.meta import (
@@ -62,6 +61,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     build_constants_overlay_strategy,
 )
 from schemathesis.specs.openapi.coverage._schema import ANNOTATION_KEYWORDS
+from schemathesis.specs.openapi.diagnostics import build_unsatisfiable_schema_error
 from schemathesis.specs.openapi.formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
     HEADER_FORMAT,

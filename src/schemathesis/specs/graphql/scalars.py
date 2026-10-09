@@ -4,7 +4,7 @@ import re
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from schemathesis.core.errors import IncorrectUsage, SchemathesisError
+from schemathesis.core.errors import IncorrectUsage, UnsupportedType
 
 if TYPE_CHECKING:
     import graphql
@@ -13,11 +13,18 @@ if TYPE_CHECKING:
 CUSTOM_SCALARS: dict[str, st.SearchStrategy[graphql.ValueNode]] = {}
 
 
-class UnknownScalar(SchemathesisError):
+class UnknownScalar(UnsupportedType):
     """A scalar type Schemathesis has no strategy for."""
+
+    title = "Unknown GraphQL Scalar"
+    suggestion = (
+        "Define a custom strategy for it.\n"
+        "For guidance, visit: https://schemathesis.readthedocs.io/en/stable/guides/graphql-custom-scalars/"
+    )
 
     def __init__(self, name: str) -> None:
         self.name = name
+        self.summary = f"Scalar type '{name}' is not recognized"
         super().__init__(
             f"Scalar {name!r} is not supported. "
             f'Register a strategy for it via `schemathesis.graphql.scalar("{name}", ...)`'

@@ -25,7 +25,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import adjust_urlencoded_payload, find_invalid_headers
 from schemathesis.generation.coverage import GenerationSession
 from schemathesis.generation.hypothesis.examples import add_single_example, generate_one
-from schemathesis.generation.hypothesis.reporting import GENERIC_UNSATISFIABLE_MESSAGE, find_unsatisfiable_parameter
+from schemathesis.generation.hypothesis.reporting import GENERIC_UNSATISFIABLE_MESSAGE
 from schemathesis.generation.meta import CoveragePhaseData
 from schemathesis.hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -300,7 +300,7 @@ def _translate_examples_materialization_error(exc: Exception, operation: APIOper
     """Wrap a materialization-time exception into the user-facing form, or `None` to absorb."""
     if isinstance(exc, Unsatisfiable):
         # Probing every parameter is costly, hence only on the error path.
-        unsatisfiable = find_unsatisfiable_parameter(operation)
+        unsatisfiable = operation.schema.find_unsatisfiable_parameter(operation)
         if unsatisfiable is not None:
             cause = unsatisfiable.get_error_message(operation.schema.config.output)
         else:

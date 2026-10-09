@@ -21,13 +21,13 @@ from schemathesis.core.errors import (
     InvalidTransition,
     SerializationNotPossible,
     UnresolvableReference,
+    UnsupportedType,
     format_exception,
     get_request_error_extras,
     get_request_error_message,
     split_traceback,
 )
 from schemathesis.core.output import escape_surrogates
-from schemathesis.specs.graphql.scalars import UnknownScalar
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -94,6 +94,9 @@ class EngineErrorInfo:
         if isinstance(self._error, requests.RequestException):
             return "Network Error"
 
+        if isinstance(self._error, UnsupportedType):
+            return self._error.title
+
         if self._kind in (
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE,
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH,
@@ -114,7 +117,6 @@ class EngineErrorInfo:
         return {
             RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Missing Open API links",
             RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE: "Invalid OpenAPI Links Definition",
-            RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Unknown GraphQL Scalar",
             RuntimeErrorKind.SERIALIZATION_UNBOUNDED_PREFIX: "XML serialization error",
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE: "Serialization not possible",
             RuntimeErrorKind.AUTHENTICATION_ERROR: "Authentication Error",
@@ -132,8 +134,8 @@ class EngineErrorInfo:
         if isinstance(self._error, requests.RequestException):
             return get_request_error_message(self._error)
 
-        if isinstance(self._error, UnknownScalar):
-            return f"Scalar type '{self._error.name}' is not recognized"
+        if isinstance(self._error, UnsupportedType):
+            return self._error.summary
 
         if self._kind in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
@@ -171,7 +173,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND,
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE,
-            RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR,
+            RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_TYPE,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK,
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
@@ -220,7 +222,10 @@ class EngineErrorInfo:
             message.append(f"\nReproduce with:\n\n    {self._code_sample}")
 
         # Suggestion
-        suggestion = get_runtime_error_suggestion(self._kind, bold=bold)
+        if isinstance(self._error, UnsupportedType):
+            suggestion: str | None = self._error.suggestion
+        else:
+            suggestion = get_runtime_error_suggestion(self._kind, bold=bold)
         if suggestion is not None:
             message.append(f"\nTip: {suggestion}")
 
@@ -262,8 +267,6 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
         "For guidance, visit: https://json-schema.org/understanding-json-schema/reference/regular_expressions",
         RuntimeErrorKind.SCHEMA_UNSUPPORTED_REGULAR_EXPRESSION: "The pattern is valid - values matching it are what "
         "cannot be built.\nNarrow it, or supply examples for this operation.",
-        RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Define a custom strategy for it.\n"
-        "For guidance, visit: https://schemathesis.readthedocs.io/en/stable/guides/graphql-custom-scalars/",
         RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE: _format_health_check_suggestion("data_too_large"),
         RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH: _format_health_check_suggestion("filter_too_much"),
         RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_TOO_SLOW: _format_health_check_suggestion("too_slow"),
@@ -292,7 +295,7 @@ class RuntimeErrorKind(str, enum.Enum):
     # Hypothesis issues
     HYPOTHESIS_UNSATISFIABLE = "hypothesis_unsatisfiable"
     HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK = "hypothesis_unsatisfiable_filter_hook"
-    HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR = "hypothesis_unsupported_graphql_scalar"
+    HYPOTHESIS_UNSUPPORTED_TYPE = "hypothesis_unsupported_type"
     HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE = "hypothesis_health_check_data_too_large"
     HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH = "hypothesis_health_check_filter_too_much"
     HYPOTHESIS_HEALTH_CHECK_TOO_SLOW = "hypothesis_health_check_too_slow"
@@ -322,8 +325,8 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
     if isinstance(error, ServerUnavailable):
         return RuntimeErrorKind.SERVER_UNAVAILABLE
 
-    if isinstance(error, UnknownScalar):
-        return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR
+    if isinstance(error, UnsupportedType):
+        return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_TYPE
 
     # Configuration errors
     if isinstance(error, ConfigError):

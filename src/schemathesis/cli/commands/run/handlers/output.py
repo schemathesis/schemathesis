@@ -52,15 +52,15 @@ if TYPE_CHECKING:
     from rich.text import Text
 
     from schemathesis.cli.commands.run.context import ExecutionContext
+    from schemathesis.core.spec import AuthFlowSteps
     from schemathesis.engine.run.cache import CacheReport
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
-    from schemathesis.specs.openapi.auth_flow.models import AuthFlowSpec
 
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 UNMATCHED_FILTER_TIP = "Check the filter for a typo, or update it if the operation was renamed"
 
 
-def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSpec) -> Text:
+def _auth_bootstrap_line(payload: AuthBootstrapPayload, spec: AuthFlowSteps) -> Text:
     from rich.style import Style
     from rich.text import Text
 

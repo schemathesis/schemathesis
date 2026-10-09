@@ -71,6 +71,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import TypeAlias
 
+    from hypothesis import HealthCheck
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthProvider, AuthStorage
@@ -86,11 +87,13 @@ if TYPE_CHECKING:
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
     from schemathesis.generation.coverage import GenerationSession
+    from schemathesis.generation.hypothesis.reporting import SlowParameter, UnsatisfiableParameter
     from schemathesis.generation.stateful import APIStateMachine
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.specs.openapi.adapter import OpenApiResponses
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
     from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters, SecurityRequirements
+    from schemathesis.specs.openapi.auth_flow.bootstrap import OpenApiAuthFlow
     from schemathesis.specs.openapi.types import OperationObject
 
     OpenApiOperation: TypeAlias = APIOperation[
@@ -162,6 +165,27 @@ class OpenApiSchema(BaseSchema):
     @cached_property
     def security(self) -> OpenApiSecurity:
         return OpenApiSecurity(raw_schema=self.raw_schema, adapter=self.adapter, resolver=self.root_resolver)
+
+    @override
+    def find_unsatisfiable_parameter(self, operation: APIOperation) -> UnsatisfiableParameter | None:
+        from schemathesis.specs.openapi.diagnostics import find_unsatisfiable_parameter
+
+        return find_unsatisfiable_parameter(operation)
+
+    @override
+    def find_slow_parameter(self, operation: APIOperation, reason: HealthCheck) -> SlowParameter | None:
+        from schemathesis.specs.openapi.diagnostics import find_slow_parameter
+
+        return find_slow_parameter(operation, reason)
+
+    @override
+    def auth_flow(self) -> OpenApiAuthFlow | None:
+        spec = self.analysis.auth_flow
+        if spec is None:
+            return None
+        from schemathesis.specs.openapi.auth_flow.bootstrap import OpenApiAuthFlow
+
+        return OpenApiAuthFlow(schema=self, spec=spec)
 
     @override
     def is_security_param_negated(self, case: Case) -> bool:

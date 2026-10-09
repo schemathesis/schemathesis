@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     import httpx
     import httpx2
     import requests
+    from hypothesis import HealthCheck
     from hypothesis.strategies import SearchStrategy
     from requests.structures import CaseInsensitiveDict
     from typing_extensions import Self
@@ -64,12 +65,12 @@ if TYPE_CHECKING:
     from schemathesis.core.cache import CacheWriter
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
-    from schemathesis.core.spec import Scheduler
+    from schemathesis.core.spec import AuthFlow, Scheduler
     from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
-    from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
+    from schemathesis.generation.hypothesis.reporting import FilterCaseTracker, SlowParameter, UnsatisfiableParameter
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.python._constants.pool import ConstantsPool
     from schemathesis.resources import ExtraDataSource, ResourcePool
@@ -135,6 +136,10 @@ class BaseSchema(Mapping):
         Subclasses should implement this to provide spec-specific auth mechanisms.
         """
         raise NotImplementedError
+
+    def auth_flow(self) -> AuthFlow | None:
+        """Sign-up and login flow the schema declares, or `None` when there is none."""
+        return None
 
     @cached_property
     def reauth_retry_statuses(self) -> frozenset[int]:
@@ -599,6 +604,14 @@ class BaseSchema(Mapping):
     def iter_schema_warnings(self) -> list[SchemaWarning]:
         """Return spec-level static-analysis warnings collected from the schema."""
         return []
+
+    def find_unsatisfiable_parameter(self, operation: APIOperation) -> UnsatisfiableParameter | None:
+        """Return the first parameter of `operation` that admits no value, if the spec can tell."""
+        return None
+
+    def find_slow_parameter(self, operation: APIOperation, reason: HealthCheck) -> SlowParameter | None:
+        """Return the first parameter of `operation` that fails the `reason` health check, if the spec can tell."""
+        return None
 
     def build_request_url(self, case: Case, base_url: str) -> str:
         """Construct the request URL by templating the case path onto `base_url`."""

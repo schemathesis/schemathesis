@@ -16,11 +16,11 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema.resolver import load_file
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis.reporting import find_slow_parameter, find_unsatisfiable_parameter
 from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
+from schemathesis.specs.openapi.diagnostics import find_slow_parameter, find_unsatisfiable_parameter
 from test.utils import assert_requests_call, to_float32
 
 
