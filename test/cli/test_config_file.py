@@ -279,3 +279,28 @@ def test_continue_on_failure_from_config(cli, ctx):
     )
 
     assert "  20 generated," in result.stdout, result.stdout
+
+
+def test_request_timeout_from_config(cli, ctx):
+    api = ctx.openapi.apps.slow()
+
+    result = cli.run(
+        api.schema_url, "--phases=fuzzing", "--max-examples=1", "--seed=1", config={"request-timeout": 0.01}
+    )
+
+    assert "Read timed out after 0.01 seconds" in result.stdout, result.stdout
+
+
+def test_request_timeout_from_cli_overrides_config(cli, ctx):
+    api = ctx.openapi.apps.slow()
+
+    result = cli.run(
+        api.schema_url,
+        "--phases=fuzzing",
+        "--max-examples=1",
+        "--seed=1",
+        "--request-timeout=0.01",
+        config={"request-timeout": 10},
+    )
+
+    assert "Read timed out after 0.01 seconds" in result.stdout, result.stdout
