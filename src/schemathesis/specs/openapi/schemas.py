@@ -526,7 +526,8 @@ class OpenApiSchema(BaseSchema):
         try:
             method, path = label.split(" ", maxsplit=1)
             return self[path][method]
-        except (OperationNotFound, ValueError):
+        # Both a missing path and a missing method on a known path raise `LookupError`.
+        except (LookupError, ValueError):
             return None
 
     @override
