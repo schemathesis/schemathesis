@@ -1,4 +1,5 @@
 import json
+import re
 from io import BytesIO
 
 import pytest
@@ -183,6 +184,19 @@ def test_dynamic_body(output, expr, expected):
 )
 def test_invalid_expression(output, expr):
     with pytest.raises(RuntimeExpressionError):
+        expressions.evaluate(expr, output)
+
+
+@pytest.mark.parametrize(
+    ("expr", "suggestion"),
+    [
+        ("$response.body.0.id", "$response.body#/0/id"),
+        ("$request.body.user.name", "$request.body#/user/name"),
+        ("{$response.body.id}", "$response.body#/id"),
+    ],
+)
+def test_dotted_body_path_suggests_pointer(output, expr, suggestion):
+    with pytest.raises(RuntimeExpressionError, match=re.escape(f"Did you mean `{suggestion}`?")):
         expressions.evaluate(expr, output)
 
 
