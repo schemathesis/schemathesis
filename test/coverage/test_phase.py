@@ -5939,6 +5939,21 @@ def test_negative_enum_does_not_flag_integer_entries_matching_declared_type(ctx,
     assert_bodies(operation, GenerationMode.NEGATIVE, valid=False)
 
 
+@pytest.mark.parametrize("location", ["query", "header", "path"])
+def test_negative_enum_skips_mismatched_entries_read_as_valid(ctx, location):
+    # Servers read `1` sent for a boolean parameter as `true`.
+    schema = {"type": "boolean", "enum": ["0", "1", True, False]}
+    path = "/items/{p}" if location == "path" else "/items"
+    parameters = [{"in": location, "name": "p", "required": True, "schema": schema}]
+    operation = load_schema(ctx, parameters=parameters, path=path, method="get")[path]["get"]
+
+    assert [
+        case.meta.raw_containers[ParameterLocation(location)]["p"]
+        for case in iter_cases(operation, GenerationMode.NEGATIVE)
+        if case.meta.phase.data.description == "Enum value with type mismatching the declared 'type'"
+    ] == []
+
+
 @pytest.mark.parametrize(
     ("body_schema", "expected"),
     [

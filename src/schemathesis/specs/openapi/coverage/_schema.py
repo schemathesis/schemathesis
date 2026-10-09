@@ -3674,12 +3674,21 @@ def _negative_enum(
     # on the positive path, so emit each mismatched entry as a negative to keep the keyword covered.
     declared_types = set(get_type(schema))
     if declared_types:
+        judges = [judge for (judge,) in _make_branch_validators([schema], ctx, strict=False)]
+        types = parameter_types(schema)
+
+        def is_valid(instance: Any) -> bool:
+            return any(judge.is_valid(instance) for judge in judges)
+
         for entry in value:
             entry_type = to_json_type_name(entry)
             if entry_type in declared_types:
                 continue
             # Integer values satisfy `type: number` in JSON Schema.
             if entry_type == "integer" and "number" in declared_types:
+                continue
+            # A parameter entry travels as text the server may read as valid, e.g. `"1"` as `true`.
+            if any(sent_text_is_valid(text, is_valid, types) for text in ctx.wire.sent_texts(entry)):
                 continue
             if not ctx.wire.representable(entry) or not seen.insert(entry):
                 continue
