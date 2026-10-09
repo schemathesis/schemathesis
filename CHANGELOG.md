@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False `negative_data_rejection` for nullable and `allowEmptyValue` parameters in the coverage phase.
+- False `negative_data_rejection` for parameter enum entries like `"1"` under `type: boolean` in the coverage phase.
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
 - False `negative_data_rejection` for header and cookie enums like `"true"` in the coverage phase.
 - False `negative_data_rejection` for nullable string header and cookie parameters in the coverage phase.
