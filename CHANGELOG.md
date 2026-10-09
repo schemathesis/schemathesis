@@ -20,6 +20,7 @@
 - Non-ASCII bytes in generated `Bearer` tokens for valid test cases.
 - Exploded object query parameters overwriting a declared query parameter of the same name.
 - Crash when the cache holds an entry for a method removed from a path still in the schema.
+- `st replay` marking cases as fixed when the crash file has masked values like `password`. [#5141](https://github.com/schemathesis/schemathesis/issues/5141)
 
 ## [4.30.0](https://github.com/schemathesis/schemathesis/compare/v4.29.4...v4.30.0) - 2026-10-08
 

@@ -1,0 +1,11 @@
+Exit code: 2
+---
+Stdout:
+
+Replaying 1 case from /tmp/POST_users_not_a_server_error_testtest.json
+
+  ! ERROR  POST /users
+
+    the crash file has masked values that replay cannot restore; record it with `output.sanitization.enabled = false` to replay it
+
+============================== 1 errored in 1.00s ==============================
